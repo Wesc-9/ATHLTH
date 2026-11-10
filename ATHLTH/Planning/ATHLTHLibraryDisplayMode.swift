@@ -201,3 +201,37 @@ enum ATHLTHLibraryName {
         )
     }
 }
+
+
+/// Identical ATHLTH / Mine selector across exercises, workouts, plans and routes.
+struct ATHLTHLibrarySourcePicker: View {
+    @Binding var selection: ATHLTHUnifiedLibraryScope
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(ATHLTHUnifiedLibraryScope.allCases) { source in
+                Button {
+                    selection = source
+                } label: {
+                    Text(source.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(selection == source ? Color.white : ATHLTHPlanDesign.ink)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(
+                            selection == source ? ATHLTHPlanDesign.ink : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selection == source ? [.isSelected] : [])
+                .accessibilityIdentifier("athlth-library-source-\(source.rawValue)")
+            }
+        }
+        .padding(4)
+        .background(
+            ATHLTHPlanDesign.selectedSurface,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .accessibilityElement(children: .contain)
+    }
+}

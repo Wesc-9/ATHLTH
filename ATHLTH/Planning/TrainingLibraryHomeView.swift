@@ -17,7 +17,7 @@ enum ATHLTHUnifiedLibraryScope: String, CaseIterable, Identifiable, Hashable {
         case .athlth: return "ATHLTH"
         case .mine:
             return ATHLTHLocalization.choose(
-                english: "My own", norwegian: "Egne"
+                english: "Mine", norwegian: "Mine"
             )
         }
     }
@@ -29,19 +29,10 @@ struct ATHLTHUnifiedPlansLibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker(
-                ATHLTHLocalization.choose(
-                    english: "Plan collection", norwegian: "Plansamling"
-                ), selection: $scope
-            ) {
-                ForEach(ATHLTHUnifiedLibraryScope.allCases) { option in
-                    Text(option.title).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
-            .accessibilityIdentifier("training-plans-source-filter")
+            ATHLTHLibrarySourcePicker(selection: $scope)
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .accessibilityIdentifier("training-plans-source-filter")
 
             if scope == .athlth {
                 TrainingPlanLibraryView()
@@ -62,19 +53,10 @@ struct ATHLTHUnifiedWorkoutsLibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker(
-                ATHLTHLocalization.choose(
-                    english: "Workout collection", norwegian: "Øktsamling"
-                ), selection: $scope
-            ) {
-                ForEach(ATHLTHUnifiedLibraryScope.allCases) { option in
-                    Text(option.title).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
-            .accessibilityIdentifier("workouts-source-filter")
+            ATHLTHLibrarySourcePicker(selection: $scope)
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .accessibilityIdentifier("workouts-source-filter")
 
             if scope == .athlth {
                 WorkoutTemplateLibraryView(onStartRunning: onStartRunning)
@@ -1654,6 +1636,8 @@ struct TrainingPlanLibraryView: View {
     @State private var selectedMuscle: ExerciseMuscleGroup?
     @State private var sessionsPerWeekFilter: Int?
     @State private var weeklySortAscending: Bool?
+    @State private var showFavoritesOnly = false
+    @State private var searchExpanded = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var libraryViewWidth: CGFloat = 390
     @FocusState private var searchFocused: Bool
@@ -1732,11 +1716,12 @@ struct TrainingPlanLibraryView: View {
 
     private var hasActiveFilters: Bool {
         !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        selectedCategory != "all" || favoritePlansOnly ||
+        selectedCategory != "all" || favoritePlansOnly || showFavoritesOnly ||
         selectedMuscle != nil || sessionsPerWeekFilter != nil
     }
 
     private var filterCount: Int {
+        (showFavoritesOnly ? 1 : 0) +
         (selectedMuscle == nil ? 0 : 1) +
         (sessionsPerWeekFilter == nil ? 0 : 1) +
         (weeklySortAscending == nil ? 0 : 1)
@@ -1749,7 +1734,7 @@ struct TrainingPlanLibraryView: View {
                 selectedCategory == "all" || entry.category == selectedCategory
             let muscleMatches =
                 selectedMuscle.map { entry.explicitlyTargets($0) } ?? true
-            let favoriteMatches = !favoritePlansOnly || favorites.isFavorite(
+            let favoriteMatches = !(favoritePlansOnly || showFavoritesOnly) || favorites.isFavorite(
                 .plan, itemID: entry.id.uuidString
             )
             let searchMatches = ATHLTHWorkoutSearch.matches(
@@ -1795,27 +1780,28 @@ struct TrainingPlanLibraryView: View {
     }
 
     private var listedEntries: [TrainingPlanCatalogEntry] {
-        if hasActiveFilters { return filteredEntries }
-        let featuredIDs = Set(featuredEntries.map(\.id))
-        let remaining = filteredEntries.filter { !featuredIDs.contains($0.id) }
-        return remaining.isEmpty ? filteredEntries : remaining
+        // Featured entries remain in the normal list while editorial cards are hidden.
+        filteredEntries
     }
 
     var body: some View {
         ScrollViewReader { scroll in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
-                    libraryHeading
-                    inlineSearch
-                    categoryStrip
-
-                    if !hasActiveFilters && !featuredEntries.isEmpty {
-                        featuredSection {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                scroll.scrollTo("all-training-plans", anchor: .top)
-                            }
+                    HStack(alignment: .top, spacing: 12) {
+                        libraryHeading
+                        Button { searchExpanded.toggle() } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(ink)
+                                .frame(width: 44, height: 44)
+                                .background(.white, in: Circle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(tr("Search plans", "Søk i planer"))
                     }
+                    if searchExpanded || !query.isEmpty { inlineSearch }
+                    categoryStrip
 
                     resultsHeader
                         .id("all-training-plans")
@@ -1869,6 +1855,11 @@ struct TrainingPlanLibraryView: View {
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top < -28
+            } action: { _, isPulling in
+                if isPulling { searchExpanded = true }
+            }
         }
         .background(canvas.ignoresSafeArea())
         .navigationTitle(favoritePlansOnly
@@ -2160,6 +2151,18 @@ struct TrainingPlanLibraryView: View {
                 .font(.caption.weight(.medium))
                 .foregroundStyle(muted)
             Spacer(minLength: 6)
+            if !favoritePlansOnly {
+                Button { showFavoritesOnly.toggle() } label: {
+                    Image(systemName: showFavoritesOnly ? "star.fill" : "star")
+                        .foregroundStyle(showFavoritesOnly ? bronze : ink)
+                        .frame(width: 38, height: 38)
+                        .background(.white.opacity(0.88), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Favorite plans", "Favorittplaner"))
+                .accessibilityAddTraits(showFavoritesOnly ? [.isSelected] : [])
+                .accessibilityIdentifier("training-plans-favorites-filter")
+            }
             catalogFiltersMenu
         }
     }
@@ -2246,7 +2249,7 @@ struct TrainingPlanLibraryView: View {
             }
             if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                 selectedCategory != "all" || selectedMuscle != nil ||
-                filterCount > 0 {
+                filterCount > 0 || showFavoritesOnly {
                 Divider()
                 Button {
                     query = ""
@@ -2254,6 +2257,7 @@ struct TrainingPlanLibraryView: View {
                     selectedMuscle = nil
                     sessionsPerWeekFilter = nil
                     weeklySortAscending = nil
+                    showFavoritesOnly = false
                 } label: {
                     Label(tr("Reset filters", "Nullstill filtre"),
                           systemImage: "arrow.counterclockwise")

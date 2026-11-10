@@ -140,6 +140,7 @@ struct ExerciseLibraryView: View {
     @State private var selectedBodyPart = "All"
     @State private var selectedEquipment = "All"
     @State private var favoritesOnly = false
+    @State private var searchExpanded = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var libraryViewWidth: CGFloat = 390
     @State private var showingCreateExercise = false
@@ -205,7 +206,7 @@ struct ExerciseLibraryView: View {
             case .library:
                 // Unified library: ATHLTH, RepDB and owned exercises share
                 // the same catalog. Mine is an optional filter below.
-                sourceMatches = true
+                sourceMatches = onSelect != nil || entry.source != .custom
             case .mine:
                 sourceMatches = entry.source == .custom
             case .marketplace:
@@ -295,6 +296,13 @@ struct ExerciseLibraryView: View {
         )
     }
 
+    private var standaloneScope: Binding<ATHLTHUnifiedLibraryScope> {
+        Binding(
+            get: { selectedSection == .mine ? .mine : .athlth },
+            set: { selectedSection = $0 == .mine ? .mine : .library }
+        )
+    }
+
     var body: some View {
         // Reuse one filtered/sorted list for empty state, rows and alphabet targets.
         // Marketplace has its own remote catalog. Do not filter/sort the
@@ -313,6 +321,11 @@ struct ExerciseLibraryView: View {
                 .padding(.horizontal)
                 .padding(.top, 10)
                 .padding(.bottom, 4)
+            } else if onSelect == nil {
+                ATHLTHLibrarySourcePicker(selection: standaloneScope)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("exercises-source-filter")
             }
 
             if selectedSection == .marketplace {
@@ -325,6 +338,15 @@ struct ExerciseLibraryView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 Spacer()
+                Button { searchExpanded.toggle() } label: {
+                    Image(systemName: "magnifyingglass")
+                        .frame(width: 44, height: 44)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Search exercises", norwegian: "Søk i øvelser"
+                ))
                 ATHLTHLibraryDisplayPicker(selection: $displayMode)
             }
             .padding(.horizontal, 16)
@@ -628,6 +650,11 @@ struct ExerciseLibraryView: View {
                         .padding(.leading, 16)
                         .padding(.trailing, 34)
                         .padding(.vertical, 16)
+                    }
+                    .onScrollGeometryChange(for: Bool.self) { geometry in
+                        geometry.contentOffset.y + geometry.contentInsets.top < -28
+                    } action: { _, isPulling in
+                        if isPulling { searchExpanded = true }
                     }
                     .overlay(
                         alignment: .trailing
@@ -1020,6 +1047,7 @@ struct ExerciseLibraryView: View {
 
     private var filters: some View {
         VStack(spacing: 10) {
+            if searchExpanded || !queryInput.isEmpty {
             HStack(spacing: 9) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
@@ -1078,6 +1106,8 @@ struct ExerciseLibraryView: View {
                 x: 0,
                 y: 5
             )
+
+            }
 
             // One swipeable horizontal line, matching the muscle chips in
             // Train's plan library. Every muscle is visible as a direct tap
@@ -1157,8 +1187,9 @@ struct ExerciseLibraryView: View {
                     .buttonStyle(.plain)
                     }
 
-                    // The personal-exercise filter is also useful when
-                    // choosing exercises while building a workout.
+                    // Keep this shortcut only in the training exercise picker;
+                    // standalone browsing uses the common source selector.
+                    if onSelect != nil {
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             selectedSection = selectedSection == .mine ? .library : .mine
@@ -1183,6 +1214,7 @@ struct ExerciseLibraryView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("exercise-library-mine-filter")
+                    }
 
                     Menu {
                         Button(

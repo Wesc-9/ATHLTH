@@ -123,10 +123,11 @@ struct RouteLibraryListView: View {
     @StateObject private var locationStore = HomeLocationStore()
     let source: RouteLibrarySource
 
-    @State private var selectedCollection: RouteLibraryCollection = .publicRoutes
+    @State private var selectedCollection: ATHLTHUnifiedLibraryScope = .athlth
     @State private var didSaveRouteInBuilder = false
     @State private var catalog: [RouteLibraryEntry] = []
     @State private var query = ""
+    @State private var searchExpanded = false
     @State private var sort: RouteLibrarySort = .nearest
     @State private var lengthFilter = 0
     @State private var showingCustomLength = false
@@ -240,7 +241,7 @@ struct RouteLibraryListView: View {
         } else {
             VStack(spacing: 0) {
                 routeCollectionPicker
-                if selectedCollection == .publicRoutes {
+                if selectedCollection == .athlth {
                     databaseBrowseView
                 } else {
                     // The same owned-route view already used in the rest of
@@ -254,33 +255,11 @@ struct RouteLibraryListView: View {
     }
 
     private var routeCollectionPicker: some View {
-        HStack(spacing: 8) {
-            ForEach(RouteLibraryCollection.allCases) { collection in
-                let isSelected = selectedCollection == collection
-                Button {
-                    selectedCollection = collection
-                } label: {
-                    Label(collection.title, systemImage: collection.symbol)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .foregroundStyle(isSelected ? .white : ATHLTHPlanDesign.ink)
-                        .background(
-                            isSelected ? ATHLTHTheme.accentDeep
-                                : ATHLTHPlanDesign.warmSurface,
-                            in: RoundedRectangle(cornerRadius: 15)
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 3)
-        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
-        .frame(maxWidth: .infinity)
+        ATHLTHLibrarySourcePicker(selection: $selectedCollection)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 3)
+            .accessibilityIdentifier("routes-source-filter")
     }
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -400,8 +379,12 @@ struct RouteLibraryListView: View {
             .padding(.horizontal, 16)
             .padding(.top, 14)
             .padding(.bottom, 76)
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
             .frame(maxWidth: .infinity)
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < -28
+        } action: { _, isPulling in
+            if isPulling { searchExpanded = true }
         }
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         .navigationTitle(tr("Routes", "Ruter"))
@@ -501,6 +484,14 @@ struct RouteLibraryListView: View {
 
     private var databaseFilters: some View {
         VStack(alignment: .leading, spacing: 14) {
+            Button { searchExpanded.toggle() } label: {
+                Label(tr("Search routes", "Søk i ruter"), systemImage: "magnifyingglass")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(minHeight: 40)
+            }
+            .buttonStyle(.plain)
+            if searchExpanded || !query.isEmpty {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -525,6 +516,8 @@ struct RouteLibraryListView: View {
                     .stroke(ATHLTHPlanDesign.outline)
             }
 
+            }
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(PublicRouteBrowseFilter.allCases) { option in
@@ -538,7 +531,7 @@ struct RouteLibraryListView: View {
                                 .foregroundStyle(publicFilter == option
                                                  ? .white : ATHLTHPlanDesign.ink)
                                 .background(publicFilter == option
-                                            ? ATHLTHTheme.accentDeep
+                                            ? ATHLTHPlanDesign.ink
                                             : ATHLTHPlanDesign.warmSurface,
                                             in: Capsule())
                         }
@@ -607,7 +600,6 @@ struct RouteLibraryListView: View {
                                        "Endre estimert løpetempo"))
             }
         }
-        .padding(16)
         .padding(13)
         .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 19))
         .overlay {

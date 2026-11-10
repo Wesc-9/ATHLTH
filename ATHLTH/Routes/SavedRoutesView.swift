@@ -84,6 +84,7 @@ struct SavedRoutesView: View {
     }
 
     @State private var search = ""
+    @State private var searchExpanded = false
     @State private var showingCustomLength = false
     @State private var previewRoute: TrainingRoute?
     @State private var watchMessage: String?
@@ -270,8 +271,12 @@ struct SavedRoutesView: View {
             .padding(.horizontal, 16)
             .padding(.top, 14)
             .padding(.bottom, 80)
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
             .frame(maxWidth: .infinity)
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < -28
+        } action: { _, isPulling in
+            if isPulling { searchExpanded = true }
         }
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         .navigationTitle(selectionTitle ?? tr("My routes", "Mine ruter"))
@@ -330,6 +335,14 @@ struct SavedRoutesView: View {
 
     private var searchAndFilters: some View {
         VStack(alignment: .leading, spacing: 14) {
+            Button { searchExpanded.toggle() } label: {
+                Label(tr("Search routes", "Søk i ruter"), systemImage: "magnifyingglass")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(minHeight: 40)
+            }
+            .buttonStyle(.plain)
+            if searchExpanded || !search.isEmpty {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -349,6 +362,8 @@ struct SavedRoutesView: View {
             .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 15))
             .overlay(RoundedRectangle(cornerRadius: 15).stroke(ATHLTHPlanDesign.outline))
 
+            }
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(SavedRouteFilter.allCases) { option in
@@ -358,7 +373,7 @@ struct SavedRoutesView: View {
                                 .padding(.horizontal, 13)
                                 .frame(height: 36)
                                 .foregroundStyle(filter == option ? Color.white : ATHLTHPlanDesign.ink)
-                                .background(filter == option ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.warmSurface,
+                                .background(filter == option ? ATHLTHPlanDesign.ink : ATHLTHPlanDesign.warmSurface,
                                             in: Capsule())
                         }
                         .buttonStyle(.plain)
