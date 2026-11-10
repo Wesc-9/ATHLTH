@@ -7,7 +7,8 @@ final class ATHLTHStudioRecordedWorkoutsTests: XCTestCase {
         id: UUID = UUID(),
         healthID: UUID? = nil,
         started: Date = .now,
-        finished: Bool = true
+        finished: Bool = true,
+        duration: TimeInterval = 2_400
     ) -> StrengthWorkoutLog {
         StrengthWorkoutLog(
             id: id,
@@ -17,11 +18,11 @@ final class ATHLTHStudioRecordedWorkoutsTests: XCTestCase {
             trackingMode: .simple,
             title: "Strength",
             startedAt: started,
-            endedAt: finished ? started.addingTimeInterval(2_400) : nil,
+            endedAt: finished ? started.addingTimeInterval(duration) : nil,
             exercises: [],
             healthMetrics: LinkedHealthWorkoutMetrics(
                 healthKitWorkoutUUID: healthID,
-                duration: finished ? 2_400 : nil,
+                duration: finished ? duration : nil,
                 activeCalories: nil,
                 averageHeartRate: nil,
                 maxHeartRate: nil
@@ -92,8 +93,9 @@ final class ATHLTHStudioRecordedWorkoutsTests: XCTestCase {
     func testDifferentDurationAtNearbyStartRemainsSeparate() {
         let moment = Date(timeIntervalSince1970: 1_800_000_000)
         let local = strength(started: moment)
-        var other = WorkoutSummary(localStrengthWorkout: strength(started: moment))
-        other.duration = 900
+        let other = WorkoutSummary(localStrengthWorkout: strength(
+            started: moment, duration: 900
+        ))
         let result = ATHLTHStudioRecordedWorkouts.merged(
             health: [other], localStrength: [local]
         )
