@@ -17,6 +17,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddFreeStrength: (WorkoutPhaseKind) -> Void
     let onAddSuperset: (WorkoutPhaseKind) -> Void
     let onAddExerciseToSuperset: (WorkoutPhaseKind, UUID) -> Void
+    let onAddRestToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onSetSupersetRounds: (UUID, Int) -> Void
     let onUngroupSuperset: (UUID) -> Void
     let onDeleteSuperset: (UUID) -> Void
@@ -535,7 +536,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
                 VStack(spacing: 3) {
                     ForEach(Array(members.enumerated()), id: \.element.editorDragID) { index, member in
-                        stepRow(member, position: index + 1, phase: phase)
+                        let position = rows.firstIndex(where: {
+                            $0.editorDragID == member.editorDragID
+                        }).map { $0 + 1 } ?? (index + 1)
+                        stepRow(member, position: position, phase: phase)
                     }
                 }
 
@@ -553,6 +557,21 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                                 in: RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
+
+                if !members.contains(where: { $0.isRestOrActiveRecovery }) {
+                    Button {
+                        onAddRestToSuperset(phase, id)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Add rest between rounds",
+                            norwegian: "Legg til pause mellom runder"
+                        ), systemImage: "pause.circle")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(bronze)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 6)
+                }
             } else if members.count < 2 {
                 Button {
                     collapsedSupersetGroups.remove(id)
