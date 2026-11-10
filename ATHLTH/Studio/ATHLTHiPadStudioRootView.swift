@@ -142,7 +142,6 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var detailNavigationPath = NavigationPath()
     /// The right inspector is for Messages only; Activity remains in Notifications.
     @State private var showingInspector = false
-    @State private var showingProfile = false
     /// Secondary Studio tools also replace the detail column, not modal sheets.
     @State private var sidebarPage: ATHLTHSideMenuDestination?
     @SceneStorage("athlth.studio.libraryExpanded") private var libraryExpanded = false
@@ -295,14 +294,6 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
-        }
-        .sheet(isPresented: $showingProfile) {
-            // The existing iPhone profile stays unchanged inside a tall,
-            // phone-width sheet rather than stretching across the iPad.
-            ATHLTHSideMenuDeepLinkView(destination: .profile)
-                .frame(width: 430)
-                .presentationSizing(.fitted)
-                .presentationDetents([.large])
         }
         .onAppear {
             // Scene-local, not shared across windows: Stage Manager windows
@@ -710,9 +701,11 @@ struct ATHLTHiPadStudioRootView: View {
                         selected: sidebarPage == .trainTogether
                     ) { openSidebarPage(.trainTogether) }
 
-                    sidebarAction("Ghost Race", symbol: "flag.checkered") {
-                        trainRequest = .ghost
-                        showingTrain = true
+                    sidebarAction(
+                        "Ghost Race", symbol: "flag.checkered",
+                        selected: sidebarPage == .ghostRace
+                    ) {
+                        openSidebarPage(.ghostRace)
                     }
 
                     sidebarAction(
@@ -743,154 +736,42 @@ struct ATHLTHiPadStudioRootView: View {
                         openStudio(.coach)
                     }
 
+                    // Secondary destinations stay discoverable without a
+                    // floating "More" menu obscuring the sidebar.
                     sidebarAction(
-                        ATHLTHLocalization.choose(english: "Profile", norwegian: "Profil"),
-                        symbol: "person.crop.circle"
-                    ) { showingProfile = true }
+                        ATHLTHLocalization.choose(
+                            english: "Workout history", norwegian: "Treningshistorikk"
+                        ),
+                        symbol: "clock.arrow.circlepath",
+                        selected: selection == .history && libraryPage == nil &&
+                            sidebarPage == nil
+                    ) { openStudio(.history) }
 
-                    Menu {
-                        Button {
-                            openStudio(.history)
-                        } label: {
-                            Label(ATHLTHStudioDestination.history.label,
-                                  systemImage: "clock.arrow.circlepath")
-                        }
-                        Button {
-                            openStudio(.explore)
-                        } label: {
-                            Label(ATHLTHStudioDestination.explore.label,
-                                  systemImage: "map")
-                        }
-                        Button {
-                            openStudio(.community)
-                        } label: {
-                            Label(ATHLTHStudioDestination.community.label,
-                                  systemImage: "person.3")
-                        }
-                        Divider()
-                        Button {
-                            showingPlanSync = true
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Plan sync", norwegian: "Plansynkronisering"
-                                ),
-                                systemImage: !studioPlanSync.conflicts.isEmpty
-                                    ? "exclamationmark.icloud"
-                                    : studioPlanSync.enabled ? "checkmark.icloud" : "icloud.slash"
-                            )
-                        }
-                        Button {
-                            showingPresentation = true
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Presentation mode",
-                                    norwegian: "Presentasjonsmodus"
-                                ),
-                                systemImage: "rectangle.on.rectangle"
-                            )
-                        }
-                        Button {
-                            openSidebarPage(.exerciseProgress)
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Exercise progression",
-                                    norwegian: "Øvelsesfremdrift"
-                                ),
-                                systemImage: "chart.bar"
-                            )
-                        }
-                        Menu {
-                            Button {
-                                openStudio(.overview)
-                            } label: {
-                                Label(ATHLTHStudioDestination.overview.label,
-                                      systemImage: "square.grid.2x2")
-                            }
-                            .keyboardShortcut("1", modifiers: [.command])
-                            Button {
-                                openStudio(.planner)
-                            } label: {
-                                Label(ATHLTHStudioDestination.planner.label,
-                                      systemImage: "calendar")
-                            }
-                            .keyboardShortcut("2", modifiers: [.command])
-                            Button {
-                                openStudio(.insights)
-                            } label: {
-                                Label(ATHLTHStudioDestination.insights.label,
-                                      systemImage: "chart.xyaxis.line")
-                            }
-                            .keyboardShortcut("3", modifiers: [.command])
-                            Button {
-                                openStudio(.history)
-                            } label: {
-                                Label(ATHLTHStudioDestination.history.label,
-                                      systemImage: "clock.arrow.circlepath")
-                            }
-                            .keyboardShortcut("4", modifiers: [.command])
-                            Button {
-                                openStudio(.explore)
-                            } label: {
-                                Label(ATHLTHStudioDestination.explore.label,
-                                      systemImage: "map")
-                            }
-                            .keyboardShortcut("5", modifiers: [.command])
-                            Button {
-                                openStudio(.community)
-                            } label: {
-                                Label(ATHLTHStudioDestination.community.label,
-                                      systemImage: "person.3")
-                            }
-                            .keyboardShortcut("6", modifiers: [.command])
-                            Button {
-                                openStudio(.coach)
-                            } label: {
-                                Label(ATHLTHStudioDestination.coach.label,
-                                      systemImage: "sparkles")
-                            }
-                            .keyboardShortcut("7", modifiers: [.command])
-                            Button {
-                                openStudio(.settings)
-                            } label: {
-                                Label(ATHLTHStudioDestination.settings.label,
-                                      systemImage: "gearshape")
-                            }
-                            .keyboardShortcut("8", modifiers: [.command])
-                            Divider()
-                            Button {
-                                trainRequest = .customQuick
-                                showingTrain = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "New quick workout",
-                                        norwegian: "Ny hurtigøkt"
-                                    ),
-                                    systemImage: "plus"
-                                )
-                            }
-                            .keyboardShortcut("n", modifiers: [.command, .shift])
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Keyboard shortcuts",
-                                    norwegian: "Hurtigtaster"
-                                ),
-                                systemImage: "keyboard"
-                            )
-                        }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(english: "More", norwegian: "Mer"),
-                            systemImage: "ellipsis.circle"
-                        )
-                        .foregroundStyle(ink)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .padding(.horizontal, 15)
-                    }
+                    sidebarAction(
+                        ATHLTHLocalization.choose(
+                            english: "Routes & Explore", norwegian: "Ruter og utforsk"
+                        ),
+                        symbol: "map",
+                        selected: selection == .explore && libraryPage == nil &&
+                            sidebarPage == nil
+                    ) { openStudio(.explore) }
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(
+                            english: "Community", norwegian: "Fellesskap"
+                        ),
+                        symbol: "person.3",
+                        selected: selection == .community && libraryPage == nil &&
+                            sidebarPage == nil
+                    ) { openStudio(.community) }
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(
+                            english: "Exercise progression", norwegian: "Øvelsesfremdrift"
+                        ),
+                        symbol: "chart.bar",
+                        selected: sidebarPage == .exerciseProgress
+                    ) { openSidebarPage(.exerciseProgress) }
                 }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 10)
@@ -905,6 +786,26 @@ struct ATHLTHiPadStudioRootView: View {
                 selected: selection == .settings && libraryPage == nil &&
                     sidebarPage == nil
             ) { openStudio(.settings) }
+                .contextMenu {
+                    Button {
+                        showingPlanSync = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Plan sync", norwegian: "Plansynkronisering"
+                            ), systemImage: "icloud"
+                        )
+                    }
+                    Button {
+                        showingPresentation = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Presentation mode", norwegian: "Presentasjonsmodus"
+                            ), systemImage: "rectangle.on.rectangle"
+                        )
+                    }
+                }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 12)
         }
@@ -944,7 +845,7 @@ struct ATHLTHiPadStudioRootView: View {
 
     private var sidebarProfileRow: some View {
         Button {
-            showingProfile = true
+            openSidebarPage(.profile)
         } label: {
             HStack(spacing: 11) {
                 Group {
