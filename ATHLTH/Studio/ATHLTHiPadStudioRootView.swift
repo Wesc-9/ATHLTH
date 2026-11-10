@@ -432,32 +432,27 @@ struct ATHLTHiPadStudioRootView: View {
         }
     }
 
-    /// The right inspector can be dismissed from here or the Inbox toolbar button.
+    /// Compact collapse affordance; the header remains visible at all widths.
     private var inspectorCollapseButton: some View {
-        HStack {
-            Spacer(minLength: 0)
-            Button {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    showingInspector = false
-                }
-            } label: {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Close Inbox", norwegian: "Lukk innboks"
-                    ),
-                    systemImage: "chevron.right"
-                )
-                .labelStyle(.titleAndIcon)
-                .font(.caption.weight(.semibold))
-                .frame(minHeight: 32)
+        Button {
+            withAnimation(.easeInOut(duration: 0.22)) {
+                showingInspector = false
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(ink)
-            .accessibilityIdentifier("athlth-ipad-hide-inspector")
+        } label: {
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ink)
+                .frame(width: 42, height: 42)
+                .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12)
+                    .stroke(gold.opacity(0.22)))
         }
-        .padding(.horizontal, 15)
-        .padding(.vertical, 4)
-        .background(canvas)
+        .buttonStyle(.plain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Close messages and activity",
+            norwegian: "Lukk meldinger og aktivitet"
+        ))
+        .accessibilityIdentifier("athlth-ipad-hide-inspector")
     }
 
     @ViewBuilder
