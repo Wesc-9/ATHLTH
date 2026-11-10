@@ -21,8 +21,7 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
             (.strides, 6), (.hills, 8), (.fourByFour, 4),
             (.thirtyThirty, 20), (.fortyFiveFifteen, 15),
             (.fiveByThree, 5), (.sixByFourHundred, 6),
-            (.fiveByOneKilometer, 5), (.shortIntervals, 10),
-            (.fartlek, 10)
+            (.fiveByOneKilometer, 5), (.shortIntervals, 10)
         ]
         for (preset, rounds) in presets {
             let blocks = preset.blocks(in: .main)
@@ -52,6 +51,32 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
             $0 + ($1.durationSeconds ?? 0)
         }, 28 * 60, accuracy: 0.01)
         XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: fourByFour), 30)
+    }
+
+    @MainActor
+    func testFartlekPyramidIsAlternatingAndEditableWithoutInventedRepeats() {
+        // Fartlek is now a five-effort pyramid, not the old 10 × 1/1
+        // interval group. Each effort and jog is a separate editable step.
+        let blocks = ATHLTHRunningExercisePreset.fartlek.blocks(in: .main)
+        XCTAssertEqual(blocks.count, 10)
+        XCTAssertEqual(blocks.expandedForExecution().count, 10)
+        XCTAssertEqual(Set(blocks.map(\.editorDragID)).count, 10)
+        XCTAssertEqual(
+            blocks.enumerated().filter { $0.offset.isMultiple(of: 2) }
+                .compactMap { $0.element.durationSeconds },
+            [60, 120, 180, 120, 60]
+        )
+        XCTAssertEqual(
+            blocks.enumerated().filter { !$0.offset.isMultiple(of: 2) }
+                .compactMap { $0.element.durationSeconds },
+            [60, 120, 180, 120, 60]
+        )
+        XCTAssertTrue(blocks.enumerated().allSatisfy { index, block in
+            block.kind == .run &&
+                block.resolvedPhase == .main &&
+                block.isRestOrActiveRecovery == !index.isMultiple(of: 2)
+        })
+        XCTAssertTrue(blocks.allSatisfy { $0.targetEffortRPE == nil })
     }
 
     @MainActor
