@@ -40,22 +40,9 @@ final class TrophyStore: ObservableObject {
     private var showcaseUpdatedAt: Date?
 
     init() {
-        let persisted = Self.loadState()
-        unlocks = persisted.unlocks
-        showcaseIDs = Array(
-            persisted.showcaseIDs
-                .prefix(Self.showcaseLimit)
-        )
-        trophyInscriptions =
-            persisted
-                .trophyInscriptions ??
-            [:]
-        hasInitializedShowcase =
-            persisted.hasInitializedShowcase
-        stateOwnerUserID =
-            persisted.ownerUserID
-        showcaseUpdatedAt =
-            persisted.showcaseUpdatedAt
+        // Do not expose the previous device user's disk cache before the
+        // currently authenticated account identity has been resolved.
+        // refresh() restores this cache only if ownerUserID matches.
         activationDate = Self.loadOrCreateActivationDate()
     }
 
