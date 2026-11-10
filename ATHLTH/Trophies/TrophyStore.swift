@@ -12,6 +12,23 @@ final class TrophyStore: ObservableObject {
 
     static let showcaseLimit = 4
 
+    /// Prevent signed-out UI from retaining another athlete's awards.
+    /// Keep the on-disk cache so an offline return to that account is possible.
+    func clearForSignOut() {
+        activeUserID = nil
+        activeUsername = nil
+        stateOwnerUserID = nil
+        trophies = []
+        unlocks = []
+        showcaseIDs = []
+        trophyInscriptions = [:]
+        hasInitializedShowcase = false
+        showcaseUpdatedAt = nil
+        revealQueue = []
+        pendingReveal = nil
+    }
+
+
     private var hasInitializedShowcase = false
     private var revealQueue: [TrophyUnlockRecord] = []
     private let activationDate: Date
@@ -1080,16 +1097,9 @@ final class TrophyStore: ObservableObject {
                         activeUsername
                 )
 
-            if showcaseUpdatedAt != nil {
-                if let cloudDate =
-                        try? await cloud
-                            .saveCabinet(
-                                showcaseIDs
-                            ) {
-                    showcaseUpdatedAt =
-                        cloudDate
-                }
-            }
+            // Reading cloud state must never write it back. That caused
+            // stale devices to overwrite other devices' cabinet changes and
+            // would create an infinite event loop under Realtime.
         }
 
         persist()
