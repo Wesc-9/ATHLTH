@@ -4294,6 +4294,8 @@ final class StrengthWorkoutStore: ObservableObject {
               let next = Self.reconcileEMOMWindows(
                 exercises: &workout.exercises, groupID: selected, at: now
               ) else { return 0 }
+        let previousExerciseIndex = currentExerciseIndex
+        let previousSetIndex = currentSetIndex
         if let index = next.nextExerciseIndex,
            let set = next.nextSetIndex {
             if currentExerciseIndex != index || currentSetIndex != set {
@@ -4313,11 +4315,12 @@ final class StrengthWorkoutStore: ObservableObject {
             currentExerciseIndex = subsequent
             currentSetIndex = 0
         }
+        let moved = previousExerciseIndex != currentExerciseIndex ||
+            previousSetIndex != currentSetIndex
+        guard moved || next.skippedSlots > 0 else { return 0 }
         activeWorkout = workout
-        if next.skippedSlots > 0 || next.groupFinished {
-            reloadDraftFromCurrentSet()
-            persistCheckpointNow()
-        }
+        reloadDraftFromCurrentSet()
+        persistCheckpointNow()
         return next.skippedSlots
     }
 
