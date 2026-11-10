@@ -588,11 +588,12 @@ struct ATHLTHArenaV3HomeView: View {
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 24)
             .padding(.top, 16)
             .padding(.bottom, 36)
-            .frame(maxWidth: 720)
-            .frame(maxWidth: .infinity)
+            // iPad Studio has a full-width detail column. Do not confine
+            // Arena to the 720 pt phone/tablet reading width.
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
         .navigationTitle("Arena")
