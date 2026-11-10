@@ -2833,9 +2833,11 @@ final class StrengthWorkoutStore: ObservableObject {
                     completedWeightKilograms: nil,
                     rpe: nil,
                     completedAt: nil,
-                    restSeconds: block.groupKind == nil
-                        ? Int(min(max(block.restBetweenSetsSeconds ?? 90, 0), 3_600))
-                        : 0,
+                    restSeconds: Int(min(max(
+                        block.restBetweenSetsSeconds ??
+                            (block.groupKind == nil ? 90 : 0),
+                        0
+                    ), 3_600)),
                     isWarmUp: block.resolvedPhase == .warmup,
                     targetKind: timed ? .time : .reps,
                     plannedDurationSeconds: block.durationSeconds.flatMap { seconds in
@@ -2861,7 +2863,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 completedAt: nil,
                 groupID: style != nil ? block.groupID : nil,
                 groupStyle: style,
-                groupClockSeconds: style == .emom ? 60 :
+                groupClockSeconds: style == .emom ?
+                    (block.groupClockSeconds ?? 60) :
                     (style == .amrap ? (block.groupClockSeconds ?? 720) : nil)
             ))
         }
