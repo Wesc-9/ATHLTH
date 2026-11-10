@@ -467,7 +467,7 @@ struct RouteLibraryListView: View {
                     UserDefaults.standard.set(
                         "newest", forKey: "athlth.routes.picker.sort.v1"
                     )
-                    selectedCollection = .savedRoutes
+                    selectedCollection = .mine
                 }
             } label: {
                 Image(systemName: "plus")
@@ -681,7 +681,7 @@ struct RouteLibraryListView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity, minHeight: 52)
                 .foregroundStyle(.white)
-                .background(ATHLTHTheme.accentDeep,
+                .background(ATHLTHPlanDesign.ink,
                             in: RoundedRectangle(cornerRadius: 15))
             }
             .padding(22)
@@ -930,7 +930,7 @@ struct RouteLibraryListView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 46)
-                            .background(ATHLTHTheme.accentDeep,
+                            .background(ATHLTHPlanDesign.ink,
                                         in: RoundedRectangle(cornerRadius: 13))
                     }
                     .buttonStyle(.plain)
