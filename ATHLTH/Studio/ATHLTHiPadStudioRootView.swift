@@ -53,6 +53,7 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var detailNavigationPath = NavigationPath()
     /// The iPad inspector is exclusively for Inbox; workouts use a sheet.
     @State private var showingInspector = false
+    @State private var inspectorTab = 0 // 0: inbox, 1: activity
     @State private var showingProfile = false
     /// Secondary Studio tools also replace the detail column, not modal sheets.
     @State private var sidebarPage: ATHLTHSideMenuDestination?
@@ -108,6 +109,38 @@ struct ATHLTHiPadStudioRootView: View {
                 studioDetail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(canvas.ignoresSafeArea())
+                    .overlay(alignment: .trailing) {
+                        if selection == .overview && !showingInspector &&
+                            libraryPage == nil && sidebarPage == nil {
+                            Button {
+                                openMessageHub(tab: 0)
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(gold)
+                                    .frame(width: 26, height: 64)
+                                    .background(canvas, in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12)
+                                        .stroke(gold.opacity(0.3)))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                ATHLTHLocalization.choose(
+                                    english: "Open messages and activity",
+                                    norwegian: "Åpne meldinger og aktivitet"
+                                )
+                            )
+                            .accessibilityIdentifier("athlth-ipad-message-edge")
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 15)
+                                    .onEnded { value in
+                                        if value.translation.width < -30 {
+                                            openMessageHub(tab: 0)
+                                        }
+                                    }
+                            )
+                        }
+                    }
                     // Overview owns its compact title/metrics inside the
                     // content. Avoid the duplicate large "Overview" title
                     // that previously consumed substantial iPad space.
@@ -132,7 +165,11 @@ struct ATHLTHiPadStudioRootView: View {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
-                                    showingInspector.toggle()
+                                    if showingInspector {
+                                        showingInspector = false
+                                    } else {
+                                        openMessageHub(tab: 0)
+                                    }
                                 }
                             } label: {
                                 Label(
@@ -250,15 +287,67 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .inspector(isPresented: $showingInspector) {
-            // Inbox is the only destination allowed in the right inspector.
+            // The right panel is exclusively for conversations and activity.
             VStack(spacing: 0) {
-                inspectorCollapseButton
-                NavigationStack {
-                    MessageInboxDestinationView()
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Connections", norwegian: "Samtaler"
+                        ))
+                        .font(.system(size: 21, weight: .semibold, design: .serif))
+                        .foregroundStyle(ink)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Messages and activity",
+                            norwegian: "Meldinger og aktivitet"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    inspectorCollapseButton
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
+                Picker("", selection: $inspectorTab) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Inbox", norwegian: "Innboks"
+                    )).tag(0)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Activity", norwegian: "Aktivitet"
+                    )).tag(1)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .padding(.horizontal, 18)
+                .padding(.bottom, 12)
+                Divider().opacity(0.4)
+                Group {
+                    if inspectorTab == 0 {
+                        NavigationStack {
+                            MessageInboxDestinationView()
+                        }
+                    } else {
+                        NavigationStack {
+                            ATHLTHSideMenuDeepLinkView(destination: .notifications)
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .inspectorColumnWidth(min: 320, ideal: 390, max: 480)
+            .background(canvas)
+            .inspectorColumnWidth(min: 340, ideal: 405, max: 490)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 50)
+                    .onEnded { value in
+                        if value.translation.width > 110 &&
+                            abs(value.translation.height) < 65 {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showingInspector = false
+                            }
+                        }
+                    }
+            )
         }
         .sheet(isPresented: $showingWorkoutDetail, onDismiss: {
             inspectedWeekDate = nil
@@ -333,6 +422,13 @@ struct ATHLTHiPadStudioRootView: View {
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func openMessageHub(tab: Int) {
+        inspectorTab = tab
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showingInspector = true
         }
     }
 
