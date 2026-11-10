@@ -73,4 +73,29 @@ final class SimpleExerciseMuscleFilterTests: XCTestCase {
             )
         }
     }
+    func testEachVisibleMuscleGroupHasDistinctIcon() {
+        let groups = [
+            "Back", "Chest", "Shoulders", "Biceps", "Triceps",
+            "Core", "Glutes", "Legs", "Calves"
+        ]
+        let symbols = groups.map(ATHLTHExerciseMuscleFilterPresentation.icon(for:))
+        XCTAssertEqual(Set(symbols).count, groups.count,
+            "Every muscle chip must be visually distinguishable at a glance")
+        XCTAssertEqual(ATHLTHExerciseMuscleFilterPresentation.icon(for: "Back"),
+                       "figure.rower")
+    }
+
+    func testFreeStrengthIsOnlyAnExercisePickerShortcut() {
+        XCTAssertFalse(ATHLTHFreeStrengthLibraryPresentation.showsShortcut(
+            isSelectingExercise: false))
+        XCTAssertTrue(ATHLTHFreeStrengthLibraryPresentation.showsShortcut(
+            isSelectingExercise: true))
+        XCTAssertFalse(ATHLTHFreeStrengthLibraryPresentation.includesInExerciseResults(
+            sourceIdentifier: "athlth-native-free-strength-training"))
+        XCTAssertTrue(ATHLTHFreeStrengthLibraryPresentation.includesInExerciseResults(
+            sourceIdentifier: "repdb-bench-press"))
+        XCTAssertTrue(ATHLTHFreeStrengthLibraryPresentation.includesInExerciseResults(
+            sourceIdentifier: nil))
+    }
+
 }
