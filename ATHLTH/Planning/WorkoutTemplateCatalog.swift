@@ -5167,6 +5167,13 @@ struct WorkoutTemplateBuilderView: View {
                     blocks[index].groupClockSeconds = seconds
                 }
             },
+            onSetStationTransition: { id, seconds in
+                guard (0...60).contains(seconds) else { return }
+                for index in blocks.indices where blocks[index].groupID == id &&
+                    blocks[index].groupKind?.canInsertRoundPause == true {
+                    blocks[index].restBetweenSetsSeconds = Double(seconds)
+                }
+            },
             onAddExerciseToSuperset: { phase, id in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
