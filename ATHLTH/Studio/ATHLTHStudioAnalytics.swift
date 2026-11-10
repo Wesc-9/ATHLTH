@@ -29,26 +29,52 @@ enum ATHLTHStudioAnalytics {
         let count = max(1, min(days, 365))
         let today = calendar.startOfDay(for: now)
         let first = calendar.date(byAdding: .day, value: -(count - 1), to: today) ?? today
-        let inRange = workouts.filter {
-            $0.startDate >= first && $0.startDate <= now && $0.duration.isFinite && $0.duration >= 0
+        // One pass through HealthKit and locally completed workouts.
+        // Home can redraw after many unrelated Health changes; avoid creating
+        // filtered workout arrays and scanning each day again for the chart.
+        var totalsByDay: [Date: (sessions: Int, minutes: Double, distance: Double)] = [:]
+        var sessions = 0
+        var totalMinutes = 0.0
+        var totalDistance = 0.0
+        var runningSessions = 0
+        var strengthSessions = 0
+        for workout in workouts {
+            guard workout.startDate >= first,
+                  workout.startDate <= now,
+                  workout.duration.isFinite,
+                  workout.duration >= 0 else { continue }
+
+            let date = calendar.startOfDay(for: workout.startDate)
+            let minutes = workout.duration / 60
+            let distance = max(0, workout.distanceKilometers ?? 0)
+            var day = totalsByDay[date] ?? (sessions: 0, minutes: 0, distance: 0)
+            day.sessions += 1
+            day.minutes += minutes
+            day.distance += distance
+            totalsByDay[date] = day
+            sessions += 1
+            totalMinutes += minutes
+            totalDistance += distance
+            if workout.activity == .running { runningSessions += 1 }
+            if workout.activity == .strength { strengthSessions += 1 }
         }
-        let groups = Dictionary(grouping: inRange) { calendar.startOfDay(for: $0.startDate) }
         let series: [Day] = (0..<count).compactMap { index in
-            guard let date = calendar.date(byAdding: .day, value: index, to: first) else { return nil }
-            let rows = groups[date] ?? []
+            guard let date = calendar.date(byAdding: .day, value: index, to: first)
+            else { return nil }
+            let day = totalsByDay[date] ?? (sessions: 0, minutes: 0, distance: 0)
             return Day(
                 date: date,
-                minutes: rows.reduce(0) { $0 + $1.duration / 60 },
-                distanceKilometers: rows.reduce(0) { $0 + max(0, $1.distanceKilometers ?? 0) },
-                sessions: rows.count
+                minutes: day.minutes,
+                distanceKilometers: day.distance,
+                sessions: day.sessions
             )
         }
         return Snapshot(
-            sessions: inRange.count,
-            minutes: series.reduce(0) { $0 + $1.minutes },
-            distanceKilometers: series.reduce(0) { $0 + $1.distanceKilometers },
-            runningSessions: inRange.filter { $0.activity == .running }.count,
-            strengthSessions: inRange.filter { $0.activity == .strength }.count,
+            sessions: sessions,
+            minutes: totalMinutes,
+            distanceKilometers: totalDistance,
+            runningSessions: runningSessions,
+            strengthSessions: strengthSessions,
             days: series
         )
     }
