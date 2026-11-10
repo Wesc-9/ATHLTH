@@ -16,6 +16,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddExercise: (WorkoutPhaseKind) -> Void
     let onAddFreeStrength: (WorkoutPhaseKind) -> Void
     let onAddSuperset: (WorkoutPhaseKind) -> Void
+    let onAddCircuit: (WorkoutPhaseKind) -> Void
     let onAddExerciseToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onAddRestToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onMoveSupersetMember: (UUID, UUID) -> Void
@@ -380,12 +381,12 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 } else {
                     VStack(spacing: 3) {
                         ForEach(Array(rows.enumerated()), id: \.element.editorDragID) { position, block in
-                            if block.groupKind == .superset,
+                            if block.groupKind?.isStrengthGroup == true,
                                let groupID = block.groupID {
                                 if !rows.prefix(position).contains(where: {
                                     $0.groupID == groupID
                                 }) {
-                                    supersetGroupCard(groupID, rows: rows, phase: phase)
+                                    strengthGroupCard(groupID, rows: rows, phase: phase)
                                 }
                             } else if let groupID = ATHLTHIntervalRecipeEditing.explicitGroupID(
                                 for: block, in: rows
@@ -447,19 +448,22 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         }
     }
 
-    /// A real grouped strength sequence with independent exercises and
-    /// configurable round count. The group is editable even with one member,
-    /// so a new Supersett can always receive its required second exercise.
-    private func supersetGroupCard(
+    /// Superset and circuit are separate persisted kinds, sharing one
+    /// premium group editor and the same ordered workout execution engine.
+    private func strengthGroupCard(
         _ id: UUID, rows: [WorkoutTemplateBlock], phase: WorkoutPhaseKind
     ) -> some View {
-        let members = rows.filter { $0.groupID == id && $0.groupKind == .superset }
+        let kind = rows.first(where: { $0.groupID == id })?.groupKind ?? .superset
+        let members = rows.filter {
+            $0.groupID == id && $0.groupKind == kind
+        }
+        let exercises = members.filter { $0.kind == .exercise }
         let rounds = members.first?.groupRounds ?? 3
         let collapsed = collapsedSupersetGroups.contains(id)
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 9) {
-                Image(systemName: "square.stack.3d.up")
+                Image(systemName: kind.symbol)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(bronze)
                     .frame(width: 38, height: 38)
@@ -472,12 +476,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     }
                 } label: {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Superset", norwegian: "Supersett"
-                        ))
+                        Text(kind.title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
-                        Text("\(members.count) " + ATHLTHLocalization.choose(
+                        Text("\(exercises.count) " + ATHLTHLocalization.choose(
                             english: "exercises", norwegian: "øvelser"
                         ) + " · \(rounds) " + ATHLTHLocalization.choose(
                             english: "rounds", norwegian: "runder"
@@ -515,7 +517,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         collapsedSupersetGroups.remove(id)
                     } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: "Delete superset", norwegian: "Slett supersett"
+                            english: kind == .circuit ? "Delete circuit" : "Delete superset",
+                            norwegian: kind == .circuit ? "Slett sirkeltrening" : "Slett supersett"
                         ), systemImage: "trash")
                     }
                 } label: {
@@ -526,10 +529,14 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             }
 
             if !collapsed {
-                if members.count < 2 {
+                if exercises.count < kind.minimumStrengthExercises {
                     Label(ATHLTHLocalization.choose(
-                        english: "Choose at least two exercises to complete the superset.",
-                        norwegian: "Legg til minst to øvelser for å fullføre supersettet."
+                        english: kind == .circuit
+                            ? "Add at least three exercises to complete the circuit."
+                            : "Choose at least two exercises to complete the superset.",
+                        norwegian: kind == .circuit
+                            ? "Legg til minst tre øvelser for å fullføre sirkeltreningen."
+                            : "Legg til minst to øvelser for å fullføre supersettet."
                     ), systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -548,8 +555,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     onAddExerciseToSuperset(phase, id)
                 } label: {
                     Label(ATHLTHLocalization.choose(
-                        english: "Add exercise to superset",
-                        norwegian: "Legg til øvelse i supersett"
+                        english: kind == .circuit
+                            ? "Add exercise to circuit" : "Add exercise to superset",
+                        norwegian: kind == .circuit
+                            ? "Legg til øvelse i sirkeltrening" : "Legg til øvelse i supersett"
                     ), systemImage: "plus.circle")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(bronze)
@@ -573,13 +582,13 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .buttonStyle(.plain)
                     .padding(.vertical, 6)
                 }
-            } else if members.count < 2 {
+            } else if exercises.count < kind.minimumStrengthExercises {
                 Button {
                     collapsedSupersetGroups.remove(id)
                     onAddExerciseToSuperset(phase, id)
                 } label: {
                     Label(ATHLTHLocalization.choose(
-                        english: "Add second exercise", norwegian: "Legg til øvelse nummer to"
+                        english: "Add next exercise", norwegian: "Legg til neste øvelse"
                     ), systemImage: "plus.circle")
                 }
                 .buttonStyle(.plain)
@@ -732,8 +741,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         phase: WorkoutPhaseKind
     ) -> some View {
         let rows = entries(in: phase)
-        let supersetMembers = block.groupKind == .superset
-            ? rows.filter { $0.groupID == block.groupID && $0.groupKind == .superset }
+        let supersetMembers = block.groupKind?.isStrengthGroup == true
+            ? rows.filter {
+                $0.groupID == block.groupID && $0.groupKind == block.groupKind
+            }
             : []
         let supersetIndex = supersetMembers.firstIndex(where: {
             $0.editorDragID == block.editorDragID
@@ -778,12 +789,12 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         .opacity(draggingID == block.editorDragID ? 0.13 : 1)
     }
 
-    /// The ordinary drag policy deliberately moves a whole group. A drag
-    /// *inside* a superset moves only its selected member among the siblings.
+    /// The ordinary drag policy moves a whole group. Within supersets or
+    /// circuits, move only the selected station among its siblings.
     private func liveReorderSupersetMember(_ id: UUID, finger: CGPoint) {
         guard let block = blocks.first(where: { $0.editorDragID == id }),
               let groupID = block.groupID,
-              block.groupKind == .superset else { return }
+              block.groupKind?.isStrengthGroup == true else { return }
         if draggingID == nil {
             guard let startFrame = dragGeometry.rowFrames[id] else { return }
             dragFingerOffsetY = finger.y - startFrame.midY
@@ -793,7 +804,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         dragPoint = finger
         let centerY = finger.y - dragFingerOffsetY
         let members = blocks.filter {
-            $0.groupID == groupID && $0.groupKind == .superset
+            $0.groupID == groupID && $0.groupKind == block.groupKind
         }
         guard let index = members.firstIndex(where: {
             $0.editorDragID == id
@@ -936,6 +947,12 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     Label(ATHLTHLocalization.choose(
                         english: "Superset", norwegian: "Supersett"
                     ), systemImage: "square.stack.3d.up")
+                }
+                Button {
+                    onAddCircuit(phase)
+                } label: {
+                    Label(WorkoutBlockGroupKind.circuit.title,
+                          systemImage: WorkoutBlockGroupKind.circuit.symbol)
                 }
             }
             if activity != .running {
