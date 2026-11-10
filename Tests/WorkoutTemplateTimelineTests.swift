@@ -157,6 +157,31 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         )
     }
 
+    func testSingleRoundCircuitHasNoTrailingRest() {
+        let groupID = UUID()
+        var squat = exercise("Squat")
+        var row = exercise("Row")
+        var pushup = exercise("Push-up")
+        var pause = recovery()
+
+        squat.groupID = groupID
+        row.groupID = groupID
+        pushup.groupID = groupID
+        pause.groupID = groupID
+        squat.groupKind = .circuit
+        row.groupKind = .circuit
+        pushup.groupKind = .circuit
+        pause.groupKind = .circuit
+        squat.groupRounds = 1
+        row.groupRounds = 1
+        pushup.groupRounds = 1
+        pause.groupRounds = 1
+
+        let steps = [squat, row, pushup, pause].expandedForExecution()
+        XCTAssertEqual(steps.map(\.kind), [.exercise, .exercise, .exercise])
+        XCTAssertEqual(steps.count, 3)
+    }
+
     func testCircuitAndSupersetRemainDistinctStrengthGroupKinds() {
         XCTAssertEqual(WorkoutBlockGroupKind.circuit.rawValue, "circuit")
         XCTAssertEqual(WorkoutBlockGroupKind.circuit.minimumStrengthExercises, 3)
