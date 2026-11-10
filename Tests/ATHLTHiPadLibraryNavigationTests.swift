@@ -44,4 +44,21 @@ final class ATHLTHiPadLibraryNavigationTests: XCTestCase {
         XCTAssertTrue(ATHLTHStudioLibraryPage.allCases.contains(.workouts))
         XCTAssertTrue(ATHLTHStudioLibraryPage.allCases.contains(.trainingPlans))
     }
+    @MainActor
+    func testGhostAndProfileHaveDedicatedStudioDestinationPages() {
+        let ghost = ATHLTHiPadSidebarPageView(
+            destination: .ghostRace, onBack: {}
+        )
+        let profile = ATHLTHiPadSidebarPageView(
+            destination: .profile, onBack: {}
+        )
+        let arena = ATHLTHiPadSidebarPageView(
+            destination: .arena, onBack: {}
+        )
+        XCTAssertEqual(ghost.title, "Ghost Race")
+        XCTAssertEqual(arena.title, "Arena")
+        XCTAssertFalse(profile.title.isEmpty)
+        XCTAssertNotEqual(profile.title, ghost.title)
+    }
+
 }
