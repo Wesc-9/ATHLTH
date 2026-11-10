@@ -172,6 +172,55 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
         XCTAssertNil(ATHLTHQuickRunTimelineAdapter.validationError(for: updated))
     }
 
+    func testAllFourBasicGoalsBecomeRealWatchRunningSteps() throws {
+        let cases: [ATHLTHBasicRunGoalKind] = [
+            .distance, .time, .pace, .heartRateZone
+        ]
+        for kind in cases {
+            let goal = ATHLTHBasicRunGoalRecipe.make(
+                id: UUID(), title: "", kind: kind,
+                distanceKilometers: 5, timeMinutes: 30,
+                paceSecondsPerKilometer: 330, heartRateZone: 3,
+                environment: .outdoor
+            )
+            XCTAssertNil(ATHLTHQuickRunTimelineAdapter.validationError(for: goal))
+            let transfer = try XCTUnwrap(ATHLTHQuickRunTimelineAdapter.transfer(
+                from: goal, title: goal.title,
+                routeAlerts: .standard, autoPauseEnabled: false
+            ))
+            XCTAssertEqual(transfer.steps.count, 1)
+            XCTAssertEqual(transfer.steps[0].phase, "work")
+            switch kind {
+            case .distance:
+                XCTAssertEqual(transfer.steps[0].measure, .distance)
+                XCTAssertEqual(transfer.steps[0].distanceMeters, 5_000)
+            case .time:
+                XCTAssertEqual(transfer.steps[0].measure, .time)
+                XCTAssertEqual(transfer.steps[0].durationSeconds, 1_800)
+            case .pace:
+                XCTAssertEqual(transfer.steps[0].measure, .open)
+                XCTAssertEqual(transfer.steps[0].targetPaceMinSecondsPerKilometer, 330)
+            case .heartRateZone:
+                XCTAssertEqual(transfer.steps[0].measure, .open)
+                XCTAssertEqual(transfer.steps[0].targetHeartRateZone, 3)
+            }
+        }
+    }
+
+    func testBasicGoalHasCorrectIndoorEnvironmentWithoutGPS() throws {
+        let goal = ATHLTHBasicRunGoalRecipe.make(
+            id: UUID(), title: "Easy indoor",
+            kind: .heartRateZone, distanceKilometers: 5,
+            timeMinutes: 30, paceSecondsPerKilometer: 360,
+            heartRateZone: 2, environment: .indoor
+        )
+        XCTAssertEqual(goal.workoutCategory, "indoor")
+        XCTAssertNil(goal.routeID)
+        XCTAssertEqual(goal.resolvedWorkoutBlocks.first?.isIndoor, true)
+        XCTAssertNil(goal.resolvedWorkoutBlocks.first?.treadmillInclinePercent)
+        XCTAssertEqual(RunEnvironment.forPlannedSession(goal), .indoor)
+    }
+
     func testTreadmillSelectionUsesPlanMetadata() {
         var run = block("Treadmill", phase: .main, seconds: 600)
         run.isIndoor = true
