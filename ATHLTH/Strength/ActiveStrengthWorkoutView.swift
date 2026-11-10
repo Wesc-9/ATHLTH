@@ -2282,6 +2282,14 @@ struct ActiveStrengthWorkoutView: View {
                             $0.sets.filter(\.isCompleted).count
                         }.min() ?? 0
                         let style = stations.first?.groupStyle
+                        let executed = stations.flatMap(\.sets).filter(\.isCompleted)
+                        let volume = executed.reduce(0) { $0 + $1.volumeKilograms }
+                        let skipped = stations.reduce(0) {
+                            $0 + ($1.skippedPlannedSetCount ?? 0)
+                        }
+                        let partialStations = max(0,
+                            actualSets - fullRounds * stations.count
+                        )
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text(style?.title ?? ATHLTHLocalization.choose(
@@ -2301,6 +2309,42 @@ struct ActiveStrengthWorkoutView: View {
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Text(String(format: "%.0f kg", volume) + " · " +
+                                 ATHLTHLocalization.choose(
+                                    english: "recorded training volume",
+                                    norwegian: "registrert treningsvolum"
+                                 ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            if style == .amrap && partialStations > 0 {
+                                Text("\(partialStations) " + ATHLTHLocalization.choose(
+                                    english: "additional stations in an unfinished round",
+                                    norwegian: "ekstra stasjoner i en ufullført runde"
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            if style == .emom {
+                                Text("\(skipped) " + ATHLTHLocalization.choose(
+                                    english: "missed minute slots",
+                                    norwegian: "minuttvinduer hoppet over"
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            if style == .dropSet {
+                                let drops = executed.compactMap { set -> String? in
+                                    guard let weight = set.completedWeightKilograms,
+                                          let reps = set.resolvedCompletedReps
+                                    else { return nil }
+                                    return String(format: "%.1f kg × %d", weight, reps)
+                                }
+                                if !drops.isEmpty {
+                                    Text(drops.joined(separator: " → "))
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                }
+                            }
                         }
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                     }
