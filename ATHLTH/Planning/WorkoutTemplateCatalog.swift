@@ -98,6 +98,18 @@ enum WorkoutPhaseKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Centralize the activity gate so the modern Studio, legacy quick add
+/// and imported/edited plans cannot expose strength modes in cardio pages.
+enum ATHLTHStrengthModeAvailability {
+    static func canCreate(
+        initialActivity: ATHLTHPlannedWorkoutType?,
+        containsStrength: Bool
+    ) -> Bool {
+        initialActivity == .strength ||
+            (initialActivity == nil && containsStrength)
+    }
+}
+
 enum WorkoutBlockGroupKind: String, Codable, Hashable {
     case superset
     case circuit
@@ -4042,8 +4054,9 @@ struct WorkoutTemplateBuilderView: View {
     /// may offer them after a strength station exists, but an explicit
     /// running/walking/cycling/wellness editor can never create them.
     private var mayInsertStrengthModes: Bool {
-        initialActivity == .strength ||
-            (initialActivity == nil && hasStrength)
+        ATHLTHStrengthModeAvailability.canCreate(
+            initialActivity: initialActivity, containsStrength: hasStrength
+        )
     }
 
     private var hasStrengthGroupsInNonStrengthWorkout: Bool {
