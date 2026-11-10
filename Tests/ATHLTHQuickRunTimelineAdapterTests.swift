@@ -81,6 +81,59 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
         ))
     }
 
+    func testAdvancedRunEnvironmentSelectionChangesLaunchRecipeWithoutMutatingSource() {
+        let routeID = UUID()
+        var run = block("Steady run", phase: .main, seconds: 1_200)
+        run.routeID = routeID
+        run.targetPaceSecondsPerKilometer = 330
+        var original = workout([run])
+        original.routeID = routeID
+
+        let treadmill = ATHLTHQuickRunTimelineAdapter.withEnvironment(
+            original, environment: .treadmill
+        )
+        XCTAssertEqual(treadmill.workoutCategory, "treadmill")
+        XCTAssertNil(treadmill.routeID)
+        XCTAssertEqual(treadmill.resolvedWorkoutBlocks.first?.isIndoor, true)
+        XCTAssertEqual(treadmill.resolvedWorkoutBlocks.first?.treadmillInclinePercent, 0)
+        XCTAssertNil(treadmill.resolvedWorkoutBlocks.first?.routeID)
+        XCTAssertEqual(
+            treadmill.resolvedWorkoutBlocks.first?.targetPaceSecondsPerKilometer,
+            330
+        )
+
+        // Choosing the environment is not an in-place edit of a saved plan.
+        XCTAssertEqual(original.routeID, routeID)
+        XCTAssertEqual(original.resolvedWorkoutBlocks.first?.isIndoor, nil)
+        XCTAssertEqual(original.resolvedWorkoutBlocks.first?.routeID, routeID)
+
+        let outdoor = ATHLTHQuickRunTimelineAdapter.withEnvironment(
+            treadmill, environment: .outdoor
+        )
+        XCTAssertEqual(outdoor.workoutCategory, "running")
+        XCTAssertEqual(outdoor.resolvedWorkoutBlocks.first?.isIndoor, false)
+        XCTAssertNil(outdoor.resolvedWorkoutBlocks.first?.treadmillInclinePercent)
+
+        let indoor = ATHLTHQuickRunTimelineAdapter.withEnvironment(
+            original, environment: .indoor
+        )
+        XCTAssertEqual(indoor.workoutCategory, "indoor")
+        XCTAssertEqual(indoor.resolvedWorkoutBlocks.first?.isIndoor, true)
+        XCTAssertNil(indoor.resolvedWorkoutBlocks.first?.treadmillInclinePercent)
+        XCTAssertNil(indoor.routeID)
+    }
+
+    func testTreadmillChoicePreservesExistingIncline() {
+        var run = block("Incline repeats", phase: .main, seconds: 240)
+        run.isIndoor = true
+        run.treadmillInclinePercent = 4
+        let updated = ATHLTHQuickRunTimelineAdapter.withEnvironment(
+            workout([run]), environment: .treadmill
+        )
+        XCTAssertEqual(updated.resolvedWorkoutBlocks.first?.treadmillInclinePercent, 4)
+        XCTAssertNil(ATHLTHQuickRunTimelineAdapter.validationError(for: updated))
+    }
+
     func testTreadmillSelectionUsesPlanMetadata() {
         var run = block("Treadmill", phase: .main, seconds: 600)
         run.isIndoor = true
