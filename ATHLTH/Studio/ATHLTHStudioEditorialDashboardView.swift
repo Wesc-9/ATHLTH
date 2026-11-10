@@ -150,18 +150,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
         return session.nextTrainingPlan
     }
 
-    private var upcoming: [ATHLTHStudioSchedule.Occurrence] {
-        ATHLTHStudioSchedule.upcoming(
-            plans: session.trainingPlans,
-            standalone: session.standalonePlannedSessions,
-            pausedPlanIDs: session.pausedTrainingPlanIDs,
-            deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
-            now: .now,
-            days: 14
-        )
-    }
-
-    private var nextWorkout: ATHLTHStudioSchedule.Occurrence? {
+    private func nextWorkout(
+        from upcoming: [ATHLTHStudioSchedule.Occurrence]
+    ) -> ATHLTHStudioSchedule.Occurrence? {
         upcoming.first { item in
             guard ATHLTHStudioSchedule.isUpcoming(item) else { return false }
             guard let planID = item.planID else { return true }
@@ -185,7 +176,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private func calendarWeek(
-        recorded: [WorkoutSummary]
+        recorded: [WorkoutSummary],
+        planned: [ATHLTHStudioSchedule.Occurrence]
     ) -> ATHLTHStudioHomeWeek.Snapshot {
         ATHLTHStudioHomeWeek.make(
             plans: session.trainingPlans,
@@ -193,7 +185,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
             recorded: recorded,
             pausedPlanIDs: session.pausedTrainingPlanIDs,
             deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
-            now: selectedDate
+            now: selectedDate,
+            plannedOverride: planned
         )
     }
 
@@ -209,8 +202,15 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 // week projection across the calendar and summary/chart.
                 // New Health/local data automatically triggers a fresh pass.
                 let workouts = recordedWorkouts
-                let week = calendarWeek(recorded: workouts)
-                let next = nextWorkout
+                let windows = ATHLTHStudioSchedule.studioHomeWindows(
+                    plans: session.trainingPlans,
+                    standalone: session.standalonePlannedSessions,
+                    pausedPlanIDs: session.pausedTrainingPlanIDs,
+                    deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
+                    selectedWeekDate: selectedDate
+                )
+                let week = calendarWeek(recorded: workouts, planned: windows.week)
+                let next = nextWorkout(from: windows.upcoming)
                 let recommendation = homeRecommendation(recorded: workouts, next: next)
                 let width = geometry.size.width
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
