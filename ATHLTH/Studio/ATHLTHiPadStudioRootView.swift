@@ -49,9 +49,81 @@ enum ATHLTHStudioInboxPanelGesturePolicy {
     }
 }
 
+/// Only the inbox controls observe MessagingStore. A message arriving should
+/// not cause Studio's entire navigation tree to observe messaging changes.
+private struct ATHLTHStudioInboxToolbarButton: View {
+    @EnvironmentObject private var messaging: MessagingStore
+    let toggle: () -> Void
+
+    private var unread: Int {
+        max(0, messaging.unreadCount + messaging.messageRequestCount)
+    }
+
+    var body: some View {
+        Button(action: toggle) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(width: 42, height: 42)
+                if unread > 0 {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 9, height: 9)
+                        .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                        .offset(x: -3, y: 3)
+                        .accessibilityHidden(true)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Inbox", norwegian: "Innboks"
+        ))
+        .accessibilityValue(unread > 0
+            ? ATHLTHLocalization.choose(
+                english: "\(unread) unread",
+                norwegian: "\(unread) uleste"
+            )
+            : ATHLTHLocalization.choose(
+                english: "No unread messages",
+                norwegian: "Ingen uleste meldinger"
+            )
+        )
+        .help(ATHLTHLocalization.choose(
+            english: "Open or close Inbox", norwegian: "Åpne eller lukk innboksen"
+        ))
+        .accessibilityIdentifier("athlth-ipad-inbox-panel")
+        .keyboardShortcut("m", modifiers: [.command, .shift])
+    }
+}
+
+private struct ATHLTHStudioInboxUnreadPill: View {
+    @EnvironmentObject private var messaging: MessagingStore
+    let ink: Color
+    let gold: Color
+
+    private var unread: Int {
+        max(0, messaging.unreadCount + messaging.messageRequestCount)
+    }
+
+    var body: some View {
+        if unread > 0 {
+            Text(unread > 99 ? "99+" : "\(unread)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ink)
+                .padding(.horizontal, 9)
+                .frame(minHeight: 25)
+                .background(gold.opacity(0.12), in: Capsule())
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "\(unread) unread messages",
+                    norwegian: "\(unread) uleste meldinger"
+                ))
+        }
+    }
+}
+
 struct ATHLTHiPadStudioRootView: View {
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var messaging: MessagingStore
     @Environment(\.accessibilityReduceMotion) private var reduceMessagePanelMotion
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var studioPlanSync = ATHLTHStudioPlanSyncStore()
@@ -85,10 +157,6 @@ struct ATHLTHiPadStudioRootView: View {
     private let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
     private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
     private let gold = Color(red: 0.69, green: 0.54, blue: 0.32)
-
-    private var unreadMessagesCount: Int {
-        max(0, messaging.unreadCount + messaging.messageRequestCount)
-    }
 
     private var messagePanelAnimation: Animation? {
         reduceMessagePanelMotion ? nil : .easeInOut(duration: 0.20)
@@ -197,7 +265,7 @@ struct ATHLTHiPadStudioRootView: View {
                         // visibility control. Do not draw a second identical
                         // leading button in the detail NavigationStack.
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button {
+                            ATHLTHStudioInboxToolbarButton {
                                 if showingInspector {
                                     withAnimation(messagePanelAnimation) {
                                         showingInspector = false
@@ -205,41 +273,7 @@ struct ATHLTHiPadStudioRootView: View {
                                 } else {
                                     openMessageHub()
                                 }
-                            } label: {
-                                ZStack(alignment: .topTrailing) {
-                                    Image(systemName: "bubble.left.and.bubble.right")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .frame(width: 42, height: 42)
-                                    if unreadMessagesCount > 0 {
-                                        Circle()
-                                            .fill(Color.red)
-                                            .frame(width: 9, height: 9)
-                                            .overlay(Circle().stroke(.white, lineWidth: 1.5))
-                                            .offset(x: -3, y: 3)
-                                            .accessibilityHidden(true)
-                                    }
-                                }
-                                .contentShape(Rectangle())
                             }
-                            .accessibilityLabel(ATHLTHLocalization.choose(
-                                english: "Inbox", norwegian: "Innboks"
-                            ))
-                            .accessibilityValue(unreadMessagesCount > 0
-                                ? ATHLTHLocalization.choose(
-                                    english: "\(unreadMessagesCount) unread",
-                                    norwegian: "\(unreadMessagesCount) uleste"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "No unread messages",
-                                    norwegian: "Ingen uleste meldinger"
-                                )
-                            )
-                            .help(ATHLTHLocalization.choose(
-                                english: "Open or close Inbox",
-                                norwegian: "Åpne eller lukk innboksen"
-                            ))
-                            .accessibilityIdentifier("athlth-ipad-inbox-panel")
-                            .keyboardShortcut("m", modifiers: [.command, .shift])
                         }
                     }
             }
@@ -358,19 +392,7 @@ struct ATHLTHiPadStudioRootView: View {
                     .foregroundStyle(ink)
                     .labelStyle(.titleAndIcon)
                     Spacer(minLength: 4)
-                    if unreadMessagesCount > 0 {
-                        Text(unreadMessagesCount > 99
-                             ? "99+" : "\(unreadMessagesCount)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ink)
-                            .padding(.horizontal, 9)
-                            .frame(minHeight: 25)
-                            .background(gold.opacity(0.12), in: Capsule())
-                            .accessibilityLabel(ATHLTHLocalization.choose(
-                                english: "\(unreadMessagesCount) unread messages",
-                                norwegian: "\(unreadMessagesCount) uleste meldinger"
-                            ))
-                    }
+                    ATHLTHStudioInboxUnreadPill(ink: ink, gold: gold)
                     inspectorCollapseButton
                 }
                 .padding(.horizontal, 17)
