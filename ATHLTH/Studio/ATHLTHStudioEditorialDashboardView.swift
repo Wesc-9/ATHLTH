@@ -202,6 +202,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .background(cream.ignoresSafeArea())
         .task(id: session.profile.userID) {
             guard ATHLTHDeviceRole.isIPad else { return }
+            // Never display the previous account's live strength summary
+            // while the next account's private status is still loading.
+            remoteStrengthStatus = nil
             while !Task.isCancelled {
                 if session.signedIn, scenePhase == .active {
                     let account = session.profile.userID
@@ -235,7 +238,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     remoteGhostStatus = nil
                 }
                 try? await Task.sleep(
-                    for: .seconds(remoteGhostStatus == nil ? 8 : 3)
+                    for: .seconds(remoteGhostStatus == nil ? 12 : 4)
                 )
             }
         }
