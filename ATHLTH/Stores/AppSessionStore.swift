@@ -5207,6 +5207,8 @@ final class AppSessionStore: ObservableObject {
         _ content: AccountTrainingContent,
         userID: UUID
     ) {
+        let signpost = ATHLTHPerformance.begin("TrainingLocalWrite")
+        defer { ATHLTHPerformance.end("TrainingLocalWrite", id: signpost) }
         AccountLocalStorage.write(
             content,
             name: "training",
@@ -5230,6 +5232,8 @@ final class AppSessionStore: ObservableObject {
 
     private func activateLocalAccount(_ userID: UUID) {
         guard localAccountID != userID else { return }
+        let signpost = ATHLTHPerformance.begin("AccountLocalActivation")
+        defer { ATHLTHPerformance.end("AccountLocalActivation", id: signpost) }
         persistAccountContent(immediate: true)
         loadingAccountContent = true
         localAccountID = userID
