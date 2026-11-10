@@ -339,6 +339,26 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         XCTAssertEqual(read.currentIndex, 1)
     }
 
+    func testStrengthModesNeverAvailableInCardioOrWellnessEditors() {
+        XCTAssertTrue(ATHLTHStrengthModeAvailability.canCreate(
+            initialActivity: .strength, containsStrength: false
+        ))
+        XCTAssertTrue(ATHLTHStrengthModeAvailability.canCreate(
+            initialActivity: nil, containsStrength: true
+        ))
+        XCTAssertFalse(ATHLTHStrengthModeAvailability.canCreate(
+            initialActivity: nil, containsStrength: false
+        ))
+        for category: ATHLTHPlannedWorkoutType in [.running, .walking, .cycling, .mobility] {
+            XCTAssertFalse(ATHLTHStrengthModeAvailability.canCreate(
+                initialActivity: category, containsStrength: true
+            ))
+            XCTAssertFalse(ATHLTHStrengthModeAvailability.canCreate(
+                initialActivity: category, containsStrength: false
+            ))
+        }
+    }
+
     func testEMOMClockPolicyRejectsEarlyAndMissedSlots() {
         let started = Date(timeIntervalSince1970: 100_000)
         func allowed(_ second: Double, station: Int) -> Bool {
