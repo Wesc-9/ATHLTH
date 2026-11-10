@@ -78,6 +78,9 @@ enum ATHLTHQuickRunTimelineAdapter {
             recipe[index].isIndoor = environment != .outdoor
             recipe[index].treadmillInclinePercent = environment == .treadmill
                 ? (recipe[index].treadmillInclinePercent ?? 0) : nil
+            if environment != .outdoor {
+                recipe[index].routeID = nil
+            }
         }
         copy.workoutBlocks = recipe
         switch environment {
