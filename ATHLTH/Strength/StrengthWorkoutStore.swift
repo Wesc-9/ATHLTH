@@ -1552,6 +1552,7 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func startCurrentSetEffort(at date: Date = Date()) {
+        guard canCompleteCurrentStrengthMode(at: date) else { return }
         guard !isResting, let workout = activeWorkout,
               let exercise = currentExercise, let set = currentSet,
               !set.isCompleted else { return }
@@ -1585,6 +1586,7 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func startOrResumeTimedSet(at date: Date = Date()) {
+        guard canCompleteCurrentStrengthMode(at: date) else { return }
         guard let workout = activeWorkout,
               let exercise = currentExercise,
               let set = currentSet,
