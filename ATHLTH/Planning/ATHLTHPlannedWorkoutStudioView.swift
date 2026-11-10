@@ -20,6 +20,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddStrengthMode: (WorkoutPhaseKind, WorkoutBlockGroupKind) -> Void
     let onSetGroupClock: (UUID, TimeInterval) -> Void
     let onSetStationTransition: (UUID, Int) -> Void
+    let onAddDropStage: (UUID) -> Void
     let onAddExerciseToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onAddRestToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onMoveSupersetMember: (UUID, UUID) -> Void
@@ -554,8 +555,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         collapsedSupersetGroups.remove(id)
                     } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: kind == .circuit ? "Delete circuit" : "Delete superset",
-                            norwegian: kind == .circuit ? "Slett sirkeltrening" : "Slett supersett"
+                            english: "Delete \(kind.title)", norwegian: "Slett \(kind.title.lowercased())"
                         ), systemImage: "trash")
                     }
                 } label: {
@@ -618,12 +618,17 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     }
                 }
 
-                if kind.allowsAdditionalStations {
+                if kind.allowsAdditionalStations || kind == .dropSet {
                     Button {
-                        onAddExerciseToSuperset(phase, id)
+                        if kind == .dropSet {
+                            onAddDropStage(id)
+                        } else {
+                            onAddExerciseToSuperset(phase, id)
+                        }
                     } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: "Add exercise", norwegian: "Legg til øvelse"
+                            english: kind == .dropSet ? "Add weight drop" : "Add exercise",
+                            norwegian: kind == .dropSet ? "Legg til vekttrinn" : "Legg til øvelse"
                         ), systemImage: "plus.circle")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(bronze)
