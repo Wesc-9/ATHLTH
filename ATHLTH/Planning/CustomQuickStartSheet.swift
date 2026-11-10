@@ -176,6 +176,31 @@ enum CustomQuickWorkoutMethod: String, CaseIterable, Identifiable, Hashable, Cod
     }
 }
 
+/// The second Basic screen only exposes modes meaningful for the activity
+/// chosen on the first screen. The policy is shared with tests and the setup
+/// guard, not merely a visual filter.
+enum ATHLTHBasicCustomActivityModePolicy {
+    static func methods(
+        for activity: CustomQuickWorkoutActivity
+    ) -> [CustomQuickWorkoutMethod] {
+        switch activity {
+        case .hiit, .circuit, .functional:
+            return CustomQuickWorkoutMethod.allCases
+        case .cycling, .rowing, .stairClimber:
+            return [.open, .intervals, .forTime]
+        case .mobility, .yoga, .sports, .other:
+            return [.open, .forTime]
+        }
+    }
+
+    static func isAvailable(
+        _ method: CustomQuickWorkoutMethod,
+        for activity: CustomQuickWorkoutActivity
+    ) -> Bool {
+        methods(for: activity).contains(method)
+    }
+}
+
 struct CustomQuickWorkoutConfiguration: Hashable {
     var activity: CustomQuickWorkoutActivity
     var method: CustomQuickWorkoutMethod
@@ -466,17 +491,8 @@ struct CustomQuickStartSheet: View {
         }
     }
 
-    /// Respect the activity chosen on the previous screen. Strength-only
-    /// protocols are not advertised for cycling, mobility or other cardio.
     private var availableMethods: [CustomQuickWorkoutMethod] {
-        switch activity {
-        case .hiit, .circuit, .functional:
-            return CustomQuickWorkoutMethod.allCases
-        case .cycling, .rowing, .stairClimber:
-            return [.open, .intervals, .forTime]
-        case .mobility, .yoga, .sports, .other:
-            return [.open, .forTime]
-        }
+        ATHLTHBasicCustomActivityModePolicy.methods(for: activity)
     }
 
     private var freeWorkoutTitle: String {
