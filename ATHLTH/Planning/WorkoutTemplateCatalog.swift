@@ -3706,6 +3706,14 @@ struct WorkoutTemplateBuilderView: View {
     @State private var studioVisiblePhases: Set<WorkoutPhaseKind> = []
     @State private var studioAdvanced = true
     @State private var studioBasicRunMode: RunQuickStartMode = .free
+    @State private var studioBasicGoalSelected = false
+    @State private var studioBasicGhostSelected = false
+    @State private var studioBasicGoalKind: ATHLTHBasicRunGoalKind = .distance
+    @State private var studioBasicGoalDistance = 5
+    @State private var studioBasicGoalMinutes = 30
+    @State private var studioBasicGoalPace = 360
+    @State private var studioBasicGoalZone = 2
+    @State private var studioBasicGhostMinutes = 40
     @State private var studioBasicRunEnvironment: RunEnvironment = .outdoor
     @State private var studioBasicDate = Date()
     @State private var studioBasicOwnedBlockIDs: Set<UUID> = []
@@ -4703,8 +4711,43 @@ struct WorkoutTemplateBuilderView: View {
                                 onChooseWorkout: {
                                     selectedPhase = .main
                                     showingSavedWorkoutPicker = true
-                                }
+                                },
+                                onChooseGoal: {
+                                    let wasStructured = studioBasicRunMode == .structured
+                                    studioBasicGoalSelected = true
+                                    studioBasicGhostSelected = false
+                                    studioBasicRunMode = .structured
+                                    if wasStructured { replaceBasicRunningGoal() }
+                                },
+                                onChooseGhost: {
+                                    studioBasicGoalSelected = false
+                                    studioBasicGhostSelected = true
+                                    studioBasicRunEnvironment = .outdoor
+                                    studioBasicRunMode = .route
+                                    ghostDraft.enabled = true
+                                    ghostDraft.setTargetTimeText(
+                                        GhostTargetTimeFormatter.string(
+                                            TimeInterval(studioBasicGhostMinutes * 60)
+                                        ),
+                                        distanceKilometers: activeRoute?.distanceKilometers
+                                    )
+                                    studioRoutePhase = .main
+                                    showingStudioRoutePicker = true
+                                },
+                                onChooseStandardMode: {
+                                    studioBasicGoalSelected = false
+                                    studioBasicGhostSelected = false
+                                    ghostDraft.enabled = false
+                                },
+                                isGoalSelected: studioBasicGoalSelected,
+                                isGhostSelected: studioBasicGhostSelected
                             )
+                            if studioBasicGoalSelected {
+                                studioBasicGoalEditor
+                            }
+                            if studioBasicGhostSelected {
+                                studioBasicGhostEditor
+                            }
                             if blocks.count > 0 {
                                 Text(ATHLTHLocalization.format(
                                     english: "%d workout steps selected",
@@ -4766,8 +4809,29 @@ struct WorkoutTemplateBuilderView: View {
                 // Only content added by the previous Basic selection is
                 // cleared; pre-existing edited exercise rows are preserved.
                 removeBasicOwnedBlocks()
-                if mode != .route { selectedRouteID = nil }
-                if mode != .structured { studioBasicWorkoutTitle = nil }
+                if mode != .route {
+                    selectedRouteID = nil
+                    studioBasicGhostSelected = false
+                }
+                if mode != .structured {
+                    studioBasicWorkoutTitle = nil
+                    studioBasicGoalSelected = false
+                } else if studioBasicGoalSelected {
+                    replaceBasicRunningGoal()
+                }
+            }
+            .onChange(of: studioBasicGoalKind) { _, _ in replaceBasicRunningGoal() }
+            .onChange(of: studioBasicGoalDistance) { _, _ in replaceBasicRunningGoal() }
+            .onChange(of: studioBasicGoalMinutes) { _, _ in replaceBasicRunningGoal() }
+            .onChange(of: studioBasicGoalPace) { _, _ in replaceBasicRunningGoal() }
+            .onChange(of: studioBasicGoalZone) { _, _ in replaceBasicRunningGoal() }
+            .onChange(of: studioBasicGhostMinutes) { _, minutes in
+                guard studioBasicGhostSelected else { return }
+                ghostDraft.enabled = true
+                ghostDraft.setTargetTimeText(
+                    GhostTargetTimeFormatter.string(TimeInterval(minutes * 60)),
+                    distanceKilometers: activeRoute?.distanceKilometers
+                )
             }
             .sheet(isPresented: $showingBlockPicker, onDismiss: {
                 if pendingStandaloneExercise {
@@ -5432,6 +5496,80 @@ struct WorkoutTemplateBuilderView: View {
         studioStepEditorSelection = ATHLTHWorkoutStudioStepEditorSelection(
             blockID: blockID, blocks: blocks
         )
+    }
+
+    private func replaceBasicRunningGoal() {
+        guard !studioAdvanced, isPlannedWorkout,
+              initialActivity == .running,
+              studioBasicGoalSelected else { return }
+        removeBasicOwnedBlocks()
+        let recipe = ATHLTHBasicRunGoalRecipe.make(
+            id: UUID(), title: title, kind: studioBasicGoalKind,
+            distanceKilometers: studioBasicGoalDistance,
+            timeMinutes: studioBasicGoalMinutes,
+            paceSecondsPerKilometer: studioBasicGoalPace,
+            heartRateZone: studioBasicGoalZone,
+            environment: studioBasicRunEnvironment
+        )
+        let additions = recipe.resolvedWorkoutBlocks.map { step -> WorkoutTemplateBlock in
+            var block = step
+            block.phase = .main
+            return block
+        }
+        studioBasicOwnedBlockIDs.formUnion(additions.map(\.editorDragID))
+        blocks.append(contentsOf: additions)
+        resequence()
+        studioBasicWorkoutTitle = recipe.title
+    }
+
+    private var studioBasicGoalEditor: some View {
+        ATHLTHPlanSurface(density: .compact) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(tr("Running goal", "Løpemål"), systemImage: "target")
+                    .font(.headline)
+                Picker(tr("Goal", "Mål"), selection: $studioBasicGoalKind) {
+                    ForEach(ATHLTHBasicRunGoalKind.allCases) { kind in
+                        Text(kind.title).tag(kind)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(studioAccent)
+                switch studioBasicGoalKind {
+                case .distance:
+                    Stepper("\(studioBasicGoalDistance) km",
+                            value: $studioBasicGoalDistance, in: 1...42)
+                case .time:
+                    Stepper("\(studioBasicGoalMinutes) min",
+                            value: $studioBasicGoalMinutes, in: 5...240, step: 5)
+                case .pace:
+                    Stepper(
+                        String(format: "%d:%02d min/km",
+                            studioBasicGoalPace / 60, studioBasicGoalPace % 60),
+                        value: $studioBasicGoalPace, in: 180...900, step: 5
+                    )
+                case .heartRateZone:
+                    Stepper(tr("Heart rate zone", "Pulssone") +
+                        " \(studioBasicGoalZone)",
+                        value: $studioBasicGoalZone, in: 1...5)
+                }
+            }
+        }
+    }
+
+    private var studioBasicGhostEditor: some View {
+        ATHLTHPlanSurface(density: .compact) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Ghost Race", systemImage: "figure.run.circle")
+                    .font(.headline)
+                Text(activeRoute?.title ?? tr("Select a route", "Velg en rute"))
+                    .font(.subheadline)
+                Stepper(
+                    tr("Target finish", "Måltid") +
+                        ": \(studioBasicGhostMinutes) min",
+                    value: $studioBasicGhostMinutes, in: 5...360, step: 5
+                )
+            }
+        }
     }
 
     private func removeBasicOwnedBlocks() {
