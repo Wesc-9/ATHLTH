@@ -2035,14 +2035,17 @@ struct PerformanceStatsView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var profileRecords: ATHLTHProfileRecordSyncStore
     @State private var runningPerformances: [ATHLTHCompletedRunningPerformance] = []
     @State private var fetchedHealthRecords: [HealthPersonalRecord] = []
     @State private var performanceWorkoutHistory:
         [WorkoutSummary] = []
     @State private var trainingVolumePeriod:
         PerformanceVolumePeriod = .year
-    @AppStorage(ProfileFeaturedRecordKind.storageKey)
-    private var featuredRecordSelectionRaw = ""
+    private var featuredRecordSelectionRaw: String {
+        get { profileRecords.selectionRaw }
+        nonmutating set { profileRecords.setSelection(newValue) }
+    }
     @State private var replacementSlot: FeaturedRecordReplacementSlot?
 
     private let gridColumns = [
@@ -2099,6 +2102,7 @@ struct PerformanceStatsView: View {
             }
         }
         .task {
+            await profileRecords.refresh(userID: session.profile.userID)
             refreshStructuredRunningRecords()
             guard health.hasRequestedAuthorization
             else {
@@ -2124,6 +2128,13 @@ struct PerformanceStatsView: View {
                             .personalRecords()
                     ) ?? []
             }
+            await profileRecords.publishAvailable(
+                userID: session.profile.userID,
+                healthRecords: resolvedHealthRecords,
+                stats: stats,
+                strength: strengthWorkout,
+                performanceWorkouts: resolvedPerformanceWorkouts
+            )
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)
@@ -2133,6 +2144,27 @@ struct PerformanceStatsView: View {
         .onChange(of: session.profile.userID) { _, _ in
             refreshStructuredRunningRecords()
         }
+    }
+
+    private func syncedRecordValue(_ kind: ProfileFeaturedRecordKind) -> String {
+        profileRecords.value(
+            for: kind,
+            local: kind.displayValue(
+                healthRecords: resolvedHealthRecords,
+                stats: stats,
+                strengthRecords: strengthWorkout.personalRecords,
+                strengthRepRecords: strengthWorkout.repPersonalRecords,
+                performanceWorkouts: resolvedPerformanceWorkouts,
+                strengthWorkouts: strengthWorkout.workoutHistory
+            )
+        )
+    }
+
+    private func syncedRecordDetail(_ kind: ProfileFeaturedRecordKind) -> String {
+        profileRecords.detail(
+            for: kind,
+            local: kind.supportingDetail(healthRecords: resolvedHealthRecords)
+        )
     }
 
     private func refreshStructuredRunningRecords() {
@@ -2511,17 +2543,8 @@ struct PerformanceStatsView: View {
         } label: {
             ProfileRecordVisualTile(
                 kind: kind,
-                value: kind.displayValue(
-                    healthRecords: resolvedHealthRecords,
-                    stats: stats,
-                    strengthRecords: strengthWorkout.personalRecords,
-                    strengthRepRecords: strengthWorkout.repPersonalRecords,
-                    performanceWorkouts: resolvedPerformanceWorkouts,
-                    strengthWorkouts: strengthWorkout.workoutHistory
-                ),
-                detail: kind.supportingDetail(
-                    healthRecords: resolvedHealthRecords
-                ),
+                value: syncedRecordValue(kind),
+                detail: syncedRecordDetail(kind),
                 showsManagement: true
             )
         }
@@ -3035,17 +3058,8 @@ struct PerformanceStatsView: View {
                     ForEach(runningSummaryKinds) { kind in
                         ProfileRecordVisualTile(
                             kind: kind,
-                            value: kind.displayValue(
-                                healthRecords: resolvedHealthRecords,
-                                stats: stats,
-                                strengthRecords: strengthWorkout.personalRecords,
-                                strengthRepRecords: strengthWorkout.repPersonalRecords,
-                                performanceWorkouts: resolvedPerformanceWorkouts,
-                                strengthWorkouts: strengthWorkout.workoutHistory
-                            ),
-                            detail: kind.supportingDetail(
-                                healthRecords: resolvedHealthRecords
-                            ),
+                            value: syncedRecordValue(kind),
+                            detail: syncedRecordDetail(kind),
                             compactPremium: true,
                             provenance: runningSummarySource(for: kind)
                         )
@@ -3161,17 +3175,8 @@ struct PerformanceStatsView: View {
         PerformanceMetricItem(
             icon: kind.icon,
             title: kind.title,
-            value: kind.displayValue(
-                healthRecords: resolvedHealthRecords,
-                stats: stats,
-                strengthRecords: strengthWorkout.personalRecords,
-                strengthRepRecords: strengthWorkout.repPersonalRecords,
-                performanceWorkouts: resolvedPerformanceWorkouts,
-                strengthWorkouts: strengthWorkout.workoutHistory
-            ),
-            detail: kind.supportingDetail(
-                healthRecords: resolvedHealthRecords
-            ),
+            value: syncedRecordValue(kind),
+            detail: syncedRecordDetail(kind),
             tint: kind.tint
         )
     }
@@ -3358,17 +3363,8 @@ struct PerformanceStatsView: View {
                     ForEach(strengthSummaryKinds) { kind in
                         ProfileRecordVisualTile(
                             kind: kind,
-                            value: kind.displayValue(
-                                healthRecords: resolvedHealthRecords,
-                                stats: stats,
-                                strengthRecords: strengthWorkout.personalRecords,
-                                strengthRepRecords: strengthWorkout.repPersonalRecords,
-                                performanceWorkouts: resolvedPerformanceWorkouts,
-                                strengthWorkouts: strengthWorkout.workoutHistory
-                            ),
-                            detail: kind.supportingDetail(
-                                healthRecords: resolvedHealthRecords
-                            ),
+                            value: syncedRecordValue(kind),
+                            detail: syncedRecordDetail(kind),
                             compactPremium: true,
                             provenance: text("ATHLTH log", "ATHLTH-logg")
                         )
@@ -5620,22 +5616,7 @@ struct PerformanceStatsView: View {
             .foregroundStyle(kind.tint)
 
             Text(
-                kind.displayValue(
-                    healthRecords:
-                        resolvedHealthRecords,
-                    stats: stats,
-                    strengthRecords:
-                        strengthWorkout
-                            .personalRecords,
-                    strengthRepRecords:
-                        strengthWorkout
-                            .repPersonalRecords,
-                    performanceWorkouts:
-                        resolvedPerformanceWorkouts,
-                    strengthWorkouts:
-                        strengthWorkout
-                            .workoutHistory
-                )
+                syncedRecordValue(kind)
             )
             .font(
                 .system(
@@ -9281,12 +9262,16 @@ struct ProfileRecordShowcasePickerView:
         HealthKitManager
     @EnvironmentObject private var strengthWorkout:
         StrengthWorkoutStore
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var profileRecords: ATHLTHProfileRecordSyncStore
     @State private var fetchedHealthRecords:
         [HealthPersonalRecord] = []
     @State private var performanceWorkoutHistory:
         [WorkoutSummary] = []
-    @AppStorage(ProfileFeaturedRecordKind.storageKey)
-    private var featuredRecordSelectionRaw = ""
+    private var featuredRecordSelectionRaw: String {
+        get { profileRecords.selectionRaw }
+        nonmutating set { profileRecords.setSelection(newValue) }
+    }
 
     private var resolvedHealthRecords:
         [HealthPersonalRecord] {
@@ -9328,7 +9313,7 @@ struct ProfileRecordShowcasePickerView:
         for kind:
             ProfileFeaturedRecordKind
     ) -> String {
-        kind.displayValue(
+        profileRecords.value(for: kind, local: kind.displayValue(
             healthRecords:
                 resolvedHealthRecords,
             stats: stats,
@@ -9343,7 +9328,7 @@ struct ProfileRecordShowcasePickerView:
             strengthWorkouts:
                 strengthWorkout
                     .workoutHistory
-        )
+        ))
     }
 
     private func isAvailable(
@@ -9587,6 +9572,7 @@ struct ProfileRecordShowcasePickerView:
             }
         }
         .task {
+            await profileRecords.refresh(userID: session.profile.userID)
             guard health.hasRequestedAuthorization
             else {
                 return
@@ -9671,9 +9657,9 @@ struct ProfileRecordShowcasePickerView:
                     ProfileRecordVisualTile(
                         kind: kind,
                         value: recordValue(for: kind),
-                        detail: kind.supportingDetail(
+                        detail: profileRecords.detail(for: kind, local: kind.supportingDetail(
                             healthRecords: resolvedHealthRecords
-                        ),
+                        )),
                         showsSelection: replacingIndex != nil,
                         isSelected: true,
                         compactPremium: true
@@ -9828,9 +9814,9 @@ struct ProfileRecordShowcasePickerView:
             ProfileRecordVisualTile(
                 kind: kind,
                 value: recordValue(for: kind),
-                detail: kind.supportingDetail(
+                detail: profileRecords.detail(for: kind, local: kind.supportingDetail(
                     healthRecords: resolvedHealthRecords
-                ),
+                )),
                 showsSelection: true,
                 isSelected: selected,
                 compactPremium: true
