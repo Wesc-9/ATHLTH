@@ -176,3 +176,84 @@ final class ATHLTHStudioRecordedWorkoutsTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 }
+
+@MainActor
+final class ATHLTHStudioAnalyticsTests: XCTestCase {
+    private func recordedStrength(started: Date, seconds: TimeInterval = 1_800) -> WorkoutSummary {
+        let log = StrengthWorkoutLog(
+            id: UUID(),
+            plannedSessionID: nil,
+            watchSessionID: nil,
+            captureDevice: .iPhone,
+            trackingMode: .simple,
+            title: "Training",
+            startedAt: started,
+            endedAt: started.addingTimeInterval(seconds),
+            exercises: [],
+            healthMetrics: LinkedHealthWorkoutMetrics(
+                healthKitWorkoutUUID: nil,
+                duration: seconds,
+                activeCalories: nil,
+                averageHeartRate: nil,
+                maxHeartRate: nil
+            )
+        )
+        return WorkoutSummary(localStrengthWorkout: log)
+    }
+
+    func testSinglePassAnalyticsCountsOnlyWorkoutsWithinSelectedDays() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 10, hour: 16
+        )))
+        let today = calendar.startOfDay(for: now)
+        let yesterday = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: -1, to: today
+        ))
+        let old = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: -8, to: today
+        ))
+        let entries = [
+            recordedStrength(started: today.addingTimeInterval(3_600)),
+            recordedStrength(started: yesterday.addingTimeInterval(3_600)),
+            recordedStrength(started: old.addingTimeInterval(3_600)),
+            recordedStrength(started: now.addingTimeInterval(3_600))
+        ]
+        let report = ATHLTHStudioAnalytics.snapshot(
+            from: entries, days: 7, now: now, calendar: calendar
+        )
+        XCTAssertEqual(report.sessions, 2)
+        XCTAssertEqual(report.strengthSessions, 2)
+        XCTAssertEqual(report.runningSessions, 0)
+        XCTAssertEqual(report.minutes, 60, accuracy: 0.001)
+        XCTAssertEqual(report.distanceKilometers, 0, accuracy: 0.001)
+        XCTAssertEqual(report.days.count, 7)
+        XCTAssertEqual(report.days.reduce(0) { $0 + $1.sessions }, 2)
+        XCTAssertEqual(report.days.last?.sessions, 1)
+        XCTAssertEqual(report.days[5].sessions, 1)
+    }
+
+    func testSinglePassAnalyticsPreservesCalendarDaysAcrossOsloDST() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 26, hour: 16
+        )))
+        let october24 = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24, hour: 10
+        )))
+        let october25 = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 25, hour: 10
+        )))
+        let report = ATHLTHStudioAnalytics.snapshot(
+            from: [recordedStrength(started: october24),
+                   recordedStrength(started: october25)],
+            days: 3, now: now, calendar: calendar
+        )
+        XCTAssertEqual(report.days.count, 3)
+        XCTAssertEqual(report.days.map(\.sessions), [1, 1, 0])
+        XCTAssertEqual(report.sessions, 2)
+        XCTAssertEqual(report.minutes, 60, accuracy: 0.001)
+    }
+}
