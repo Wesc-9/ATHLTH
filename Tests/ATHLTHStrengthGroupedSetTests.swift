@@ -18,6 +18,57 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         return block
     }
 
+    func testCircuitStrengthLogKeepsStationsRoundsAndPause() {
+        let id = UUID()
+        var squat = exercise(10, weight: 40)
+        var press = exercise(8, weight: 30)
+        var row = exercise(12, weight: 25)
+        squat.title = "Squat"
+        press.title = "Press"
+        row.title = "Row"
+        var blocks = [squat, press, row]
+        for index in blocks.indices {
+            blocks[index].groupID = id
+            blocks[index].groupKind = .circuit
+            blocks[index].groupRounds = 4
+        }
+        let logs = StrengthWorkoutStore.strengthExerciseLogsFromBlocks(blocks)
+        XCTAssertEqual(logs.count, 3)
+        XCTAssertTrue(logs.allSatisfy { $0.groupID == id && $0.groupStyle == .circuit })
+        XCTAssertTrue(logs.allSatisfy { $0.sets.count == 4 })
+        XCTAssertEqual(logs.map { $0.sets[0].plannedReps }, [10, 8, 12])
+    }
+
+    func testDropsetStrengthLogDoesNotBecomeThreeIndependentThreeSetExercises() {
+        let id = UUID()
+        var blocks = [exercise(10, weight: 25), exercise(8, weight: 20), exercise(6, weight: 15)]
+        for index in blocks.indices {
+            blocks[index].groupID = id
+            blocks[index].groupKind = .dropSet
+            blocks[index].groupRounds = 1
+        }
+        let logs = StrengthWorkoutStore.strengthExerciseLogsFromBlocks(blocks)
+        XCTAssertEqual(logs.count, 3)
+        XCTAssertTrue(logs.allSatisfy { $0.sets.count == 1 && $0.groupStyle == .dropSet })
+        XCTAssertEqual(logs.map { $0.sets[0].plannedWeightKilograms }, [25, 20, 15])
+        XCTAssertTrue(logs.allSatisfy { $0.sets[0].restSeconds == 0 })
+    }
+
+    func testAMRAPStrengthLogPreservesClockAndIdentityForWatchMirroring() {
+        let id = UUID()
+        var block = exercise(8, weight: 15)
+        block.groupID = id
+        block.groupKind = .amrap
+        block.groupRounds = 20
+        block.groupClockSeconds = 720
+        let logs = StrengthWorkoutStore.strengthExerciseLogsFromBlocks([block])
+        XCTAssertEqual(logs.count, 1)
+        XCTAssertEqual(logs[0].groupID, id)
+        XCTAssertEqual(logs[0].groupClockSeconds, 720)
+        XCTAssertEqual(logs[0].groupStyle, .amrap)
+        XCTAssertEqual(logs[0].sets.count, 20)
+    }
+
     func testOneParentCreatesIndividualExecutionSetsAndPauses() {
         var block = exercise()
         var targets = ATHLTHWorkoutSetExpansion.targets(for: block)
