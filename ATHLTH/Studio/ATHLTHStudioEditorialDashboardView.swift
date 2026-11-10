@@ -172,11 +172,15 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     /// A transparent activity hint, not a recovery diagnosis or AI promise.
-    /// Planned training always takes precedence over a generic suggestion.
-    private var homeRecommendation: ATHLTHStudioHomeRecommendation.Result {
+    /// Calculated once from the same training history and next session
+    /// used by the rest of the current Home render.
+    private func homeRecommendation(
+        recorded: [WorkoutSummary],
+        next: ATHLTHStudioSchedule.Occurrence?
+    ) -> ATHLTHStudioHomeRecommendation.Result {
         ATHLTHStudioHomeRecommendation.make(
-            nextWorkoutTitle: nextWorkout?.workout.title,
-            workouts: recordedWorkouts
+            nextWorkoutTitle: next?.workout.title,
+            workouts: recorded
         )
     }
 
@@ -206,6 +210,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 // New Health/local data automatically triggers a fresh pass.
                 let workouts = recordedWorkouts
                 let week = calendarWeek(recorded: workouts)
+                let next = nextWorkout
+                let recommendation = homeRecommendation(recorded: workouts, next: next)
                 let width = geometry.size.width
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
                 let threeColumns = width >= 880 && !dynamicTypeSize.isAccessibilitySize
@@ -245,7 +251,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             HStack(alignment: .top, spacing: 15) {
                                 planCard
                                     .frame(maxWidth: .infinity)
-                                nextWorkoutCard
+                                nextWorkoutCard(next)
                                     .frame(width: max(260, width * 0.26))
                                 compactReadinessCard
                                     .frame(width: max(220, width * 0.22))
@@ -253,12 +259,12 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         } else if split {
                             HStack(alignment: .top, spacing: 15) {
                                 planCard.frame(maxWidth: .infinity)
-                                nextWorkoutCard.frame(width: max(270, width * 0.31))
+                                nextWorkoutCard(next).frame(width: max(270, width * 0.31))
                             }
                             compactReadinessCard
                         } else {
                             planCard
-                            nextWorkoutCard
+                            nextWorkoutCard(next)
                             compactReadinessCard
                         }
 
@@ -267,7 +273,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         }
 
                         // Fact-based recommendation with an explicit reason.
-                        recommendationCard
+                        recommendationCard(recommendation, next: next)
                         // Coach already lives in the toolbar. Prioritize
                         // factual progress rather than repeated advice.
                         progressCard(wide: split, recorded: workouts, week: week)
@@ -471,9 +477,11 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .accessibilityIdentifier("athlth-ipad-active-training-plan")
     }
 
-    private var recommendationCard: some View {
-        let recommendation = homeRecommendation
-        return HStack(alignment: .center, spacing: 16) {
+    private func recommendationCard(
+        _ recommendation: ATHLTHStudioHomeRecommendation.Result,
+        next: ATHLTHStudioSchedule.Occurrence?
+    ) -> some View {
+        HStack(alignment: .center, spacing: 16) {
             Image(systemName: "sparkles")
                 .font(.system(size: 19, weight: .medium))
                 .foregroundStyle(bronze)
@@ -494,14 +502,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
             Spacer(minLength: 6)
             Button {
-                if let item = nextWorkout {
+                if let item = next {
                     onOpenWorkout(item)
                 } else {
                     onStartQuick()
                 }
             } label: {
                 Label(
-                    nextWorkout == nil
+                    next == nil
                         ? tr("Choose workout", "Velg økt")
                         : tr("View workout", "Se økt"),
                     systemImage: "arrow.up.right"
@@ -518,12 +526,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .accessibilityIdentifier("athlth-ipad-home-recommendation")
     }
 
-    private var nextWorkoutCard: some View {
+    private func nextWorkoutCard(
+        _ next: ATHLTHStudioSchedule.Occurrence?
+    ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(tr("Next workout", "Neste økt"))
                 .font(.system(size: 22, weight: .medium, design: .serif))
                 .foregroundStyle(ink)
-            if let item = nextWorkout {
+            if let item = next {
                 Label(item.workout.title, systemImage: item.workout.kind.systemImage)
                     .font(.headline)
                     .foregroundStyle(ink)
