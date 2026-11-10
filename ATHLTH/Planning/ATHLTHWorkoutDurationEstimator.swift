@@ -74,8 +74,29 @@ enum ATHLTHWorkoutDurationEstimator {
 
         var seconds = 0.0
         var hasActivity = false
+        var countedTimedGroups = Set<UUID>()
 
         for block in steps {
+            // EMOM has a fixed clock for each station; AMRAP has one fixed
+            // workout cap. Repetition targets are *not* additional time.
+            if let kind = block.executionGroupKind,
+               kind.usesGroupClock,
+               let id = block.executionGroupID {
+                if countedTimedGroups.insert(id).inserted {
+                    let allotted: TimeInterval
+                    if kind == .emom {
+                        allotted = (block.executionGroupClockSeconds ?? 60) *
+                            Double(block.executionStationCount ?? 1) *
+                            Double(block.executionTotalRounds ?? 1)
+                    } else {
+                        allotted = block.executionGroupClockSeconds ?? 720
+                    }
+                    guard allotted.isFinite && allotted > 0 else { return nil }
+                    seconds += allotted
+                    hasActivity = true
+                }
+                continue
+            }
             switch block.kind {
             case .exercise:
                 hasActivity = true
