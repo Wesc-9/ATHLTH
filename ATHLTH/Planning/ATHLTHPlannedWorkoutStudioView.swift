@@ -128,7 +128,13 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .multilineTextAlignment(.center)
                     HStack(spacing: 8) {
                         Button {
-                            onAddRun(.main)
+                            // Strength always enters the exercise library.
+                            // Other activities keep the existing quick-add path.
+                            if activity == .strength {
+                                onAddExercise(.main)
+                            } else {
+                                onAddRun(.main)
+                            }
                             visiblePhases.insert(.main)
                         } label: {
                             Label(ATHLTHLocalization.choose(
@@ -662,19 +668,19 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     private func addContentMenu(_ phase: WorkoutPhaseKind) -> some View {
         Menu {
-            Button {
-                onAddRun(phase)
-            } label: {
-                Label(
-                    activity == .strength
-                        ? ATHLTHLocalization.choose(
-                            english: "Strength exercise", norwegian: "Styrkeøvelse"
-                        )
-                        : ATHLTHLocalization.choose(
+            // Strength uses the existing library picker below. The former
+            // "Strength exercise" action opened that same picker twice.
+            if activity != .strength {
+                Button {
+                    onAddRun(phase)
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
                             english: "Running exercise", norwegian: "Løpeøvelse"
                         ),
-                    systemImage: activity == .strength ? "dumbbell" : "figure.run"
-                )
+                        systemImage: "figure.run"
+                    )
+                }
             }
             Button {
                 onAddExercise(phase)
