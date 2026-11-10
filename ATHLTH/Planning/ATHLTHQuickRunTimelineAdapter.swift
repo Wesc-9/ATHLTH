@@ -65,6 +65,35 @@ enum ATHLTHQuickRunTimelineAdapter {
             workout.workoutCategory == "treadmill" ? .treadmill : .indoor
     }
 
+    /// Apply the choice from Workout Details to the full ordered running
+    /// recipe before iPhone/Watch transfer. The selected library template
+    /// remains unchanged. Outdoor routes/route Ghost cannot follow indoors.
+    static func withEnvironment(
+        _ workout: PlannedSession,
+        environment: RunEnvironment
+    ) -> PlannedSession {
+        var copy = workout
+        var recipe = workout.resolvedWorkoutBlocks
+        for index in recipe.indices where recipe[index].kind == .run {
+            recipe[index].isIndoor = environment != .outdoor
+            recipe[index].treadmillInclinePercent = environment == .treadmill
+                ? (recipe[index].treadmillInclinePercent ?? 0) : nil
+        }
+        copy.workoutBlocks = recipe
+        switch environment {
+        case .outdoor: copy.workoutCategory = "running"
+        case .indoor: copy.workoutCategory = "indoor"
+        case .treadmill: copy.workoutCategory = "treadmill"
+        }
+        if environment != .outdoor {
+            copy.routeID = nil
+            copy.routeAlertConfiguration = nil
+            copy.ghostTargetDurationSeconds = nil
+            copy.ghostUpdates = nil
+        }
+        return copy
+    }
+
     static func transfer(
         from workout: PlannedSession,
         title: String,
