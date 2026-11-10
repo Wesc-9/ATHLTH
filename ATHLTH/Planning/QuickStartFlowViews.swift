@@ -1524,9 +1524,8 @@ struct RunQuickStartSheet: View {
             ScrollView {
                 VStack(spacing: isAdvancedSetup ? 16 : 12) {
                     if isAdvancedSetup {
-                        introCard
+                        advancedWorkoutDetailsCard
                         modeCard
-                        runEnvironmentCard
                     } else {
                         ATHLTHRunBasicSetupView(
                             workoutName: $quickWorkoutName,
@@ -1860,22 +1859,91 @@ struct RunQuickStartSheet: View {
         }
     }
 
-    private var introCard: some View {
-        // Reuse the same editorial intro component as the Training Plan
-        // builder instead of maintaining a separate photo-card treatment.
-        ATHLTHPlanSectionIntro(
-            eyebrow: ATHLTHLocalization.choose(
-                english: "QUICK TRAIN", norwegian: "HURTIGTRENING"
-            ),
-            title: ATHLTHLocalization.choose(
-                english: "Start run", norwegian: "Start løpeøkt"
-            ),
-            subtitle: ATHLTHLocalization.choose(
-                english: "Choose the workout and where to run. Then start on iPhone or Apple Watch.",
-                norwegian: "Velg løpetype og hvor du vil løpe. Start deretter med iPhone eller Apple Watch."
-            ),
-            icon: "figure.run"
-        )
+    /// Advanced reuses the Basic workout-details hierarchy, but keeps
+    /// its full mode and coaching tools below the compact identity card.
+    private var advancedWorkoutDetailsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "figure.run")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        ATHLTHTrainDesign.paleGold.opacity(0.45),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "WORKOUT DETAILS", norwegian: "ØKTDETALJER"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.8)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Running", norwegian: "Løping"
+                    ))
+                    .font(.system(size: 22, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                }
+                Spacer(minLength: 0)
+            }
+
+            TextField(
+                "", text: $quickWorkoutName,
+                prompt: Text(ATHLTHLocalization.choose(
+                    english: "Workout name (optional)",
+                    norwegian: "Øktnavn (valgfritt)"
+                ))
+                .foregroundStyle(.secondary.opacity(0.55))
+            )
+            .font(.subheadline.weight(.medium))
+            .tint(ATHLTHTrainDesign.bronze)
+            .textInputAutocapitalization(.sentences)
+            .frame(minHeight: 43)
+            .padding(.horizontal, 13)
+            .background(
+                ATHLTHPlanDesign.canvas,
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+
+            HStack(spacing: 8) {
+                Label(
+                    quickDisplayDate.formatted(date: .abbreviated, time: .omitted),
+                    systemImage: "calendar"
+                )
+                Spacer(minLength: 8)
+                Label(
+                    quickDisplayDate.formatted(date: .omitted, time: .shortened),
+                    systemImage: "clock"
+                )
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHTrainDesign.ink)
+            .frame(minHeight: 43)
+            .padding(.horizontal, 12)
+            .background(
+                ATHLTHPlanDesign.canvas,
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+
+            ATHLTHRunEnvironmentDetailRow(environment: $environment)
+
+            if environment == .treadmill,
+               let prior = phoneWorkout.lastTreadmillSpeedReference {
+                Label(
+                    ATHLTHLocalization.format(
+                        english: "Last treadmill speed: %.1f km/h (reference only)",
+                        norwegian: "Siste møllehastighet: %.1f km/t (kun referanse)",
+                        prior.speed
+                    ),
+                    systemImage: "clock.arrow.circlepath"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+            }
+        }
+        .padding(15)
+        .athlthTrainPaper()
     }
 
     private var runSetupModeButton: some View {
@@ -1943,53 +2011,6 @@ struct RunQuickStartSheet: View {
                     "Bytt oppsettsmodus for løpeøkt"
             )
         )
-    }
-
-    private var runEnvironmentCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(ATHLTHLocalization.choose(
-                english: "Where are you running?", norwegian: "Hvor løper du?"
-            ))
-            .font(.headline)
-            .foregroundStyle(ATHLTHPlanDesign.ink)
-
-            // The Training Plan selection cards are shared verbatim.
-            ForEach(RunEnvironment.allCases) { option in
-                ATHLTHPlanSelectionCard(
-                    title: option.title,
-                    subtitle: option.subtitle,
-                    symbol: option.systemImage,
-                    selected: environment == option,
-                    accent: ATHLTHPlanDesign.accentInk
-                ) {
-                    environment = option
-                }
-            }
-
-            if environment == .treadmill,
-               let prior = phoneWorkout.lastTreadmillSpeedReference {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "clock.arrow.circlepath")
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.format(
-                            english: "Your previous logged belt speed: %.1f km/h",
-                            norwegian: "Din sist registrerte møllehastighet: %.1f km/t",
-                            prior.speed
-                        ))
-                        .font(.subheadline.weight(.semibold))
-                        Text(ATHLTHLocalization.choose(
-                            english: "Historical reference only. Set your actual belt speed during the workout.",
-                            norwegian: "Kun historikk. Registrer faktisk møllehastighet under økten."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                }
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                .padding(14)
-                .athlthPlanCard(radius: 18)
-            }
-        }
     }
 
     private var modeCard: some View {
@@ -2625,10 +2646,9 @@ struct RunQuickStartSheet: View {
         }
 
         launchFailure = nil
-        let runEnvironment = mode == .structured
-            ? advancedWorkout.map { ATHLTHQuickRunTimelineAdapter.environment(for: $0) }
-                ?? environment
-            : environment
+        // The environment chosen in Workout Details is authoritative.
+        // A previously selected structured workout must not override it.
+        let runEnvironment = environment
         var configuration = RunQuickStartConfiguration(
                 mode: mode,
                 route:
@@ -2699,7 +2719,12 @@ struct RunQuickStartSheet: View {
                     advancedWorkout != nil ? nil : quickWorkoutName
             )
         configuration.petIDs = selectedPetIDs
-        configuration.advancedWorkout = mode == .structured ? advancedWorkout : nil
+        configuration.advancedWorkout = mode == .structured
+            ? advancedWorkout.map {
+                ATHLTHQuickRunTimelineAdapter.withEnvironment(
+                    $0, environment: runEnvironment
+                )
+            } : nil
         configuration.routeWarmup = mode == .route ? routeWarmup : .disabled
         configuration.ghostPacingStrategy = ghostDraft.pacingStrategy
         launchInProgress = true
