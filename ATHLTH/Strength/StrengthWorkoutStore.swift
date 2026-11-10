@@ -2387,7 +2387,8 @@ final class StrengthWorkoutStore: ObservableObject {
                     isWarmUp:
                         draftWarmUp,
                     restSeconds:
-                        draftRestSeconds
+                        draftRestSeconds,
+                    completedAt: command.sentAt
                 )
 
             case .completeSetWithoutDetails:
@@ -2412,8 +2413,8 @@ final class StrengthWorkoutStore: ObservableObject {
                         )
                     }
                     completeCurrentSetWithoutDetails(
-                        restSeconds:
-                            draftRestSeconds
+                        restSeconds: draftRestSeconds,
+                        completedAt: command.sentAt
                     )
                 }
 
@@ -3214,7 +3215,8 @@ final class StrengthWorkoutStore: ObservableObject {
         rpe: Double?,
         rir: Double? = nil,
         isWarmUp: Bool? = nil,
-        restSeconds: Int? = nil
+        restSeconds: Int? = nil,
+        completedAt: Date = Date()
     ) {
         guard
             var workout = activeWorkout,
@@ -3226,7 +3228,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
         // The clock policy also guards Watch/offline-replayed completions;
         // a blocked command cannot add completed reps, weight or records.
-        guard canCompleteCurrentStrengthMode() else { return }
+        guard canCompleteCurrentStrengthMode(at: completedAt) else { return }
         var set = workout.exercises[currentExerciseIndex].sets[currentSetIndex]
         let measuredEffort = currentSetEffortClock?.elapsedSeconds()
         // The timer is an optional aid. It does not own set completion;
@@ -3326,7 +3328,7 @@ final class StrengthWorkoutStore: ObservableObject {
             }
             watchCaptureNeedsBaseline.remove(set.id)
         }
-        set.completedAt = Date()
+        set.completedAt = completedAt
         if let measuredEffort {
             set.actualSetElapsedSeconds = measuredEffort
         }
@@ -4314,7 +4316,8 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func completeCurrentSetWithoutDetails(
-        restSeconds: Int? = nil
+        restSeconds: Int? = nil,
+        completedAt: Date = Date()
     ) {
         completeCurrentSet(
             reps: nil,
@@ -4322,7 +4325,8 @@ final class StrengthWorkoutStore: ObservableObject {
             rpe: nil,
             rir: nil,
             isWarmUp: draftWarmUp,
-            restSeconds: restSeconds
+            restSeconds: restSeconds,
+            completedAt: completedAt
         )
     }
 
