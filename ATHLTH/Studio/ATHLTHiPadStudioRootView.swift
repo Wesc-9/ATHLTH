@@ -135,8 +135,8 @@ struct ATHLTHiPadStudioRootView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel(
                                 ATHLTHLocalization.choose(
-                                    english: "Open messages and activity",
-                                    norwegian: "Åpne meldinger og aktivitet"
+                                    english: "Open Inbox",
+                                    norwegian: "Åpne innboks"
                                 )
                             )
                             .accessibilityIdentifier("athlth-ipad-message-edge")
