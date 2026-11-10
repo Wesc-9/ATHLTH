@@ -21,11 +21,10 @@ struct ATHLTHRunBasicSetupView: View {
     /// Basic offers one simple coach toggle; Advanced owns the full rules.
     var audioCoachEnabled: Binding<Bool>? = nil
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var showsWorkoutDetails = false
 
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
-    private let gold = ATHLTHTrainDesign.gold
 
     private var suggestedName: String {
         switch mode {
@@ -45,45 +44,65 @@ struct ATHLTHRunBasicSetupView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            detailsCard
+        VStack(alignment: .leading, spacing: 15) {
+            sectionHeading(ATHLTHLocalization.choose(
+                english: "Running", norwegian: "Løping"
+            ))
 
-            VStack(alignment: .leading, spacing: 8) {
-                sectionHeading(
-                    ATHLTHLocalization.choose(english: "Run type", norwegian: "Løpetype")
-                )
-                if onChooseGoal != nil || onChooseGhost != nil {
-                    LazyVGrid(
-                        columns: [GridItem(.flexible()), GridItem(.flexible())],
-                        spacing: 9
-                    ) {
-                        runTiles
-                    }
-                } else {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 9) { runTiles }
-                        if dynamicTypeSize.isAccessibilitySize {
-                            VStack(spacing: 8) { runTiles }
-                        } else {
-                            HStack(spacing: 5) { runTiles }
-                        }
-                    }
-                }
+            ATHLTHBasicActivityHero(
+                title: ATHLTHLocalization.choose(
+                    english: "Free running", norwegian: "Fri løping"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Start without a plan. Add goals and coaching if you want.",
+                    norwegian: "Start uten plan. Legg til mål og veiledning hvis du ønsker."
+                ),
+                symbol: "figure.run",
+                isSelected: mode == .free && !isGoalSelected && !isGhostSelected
+            ) {
+                onChooseStandardMode?()
+                mode = .free
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                sectionHeading(
-                    ATHLTHLocalization.choose(english: "Where are you running?",
-                                              norwegian: "Hvor trener du?")
-                )
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 9) { environmentTiles }
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(spacing: 8) { environmentTiles }
-                    } else {
-                        HStack(spacing: 5) { environmentTiles }
+            sectionHeading(ATHLTHLocalization.choose(
+                english: "Other ways to run", norwegian: "Andre måter å løpe på"
+            ))
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 10),
+                          GridItem(.flexible(), spacing: 10)],
+                spacing: 10
+            ) {
+                runTiles
+            }
+
+            DisclosureGroup(isExpanded: $showsWorkoutDetails) {
+                detailsCard
+                    .padding(.top, 10)
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(bronze)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Workout details", norwegian: "Øktdetaljer"
+                        ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                        Text(environment.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
+                .frame(minHeight: 44)
+            }
+            .tint(bronze)
+            .padding(14)
+            .athlthTrainPaper()
+        }
+        .onChange(of: environment) { _, value in
+            if value != .outdoor && mode == .route {
+                onChooseStandardMode?()
+                mode = .free
             }
         }
     }
@@ -175,6 +194,8 @@ struct ATHLTHRunBasicSetupView: View {
             .background(ATHLTHPlanDesign.canvas,
                         in: RoundedRectangle(cornerRadius: 12))
 
+            ATHLTHRunEnvironmentDetailRow(environment: $environment)
+
             if let audioCoachEnabled {
                 Toggle(isOn: audioCoachEnabled) {
                     Label("Audio Coach", systemImage: "waveform")
@@ -199,12 +220,18 @@ struct ATHLTHRunBasicSetupView: View {
 
     @ViewBuilder
     private var runTiles: some View {
-        ForEach(RunQuickStartMode.allCases) { option in
-            choiceTile(
+        ForEach(RunQuickStartMode.allCases.filter { $0 != .free }) { option in
+            ATHLTHBasicActivityModeTile(
                 title: option.title,
+                subtitle: option == .route
+                    ? ATHLTHLocalization.choose(
+                        english: "Map and guidance", norwegian: "Kart og navigasjon"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Intervals and plans", norwegian: "Intervaller og økter"
+                    ),
                 symbol: option.icon,
-                selected: mode == option &&
-                    !isGoalSelected && !isGhostSelected
+                selected: mode == option && !isGoalSelected && !isGhostSelected
             ) {
                 onChooseStandardMode?()
                 if option == .route {
@@ -217,96 +244,29 @@ struct ATHLTHRunBasicSetupView: View {
             }
         }
         if let onChooseGoal {
-            choiceTile(
+            ATHLTHBasicActivityModeTile(
                 title: ATHLTHLocalization.choose(
                     english: "Goal-based", norwegian: "Målstyrt"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Time, pace or pulse", norwegian: "Tid, tempo eller puls"
                 ),
                 symbol: "target", selected: isGoalSelected,
                 action: onChooseGoal
             )
         }
         if let onChooseGhost {
-            choiceTile(
+            ATHLTHBasicActivityModeTile(
                 title: "Ghost Race",
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Race your past self", norwegian: "Utfordre deg selv"
+                ),
                 symbol: "figure.run.circle", selected: isGhostSelected,
                 action: onChooseGhost
             )
         }
     }
 
-    @ViewBuilder
-    private var environmentTiles: some View {
-        ForEach(RunEnvironment.allCases) { option in
-            choiceTile(
-                title: option.title,
-                symbol: option.systemImage,
-                selected: environment == option
-            ) {
-                environment = option
-                if option != .outdoor && mode == .route {
-                    mode = .free
-                    onChooseStandardMode?()
-                }
-            }
-        }
-    }
-
-    private func choiceTile(
-        title: String,
-        symbol: String,
-        selected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack {
-                    Image(systemName: symbol)
-                        .font(.system(size: 19, weight: .medium))
-                        .foregroundStyle(selected ? .white : bronze)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            selected ? bronze : ATHLTHTrainDesign.paleGold.opacity(0.48),
-                            in: RoundedRectangle(cornerRadius: 11)
-                        )
-                    Spacer(minLength: 0)
-                    if selected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 15))
-                            .foregroundStyle(bronze)
-                    }
-                }
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 83 : 68,
-                   alignment: .topLeading)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 10)
-            .background(
-                selected
-                    ? ATHLTHTrainDesign.paleGold.opacity(0.37)
-                    : ATHLTHTrainDesign.paper,
-                in: RoundedRectangle(cornerRadius: 17)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .strokeBorder(
-                        selected ? gold.opacity(0.8)
-                            : ATHLTHTrainDesign.rule.opacity(0.42),
-                        lineWidth: selected ? 1.2 : 0.8
-                    )
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 17))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .frame(maxWidth: .infinity)
-    }
 }
 
  
