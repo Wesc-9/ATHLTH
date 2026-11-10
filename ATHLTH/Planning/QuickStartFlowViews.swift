@@ -3885,160 +3885,198 @@ struct StrengthQuickStartSheet: View {
     @EnvironmentObject private var social: SocialStore
 
     let onChoose: (PlannedSession) -> Void
+    @State private var draftID = UUID()
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10)
+    ]
+    private let modes: [WorkoutBlockGroupKind] = [
+        .superset, .circuit, .emom, .amrap, .dropSet
+    ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    QuickTrainingHeroCard(
-                        imageName:
-                            "StrengthQuickHero",
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Start Strength",
-                                norwegian:
-                                    "Start styrkeøkt"
-                            ),
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Add exercises first for a focused session, or choose a completely open workout.",
-                                norwegian:
-                                    "Legg inn øvelser først for en fokusert økt, eller velg en helt åpen økt."
-                            ),
-                        icon:
-                            "figure.strengthtraining.traditional"
-                    )
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Strength", norwegian: "Styrketrening"
+                    ))
+                    .font(.system(size: 26, weight: .medium, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+
+                    ATHLTHBasicActivityHero(
+                        title: ATHLTHLocalization.choose(
+                            english: "Free strength training",
+                            norwegian: "Fri styrketrening"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Start without a plan. Add exercises and sets as you go.",
+                            norwegian: "Start uten plan. Legg til øvelser og sett underveis."
+                        ),
+                        symbol: "dumbbell",
+                        isSelected: false,
+                        actionTitle: ATHLTHLocalization.choose(
+                            english: "Start free strength",
+                            norwegian: "Start fri styrketrening"
+                        )
+                    ) {
+                        beginWorkout(emptySession)
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Other ways to train",
+                        norwegian: "Andre måter å trene styrke på"
+                    ))
+                    .font(.system(size: 17, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        NavigationLink {
+                            StrengthQuickBuilderView { workout in
+                                beginWorkout(workout)
+                            }
+                        } label: {
+                            ATHLTHBasicActivityModeTile(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Training workout",
+                                    norwegian: "Treningsøkt"
+                                ),
+                                subtitle: ATHLTHLocalization.choose(
+                                    english: "Choose exercises and sets",
+                                    norwegian: "Velg øvelser og sett"
+                                ),
+                                symbol: "list.bullet.clipboard",
+                                selected: false
+                            ) {}
+                        }
+                        .buttonStyle(.plain)
+
+                        ForEach(modes, id: \.self) { kind in
+                            NavigationLink {
+                                strengthModeBuilder(kind)
+                            } label: {
+                                ATHLTHBasicActivityModeTile(
+                                    title: kind.title,
+                                    subtitle: modeSubtitle(kind),
+                                    symbol: kind.symbol,
+                                    selected: false
+                                ) {}
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
 
                     NavigationLink {
-                        StrengthQuickBuilderView { workout in
-                            social.prepareQuickTrainFriendsForLaunch()
-                            onChoose(workout)
-                            dismiss()
-                        }
+                        strengthAdvancedBuilder
                     } label: {
-                        choiceCard(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Add exercises first",
-                                    norwegian:
-                                        "Legg til øvelser først"
-                                ),
-                            subtitle:
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Build the workout before you start. During training ATHLTH shows one exercise at a time.",
-                                    norwegian:
-                                        "Bygg økten før du starter. Under trening viser ATHLTH én øvelse om gangen."
-                                ),
-                            icon:
-                                "list.bullet.clipboard.fill"
-                        )
+                        Label(ATHLTHLocalization.choose(
+                            english: "Advanced workout builder",
+                            norwegian: "Avansert øktbygger"
+                        ), systemImage: "slider.horizontal.3")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(.plain)
-
-                    Button {
-                        social.prepareQuickTrainFriendsForLaunch()
-                        onChoose(emptySession)
-                        dismiss()
-                    } label: {
-                        choiceCard(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Train without a plan",
-                                    norwegian:
-                                        "Tren uten plan"
-                                ),
-                            subtitle:
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Start the timer without preloading exercises. You can add one while training if you want.",
-                                    norwegian:
-                                        "Start tidtaking uten å legge inn øvelser på forhånd. Du kan legge til en øvelse underveis hvis du vil."
-                                ),
-                            icon:
-                                "figure.strengthtraining.traditional"
-                        )
-                    }
-                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-strength-advanced-builder")
                 }
-                .padding()
+                .padding(16)
             }
-            .navigationTitle(
-                ATHLTHLocalization.choose(
-                    english: "Strength",
-                    norwegian: "Styrke"
-                )
-            )
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Strength", norwegian: "Styrke"
+            ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
                 }
             }
         }
+    }
+
+    private func modeSubtitle(_ mode: WorkoutBlockGroupKind) -> String {
+        switch mode {
+        case .superset: return ATHLTHLocalization.choose(
+            english: "Exercises back to back", norwegian: "Øvelser etter hverandre"
+        )
+        case .circuit: return ATHLTHLocalization.choose(
+            english: "Stations and rounds", norwegian: "Stasjoner og runder"
+        )
+        case .emom: return ATHLTHLocalization.choose(
+            english: "Every minute", norwegian: "Hvert minutt"
+        )
+        case .amrap: return ATHLTHLocalization.choose(
+            english: "As many rounds as possible", norwegian: "Flest mulig runder"
+        )
+        case .dropSet: return ATHLTHLocalization.choose(
+            english: "Reduce the load", norwegian: "Reduser vekten"
+        )
+        case .intervals: return ATHLTHLocalization.choose(
+            english: "Intervals", norwegian: "Intervaller"
+        )
+        }
+    }
+
+    private func strengthModeBuilder(_ kind: WorkoutBlockGroupKind) -> some View {
+        WorkoutTemplateBuilderView(
+            initialTitle: kind.title,
+            initialQuickAdd: kind.rawValue,
+            draftContext: "quick-strength-\(draftID.uuidString)-\(kind.rawValue)",
+            initialActivity: .strength,
+            initialStudioAdvanced: true,
+            onAddStandalone: { workout in
+                beginWorkout(workout)
+                return true
+            },
+            saveButtonTitle: ATHLTHLocalization.choose(
+                english: "Continue to start", norwegian: "Gå videre til start"
+            )
+        )
+    }
+
+    private var strengthAdvancedBuilder: some View {
+        WorkoutTemplateBuilderView(
+            initialTitle: ATHLTHLocalization.choose(
+                english: "Strength workout", norwegian: "Styrkeøkt"
+            ),
+            draftContext: "quick-strength-advanced-\(draftID.uuidString)",
+            initialActivity: .strength,
+            initialStudioAdvanced: true,
+            onAddStandalone: { workout in
+                beginWorkout(workout)
+                return true
+            },
+            saveButtonTitle: ATHLTHLocalization.choose(
+                english: "Continue to start", norwegian: "Gå videre til start"
+            )
+        )
+    }
+
+    private func beginWorkout(_ workout: PlannedSession) {
+        social.prepareQuickTrainFriendsForLaunch()
+        onChoose(workout)
+        dismiss()
     }
 
     private var emptySession: PlannedSession {
         PlannedSession(
             id: UUID(),
-            title:
-                ATHLTHLocalization.choose(
-                    english: "Strength",
-                    norwegian: "Styrke"
-                ),
-            kind: .strength,
-            scheduledStart: nil,
+            title: ATHLTHLocalization.choose(
+                english: "Free strength training", norwegian: "Fri styrketrening"
+            ),
+            kind: .strength, scheduledStart: nil,
             durationMinutes: nil,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
-            routeID: nil,
-            exercises: [],
-            notes:
-                "Open strength session · exercises can be added during training",
+            routeID: nil, exercises: [],
+            notes: "Open strength session · exercises can be added during training",
             runningWorkout: nil
         )
-    }
-
-    private func choiceCard(
-        title: String,
-        subtitle: String,
-        icon: String
-    ) -> some View {
-        ATHLTHCard {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 52, height: 52)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 15)
-                    )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.bold())
-                    .foregroundStyle(.tertiary)
-            }
-        }
     }
 }
 
