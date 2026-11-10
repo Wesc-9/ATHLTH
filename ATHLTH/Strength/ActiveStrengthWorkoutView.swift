@@ -2383,6 +2383,11 @@ struct ActiveStrengthWorkoutView: View {
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
+                        .onChange(of: timeline.date) { _, instant in
+                            if kind == .emom {
+                                _ = strength.reconcileCurrentEMOM(at: instant)
+                            }
+                        }
                     }
                 } else {
                     HStack {
