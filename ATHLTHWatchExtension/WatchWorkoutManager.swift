@@ -178,6 +178,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var recordedStructuredRunMinutes: [ATHLTHRecordedRunningMinute] = []
     private var lastIntervalProgressCueKey: String?
     private var lastIntervalWarningCueKey: String?
+    // One haptic per EMOM boundary, scoped to the group's start.
+    private var lastEMOMHapticGroupStart: Date?
+    private var lastEMOMHapticSlot = -1
     private var plannedRouteLocations: [CLLocation] = []
     private var plannedRouteCumulativeMeters: [Double] = []
     private var plannedRouteGeometryMeters: Double = 0
@@ -4445,6 +4448,28 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         return true
     }
 
+    /// Watch haptics are alerts only. Clock ticks never mark sets complete.
+    private func announceStrengthEMOMMinuteIfDue(now: Date) {
+        guard kind == .strength, state == .running,
+              let snapshot = strengthSession,
+              snapshot.strengthModeRaw == "emom",
+              let started = snapshot.strengthModeStartedAt,
+              let seconds = snapshot.strengthModeClockSeconds,
+              seconds.isFinite, seconds > 0 else { return }
+        if lastEMOMHapticGroupStart != started {
+            lastEMOMHapticGroupStart = started
+            lastEMOMHapticSlot = -1
+        }
+        let elapsed = now.timeIntervalSince(started)
+        guard elapsed >= seconds else { return }
+        let slot = Int(floor(elapsed / seconds))
+        let delay = elapsed - Double(slot) * seconds
+        guard slot > lastEMOMHapticSlot, delay >= 0, delay <= 2.5
+        else { return }
+        lastEMOMHapticSlot = slot
+        WKInterfaceDevice.current().play(.notification)
+    }
+
     private func startTimer() {
         stopTimer()
 
@@ -4474,6 +4499,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     )
 
                 self.evaluateIndoorSuggestion(now: Date())
+                self.announceStrengthEMOMMinuteIfDue(now: Date())
                 self.recordRunningMinuteIfDue()
                 self.advanceEmbeddedHybridIntervalIfNeeded(at: Date())
                 self.evaluateStructuredRunningWorkout()
