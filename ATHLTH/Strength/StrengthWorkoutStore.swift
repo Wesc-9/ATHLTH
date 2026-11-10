@@ -3168,8 +3168,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 false
         )
 
+        let launchStartedAt = launchedWorkout.startedAt
         Self.beginStrengthGroup(&launchedWorkout, selected: 0,
-                                at: launchedWorkout.startedAt)
+                                at: launchStartedAt)
         launchedWorkout.plannedTrainingPlace = session.plannedTrainingPlace
         launchedWorkout.liveHeartRateTargetZone =
             session.targetAlertConfiguration?.heartRateZone
