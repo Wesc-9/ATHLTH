@@ -6671,8 +6671,12 @@ struct SessionEditorView: View {
                     initialActivity: selectedScratchWorkoutType,
                     onScheduledTimeChanged: { scheduledTime = $0 },
                     onAddStandalone: { updated in
-                        if isStandalone, onPreparedWorkout == nil,
-                           selectedPartnerID == nil, !saveToActivePlan {
+                        if ATHLTHScratchComposerPresentationPolicy.savesDirectly(
+                            isStandalone: isStandalone,
+                            preparesForSharing: onPreparedWorkout != nil,
+                            hasPartner: selectedPartnerID != nil,
+                            targetsActivePlan: saveToActivePlan
+                        ) {
                             // Preserve the complete workout snapshot
                             // (music, gear, run environment, coach, blocks).
                             // The parent must not re-compose a reduced
@@ -6909,8 +6913,12 @@ struct SessionEditorView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
-                    if isStandalone && selectedScratchWorkoutType != nil &&
-                        showingUnifiedWorkoutComposer && !draftFinalized {
+                    if ATHLTHScratchComposerPresentationPolicy.shouldRestoreOnWake(
+                        isStandalone: isStandalone,
+                        hasScratchSource: selectedScratchWorkoutType != nil,
+                        builderWasPresented: showingUnifiedWorkoutComposer,
+                        isFinalized: draftFinalized
+                    ) {
                         restoreScratchComposerOnWake = true
                     }
                     persistDraft()
