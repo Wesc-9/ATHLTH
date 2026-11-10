@@ -17,6 +17,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddFreeStrength: (WorkoutPhaseKind) -> Void
     let onAddSuperset: (WorkoutPhaseKind) -> Void
     let onAddCircuit: (WorkoutPhaseKind) -> Void
+    let onAddStrengthMode: (WorkoutPhaseKind, WorkoutBlockGroupKind) -> Void
+    let onSetGroupClock: (UUID, TimeInterval) -> Void
     let onAddExerciseToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onAddRestToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onMoveSupersetMember: (UUID, UUID) -> Void
@@ -459,6 +461,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         }
         let exercises = members.filter { $0.kind == .exercise }
         let rounds = members.first?.groupRounds ?? 3
+        let clock = members.first?.groupClockSeconds
         let collapsed = collapsedSupersetGroups.contains(id)
 
         return VStack(alignment: .leading, spacing: 10) {
@@ -479,11 +482,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         Text(kind.title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
-                        Text("\(exercises.count) " + ATHLTHLocalization.choose(
-                            english: "exercises", norwegian: "øvelser"
-                        ) + " · \(rounds) " + ATHLTHLocalization.choose(
-                            english: "rounds", norwegian: "runder"
-                        ))
+                        Text(groupSummary(kind: kind, exerciseCount: exercises.count,
+                                          rounds: rounds, clockSeconds: clock))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     }
@@ -496,14 +496,25 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 .frame(minHeight: 44)
 
                 Menu {
-                    ForEach(1...20, id: \.self) { count in
-                        Button("\(count) " + ATHLTHLocalization.choose(
-                            english: "rounds", norwegian: "runder"
-                        )) {
-                            onSetSupersetRounds(id, count)
+                    if kind != .amrap && kind != .dropSet {
+                        ForEach(1...20, id: \.self) { count in
+                            Button("\(count) " + ATHLTHLocalization.choose(
+                                english: kind == .emom ? "cycles" : "rounds",
+                                norwegian: kind == .emom ? "sykluser" : "runder"
+                            )) {
+                                onSetSupersetRounds(id, count)
+                            }
                         }
+                        Divider()
                     }
-                    Divider()
+                    if kind == .amrap {
+                        ForEach([5, 8, 10, 12, 15, 20, 25, 30], id: \.self) { minutes in
+                            Button("\(minutes) min") {
+                                onSetGroupClock(id, Double(minutes * 60))
+                            }
+                        }
+                        Divider()
+                    }
                     Button {
                         onUngroupSuperset(id)
                         collapsedSupersetGroups.remove(id)
@@ -533,10 +544,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     Label(ATHLTHLocalization.choose(
                         english: kind == .circuit
                             ? "Add at least three exercises to complete the circuit."
-                            : "Choose at least two exercises to complete the superset.",
+                            : "Add exercises to complete this group.",
                         norwegian: kind == .circuit
                             ? "Legg til minst tre øvelser for å fullføre sirkeltreningen."
-                            : "Legg til minst to øvelser for å fullføre supersettet."
+                            : "Legg til flere øvelser for å fullføre gruppen."
                     ), systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -551,24 +562,24 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     }
                 }
 
-                Button {
-                    onAddExerciseToSuperset(phase, id)
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: kind == .circuit
-                            ? "Add exercise to circuit" : "Add exercise to superset",
-                        norwegian: kind == .circuit
-                            ? "Legg til øvelse i sirkeltrening" : "Legg til øvelse i supersett"
-                    ), systemImage: "plus.circle")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(bronze)
-                    .frame(maxWidth: .infinity, minHeight: 42)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 12))
+                if kind.allowsAdditionalStations {
+                    Button {
+                        onAddExerciseToSuperset(phase, id)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Add exercise", norwegian: "Legg til øvelse"
+                        ), systemImage: "plus.circle")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(bronze)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
-                if !members.contains(where: { $0.isRestOrActiveRecovery }) {
+                if kind.canInsertRoundPause &&
+                   !members.contains(where: { $0.isRestOrActiveRecovery }) {
                     Button {
                         onAddRestToSuperset(phase, id)
                     } label: {
@@ -582,7 +593,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .buttonStyle(.plain)
                     .padding(.vertical, 6)
                 }
-            } else if exercises.count < kind.minimumStrengthExercises {
+            } else if exercises.count < kind.minimumStrengthExercises &&
+                      kind.allowsAdditionalStations {
                 Button {
                     collapsedSupersetGroups.remove(id)
                     onAddExerciseToSuperset(phase, id)
@@ -601,6 +613,34 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(bronze.opacity(0.23), lineWidth: 0.8)
+        }
+    }
+
+    private func groupSummary(
+        kind: WorkoutBlockGroupKind, exerciseCount: Int,
+        rounds: Int, clockSeconds: TimeInterval?
+    ) -> String {
+        let count = "\(exerciseCount) " + ATHLTHLocalization.choose(
+            english: kind == .dropSet ? "weight stages" : "exercises",
+            norwegian: kind == .dropSet ? "vekttrinn" : "øvelser"
+        )
+        switch kind {
+        case .emom:
+            return count + " · \(rounds) " + ATHLTHLocalization.choose(
+                english: "cycles", norwegian: "sykluser"
+            ) + " · 60 s " + ATHLTHLocalization.choose(
+                english: "per station", norwegian: "per stasjon"
+            )
+        case .amrap:
+            return count + " · \(Int((clockSeconds ?? 720) / 60)) min"
+        case .dropSet:
+            return count + " · " + ATHLTHLocalization.choose(
+                english: "no rest", norwegian: "uten pause"
+            )
+        case .circuit, .superset, .intervals:
+            return count + " · \(rounds) " + ATHLTHLocalization.choose(
+                english: "rounds", norwegian: "runder"
+            )
         }
     }
 
@@ -953,6 +993,14 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 } label: {
                     Label(WorkoutBlockGroupKind.circuit.title,
                           systemImage: WorkoutBlockGroupKind.circuit.symbol)
+                }
+                ForEach([WorkoutBlockGroupKind.emom, .amrap, .dropSet],
+                        id: \.self) { kind in
+                    Button {
+                        onAddStrengthMode(phase, kind)
+                    } label: {
+                        Label(kind.title, systemImage: kind.symbol)
+                    }
                 }
             }
             if activity != .running {
