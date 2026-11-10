@@ -309,23 +309,55 @@ struct ExerciseLibraryView: View {
         // entire on-device exercise library while that tab is selected.
         let entries = selectedSection == .marketplace ? [] : displayedResults
         return VStack(spacing: 0) {
-            if source == nil {
+            if onSelect == nil {
+                HStack(spacing: 10) {
+                    if selectedSection == .marketplace {
+                        Button {
+                            selectedSection = .library
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Back to exercises",
+                                    norwegian: "Tilbake til øvelser"
+                                ),
+                                systemImage: "chevron.left"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        ATHLTHLibrarySourcePicker(selection: standaloneScope)
+                            .accessibilityIdentifier("exercises-source-filter")
+                    }
+                    if source == nil {
+                        Button {
+                            selectedSection = selectedSection == .marketplace
+                                ? .library : .marketplace
+                        } label: {
+                            Image(systemName: selectedSection == .marketplace
+                                  ? "books.vertical" : "bag")
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .frame(width: 44, height: 44)
+                                .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Exercise marketplace", norwegian: "Øvelsesmarked"
+                        ))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+            } else if source == nil {
                 ATHLTHPremiumSegmentedControl(
-                    titles:
-                        ExerciseLibrarySection
-                            .allCases
-                            .map(\.title),
-                    selection:
-                        selectedSectionIndex
+                    titles: ExerciseLibrarySection.allCases.map(\.title),
+                    selection: selectedSectionIndex
                 )
                 .padding(.horizontal)
                 .padding(.top, 10)
                 .padding(.bottom, 4)
-            } else if onSelect == nil {
-                ATHLTHLibrarySourcePicker(selection: standaloneScope)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .accessibilityIdentifier("exercises-source-filter")
             }
 
             if selectedSection == .marketplace {
