@@ -76,7 +76,7 @@ final class AthleteOfflinePackStore: ObservableObject {
                 newest[routeID] = (date: manifest.downloadedAt, file: file)
             }
         }
-        routeSnapshotFileIndex = newest.mapValues(\.file)
+        routeSnapshotFileIndex = newest.mapValues { $0.file }
     }
 
     private func root(_ id: UUID) throws -> URL {
