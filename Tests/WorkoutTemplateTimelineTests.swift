@@ -349,7 +349,7 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         XCTAssertFalse(ATHLTHStrengthModeAvailability.canCreate(
             initialActivity: nil, containsStrength: false
         ))
-        for category: ATHLTHPlannedWorkoutType in [.running, .walking, .cycling, .mobility] {
+        for category in [ATHLTHPlannedWorkoutType.running, .walking, .cycling, .mobility] {
             XCTAssertFalse(ATHLTHStrengthModeAvailability.canCreate(
                 initialActivity: category, containsStrength: true
             ))
