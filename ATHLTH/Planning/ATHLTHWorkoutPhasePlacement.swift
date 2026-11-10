@@ -63,6 +63,15 @@ enum ATHLTHWorkoutPhasePlacement {
         next.groupID = block.groupID
         next.groupKind = block.groupKind
         next.groupRounds = block.groupRounds
+        // Renumbering happens on *every* editor insert, delete and reorder.
+        // Dropping these fields would silently reset timed strength programs.
+        next.groupClockSeconds = block.groupClockSeconds
+        next.executionGroupKind = block.executionGroupKind
+        next.executionGroupID = block.executionGroupID
+        next.executionRound = block.executionRound
+        next.executionTotalRounds = block.executionTotalRounds
+        next.executionGroupClockSeconds = block.executionGroupClockSeconds
+        next.executionStationCount = block.executionStationCount
         next.cardioActivity = block.cardioActivity
         next.isIndoor = block.isIndoor
         next.exerciseSnapshot = block.exerciseSnapshot
