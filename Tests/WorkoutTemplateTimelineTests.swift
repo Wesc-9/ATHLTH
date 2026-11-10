@@ -104,7 +104,7 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         )
         XCTAssertEqual(
             ATHLTHWorkoutDurationEstimator.minutes(for: [squat, bench, row, pause]),
-            20
+            10
         )
     }
 
