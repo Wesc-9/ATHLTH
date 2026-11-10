@@ -101,6 +101,9 @@ enum WorkoutPhaseKind: String, Codable, CaseIterable, Identifiable {
 enum WorkoutBlockGroupKind: String, Codable, Hashable {
     case superset
     case circuit
+    case emom
+    case amrap
+    case dropSet = "dropset"
     case intervals
 
     var title: String {
@@ -109,6 +112,10 @@ enum WorkoutBlockGroupKind: String, Codable, Hashable {
             return ATHLTHLocalization.choose(english: "Superset", norwegian: "Supersett")
         case .circuit:
             return ATHLTHLocalization.choose(english: "Circuit training", norwegian: "Sirkeltrening")
+        case .emom: return "EMOM"
+        case .amrap: return "AMRAP"
+        case .dropSet:
+            return ATHLTHLocalization.choose(english: "Drop set", norwegian: "Dropsett")
         case .intervals:
             return ATHLTHLocalization.choose(english: "Intervals", norwegian: "Intervaller")
         }
@@ -118,6 +125,9 @@ enum WorkoutBlockGroupKind: String, Codable, Hashable {
         switch self {
         case .superset: return "dumbbell.fill"
         case .circuit: return "arrow.triangle.2.circlepath"
+        case .emom: return "clock.arrow.circlepath"
+        case .amrap: return "timer"
+        case .dropSet: return "arrow.down.right"
         case .intervals: return "repeat"
         }
     }
@@ -128,11 +138,16 @@ enum WorkoutBlockGroupKind: String, Codable, Hashable {
         switch self {
         case .superset: return 2
         case .circuit: return 3
+        case .emom, .amrap: return 1
+        case .dropSet: return 2
         case .intervals: return 0
         }
     }
 
-    var isStrengthGroup: Bool { self == .superset || self == .circuit }
+    var isStrengthGroup: Bool { self != .intervals }
+    var usesGroupClock: Bool { self == .emom || self == .amrap }
+    var canInsertRoundPause: Bool { self == .superset || self == .circuit }
+    var allowsAdditionalStations: Bool { self != .dropSet }
 }
 
 struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
@@ -171,6 +186,16 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var groupID: UUID? = nil
     var groupKind: WorkoutBlockGroupKind? = nil
     var groupRounds: Int? = nil
+    /// EMOM: seconds per station; AMRAP: total seconds.
+    var groupClockSeconds: TimeInterval? = nil
+    /// Expanded execution metadata; source groupID and groupKind remain
+    /// untouched. All optional for backward-compatible saved workouts.
+    var executionGroupKind: WorkoutBlockGroupKind? = nil
+    var executionGroupID: UUID? = nil
+    var executionRound: Int? = nil
+    var executionTotalRounds: Int? = nil
+    var executionGroupClockSeconds: TimeInterval? = nil
+    var executionStationCount: Int? = nil
     /// Nil is an old running block. New walk blocks keep their real identity.
     var cardioActivity: WorkoutCardioActivity? = nil
     /// Nil remains outdoors for backward compatibility.
@@ -216,6 +241,13 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.groupID == rhs.groupID &&
         lhs.groupKind == rhs.groupKind &&
         lhs.groupRounds == rhs.groupRounds &&
+        lhs.groupClockSeconds == rhs.groupClockSeconds &&
+        lhs.executionGroupKind == rhs.executionGroupKind &&
+        lhs.executionGroupID == rhs.executionGroupID &&
+        lhs.executionRound == rhs.executionRound &&
+        lhs.executionTotalRounds == rhs.executionTotalRounds &&
+        lhs.executionGroupClockSeconds == rhs.executionGroupClockSeconds &&
+        lhs.executionStationCount == rhs.executionStationCount &&
         lhs.cardioActivity == rhs.cardioActivity &&
         lhs.isIndoor == rhs.isIndoor &&
         lhs.exerciseSnapshot == rhs.exerciseSnapshot &&
@@ -250,6 +282,13 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(groupID)
         hasher.combine(groupKind)
         hasher.combine(groupRounds)
+        hasher.combine(groupClockSeconds)
+        hasher.combine(executionGroupKind)
+        hasher.combine(executionGroupID)
+        hasher.combine(executionRound)
+        hasher.combine(executionTotalRounds)
+        hasher.combine(executionGroupClockSeconds)
+        hasher.combine(executionStationCount)
         hasher.combine(cardioActivity)
         hasher.combine(isIndoor)
         hasher.combine(exerciseSnapshot)
@@ -292,6 +331,13 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case groupID = "group_id"
         case groupKind = "group_kind"
         case groupRounds = "group_rounds"
+        case groupClockSeconds = "group_clock_seconds"
+        case executionGroupKind = "execution_group_kind"
+        case executionGroupID = "execution_group_id"
+        case executionRound = "execution_round"
+        case executionTotalRounds = "execution_total_rounds"
+        case executionGroupClockSeconds = "execution_group_clock_seconds"
+        case executionStationCount = "execution_station_count"
         case cardioActivity = "cardio_activity"
         case isIndoor = "is_indoor"
         case exerciseSnapshot = "exercise_snapshot"
@@ -404,7 +450,10 @@ extension Array where Element == WorkoutTemplateBlock {
         var cursor = 0
 
         func append(_ source: WorkoutTemplateBlock, title: String? = nil,
-                    strengthSet: ATHLTHStrengthSetTarget? = nil) {
+                    strengthSet: ATHLTHStrengthSetTarget? = nil,
+                    origin: WorkoutTemplateBlock? = nil,
+                    round: Int? = nil, totalRounds: Int? = nil,
+                    stationCount: Int? = nil) {
             guard output.count < 1000 else { return }
             var item = WorkoutTemplateBlock(
                 sequence: output.count + 1,
@@ -436,6 +485,14 @@ extension Array where Element == WorkoutTemplateBlock {
             item.sourceIntensityZoneLabel = source.sourceIntensityZoneLabel
             item.targetHeartRatePercentMin = source.targetHeartRatePercentMin
             item.targetHeartRatePercentMax = source.targetHeartRatePercentMax
+            if let origin {
+                item.executionGroupKind = origin.groupKind
+                item.executionGroupID = origin.groupID
+                item.executionRound = round
+                item.executionTotalRounds = totalRounds
+                item.executionGroupClockSeconds = origin.groupClockSeconds
+                item.executionStationCount = stationCount
+            }
             output.append(item)
         }
 
@@ -448,6 +505,7 @@ extension Array where Element == WorkoutTemplateBlock {
                 }
                 let members = Array(self[start..<cursor])
                 let rounds = Swift.min(Swift.max(current.groupRounds ?? 1, 1), 20)
+                let stationCount = members.filter { $0.kind == .exercise }.count
                 for round in 1...rounds {
                     for (position, member) in members.enumerated() {
                         // A recovery at the end of an interval group is a
@@ -461,7 +519,9 @@ extension Array where Element == WorkoutTemplateBlock {
                         }
                         append(member, title: rounds > 1
                             ? "\(member.title) · \(round)/\(rounds)"
-                            : member.title)
+                            : member.title,
+                            origin: current, round: round,
+                            totalRounds: rounds, stationCount: stationCount)
                     }
                 }
             } else {
