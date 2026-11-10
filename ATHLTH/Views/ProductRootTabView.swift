@@ -1140,7 +1140,7 @@ struct ATHLTHHomeView: View {
 
                     HomeWeeklyProgressStrip(
                         plan: session.activePlan,
-                        workouts: health.workouts,
+                        workouts: homeRecordedWorkouts,
                         events: homeWeeklyCommunityEvents,
                         onStartStandaloneWorkout: { workout, device in
                             startHomeStandaloneWorkout(workout, device: device)
@@ -2091,9 +2091,19 @@ struct ATHLTHHomeView: View {
             )
     }
 
+    /// Keep iPhone weekly progress consistent with iPad Studio. Completed
+    /// strength sessions remain visible while their HealthKit export is pending.
+    /// The shared projection de-duplicates linked and time-matched recordings.
+    private var homeRecordedWorkouts: [WorkoutSummary] {
+        ATHLTHStudioRecordedWorkouts.merged(
+            health: health.workouts,
+            localStrength: strengthWorkout.workoutHistory
+        )
+    }
+
     private var homeWorkoutsThisWeek:
         [WorkoutSummary] {
-        health.workouts.filter {
+        homeRecordedWorkouts.filter {
             homeWeekInterval.contains(
                 $0.startDate
             )
