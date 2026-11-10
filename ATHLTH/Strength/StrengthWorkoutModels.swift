@@ -580,6 +580,14 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
         completedAt != nil
     }
 
+    /// Older manual skips remove planned sets and record a separate count;
+    /// timed EMOM skips retain the original slot and store skippedAt.
+    /// These must be combined for display, never counted twice in totals.
+    var auditedSkippedSets: Int {
+        (skippedPlannedSetCount ?? 0) +
+            sets.filter { $0.skippedAt != nil }.count
+    }
+
     var isWarmUpExercise: Bool {
         !sets.isEmpty && sets.allSatisfy {
             $0.isWarmUp == true || $0.plannedSetType == .warmUp
