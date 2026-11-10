@@ -64,7 +64,7 @@ struct ATHLTHStudioPlannerView: View {
                         Spacer()
 
                         Button {
-                            if session.activePlan != nil {
+                            if openedPlanID != nil || session.activePlan != nil {
                                 showingCoachAdaptation = true
                             } else {
                                 onOpenCoach?()
@@ -142,7 +142,7 @@ struct ATHLTHStudioPlannerView: View {
             .environment(\.athlthStudioFullscreenEditing, true)
         }
         .sheet(isPresented: $showingCoachAdaptation) {
-            CoachPlanAdaptationView()
+            CoachPlanAdaptationView(planID: openedPlanID)
                 .presentationDetents([.large])
         }
     }

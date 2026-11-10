@@ -11,15 +11,20 @@ struct CoachPlanAdaptationView: View {
     @State private var errorMessage: String?
     @State private var infoMessage: String?
     @State private var appliedRecordID: UUID?
+    private let requestedPlanID: UUID?
 
-    init(initialNotes: String = "") {
+    init(initialNotes: String = "", planID: UUID? = nil) {
         _userNotes = State(initialValue: initialNotes)
+        self.requestedPlanID = planID
     }
 
     private let service = CoachPlanAdaptationService()
 
     private var plan: TrainingPlan? {
-        session.activePlan
+        // The iPad editor can open an owned plan that is not currently active.
+        // Proposal versioning and writes still use the canonical session store.
+        requestedPlanID.flatMap { session.trainingPlan(withID: $0) } ??
+            session.activePlan
     }
 
     private var proposal: CoachPlanChangeProposal? {
@@ -164,7 +169,9 @@ struct CoachPlanAdaptationView: View {
 
             Spacer()
 
-            Text("ACTIVE")
+            Text(session.activePlan?.id == plan.id
+                 ? ATHLTHLocalization.choose(english: "ACTIVE", norwegian: "AKTIV")
+                 : ATHLTHLocalization.choose(english: "SELECTED", norwegian: "VALGT"))
                 .font(.caption2.weight(.bold))
                 .tracking(1.2)
                 .foregroundStyle(ATHLTHTheme.vitality)
