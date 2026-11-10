@@ -67,6 +67,47 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         XCTAssertTrue(steps.allSatisfy { $0.groupID == nil })
     }
 
+    func testSupersetOptionalRoundRestRunsBetweenButNotAfterFinalRound() {
+        let group = UUID()
+        var squat = exercise("Squat")
+        var bench = exercise("Bench press")
+        var row = exercise("Row")
+        var pause = recovery()
+        squat.groupID = group
+        squat.groupKind = .superset
+        squat.groupRounds = 3
+        bench.groupID = group
+        bench.groupKind = .superset
+        bench.groupRounds = 3
+        row.groupID = group
+        row.groupKind = .superset
+        row.groupRounds = 3
+        pause.groupID = group
+        pause.groupKind = .superset
+        pause.groupRounds = 3
+
+        let steps = [squat, bench, row, pause].expandedForExecution()
+        XCTAssertEqual(steps.count, 11)
+        XCTAssertEqual(steps.map(\.kind), [
+            .exercise, .exercise, .exercise, .rest,
+            .exercise, .exercise, .exercise, .rest,
+            .exercise, .exercise, .exercise
+        ])
+        XCTAssertEqual(steps.map { $0.title.components(separatedBy: " · ")[0] }, [
+            "Squat", "Bench press", "Row", "Recovery",
+            "Squat", "Bench press", "Row", "Recovery",
+            "Squat", "Bench press", "Row"
+        ])
+        XCTAssertEqual(
+            steps.filter { $0.kind == .rest }.compactMap(\.durationSeconds),
+            [60, 60]
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.minutes(for: [squat, bench, row, pause]),
+            20
+        )
+    }
+
     func testIntervalRepeatsRunAndRecoveryButSkipsFinalRecovery() {
         let id = UUID()
         var run = running()
