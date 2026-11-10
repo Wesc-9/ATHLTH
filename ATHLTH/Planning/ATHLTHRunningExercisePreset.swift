@@ -6,7 +6,8 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
     case running, treadmill, progressive, drills, easy, strides, threshold, hills
     case fourByFour, thirtyThirty, fortyFiveFifteen, fiveByThree
     case sixByFourHundred, fiveByOneKilometer, shortIntervals, fartlek
-    case sixMinuteTest, cooldown
+    case sixMinuteTest, cooperTest, oneKilometerTest, fiveKilometerTest
+    case tenKilometerTest, longRun, recoveryRun, cooldown
 
     var id: String { rawValue }
 
@@ -29,6 +30,12 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
         case .shortIntervals: return tr("Sprint · 10 × 30 sec", "Sprint · 10 × 30 sek")
         case .fartlek: return tr("Fartlek · 10 × 1 min", "Fartslek · 10 × 1 min")
         case .sixMinuteTest: return tr("6-minute running test", "6-minutters løpstest")
+        case .cooperTest: return tr("Cooper test · 12 min", "Coopertest · 12 min")
+        case .oneKilometerTest: return tr("1 km time trial", "1 km testløp")
+        case .fiveKilometerTest: return tr("5 km time trial", "5 km testløp")
+        case .tenKilometerTest: return tr("10 km time trial", "10 km testløp")
+        case .longRun: return tr("Long run", "Langtur")
+        case .recoveryRun: return tr("Recovery run", "Restitusjonsløping")
         case .cooldown: return tr("Very easy jog", "Svært rolig nedjogg")
         }
     }
@@ -37,7 +44,10 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
         switch self {
         case .running: return tr("20 min · adjust time or distance", "20 min · juster tid eller distanse")
         case .treadmill: return tr("20 min · indoor, adjustable speed and incline", "20 min · innendørs, juster fart og stigning")
-        case .progressive: return tr("10 min · increasing pace", "10 min · gradvis økende fart")
+        case .progressive: return tr(
+            "15 min · 3 progressively faster, editable pace steps",
+            "15 min · 3 deløkter med økende, justerbart tempo"
+        )
         case .drills: return tr("5 min · technique and coordination", "5 min · teknikk og koordinasjon")
         case .easy: return tr("20 min · conversational pace", "20 min · rolig snakketempo")
         case .strides: return tr("6 repeats with 60 sec recovery", "6 drag med 60 sek pause")
@@ -52,6 +62,12 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
         case .shortIntervals: return tr("10 × 30 sec · 90 sec recovery", "10 × 30 sek · 90 sek pause")
         case .fartlek: return tr("10 × 1 min fast / 1 min easy", "10 × 1 min raskt / 1 min rolig")
         case .sixMinuteTest: return tr("6 min · greatest distance possible", "6 min · løp så langt du kan")
+        case .cooperTest: return tr("12 min · greatest distance possible", "12 min · løp så langt du kan")
+        case .oneKilometerTest: return tr("1 km · best time", "1 km · best mulig tid")
+        case .fiveKilometerTest: return tr("5 km · best time", "5 km · best mulig tid")
+        case .tenKilometerTest: return tr("10 km · best time", "10 km · best mulig tid")
+        case .longRun: return tr("75 min · easy aerobic effort", "75 min · rolig aerob langtur")
+        case .recoveryRun: return tr("25 min · easy HR zone", "25 min · rolig pulssone")
         case .cooldown: return tr("10 min · very gentle pace", "10 min · svært rolig tempo")
         }
     }
@@ -67,7 +83,22 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
             block.targetPaceSecondsPerKilometer = 360
             return [block]
         case .progressive:
-            return [Self.run(title: title, seconds: 600, effort: 4, phase: phase)]
+            // Each step has a real, editable pace target. Do not show
+            // "progressive" for one flat effort with no speed progression.
+            // These are example paces, not claims about athlete ability.
+            let paces: [TimeInterval] = [420, 390, 360]
+            return paces.enumerated().map { index, pace in
+                var step = Self.run(
+                    title: tr("Progressive step", "Progressivt drag") + " \(index + 1)",
+                    seconds: 300, effort: index + 3, phase: phase
+                )
+                step.targetPaceSecondsPerKilometer = pace
+                step.notes = tr(
+                    "Example target pace; adjust each step to your fitness.",
+                    "Eksempeltempo. Tilpass hvert drag til ditt nivå."
+                )
+                return step
+            }
         case .drills:
             var block = Self.run(title: title, seconds: 300, effort: 3, phase: phase)
             block.notes = tr("Running technique, cadence and acceleration drills.",
@@ -80,7 +111,15 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
                                   effort: 7, phase: phase,
                                   workName: tr("Stride", "Stigningsløp"))
         case .threshold:
-            return [Self.run(title: title, seconds: 1_200, effort: 7, phase: phase)]
+            var step = Self.run(title: title, seconds: 1_200, effort: 7, phase: phase)
+            // Threshold varies by athlete. Provide an editable initial zone
+            // without incorrectly claiming a personally measured threshold.
+            step.targetHeartRateZone = 4
+            step.notes = tr(
+                "Suggested HR zone 4. Adjust to your measured threshold or pace.",
+                "Foreslått pulssone 4. Juster etter målt terskel eller terskeltempo."
+            )
+            return [step]
         case .hills:
             return Self.intervals(work: 45, recovery: 90, rounds: 8,
                                   effort: 8, phase: phase,
@@ -113,12 +152,47 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
                                   rounds: 10, effort: 9, phase: phase,
                                   workName: tr("Sprint", "Sprint"))
         case .fartlek:
-            return Self.intervals(work: 60, recovery: 60,
-                                  rounds: 10, effort: 7, phase: phase,
-                                  workName: tr("Fast effort", "Hurtig drag"),
-                                  activeRecovery: true)
+            // Pyramid rather than another static 1/1 interval preset:
+            // fast 1-2-3-2-1 minutes, matched easy jogs, independently editable.
+            return [60.0, 120, 180, 120, 60].enumerated().flatMap { index, seconds in
+                var fast = Self.run(
+                    title: tr("Fartlek effort", "Fartslekdrag") + " \(index + 1)",
+                    seconds: seconds, effort: 7, phase: phase
+                )
+                fast.notes = tr("Comfortably fast; adjust effort or pace.",
+                                "Kontrollert raskt. Juster intensitet eller tempo.")
+                var easy = Self.run(
+                    title: tr("Easy jog", "Rolig jogg") + " \(index + 1)",
+                    seconds: seconds, effort: 2, phase: phase
+                )
+                easy.activityTag = "active_recovery"
+                easy.targetHeartRateZone = 2
+                return [fast, easy]
+            }
         case .sixMinuteTest:
             return [Self.run(title: title, seconds: 360, effort: 9, phase: phase)]
+        case .cooperTest:
+            return [Self.run(title: title, seconds: 720, effort: 9, phase: phase)]
+        case .oneKilometerTest, .fiveKilometerTest, .tenKilometerTest:
+            var test = Self.run(title: title, seconds: 600, effort: 9, phase: phase)
+            test.durationSeconds = nil
+            test.distanceMeters = self == .oneKilometerTest
+                ? 1_000 : self == .fiveKilometerTest ? 5_000 : 10_000
+            return [test]
+        case .longRun:
+            var long = Self.run(title: title, seconds: 4_500, effort: 3, phase: phase)
+            long.targetHeartRateZone = 2
+            long.notes = tr(
+                "Aerobic long run. Adjust zone, duration and optionally add a faster finish.",
+                "Rolig langtur. Juster sone og varighet, eller legg til en rask avslutning."
+            )
+            return [long]
+        case .recoveryRun:
+            var easy = Self.run(title: title, seconds: 1_500, effort: 2, phase: phase)
+            easy.targetHeartRateZone = 1
+            easy.notes = tr("Stay easy; slow down if heart rate rises.",
+                            "Hold lav intensitet og senk farten hvis pulsen stiger.")
+            return [easy]
         case .cooldown:
             return [Self.run(title: title, seconds: 600, effort: 2, phase: phase)]
         }
