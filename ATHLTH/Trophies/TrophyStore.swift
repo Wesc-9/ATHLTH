@@ -24,6 +24,7 @@ final class TrophyStore: ObservableObject {
         trophyInscriptions = [:]
         hasInitializedShowcase = false
         showcaseUpdatedAt = nil
+        pendingCabinetUpload = false
         revealQueue = []
         pendingReveal = nil
     }
@@ -38,6 +39,8 @@ final class TrophyStore: ObservableObject {
     private var activeUsername: String?
     private var stateOwnerUserID: UUID?
     private var showcaseUpdatedAt: Date?
+    private var pendingCabinetUpload = false
+    private var isSavingCabinet = false
 
     init() {
         // Do not expose the previous device user's disk cache before the
@@ -158,18 +161,24 @@ final class TrophyStore: ObservableObject {
                     trophyInscriptions = saved.trophyInscriptions ?? [:]
                     hasInitializedShowcase = saved.hasInitializedShowcase
                     showcaseUpdatedAt = saved.showcaseUpdatedAt
+                    pendingCabinetUpload = saved.pendingCabinetUpload ?? false
                 } else {
                     unlocks = []
                     showcaseIDs = []
                     trophyInscriptions = [:]
                     hasInitializedShowcase = false
                     showcaseUpdatedAt = nil
+                    pendingCabinetUpload = false
                 }
                 revealQueue = []
                 pendingReveal = nil
             }
 
             stateOwnerUserID = currentUserID
+        }
+
+        if let currentUserID, pendingCabinetUpload {
+            await flushCabinetEdit(for: currentUserID)
         }
 
         if currentUserID != nil,
@@ -188,7 +197,8 @@ final class TrophyStore: ObservableObject {
                     remote
                 }
 
-            if let remoteUpdated =
+            if !pendingCabinetUpload,
+               let remoteUpdated =
                     remote
                         .cabinetUpdatedAt,
                showcaseUpdatedAt == nil ||
@@ -1145,28 +1155,11 @@ final class TrophyStore: ObservableObject {
 
         hasInitializedShowcase = true
         showcaseUpdatedAt = Date()
+        pendingCabinetUpload = true
         persist()
-
-        guard activeUserID != nil
-        else {
-            return
-        }
-
-        Task { @MainActor [weak self] in
-            guard let self else {
-                return
-            }
-
-            if let cloudDate =
-                    try? await self
-                        .cloud
-                        .saveCabinet(
-                            self
-                                .showcaseIDs
-                        ) {
-                self.showcaseUpdatedAt =
-                    cloudDate
-                self.persist()
+        if let userID = activeUserID {
+            Task { @MainActor [weak self] in
+                await self?.flushCabinetEdit(for: userID)
             }
         }
     }
@@ -1198,29 +1191,42 @@ final class TrophyStore: ObservableObject {
             replacementTrophyID
         hasInitializedShowcase = true
         showcaseUpdatedAt = Date()
+        pendingCabinetUpload = true
         persist()
-
-        guard activeUserID != nil
-        else {
-            return
+        if let userID = activeUserID {
+            Task { @MainActor [weak self] in
+                await self?.flushCabinetEdit(for: userID)
+            }
         }
+    }
 
-        Task { @MainActor [weak self] in
-            guard let self else {
-                return
+    /// Never lose an offline cabinet edit. The original choice is persisted
+    /// before upload and replayed on foreground/account refresh.
+    private func flushCabinetEdit(for userID: UUID) async {
+        guard !isSavingCabinet,
+              pendingCabinetUpload,
+              stateOwnerUserID == userID,
+              activeUserID == userID,
+              SupabaseEnvironment.client.auth.currentUser?.id == userID
+        else { return }
+        let captured = showcaseIDs
+        isSavingCabinet = true
+        defer { isSavingCabinet = false }
+        do {
+            let cloudDate = try await cloud.saveCabinet(captured)
+            guard stateOwnerUserID == userID,
+                  activeUserID == userID,
+                  SupabaseEnvironment.client.auth.currentUser?.id == userID
+            else { return }
+            // If the person changed the shelf mid-request, leave the newer
+            // edit queued. The next foreground refresh will upload it.
+            if captured == showcaseIDs {
+                pendingCabinetUpload = false
+                showcaseUpdatedAt = cloudDate ?? Date()
+                persist()
             }
-
-            if let cloudDate =
-                    try? await self
-                        .cloud
-                        .saveCabinet(
-                            self
-                                .showcaseIDs
-                        ) {
-                self.showcaseUpdatedAt =
-                    cloudDate
-                self.persist()
-            }
+        } catch {
+            // Keep pending locally. Failed sync is retried on reconnection.
         }
     }
 
@@ -1715,7 +1721,8 @@ final class TrophyStore: ObservableObject {
                 trophyInscriptions,
             hasInitializedShowcase: hasInitializedShowcase,
             ownerUserID: stateOwnerUserID,
-            showcaseUpdatedAt: showcaseUpdatedAt
+            showcaseUpdatedAt: showcaseUpdatedAt,
+            pendingCabinetUpload: pendingCabinetUpload
         )
 
         guard let url = Self.stateURL,
@@ -1776,6 +1783,7 @@ private struct TrophyPersistedState: Codable {
     let hasInitializedShowcase: Bool
     let ownerUserID: UUID?
     let showcaseUpdatedAt: Date?
+    let pendingCabinetUpload: Bool?
 
     static let empty = TrophyPersistedState(
         unlocks: [],
@@ -1783,6 +1791,7 @@ private struct TrophyPersistedState: Codable {
         trophyInscriptions: [:],
         hasInitializedShowcase: false,
         ownerUserID: nil,
-        showcaseUpdatedAt: nil
+        showcaseUpdatedAt: nil,
+        pendingCabinetUpload: nil
     )
 }
