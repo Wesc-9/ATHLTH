@@ -2257,7 +2257,6 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
-    @ViewBuilder
     /// A grouped workout retains real completed-set evidence rather than
     /// inferring rounds from a plan or treating omitted sets as performance.
     @ViewBuilder
@@ -2418,6 +2417,7 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
+    @ViewBuilder
     private func focusedStrengthContent(
         workout: StrengthWorkoutLog,
         exercise: StrengthExerciseLog
