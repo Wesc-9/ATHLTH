@@ -1227,97 +1227,37 @@ struct WorkoutStartOptionsView: View {
     }
 
     private var strengthIntroCard: some View {
-        ZStack {
-            Image(
-                "StrengthQuickHero"
-            )
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity)
-            .frame(height: 118)
-            .clipped()
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.68),
-                    Color.black.opacity(0.28),
-                    Color.black.opacity(0.08)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 5
-            ) {
-                Text(session.title)
-                    .font(
-                        .title2.weight(
-                            .bold
-                        )
+        ATHLTHPlanSurface(density: .compact) {
+            HStack(alignment: .top, spacing: 13) {
+                Image(systemName: "dumbbell")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 48, height: 48)
+                    .background(
+                        ATHLTHTrainDesign.paleGold.opacity(0.42),
+                        in: RoundedRectangle(cornerRadius: 14)
                     )
-                    .foregroundStyle(
-                        .white
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(
-                        0.82
-                    )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            trackingMode == .advanced
-                                ? "Detailed tracking, exercise by exercise."
-                                : "Fast setup. Add exercises here before you start.",
-                        norwegian:
-                            trackingMode == .advanced
-                                ? "Detaljert registrering, øvelse for øvelse."
-                                : "Raskt oppsett. Legg til øvelser her før du starter."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    Color.white.opacity(
-                        0.84
-                    )
-                )
-                .lineLimit(2)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(session.title)
+                        .font(.system(size: 22, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(ATHLTHLocalization.choose(
+                        english: trackingMode == .advanced
+                            ? "Adjust sets, coaching and workout details."
+                            : "Ready to train. Exercises and sets can be added as you go.",
+                        norwegian: trackingMode == .advanced
+                            ? "Juster sett, veiledning og øktdetaljer."
+                            : "Klar til trening. Øvelser og sett kan legges til underveis."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
             }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 118)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 26,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 26,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(
-                    0.22
-                ),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(
-                    0.08
-                ),
-            radius: 16,
-            y: 8
-        )
     }
 
     private var trackingModeButton: some View {
