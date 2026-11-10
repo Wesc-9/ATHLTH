@@ -36,6 +36,13 @@ final class ATHLTHRunningPaceTests: XCTestCase {
         XCTAssertNil(ATHLTHRunningPace.average(elapsedSeconds: .infinity, distanceMeters: 250))
     }
 
+    func testIPhoneIndoorPolicyDoesNotMisclassifyLegacyWorkouts() {
+        XCTAssertFalse(ATHLTHPhoneRunEnvironmentPolicy.isIndoor(nil))
+        XCTAssertFalse(ATHLTHPhoneRunEnvironmentPolicy.isIndoor(.outdoor))
+        XCTAssertTrue(ATHLTHPhoneRunEnvironmentPolicy.isIndoor(.indoor))
+        XCTAssertTrue(ATHLTHPhoneRunEnvironmentPolicy.isIndoor(.treadmill))
+    }
+
     func testGPSPaceIsNeverAllowedIndoors() {
         XCTAssertNil(ATHLTHRunningPace.outdoorGPS(speedMetersPerSecond: 3, isOutdoor: false))
         XCTAssertNil(ATHLTHRunningPace.outdoorGPS(speedMetersPerSecond: 0, isOutdoor: false))
