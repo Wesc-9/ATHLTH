@@ -251,6 +251,7 @@ struct CustomQuickStartSheet: View {
     let onStart: (CustomQuickWorkoutConfiguration, CustomQuickStartDestination) -> Void
 
     @State private var activity: CustomQuickWorkoutActivity = .hiit
+    @State private var showingOtherActivities = false
     @State private var method: CustomQuickWorkoutMethod = .open
     @State private var durationMinutes = 20
     @State private var workSeconds = 40
@@ -298,22 +299,52 @@ struct CustomQuickStartSheet: View {
                 VStack(alignment: .leading, spacing: 19) {
                     header
 
-                    sectionTitle(tr("Activity", "Aktivitet"))
-                    LazyVGrid(columns: columns, spacing: 9) {
-                        ForEach(CustomQuickWorkoutActivity.allCases) { kind in
-                            activityTile(kind)
+                    ATHLTHBasicActivityHero(
+                        title: freeWorkoutTitle,
+                        subtitle: tr(
+                            "Start freely with your selected activity. Add timing and coaching only if you want.",
+                            "Start fritt i valgt aktivitet. Legg til tid og veiledning hvis du ønsker."
+                        ),
+                        symbol: activity.systemImage,
+                        isSelected: method == .open
+                    ) {
+                        method = .open
+                    }
+
+                    sectionTitle(tr("Other ways to train", "Andre måter å trene på"))
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(availableMethods.filter { $0 != .open }) { option in
+                            ATHLTHBasicActivityModeTile(
+                                title: option.localizedTitle,
+                                subtitle: option.localizedSubtitle,
+                                symbol: option.systemImage,
+                                selected: method == option
+                            ) {
+                                method = option
+                            }
                         }
                     }
 
-                    sectionTitle(tr("How will you train?", "Øktoppsett"))
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 9) {
-                            ForEach(CustomQuickWorkoutMethod.allCases) { option in
-                                methodTile(option)
+                    DisclosureGroup(isExpanded: $showingOtherActivities) {
+                        LazyVGrid(columns: columns, spacing: 9) {
+                            ForEach(CustomQuickWorkoutActivity.allCases) { kind in
+                                activityTile(kind)
                             }
                         }
-                        .padding(.vertical, 2)
+                        .padding(.top, 8)
+                    } label: {
+                        Label(
+                            tr("Activity · \(activity.localizedTitle)",
+                               "Aktivitet · \(activity.localizedTitle)"),
+                            systemImage: "slider.horizontal.3"
+                        )
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .frame(minHeight: 44)
                     }
+                    .tint(ATHLTHTrainDesign.bronze)
+                    .padding(12)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 16))
 
                     configurationControls
 
@@ -411,6 +442,11 @@ struct CustomQuickStartSheet: View {
                 .background(.regularMaterial)
             }
         }
+        .onChange(of: activity) { _, _ in
+            // Preserve the correct recording category but never carry an
+            // EMOM/AMRAP option into cycling, yoga or other activities.
+            if !availableMethods.contains(method) { method = .open }
+        }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .task {
@@ -427,6 +463,34 @@ struct CustomQuickStartSheet: View {
             if social.trainingPartners.isEmpty {
                 await social.refresh()
             }
+        }
+    }
+
+    /// Respect the activity chosen on the previous screen. Strength-only
+    /// protocols are not advertised for cycling, mobility or other cardio.
+    private var availableMethods: [CustomQuickWorkoutMethod] {
+        switch activity {
+        case .hiit, .circuit, .functional:
+            return CustomQuickWorkoutMethod.allCases
+        case .cycling, .rowing, .stairClimber:
+            return [.open, .intervals, .forTime]
+        case .mobility, .yoga, .sports, .other:
+            return [.open, .forTime]
+        }
+    }
+
+    private var freeWorkoutTitle: String {
+        switch activity {
+        case .cycling: return tr("Free cycling", "Fri sykling")
+        case .mobility: return tr("Free mobility", "Fri mobilitet")
+        case .yoga: return tr("Free yoga", "Fri yoga")
+        case .rowing: return tr("Free rowing", "Fri roing")
+        case .stairClimber: return tr("Free stairs", "Frie trapper")
+        case .sports: return tr("Free sport", "Fri idrett")
+        case .hiit: return tr("Free HIIT", "Fri HIIT")
+        case .circuit: return tr("Free circuit", "Fri sirkel")
+        case .functional: return tr("Free functional training", "Fri funksjonell trening")
+        case .other: return tr("Free workout", "Fri trening")
         }
     }
 
