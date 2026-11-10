@@ -103,6 +103,7 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var deviceRelay = WorkoutDeviceRelayStore.shared
 
     @State private var didInstallBackgroundRefreshHandlers = false
+    @State private var profileRecordPublishTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -282,7 +283,10 @@ private struct ATHLTHSceneRootView: View {
             profileRecords.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
-            if !signedIn { trophies.clearForSignOut() }
+            if !signedIn {
+                profileRecordPublishTask?.cancel()
+                trophies.clearForSignOut()
+            }
             if signedIn {
                 studioPlanSync.scheduleSync(session: appSession)
             }
@@ -308,6 +312,7 @@ private struct ATHLTHSceneRootView: View {
                   owner == appSession.profile.userID else { return }
             scheduleAutomaticOfflinePreparation()
             studioPlanSync.scheduleSync(session: appSession)
+            scheduleProfileRecordSummaryPublish()
         }
         .onChange(of: appSession.profile.userID) { _, _ in
             // The account identity can be resolved after the signed-in
@@ -335,6 +340,34 @@ private struct ATHLTHSceneRootView: View {
     /// Store editable training data locally (AppSessionStore) and prepare
     /// optional route/exercise media without a separate download workflow.
     /// The UI and workout engine never wait for the media preparation.
+    /// Recompute on genuine workout-data changes, not every view redraw.
+    /// This never uploads GPS traces or HealthKit samples.
+    private func scheduleProfileRecordSummaryPublish() {
+        guard ATHLTHDeviceRole.isIPhone, appSession.signedIn else { return }
+        let userID = appSession.profile.userID
+        profileRecordPublishTask?.cancel()
+        profileRecordPublishTask = Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(2)) }
+            catch { return }
+            guard !Task.isCancelled,
+                  appSession.signedIn,
+                  appSession.profile.userID == userID else { return }
+            let records = health.hasRequestedAuthorization
+                ? ((try? await health.personalRecords()) ?? [])
+                : []
+            guard !Task.isCancelled,
+                  appSession.signedIn,
+                  appSession.profile.userID == userID else { return }
+            await profileRecords.publishAvailable(
+                userID: userID,
+                healthRecords: records,
+                stats: nil,
+                strength: strengthWorkout,
+                performanceWorkouts: health.workouts
+            )
+        }
+    }
+
     private func scheduleAutomaticOfflinePreparation() {
         automaticOfflineLibrary.update(
             userID: appSession.signedIn ? appSession.profile.userID : nil,
