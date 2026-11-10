@@ -14,6 +14,12 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddRun: (WorkoutPhaseKind) -> Void
     let onAddIntervals: (WorkoutPhaseKind) -> Void
     let onAddExercise: (WorkoutPhaseKind) -> Void
+    let onAddFreeStrength: (WorkoutPhaseKind) -> Void
+    let onAddSuperset: (WorkoutPhaseKind) -> Void
+    let onAddExerciseToSuperset: (WorkoutPhaseKind, UUID) -> Void
+    let onSetSupersetRounds: (UUID, Int) -> Void
+    let onUngroupSuperset: (UUID) -> Void
+    let onDeleteSuperset: (UUID) -> Void
     let onAddRest: (WorkoutPhaseKind) -> Void
     let onAddActiveRest: (WorkoutPhaseKind) -> Void
     let onAddWorkout: (WorkoutPhaseKind) -> Void
@@ -34,6 +40,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     @State private var phasePendingDeletion: WorkoutPhaseKind?
     @State private var collapsedPhases: Set<WorkoutPhaseKind> = []
     @State private var expandedIntervalGroups: Set<UUID> = []
+    @State private var collapsedSupersetGroups: Set<UUID> = []
     @State private var intervalToAdjust: IntervalSelection?
     @State private var intervalPendingDeletion: UUID?
     @State private var draggingID: UUID?
@@ -371,7 +378,14 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 } else {
                     VStack(spacing: 3) {
                         ForEach(Array(rows.enumerated()), id: \.element.editorDragID) { position, block in
-                            if let groupID = ATHLTHIntervalRecipeEditing.explicitGroupID(
+                            if block.groupKind == .superset,
+                               let groupID = block.groupID {
+                                if !rows.prefix(position).contains(where: {
+                                    $0.groupID == groupID
+                                }) {
+                                    supersetGroupCard(groupID, rows: rows, phase: phase)
+                                }
+                            } else if let groupID = ATHLTHIntervalRecipeEditing.explicitGroupID(
                                 for: block, in: rows
                             ) {
                                 if !rows.prefix(position).contains(where: {
@@ -428,6 +442,136 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             geometry.frame(in: .named("athlthWorkoutStudio"))
         } action: { _, frame in
             if dragGeometry.phaseFrames[phase] != frame { dragGeometry.phaseFrames[phase] = frame }
+        }
+    }
+
+    /// A real grouped strength sequence with independent exercises and
+    /// configurable round count. The group is editable even with one member,
+    /// so a new Supersett can always receive its required second exercise.
+    private func supersetGroupCard(
+        _ id: UUID, rows: [WorkoutTemplateBlock], phase: WorkoutPhaseKind
+    ) -> some View {
+        let members = rows.filter { $0.groupID == id && $0.groupKind == .superset }
+        let rounds = members.first?.groupRounds ?? 3
+        let collapsed = collapsedSupersetGroups.contains(id)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 9) {
+                Image(systemName: "square.stack.3d.up")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(bronze)
+                    .frame(width: 38, height: 38)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        if collapsed { collapsedSupersetGroups.remove(id) }
+                        else { collapsedSupersetGroups.insert(id) }
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Superset", norwegian: "Supersett"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                        Text("\(members.count) " + ATHLTHLocalization.choose(
+                            english: "exercises", norwegian: "øvelser"
+                        ) + " · \(rounds) " + ATHLTHLocalization.choose(
+                            english: "rounds", norwegian: "runder"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: collapsed ? "chevron.down" : "chevron.up")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ink)
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+
+                Menu {
+                    ForEach(1...20, id: \.self) { count in
+                        Button("\(count) " + ATHLTHLocalization.choose(
+                            english: "rounds", norwegian: "runder"
+                        )) {
+                            onSetSupersetRounds(id, count)
+                        }
+                    }
+                    Divider()
+                    Button {
+                        onUngroupSuperset(id)
+                        collapsedSupersetGroups.remove(id)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Ungroup", norwegian: "Løs opp gruppe"
+                        ), systemImage: "square.stack.3d.up.slash")
+                    }
+                    Button(role: .destructive) {
+                        onDeleteSuperset(id)
+                        collapsedSupersetGroups.remove(id)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Delete superset", norwegian: "Slett supersett"
+                        ), systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 36, height: 44)
+                        .foregroundStyle(ink)
+                }
+            }
+
+            if !collapsed {
+                if members.count < 2 {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Choose at least two exercises to complete the superset.",
+                        norwegian: "Legg til minst to øvelser for å fullføre supersettet."
+                    ), systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                VStack(spacing: 3) {
+                    ForEach(Array(members.enumerated()), id: \.element.editorDragID) { index, member in
+                        stepRow(member, position: index + 1, phase: phase)
+                    }
+                }
+
+                Button {
+                    onAddExerciseToSuperset(phase, id)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Add exercise to superset",
+                        norwegian: "Legg til øvelse i supersett"
+                    ), systemImage: "plus.circle")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(bronze)
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            } else if members.count < 2 {
+                Button {
+                    collapsedSupersetGroups.remove(id)
+                    onAddExerciseToSuperset(phase, id)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Add second exercise", norwegian: "Legg til øvelse nummer to"
+                    ), systemImage: "plus.circle")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(bronze)
+            }
+        }
+        .padding(11)
+        .background(ATHLTHPlanDesign.canvas,
+                    in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(bronze.opacity(0.23), lineWidth: 0.8)
         }
     }
 
@@ -695,6 +839,22 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         norwegian: "Øvelse fra bibliotek"
                     ),
                     systemImage: activity == .running ? "figure.run" : "dumbbell")
+            }
+            if activity == .strength {
+                Button {
+                    onAddFreeStrength(phase)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Free strength training", norwegian: "Fri styrketrening"
+                    ), systemImage: "stopwatch")
+                }
+                Button {
+                    onAddSuperset(phase)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Superset", norwegian: "Supersett"
+                    ), systemImage: "square.stack.3d.up")
+                }
             }
             if activity != .running {
                 Button {
