@@ -98,4 +98,32 @@ final class SimpleExerciseMuscleFilterTests: XCTestCase {
             sourceIdentifier: nil))
     }
 
+    func testEquipmentScanOnlyAppearsInsideActiveStrengthWorkout() {
+        XCTAssertTrue(ATHLTHEquipmentScanVisibilityPolicy.showsEntryPoint(
+            isLiveWorkoutPicker: true,
+            isSelectingExercise: true,
+            isLibraryTab: true
+        ))
+        XCTAssertFalse(ATHLTHEquipmentScanVisibilityPolicy.showsEntryPoint(
+            isLiveWorkoutPicker: false,
+            isSelectingExercise: false,
+            isLibraryTab: true
+        ), "Ordinary exercise library must not advertise scanning")
+        XCTAssertFalse(ATHLTHEquipmentScanVisibilityPolicy.showsEntryPoint(
+            isLiveWorkoutPicker: false,
+            isSelectingExercise: true,
+            isLibraryTab: true
+        ), "Planning an exercise is not an active workout")
+        XCTAssertFalse(ATHLTHEquipmentScanVisibilityPolicy.showsEntryPoint(
+            isLiveWorkoutPicker: true,
+            isSelectingExercise: false,
+            isLibraryTab: true
+        ))
+        XCTAssertFalse(ATHLTHEquipmentScanVisibilityPolicy.showsEntryPoint(
+            isLiveWorkoutPicker: true,
+            isSelectingExercise: true,
+            isLibraryTab: false
+        ), "The Mine tab should contain only exercises")
+    }
+
 }
