@@ -131,6 +131,10 @@ struct ATHLTHiPadStudioRootView: View {
                                     .background(canvas, in: RoundedRectangle(cornerRadius: 12))
                                     .overlay(RoundedRectangle(cornerRadius: 12)
                                         .stroke(gold.opacity(0.3)))
+                                    // Preserve the slim visual grip while
+                                    // offering a full-size touch target.
+                                    .frame(width: 44, height: 72)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(
