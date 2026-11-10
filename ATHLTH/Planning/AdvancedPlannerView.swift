@@ -5501,6 +5501,7 @@ struct SessionEditorView: View {
     // Solo scratch sessions are saved directly from the shared builder,
     // avoiding the legacy "Plan extra workout" intermediary.
     @State private var closeAfterScratchSave = false
+    @State private var scratchBuilderClosedIntentionally = false
     @State private var showingRecoveryRestPlanner = false
     @State private var selectedPartnerID: UUID?
     @State private var partnerPlanningExpanded = false
@@ -6646,20 +6647,42 @@ struct SessionEditorView: View {
                 onDismiss: {
                     if closeAfterScratchSave {
                         closeAfterScratchSave = false
+                        scratchBuilderClosedIntentionally = false
                         restoreScratchComposerOnWake = false
-                        // Wait until the child sheet has fully gone before
-                        // dismissing its owner, avoiding overlapping sheets.
+                        // First dismiss the child, then the obsolete host.
                         Task { @MainActor in
                             await Task.yield()
                             dismiss()
                         }
-                    } else if scenePhase == .active &&
-                        !restoreScratchComposerOnWake &&
-                        isStandalone && selectedScratchWorkoutType != nil &&
+                    } else if isStandalone &&
+                        selectedScratchWorkoutType != nil &&
                         onPreparedWorkout == nil && selectedPartnerID == nil {
-                        // Cancel/back from a scratch workout returns to the
-                        // caller. The existing draft remains recoverable.
-                        dismiss()
+                        if scratchBuilderClosedIntentionally {
+                            scratchBuilderClosedIntentionally = false
+                            restoreScratchComposerOnWake = false
+                            // An actual Cancel/Save Draft returns to the
+                            // caller; there is no second editing screen.
+                            Task { @MainActor in
+                                await Task.yield()
+                                dismiss()
+                            }
+                        } else if !draftFinalized {
+                            // iOS may dismiss a sheet during backgrounding
+                            // without invoking the editor's Cancel action.
+                            // Do not mistake this for an intentional exit.
+                            restoreScratchComposerOnWake = true
+                            if scenePhase == .active {
+                                Task { @MainActor in
+                                    await Task.yield()
+                                    guard restoreScratchComposerOnWake &&
+                                          !draftFinalized else { return }
+                                    if !showingUnifiedWorkoutComposer {
+                                        showingUnifiedWorkoutComposer = true
+                                    }
+                                    restoreScratchComposerOnWake = false
+                                }
+                            }
+                        }
                     }
                 }
             ) {
@@ -6698,10 +6721,16 @@ struct SessionEditorView: View {
                             applyScratchTimeline(updated)
                         }
                         return true
+                    },
+                    onCloseRequested: {
+                        scratchBuilderClosedIntentionally = true
                     }
                 )
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .interactiveDismissDisabled(
+                    isStandalone && selectedScratchWorkoutType != nil
+                )
             }
             // Keep the scratch and catalog sheets independent so a
             // transient state change cannot replace the scratch type
@@ -6713,6 +6742,7 @@ struct SessionEditorView: View {
                     openScratchComposerAfterPickerDismiss = false
                     // Open the unified timeline only after the type picker
                     // has fully closed: no overlapping sheet presentations.
+                    scratchBuilderClosedIntentionally = false
                     showingUnifiedWorkoutComposer = true
                 }
             ) {
