@@ -303,7 +303,8 @@ struct ActiveStrengthWorkoutView: View {
                         selectedExerciseCounts: Dictionary(
                             activeExistingPlannedExercises.compactMap(\.exerciseID).map { ($0, 1) },
                             uniquingKeysWith: +
-                        )
+                        ),
+                        allowsEquipmentScan: true
                     ) { entry in
                         pendingExercise = entry
                         showingExerciseLibrary = false
@@ -13468,7 +13469,8 @@ private struct StrengthActiveExerciseQueueView: View {
                     selectionTitle: ATHLTHLocalization.choose(
                         english: addingWarmUp ? "Add warm-up" : "Add exercise",
                         norwegian: addingWarmUp ? "Legg til oppvarming" : "Legg til øvelse"
-                    )
+                    ),
+                    allowsEquipmentScan: true
                 ) { entry in
                     showingExerciseLibrary = false
                     pendingExercise = entry
