@@ -64,6 +64,24 @@ enum ATHLTHStructuredAMRAPProgression {
     }
 }
 
+/// The recording cursor is account-scoped and survives app termination.
+/// This is not a saved workout completion and is removed on finish/discard.
+struct ATHLTHStructuredWorkoutCheckpoint: Codable {
+    var workoutID: UUID
+    var savedAt: Date
+    var startedAt: Date
+    var stepEnteredAt: Date
+    var currentIndex: Int
+    var completedIDs: Set<String>
+    var results: [String: StructuredWorkoutStepResult]
+    var modeStarts: [UUID: Date]
+    var executionBlocks: [WorkoutTemplateBlock]
+    var emomWaiting: Bool
+    var timedOutGroups: Set<UUID>
+    var enteredReps: Int
+    var enteredWeight: String
+}
+
 struct StructuredWorkoutCompletion: Identifiable, Codable, Hashable {
     let id: UUID
     let workoutTemplateID: UUID?
@@ -161,6 +179,11 @@ struct StructuredWorkoutSessionView: View {
     @State private var enteredWeight = ""
     @State private var showAllSteps = false
     @State private var activeExecutionBlocks: [WorkoutTemplateBlock] = []
+    @State private var restoringCheckpoint = false
+
+    private var checkpointName: String {
+        "structuredWorkoutInProgress.v1.\(workout.id.uuidString)"
+    }
 
     private var blocks: [WorkoutTemplateBlock] {
         activeExecutionBlocks.isEmpty
@@ -246,7 +269,10 @@ struct StructuredWorkoutSessionView: View {
             ) {
                 Button(ATHLTHLocalization.choose(
                     english: "Discard workout", norwegian: "Forkast økten"
-                ), role: .destructive) { dismiss() }
+                ), role: .destructive) {
+                    removeCheckpoint()
+                    dismiss()
+                }
                 Button(ATHLTHLocalization.choose(
                     english: "Continue workout", norwegian: "Fortsett økten"
                 ), role: .cancel) {}
@@ -301,13 +327,14 @@ struct StructuredWorkoutSessionView: View {
                 )
             }
             .onAppear {
-                if !hasStarted {
+                if !hasStarted && !restoreCheckpoint() {
                     activeExecutionBlocks = ATHLTHStructuredAMRAPProgression.initialSteps(
                         from: workout.resolvedWorkoutBlocks
                     )
                     startedAt = Date()
                     hasStarted = true
                     setupCurrentStep()
+                    persistCheckpoint()
                     // This view itself is the iPhone interval/strength
                     // recorder. A ready lobby is only marked started when
                     // its first real recording screen becomes active.
@@ -324,8 +351,12 @@ struct StructuredWorkoutSessionView: View {
             }
             .onChange(
                 of: scenePhase
-            ) { _, _ in
+            ) { _, phase in
                 updateScreenAwakeState()
+                if phase == .active {
+                    checkTimedMode(at: Date())
+                }
+                persistCheckpoint()
             }
             .onChange(
                 of: savedCompletion
@@ -333,7 +364,30 @@ struct StructuredWorkoutSessionView: View {
                 updateScreenAwakeState()
             }
             .onChange(of: currentIndex) { _, _ in
+                guard !restoringCheckpoint else { return }
                 setupCurrentStep()
+                persistCheckpoint()
+            }
+            .onChange(of: activeExecutionBlocks) { _, _ in
+                persistCheckpoint()
+            }
+            .onChange(of: results) { _, _ in
+                persistCheckpoint()
+            }
+            .onChange(of: modeStarts) { _, _ in
+                persistCheckpoint()
+            }
+            .onChange(of: emomWaitingForMinute) { _, _ in
+                persistCheckpoint()
+            }
+            .onChange(of: amrapTimedOutGroups) { _, _ in
+                persistCheckpoint()
+            }
+            .onChange(of: enteredReps) { _, _ in
+                persistCheckpoint()
+            }
+            .onChange(of: enteredWeight) { _, _ in
+                persistCheckpoint()
             }
         }
     }
@@ -1169,6 +1223,65 @@ struct StructuredWorkoutSessionView: View {
         }
     }
 
+    private func persistCheckpoint() {
+        guard hasStarted, !savedCompletion, !restoringCheckpoint else { return }
+        let state = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: workout.id,
+            savedAt: Date(),
+            startedAt: startedAt,
+            stepEnteredAt: stepEnteredAt,
+            currentIndex: currentIndex,
+            completedIDs: completedBlockIDs,
+            results: results,
+            modeStarts: modeStarts,
+            executionBlocks: activeExecutionBlocks,
+            emomWaiting: emomWaitingForMinute,
+            timedOutGroups: amrapTimedOutGroups,
+            enteredReps: enteredReps,
+            enteredWeight: enteredWeight
+        )
+        AccountLocalStorage.write(
+            state, name: checkpointName, userID: session.profile.userID
+        )
+    }
+
+    @discardableResult
+    private func restoreCheckpoint() -> Bool {
+        guard let saved = AccountLocalStorage.read(
+            ATHLTHStructuredWorkoutCheckpoint.self,
+            name: checkpointName, userID: session.profile.userID
+        ), saved.workoutID == workout.id,
+           saved.savedAt > Date().addingTimeInterval(-7 * 24 * 3600),
+           !saved.executionBlocks.isEmpty,
+           saved.executionBlocks.indices.contains(saved.currentIndex)
+        else { return false }
+        restoringCheckpoint = true
+        activeExecutionBlocks = saved.executionBlocks
+        startedAt = saved.startedAt
+        stepEnteredAt = saved.stepEnteredAt
+        currentIndex = saved.currentIndex
+        completedBlockIDs = saved.completedIDs
+        results = saved.results
+        modeStarts = saved.modeStarts
+        emomWaitingForMinute = saved.emomWaiting
+        amrapTimedOutGroups = saved.timedOutGroups
+        enteredReps = saved.enteredReps
+        enteredWeight = saved.enteredWeight
+        hasStarted = true
+        Task { @MainActor in
+            await Task.yield()
+            restoringCheckpoint = false
+            checkTimedMode(at: Date())
+        }
+        return true
+    }
+
+    private func removeCheckpoint() {
+        UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key(
+            checkpointName, userID: session.profile.userID
+        ))
+    }
+
     @MainActor
     private func updateScreenAwakeState() {
         ATHLTHWorkoutScreenAwake.set(
@@ -1210,6 +1323,7 @@ struct StructuredWorkoutSessionView: View {
             completion,
             userID: session.profile.userID
         )
+        removeCheckpoint()
         savedCompletion = true
     }
 
