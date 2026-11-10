@@ -66,7 +66,63 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         XCTAssertEqual(logs[0].groupID, id)
         XCTAssertEqual(logs[0].groupClockSeconds, 720)
         XCTAssertEqual(logs[0].groupStyle, .amrap)
-        XCTAssertEqual(logs[0].sets.count, 20)
+        XCTAssertEqual(logs[0].sets.count, 1)
+    }
+
+    func testAMRAPCreatesAnotherRoundOnlyWhenTheEntirePreviousRoundIsDone() {
+        let id = UUID()
+        let started = Date(timeIntervalSince1970: 80_000)
+        var stations = [exercise(8, weight: 15), exercise(12, weight: 8)]
+        for index in stations.indices {
+            stations[index].groupID = id
+            stations[index].groupKind = .amrap
+            stations[index].groupRounds = 20 // Old drafts must not impose a cap.
+            stations[index].groupClockSeconds = 120
+        }
+        var logs = StrengthWorkoutStore.strengthExerciseLogsFromBlocks(stations)
+        XCTAssertEqual(logs.map { $0.sets.count }, [1, 1])
+        for index in logs.indices { logs[index].groupStartedAt = started }
+        logs[0].sets[0].completedAt = started.addingTimeInterval(20)
+        XCTAssertFalse(StrengthWorkoutStore.extendOpenEndedAMRAPGroupIfNeeded(
+            exercises: &logs, groupID: id,
+            at: started.addingTimeInterval(20)
+        ))
+        logs[1].sets[0].completedAt = started.addingTimeInterval(25)
+        XCTAssertTrue(StrengthWorkoutStore.extendOpenEndedAMRAPGroupIfNeeded(
+            exercises: &logs, groupID: id,
+            at: started.addingTimeInterval(25)
+        ))
+        XCTAssertEqual(logs.map { $0.sets.count }, [2, 2])
+        XCTAssertEqual(logs[0].sets[1].plannedReps, 8)
+        XCTAssertNil(logs[0].sets[1].completedAt)
+        XCTAssertFalse(StrengthWorkoutStore.extendOpenEndedAMRAPGroupIfNeeded(
+            exercises: &logs, groupID: id,
+            at: started.addingTimeInterval(26)
+        ))
+        logs[0].sets[1].completedAt = started.addingTimeInterval(119)
+        logs[1].sets[1].completedAt = started.addingTimeInterval(119)
+        XCTAssertFalse(StrengthWorkoutStore.extendOpenEndedAMRAPGroupIfNeeded(
+            exercises: &logs, groupID: id,
+            at: started.addingTimeInterval(120)
+        ))
+        XCTAssertEqual(logs.map { $0.sets.count }, [2, 2])
+    }
+
+    func testSingleStationAMRAPCanContinuePastOriginalRound() {
+        let id = UUID()
+        let started = Date(timeIntervalSince1970: 90_000)
+        var source = exercise(10, weight: 5)
+        source.groupID = id
+        source.groupKind = .amrap
+        source.groupClockSeconds = 120
+        var logs = StrengthWorkoutStore.strengthExerciseLogsFromBlocks([source])
+        logs[0].groupStartedAt = started
+        logs[0].sets[0].completedAt = started.addingTimeInterval(15)
+        XCTAssertTrue(StrengthWorkoutStore.extendOpenEndedAMRAPGroupIfNeeded(
+            exercises: &logs, groupID: id,
+            at: started.addingTimeInterval(15)
+        ))
+        XCTAssertEqual(logs[0].sets.count, 2)
     }
 
     func testOneParentCreatesIndividualExecutionSetsAndPauses() {
