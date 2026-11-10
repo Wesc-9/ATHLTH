@@ -1385,6 +1385,61 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
 
 }
 
+/// Shared by phone and Watch to reject early/expired strength efforts.
+/// A clock does not prove repetitions; the athlete still confirms each set.
+enum ATHLTHStrengthModeClockPolicy {
+    static func permitsCompletion(
+        modeRaw: String?,
+        startedAt: Date?,
+        clockSeconds: TimeInterval?,
+        roundIndex: Int,
+        stationIndex: Int,
+        stationCount: Int,
+        at now: Date = Date()
+    ) -> Bool {
+        guard let modeRaw, let startedAt else { return true }
+        let elapsed = max(0, now.timeIntervalSince(startedAt))
+        switch modeRaw {
+        case "amrap":
+            let timeLimit = clockSeconds ?? 720
+            return timeLimit.isFinite && timeLimit > 0 && elapsed < timeLimit
+        case "emom":
+            let perStation = clockSeconds ?? 60
+            guard perStation.isFinite && perStation > 0,
+                  stationIndex >= 0, stationCount > 0, roundIndex >= 0
+            else { return false }
+            let slot = roundIndex * stationCount + stationIndex
+            return elapsed >= Double(slot) * perStation &&
+                elapsed < Double(slot + 1) * perStation
+        default:
+            return true
+        }
+    }
+
+    static func remainingSeconds(
+        modeRaw: String?,
+        startedAt: Date?,
+        clockSeconds: TimeInterval?,
+        roundIndex: Int,
+        stationIndex: Int,
+        stationCount: Int,
+        at now: Date = Date()
+    ) -> TimeInterval? {
+        guard let modeRaw, let startedAt else { return nil }
+        let elapsed = max(0, now.timeIntervalSince(startedAt))
+        switch modeRaw {
+        case "amrap":
+            return max(0, (clockSeconds ?? 720) - elapsed)
+        case "emom":
+            let end = Double(roundIndex * max(1, stationCount) + stationIndex + 1) *
+                (clockSeconds ?? 60)
+            return max(0, end - elapsed)
+        default:
+            return nil
+        }
+    }
+}
+
 /// The Watch may independently advance only time-based treadmill phases
 /// embedded in its existing strength recording. It never starts HealthKit,
 /// guesses distance or completes ordinary strength sets automatically.
