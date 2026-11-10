@@ -720,6 +720,15 @@ struct ATHLTHiPadStudioRootView: View {
                         symbol: "person.3",
                         selected: sidebarPage == .clubs
                     ) { openSidebarPage(.clubs) }
+                    .contextMenu {
+                        Button {
+                            openStudio(.community)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Community", norwegian: "Fellesskap"
+                            ), systemImage: "person.3")
+                        }
+                    }
 
                     Divider().padding(.vertical, 7).padding(.horizontal, 10)
 
@@ -729,6 +738,22 @@ struct ATHLTHiPadStudioRootView: View {
                         selected: selection == .insights && libraryPage == nil &&
                             sidebarPage == nil
                     ) { openStudio(.insights) }
+                    .contextMenu {
+                        Button {
+                            openStudio(.history)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Workout history", norwegian: "Treningshistorikk"
+                            ), systemImage: "clock.arrow.circlepath")
+                        }
+                        Button {
+                            openSidebarPage(.exerciseProgress)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Exercise progression", norwegian: "Øvelsesfremdrift"
+                            ), systemImage: "chart.bar")
+                        }
+                    }
 
                     sidebarAction("ATHLTH Coach", symbol: "sparkles",
                                   selected: selection == .coach &&
@@ -736,42 +761,6 @@ struct ATHLTHiPadStudioRootView: View {
                         openStudio(.coach)
                     }
 
-                    // Secondary destinations stay discoverable without a
-                    // floating "More" menu obscuring the sidebar.
-                    sidebarAction(
-                        ATHLTHLocalization.choose(
-                            english: "Workout history", norwegian: "Treningshistorikk"
-                        ),
-                        symbol: "clock.arrow.circlepath",
-                        selected: selection == .history && libraryPage == nil &&
-                            sidebarPage == nil
-                    ) { openStudio(.history) }
-
-                    sidebarAction(
-                        ATHLTHLocalization.choose(
-                            english: "Routes & Explore", norwegian: "Ruter og utforsk"
-                        ),
-                        symbol: "map",
-                        selected: selection == .explore && libraryPage == nil &&
-                            sidebarPage == nil
-                    ) { openStudio(.explore) }
-
-                    sidebarAction(
-                        ATHLTHLocalization.choose(
-                            english: "Community", norwegian: "Fellesskap"
-                        ),
-                        symbol: "person.3",
-                        selected: selection == .community && libraryPage == nil &&
-                            sidebarPage == nil
-                    ) { openStudio(.community) }
-
-                    sidebarAction(
-                        ATHLTHLocalization.choose(
-                            english: "Exercise progression", norwegian: "Øvelsesfremdrift"
-                        ),
-                        symbol: "chart.bar",
-                        selected: sidebarPage == .exerciseProgress
-                    ) { openSidebarPage(.exerciseProgress) }
                 }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 10)
@@ -941,6 +930,15 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .padding(.leading, 16)
         .padding(.trailing, 5)
+        .contextMenu {
+            Button {
+                openStudio(.explore)
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Routes & Explore", norwegian: "Ruter og utforsk"
+                ), systemImage: "map")
+            }
+        }
     }
 
     private func libraryLink(
