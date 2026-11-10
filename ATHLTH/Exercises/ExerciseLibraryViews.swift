@@ -72,15 +72,23 @@ enum ATHLTHExerciseMuscleFilterPresentation {
         part == "Legs" ? ["Quads", "Hamstrings", "Calves"] : [part]
     }
 
+    /// Give each muscle filter a recognizably different icon. Tiny
+    /// full-body anatomy silhouettes all looked identical in a 20pt chip.
+    /// The existing detailed anatomy illustrations remain in exercise cards.
     static func icon(for part: String) -> String {
         switch part {
         case "Back": return "figure.rower"
         case "Chest": return "figure.strengthtraining.traditional"
         case "Shoulders": return "figure.boxing"
-        case "Biceps", "Triceps", "Forearms": return "dumbbell"
+        case "Biceps": return "dumbbell.fill"
+        case "Triceps": return "figure.strengthtraining.functional"
+        case "Forearms": return "hand.raised.fingers.spread"
         case "Core": return "figure.core.training"
         case "Glutes": return "figure.squat"
-        case "Quads", "Hamstrings", "Legs", "Calves": return "figure.walk"
+        case "Quads": return "figure.stairs"
+        case "Hamstrings": return "figure.flexibility"
+        case "Legs": return "figure.walk"
+        case "Calves": return "figure.run"
         default: return "figure.strengthtraining.traditional"
         }
     }
@@ -184,7 +192,12 @@ struct ExerciseLibraryView: View {
                     itemID: entry.id.uuidString
                 )
 
-            return sourceMatches && favoriteMatches
+            // Free strength is a workout-start option, not a standalone
+            // exercise for browsing, favoriting or opening in the library.
+            // Keep it selectable only from an add-exercise flow.
+            let availableInContext = onSelect != nil ||
+                entry.sourceIdentifier != "athlth-native-free-strength-training"
+            return sourceMatches && favoriteMatches && availableInContext
         }
     }
 
@@ -292,33 +305,22 @@ struct ExerciseLibraryView: View {
             translationAvailabilityBanner
 
             if selectedSection == .library,
+               let onSelect,
                let free = library.athlthCatalogExercises.first(where: {
                    $0.sourceIdentifier == "athlth-native-free-strength-training"
                }) {
-                if let onSelect {
-                    Button {
-                        onSelect(free)
-                    } label: {
-                        freeStrengthShortcutLabel
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 6)
-                } else {
-                    NavigationLink {
-                        ExerciseDetailView(
-                            entry: free,
-                            selectionTitle: selectionTitle,
-                            onSelect: onSelect
-                        )
-                    } label: {
-                        freeStrengthShortcutLabel
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 6)
+                // The shortcut only appears inside the exercise picker.
+                // It is intentionally absent from the standalone library.
+                Button {
+                    onSelect(free)
+                } label: {
+                    freeStrengthShortcutLabel
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
             }
+
 
             Button {
                 beginEquipmentScan()
@@ -1212,19 +1214,14 @@ struct ExerciseLibraryView: View {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 12, weight: .medium))
                 } else {
-                    // Reuse the application's existing vector muscle anatomy
-                    // figures rather than ambiguous generic sports icons.
-                    ATHLTHPremiumMuscleFigure(
-                        profile: ExerciseMuscleProfileFactory.profile(
-                            primary: ATHLTHExerciseMuscleFilterPresentation
-                                .emphasizedMuscles(for: value),
-                            secondary: []
-                        ),
-                        isFront: !ATHLTHExerciseMuscleFilterPresentation.isBackMuscle(value),
-                        activationTint: selected
-                            ? Color.white : ATHLTHPlanDesign.accent
+                    Image(systemName:
+                        ATHLTHExerciseMuscleFilterPresentation.icon(for: value)
                     )
-                    .frame(width: 20, height: 27)
+                    .font(.system(size: 16, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(selected ? Color.white :
+                        ATHLTHPlanDesign.accentInk)
+                    .frame(width: 25, height: 27)
                     .accessibilityHidden(true)
                 }
                 Text(title)
