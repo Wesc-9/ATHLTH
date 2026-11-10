@@ -2796,9 +2796,21 @@ final class StrengthWorkoutStore: ObservableObject {
                 if let last, let seconds = block.durationSeconds,
                    seconds.isFinite && seconds >= 0 {
                     let capped = min(Int(seconds.rounded()), 3_600)
-                    queue[last].restSecondsOverride = capped
-                    for setIndex in queue[last].sets.indices {
-                        queue[last].sets[setIndex].restSeconds = capped
+                    if block.groupID != nil &&
+                       block.groupKind?.canInsertRoundPause == true {
+                        // A group pause happens BETWEEN rounds, never after
+                        // the last completed round. Keep per-set values instead
+                        // of overriding every set on the exercise.
+                        queue[last].restSecondsOverride = nil
+                        for setIndex in queue[last].sets.indices {
+                            queue[last].sets[setIndex].restSeconds =
+                                setIndex + 1 < queue[last].sets.count ? capped : 0
+                        }
+                    } else {
+                        queue[last].restSecondsOverride = capped
+                        for setIndex in queue[last].sets.indices {
+                            queue[last].sets[setIndex].restSeconds = capped
+                        }
                     }
                 }
                 continue
