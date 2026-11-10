@@ -1272,6 +1272,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 max(Date().timeIntervalSince(completedAt), 0)
         }
 
+        Self.beginStrengthGroup(&workout, selected: target)
         currentExerciseIndex = target
         currentSetIndex = workout.exercises[target].sets
             .firstIndex(where: { !$0.isCompleted }) ?? 0
@@ -1293,7 +1294,7 @@ final class StrengthWorkoutStore: ObservableObject {
     /// A completed set can be reviewed but is never implicitly repeated.
     @discardableResult
     func selectSetForNow(exerciseID: UUID, setID: UUID) -> Bool {
-        guard let workout = activeWorkout,
+        guard var workout = activeWorkout,
               let exerciseIndex = workout.exercises.firstIndex(where: {
                   $0.id == exerciseID
               }),
@@ -1311,6 +1312,8 @@ final class StrengthWorkoutStore: ObservableObject {
         timedSetCountdown = nil
         restStartedAt = nil
         restEndsAt = nil
+        Self.beginStrengthGroup(&workout, selected: exerciseIndex)
+        activeWorkout = workout
         currentExerciseIndex = exerciseIndex
         currentSetIndex = setIndex
         isFreeTrainingBetweenExercises = false
@@ -1987,7 +1990,11 @@ final class StrengthWorkoutStore: ObservableObject {
                                     ),
                             skippedSets: item.skippedPlannedSetCount,
                             isEmbeddedRunningInterval:
-                                item.isEmbeddedRunningInterval
+                                item.isEmbeddedRunningInterval,
+                            strengthGroupID: item.groupID,
+                            strengthGroupStyleRaw: item.groupStyle?.rawValue,
+                            strengthGroupClockSeconds: item.groupClockSeconds,
+                            strengthGroupStartedAt: item.groupStartedAt
                         )
                     },
             startedAt:
@@ -2009,6 +2016,17 @@ final class StrengthWorkoutStore: ObservableObject {
                 set?.plannedDurationSeconds == nil &&
                 exercise?.exercise.isTimeOnlyBodyweightStrength == true
         )
+        if let exercise, let id = exercise.groupID {
+            let siblings = workout.exercises.filter { $0.groupID == id }
+            snapshot.strengthModeRaw = exercise.groupStyle?.rawValue
+            snapshot.strengthModeClockSeconds = exercise.groupClockSeconds
+            snapshot.strengthModeStartedAt = exercise.groupStartedAt
+            snapshot.strengthModeRound = currentSetIndex + 1
+            snapshot.strengthModeTotalRounds = exercise.sets.count
+            snapshot.strengthModeStationIndex =
+                siblings.firstIndex(where: { $0.id == exercise.id }).map { $0 + 1 }
+            snapshot.strengthModeStationCount = siblings.count
+        }
         // The Watch may show/adjust plates only when the iPhone knows this
         // exercise uses a bar. Nil intentionally preserves legacy total entry
         // for older/offline Watch-created sessions.
@@ -2136,6 +2154,12 @@ final class StrengthWorkoutStore: ObservableObject {
                                 )
                             },
                         completedAt: nil,
+                        groupID: item.strengthGroupID,
+                        groupStyle: item.strengthGroupStyleRaw.flatMap {
+                            StrengthExerciseGroupStyle(rawValue: $0)
+                        },
+                        groupClockSeconds: item.strengthGroupClockSeconds,
+                        groupStartedAt: item.strengthGroupStartedAt,
                         skippedPlannedSetCount: item.skippedSets
                     )
                 }
@@ -2838,6 +2862,21 @@ final class StrengthWorkoutStore: ObservableObject {
         return queue
     }
 
+    /// Start one group's absolute clock exactly once, including after a
+    /// restored checkpoint or switching from an earlier workout section.
+    private static func beginStrengthGroup(
+        _ workout: inout StrengthWorkoutLog, selected index: Int,
+        at now: Date = Date()
+    ) {
+        guard workout.exercises.indices.contains(index),
+              let id = workout.exercises[index].groupID,
+              workout.exercises[index].groupStyle != nil,
+              workout.exercises[index].groupStartedAt == nil else { return }
+        for item in workout.exercises.indices where workout.exercises[item].groupID == id {
+            workout.exercises[item].groupStartedAt = now
+        }
+    }
+
     /// Append a complete saved workout while preserving the existing active
     /// recording, captured sets, Watch workout ID and original training plan.
     /// Timed run/recovery blocks become one embedded interval exercise with
@@ -2995,6 +3034,7 @@ final class StrengthWorkoutStore: ObservableObject {
             workout.exercises.allSatisfy(\.isCompleted)
         let firstNew = workout.exercises.count
         workout.exercises.append(contentsOf: additions)
+        if shouldFocus { Self.beginStrengthGroup(&workout, selected: firstNew) }
         activeWorkout = workout
         isFreeTrainingBetweenExercises = false
         if shouldFocus {
@@ -3128,6 +3168,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 false
         )
 
+        Self.beginStrengthGroup(&launchedWorkout, selected: 0,
+                                at: launchedWorkout.startedAt)
         launchedWorkout.plannedTrainingPlace = session.plannedTrainingPlace
         launchedWorkout.liveHeartRateTargetZone =
             session.targetAlertConfiguration?.heartRateZone
@@ -4775,6 +4817,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 )
         }
 
+        Self.beginStrengthGroup(&workout, selected: nextIndex)
         currentExerciseIndex = nextIndex
         currentSetIndex =
             workout.exercises[nextIndex]
