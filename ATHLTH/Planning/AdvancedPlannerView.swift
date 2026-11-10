@@ -10663,6 +10663,11 @@ struct SessionEditorView: View {
         else { return }
 
         applySavedWorkout(draft.workout)
+        // Standalone drafts carry their selected calendar time. Do not reset
+        // to the default 18:00 when the scratch builder is reconstructed.
+        if isStandalone, let savedTime = draft.workout.scheduledStart {
+            scheduledTime = savedTime
+        }
         durationMinutes = draft.workout.durationMinutes ?? 0
         meetingPoint = draft.workout.meetingPoint
         reminderMinutesBefore = draft.workout.reminderMinutesBefore ?? 0
