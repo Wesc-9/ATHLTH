@@ -3184,6 +3184,27 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    /// The active group is one workout on phone and Watch. Its window
+    /// governs whether a new set may be recorded, not the HealthKit session.
+    func canCompleteCurrentStrengthMode(at now: Date = Date()) -> Bool {
+        guard let workout = activeWorkout,
+              workout.exercises.indices.contains(currentExerciseIndex)
+        else { return false }
+        let item = workout.exercises[currentExerciseIndex]
+        guard let id = item.groupID else { return true }
+        let members = workout.exercises.filter { $0.groupID == id }
+        let station = members.firstIndex(where: { $0.id == item.id }) ?? 0
+        return ATHLTHStrengthModeClockPolicy.permitsCompletion(
+            modeRaw: item.groupStyle?.rawValue,
+            startedAt: item.groupStartedAt,
+            clockSeconds: item.groupClockSeconds,
+            roundIndex: currentSetIndex,
+            stationIndex: station,
+            stationCount: members.count,
+            at: now
+        )
+    }
+
     func completeCurrentSet(
         reps: Int?,
         durationSeconds: Int? = nil,
@@ -3203,6 +3224,9 @@ final class StrengthWorkoutStore: ObservableObject {
             return
         }
 
+        // The clock policy also guards Watch/offline-replayed completions;
+        // a blocked command cannot add completed reps, weight or records.
+        guard canCompleteCurrentStrengthMode() else { return }
         var set = workout.exercises[currentExerciseIndex].sets[currentSetIndex]
         let measuredEffort = currentSetEffortClock?.elapsedSeconds()
         // The timer is an optional aid. It does not own set completion;
