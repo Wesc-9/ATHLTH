@@ -5494,6 +5494,7 @@ struct SessionEditorView: View {
     @State private var openScratchComposerAfterPickerDismiss = false
     @State private var selectedScratchWorkoutType: ATHLTHPlannedWorkoutType?
     @State private var scratchTimelineDraftID = UUID()
+    @State private var scratchResumingSavedComposer = false
     @State private var showingUnifiedWorkoutComposer = false
     // Restore an involuntarily dismissed scratch builder after app suspension.
     @State private var restoreScratchComposerOnWake = false
@@ -6276,6 +6277,10 @@ struct SessionEditorView: View {
         discardStoredStandaloneDraft()
         selectedScratchWorkoutType = type
         scratchTimelineDraftID = UUID()
+        scratchResumingSavedComposer = false
+        if isStandalone, onPreparedWorkout == nil, selectedPartnerID == nil {
+            storeScratchComposerEntry(type: type, draftID: scratchTimelineDraftID)
+        }
         hasSelectedWorkoutSource = true
         title = ""
         notes = ""
@@ -6667,6 +6672,7 @@ struct SessionEditorView: View {
                         selectedRunningWorkouts.isEmpty
                         ? scratchQuickAdd : nil,
                     draftContext: "session-scratch.\(session.profile.userID.uuidString).\(scratchTimelineDraftID.uuidString)",
+                    resumeSavedScratchDraft: scratchResumingSavedComposer,
                     plannedDate: scheduledTime,
                     initialActivity: selectedScratchWorkoutType,
                     onScheduledTimeChanged: { scheduledTime = $0 },
@@ -6870,6 +6876,27 @@ struct SessionEditorView: View {
     private var editorLifecycle: some View {
         AnyView(editorDetailSheets)
             .onAppear {
+                // Reopen the actual scratch editor on a later visit. The
+                // parent "Plan extra workout" Form is only an implementation
+                // detail and must not replace an in-progress builder.
+                if !draftRestored, isStandalone, onPreparedWorkout == nil,
+                   selectedPartnerID == nil,
+                   let saved = loadScratchComposerEntry() {
+                    scratchTimelineDraftID = saved.id
+                    selectedScratchWorkoutType = saved.type
+                    scratchResumingSavedComposer = true
+                    restoreDraftIfNeeded()
+                    hasSelectedWorkoutSource = true
+                    Task { @MainActor in
+                        await Task.yield()
+                        guard !draftFinalized,
+                              selectedScratchWorkoutType == saved.type,
+                              !showingScratchTypePicker else { return }
+                        if !showingUnifiedWorkoutComposer {
+                            showingUnifiedWorkoutComposer = true
+                        }
+                    }
+                } else {
                 let existingDraft = UserDefaults.standard.data(
                     forKey: draftStorageKey
                 ) != nil
@@ -6904,6 +6931,7 @@ struct SessionEditorView: View {
                         hasSelectedWorkoutSource = true
                     }
                 }
+                }
                 if social.trainingPartners.isEmpty {
                     Task { await social.refresh() }
                 }
@@ -6920,6 +6948,7 @@ struct SessionEditorView: View {
                         isFinalized: draftFinalized
                     ) {
                         restoreScratchComposerOnWake = true
+                        scratchResumingSavedComposer = true
                     }
                     persistDraft()
                 } else if restoreScratchComposerOnWake && !draftFinalized {
@@ -10497,6 +10526,32 @@ struct SessionEditorView: View {
         // AppSessionStore schedules the reminder when saving.
     }
 
+    private struct ScratchComposerEntry: Codable {
+        let type: ATHLTHPlannedWorkoutType
+        let id: UUID
+    }
+
+    // The draft ID must survive dismissal and relaunch; otherwise the new
+    // builder looks for a different UserDefaults key and appears reset.
+    private var scratchComposerEntryKey: String {
+        draftStorageKey + ".scratchComposer"
+    }
+
+    private func storeScratchComposerEntry(
+        type: ATHLTHPlannedWorkoutType,
+        draftID: UUID
+    ) {
+        let entry = ScratchComposerEntry(type: type, id: draftID)
+        guard let data = try? JSONEncoder().encode(entry) else { return }
+        UserDefaults.standard.set(data, forKey: scratchComposerEntryKey)
+    }
+
+    private func loadScratchComposerEntry() -> ScratchComposerEntry? {
+        guard let data = UserDefaults.standard.data(forKey: scratchComposerEntryKey)
+        else { return nil }
+        return try? JSONDecoder().decode(ScratchComposerEntry.self, from: data)
+    }
+
     private var draftStorageKey: String {
         let context: String
         if onPreparedWorkout != nil {
@@ -10519,6 +10574,7 @@ struct SessionEditorView: View {
         guard isStandalone, existingWorkout == nil,
               onPreparedWorkout == nil else { return }
         UserDefaults.standard.removeObject(forKey: draftStorageKey)
+        UserDefaults.standard.removeObject(forKey: scratchComposerEntryKey)
         hasStoredStandaloneDraft = false
     }
 
@@ -10588,6 +10644,7 @@ struct SessionEditorView: View {
     private func finishDraft() {
         draftFinalized = true
         UserDefaults.standard.removeObject(forKey: draftStorageKey)
+        UserDefaults.standard.removeObject(forKey: scratchComposerEntryKey)
     }
 
     private func compactPlannedSetLabel(
