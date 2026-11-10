@@ -21,6 +21,64 @@ final class AthleteOfflinePackStore: ObservableObject {
     @Published var error: String?
     private var accountID: UUID?
 
+    /// Account-scoped thumbnail index. A route grid must not decode every
+    /// offline pack manifest for every cell, or return a previous account's image.
+    private static var routeSnapshotIndexOwner: UUID?
+    private static var routeSnapshotFileIndex: [UUID: URL] = [:]
+    private static let routeSnapshotImages: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 20
+        cache.totalCostLimit = 12 * 1024 * 1024
+        return cache
+    }()
+
+    private static func invalidateRouteSnapshotIndex() {
+        routeSnapshotIndexOwner = nil
+        routeSnapshotFileIndex.removeAll(keepingCapacity: false)
+        routeSnapshotImages.removeAllObjects()
+    }
+
+    private static func indexRouteSnapshots(for userID: UUID) {
+        guard routeSnapshotIndexOwner != userID else { return }
+        routeSnapshotFileIndex.removeAll(keepingCapacity: false)
+        routeSnapshotImages.removeAllObjects()
+        routeSnapshotIndexOwner = userID
+
+        let signpost = ATHLTHPerformance.begin("OfflineRouteSnapshotIndex")
+        defer { ATHLTHPerformance.end("OfflineRouteSnapshotIndex", id: signpost) }
+        guard let root = try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: false
+        ) else { return }
+        let folder = root
+            .appendingPathComponent("AthleteOfflinePacks", isDirectory: true)
+            .appendingPathComponent(userID.uuidString, isDirectory: true)
+        guard let directories = try? FileManager.default.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: nil
+        ) else { return }
+
+        var newest: [UUID: (date: Date, file: URL)] = [:]
+        for directory in directories {
+            guard UUID(uuidString: directory.lastPathComponent) != nil,
+                  let data = try? Data(
+                    contentsOf: directory.appendingPathComponent("pack.json")
+                  ),
+                  let manifest = try? JSONDecoder().decode(
+                    AthleteOfflinePack.self, from: data
+                  ) else { continue }
+            for routeID in manifest.mapRouteIDs {
+                let file = directory.appendingPathComponent(routeID.uuidString + ".png")
+                guard FileManager.default.fileExists(atPath: file.path),
+                      manifest.routes.contains(where: { $0.id == routeID })
+                else { continue }
+                if let current = newest[routeID],
+                   current.date >= manifest.downloadedAt { continue }
+                newest[routeID] = (date: manifest.downloadedAt, file: file)
+            }
+        }
+        routeSnapshotFileIndex = newest.mapValues(\.file)
+    }
+
     private func root(_ id: UUID) throws -> URL {
         var url = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("AthleteOfflinePacks", isDirectory: true).appendingPathComponent(id.uuidString, isDirectory: true)
@@ -29,6 +87,7 @@ final class AthleteOfflinePackStore: ObservableObject {
         return url
     }
     func load(userID: UUID) {
+        Self.invalidateRouteSnapshotIndex()
         accountID = userID; packs = []; error = nil
         do {
             let folder = try root(userID)
@@ -69,6 +128,7 @@ final class AthleteOfflinePackStore: ObservableObject {
     /// Forget which account is active without deleting its encrypted local
     /// files. A later sign-in to that account can load them again.
     func clearActiveAccount() {
+        Self.invalidateRouteSnapshotIndex()
         accountID = nil
         packs = []
         error = nil
@@ -80,35 +140,31 @@ final class AthleteOfflinePackStore: ObservableObject {
     static func cachedRouteSnapshot(routeID: UUID, userID: UUID) -> UIImage? {
         let signpost = ATHLTHPerformance.begin("OfflineRouteSnapshotLookup")
         defer { ATHLTHPerformance.end("OfflineRouteSnapshotLookup", id: signpost) }
-        guard let root = try? FileManager.default.url(
-            for: .applicationSupportDirectory, in: .userDomainMask,
-            appropriateFor: nil, create: false
-        ) else { return nil }
-        let directory = root
-            .appendingPathComponent("AthleteOfflinePacks", isDirectory: true)
-            .appendingPathComponent(userID.uuidString, isDirectory: true)
-        guard let folders = try? FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: nil
-        ) else { return nil }
-        for folder in folders {
-            guard UUID(uuidString: folder.lastPathComponent) != nil,
-                  let data = try? Data(contentsOf: folder.appendingPathComponent("pack.json")),
-                  let manifest = try? JSONDecoder().decode(
-                    AthleteOfflinePack.self, from: data
-                  ),
-                  manifest.mapRouteIDs.contains(routeID) else { continue }
-            let file = folder.appendingPathComponent(routeID.uuidString + ".png")
-            if let image = UIImage(contentsOfFile: file.path) {
-                return image
-            }
+        indexRouteSnapshots(for: userID)
+        guard let path = routeSnapshotFileIndex[routeID] else { return nil }
+        let key = "\(userID.uuidString)|\(routeID.uuidString)" as NSString
+        if let cached = routeSnapshotImages.object(forKey: key) {
+            return cached
         }
-        return nil
+        guard let image = UIImage(contentsOfFile: path.path) else { return nil }
+        routeSnapshotImages.setObject(
+            image, forKey: key,
+            cost: image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+        )
+        return image
     }
 
     func remove(_ pack: AthleteOfflinePack) {
         guard let accountID else { return }
-        do { try FileManager.default.removeItem(at: root(accountID).appendingPathComponent(pack.id.uuidString)); packs.removeAll { $0.id == pack.id } }
-        catch { self.error = "The offline pack could not be deleted." }
+        do {
+            try FileManager.default.removeItem(
+                at: root(accountID).appendingPathComponent(pack.id.uuidString)
+            )
+            packs.removeAll { $0.id == pack.id }
+            Self.invalidateRouteSnapshotIndex()
+        } catch {
+            self.error = "The offline pack could not be deleted."
+        }
     }
     func download(plan: TrainingPlan, routes: [TrainingRoute], userID: UUID, includeMedia: Bool = true) async {
         guard !downloading else { return }
