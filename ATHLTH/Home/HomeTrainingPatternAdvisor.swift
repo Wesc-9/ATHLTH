@@ -91,6 +91,36 @@ enum HomeTrainingPatternAdvisor {
                                   to: calendar.startOfDay(for: now))
             ?? now.addingTimeInterval(-42 * 86_400)
         var events: [Event] = []
+        // Indexed reconciliation avoids scanning all prior sessions for
+        // every local workout. Each time bucket covers two minutes and
+        // adjacent buckets are also checked to preserve the +/-120s rule.
+        var eventIDs: Set<UUID> = []
+        var startsByActivity: [Activity: [Int: [Date]]] = [:]
+
+        func bucket(for date: Date) -> Int {
+            Int(floor(date.timeIntervalSince1970 / 120))
+        }
+
+        func append(_ event: Event) {
+            events.append(event)
+            eventIDs.insert(event.id)
+            let index = bucket(for: event.startedAt)
+            startsByActivity[event.activity, default: [:]][index, default: []]
+                .append(event.startedAt)
+        }
+
+        func hasNearbyStart(_ date: Date, activity: Activity) -> Bool {
+            let index = bucket(for: date)
+            guard let starts = startsByActivity[activity] else { return false }
+            for candidateBucket in (index - 1)...(index + 1) {
+                if starts[candidateBucket]?.contains(where: {
+                    abs($0.timeIntervalSince(date)) <= 120
+                }) == true {
+                    return true
+                }
+            }
+            return false
+        }
 
         func accepts(_ date: Date, duration: TimeInterval) -> Bool {
             date >= start && date <= now && duration.isFinite &&
@@ -100,7 +130,7 @@ enum HomeTrainingPatternAdvisor {
         for workout in workouts where accepts(
             workout.startDate, duration: workout.duration
         ) {
-            events.append(Event(
+            append(Event(
                 id: workout.id, activity: Activity(workout.activity),
                 startedAt: workout.startDate,
                 minutes: Int((workout.duration / 60).rounded())
@@ -113,15 +143,14 @@ enum HomeTrainingPatternAdvisor {
         }
         for record in finishedStrength {
             // HealthKit and ATHLTH logs can describe the same workout.
-            if events.contains(where: {
-                $0.id == record.healthMetrics.healthKitWorkoutUUID ||
-                ($0.activity == .strength &&
-                 abs($0.startedAt.timeIntervalSince(record.startedAt)) <= 120)
-            }) {
+            if (record.healthMetrics.healthKitWorkoutUUID.map {
+                eventIDs.contains($0)
+            } ?? false) ||
+                hasNearbyStart(record.startedAt, activity: .strength) {
                 continue
             }
             let duration = record.endedAt!.timeIntervalSince(record.startedAt)
-            events.append(Event(
+            append(Event(
                 id: record.id, activity: .strength, startedAt: record.startedAt,
                 minutes: Int((duration / 60).rounded())
             ))
@@ -132,15 +161,12 @@ enum HomeTrainingPatternAdvisor {
                   accepts(record.start, duration: end.timeIntervalSince(record.start))
             else { continue }
             let activity: Activity = record.walking ? .walking : .running
-            if events.contains(where: {
-                $0.id == record.id ||
-                (record.healthID != nil && $0.id == record.healthID) ||
-                ($0.activity == activity &&
-                 abs($0.startedAt.timeIntervalSince(record.start)) <= 120)
-            }) {
+            if eventIDs.contains(record.id) ||
+                (record.healthID.map { eventIDs.contains($0) } ?? false) ||
+                hasNearbyStart(record.start, activity: activity) {
                 continue
             }
-            events.append(Event(
+            append(Event(
                 id: record.id, activity: activity, startedAt: record.start,
                 minutes: Int((end.timeIntervalSince(record.start) / 60).rounded())
             ))
