@@ -176,6 +176,7 @@ final class TrophyStore: ObservableObject {
            let remote =
                 try? await cloud
                     .loadState() {
+            guard activeUserID == currentUserID else { return }
             mergeRemoteUnlocks(
                 remote.unlocks
             )
@@ -217,6 +218,8 @@ final class TrophyStore: ObservableObject {
         }
 
         let healthSnapshot = try? await health.trophySnapshot()
+        // A previous request may complete after sign-out or switching user.
+        guard activeUserID == currentUserID else { return }
         let strengthSnapshot = strength.trophySnapshot()
 
         if currentUserID != nil,
@@ -224,6 +227,7 @@ final class TrophyStore: ObservableObject {
             await claimPrestigeTrophies(
                 from: healthSnapshot
             )
+            guard activeUserID == currentUserID else { return }
         }
 
         let completedGoals = goals.goals.filter { $0.status == .completed }
