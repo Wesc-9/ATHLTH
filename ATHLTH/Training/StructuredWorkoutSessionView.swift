@@ -13,6 +13,57 @@ struct StructuredWorkoutStepResult: Codable, Hashable {
     var completed: Bool
 }
 
+/// Shared deterministic recipe for the structured iPhone player.
+/// AMRAP is time-limited, not a fixed 20-round interval. Expanding just
+/// one round at a time avoids a bogus "completed" result from unused steps.
+enum ATHLTHStructuredAMRAPProgression {
+    static func initialSteps(from source: [WorkoutTemplateBlock]) -> [WorkoutTemplateBlock] {
+        var oneRound = source
+        for index in oneRound.indices where oneRound[index].groupKind == .amrap {
+            oneRound[index].groupRounds = 1
+        }
+        return oneRound.expandedForExecution()
+    }
+
+    static func appendingNextRound(
+        to steps: [WorkoutTemplateBlock],
+        after index: Int,
+        startedAt: Date?,
+        now: Date
+    ) -> [WorkoutTemplateBlock]? {
+        guard steps.indices.contains(index),
+              let id = steps[index].executionGroupID,
+              steps[index].executionGroupKind == .amrap,
+              let startedAt,
+              let limit = steps[index].executionGroupClockSeconds,
+              limit.isFinite, limit > 0,
+              now.timeIntervalSince(startedAt) < limit,
+              index + 1 == steps.count ||
+                 steps[index + 1].executionGroupID != id
+        else { return nil }
+        let recipe = steps.filter {
+            $0.executionGroupID == id && $0.executionRound == 1
+        }
+        guard !recipe.isEmpty, recipe.count <= 20 else { return nil }
+        let nextRound = (steps[index].executionRound ?? 1) + 1
+        let copies = recipe.map { origin -> WorkoutTemplateBlock in
+            var next = origin
+            next.editorDragID = UUID()
+            next.executionRound = nextRound
+            next.executionTotalRounds = nil
+            next.title = origin.title + " · \(nextRound)"
+            return next
+        }
+        var updated = steps
+        updated.insert(contentsOf: copies, at: index + 1)
+        return updated.enumerated().map {
+            ATHLTHWorkoutPhasePlacement.renumbered(
+                $0.element, sequence: $0.offset + 1
+            )
+        }
+    }
+}
+
 struct StructuredWorkoutCompletion: Identifiable, Codable, Hashable {
     let id: UUID
     let workoutTemplateID: UUID?
@@ -109,9 +160,14 @@ struct StructuredWorkoutSessionView: View {
     @State private var enteredReps = 0
     @State private var enteredWeight = ""
     @State private var showAllSteps = false
+    @State private var activeExecutionBlocks: [WorkoutTemplateBlock] = []
 
     private var blocks: [WorkoutTemplateBlock] {
-        workout.resolvedWorkoutBlocks.expandedForExecution()
+        activeExecutionBlocks.isEmpty
+            ? ATHLTHStructuredAMRAPProgression.initialSteps(
+                from: workout.resolvedWorkoutBlocks
+            )
+            : activeExecutionBlocks
     }
 
     private var currentBlock: WorkoutTemplateBlock? {
@@ -215,14 +271,20 @@ struct StructuredWorkoutSessionView: View {
                 )) {
                     finishWorkout()
                 }
-                .disabled(savedCompletion || completedBlockIDs.isEmpty)
+                .disabled(savedCompletion ||
+                    (completedBlockIDs.isEmpty && amrapTimedOutGroups.isEmpty))
 
                 Button(ATHLTHLocalization.choose(
                     english: "Cancel", norwegian: "Avbryt"
                 ), role: .cancel) {}
             } message: {
                 Text(
-                    completedBlockIDs.isEmpty
+                    completedBlockIDs.isEmpty && !amrapTimedOutGroups.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "Time expired. Save the zero-round effort without inventing a completed set.",
+                            norwegian: "Tiden er ute. Lagre økten med null runder uten å registrere sett som ikke er utført."
+                        )
+                        : completedBlockIDs.isEmpty
                         ? ATHLTHLocalization.choose(
                             english: "Complete at least one block before saving the workout.",
                             norwegian: "Fullfør minst én blokk før økten kan lagres."
@@ -240,6 +302,9 @@ struct StructuredWorkoutSessionView: View {
             }
             .onAppear {
                 if !hasStarted {
+                    activeExecutionBlocks = ATHLTHStructuredAMRAPProgression.initialSteps(
+                        from: workout.resolvedWorkoutBlocks
+                    )
                     startedAt = Date()
                     hasStarted = true
                     setupCurrentStep()
@@ -529,9 +594,15 @@ struct StructuredWorkoutSessionView: View {
         if kind == .amrap {
             if elapsed >= (block.executionGroupClockSeconds ?? 720),
                amrapTimedOutGroups.insert(id).inserted {
-                // Stop accepting new work at the deadline. The completed
-                // repetitions and stages remain intact for the review.
-                showingFinishConfirmation = !completedBlockIDs.isEmpty
+                // A timed group may be followed by other workout sections.
+                // Move past its unfinished stage without inventing completed
+                // reps. An all-AMRAP workout is offered for review.
+                if let next = blocks.indices.dropFirst(currentIndex + 1)
+                    .first(where: { blocks[$0].executionGroupID != id }) {
+                    currentIndex = next
+                } else {
+                    showingFinishConfirmation = true
+                }
             }
         } else if kind == .emom {
             let ordinal = blocks.prefix(currentIndex).filter {
@@ -1051,6 +1122,16 @@ struct StructuredWorkoutSessionView: View {
 
     private func goToNextStep() {
         emomWaitingForMinute = false
+        if let block = currentBlock,
+           let id = block.executionGroupID,
+           let updated = ATHLTHStructuredAMRAPProgression.appendingNextRound(
+                to: blocks,
+                after: currentIndex,
+                startedAt: modeStarts[id],
+                now: Date()
+           ) {
+            activeExecutionBlocks = updated
+        }
         if currentIndex < blocks.count - 1 {
             currentIndex += 1
         } else {
@@ -1101,7 +1182,9 @@ struct StructuredWorkoutSessionView: View {
     private func finishWorkout() {
         // Ignore repeated confirmation taps and empty sessions. A saved
         // structured completion is evidence for the linked training plan.
-        guard !savedCompletion, !completedBlockIDs.isEmpty else { return }
+        guard !savedCompletion,
+              !completedBlockIDs.isEmpty || !amrapTimedOutGroups.isEmpty
+        else { return }
         var completion =
             StructuredWorkoutCompletion(
                 id: UUID(),
