@@ -302,20 +302,25 @@ struct ATHLTHSideMenuView: View {
         norwegian: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 9) {
             Text(ATHLTHLocalization.choose(
                 english: english,
                 norwegian: norwegian
             ))
             .font(.system(size: 10, weight: .semibold))
-            .tracking(1.6)
-            .foregroundStyle(ATHLTHTheme.accentDeep)
-            .padding(.leading, 11)
+            .tracking(1.2)
+            .foregroundStyle(menuMuted)
+            .padding(.leading, 8)
 
             VStack(spacing: 2, content: content)
+                .padding(5)
+                .background(menuCard, in: RoundedRectangle(cornerRadius: 18))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(warmDivider, lineWidth: 1)
+                }
         }
     }
-
 
     /// Library name opens the complete hub. Only the separate trailing
     /// chevron expands or collapses the four personal shortcuts.
@@ -422,38 +427,52 @@ struct ATHLTHSideMenuView: View {
         Button {
             onSelect(destination)
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .regular))
-                    .frame(width: 22)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(menuBronze)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        menuSurface.opacity(selected ? 1 : 0.74),
+                        in: RoundedRectangle(cornerRadius: 10)
+                    )
                     .accessibilityHidden(true)
 
                 Text(ATHLTHLocalization.choose(
                     english: english, norwegian: norwegian
                 ))
                 .font(.subheadline.weight(selected ? .semibold : .medium))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .foregroundStyle(menuInk)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(0.86)
+                .multilineTextAlignment(.leading)
 
-                Spacer(minLength: 4)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.7))
-                    .accessibilityHidden(true)
+                Spacer(minLength: 2)
+                if selected {
+                    Circle()
+                        .fill(menuBronze)
+                        .frame(width: 5, height: 5)
+                        .accessibilityHidden(true)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(menuMuted.opacity(0.6))
+                        .accessibilityHidden(true)
+                }
             }
-            .padding(.horizontal, 11)
-            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 46)
+            .padding(.horizontal, 8)
+            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 48)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 if selected {
                     RoundedRectangle(cornerRadius: 13)
-                        .fill(ATHLTHTheme.premiumGoldSoft.opacity(0.68))
+                        .fill(menuBronze.opacity(0.10))
                 }
             }
-            .contentShape(Rectangle())
+            .contentShape(RoundedRectangle(cornerRadius: 13))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     private var homeUnreadInbox: Int {
