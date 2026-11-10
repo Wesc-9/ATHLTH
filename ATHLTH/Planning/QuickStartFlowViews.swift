@@ -1903,6 +1903,15 @@ struct RunQuickStartSheet: View {
                     route: guidanceRoute,
                     settings: settings
                 )
+                if basicGhostSelected, guidanceRoute != nil {
+                    ghostDraft.enabled = true
+                    ghostDraft.setTargetTimeText(
+                        GhostTargetTimeFormatter.string(
+                            TimeInterval(basicGhostTargetMinutes * 60)
+                        ),
+                        distanceKilometers: guidanceRoute?.distanceKilometers
+                    )
+                }
             }
             .onChange(
                 of: selectedWorkout?.id
@@ -2693,43 +2702,15 @@ struct RunQuickStartSheet: View {
     }
 
     private var basicGoalWorkout: PlannedSession {
-        var step = WorkoutTemplateBlock(
-            sequence: 1, kind: .run,
-            title: ATHLTHLocalization.choose(
-                english: "Goal-based run", norwegian: "Målstyrt løping"
-            ),
-            exerciseSlug: nil,
-            distanceMeters: basicGoalKind == .distance
-                ? Double(basicGoalDistanceKilometers * 1_000) : nil,
-            repetitions: nil,
-            durationSeconds: basicGoalKind == .time
-                ? TimeInterval(basicGoalTimeMinutes * 60) : nil,
-            targetWeightKilograms: nil,
-            loadNote: nil, notes: nil, phase: .main
-        )
-        step.cardioActivity = .running
-        if basicGoalKind == .pace {
-            step.targetPaceSecondsPerKilometer =
-                Double(basicGoalPaceSecondsPerKilometer)
-        }
-        if basicGoalKind == .heartRateZone {
-            step.targetHeartRateZone = basicGoalHeartRateZone
-        }
-
-        var result = PlannedSession(
+        ATHLTHBasicRunGoalRecipe.make(
             id: basicGoalWorkoutID,
-            title: quickWorkoutName.isEmpty ? step.title : quickWorkoutName,
-            kind: .running, scheduledStart: nil,
-            durationMinutes: basicGoalKind == .time
-                ? basicGoalTimeMinutes : nil,
-            targetDistanceKilometers: basicGoalKind == .distance
-                ? Double(basicGoalDistanceKilometers) : nil,
-            targetPaceSecondsPerKilometer: step.targetPaceSecondsPerKilometer,
-            routeID: nil, exercises: [], notes: nil
-        )
-        result.workoutBlocks = [step]
-        return ATHLTHQuickRunTimelineAdapter.withEnvironment(
-            result, environment: environment
+            title: quickWorkoutName,
+            kind: basicGoalKind,
+            distanceKilometers: basicGoalDistanceKilometers,
+            timeMinutes: basicGoalTimeMinutes,
+            paceSecondsPerKilometer: basicGoalPaceSecondsPerKilometer,
+            heartRateZone: basicGoalHeartRateZone,
+            environment: environment
         )
     }
 
