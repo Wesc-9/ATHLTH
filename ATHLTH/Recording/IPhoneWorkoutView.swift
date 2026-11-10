@@ -217,7 +217,7 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             let distance =
                 workout.distanceMeters /
                 splitMeters
-            let isIndoor = workout.runEnvironment != .outdoor
+            let isIndoor = workout.runEnvironment.map { $0 != .outdoor } ?? false
             let isTreadmill = workout.runEnvironment == .treadmill &&
                 workout.indoorVenue != .indoorRunning
             // Neither type of indoor running may reuse GPS pace. Indoor
