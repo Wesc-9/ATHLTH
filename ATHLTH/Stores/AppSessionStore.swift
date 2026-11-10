@@ -3927,6 +3927,19 @@ final class AppSessionStore: ObservableObject {
         return copy
     }
 
+    /// Reuses the exact independent-copy engine (including fresh exercise,
+    /// superset and set-target IDs) before retaining the replaced workout's
+    /// calendar identity. Completion and version guards are applied by save.
+    func studioFavoriteReplacement(
+        source: PlannedSession,
+        replacing original: PlannedSession
+    ) -> PlannedSession {
+        makeIndependentPlanStudioCopy(
+            source: source,
+            scheduled: original.scheduledStart ?? source.scheduledStart
+        ).studioReplacement(keepingIDFrom: original)
+    }
+
     private func insertPlanWorkoutCopy(
         source: PlannedSession,
         planID: UUID,

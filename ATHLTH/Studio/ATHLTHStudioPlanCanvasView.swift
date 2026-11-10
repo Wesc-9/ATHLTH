@@ -1200,7 +1200,9 @@ struct ATHLTHStudioPlanCanvasView: View {
         if replacingExisting,
            day.sessions.filter({ !$0.isExplicitRestDay }).count == 1,
            let existing = day.sessions.first {
-            let replacement = choice.workout.studioReplacement(keepingIDFrom: existing)
+            let replacement = session.studioFavoriteReplacement(
+                source: choice.workout, replacing: existing
+            )
             succeeded = session.savePlanStudioWorkout(
                 replacement, inPlan: current.id, dayID: day.id,
                 editingWorkoutID: existing.id, expectedPlanVersion: current.version,
