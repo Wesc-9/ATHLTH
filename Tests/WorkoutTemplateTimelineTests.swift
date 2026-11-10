@@ -269,6 +269,45 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         XCTAssertEqual(steps.map(\.executionGroupKind), [.dropSet, .dropSet, .dropSet])
     }
 
+    func testEMOMClockPolicyRejectsEarlyAndMissedSlots() {
+        let started = Date(timeIntervalSince1970: 100_000)
+        func allowed(_ second: Double, station: Int) -> Bool {
+            ATHLTHStrengthModeClockPolicy.permitsCompletion(
+                modeRaw: "emom", startedAt: started, clockSeconds: 60,
+                roundIndex: 0, stationIndex: station, stationCount: 3,
+                at: started.addingTimeInterval(second)
+            )
+        }
+        XCTAssertTrue(allowed(25, station: 0))
+        XCTAssertFalse(allowed(60, station: 0))
+        XCTAssertFalse(allowed(40, station: 1))
+        XCTAssertTrue(allowed(62, station: 1))
+        XCTAssertEqual(ATHLTHStrengthModeClockPolicy.remainingSeconds(
+            modeRaw: "emom", startedAt: started, clockSeconds: 60,
+            roundIndex: 0, stationIndex: 1, stationCount: 3,
+            at: started.addingTimeInterval(85)
+        ), 35)
+    }
+
+    func testAMRAPClockPolicyStopsAtDeadlineButPreservesPriorEfforts() {
+        let started = Date(timeIntervalSince1970: 100_000)
+        func allowed(_ second: Double) -> Bool {
+            ATHLTHStrengthModeClockPolicy.permitsCompletion(
+                modeRaw: "amrap", startedAt: started, clockSeconds: 720,
+                roundIndex: 0, stationIndex: 0, stationCount: 3,
+                at: started.addingTimeInterval(second)
+            )
+        }
+        XCTAssertTrue(allowed(719))
+        XCTAssertFalse(allowed(720))
+        XCTAssertFalse(allowed(810))
+        XCTAssertTrue(ATHLTHStrengthModeClockPolicy.permitsCompletion(
+            modeRaw: nil, startedAt: nil, clockSeconds: nil,
+            roundIndex: 0, stationIndex: 0, stationCount: 1,
+            at: started
+        ))
+    }
+
     func testIntervalRepeatsRunAndRecoveryButSkipsFinalRecovery() {
         let id = UUID()
         var run = running()
