@@ -22,6 +22,13 @@ struct ATHLTHStudioPlannerView: View {
     @State private var showingLegacyOverview = false
     @State private var showingScenarioPreview = false
     @State private var showingCoachAdaptation = false
+    @State private var showingNewPlanBuilder = false
+    @State private var openedPlanID: UUID?
+    @State private var screen: PlanStudioScreen = .home
+
+    private enum PlanStudioScreen {
+        case home, editor, myPlans, explorePlans, favoritePlans
+    }
 
     private enum DragMode: String, CaseIterable, Identifiable {
         case move, copy
@@ -34,108 +41,269 @@ struct ATHLTHStudioPlannerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("ATHLTH PLAN STUDIO")
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(1.8)
-                        .foregroundStyle(ATHLTHStudioStyle.gold)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Build your training program",
-                        norwegian: "Bygg treningsprogrammet ditt"
-                    ))
-                    .font(.headline)
-                    .foregroundStyle(ATHLTHStudioStyle.ink)
-                }
-                Spacer(minLength: 4)
-                if plan != nil {
-                    if session.activePlan != nil {
+            switch screen {
+            case .home:
+                planStudioHome
+            case .editor:
+                VStack(spacing: 0) {
+                    HStack(spacing: 12) {
                         Button {
-                            showingCoachAdaptation = true
+                            screen = .myPlans
                         } label: {
                             Label(
                                 ATHLTHLocalization.choose(
-                                    english: "Coach plan suggestions",
-                                    norwegian: "Coach-forslag til planen"
+                                    english: "My plans", norwegian: "Mine planer"
                                 ),
-                                systemImage: "wand.and.stars"
+                                systemImage: "chevron.left"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHStudioStyle.ink)
+
+                        Spacer()
+
+                        Button {
+                            if session.activePlan != nil {
+                                showingCoachAdaptation = true
+                            } else {
+                                onOpenCoach?()
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Coach plan editor", norwegian: "Coach planredigering"
+                                ),
+                                systemImage: "sparkles"
                             )
                         }
                         .buttonStyle(.bordered)
-                        .accessibilityIdentifier("athlth-ipad-coach-plan-adaptation")
+                        .controlSize(.small)
+                        .foregroundStyle(ATHLTHStudioStyle.ink)
+                        .accessibilityIdentifier("athlth-ipad-coach-plan-editor")
                     }
-                    Button {
-                        showingScenarioPreview = true
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Plan what-if", norwegian: "Prøv planendring"
-                        ), systemImage: "arrow.left.arrow.right")
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("athlth-ipad-scenario-preview")
-                    if let onOpenCoach {
-                        Button(action: onOpenCoach) {
-                            Label("ATHLTH Coach", systemImage: "sparkles")
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-                Picker(ATHLTHLocalization.choose(
-                    english: "Layout", norwegian: "Visning"
-                ), selection: $showingLegacyOverview) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Full plan canvas", norwegian: "Stor planarbeidsflate"
-                    )).tag(false)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Overview / Scenario Lab", norwegian: "Oversikt / Scenario Lab"
-                    )).tag(true)
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 350)
-            }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 10)
-            .background(.white.opacity(0.85))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 9)
+                    .background(.white.opacity(0.82))
 
-            if showingLegacyOverview {
-                legacyOverview
-            } else {
-                ATHLTHStudioPlanCanvasView(
-                    onStartWorkout: onStartWorkout,
-                    onSendToWatch: onSendToWatch,
-                    onStartAfter: onStartAfter
-                )
+                    ATHLTHStudioPlanCanvasView(
+                        onStartWorkout: onStartWorkout,
+                        onSendToWatch: onSendToWatch,
+                        onStartAfter: onStartAfter,
+                        requestedPlanID: openedPlanID
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            case .myPlans:
+                VStack(spacing: 0) {
+                    libraryHeading(
+                        ATHLTHLocalization.choose(english: "My plans", norwegian: "Mine planer")
+                    )
+                    MyTrainingPlansLibraryView(
+                        onOpenPlan: { id in
+                            openedPlanID = id
+                            screen = .editor
+                        },
+                        onCreatePlan: { showingNewPlanBuilder = true }
+                    )
+                }
+            case .explorePlans:
+                VStack(spacing: 0) {
+                    libraryHeading(ATHLTHLocalization.choose(
+                        english: "Explore plans", norwegian: "Utforsk planer"
+                    ))
+                    TrainingPlanLibraryView()
+                }
+            case .favoritePlans:
+                VStack(spacing: 0) {
+                    libraryHeading(ATHLTHLocalization.choose(
+                        english: "Favorite plans", norwegian: "Favorittplaner"
+                    ))
+                    TrainingPlanLibraryView(favoritePlansOnly: true)
+                }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
+        .fullScreenCover(isPresented: $showingNewPlanBuilder) {
+            // Identical simple/advanced, day-by-day/week-by-week,
+            // training-day selection and block editing as iPhone.
+            ATHLTHTrainingPlanBuilderFlow(
+                startsAtSourceChoice: false,
+                initialAdvanced: false,
+                resumesDraftOnAppear: true,
+                draftID: nil,
+                onCreated: { id in
+                    openedPlanID = id
+                    showingNewPlanBuilder = false
+                    screen = .editor
+                }
+            )
+            .environment(\.athlthStudioFullscreenEditing, true)
+        }
         .sheet(isPresented: $showingCoachAdaptation) {
             CoachPlanAdaptationView()
                 .presentationDetents([.large])
         }
-        .sheet(isPresented: $showingScenarioPreview) {
-            if let plan {
-                ATHLTHStudioPlanningScenarioView(
-                    planID: plan.id,
-                    onAskCoach: {
-                        showingScenarioPreview = false
-                        Task { @MainActor in
-                            try? await Task.sleep(for: .milliseconds(350))
-                            onOpenCoach?()
-                        }
-                    },
-                    onAddWorkout: {
-                        showingScenarioPreview = false
-                        Task { @MainActor in
-                            try? await Task.sleep(for: .milliseconds(350))
-                            trainRequest = .plan
-                            showingTrainingEditor = true
+    }
+
+    private func libraryHeading(_ title: String) -> some View {
+        HStack {
+            Button { screen = .home } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Plan Studio", norwegian: "Plan Studio"
+                    ),
+                    systemImage: "chevron.left"
+                )
+                .font(.subheadline.weight(.medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(ATHLTHStudioStyle.ink)
+            Spacer()
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHStudioStyle.ink)
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 12)
+        .background(.white.opacity(0.82))
+    }
+
+    private var planStudioHome: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "YOUR TRAINING PLANS", norwegian: "DINE TRENINGSPLANER"
+                    ))
+                    .font(.caption2.weight(.semibold))
+                    .tracking(2)
+                    .foregroundStyle(ATHLTHStudioStyle.gold)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Plan your next training block",
+                        norwegian: "Planlegg din neste treningsperiode"
+                    ))
+                    .font(.system(size: 31, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Continue your active plan, build a new one, or manage saved plans.",
+                        norwegian: "Fortsett den aktive planen, opprett en ny eller administrer lagrede planer."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+
+                LazyVGrid(columns: [
+                    GridItem(.adaptive(minimum: 260, maximum: 520), spacing: 14)
+                ], spacing: 14) {
+                    homeTile(
+                        title: ATHLTHLocalization.choose(
+                            english: "Active plan", norwegian: "Aktiv plan"
+                        ),
+                        detail: session.activePlan?.title ?? ATHLTHLocalization.choose(
+                            english: "No active plan", norwegian: "Ingen aktiv plan"
+                        ),
+                        icon: "calendar.badge.checkmark"
+                    ) {
+                        if let id = session.activePlan?.id {
+                            openedPlanID = id
+                            screen = .editor
+                        } else {
+                            screen = .myPlans
                         }
                     }
-                )
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+                    homeTile(
+                        title: ATHLTHLocalization.choose(
+                            english: "Create plan", norwegian: "Opprett plan"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Simple or advanced, with your training days",
+                            norwegian: "Enkel eller avansert, med dine treningsdager"
+                        ),
+                        icon: "plus.circle"
+                    ) { showingNewPlanBuilder = true }
+                    homeTile(
+                        title: ATHLTHLocalization.choose(
+                            english: "Explore plans", norwegian: "Utforsk planer"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Browse the ATHLTH training-plan library",
+                            norwegian: "Utforsk treningsplanene i ATHLTH-biblioteket"
+                        ),
+                        icon: "books.vertical"
+                    ) { screen = .explorePlans }
+                    homeTile(
+                        title: ATHLTHLocalization.choose(
+                            english: "Favorite plans", norwegian: "Favorittplaner"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Plans you have marked with a star",
+                            norwegian: "Planene du har markert med stjerne"
+                        ),
+                        icon: "star"
+                    ) { screen = .favoritePlans }
+                    homeTile(
+                        title: ATHLTHLocalization.choose(
+                            english: "My plans", norwegian: "Mine planer"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Open, edit and create plans",
+                            norwegian: "Åpne, rediger og opprett planer"
+                        ),
+                        icon: "folder"
+                    ) { screen = .myPlans }
+                    homeTile(
+                        title: "ATHLTH Coach",
+                        detail: ATHLTHLocalization.choose(
+                            english: "Build and refine your plan with AI",
+                            norwegian: "Bygg og tilpass en plan med AI"
+                        ),
+                        icon: "sparkles"
+                    ) { onOpenCoach?() }
+                }
             }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollIndicators(.hidden)
+    }
+
+    private func homeTile(
+        title: String, detail: String, icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 23))
+                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                    .frame(width: 46, height: 46)
+                    .background(ATHLTHStudioStyle.canvas,
+                                in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(title)
+                        .font(.system(size: 21, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHStudioStyle.ink)
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHStudioStyle.gold)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 19))
+            .overlay(RoundedRectangle(cornerRadius: 19)
+                .stroke(ATHLTHStudioStyle.outline.opacity(0.5)))
+        }
+        .buttonStyle(.plain)
     }
 
     private var legacyOverview: some View {

@@ -185,7 +185,7 @@ struct ATHLTHiPadStudioRootView: View {
         }
         _selection = State(initialValue: initial)
         _libraryPage = State(initialValue: libraryPreview)
-        // Plan Studio starts with an icon rail, but inline library pages
+        // Plan Studio starts with its sidebar fully hidden; library pages
         // keep their sidebar visible in both preview and normal navigation.
         _sidebarVisibility = State(initialValue:
             libraryPreview == nil && initial == .planner ? .detailOnly : .all)
@@ -540,104 +540,12 @@ struct ATHLTHiPadStudioRootView: View {
                 onBack: { returnFromSidebarPage() }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if selection == .planner {
-            HStack(spacing: 0) {
-                compactPlannerRail
-                    .frame(width: 62)
-
-                ATHLTHStudioStyle.outline.opacity(0.55)
-                    .frame(width: 1)
-
-                page
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
         } else {
+            // Plan Studio uses the full detail width. The native sidebar
+            // control switches between fully hidden and the regular sidebar.
             page
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-    }
-
-    /// Studio owns only navigation chrome. Every destination continues to
-    /// use its original shared iPhone/iPad stores and feature implementation.
-    private var compactPlannerRail: some View {
-        VStack(spacing: 11) {
-            Image(systemName: "square.grid.2x2")
-                .font(.system(size: 19, weight: .medium))
-                .foregroundStyle(gold)
-                .padding(.top, 12)
-                .accessibilityHidden(true)
-
-            ScrollView {
-                VStack(spacing: 7) {
-                    ForEach(ATHLTHStudioDestination.allCases) { destination in
-                        Button {
-                            openStudio(destination)
-                        } label: {
-                            Image(systemName: destination.symbol)
-                                .font(.system(size: 18, weight: selection == destination
-                                    ? .semibold : .regular))
-                                .foregroundStyle(selection == destination
-                                    ? ink : ink.opacity(0.62))
-                                .frame(width: 44, height: 44)
-                                .background {
-                                    if selection == destination {
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(.white)
-                                    }
-                                }
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help(destination.label)
-                        .accessibilityLabel(destination.label)
-                        .accessibilityAddTraits(
-                            selection == destination ? .isSelected : []
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity)
-
-                Menu {
-                    Button {
-                        openPersonalLibrary(.exercises)
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Exercises", norwegian: "Øvelser"
-                        ), systemImage: "dumbbell")
-                    }
-                    Button {
-                        openPersonalLibrary(.routes)
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Routes", norwegian: "Ruter"
-                        ), systemImage: "map")
-                    }
-                    Button {
-                        openPersonalLibrary(.trainingPlans)
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Training plans", norwegian: "Treningsplaner"
-                        ), systemImage: "calendar")
-                    }
-                    Button {
-                        openPersonalLibrary(.workouts)
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Workouts", norwegian: "Treningsøkter"
-                        ), systemImage: "bookmark")
-                    }
-                } label: {
-                    Image(systemName: "books.vertical")
-                        .font(.system(size: 18))
-                        .foregroundStyle(ink.opacity(0.7))
-                        .frame(width: 44, height: 44)
-                }
-                .help(ATHLTHLocalization.choose(
-                    english: "My training library", norwegian: "Mitt treningsbibliotek"
-                ))
-                .accessibilityIdentifier("athlth-ipad-library-rail")
-            }
-        }
-        .background(canvas)
     }
 
     /// The iPad sidebar follows the same information architecture as the

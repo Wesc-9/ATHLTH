@@ -3709,6 +3709,7 @@ struct PersonalizeTrainingPlanView: View {
 
 struct MyTrainingPlansLibraryView: View {
     var onOpenPlan: ((UUID) -> Void)? = nil
+    var onCreatePlan: (() -> Void)? = nil
 
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
@@ -3954,7 +3955,8 @@ struct MyTrainingPlansLibraryView: View {
                         )
                     } actions: {
                         Button("Create Plan") {
-                            showingCreatePlan = true
+                            if let onCreatePlan { onCreatePlan() }
+                            else { showingCreatePlan = true }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(ATHLTHTheme.accent)
@@ -3986,7 +3988,8 @@ struct MyTrainingPlansLibraryView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showingCreatePlan = true
+                    if let onCreatePlan { onCreatePlan() }
+                    else { showingCreatePlan = true }
                 } label: {
                     Image(systemName: "plus")
                 }
