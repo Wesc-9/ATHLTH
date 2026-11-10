@@ -4038,6 +4038,21 @@ struct WorkoutTemplateBuilderView: View {
         blocks.contains(where: { $0.kind == .exercise })
     }
 
+    /// Strength modes belong only to strength editing. A generic mixed editor
+    /// may offer them after a strength station exists, but an explicit
+    /// running/walking/cycling/wellness editor can never create them.
+    private var mayInsertStrengthModes: Bool {
+        initialActivity == .strength ||
+            (initialActivity == nil && hasStrength)
+    }
+
+    private var hasStrengthGroupsInNonStrengthWorkout: Bool {
+        guard let activity = initialActivity, activity != .strength else {
+            return false
+        }
+        return blocks.contains { $0.groupKind?.isStrengthGroup == true }
+    }
+
     private var hasCycling: Bool {
         blocks.contains { $0.kind == .note && $0.activityTag == "cycling"
             && ($0.durationSeconds ?? 0) > 0 }
@@ -4092,6 +4107,7 @@ struct WorkoutTemplateBuilderView: View {
                 hasTimedWellness || basicFreeRun) &&
             !hasIncompleteStrengthGroup &&
             !hasInvalidDropSetWeights &&
+            !hasStrengthGroupsInNonStrengthWorkout &&
             (!isPlannedWorkout || resolvedDurationMinutes != nil ||
              routeDistanceGoal || basicFreeRun)
     }
@@ -5127,17 +5143,20 @@ struct WorkoutTemplateBuilderView: View {
                 }
             },
             onAddSuperset: { phase in
+                guard mayInsertStrengthModes else { return }
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
                 createSuperset()
             },
             onAddCircuit: { phase in
+                guard mayInsertStrengthModes else { return }
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
                 createCircuit()
             },
             onAddStrengthMode: { phase, kind in
-                guard [.emom, .amrap, .dropSet].contains(kind) else { return }
+                guard mayInsertStrengthModes,
+                      [.emom, .amrap, .dropSet].contains(kind) else { return }
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
                 createStrengthMode(kind)
@@ -5777,12 +5796,16 @@ struct WorkoutTemplateBuilderView: View {
                             addRunBlock(toGroup: id, activity: .walking)
                         }
                     }
-                    Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
-                        addRestBlock(toGroup: id)
+                    if kind == .intervals || kind.canInsertRoundPause {
+                        Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
+                            addRestBlock(toGroup: id)
+                        }
                     }
-                    Button(tr("Active recovery · jog", "Aktiv pause · jogg"),
-                           systemImage: "figure.run") {
-                        addActiveRecoveryBlock(toGroup: id)
+                    if kind == .intervals {
+                        Button(tr("Active recovery · jog", "Aktiv pause · jogg"),
+                               systemImage: "figure.run") {
+                            addActiveRecoveryBlock(toGroup: id)
+                        }
                     }
                 } label: {
                     Label(tr("Add to group", "Legg til i gruppen"),
@@ -6363,11 +6386,12 @@ struct WorkoutTemplateBuilderView: View {
                             createIntervals()
                             showingBlockPicker = false
                         }
-                        pickerRow(tr("Superset", "Supersett"), icon: "square.stack.3d.up") {
-                            pendingExerciseChoice = .superset
-                            showingBlockPicker = false
-                        }
-                        if initialActivity == .strength {
+                        if mayInsertStrengthModes {
+                            pickerRow(tr("Superset", "Supersett"),
+                                      icon: "square.stack.3d.up") {
+                                pendingExerciseChoice = .superset
+                                showingBlockPicker = false
+                            }
                             pickerRow(tr("Circuit training", "Sirkeltrening"),
                                       icon: WorkoutBlockGroupKind.circuit.symbol) {
                                 pendingExerciseChoice = .circuit
@@ -6823,19 +6847,22 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func createSuperset() {
+        guard mayInsertStrengthModes else { return }
         exerciseTargetGroupID = UUID()
         pendingNewGroupKind = .superset
         showingExercisePicker = true
     }
 
     private func createCircuit() {
+        guard mayInsertStrengthModes else { return }
         exerciseTargetGroupID = UUID()
         pendingNewGroupKind = .circuit
         showingExercisePicker = true
     }
 
     private func createStrengthMode(_ mode: WorkoutBlockGroupKind) {
-        guard [.emom, .amrap, .dropSet].contains(mode) else { return }
+        guard mayInsertStrengthModes,
+              [.emom, .amrap, .dropSet].contains(mode) else { return }
         exerciseTargetGroupID = UUID()
         pendingNewGroupKind = mode
         showingExercisePicker = true
