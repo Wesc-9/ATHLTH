@@ -102,6 +102,36 @@ final class ATHLTHStudioRecordedWorkoutsTests: XCTestCase {
         XCTAssertEqual(result.count, 2)
     }
 
+    func testHomeRecommendationPrefersScheduledWorkout() {
+        let result = ATHLTHStudioHomeRecommendation.make(
+            nextWorkoutTitle: "Intervals",
+            workouts: []
+        )
+        XCTAssertEqual(result.titleEnglish, "Intervals")
+        XCTAssertTrue(result.reasonNorwegian.contains("planlagt"))
+    }
+
+    func testHomeRecommendationWithoutHistoryIsTransparent() {
+        let result = ATHLTHStudioHomeRecommendation.make(
+            nextWorkoutTitle: nil,
+            workouts: []
+        )
+        XCTAssertTrue(result.reasonNorwegian.contains("Ingen nylig"))
+    }
+
+    func testHomeRecommendationSuggestsBalanceOnlyFromRecordedActivities() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let recentStrength = WorkoutSummary(localStrengthWorkout: strength(
+            started: now.addingTimeInterval(-86_400)
+        ))
+        let result = ATHLTHStudioHomeRecommendation.make(
+            nextWorkoutTitle: nil,
+            workouts: [recentStrength],
+            now: now
+        )
+        XCTAssertTrue(result.titleNorwegian.contains("rolig tur"))
+    }
+
     func testUnfinishedLocalStrengthIsNotCountedAsRecorded() {
         let active = strength(finished: false)
         let result = ATHLTHStudioRecordedWorkouts.merged(
