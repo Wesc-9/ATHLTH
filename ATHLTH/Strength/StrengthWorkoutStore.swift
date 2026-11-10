@@ -4217,6 +4217,110 @@ final class StrengthWorkoutStore: ObservableObject {
         return suggestion
     }
 
+    struct EMOMWindowReconciliation {
+        var nextExerciseIndex: Int?
+        var nextSetIndex: Int?
+        var skippedSlots: Int
+        var groupFinished: Bool
+    }
+
+    /// Resolve elapsed EMOM slots without ever claiming they were completed.
+    /// Slots are chronological: round 1/station 1, station 2, then round 2.
+    /// Absolute time means backgrounding, Watch handoff and app resume
+    /// cannot extend an already-missed minute.
+    static func reconcileEMOMWindows(
+        exercises: inout [StrengthExerciseLog],
+        groupID: UUID,
+        at now: Date
+    ) -> EMOMWindowReconciliation? {
+        let members = exercises.indices.filter { exercises[$0].groupID == groupID }
+        guard let first = members.first,
+              exercises[first].groupStyle == .emom,
+              let started = exercises[first].groupStartedAt,
+              let clock = exercises[first].groupClockSeconds,
+              clock.isFinite, clock > 0,
+              let rounds = members.map({ exercises[$0].sets.count }).min(),
+              rounds > 0 else { return nil }
+        let totalSlots = rounds * members.count
+        let elapsed = max(now.timeIntervalSince(started), 0)
+        let expiredSlots = min(totalSlots, max(0, Int(floor(elapsed / clock))))
+        var skipped = 0
+        if expiredSlots > 0 {
+            for slot in 0..<expiredSlots {
+                let exerciseIndex = members[slot % members.count]
+                let setIndex = slot / members.count
+                guard exercises[exerciseIndex].sets.indices.contains(setIndex),
+                      !exercises[exerciseIndex].sets[setIndex].isResolved
+                else { continue }
+                exercises[exerciseIndex].sets[setIndex].skippedAt =
+                    started.addingTimeInterval(Double(slot + 1) * clock)
+                exercises[exerciseIndex].skippedPlannedSetCount =
+                    (exercises[exerciseIndex].skippedPlannedSetCount ?? 0) + 1
+                skipped += 1
+            }
+        }
+        for index in members {
+            if !exercises[index].sets.isEmpty &&
+                exercises[index].sets.allSatisfy(\.isResolved) {
+                exercises[index].completedAt = exercises[index].completedAt ?? now
+            }
+        }
+        for slot in expiredSlots..<totalSlots {
+            let exerciseIndex = members[slot % members.count]
+            let setIndex = slot / members.count
+            if exercises[exerciseIndex].sets.indices.contains(setIndex),
+               !exercises[exerciseIndex].sets[setIndex].isResolved {
+                return EMOMWindowReconciliation(
+                    nextExerciseIndex: exerciseIndex,
+                    nextSetIndex: setIndex,
+                    skippedSlots: skipped, groupFinished: false
+                )
+            }
+        }
+        return EMOMWindowReconciliation(
+            nextExerciseIndex: nil, nextSetIndex: nil,
+            skippedSlots: skipped, groupFinished: true
+        )
+    }
+
+    /// Called from the live iPhone mode clock and on restoration. Skipped
+    /// work is accounted for but will never appear in completed-set volume.
+    @discardableResult
+    func reconcileCurrentEMOM(at now: Date = Date()) -> Int {
+        guard var workout = activeWorkout,
+              workout.exercises.indices.contains(currentExerciseIndex),
+              let selected = workout.exercises[currentExerciseIndex].groupID,
+              workout.exercises[currentExerciseIndex].groupStyle == .emom,
+              let next = Self.reconcileEMOMWindows(
+                exercises: &workout.exercises, groupID: selected, at: now
+              ) else { return 0 }
+        if let index = next.nextExerciseIndex,
+           let set = next.nextSetIndex {
+            if currentExerciseIndex != index || currentSetIndex != set {
+                currentExerciseIndex = index
+                currentSetIndex = set
+                restStartedAt = nil
+                restEndsAt = nil
+                timedSetCountdown = nil
+                setEffortClock = nil
+            }
+        } else if next.groupFinished,
+                  let subsequent = workout.exercises.indices.first(where: {
+                      workout.exercises[$0].groupID != selected &&
+                      !workout.exercises[$0].isCompleted
+                  }) {
+            Self.beginStrengthGroup(&workout, selected: subsequent, at: now)
+            currentExerciseIndex = subsequent
+            currentSetIndex = 0
+        }
+        activeWorkout = workout
+        if next.skippedSlots > 0 || next.groupFinished {
+            reloadDraftFromCurrentSet()
+            persistCheckpointNow()
+        }
+        return next.skippedSlots
+    }
+
     /// Returns one new AMRAP round only after the entire previous round
     /// has been recorded. Does not infer work from timer ticks. A single
     /// exercise AMRAP follows the same rules as a multi-station AMRAP.
@@ -4325,7 +4429,7 @@ final class StrengthWorkoutStore: ObservableObject {
                             .sets[
                                 completedSetIndex
                             ]
-                            .isCompleted
+                            .isResolved
                     }
                 ) {
             currentExerciseIndex =
@@ -4342,7 +4446,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     workout.exercises[index]
                         .sets.firstIndex(
                             where: {
-                                !$0.isCompleted
+                                !$0.isResolved
                             }
                         ) {
                 currentExerciseIndex = index
@@ -4802,6 +4906,19 @@ final class StrengthWorkoutStore: ObservableObject {
               workout.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex),
               !workout.exercises[currentExerciseIndex].sets[currentSetIndex].isCompleted
         else { return false }
+
+        if workout.exercises[currentExerciseIndex].groupStyle == .emom,
+           let id = workout.exercises[currentExerciseIndex].groupID {
+            workout.exercises[currentExerciseIndex].sets[currentSetIndex].skippedAt = Date()
+            workout.exercises[currentExerciseIndex].skippedPlannedSetCount =
+                (workout.exercises[currentExerciseIndex].skippedPlannedSetCount ?? 0) + 1
+            activeWorkout = workout
+            // Keep each minute's original slot index so the group clock
+            // and the Watch never mix rounds when a station is omitted.
+            _ = reconcileCurrentEMOM()
+            persistCheckpointNow()
+            return true
+        }
 
         var exercise = workout.exercises[currentExerciseIndex]
         let skipped = exercise.sets.remove(at: currentSetIndex)
