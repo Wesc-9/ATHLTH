@@ -1229,7 +1229,8 @@ struct WatchActiveWorkoutView: View {
         _ snapshot:
             WatchStrengthSessionSnapshot
     ) -> some View {
-        HStack(spacing: 5) {
+        VStack(spacing: 4) {
+            HStack(spacing: 5) {
             Text(
                 snapshot.exerciseName ??
                 ATHLTHLocalization.choose(
@@ -1309,6 +1310,8 @@ struct WatchActiveWorkoutView: View {
                         "Settvalg"
                 )
             )
+            }
+            WatchStrengthModeStrip(snapshot: snapshot)
         }
         .padding(
             .horizontal,
