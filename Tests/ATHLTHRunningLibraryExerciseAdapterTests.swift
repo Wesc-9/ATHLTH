@@ -43,6 +43,53 @@ final class ATHLTHRunningLibraryExerciseAdapterTests: XCTestCase {
         }
     }
 
+    func testProgressivePresetContainsIncreasingActualPaceTargets() {
+        let steps = ATHLTHRunningExercisePreset.progressive.blocks(in: .main)
+        XCTAssertEqual(steps.count, 3)
+        XCTAssertEqual(steps.map(\.durationSeconds), [300, 300, 300])
+        XCTAssertEqual(
+            steps.compactMap(\.targetPaceSecondsPerKilometer),
+            [420, 390, 360]
+        )
+        XCTAssertTrue(steps.allSatisfy { $0.kind == .run && $0.resolvedPhase == .main })
+    }
+
+    func testFartlekHasDifferentEffortLengthsAndRecoveries() {
+        let steps = ATHLTHRunningExercisePreset.fartlek.blocks(in: .main)
+        XCTAssertEqual(steps.count, 10)
+        XCTAssertEqual(steps.enumerated().filter { $0.offset.isMultiple(of: 2) }
+            .compactMap { $0.element.durationSeconds }, [60, 120, 180, 120, 60])
+        XCTAssertEqual(steps.filter { $0.activityTag == "active_recovery" }.count, 5)
+        XCTAssertEqual(steps.filter { $0.activityTag == "active_recovery" }
+            .map(\.targetHeartRateZone), [2, 2, 2, 2, 2])
+    }
+
+    func testLongRecoveryAndPerformanceRunPresetsAreRealRunningSteps() {
+        let long = ATHLTHRunningExercisePreset.longRun.blocks(in: .main)
+        XCTAssertEqual(long.count, 1)
+        XCTAssertEqual(long.first?.durationSeconds, 4_500)
+        XCTAssertEqual(long.first?.targetHeartRateZone, 2)
+
+        let recovery = ATHLTHRunningExercisePreset.recoveryRun.blocks(in: .cooldown)
+        XCTAssertEqual(recovery.first?.targetHeartRateZone, 1)
+        XCTAssertEqual(recovery.first?.durationSeconds, 1_500)
+
+        let cooper = ATHLTHRunningExercisePreset.cooperTest.blocks(in: .main)
+        XCTAssertEqual(cooper.first?.durationSeconds, 720)
+
+        for (preset, meters) in [
+            (ATHLTHRunningExercisePreset.oneKilometerTest, 1_000.0),
+            (.fiveKilometerTest, 5_000.0),
+            (.tenKilometerTest, 10_000.0)
+        ] {
+            let steps = preset.blocks(in: .main)
+            XCTAssertEqual(steps.count, 1)
+            XCTAssertEqual(steps.first?.kind, .run)
+            XCTAssertEqual(steps.first?.distanceMeters, meters)
+            XCTAssertNil(steps.first?.durationSeconds)
+        }
+    }
+
     func testNeverConvertsStrengthOrGroupedExercises() {
         XCTAssertEqual(ATHLTHRunningLibraryExerciseAdapter.adapt(
             libraryStep("Squat")).kind, .exercise)
