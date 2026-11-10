@@ -1479,16 +1479,18 @@ struct RunQuickStartSheet: View {
         self.plannedSession = plannedSession
         self.onStart = onStart
 
-        // A planned indoor workout must start without GPS. Keep its
-        // structured 4×4 steps, but do not let a saved route force outdoor mode.
-        let plannedIndoor = RunEnvironment.forPlannedSession(plannedSession) == .treadmill
+        // Planned indoor and treadmill workouts must never inherit GPS
+        // even when launched from an existing route or interval card.
+        let plannedEnvironment = RunEnvironment.forPlannedSession(plannedSession)
         let initialMode: RunQuickStartMode =
             initialWorkout != nil ? .structured :
-            (initialRoute != nil && !plannedIndoor ? .route : .free)
+            (initialRoute != nil && plannedEnvironment == .outdoor ? .route : .free)
 
-        _environment = State(initialValue: plannedIndoor ? .treadmill : .outdoor)
+        _environment = State(initialValue: plannedEnvironment)
         _mode = State(initialValue: initialMode)
-        _selectedRoute = State(initialValue: plannedIndoor ? nil : initialRoute)
+        _selectedRoute = State(
+            initialValue: plannedEnvironment == .outdoor ? initialRoute : nil
+        )
         _selectedWorkout = State(
             initialValue: initialWorkout
         )
@@ -2670,7 +2672,7 @@ struct RunQuickStartSheet: View {
                             .treadmillInclinePercent ?? 0
                         : nil,
                 audioCoach:
-                    isAdvancedSetup
+                    audioCoachDraft.enabled
                         ? audioCoachConfiguration
                         : .disabled,
                 routeAlerts:
