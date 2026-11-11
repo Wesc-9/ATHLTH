@@ -2316,8 +2316,30 @@ struct ATHLTHHomeView: View {
     }
 
     private var homeFriendsCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
+            // The existing strip owns actual friend status and quick actions.
             HomeActiveFriendsStrip(isActive: isActive)
+            if social.mutualFollows.isEmpty && !social.isHomeFriendsRefreshing {
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Friends", norwegian: "Venner"
+                        ),
+                        systemImage: "person.2"
+                    )
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Friends you connect with appear here.",
+                        norwegian: "Venner du knytter kontakt med, vises her."
+                    ))
+                    .font(.system(size: 11))
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 7)
+            }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, minHeight: 158, alignment: .topLeading)
