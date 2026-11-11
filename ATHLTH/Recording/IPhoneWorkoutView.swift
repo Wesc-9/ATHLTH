@@ -987,6 +987,9 @@ private struct IPhoneStructuredStepCard: View {
     let step: WatchRunningWorkoutStep
 
     var body: some View {
+        if step.phase == "free" {
+            freeRunningStageCard
+        } else {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(ATHLTHLocalization.choose(
                                 english: "WORKOUT STEP", norwegian: "ØKTSTEG"
@@ -1193,6 +1196,85 @@ private struct IPhoneStructuredStepCard: View {
         .padding(17)
         .frame(maxWidth: .infinity)
         .athlthPlanCard(radius: 21)
+        }
+    }
+
+    /// Interval selection does not replace an already-running free segment:
+    /// show the real elapsed time and distance until Start interval is tapped.
+    private var freeRunningStageCard: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(alignment: .leading, spacing: 15) {
+                HStack(spacing: 10) {
+                    Image(systemName: "figure.run")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 44, height: 44)
+                        .background(ATHLTHTrainDesign.paleGold.opacity(0.55),
+                                    in: RoundedRectangle(cornerRadius: 14))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "FREE RUNNING", norwegian: "FRI LØPING"
+                        ))
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Recording continues", norwegian: "Registreringen fortsetter"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                    }
+                    Spacer()
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 13) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "TIME SO FAR", norwegian: "TID SÅ LANGT"
+                        ))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        Text(ATHLTHRunStepCountdown.display(
+                            max(workout.elapsed(at: context.date), 0)
+                        ))
+                        .font(.system(size: 31, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                    }
+                    Spacer(minLength: 6)
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "DISTANCE SO FAR", norwegian: "DISTANSE SÅ LANGT"
+                        ))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        Text(String(format: "%.2f km", workout.distanceMeters / 1000))
+                            .font(.title3.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                }
+
+                if let next = recorder.nextStructuredStep {
+                    Divider().opacity(0.6)
+                    Label(ATHLTHLocalization.choose(
+                        english: "Ready when you are: ", norwegian: "Klar når du er: "
+                    ) + next.title, systemImage: "arrow.right.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .lineLimit(2)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Start the next part with the button below. All running up to that moment is included in the summary.",
+                        norwegian: "Start neste del med knappen nedenfor. All løping fram til da blir med i sammendraget."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .padding(19)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .athlthPlanCard(radius: 21)
+            .transaction { $0.animation = nil }
+        }
     }
 
     private func routeDistanceText(
