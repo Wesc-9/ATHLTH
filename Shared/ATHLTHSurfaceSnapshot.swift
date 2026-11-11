@@ -31,6 +31,13 @@ struct ATHLTHSurfaceWorkoutSnapshot: Codable, Equatable {
     var distanceMeters: Double
     var heartRate: Double
     var updatedAt: Date
+    // Optional for old cached iPhone/iPad widget snapshots.
+    var currentStep: String? = nil
+    var nextStep: String? = nil
+    var runningIntervalOrdinal: Int? = nil
+    var runningIntervalTotal: Int? = nil
+    var runningInRecovery: Bool? = nil
+    var runningStepRemainingSeconds: TimeInterval? = nil
 }
 
 enum ATHLTHSurfaceSharedStore {
