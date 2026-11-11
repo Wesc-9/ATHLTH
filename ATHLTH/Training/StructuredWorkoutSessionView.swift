@@ -214,6 +214,21 @@ struct StructuredWorkoutSessionView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if !savedCompletion {
+                        HStack(spacing: 9) {
+                            ATHLTHLiveWorkoutControlButton(kind: .minimize) {
+                                persistCheckpoint()
+                                dismiss()
+                            }
+                            Spacer(minLength: 5)
+                            ATHLTHLiveWorkoutControlButton(kind: .add) {
+                                showAllSteps.toggle()
+                            }
+                            ATHLTHLiveWorkoutControlButton(kind: .finish) {
+                                showingFinishConfirmation = true
+                            }
+                        }
+                    }
                     sessionHeader
 
                     if let currentBlock {
@@ -285,45 +300,50 @@ struct StructuredWorkoutSessionView: View {
             .safeAreaInset(edge: .bottom) {
                 bottomControls
             }
-            .confirmationDialog(
-                ATHLTHLocalization.choose(
-                    english: "Finish workout?", norwegian: "Avslutte økten?"
-                ),
-                isPresented: $showingFinishConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(ATHLTHLocalization.choose(
-                    english: "Finish workout", norwegian: "Fullfør økt"
-                )) {
-                    finishWorkout()
-                }
-                .disabled(savedCompletion ||
-                    (completedBlockIDs.isEmpty && amrapTimedOutGroups.isEmpty))
-
-                Button(ATHLTHLocalization.choose(
-                    english: "Cancel", norwegian: "Avbryt"
-                ), role: .cancel) {}
-            } message: {
-                Text(
-                    completedBlockIDs.isEmpty && !amrapTimedOutGroups.isEmpty
-                        ? ATHLTHLocalization.choose(
-                            english: "Time expired. Save the zero-round effort without inventing a completed set.",
-                            norwegian: "Tiden er ute. Lagre økten med null runder uten å registrere sett som ikke er utført."
+            .sheet(isPresented: $showingFinishConfirmation) {
+                ATHLTHWorkoutFinishSheet(
+                    metrics: [
+                        ATHLTHWorkoutFinishMetric(
+                            title: ATHLTHLocalization.choose(
+                                english: "Elapsed", norwegian: "Varighet"
+                            ),
+                            value: "\(max(0, Int(Date().timeIntervalSince(startedAt) / 60))) min",
+                            symbol: "clock"
+                        ),
+                        ATHLTHWorkoutFinishMetric(
+                            title: ATHLTHLocalization.choose(
+                                english: "Completed blocks", norwegian: "Fullførte blokker"
+                            ),
+                            value: "\(completedBlockIDs.count) / \(blocks.count)",
+                            symbol: "checkmark.circle"
                         )
-                        : completedBlockIDs.isEmpty
+                    ],
+                    progress: blocks.isEmpty ? 0 :
+                        Double(completedBlockIDs.count) / Double(blocks.count),
+                    remainingWarning: completedBlockIDs.isEmpty
                         ? ATHLTHLocalization.choose(
-                            english: "Complete at least one block before saving the workout.",
-                            norwegian: "Fullfør minst én blokk før økten kan lagres."
+                            english: amrapTimedOutGroups.isEmpty
+                                ? "Complete at least one block before saving."
+                                : "Time expired. You can save a zero-round effort.",
+                            norwegian: amrapTimedOutGroups.isEmpty
+                                ? "Fullfør minst én blokk før du lagrer."
+                                : "Tiden er ute. Du kan lagre en økt med null runder."
                         )
-                        : completedBlockIDs.count == blocks.count
-                            ? ATHLTHLocalization.choose(
-                                english: "All blocks are completed.",
-                                norwegian: "Alle blokkene er gjennomført."
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "\(completedBlockIDs.count) of \(blocks.count) blocks are completed.",
-                                norwegian: "\(completedBlockIDs.count) av \(blocks.count) blokker er gjennomført."
-                            )
+                        : nil,
+                    saveExplanation: ATHLTHLocalization.choose(
+                        english: "Your recorded steps and actual results will be retained.",
+                        norwegian: "Registrerte steg og faktiske resultater blir tatt vare på."
+                    ),
+                    saving: false,
+                    onFinish: {
+                        finishWorkout()
+                        if savedCompletion {
+                            showingFinishConfirmation = false
+                        }
+                    },
+                    onContinue: { showingFinishConfirmation = false },
+                    canFinish: !savedCompletion &&
+                        (!completedBlockIDs.isEmpty || !amrapTimedOutGroups.isEmpty)
                 )
             }
             .onAppear {
