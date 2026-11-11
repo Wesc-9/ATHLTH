@@ -21,14 +21,14 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var entryPlanFocus: String? = nil
     var entryPlanGoal: String? = nil
     // Optional so v1 snapshots made before the advanced-fields update still decode.
-    // Only structural preferences; health, injuries and private notes are excluded.
+    // Legacy structural fields remain for backward-compatible decoding.
     var preferredDayIndexes: [Int]?
     var varyWeekdays: Bool? = nil
     var linkedGoalIDs: [UUID]? = nil
     var equipmentContext: String?
     var weeklyTimeBudgetMinutes: Int?
     // Only structural week choices and built-in subtype labels are stored.
-    // Custom session names and personal health notes are intentionally omitted.
+    // Full entered configuration is retained in the optional configuration checkpoint.
     var workoutKindsByDay: [Int: String]? = nil
     var workoutPresetsByDay: [Int: String]? = nil
     var workoutMinutesByDay: [Int: Int]? = nil
@@ -226,7 +226,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
 
 /// Atomic, per-account checkpoint storage. Existing UserDefaults snapshots are
 /// migrated on first read to avoid losing drafts created by older TestFlight builds.
-/// The payload intentionally excludes injury notes, free-text notes and route IDs.
+/// The account-scoped payload is stored atomically with file protection on Apple devices.
 struct ATHLTHPlanDraftRecord: Identifiable {
     let draftID: UUID?
     let draft: ATHLTHPlanCreationDraft

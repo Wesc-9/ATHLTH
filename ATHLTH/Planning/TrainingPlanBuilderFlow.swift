@@ -208,12 +208,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var aiPlanAction = "fill"
     @State private var aiAdjustmentInstruction = ""
+    @State private var aiAdjustmentDate: Date?
     private struct GuidedAIFillPreview: Identifiable {
         let id = UUID()
         let draft: AIProgramDraft
         let proposal: ATHLTHGuidedPlanAutofill.Proposal
         let originalEdits: [Int: ATHLTHPlanWeekDayEdit]
         let originalTemplates: [Int: ATHLTHPlanStructuredWorkoutBlueprint]
+        let originalPreferredDays: Set<Int>
         let replacingKeys: Set<Int>?
         let ownerID: UUID
         let planStart: Date
@@ -496,7 +498,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         mode == .advanced
                             ? ATHLTHTheme.premiumGold
                                 .opacity(0.34)
-                            : ATHLTHTheme.accent
+                            : ATHLTHTrainDesign.bronze
                                 .opacity(0.28)
                 )
 
@@ -1366,7 +1368,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .foregroundStyle(.white)
                             .padding(18)
                             .frame(maxWidth: .infinity, minHeight: 58)
-                            .background(ATHLTHPlanDesign.ink, in: RoundedRectangle(cornerRadius: 18))
+                            .background(ATHLTHTrainDesign.bronze.gradient, in: RoundedRectangle(cornerRadius: 18))
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -2573,7 +2575,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .fill(
                             index <= stepDisplayNumber
                                 ? ATHLTHTrainDesign.bronze
-                                : ATHLTHTheme.accent
+                                : ATHLTHTrainDesign.bronze
                                     .opacity(0.10)
                         )
                         .frame(height: 5)
@@ -4054,6 +4056,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
 
+    private var selectedAIAdjustmentDate: Date {
+        if let aiAdjustmentDate { return min(max(aiAdjustmentDate, startDate), resolvedEndDate) }
+        if step == .week && weekPlanningApproach == .guided { return guidedCurrentDate }
+        let weekday = selectedAdvancedWeekDay ?? advancedWeekItems(for: selectedPlanWeekIndex)
+            .sorted { $0.date < $1.date }.first?.weekday ?? 1
+        return dateForWeekDay(weekday, weekIndex: selectedPlanWeekIndex)
+    }
+    private var aiAdjustmentDateBinding: Binding<Date> {
+        Binding(get: { selectedAIAdjustmentDate }, set: { aiAdjustmentDate = $0 })
+    }
+
     private var planAITools: some View {
         builderPanel {
             VStack(alignment: .leading, spacing: 12) {
@@ -4065,6 +4078,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     aiPlanAction = "fill"
                     showingGuidedAIConsent = true
                 }
+                DatePicker(
+                    ATHLTHLocalization.choose(english: "Day to adjust", norwegian: "Dag som skal justeres"),
+                    selection: aiAdjustmentDateBinding,
+                    in: startDate...resolvedEndDate, displayedComponents: .date)
                 Button(ATHLTHLocalization.choose(english: "Adjust selected day", norwegian: "Juster valgt dag")) {
                     aiPlanAction = "adjust"
                     showingGuidedAIConsent = true
@@ -4906,9 +4923,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let requestedWeeks = weekCount
         let originalEdits = weekDayEdits
         let originalTemplates = structuredWorkoutsByDay
-        let targetDay = weekPlanningApproach == .guided ? guidedCurrentWeekday :
-            (selectedAdvancedWeekDay ?? advancedWeekItems(for: selectedPlanWeekIndex).sorted { $0.date < $1.date }.first?.weekday ?? 1)
-        let targetWeek = weekPlanningApproach == .guided ? guidedCurrentWeek : selectedPlanWeekIndex
+        let originalPreferredDays = selectedDays
+        let adjustmentOffset = max(0, Calendar.current.dateComponents([.day],
+            from: Calendar.current.startOfDay(for: startDate),
+            to: Calendar.current.startOfDay(for: selectedAIAdjustmentDate)).day ?? 0)
+        let targetDay = (Calendar.current.component(.weekday, from: selectedAIAdjustmentDate) + 5) % 7 + 1
+        let targetWeek = min(weekCount - 1, adjustmentOffset / 7)
         let replacingKeys: Set<Int>? = aiPlanAction == "rebuild"
             ? Set(1...(weekCount * 7))
             : aiPlanAction == "adjust" ? Set([weekDayKey(targetDay, weekIndex: targetWeek)]) : nil
@@ -4950,7 +4970,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             let draft = try await guidedAIService.generate(request)
             guard session.signedIn, session.profile.userID == athleteID,
                   startDate == requestedStart, weekCount == requestedWeeks,
-                  weekDayEdits == originalEdits, structuredWorkoutsByDay == originalTemplates else {
+                  weekDayEdits == originalEdits, structuredWorkoutsByDay == originalTemplates,
+                  selectedDays == originalPreferredDays else {
                 // Never apply a response to a changed account or date range.
                 return
             }
@@ -4982,6 +5003,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             guidedAIFillPreview = GuidedAIFillPreview(
                 draft: draft, proposal: proposal,
                 originalEdits: originalEdits, originalTemplates: originalTemplates,
+                originalPreferredDays: originalPreferredDays,
                 replacingKeys: replacingKeys,
                 ownerID: athleteID, planStart: requestedStart, weekCount: requestedWeeks
             )
@@ -4995,7 +5017,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         guard session.signedIn, session.profile.userID == preview.ownerID,
               startDate == preview.planStart, weekCount == preview.weekCount,
               weekDayEdits == preview.originalEdits,
-              structuredWorkoutsByDay == preview.originalTemplates else {
+              structuredWorkoutsByDay == preview.originalTemplates,
+              selectedDays == preview.originalPreferredDays else {
             guidedAIFillPreview = nil
             return
         }
@@ -7222,17 +7245,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 conflictCard(conflict)
             }
 
-            Button {
-                createPlan(seedSuggestedWeek: mode == .basic)
-            } label: {
-                creationChoiceCard(
-                    title: ATHLTHLocalization.choose(english: "Finish", norwegian: "Fullfør"),
-                    subtitle: ATHLTHLocalization.choose(english: "Save your workouts and rest days as planned.", norwegian: "Lagre øktene og hviledagene slik du har planlagt dem."),
-                    icon: "checkmark.seal.fill", prominent: true
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(!canCreatePlan || isCreatingPlan)
             planAITools
         }
     }
@@ -7498,7 +7510,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     LinearGradient(
                         colors: [
                             ATHLTHTrainDesign.bronze,
-                            ATHLTHTheme.accent
+                            ATHLTHTrainDesign.bronze
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -7715,34 +7727,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         canContinue ? 1 : 0.38
                     )
                 } else {
-                    HStack(spacing: 8) {
-                        Image(
-                            systemName:
-                                "checkmark.circle.fill"
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.vitality
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Review your plan and tap Finish",
-                                norwegian:
-                                    "Se over planen og trykk Fullfør"
-                            )
-                        )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-
-                        Spacer()
+                    Button {
+                        createPlan(seedSuggestedWeek: mode == .basic)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(english: "Finish", norwegian: "Fullfør"), systemImage: "checkmark.seal.fill")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(ATHLTHTrainDesign.bronze.gradient, in: RoundedRectangle(cornerRadius: 16))
                     }
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 48
-                    )
+                    .buttonStyle(.plain)
+                    .disabled(!canCreatePlan || isCreatingPlan)
                 }
             }
             .padding(.horizontal, 18)
