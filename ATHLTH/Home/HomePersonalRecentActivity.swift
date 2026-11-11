@@ -1377,10 +1377,26 @@ struct HomePersonalRecentActivitySection:
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                     } else if workout.activity == .strength {
-                        Text(workout.summaryText)
-                            .font(.system(size: 11.5, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                            .lineLimit(2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let count = workout.strengthExerciseCount, count > 0 {
+                                Label(
+                                    "\(count) " + ATHLTHLocalization.choose(
+                                        english: "exercises", norwegian: "øvelser"
+                                    ),
+                                    systemImage: "dumbbell.fill"
+                                )
+                            }
+                            Label(HomeRecentCardFormat.duration(workout.duration),
+                                  systemImage: "clock")
+                            if let volume = workout.strengthTotalVolumeKilograms,
+                               volume > 0 {
+                                Label(HomeRecentCardFormat.volume(volume),
+                                      systemImage: "scalemass")
+                            }
+                        }
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
                     } else {
                         Text(workout.summaryText)
                             .font(.system(size: 11, weight: .medium))
@@ -1445,6 +1461,23 @@ struct HomePersonalRecentActivitySection:
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
+                    } else if HomeFollowingWorkoutPresentation.activity(for: feedItem) == .strength {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let count = HomeRecentCardFormat.integer(feedItem, key: "exercise_count") {
+                                Label("\(count) " + ATHLTHLocalization.choose(
+                                    english: "exercises", norwegian: "øvelser"
+                                ), systemImage: "dumbbell.fill")
+                            }
+                            Label(HomeRecentCardFormat.duration(
+                                HomeRecentCardFormat.number(feedItem, key: "duration_seconds")
+                            ), systemImage: "clock")
+                            if let volume = HomeRecentCardFormat.number(feedItem, key: "volume_kg") {
+                                Label(HomeRecentCardFormat.volume(volume), systemImage: "scalemass")
+                            }
+                        }
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
                     } else {
                         Text(feedItem.activity.title)
                             .font(.system(size: 11.5, weight: .medium))
