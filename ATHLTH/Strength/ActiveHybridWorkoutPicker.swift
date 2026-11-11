@@ -166,7 +166,12 @@ struct ActiveHybridWorkoutPicker: View {
             }
             .sheet(item: $pendingRunningWarmup) { planned in
                 ATHLTHLiveRunningWarmupSheet(session: planned) { chosen, startNow in
-                    append(chosen, startNow: startNow)
+                    let success = onAppend(chosen, startNow)
+                    if success {
+                        pendingRunningWarmup = nil
+                        dismiss()
+                    }
+                    return success
                 }
                 .presentationDragIndicator(.visible)
             }
