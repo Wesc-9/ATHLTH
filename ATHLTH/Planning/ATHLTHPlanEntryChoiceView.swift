@@ -25,26 +25,46 @@ struct ATHLTHPlanEntryChoiceView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        GeometryReader { viewport in
+            VStack(alignment: .leading, spacing: 12) {
                 header
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(tr("Choose how to build your plan",
-                            "Velg hvordan du vil lage planen"))
-                        .font(.system(size: 32, weight: .regular, design: .serif))
-                        .tracking(-0.6)
-                        .foregroundStyle(ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
-
-                    Text(tr("You can change and customise your plan later.",
-                            "Du kan når som helst endre og tilpasse planen senere."))
+                Text(tr("Choose how to build your plan", "Velg hvordan du vil lage planen"))
+                    .font(.system(size: 26, weight: .regular, design: .serif))
+                    .foregroundStyle(ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                if viewport.size.height > 650 {
+                    Text(tr("You can customise your plan later.", "Du kan tilpasse planen senere."))
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.bottom, 5)
+                GeometryReader { available in
+                    if typeSize.isAccessibilitySize {
+                        ScrollView {
+                            cards(cardHeight: 430)
+                        }
+                    } else {
+                        let horizontal = available.size.width > 500 && available.size.width > available.size.height
+                        cards(
+                            cardHeight: max(0, horizontal ? available.size.height : (available.size.height - 12) / 2),
+                            horizontal: horizontal
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .frame(maxWidth: 740)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .background(paper.ignoresSafeArea())
+    }
 
+    private func cards(cardHeight: CGFloat, horizontal: Bool = false) -> some View {
+        let layout = horizontal
+            ? AnyLayout(HStackLayout(spacing: 12))
+            : AnyLayout(VStackLayout(spacing: 12))
+        return layout {
                 modeCard(
                     .simple,
                     title: tr("Simple", "Enkel"),
@@ -60,7 +80,8 @@ struct ATHLTHPlanEntryChoiceView: View {
                         tr("A quick and clear plan", "En rask og oversiktlig plan")
                     ],
                     buttonTitle: tr("Choose simple", "Velg enkel"),
-                    emphasized: true
+                    emphasized: true,
+                    cardHeight: cardHeight
                 )
 
                 modeCard(
@@ -78,17 +99,10 @@ struct ATHLTHPlanEntryChoiceView: View {
                         tr("Advanced goals and progression", "Avanserte valg og progresjon")
                     ],
                     buttonTitle: tr("Choose advanced", "Velg avansert"),
-                    emphasized: false
+                    emphasized: false,
+                    cardHeight: cardHeight
                 )
-            }
-            .frame(maxWidth: 590, alignment: .leading)
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
-            .padding(.bottom, 28)
-            .frame(maxWidth: .infinity)
         }
-        .scrollIndicators(.hidden)
-        .background(paper.ignoresSafeArea())
     }
 
     private var header: some View {
@@ -121,7 +135,6 @@ struct ATHLTHPlanEntryChoiceView: View {
                 .frame(width: 85, height: 1)
                 .accessibilityHidden(true)
         }
-        .padding(.bottom, 12)
     }
 
     private func modeCard(
@@ -132,7 +145,8 @@ struct ATHLTHPlanEntryChoiceView: View {
         symbol: String,
         features: [String],
         buttonTitle: String,
-        emphasized: Bool
+        emphasized: Bool,
+        cardHeight: CGFloat
     ) -> some View {
         Button {
             choice = selectedMode
@@ -162,6 +176,7 @@ struct ATHLTHPlanEntryChoiceView: View {
                     )
 
                     VStack(alignment: .leading, spacing: 0) {
+                        if cardHeight >= 338 {
                         Image(systemName: symbol)
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.white)
@@ -174,22 +189,26 @@ struct ATHLTHPlanEntryChoiceView: View {
                                 Circle()
                                     .strokeBorder(.white.opacity(0.54), lineWidth: 0.9)
                             }
-                            .padding(.bottom, 20)
+                            .padding(.bottom, 12)
+                        }
 
                         Text(title)
                             .font(.system(
-                                size: typeSize.isAccessibilitySize ? 40 : 43,
+                                size: cardHeight < 260 ? 28 : 36,
                                 weight: .regular, design: .serif))
                             .foregroundStyle(.white)
                             .padding(.bottom, 7)
 
+                        if cardHeight >= 180 {
                         Text(description)
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.94))
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: 270, alignment: .leading)
-                            .padding(.bottom, 15)
+                            .padding(.bottom, 8)
+                        }
 
+                        if cardHeight >= 300 {
                         VStack(alignment: .leading, spacing: 7) {
                             ForEach(features, id: \.self) { feature in
                                 HStack(alignment: .firstTextBaseline, spacing: 9) {
@@ -205,7 +224,8 @@ struct ATHLTHPlanEntryChoiceView: View {
                             }
                         }
 
-                        Spacer(minLength: 14)
+                        }
+                        Spacer(minLength: 6)
 
                         HStack(spacing: 9) {
                             Spacer()
@@ -215,12 +235,10 @@ struct ATHLTHPlanEntryChoiceView: View {
                         }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
-                        .frame(minHeight: 51)
+                        .frame(minHeight: 44)
                         .frame(maxWidth: .infinity)
                         .background(
-                            emphasized
-                                ? bronze.gradient
-                                : Color(red: 0.23, green: 0.24, blue: 0.29).gradient,
+                            bronze.gradient,
                             in: RoundedRectangle(cornerRadius: 15)
                         )
                         .overlay {
@@ -228,11 +246,11 @@ struct ATHLTHPlanEntryChoiceView: View {
                                 .strokeBorder(.white.opacity(0.29), lineWidth: 0.8)
                         }
                     }
-                    .padding(19)
+                    .padding(cardHeight < 260 ? 14 : 19)
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
             }
-            .frame(height: typeSize.isAccessibilitySize ? 430 : 338)
+            .frame(height: cardHeight)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
