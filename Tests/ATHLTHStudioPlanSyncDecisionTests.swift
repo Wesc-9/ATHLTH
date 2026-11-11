@@ -78,25 +78,40 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
     }
 
     @MainActor
-    func testPlansWithInjuryNotesNeverQualifyForOrdinaryCloudSync() {
+    func testAccountCopyRemovesInjuryDetailsAndPrivateNotes() {
         var plan = makeMinimalPlan()
+        plan.summary = "Private medical details"
         plan.builderProfile = TrainingPlanBuilderProfile(
-            mode: .basic,
-            primaryFocus: .running,
-            goal: .improveFitness,
-            sessionsPerWeek: 3,
+            mode: .basic, primaryFocus: .running, goal: .improveFitness,
+            goalDetail: "Private goal notes", sessionsPerWeek: 3,
             preferredDayIndexes: [1, 3, 5],
             injuriesOrLimitations: "Knee injury"
         )
-        XCTAssertFalse(ATHLTHStudioPlanSyncStore.isEligibleForOrdinaryAccountSync(plan))
-        plan.builderProfile?.injuriesOrLimitations = "   "
-        XCTAssertTrue(ATHLTHStudioPlanSyncStore.isEligibleForOrdinaryAccountSync(plan))
+        let copy = ATHLTHStudioPlanSyncStore.accountCopy(of: plan)
+        XCTAssertNil(copy.builderProfile?.injuriesOrLimitations)
+        XCTAssertNil(copy.builderProfile?.goalDetail)
+        XCTAssertEqual(copy.summary, "")
+        XCTAssertEqual(plan.builderProfile?.injuriesOrLimitations, "Knee injury")
+        XCTAssertEqual(copy.id, plan.id)
+        XCTAssertEqual(copy.ownerID, plan.ownerID)
     }
 
     @MainActor
-    func testPlanWithoutInjuryNotesIsEligibleForOrdinaryCloudSync() {
-        let plan = makeMinimalPlan()
-        XCTAssertTrue(ATHLTHStudioPlanSyncStore.isEligibleForOrdinaryAccountSync(plan))
+    func testAccountCopyPreservesOriginalAndDoesNotImportOtherAccountNotes() {
+        var plan = makeMinimalPlan()
+        plan.summary = "Local note"
+        let cloud = ATHLTHStudioPlanSyncStore.accountCopy(of: plan)
+        let restored = ATHLTHStudioPlanSyncStore.restoringDeviceOnlyFields(
+            from: plan, into: cloud
+        )
+        XCTAssertEqual(restored.summary, "Local note")
+        XCTAssertEqual(cloud.summary, "")
+        var other = cloud
+        other.ownerID = UUID()
+        let rejected = ATHLTHStudioPlanSyncStore.restoringDeviceOnlyFields(
+            from: plan, into: other
+        )
+        XCTAssertEqual(rejected.summary, "")
     }
 
     private func makeMinimalPlan() -> TrainingPlan {
