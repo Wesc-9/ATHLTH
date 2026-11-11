@@ -195,6 +195,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
         // Always use the persisted plan rather than a possibly stale
         // value captured when the parent first presented this screen.
         let currentPlan = session.trainingPlan(withID: plan.id) ?? plan
+        let isAdvanced = currentPlan.builderProfile?.mode != .basic
         let report = ATHLTHPlanWeeklyFollowThrough.inspect(
             plan: currentPlan,
             store: session,
@@ -258,6 +259,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
 
+            if isAdvanced {
             VStack(alignment: .leading, spacing: 9) {
                 Button {
                     showsIntensityPreview.toggle()
@@ -359,6 +361,8 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
             }
             .foregroundStyle(ATHLTHPlanDesign.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            }
 
             if let currentWeekIndex {
                 let week = currentPlan.weeks[currentWeekIndex]
@@ -516,7 +520,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                 ))
             }
 
-            if load.estimatedMinutes > 0 {
+            if isAdvanced && load.estimatedMinutes > 0 {
                 VStack(alignment: .leading, spacing: 7) {
                     Button {
                         showsTrainingDetails.toggle()
@@ -662,7 +666,7 @@ struct ATHLTHPlanWeeklyFollowThroughView: View {
                         )
                     )
 
-                    if let completedPercent = report.completionPercent,
+                    if isAdvanced, let completedPercent = report.completionPercent,
                        let accountedPercent = report.accountedPercent {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(ATHLTHLocalization.choose(
