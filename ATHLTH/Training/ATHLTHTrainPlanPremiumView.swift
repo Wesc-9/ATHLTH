@@ -231,7 +231,10 @@ struct ATHLTHTrainPlanPremiumView: View {
 
         private var studioPlanTools: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 9) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 150, maximum: 350), spacing: 9)],
+                spacing: 9
+            ) {
                 studioModeChoice(
                     title: tr("Simple", "Enkel"),
                     subtitle: tr("Weekly planning", "Ukesvis planlegging"),
@@ -311,7 +314,10 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private var studioEntryPoints: some View {
         VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 9) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 150, maximum: 350), spacing: 9)],
+                spacing: 9
+            ) {
                 studioModeChoice(
                     title: tr("Simple", "Enkel"),
                     subtitle: tr("Week by week", "Uke for uke"),
@@ -383,11 +389,15 @@ struct ATHLTHTrainPlanPremiumView: View {
                     Text(title)
                         .font(.system(size: 13, weight: .semibold, design: .serif))
                         .foregroundStyle(graphite)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                     Text(subtitle)
                         .font(.system(size: 10))
                         .foregroundStyle(secondaryInk)
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))
@@ -461,10 +471,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .buttonStyle(.plain)
                     .padding(.top, 4)
                     LazyVGrid(
-                        columns: Array(
-                            repeating: GridItem(.flexible(minimum: 0), spacing: 9),
-                            count: 3
-                        ),
+                        columns: [GridItem(.adaptive(minimum: 108, maximum: 220), spacing: 9)],
                         spacing: 9
                     ) {
                         referenceEmptyAction(tr("Plans", "Planer"),
@@ -506,10 +513,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .foregroundStyle(warmGold)
             }
             LazyVGrid(
-                columns: Array(
-                    repeating: GridItem(.flexible(minimum: 0), spacing: 9),
-                    count: 3
-                ),
+                columns: [GridItem(.adaptive(minimum: 108, maximum: 220), spacing: 9)],
                 spacing: 9
             ) {
                 referenceTemplateCard("GoalStrength",
