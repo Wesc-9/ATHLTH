@@ -656,24 +656,6 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
             }
-            HStack(spacing: 10) {
-                Button {
-                    showingPlanDetails = true
-                    planDetailTab = 1
-                } label: {
-                    Label(tr("View full plan", "Se hele planen"),
-                          systemImage: "list.bullet")
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-                Button { showingMyPlans = true } label: {
-                    Label(tr("My plans", "Mine planer"), systemImage: "square.stack")
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-            }
         }
     }
 
@@ -723,28 +705,40 @@ struct ATHLTHTrainPlanPremiumView: View {
                         ? tr("Show plan overview", "Vis planoversikt")
                         : tr("Open My plans", "Åpne Mine planer")
                 )
-                // Week/day view options only apply while an active plan is shown.
-                if session.activePlan != nil && !browsingMyPlans {
+                // A view switcher rather than a settings affordance. All
+                // layouts of the selected plan are in one predictable place.
+                if plan != nil && !browsingMyPlans {
                     Menu {
                         Button {
                             showPlanWeekOverview = true
                         } label: {
                             Label(tr("Whole week", "Hele uken"),
-                                  systemImage: showPlanWeekOverview ? "checkmark.circle.fill" : "calendar")
+                                  systemImage: showPlanWeekOverview ? "checkmark" : "calendar")
                         }
                         Button {
                             showPlanWeekOverview = false
                         } label: {
                             Label(tr("One day", "Én dag"),
-                                  systemImage: !showPlanWeekOverview ? "checkmark.circle.fill" : "calendar.day.timeline.left")
+                                  systemImage: !showPlanWeekOverview
+                                      ? "checkmark" : "calendar.day.timeline.left")
+                        }
+                        Divider()
+                        Button {
+                            planDetailTab = 1
+                            showingPlanDetails = true
+                        } label: {
+                            Label(tr("View full plan", "Se hele planen"),
+                                  systemImage: "list.bullet.rectangle")
                         }
                     } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 16))
+                        Image(systemName: "rectangle.grid.1x2")
+                            .font(.system(size: 17, weight: .medium))
                             .frame(width: 44, height: 44)
                             .background(.white.opacity(0.85), in: Circle())
                     }
-                    .accessibilityLabel(tr("Choose plan view", "Velg planvisning"))
+                    .accessibilityLabel(tr("Change plan view", "Endre planvisning"))
+                    .accessibilityHint(tr("Choose day, week or entire plan",
+                                          "Velg dag, uke eller hele planen"))
                 }
             }
             .foregroundStyle(graphite)
