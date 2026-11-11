@@ -58,7 +58,7 @@ enum HomeCoachWorkoutSelection {
             return l == r ? lhs.offset < rhs.offset : l > r
         }
         .prefix(limit)
-        .map(\.element)
+        .map { $0.element }
     }
 }
 
