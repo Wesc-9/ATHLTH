@@ -102,8 +102,6 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
-    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
-    @StateObject private var crossDeviceWorkout = ATHLTHCrossDeviceWorkoutStore()
     @EnvironmentObject private var notifications:
         ATHLTHNotificationStore
     @EnvironmentObject private var messaging:
@@ -379,21 +377,6 @@ struct ProductRootTabView: View {
             openPendingDailyCheckInIfNeeded()
             await syncApplicationIconBadge()
         }
-        .task(id: session.signedIn ? session.profile.userID : nil) {
-            if scenePhase == .active {
-                crossDeviceWorkout.didForeground()
-            }
-            if session.signedIn {
-                await crossDeviceWorkout.track(
-                    signedIn: true,
-                    accountID: session.profile.userID,
-                    phone: phoneWorkout,
-                    strength: strengthWorkout
-                )
-            } else {
-                crossDeviceWorkout.clearLocalState()
-            }
-        }
         .onChange(of: pushManager.pendingDailyCheckInAccountID) { _, _ in
             openPendingDailyCheckInIfNeeded()
         }
@@ -451,11 +434,6 @@ struct ProductRootTabView: View {
         .onChange(
             of: scenePhase
         ) { _, phase in
-            if phase == .active {
-                crossDeviceWorkout.didForeground()
-            } else {
-                crossDeviceWorkout.didBackground()
-            }
             guard phase == .active
             else {
                 return
@@ -674,28 +652,6 @@ struct ProductRootTabView: View {
                     .transition(
                         .move(edge: .top).combined(with: .opacity)
                     )
-                }
-
-                if UIDevice.current.userInterfaceIdiom == .pad,
-                   let remote = crossDeviceWorkout.remote,
-                   strengthWorkout.activeWorkout == nil,
-                   phoneWorkout.active == nil {
-                    if crossDeviceWorkout.isExpanded {
-                        ATHLTHCrossDeviceLiveCard(snapshot: remote) {
-                            crossDeviceWorkout.setExpanded(false)
-                        }
-                    } else {
-                        ATHLTHMinimizedWorkoutReturnPill(
-                            title: ATHLTHLocalization.choose(
-                                english: "Live workout on iPhone",
-                                norwegian: "Live økt på iPhone"
-                            ),
-                            systemImage: remote.symbol,
-                            detail: remote.title
-                        ) {
-                            crossDeviceWorkout.setExpanded(true)
-                        }
-                    }
                 }
 
                 if workoutMirroring
