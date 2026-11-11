@@ -323,63 +323,175 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
     }
 
+    // A schedule and the values spoken at that schedule are ONE group.
+    // The underlying Watch/iPhone rule engine and saved profiles remain shared.
+    private var periodicGroupCount: Int {
+        let scheduled = draft.customRules.isEmpty
+            ? (draft.distanceTriggerEnabled ? 1 : 0) +
+              (draft.timeTriggerEnabled ? 1 : 0)
+            : draft.customRules.count
+        return scheduled + (draft.smartPrompts.motivationEnabled ? 1 : 0)
+    }
+
+    private var standardSpokenValues: String {
+        var values: [String] = []
+        if draft.announceDistance { values.append(tr("Distance", "Distanse")) }
+        if draft.announceElapsedTime { values.append(tr("Time", "Tid")) }
+        if draft.announceAveragePace { values.append(tr("Pace", "Tempo")) }
+        if draft.announceHeartRate { values.append(tr("Heart rate", "Puls")) }
+        if draft.announceClockTime { values.append(tr("Clock time", "Klokkeslett")) }
+        return values.isEmpty
+            ? tr("Choose values to announce", "Velg hva som skal leses opp")
+            : values.joined(separator: " · ")
+    }
+
+    private var extraActiveOptions: [ATHLTHAudioCoachOption] {
+        activeOptions.filter { option in
+            switch option {
+            case .distanceUpdates, .timedUpdates, .distance, .elapsedTime,
+                 .averagePace, .clockTime, .heartRate, .motivation,
+                 .customAnnouncements:
+                return false
+            default:
+                return true
+            }
+        }
+    }
+
     private var advancedCard: some View {
         ATHLTHPlanSurface(ghost: false) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("ACTIVE COACH", "AKTIV COACH"))
+                    Text(tr("SCHEDULED COACH", "PLANLAGT COACH"))
                         .font(.caption2.weight(.bold))
                         .tracking(1.4)
                         .foregroundStyle(bronze)
-                    Text(tr("Active announcements", "Aktive beskjeder"))
+                    Text(tr("Announcement groups", "Varslingsgrupper"))
                         .font(.system(size: 20, weight: .semibold, design: .serif))
                         .foregroundStyle(ink)
                 }
                 Spacer()
-                Text("\(activeOptions.count)")
+                Text("\(periodicGroupCount)")
                     .font(.subheadline.monospacedDigit().weight(.semibold))
                     .foregroundStyle(bronze)
             }
 
-            if activeOptions.isEmpty {
-                Text(tr(
-                    "Nothing is scheduled to be spoken. Add a message or trigger below.",
-                    "Ingen beskjeder er aktivert. Legg til ønskede varsler nedenfor."
-                ))
-                .font(.subheadline)
-                .foregroundStyle(dim)
+            Text(tr(
+                "Choose WHEN to speak and WHAT to say together. Each group creates one announcement at its interval.",
+                "Velg NÅR coachen skal snakke og HVA han skal si samlet. Hver gruppe gir én beskjed per intervall."
+            ))
+            .font(.caption)
+            .foregroundStyle(dim)
+
+            if draft.customRules.isEmpty {
+                if draft.distanceTriggerEnabled {
+                    announcementGroupRow(
+                        title: tr("Every distance", "Etter distanse") +
+                            " · " + ATHLTHAudioCoachOption.distanceUpdates.detail(in: draft),
+                        detail: standardSpokenValues,
+                        icon: "point.bottomleft.forward.to.point.topright.scurvepath"
+                    ) { editingOption = .distanceUpdates }
+                }
+                if draft.timeTriggerEnabled {
+                    announcementGroupRow(
+                        title: tr("Every time interval", "Etter tid") +
+                            " · " + ATHLTHAudioCoachOption.timedUpdates.detail(in: draft),
+                        detail: standardSpokenValues,
+                        icon: "clock.arrow.circlepath"
+                    ) { editingOption = .timedUpdates }
+                }
             } else {
-                VStack(spacing: 0) {
-                    ForEach(activeOptions) { option in
-                        activeRow(option)
-                        if option != activeOptions.last {
-                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                        }
-                    }
+                ForEach(draft.customRules) { rule in
+                    announcementGroupRow(
+                        title: rule.trigger == .distance
+                            ? tr("Every", "Hver") + " \(rule.validatedInterval) m"
+                            : tr("Every", "Hvert") + " \(rule.validatedInterval) s",
+                        detail: rule.selectedMetrics.map(\.title).joined(separator: " · "),
+                        icon: rule.trigger == .distance
+                            ? "point.bottomleft.forward.to.point.topright.scurvepath"
+                            : "clock.arrow.circlepath"
+                    ) { editingOption = .customAnnouncements }
                 }
             }
+            if draft.smartPrompts.motivationEnabled {
+                announcementGroupRow(
+                    title: tr("Motivation", "Motivasjon") +
+                        " · " + tr("every", "hvert") +
+                        " \(draft.smartPrompts.motivationIntervalSeconds) s",
+                    detail: tr("Motivational words, according to chosen style",
+                               "Motiverende ord i valgt stil"),
+                    icon: "sparkles"
+                ) { editingOption = .motivation }
+            }
+            if periodicGroupCount == 0 {
+                Text(tr("No recurring announcements", "Ingen gjentakende beskjeder"))
+                    .font(.subheadline)
+                    .foregroundStyle(dim)
+                    .padding(.vertical, 6)
+            }
 
-            Button {
-                showingCatalogue = true
-            } label: {
-                Label(tr("Add announcement or rule", "Legg til beskjed eller regel"),
+            Button { editingOption = .customAnnouncements } label: {
+                Label(tr("Create announcement group", "Opprett varslingsgruppe"),
                       systemImage: "plus.circle.fill")
                     .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 47)
+                    .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
             .tint(bronze)
             .accessibilityIdentifier("athlth-audio-coach-add-option")
 
-            if !draft.customRules.isEmpty {
-                Text(tr(
-                    "Independent rules replace the usual distance/time triggers to avoid duplicate announcements.",
-                    "Egne regler erstatter de vanlige distanse- og tidsutløserne for å unngå doble beskjeder."
-                ))
-                .font(.caption)
-                .foregroundStyle(dim)
+            if !extraActiveOptions.isEmpty {
+                Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                Text(tr("Events and special alerts", "Hendelser og spesialvarsler"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                VStack(spacing: 0) {
+                    ForEach(extraActiveOptions) { option in
+                        activeRow(option)
+                        if option != extraActiveOptions.last {
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                        }
+                    }
+                }
             }
+            Button { showingCatalogue = true } label: {
+                Label(tr("Add other alert", "Legg til annet varsel"),
+                      systemImage: "plus")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
         }
+    }
+
+    private func announcementGroupRow(
+        title: String, detail: String, icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 11) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(bronze)
+                    .frame(width: 36, height: 42)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(dim)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(dim)
+            }
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
     }
 
     private func activeRow(_ option: ATHLTHAudioCoachOption) -> some View {
@@ -637,8 +749,20 @@ struct ATHLTHAudioCoachActiveListView: View {
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 }
             }
-            Text(tr("New announcement", "Ny beskjed"))
+            Text(tr("New announcement group", "Ny varslingsgruppe"))
                 .font(.subheadline.weight(.semibold))
+            Button {
+                draft.enabled = true
+                draft.smartPrompts.motivationEnabled = true
+                draft.smartPrompts.motivationIntervalSeconds = 60
+                editingOption = nil
+            } label: {
+                Label(tr("Every minute · motivational words",
+                         "Hvert minutt · motiverende ord"),
+                      systemImage: "sparkles")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
             Button {
                 // One tap saves the full bundle. No separate Add operation.
                 if draft.addKilometerMetricsBundle() {
@@ -943,20 +1067,17 @@ struct ATHLTHAudioCoachActiveListView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    NavigationLink {
-                        ATHLTHCoachVoiceChoices(
-                            selectedIdentifier: $draft.voiceIdentifier,
-                            language: draft.language,
-                            speechRate: draft.speechRate,
-                            speechVolume: draft.speechVolume,
-                            duckOtherAudio: draft.duckOtherAudio,
-                            speechStyle: draft.speechStyle
-                        )
-                    } label: {
-                        Label(tr("Choose and preview voice", "Velg og test stemme"),
-                              systemImage: "waveform")
-                            .frame(minHeight: 44)
-                    }
+                    Text(tr("Choose and preview voice", "Velg og test stemme"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    ATHLTHCoachVoiceChoices(
+                        selectedIdentifier: $draft.voiceIdentifier,
+                        language: draft.language,
+                        speechRate: draft.speechRate,
+                        speechVolume: draft.speechVolume,
+                        duckOtherAudio: draft.duckOtherAudio,
+                        speechStyle: draft.speechStyle
+                    )
                     HStack {
                         Text(tr("Voice speed", "Stemmehastighet"))
                         Spacer()
