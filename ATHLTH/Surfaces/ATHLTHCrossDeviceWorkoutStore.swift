@@ -15,9 +15,23 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     let nextStep: String?
     let completedSets: Int?
     let totalSets: Int?
+    var paused: Bool? = nil
 
     var id: UUID { sessionID }
-    var symbol: String { kind == "strength" ? "dumbbell.fill" : "figure.run" }
+    var symbol: String {
+        switch kind {
+        case "running": return "figure.run"
+        case "walking": return "figure.walk"
+        case "cycling": return "figure.outdoor.cycle"
+        case "strength": return "dumbbell.fill"
+        case "hiit": return "figure.highintensity.intervaltraining"
+        case "functional": return "figure.cross.training"
+        case "rowing": return "figure.rower"
+        case "stairClimbing": return "figure.stair.stepper"
+        case "yoga": return "figure.yoga"
+        default: return "figure.mixed.cardio"
+        }
+    }
 }
 
 private struct ATHLTHCrossDeviceWorkoutRow: Codable {
@@ -44,6 +58,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     private let client = SupabaseEnvironment.client
     private var lastPublishedID: UUID?
+    private var mirroredStartedAt: Date?
+    private var mirroredSessionID: UUID?
     private var lastRemoteExpiry: Date?
     private var hasLoadedRemote = false
     private var foregroundedSinceLastPoll = false
@@ -66,6 +82,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     func clearLocalState() {
         remote = nil
         lastPublishedID = nil
+        mirroredStartedAt = nil
+        mirroredSessionID = nil
         lastRemoteExpiry = nil
         hasLoadedRemote = false
         foregroundedSinceLastPoll = false
@@ -78,7 +96,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         signedIn: Bool,
         accountID: UUID,
         phone: IPhoneWorkoutStore,
-        strength: StrengthWorkoutStore
+        strength: StrengthWorkoutStore,
+        mirroredWatch: WorkoutMirroringStore
     ) async {
         guard signedIn else {
             clearLocalState()
@@ -93,7 +112,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 if isPad {
                     await readRemote(accountID: accountID)
                 } else {
-                    await publishLocal(accountID: accountID, phone: phone, strength: strength)
+                    await publishLocal(
+                        accountID: accountID, phone: phone,
+                        strength: strength, mirroredWatch: mirroredWatch
+                    )
                 }
             } else {
                 remote = nil
@@ -110,7 +132,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     private func liveSnapshot(
         phone: IPhoneWorkoutStore,
-        strength: StrengthWorkoutStore
+        strength: StrengthWorkoutStore,
+        mirroredWatch: WorkoutMirroringStore
     ) -> ATHLTHCrossDeviceWorkoutSnapshot? {
         if let log = strength.activeWorkout {
             let exercise = strength.currentExerciseIndex
@@ -130,12 +153,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 totalSets: log.exercises.reduce(0) { $0 + $1.sets.count }
             )
         }
-        if let run = phone.active, !run.walking {
+        if let run = phone.active {
             let index = run.structuredStepIndex ?? 0
             let steps = run.structuredRunningWorkout?.steps ?? []
             return ATHLTHCrossDeviceWorkoutSnapshot(
                 sessionID: run.id,
-                kind: "running",
+                kind: run.walking ? "walking" : "running",
                 title: run.title,
                 startedAt: run.start,
                 elapsedSeconds: max(0, run.elapsed(at: Date())),
@@ -146,7 +169,37 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 nextStep: steps.indices.contains(index + 1)
                     ? steps[index + 1].title : nil,
                 completedSets: nil,
-                totalSets: nil
+                totalSets: nil,
+                paused: run.resumedAt == nil
+            )
+        }
+        if let watch = mirroredWatch.snapshot,
+           watch.state == .preparing ||
+           watch.state == .running ||
+           watch.state == .paused {
+            // Watch remains the only HealthKit sensor/recording source. The
+            // iPhone only relays a private summary to the signed-in iPad.
+            let startedAt = watch.startedAt ??
+                watch.capturedAt.addingTimeInterval(-watch.confirmedActiveDuration)
+            if mirroredStartedAt != startedAt || mirroredSessionID == nil {
+                mirroredStartedAt = startedAt
+                mirroredSessionID = UUID()
+            }
+            guard let sessionID = mirroredSessionID else { return nil }
+            return ATHLTHCrossDeviceWorkoutSnapshot(
+                sessionID: sessionID,
+                kind: watch.kind.rawValue,
+                title: watch.workoutDisplayTitle ?? watch.kind.title,
+                startedAt: startedAt,
+                elapsedSeconds: watch.confirmedActiveDuration,
+                distanceMeters: watch.kind.supportsDistanceMetric &&
+                    watch.distanceMeters.isFinite
+                    ? max(0, watch.distanceMeters) : nil,
+                currentStep: watch.runningStepTitle ?? watch.strengthExerciseName,
+                nextStep: watch.runningNextStepTitle ?? watch.strengthNextExerciseName,
+                completedSets: nil,
+                totalSets: nil,
+                paused: watch.state == .paused
             )
         }
         return nil
@@ -155,9 +208,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private func publishLocal(
         accountID: UUID,
         phone: IPhoneWorkoutStore,
-        strength: StrengthWorkoutStore
+        strength: StrengthWorkoutStore,
+        mirroredWatch: WorkoutMirroringStore
     ) async {
-        let active = liveSnapshot(phone: phone, strength: strength)
+        let active = liveSnapshot(
+            phone: phone, strength: strength, mirroredWatch: mirroredWatch
+        )
         if let active {
             let now = Date()
             let row = ATHLTHCrossDeviceWorkoutRow(
@@ -217,7 +273,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 ATHLTHSurfaceWorkoutSnapshot(
                     title: $0.title,
                     systemImage: $0.symbol,
-                    state: $0.kind == "strength" ? "remote_strength" : "running",
+                    state: $0.paused == true ? "paused" : (
+                        $0.kind == "strength" ? "remote_strength" : "running"
+                    ),
                     startedAt: $0.startedAt,
                     elapsedTime: $0.elapsedSeconds,
                     distanceMeters: $0.distanceMeters ?? 0,
