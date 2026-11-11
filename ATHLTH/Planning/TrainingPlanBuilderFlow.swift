@@ -871,7 +871,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    private var planPrimaryObservers: some View {
+    private var planCheckpointObservers: some View {
         AnyView(planLifecycle)
         .onChange(of: title) { _, _ in saveResumableDraft() }
         .onChange(of: configurationCheckpoint) { _, _ in saveResumableDraft() }
@@ -881,6 +881,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: weekCount) { _, _ in saveResumableDraft() }
         .onChange(of: startDate) { _, _ in saveResumableDraft() }
         .onChange(of: mode) { _, _ in saveResumableDraft() }
+    }
+
+    private var planGoalObservers: some View {
+        AnyView(planCheckpointObservers)
         .onChange(of: focus) { _, _ in saveResumableDraft() }
         .onChange(of: goal) { _, _ in saveResumableDraft() }
         .onChange(of: selectedGoalArea) { _, _ in saveResumableDraft() }
@@ -897,6 +901,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .onChange(of: varyWeekdays) { _, _ in saveResumableDraft() }
         .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
+    }
+
+    private var planPrimaryObservers: some View {
+        AnyView(planGoalObservers)
         .onChange(of: workoutKindOverridesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: workoutTitleOverridesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: workoutMinutesByDay) { _, _ in saveResumableDraft() }
