@@ -43,6 +43,9 @@ struct ATHLTHWorkoutAudioDock: View {
     @State private var isExpanded = false
 
     var showSpotifyLauncher: Bool = true
+    /// Compact live navigation bars present expanded audio controls in a
+    /// popover, keeping the header the same height on every workout screen.
+    var inlinePopovers = false
     /// Running places the shared strength-style launchers at top left.
     /// Existing strength and other screens keep the trailing default.
     var compactAlignment: HorizontalAlignment = .trailing
@@ -69,7 +72,7 @@ struct ATHLTHWorkoutAudioDock: View {
             if coachVisible ||
                 (showSpotifyLauncher && spotify.isConnected) {
                 VStack(alignment: compactAlignment, spacing: 8) {
-                    if isExpanded {
+                    if isExpanded && !inlinePopovers {
                         expandedControlBar
                             .transition(
                                 .opacity.combined(with: .move(edge: .bottom))
@@ -89,11 +92,22 @@ struct ATHLTHWorkoutAudioDock: View {
                             launcher(for: .spotify)
                         }
                     }
-                    .padding(compactAlignment == .leading ? .leading : .trailing, 18)
+                    .padding(
+                        compactAlignment == .leading ? .leading : .trailing,
+                        inlinePopovers ? 0 : 18
+                    )
                 }
-                .frame(maxWidth: .infinity,
+                .frame(maxWidth: inlinePopovers ? nil : .infinity,
                        alignment: compactAlignment == .leading ? .leading : .trailing)
-                .padding(.bottom, 7)
+                .padding(.bottom, inlinePopovers ? 0 : 7)
+                .popover(isPresented: Binding(
+                    get: { inlinePopovers && isExpanded },
+                    set: { if !$0 { isExpanded = false } }
+                )) {
+                    expandedControlBar
+                        .frame(width: 300)
+                        .presentationCompactAdaptation(.popover)
+                }
                 .animation(.easeInOut(duration: 0.22), value: isExpanded)
                 .task(id: isExpanded && selectedMode == .spotify
                     && spotify.isConnected) {
