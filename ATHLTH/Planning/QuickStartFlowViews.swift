@@ -384,10 +384,12 @@ struct AudioCoachDraft {
            (100...240).contains(maximumHeartRateBPM) {
             prompts.maximumHeartRateBPM = maximumHeartRateBPM
         }
-        // Custom groups are the authoritative periodic schedule. Do not
-        // transmit the legacy kilometre/time triggers alongside them: they
-        // would add unscheduled fields to the requested grouped announcement.
-        let standardCadenceEnabled = enabled && customRules.isEmpty
+        // Keep standard distance/time cadence independently of custom groups.
+        // For example, a new every-minute motivation rule must not disable an
+        // athlete's existing every-kilometre distance/time announcement.
+        // The Watch/iPhone rule schedulers already merge simultaneous events
+        // and suppress duplicated metrics when a custom milestone is due.
+        let standardCadenceEnabled = enabled
         return WatchAudioCoachConfiguration(
             enabled: enabled,
             language: language,
