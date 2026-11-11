@@ -1651,7 +1651,7 @@ struct RunQuickStartSheet: View {
                         }
                     }
 
-                    ATHLTHWorkoutPetSelectionCard(selectedPetIDs: $selectedPetIDs)
+                    ATHLTHQuickWorkoutPetPicker(selectedPetIDs: $selectedPetIDs)
 
                     if isAdvancedSetup {
                         VStack(spacing: 12) {
@@ -3608,7 +3608,7 @@ struct WalkQuickStartSheet: View {
                         selectedGearIDs: $selectedGearIDs,
                         activity: .walking
                     )
-                    ATHLTHWorkoutPetSelectionCard(selectedPetIDs: $selectedPetIDs)
+                    ATHLTHQuickWorkoutPetPicker(selectedPetIDs: $selectedPetIDs)
 
                     ATHLTHPlanSurface(density: .compact) {
                         VStack(
@@ -4501,3 +4501,91 @@ private extension Optional where Wrapped == String {
         self ?? ""
     }
 }
+
+
+ // Shared compact, accessible pet picker for both Quick Run and Quick Walk.
+ // Avoid the floating single-choice menu: athletes may bring more than one pet.
+ private struct ATHLTHQuickWorkoutPetPicker: View {
+     @EnvironmentObject private var pets: ATHLTHPetStore
+     @Binding var selectedPetIDs: Set<UUID>
+     @State private var expanded = false
+
+     var body: some View {
+         if !pets.visiblePets.isEmpty {
+             ATHLTHPlanSurface(ghost: false, density: .compact) {
+                 DisclosureGroup(isExpanded: $expanded) {
+                     VStack(alignment: .leading, spacing: 10) {
+                         ForEach(pets.visiblePets) { pet in
+                             Button {
+                                 if selectedPetIDs.contains(pet.id) {
+                                     selectedPetIDs.remove(pet.id)
+                                 } else {
+                                     selectedPetIDs.insert(pet.id)
+                                 }
+                             } label: {
+                                 HStack(spacing: 11) {
+                                     ATHLTHPetAvatar(pet: pet, size: 38)
+                                     VStack(alignment: .leading, spacing: 2) {
+                                         Text(pet.name)
+                                             .font(.subheadline.weight(.semibold))
+                                             .foregroundStyle(ATHLTHPlanDesign.ink)
+                                         Text(pet.breed ?? pet.speciesName)
+                                             .font(.caption)
+                                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                     }
+                                     Spacer()
+                                     Image(systemName: selectedPetIDs.contains(pet.id)
+                                         ? "checkmark.circle.fill" : "circle")
+                                         .font(.title3)
+                                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                 }
+                                 .frame(minHeight: 48)
+                                 .contentShape(Rectangle())
+                             }
+                             .buttonStyle(.plain)
+                             .accessibilityAddTraits(
+                                 selectedPetIDs.contains(pet.id) ? .isSelected : []
+                             )
+                         }
+                         Text(ATHLTHLocalization.choose(
+                             english: "You can select several companions for this workout.",
+                             norwegian: "Du kan velge flere turkamerater til denne økten."
+                         ))
+                         .font(.caption)
+                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                     }
+                     .padding(.top, 12)
+                 } label: {
+                     HStack(spacing: 11) {
+                         Image(systemName: "pawprint.fill")
+                             .font(.system(size: 17, weight: .medium))
+                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                             .frame(width: 36, height: 36)
+                             .background(ATHLTHPlanDesign.selectedSurface,
+                                         in: RoundedRectangle(cornerRadius: 11))
+                         VStack(alignment: .leading, spacing: 3) {
+                             Text(ATHLTHLocalization.choose(
+                                 english: "Training companions", norwegian: "Turkamerat"
+                             ))
+                             .font(.subheadline.weight(.semibold))
+                             .foregroundStyle(ATHLTHPlanDesign.ink)
+                             Text(pets.visiblePets.filter {
+                                 selectedPetIDs.contains($0.id)
+                             }.map(\.name).joined(separator: ", ").isEmpty
+                                 ? ATHLTHLocalization.choose(
+                                     english: "Optional · choose a pet",
+                                     norwegian: "Valgfritt · velg turkamerat")
+                                 : pets.visiblePets.filter {
+                                     selectedPetIDs.contains($0.id)
+                                 }.map(\.name).joined(separator: ", "))
+                                 .font(.caption)
+                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                         }
+                     }
+                     .frame(minHeight: 48)
+                 }
+                 .tint(ATHLTHPlanDesign.accentInk)
+             }
+         }
+     }
+ }
