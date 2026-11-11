@@ -571,12 +571,12 @@ final class MirroredWorkoutAudioCoach:
         _ snapshot: WatchWorkoutLiveSnapshot
     ) {
         guard snapshot.kind == .running || snapshot.kind == .walking,
-              let settings = configuration.smartPrompts
+              let configuredSettings = configuration.smartPrompts
         else { return }
 
         // The independent periodic group is authoritative when both
         // legacy automatic motivation and an exact timer are configured.
-        var resolvedSettings = settings
+        var resolvedSettings = configuredSettings
         if (configuration.customRules ?? []).contains(where: {
             $0.isEnabled && $0.selectedMetrics.contains(.motivation)
         }) {
