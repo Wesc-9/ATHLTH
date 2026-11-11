@@ -24,6 +24,9 @@ enum ATHLTHSurfaceCoordinator {
         ATHLTHSurfaceSharedStore.save(shared)
         let changedSession = previous?.startedAt != workout?.startedAt ||
             previous?.state != workout?.state ||
+            previous?.currentStep != workout?.currentStep ||
+            previous?.runningIntervalOrdinal != workout?.runningIntervalOrdinal ||
+            previous?.runningInRecovery != workout?.runningInRecovery ||
             (previous == nil) != (workout == nil)
         let stale = lastRemoteWidgetReloadAt.map {
             Date().timeIntervalSince($0) >= 20
@@ -97,10 +100,11 @@ enum ATHLTHSurfaceCoordinator {
             ATHLTHSurfaceSharedStore.load()
 
         let workoutTransition =
-            previous.activeWorkout?.state !=
-                surfaceSnapshot.activeWorkout?.state ||
-            (previous.activeWorkout == nil) !=
-                (surfaceSnapshot.activeWorkout == nil)
+            previous.activeWorkout?.state != surfaceSnapshot.activeWorkout?.state ||
+            previous.activeWorkout?.currentStep != surfaceSnapshot.activeWorkout?.currentStep ||
+            previous.activeWorkout?.runningIntervalOrdinal != surfaceSnapshot.activeWorkout?.runningIntervalOrdinal ||
+            previous.activeWorkout?.runningInRecovery != surfaceSnapshot.activeWorkout?.runningInRecovery ||
+            (previous.activeWorkout == nil) != (surfaceSnapshot.activeWorkout == nil)
 
         let surfaceChanged =
             previous.recoveryScore !=
