@@ -436,8 +436,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 var mergedDay = day
                 mergedDay.sessions = day.sessions.map { workout in
                     var merged = workout
-                    if let old = local.weeks.flatMap(\\.days)
-                        .flatMap(\\.sessions).first(where: { $0.id == workout.id }) {
+                    if let old = local.weeks.flatMap(\.days)
+                        .flatMap(\.sessions).first(where: { $0.id == workout.id }) {
                         merged.notes = old.notes
                         merged.meetingPoint = old.meetingPoint
                         merged.plannedTrainingPlace = old.plannedTrainingPlace
