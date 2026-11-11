@@ -23,6 +23,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case distance
         case heartRate
         case heartRateZone
+        case motivation
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -36,6 +37,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 english: "Heart rate", norwegian: "Puls")
             case .heartRateZone: return ATHLTHLocalization.choose(
                 english: "Heart-rate zone", norwegian: "Pulssone")
+            case .motivation: return ATHLTHLocalization.choose(
+                english: "Motivation", norwegian: "Motivasjon")
             }
         }
     }
@@ -48,6 +51,12 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     /// Optional for compatibility with existing stored one-metric rules.
     /// A single scheduled event can read several metrics as ONE spoken cue.
     var additionalMetrics: [Metric]? = nil
+    /// Optional for old saved profiles and existing Watch transfers.
+    /// Disabled groups remain visible/editable but never create a spoken cue.
+    var enabled: Bool? = nil
+    var encouragementStyle: ATHLTHCoachEncouragementStyle? = nil
+
+    var isEnabled: Bool { enabled ?? true }
 
     var selectedMetrics: [Metric] {
         var ordered: [Metric] = [metric]
@@ -73,6 +82,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         maximumHeartRateBPM: Double? = nil,
         excluding excludedMetrics: Set<Metric> = []
     ) -> String? {
+        let intervalValue = trigger == .distance ? distanceMeters : elapsedSeconds
+        let motivationSlot = intervalValue.isFinite && intervalValue >= 0
+            ? Int(min(floor(intervalValue / Double(validatedInterval)),
+                      Double(Int.max / 2)))
+            : 0
         let parts = selectedMetrics.filter {
             !excludedMetrics.contains($0)
         }.compactMap { item in
@@ -81,7 +95,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 elapsedSeconds: elapsedSeconds,
                 paceSecondsPerKilometer: paceSecondsPerKilometer,
                 heartRateBPM: heartRateBPM, norwegian: norwegian,
-                maximumHeartRateBPM: maximumHeartRateBPM
+                maximumHeartRateBPM: maximumHeartRateBPM,
+                motivationSlot: motivationSlot
             )
         }
         return parts.isEmpty ? nil : parts.joined(separator: ". ")
@@ -94,7 +109,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         paceSecondsPerKilometer: TimeInterval?,
         heartRateBPM: Double?,
         norwegian: Bool,
-        maximumHeartRateBPM: Double?
+        maximumHeartRateBPM: Double?,
+        motivationSlot: Int
     ) -> String? {
         switch metric {
         case .pace:
@@ -129,7 +145,46 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 heartRateBPM: heartRateBPM, maximumBPM: maximumHeartRateBPM
             ) else { return nil }
             return norwegian ? "Pulssone \(zone)" : "Heart-rate zone \(zone)"
+        case .motivation:
+            return ATHLTHAudioCoachScheduledMotivation.phrase(
+                slot: motivationSlot,
+                style: encouragementStyle ?? .encouragement,
+                norwegian: norwegian
+            )
         }
+    }
+}
+
+/// Deterministic, offline motivational cues. A rule generates one short phrase
+/// per distance/time milestone, without waiting for a network coach service.
+enum ATHLTHAudioCoachScheduledMotivation {
+    static func phrase(
+        slot: Int,
+        style: ATHLTHCoachEncouragementStyle,
+        norwegian: Bool
+    ) -> String {
+        let phrases: [String]
+        switch (style, norwegian) {
+        case (.praise, true):
+            phrases = ["Bra jobbet! Du holder det gående.", "Sterk innsats. Fortsett slik!",
+                       "Dette gjør du bra. Finn din rytme."]
+        case (.praise, false):
+            phrases = ["Great work! Keep going.", "Strong effort. Keep it up!",
+                       "You're doing well. Find your rhythm."]
+        case (.push, true):
+            phrases = ["Hold fokus, du har mer å gi!", "Finn rytmen og jobb videre!",
+                       "Fortsett å presse kontrollert, du klarer dette!"]
+        case (.push, false):
+            phrases = ["Stay focused, you've got more to give!", "Find your rhythm and keep going!",
+                       "Keep pushing with control. You've got this!"]
+        case (.encouragement, true):
+            phrases = ["Du er i gang. Ett steg om gangen!", "Hold flyten, du gjør en god jobb!",
+                       "Fortsett i ditt tempo. Du har dette!"]
+        case (.encouragement, false):
+            phrases = ["You're moving. One step at a time!", "Keep the flow, you're doing great!",
+                       "Stay with your pace. You've got this!"]
+        }
+        return phrases[max(slot, 0) % phrases.count]
     }
 }
 
@@ -206,6 +261,7 @@ enum ATHLTHAudioCoachRuleDelivery {
             // Consume the crossed milestone even if a sensor value is missing.
             // It must not be announced much later after that value recovers.
             lastSlots[rule.id] = current
+            guard rule.isEnabled else { continue }
             // Simultaneous rules are composed into one speech event. A
             // metric already included by another rule is not repeated.
             let available = rule.selectedMetrics.filter { metric in
@@ -217,7 +273,7 @@ enum ATHLTHAudioCoachRuleDelivery {
                         maximumBPM: maximumHeartRateBPM
                     ) != nil
                 case .pace: return paceSecondsPerKilometer != nil
-                case .distance, .elapsedTime: return true
+                case .distance, .elapsedTime, .motivation: return true
                 }
             }
             let effective = available.filter { !spokenMetrics.contains($0) }
