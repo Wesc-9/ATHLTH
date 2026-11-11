@@ -192,19 +192,9 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(tr("Training signals", "Treningssignaler"))
-                    .font(.system(size: 23, weight: .regular, design: .serif))
-                    .foregroundStyle(ATHLTHInsightsStyle.ink)
-                Text(tr(
-                    "Understand training load, quality and response.",
-                    "Forstå belastning, kvalitet og respons for å trene smartere."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHInsightsStyle.muted)
-            }
-            .padding(.horizontal, 2)
-
+            // Training's first card sits directly over the cover artwork.
+            // The old floating "Training signals" title repeated the tab name
+            // and visually separated the load card from the image.
             loadCard
             qualityCard
             responseCard
