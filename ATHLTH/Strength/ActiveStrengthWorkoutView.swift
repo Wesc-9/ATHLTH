@@ -2088,140 +2088,41 @@ struct ActiveStrengthWorkoutView: View {
             let completedSetCount = min(max(workout.totalCompletedSets, 0),
                                         max(plannedSetCount, 0))
             let remainingSets = max(plannedSetCount - completedSetCount, 0)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: "flag.checkered")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundStyle(ATHLTHTrainDesign.bronze)
-                            .frame(width: 52, height: 52)
-                            .background(ATHLTHTrainDesign.paleGold.opacity(0.56),
-                                        in: RoundedRectangle(cornerRadius: 18))
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Finish your workout?",
-                                norwegian: "Avslutte treningsøkten?"
-                            ))
-                            .font(.system(size: 27, weight: .semibold, design: .serif))
-                            .foregroundStyle(ATHLTHTrainDesign.ink)
-                            Text(ATHLTHLocalization.choose(
-                                english: "Review your progress before saving.",
-                                norwegian: "Se over økten før du lagrer."
-                            ))
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHTrainDesign.secondary)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 13) {
-                        HStack(spacing: 16) {
-                            finishMetric(
-                                title: ATHLTHLocalization.choose(
-                                    english: "Elapsed", norwegian: "Varighet"
-                                ),
-                                value: "\(max(Int(Date().timeIntervalSince(workout.startedAt) / 60), 0)) min",
-                                symbol: "clock"
-                            )
-                            finishMetric(
-                                title: ATHLTHLocalization.choose(
-                                    english: "Sets completed", norwegian: "Fullførte sett"
-                                ),
-                                value: "\(completedSetCount) / \(plannedSetCount)",
-                                symbol: "dumbbell"
-                            )
-                        }
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(ATHLTHTrainDesign.rule.opacity(0.65))
-                                Capsule()
-                                    .fill(ATHLTHTrainDesign.gold)
-                                    .frame(width: geometry.size.width *
-                                        (plannedSetCount > 0
-                                            ? CGFloat(completedSetCount) / CGFloat(plannedSetCount)
-                                            : 0))
-                            }
-                        }
-                        .frame(height: 5)
-                        .accessibilityHidden(true)
-
-                        if remainingSets > 0 {
-                            Label(ATHLTHLocalization.choose(
-                                english: "\(remainingSets) sets remain. You can still save the session as it is.",
-                                norwegian: "\(remainingSets) sett gjenstår. Du kan likevel lagre økten slik den er."
-                            ), systemImage: "info.circle")
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTrainDesign.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(16)
-                    .athlthTrainPaper()
-
-                    Label(finishSaveExplanation(for: workout),
-                          systemImage: workout.captureDevice == .appleWatch
-                            ? "applewatch" : "heart.text.square")
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Spacer(minLength: 0)
+            ATHLTHWorkoutFinishSheet(
+                metrics: [
+                    ATHLTHWorkoutFinishMetric(
+                        title: ATHLTHLocalization.choose(
+                            english: "Elapsed", norwegian: "Varighet"
+                        ),
+                        value: "\(max(Int(Date().timeIntervalSince(workout.startedAt) / 60), 0)) min",
+                        symbol: "clock"
+                    ),
+                    ATHLTHWorkoutFinishMetric(
+                        title: ATHLTHLocalization.choose(
+                            english: "Sets completed", norwegian: "Fullførte sett"
+                        ),
+                        value: "\(completedSetCount) / \(plannedSetCount)",
+                        symbol: "dumbbell"
+                    )
+                ],
+                progress: plannedSetCount > 0
+                    ? Double(completedSetCount) / Double(plannedSetCount) : 0,
+                remainingWarning: remainingSets > 0
+                    ? ATHLTHLocalization.choose(
+                        english: "\(remainingSets) sets remain. You can still save the session as it is.",
+                        norwegian: "\(remainingSets) sett gjenstår. Du kan likevel lagre økten slik den er."
+                    ) : nil,
+                saveExplanation: finishSaveExplanation(for: workout),
+                saving: finishInProgress,
+                onFinish: {
+                    guard !finishInProgress else { return }
+                    showingFinishConfirmation = false
+                    Task { await finishWorkout() }
+                },
+                onContinue: {
+                    showingFinishConfirmation = false
                 }
-                .padding(.horizontal, 21)
-                .padding(.top, 25)
-                .padding(.bottom, 18)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 10) {
-                    Button {
-                        guard !finishInProgress else { return }
-                        showingFinishConfirmation = false
-                        Task { await finishWorkout() }
-                    } label: {
-                        HStack(spacing: 10) {
-                            if finishInProgress {
-                                ProgressView().tint(.white)
-                            } else {
-                                Image(systemName: "checkmark.circle.fill")
-                            }
-                            Text(ATHLTHLocalization.choose(
-                                english: "Finish and save workout",
-                                norwegian: "Avslutt og lagre økten"
-                            ))
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 54)
-                        .background(
-                            LinearGradient(
-                                colors: [ATHLTHTrainDesign.bronze, ATHLTHTrainDesign.gold],
-                                startPoint: .leading, endPoint: .trailing
-                            ),
-                            in: RoundedRectangle(cornerRadius: 18)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(finishInProgress)
-
-                    Button {
-                        showingFinishConfirmation = false
-                    } label: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Keep training", norwegian: "Fortsett treningen"
-                        ))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                        .frame(maxWidth: .infinity, minHeight: 43)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(finishInProgress)
-                }
-                .padding(.horizontal, 21)
-                .padding(.top, 13)
-                .padding(.bottom, 8)
-                .background(ATHLTHTrainDesign.canvas)
-            }
+            )
         }
     }
 
