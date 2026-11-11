@@ -265,6 +265,32 @@ enum ATHLTHSpokenAudioSession {
         )
     }
 
+    /// Confirm that music has been released after the first successful
+    /// deactivation. Bluetooth and external music apps sometimes finish their
+    /// audio handoff a fraction of a second later. Always re-check, but never
+    /// touch the session when a newer voice cue owns it.
+    private static func verifyMusicRestored(generation: Int) {
+        delayedRestoreTask?.cancel()
+        delayedRestoreTask = Task { @MainActor in
+            for delay in [Duration.milliseconds(350), .seconds(1)] {
+                do { try await Task.sleep(for: delay) }
+                catch { return }
+                guard !Task.isCancelled,
+                      owners.isEmpty,
+                      revision == generation else { return }
+                do {
+                    try restoreMusicAudio(AVAudioSession.sharedInstance())
+                } catch {
+                    // The existing retry loop handles AirPods / Spotify
+                    // transition failures without restoring over a new cue.
+                    restoreIfIdle(generation: generation)
+                    return
+                }
+            }
+            delayedRestoreTask = nil
+        }
+    }
+
     private static func restoreIfIdle(generation: Int) {
         guard owners.isEmpty, generation == revision else { return }
         delayedRestoreTask?.cancel()
@@ -275,6 +301,7 @@ enum ATHLTHSpokenAudioSession {
         // retry both operations, without racing a new speaker.
         do {
             try restoreMusicAudio(session)
+            verifyMusicRestored(generation: generation)
         } catch {
             // Keep retrying deactivation after route transitions. No retry
             // can remove a new cue's mixing/duck policy: it re-checks revision.
@@ -299,7 +326,7 @@ enum ATHLTHSpokenAudioSession {
 
                     do {
                         try restoreMusicAudio(session)
-                        delayedRestoreTask = nil
+                        verifyMusicRestored(generation: generation)
                         return
                     } catch {
                         continue
@@ -318,7 +345,7 @@ enum ATHLTHSpokenAudioSession {
                           revision == generation else { return }
                     do {
                         try restoreMusicAudio(session)
-                        delayedRestoreTask = nil
+                        verifyMusicRestored(generation: generation)
                         return
                     } catch { continue }
                 }
