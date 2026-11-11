@@ -114,6 +114,50 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
         XCTAssertEqual(rejected.summary, "")
     }
 
+    @MainActor
+    func testBasicAndAdvancedBothExcludeSessionNotesWithoutLosingWorkout() {
+        for mode in [TrainingPlanBuilderMode.basic, .advanced] {
+            var plan = makeMinimalPlan()
+            plan.builderProfile = TrainingPlanBuilderProfile(
+                mode: mode,
+                primaryFocus: .running,
+                goal: .improveFitness,
+                sessionsPerWeek: 2,
+                preferredDayIndexes: [1, 4],
+                injuriesOrLimitations: "Private injury note"
+            )
+            let workout = PlannedSession(
+                id: UUID(), title: "Easy run", kind: .running,
+                scheduledStart: nil, durationMinutes: 30,
+                targetDistanceKilometers: 5, targetPaceSecondsPerKilometer: nil,
+                routeID: nil, exercises: [], notes: "Private session note"
+            )
+            let day = TrainingPlanDay(
+                id: UUID(), dayIndex: 1, title: "Monday", sessions: [workout]
+            )
+            plan.weeks = [TrainingPlanWeek(
+                id: UUID(), weekNumber: 1, title: "Week one", days: [day]
+            )]
+
+            let cloud = ATHLTHStudioPlanSyncStore.accountCopy(of: plan)
+            XCTAssertNil(cloud.builderProfile?.injuriesOrLimitations)
+            XCTAssertNil(cloud.weeks[0].days[0].sessions[0].notes)
+            XCTAssertEqual(cloud.weeks[0].days[0].sessions[0].id, workout.id)
+            XCTAssertEqual(cloud.weeks[0].days[0].sessions[0].durationMinutes, 30)
+            XCTAssertEqual(plan.weeks[0].days[0].sessions[0].notes, "Private session note")
+
+            let restored = ATHLTHStudioPlanSyncStore.restoringDeviceOnlyFields(
+                from: plan, into: cloud
+            )
+            XCTAssertEqual(
+                restored.weeks[0].days[0].sessions[0].notes, "Private session note"
+            )
+            XCTAssertEqual(
+                restored.builderProfile?.injuriesOrLimitations, "Private injury note"
+            )
+        }
+    }
+
     private func makeMinimalPlan() -> TrainingPlan {
         TrainingPlan(
             id: UUID(), ownerID: UUID(), title: "Example plan",
