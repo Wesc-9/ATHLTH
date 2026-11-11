@@ -241,6 +241,13 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             // Manual belt speed is clearly a user-entered target, not GPS.
             let displayedPace = currentPace
 
+            if workout.walking {
+                walkingMetricsPanel(
+                    distance: distance,
+                    elapsed: elapsed,
+                    averagePace: measuredAveragePace
+                )
+            } else {
             VStack(spacing: 0) {
                 let hierarchy = ATHLTHPhoneLiveHierarchyResolver.resolve(
                     kind: .running
@@ -368,7 +375,85 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                 radius: 16,
                 y: 6
             )
+            }
         }
+    }
+
+    /// Walking uses a deliberately simpler Basic layout. Same recording
+    /// values, one stable compact card, no redundant running pace hero.
+    private func walkingMetricsPanel(
+        distance: Double,
+        elapsed: TimeInterval,
+        averagePace: Double?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 17) {
+            HStack {
+                Label(ATHLTHLocalization.choose(
+                    english: "WALK IN PROGRESS", norwegian: "GÅTUR PÅGÅR"
+                ), systemImage: "figure.walk")
+                    .font(.caption.weight(.semibold))
+                    .tracking(1)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                Spacer()
+                Circle().fill(ATHLTHTheme.accentDeep).frame(width: 7, height: 7)
+            }
+
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "DISTANCE", norwegian: "DISTANSE"
+                    ))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
+                    Text(String(format: "%.2f", distance))
+                        .font(.system(size: 44, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                    Text(isMetric ? "km" : "mi")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.08))
+                    .frame(width: 1, height: 97)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "ACTIVE TIME", norwegian: "AKTIV TID"
+                    ))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
+                    Text(elapsedText(elapsed))
+                        .font(.system(size: 38, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.65)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Divider().opacity(0.55)
+
+            HStack(spacing: 8) {
+                Image(systemName: "speedometer")
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                Text(ATHLTHLocalization.choose(
+                    english: "Average pace", norwegian: "Snittempo"
+                ))
+                Spacer(minLength: 8)
+                Text(paceValue(averagePace) + (isMetric ? " /km" : " /mi"))
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+            }
+            .font(.subheadline)
+        }
+        .foregroundStyle(ATHLTHTheme.primaryText)
+        .padding(19)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .athlthPlanCard(radius: 23)
+        .transaction { $0.animation = nil }
     }
 
     private func heroMetric(
