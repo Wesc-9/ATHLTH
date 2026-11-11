@@ -631,7 +631,8 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 .foregroundStyle(ATHLTHWidgetPalette.ink)
                 .activityBackgroundTint(Color.white)
                 .activitySystemActionForegroundColor(ATHLTHWidgetPalette.ink)
-            .padding()
+                // ActivityKit owns the outer card. A second generic 16-point
+                // padding previously pushed long running content off-screen.
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -692,9 +693,157 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             expandedStrengthRestLockScreenContent(context)
         } else if context.state.workoutKindRaw == "strength" {
             compactStrengthLockScreenContent(context)
+        } else if context.state.workoutKindRaw == "running" ||
+                  context.state.workoutKindRaw == "walking" {
+            compactCardioLockScreenContent(context)
         } else {
             generalLockScreenContent(context)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
         }
+    }
+
+    /// One bounded design for running and walking, on all compatible iPhones.
+    /// No stacked multi-line route/coach/status panels can escape the
+    /// system Live Activity container. Active time and interval time use
+    /// native system timers so they move even between sensor snapshots.
+    private func compactCardioLockScreenContent(_ context: Context) -> some View {
+        let state = context.state
+        let paused = state.phase == "paused"
+        let hasStepCountdown = state.runningStepRemainingSeconds.map {
+            $0.isFinite && $0 >= 0
+        } ?? false
+        let recovery = state.runningInRecovery == true ||
+            state.runningStepTitle?.localizedCaseInsensitiveContains("pause") == true
+        let countLabel: String = {
+            if let ordinal = state.runningIntervalOrdinal,
+               let total = state.runningIntervalTotal, total > 1 {
+                let position = recovery ? min(ordinal + 1, total) : ordinal
+                return recovery
+                    ? localized("NEXT", "NESTE") + " \(position) / \(total)"
+                    : "\(ordinal) / \(total)"
+            }
+            if state.runningStepTitle != nil {
+                return state.runningStepTitle ?? ""
+            }
+            return state.workoutDisplayTitle ?? context.attributes.workoutTitle
+        }()
+        let title = recovery
+            ? localized("REST", "PAUSE")
+            : state.runningStepTitle == nil
+                ? (state.workoutKindRaw == "walking"
+                    ? localized("WALKING", "GÅTUR")
+                    : localized("RUNNING", "LØPING"))
+                : state.runningStepTitle ?? ""
+        let elapsedAnchor = state.updatedAt.addingTimeInterval(
+            -max(0, state.elapsedTime.isFinite ? state.elapsedTime : 0)
+        )
+        let stepEnd = state.updatedAt.addingTimeInterval(
+            max(0, state.runningStepRemainingSeconds ?? 0)
+        )
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                ATHLTHMarkShape()
+                    .fill(ATHLTHWidgetPalette.ink)
+                    .frame(width: 21, height: 18)
+                Text("ATHLTH")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(1.8)
+                Spacer(minLength: 4)
+                Text(paused ? localized("PAUSED", "PAUSET") :
+                        localized("ACTIVE", "PÅGÅR"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                    .lineLimit(1)
+            }
+
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Spacer(minLength: 3)
+                Text(countLabel)
+                    .font(.caption2.weight(.bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.70)
+                    .foregroundStyle(ATHLTHWidgetPalette.muted)
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(hasStepCountdown
+                         ? (recovery
+                             ? localized("NEXT INTERVAL IN", "NESTE DRAG OM")
+                             : localized("TIME REMAINING", "TID IGJEN"))
+                         : localized("WORKOUT TIME", "ØKTTID"))
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    if hasStepCountdown,
+                       let remaining = state.runningStepRemainingSeconds {
+                        if paused {
+                            Text(duration(ceil(max(remaining, 0))))
+                                .font(.system(size: 43, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                        } else if remaining > 0 {
+                            Text(
+                                timerInterval: state.updatedAt...stepEnd,
+                                countsDown: true,
+                                showsHours: false
+                            )
+                            .font(.system(size: 43, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                        } else {
+                            Text("00:00")
+                                .font(.system(size: 43, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                        }
+                    } else if paused {
+                        Text(duration(state.elapsedTime))
+                            .font(.system(size: 43, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    } else {
+                        Text(elapsedAnchor, style: .timer)
+                            .font(.system(size: 43, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    }
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.58)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if state.distanceMeters.isFinite, state.distanceMeters > 0 {
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(localized("DISTANCE", "DISTANSE"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(ATHLTHWidgetPalette.muted)
+                        Text(distance(state.distanceMeters))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                    .frame(maxWidth: 103, alignment: .trailing)
+                }
+            }
+
+            if let next = state.runningNextStepTitle,
+               !next.isEmpty {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.right.circle")
+                    Text(localized("Next", "Neste") + ": " + next)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ATHLTHWidgetPalette.muted)
+            }
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
     }
 
     /// During rest the countdown is the entire primary Lock Screen metric.
