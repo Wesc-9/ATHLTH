@@ -241,9 +241,7 @@ private struct ATHLTHHomeWidgetView: View {
             HStack(spacing: 5) {
                 if workout.runningInRecovery == true {
                     Image(systemName: "pause.circle")
-                    Text(ATHLTHLocalization.choose(
-                        english: "Rest", norwegian: "Pause"
-                    ))
+                    Text("Pause")
                 } else {
                     Image(systemName: workout.systemImage)
                     Text(hasCountdown ? "TID IGJEN" : "ØKTTID")
@@ -261,6 +259,11 @@ private struct ATHLTHHomeWidgetView: View {
         .foregroundStyle(ATHLTHWidgetPalette.ink)
         .padding(3)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func duration(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds.isFinite ? seconds.rounded(.up) : 0))
+        return String(format: "%02d:%02d", total / 60, total % 60)
     }
 
     private var smallView: some View {
