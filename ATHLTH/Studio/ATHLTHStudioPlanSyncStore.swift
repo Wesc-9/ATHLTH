@@ -540,7 +540,13 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     }
 
     private func fingerprint(for plan: TrainingPlan) throws -> String {
-        var comparable = Self.accountCopy(of: plan)
+        try Self.accountFingerprint(for: plan)
+    }
+
+    // Exposed to the internal XCTest target so private-note changes can be
+    // verified not to generate spurious cross-device sync conflicts.
+    static func accountFingerprint(for plan: TrainingPlan) throws -> String {
+        var comparable = accountCopy(of: plan)
         // Local-only note edits can advance local document metadata. Those
         // fields are not independently meaningful in shared-content comparison.
         comparable.version = 0
