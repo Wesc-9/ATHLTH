@@ -65,7 +65,13 @@ enum ATHLTHSurfaceCoordinator {
                 elapsedTime: snapshot.elapsedTime,
                 distanceMeters: snapshot.distanceMeters,
                 heartRate: snapshot.heartRate,
-                updatedAt: snapshot.capturedAt
+                updatedAt: snapshot.capturedAt,
+                currentStep: snapshot.runningStepTitle ?? snapshot.strengthExerciseName,
+                nextStep: snapshot.runningNextStepTitle ?? snapshot.strengthNextExerciseName,
+                runningIntervalOrdinal: snapshot.runningIntervalOrdinal,
+                runningIntervalTotal: snapshot.runningIntervalTotal,
+                runningInRecovery: snapshot.runningInRecovery,
+                runningStepRemainingSeconds: snapshot.runningStepRemainingSeconds
             )
         } else if let remoteWorkout,
                   Date().timeIntervalSince(remoteWorkout.updatedAt) < 35 {
