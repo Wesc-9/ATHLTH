@@ -397,4 +397,39 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertFalse(cues[1].contains("Distanse"))
     }
 
+    func testPlannedWorkoutCoachSnapshotRetainsGroupEditsWithoutGlobalChanges() throws {
+        var original = WatchAudioCoachConfiguration.disabled
+        original.enabled = true
+        original.distanceIntervalMeters = 1_000
+        original.timeIntervalSeconds = 60
+        original.customRules = [
+            ATHLTHAudioCoachRule(
+                trigger: .distance, metric: .distance, interval: 1_000,
+                additionalMetrics: [.elapsedTime, .heartRateZone]
+            ),
+            ATHLTHAudioCoachRule(
+                trigger: .time, metric: .motivation, interval: 60
+            )
+        ]
+        original.language = .norwegian
+        original.duckOtherAudio = true
+
+        var draft = AudioCoachDraft()
+        draft.load(configuration: original)
+        let prepared = draft.configuration()
+
+        XCTAssertEqual(prepared.customRules?.count, 2)
+        XCTAssertNil(prepared.distanceIntervalMeters)
+        XCTAssertNil(prepared.timeIntervalSeconds)
+        XCTAssertEqual(prepared.language, .norwegian)
+        XCTAssertEqual(prepared.duckOtherAudio, true)
+        XCTAssertTrue(prepared.customRules?[1].selectedMetrics.contains(.motivation) == true)
+
+        let copied = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self,
+            from: JSONEncoder().encode(prepared)
+        )
+        XCTAssertEqual(copied.customRules, prepared.customRules)
+    }
+
 }
