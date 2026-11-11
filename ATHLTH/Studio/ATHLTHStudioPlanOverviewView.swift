@@ -172,7 +172,7 @@ struct ATHLTHStudioPlanOverviewView: View {
         if !goals.isEmpty {
             let basic = plan.builderProfile?.mode == .basic
             let completedIDs = Set(
-                plan.weeks.flatMap(\\.days).flatMap(\\.sessions).compactMap { workout -> UUID? in
+                plan.weeks.flatMap(\.days).flatMap(\.sessions).compactMap { workout -> UUID? in
                     session.isPlanSessionCompleted(
                         planID: plan.id, sessionID: workout.id,
                         healthWorkouts: health.workouts,
@@ -190,7 +190,7 @@ struct ATHLTHStudioPlanOverviewView: View {
                 .font(.headline)
                 .foregroundStyle(ATHLTHStudioStyle.ink)
 
-                ForEach(Array(goals.enumerated()), id: \\.element.id) { index, goal in
+                ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(goal.title)
