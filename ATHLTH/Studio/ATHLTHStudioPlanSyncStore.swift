@@ -202,12 +202,22 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             }
             enabled = true
             AccountLocalStorage.write(true, name: "studioPlanSyncConsent", userID: userID)
-            let remoteRows: [RemotePlan] = try await client
-                .from("studio_plan_documents")
-                .select("plan_id,revision,body_base64")
-                .eq("user_id", value: userID)
-                .limit(250)
-                .execute().value
+            // Fetch every page before interpreting an absent document as deleted.
+            var remoteRows: [RemotePlan] = []
+            let pageSize = 250
+            while true {
+                let page: [RemotePlan] = try await client
+                    .from("studio_plan_documents")
+                    .select("plan_id,revision,body_base64")
+                    .eq("user_id", value: userID)
+                    .order("plan_id")
+                    .range(from: remoteRows.count, to: remoteRows.count + pageSize - 1)
+                    .execute().value
+                guard enabled, accountID == userID else { return }
+                remoteRows.append(contentsOf: page)
+                if page.count < pageSize { break }
+            }
+
             guard enabled, accountID == userID else { return }
 
             let remoteByID = Dictionary(uniqueKeysWithValues: remoteRows.map {

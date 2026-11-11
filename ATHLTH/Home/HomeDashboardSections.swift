@@ -3288,31 +3288,34 @@ private struct HomeWeeklyProgressDaySheet: View {
             // A planned workout opens as a card over the calendar rather
             // than pushing another page inside the day sheet.
             .sheet(item: $selectedPlannedWorkout) { workout in
-                if let planID = HomeWeeklyProgressCalendar.containingPlanID(
+                let isPlanWorkout = HomeWeeklyProgressCalendar.containingPlanID(
                     for: workout, in: plan
-                ) {
-                    PlannedWorkoutDetailView(
-                        planID: planID,
-                        workout: workout,
-                        isHealthCompleted: false
-                    )
-                    .presentationDetents([.fraction(0.85), .large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(28)
-                } else {
-                    NavigationStack {
-                        HomeWeeklyStandaloneWorkoutDetailView(
-                            workout: workout,
-                            onStartWorkout: onStartStandaloneWorkout
-                        )
-                    }
-                    // Start as a compact details sheet; expand only when needed
-                    // for longer outlines, exercise lists or accessibility text.
-                    .presentationDetents([.fraction(0.76), .large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(28)
-                }
+                ) != nil
+                HomeDailyRecommendedWorkoutSheet(
+                    workout: workout,
+                    isPlanWorkout: isPlanWorkout,
+                    canStartWithWatch: false,
+                    onOpenPlannedWorkout: {
+                        selectedPlannedWorkout = nil
+                        onOpenWorkout()
+                    },
+                    onStartOnPhone: {
+                        selectedPlannedWorkout = nil
+                        onStartStandaloneWorkout?(workout, .iPhone)
+                    },
+                    onStartOnWatch: {},
+                    isCalendarWorkout: true,
+                    canStart: !selection.completedPlannedIDs.contains(workout.id)
+                        && workout.kind != .rest
+                        && (isPlanWorkout || onStartStandaloneWorkout != nil),
+                    onDelete: canRemovePlannedWorkout(workout)
+                        ? { removePlannedWorkout(workout) } : nil
+                )
+                .presentationDetents([.fraction(0.85), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
             }
+
             .task {
                 // Allow the sheet presentation and first schedule frame to
                 // finish before constructing hundreds of template records.
@@ -4095,29 +4098,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                 norwegian: "Åpne den planlagte økten"
             ))
 
-            if canRemovePlannedWorkout(workout) {
-                Button {
-                    workoutPendingRemoval = workout
-                    showingRemoveConfirmation = true
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        .frame(width: 44, height: 48)
-                        .background(ATHLTHPlanDesign.selectedSurface,
-                                    in: RoundedRectangle(cornerRadius: 13))
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 10)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Remove scheduled workout",
-                    norwegian: "Fjern planlagt økt"
-                ))
-                .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Requires confirmation. Completed workouts stay saved.",
-                    norwegian: "Krever bekreftelse. Fullførte økter blir beholdt."
-                ))
-            }
+
         }
         .background {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
