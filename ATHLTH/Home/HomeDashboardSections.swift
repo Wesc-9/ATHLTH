@@ -2980,6 +2980,8 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var scheduleConfirmation: String?
     @State private var selectedInvitationLobby: PlannedSession?
     @State private var selectedPlannedWorkout: PlannedSession?
+    @State private var pendingPlanTracking: PlannedSession?
+    @State private var selectedPlanTracking: PlannedSession?
     @State private var workoutPendingRemoval: PlannedSession?
     @State private var showingRemoveConfirmation = false
     @State private var showingRemovalFailure = false
@@ -3287,7 +3289,16 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             // A planned workout opens as a card over the calendar rather
             // than pushing another page inside the day sheet.
-            .sheet(item: $selectedPlannedWorkout) { workout in
+            .sheet(item: $selectedPlanTracking) { workout in
+                if let planID = HomeWeeklyProgressCalendar.containingPlanID(for: workout, in: plan) {
+                    PlannedWorkoutDetailView(planID: planID, workout: workout, isHealthCompleted: false)
+                        .presentationDetents([.fraction(0.85), .large])
+                }
+            }
+            .sheet(item: $selectedPlannedWorkout, onDismiss: {
+                selectedPlanTracking = pendingPlanTracking
+                pendingPlanTracking = nil
+            }) { workout in
                 let isPlanWorkout = HomeWeeklyProgressCalendar.containingPlanID(
                     for: workout, in: plan
                 ) != nil
@@ -3296,8 +3307,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                     isPlanWorkout: isPlanWorkout,
                     canStartWithWatch: false,
                     onOpenPlannedWorkout: {
+                        pendingPlanTracking = workout
                         selectedPlannedWorkout = nil
-                        onOpenWorkout()
                     },
                     onStartOnPhone: {
                         selectedPlannedWorkout = nil
@@ -3306,7 +3317,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     onStartOnWatch: {},
                     isCalendarWorkout: true,
                     canStart: !selection.completedPlannedIDs.contains(workout.id)
-                        && workout.kind != .rest
+                        && !workout.isExplicitRestDay
                         && (isPlanWorkout || onStartStandaloneWorkout != nil),
                     onDelete: canRemovePlannedWorkout(workout)
                         ? { removePlannedWorkout(workout) } : nil
