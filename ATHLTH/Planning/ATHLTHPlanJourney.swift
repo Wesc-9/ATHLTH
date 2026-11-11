@@ -18,7 +18,7 @@ enum ATHLTHPlanJourney {
         if advanced {
             return [.mode, .goal, .basics, .week, .review]
         }
-        return [.mode, .basics]
+        return [.mode, .goal, .basics]
     }
 
     static func displayedCount(advanced: Bool) -> Int {
@@ -51,7 +51,7 @@ enum ATHLTHPlanJourney {
         // Source is retained as a valid legacy branch; it is not in today's
         // standard simple/advanced progression.
         if candidate == .source { return .source }
-        return sequence(advanced: advanced).contains(candidate) ? candidate : .basics
+        return sequence(advanced: advanced).contains(candidate) ? candidate : .goal
     }
 
     static func next(
