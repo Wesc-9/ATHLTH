@@ -1833,6 +1833,26 @@ if session.currentRole.canAccessControlCenter {
                                     }
                                 }
                                 .buttonStyle(.plain)
+                                SettingsDivider()
+                                NavigationLink {
+                                    ATHLTHAdminUserDirectoryView()
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "person.3.sequence.fill",
+                                        title: ATHLTHLocalization.choose(
+                                            english: "User database",
+                                            norwegian: "Brukerdatabase"
+                                        ),
+                                        subtitle: ATHLTHLocalization.choose(
+                                            english: "All accounts, roles and plans · read-only",
+                                            norwegian: "Alle kontoer, roller og abonnement · kun lesing"
+                                        )
+                                    ) {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                    }
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
