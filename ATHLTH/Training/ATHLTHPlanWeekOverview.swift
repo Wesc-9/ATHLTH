@@ -29,6 +29,8 @@ struct ATHLTHPlanWeekOverview: View {
             HStack {
                 Text(localized("Week overview", "Ukeoversikt"))
                     .font(.system(.title3, design: .serif, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
                     .accessibilityAddTraits(.isHeader)
                     .foregroundStyle(graphite)
                 Spacer()
@@ -37,6 +39,8 @@ struct ATHLTHPlanWeekOverview: View {
                      : localized("Simple plan", "Enkel plan"))
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(secondaryInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
             }
 
             ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
@@ -53,7 +57,7 @@ struct ATHLTHPlanWeekOverview: View {
                                 .font(.system(.title3, design: .serif, weight: .semibold))
                         }
                         .foregroundStyle(graphite)
-                        .frame(minWidth: 43)
+                        .frame(width: 43)
 
                         VStack(alignment: .leading, spacing: 7) {
                             if workouts.isEmpty {
@@ -79,7 +83,10 @@ struct ATHLTHPlanWeekOverview: View {
                                             Text(workoutSubtitle(workout))
                                                 .font(.caption2)
                                                 .foregroundStyle(secondaryInk)
+                                                .lineLimit(2)
+                                                .fixedSize(horizontal: false, vertical: true)
                                         }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                         Spacer(minLength: 0)
                                         if isCompleted(workout) {
                                             Image(systemName: "checkmark.circle.fill")
@@ -89,6 +96,7 @@ struct ATHLTHPlanWeekOverview: View {
                                 }
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
