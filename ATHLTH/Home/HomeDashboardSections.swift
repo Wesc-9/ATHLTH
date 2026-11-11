@@ -3124,14 +3124,27 @@ private struct HomeWeeklyProgressDaySheet: View {
             .filter { $0.itemType == .workout }
             .map { $0.itemID.lowercased() })
         guard !ids.isEmpty else { return [] }
-        let available = session.savedWorkoutTemplates +
-            suggestionCatalogEntries.map { $0.plannedSession() } +
-            runningLibrary.allTemplates.map { $0.plannedSession() }
-        var seen = Set<String>()
-        return available.filter { workout in
-            guard let id = workout.workoutTemplateID?.uuidString.lowercased(),
-                  ids.contains(id), seen.insert(id).inserted else { return false }
-            return true
+        // Only materialize favorited catalog entries, not hundreds of
+        // expensive templates on each sheet refresh.
+        let mine = session.savedWorkoutTemplates.filter {
+            $0.workoutTemplateID.map {
+                ids.contains($0.uuidString.lowercased())
+            } ?? false
+        }
+        let catalog = suggestionCatalogEntries
+            .filter { ids.contains($0.id.uuidString.lowercased()) }
+            .map { $0.plannedSession() }
+        let runs = runningLibrary.allTemplates
+            .map { $0.plannedSession() }
+            .filter { workout in
+                workout.workoutTemplateID.map {
+                    ids.contains($0.uuidString.lowercased())
+                } ?? false
+            }
+        var seen = Set<UUID>()
+        return (mine + catalog + runs).filter { workout in
+            guard let id = workout.workoutTemplateID else { return false }
+            return seen.insert(id).inserted
         }.prefix(5).map { $0 }
     }
 
@@ -3578,10 +3591,10 @@ private struct HomeWeeklyProgressDaySheet: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(ATHLTHLocalization.choose(
-                    english: "Suggestions from Workouts",
-                    norwegian: "Forslag fra Workouts"
+                    english: "ATHLTH Coach · Suggested workouts",
+                    norwegian: "ATHLTH Coach · Forslag til økter"
                 ))
-                .font(.headline)
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(dayInk)
                 Spacer()
                 Button {
@@ -3596,6 +3609,11 @@ private struct HomeWeeklyProgressDaySheet: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            Text(coachExplanation)
+                .font(.system(size: 11))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
 
             if suggestions.isEmpty {
                 Text(ATHLTHLocalization.choose(
@@ -3623,6 +3641,47 @@ private struct HomeWeeklyProgressDaySheet: View {
         }
     }
 
+    private var favoriteWorkoutSection: some View {
+        let saved = favoriteWorkouts
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 6) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(ATHLTHLocalization.choose(
+                    english: "Favorites", norwegian: "Favoritter"
+                ))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(dayInk)
+                Spacer()
+            }
+
+            if saved.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Workouts marked as favorites in your library appear here.",
+                    norwegian: "Økter du har merket som favoritter i biblioteket, vises her."
+                ))
+                .font(.system(size: 11))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 9) {
+                        ForEach(Array(saved.enumerated()), id: \.offset) { index, workout in
+                            Button {
+                                presentSuggestion(workout)
+                            } label: {
+                                suggestionTile(workout, index: index)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
     private func suggestionTile(_ workout: PlannedSession, index: Int) -> some View {
         let isStrength = workout.workoutCategory == "strength" || workout.kind == .strength
         let isRun = workout.workoutCategory == "running" || workout.kind == .running
@@ -3645,7 +3704,7 @@ private struct HomeWeeklyProgressDaySheet: View {
             Image(imageName)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 164, height: 95)
+                .frame(width: 148, height: 78)
                 .clipped()
                 .overlay(alignment: .bottomLeading) {
                     Image(systemName: symbol)
@@ -3698,9 +3757,9 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             .padding(.horizontal, 11)
             .padding(.bottom, 12)
-            .frame(width: 164, height: 138, alignment: .topLeading)
+            .frame(width: 148, height: 113, alignment: .topLeading)
         }
-        .frame(width: 164, height: 233)
+        .frame(width: 148, height: 191)
         .background(ATHLTHPlanDesign.surface,
                     in: RoundedRectangle(cornerRadius: 20))
         .clipShape(RoundedRectangle(cornerRadius: 20))
