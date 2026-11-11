@@ -4122,9 +4122,11 @@ final class IPhoneWorkoutStore:
             nextIndex
         // For route warm-up, the runner's manual tap IS the start-main
         // action. Keep the old two-step confirmation for library workouts.
+        // Explicit Next means start the next phase immediately. Never force
+        // a second "Start main" tap after the runner skipped warm-up.
         workout.awaitingMainStart = step.phase == "warmup" &&
             plan.autoStartMainAfterWarmup != true &&
-            !(forceManualAdvance && plan.deferRouteUntilMain == true)
+            !forceManualAdvance
         if step.phase == "warmup",
            plan.deferRouteUntilMain == true {
             workout.routeLegDistanceOffsetMeters = workout.distanceMeters
