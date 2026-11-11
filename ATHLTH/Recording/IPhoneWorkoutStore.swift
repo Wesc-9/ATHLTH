@@ -5433,6 +5433,12 @@ final class IPhoneWorkoutStore:
                 : nil
         }()
 
+        let intervalPosition = workout.structuredRunningWorkout.flatMap {
+            ATHLTHRunningIntervalPosition.resolve(
+                steps: $0.steps,
+                currentIndex: workout.structuredStepIndex ?? 0
+            )
+        }
         let snapshot =
             WatchWorkoutLiveSnapshot(
                 kind:
@@ -5493,6 +5499,9 @@ final class IPhoneWorkoutStore:
                     workout
                         .structuredRunningWorkout?
                         .steps.count,
+                runningIntervalOrdinal: intervalPosition?.ordinal,
+                runningIntervalTotal: intervalPosition?.total,
+                runningInRecovery: intervalPosition?.isRecovery,
                 runningStepProgress:
                     runningStepProgress,
                 runningOverallProgress:
