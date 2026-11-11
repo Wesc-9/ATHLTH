@@ -250,7 +250,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         var aiInstruction: String
     }
     private var configurationCheckpoint: Data? {
-        try? JSONEncoder().encode(ConfigurationCheckpoint(
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try? encoder.encode(ConfigurationCheckpoint(
             customTitle: title, workoutTitles: workoutTitleOverridesByDay,
             workoutMinutes: workoutMinutesByDay,
             goalDetail: goalDetail, summary: planSummary,

@@ -1714,7 +1714,9 @@ struct GoalCreationView: View {
     }
 
     private var encodedPlanCheckpoint: Data? {
-        try? JSONEncoder().encode(PlanCheckpoint(
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try? encoder.encode(PlanCheckpoint(
             title: title, targetValue: targetValue, exerciseName: exerciseName,
             activity: activity, hasDeadline: hasDeadline, deadline: deadline,
             coverStyle: coverStyle, whyItMatters: whyItMatters, notes: notes,
