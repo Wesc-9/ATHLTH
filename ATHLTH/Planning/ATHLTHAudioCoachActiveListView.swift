@@ -18,6 +18,11 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var showingVoice = false
     @State private var showingProfiles = false
     @State private var editingOption: ATHLTHAudioCoachOption?
+    @State private var selectedRule: SelectedRule?
+
+    private struct SelectedRule: Identifiable {
+        let id: UUID
+    }
     @State private var nextEditor: ATHLTHAudioCoachOption?
     @State private var pendingRemoval: ATHLTHAudioCoachOption?
     @State private var confirmReplaceWithStandard = false
@@ -102,7 +107,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     }
 
     private var activeAnnouncementCount: Int {
-        activeOptions.count + draft.customRules.count
+        activeOptions.count + draft.customRules.filter(\.isEnabled).count
             + (draft.smartPrompts.motivationEnabled ? 1 : 0)
             + (hasStandardAnnouncements ? (draft.distanceTriggerEnabled ? 1 : 0)
                 + (draft.timeTriggerEnabled ? 1 : 0) : 0)
@@ -188,6 +193,23 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
         }) {
             catalogueSheet
+        }
+        .sheet(item: $selectedRule) { selection in
+            NavigationStack {
+                ScrollView {
+                    ruleGroupEditor(selection.id)
+                        .padding(16)
+                }
+                .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+                .navigationTitle(tr("Announcement group", "Varslingsgruppe"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(tr("Done", "Ferdig")) { selectedRule = nil }
+                    }
+                }
+            }
+            .presentationDetents([.large])
         }
         .sheet(item: $editingOption) { option in
             NavigationStack {
@@ -423,7 +445,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
                 if draft.smartPrompts.motivationEnabled {
                     announcementGroupRow(
-                        title: tr("Motivation", "Motivasjon"),
+                        title: tr("Automatic motivation", "Automatisk motivasjon"),
                         detail: tr("Approximately every", "Omtrent hvert") +
                             " \(draft.smartPrompts.motivationIntervalSeconds) s"
                     ) { editingOption = .motivation }
@@ -431,11 +453,13 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
                 ForEach(draft.customRules) { rule in
                     announcementGroupRow(
-                        title: rule.trigger == .distance
-                            ? tr("Every \(rule.validatedInterval) m", "Hver \(rule.validatedInterval) m")
-                            : tr("Every \(rule.validatedInterval) s", "Hvert \(rule.validatedInterval) s"),
+                        title: !rule.isEnabled
+                            ? tr("Paused group", "Pauset gruppe")
+                            : rule.trigger == .distance
+                                ? tr("Every \(rule.validatedInterval) m", "Hver \(rule.validatedInterval) m")
+                                : tr("Every \(rule.validatedInterval) s", "Hvert \(rule.validatedInterval) s"),
                         detail: rule.selectedMetrics.map(\.title).joined(separator: ", ")
-                    ) { editingOption = .customAnnouncements }
+                    ) { selectedRule = SelectedRule(id: rule.id) }
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 }
                 ForEach(activeOptions) { option in
@@ -446,7 +470,15 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
             }
             Button {
-                editingOption = .customAnnouncements
+                guard draft.customRules.count < 20 else { return }
+                let group = ATHLTHAudioCoachRule(
+                    trigger: .distance,
+                    metric: .distance,
+                    interval: 1_000,
+                    additionalMetrics: [.elapsedTime, .heartRateZone]
+                )
+                draft.customRules.append(group)
+                selectedRule = SelectedRule(id: group.id)
             } label: {
                 Label(tr("Create announcement group", "Opprett varslingsgruppe"),
                       systemImage: "plus.circle.fill")
@@ -455,15 +487,35 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(bronze)
+            .disabled(draft.customRules.count >= 20)
+
+            if !draft.customRules.contains(where: {
+                $0.trigger == .time && $0.validatedInterval == 60 &&
+                $0.selectedMetrics == [.motivation]
+            }) {
+                Button {
+                    guard draft.customRules.count < 20 else { return }
+                    let group = ATHLTHAudioCoachRule(
+                        trigger: .time, metric: .motivation, interval: 60
+                    )
+                    draft.customRules.append(group)
+                    selectedRule = SelectedRule(id: group.id)
+                } label: {
+                    Label(tr("Add every-minute motivation", "Legg til motivasjon hvert minutt"),
+                          systemImage: "sparkles")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .disabled(draft.customRules.count >= 20)
+            }
 
             if !draft.smartPrompts.motivationEnabled {
                 Button {
                     draft.smartPrompts.motivationEnabled = true
-                    draft.smartPrompts.motivationIntervalSeconds = 60
                     editingOption = .motivation
                 } label: {
-                    Label(tr("Add motivation announcements", "Legg til motivasjonsvarsler"),
-                          systemImage: "sparkles")
+                    Label(tr("Add automatic motivation", "Legg til automatisk motivasjon"),
+                          systemImage: "bolt.heart")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.bordered)
@@ -814,6 +866,88 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             .buttonStyle(.bordered)
             .disabled(draft.customRules.count >= 20)
+        }
+    }
+
+    @ViewBuilder
+    private func ruleGroupEditor(_ id: UUID) -> some View {
+        if let index = draft.customRules.firstIndex(where: { $0.id == id }) {
+            let rule = $draft.customRules[index]
+            editorCard {
+                Toggle(tr("Active", "Aktiv"), isOn: Binding(
+                    get: { rule.wrappedValue.isEnabled },
+                    set: { rule.wrappedValue.enabled = $0 }
+                ))
+                .tint(bronze)
+
+                Picker(tr("Trigger", "Utløser"), selection: rule.trigger) {
+                    ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
+                        Text(trigger.title).tag(trigger)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Stepper(
+                    value: rule.interval,
+                    in: rule.wrappedValue.trigger == .time ? 15...7_200 : 100...42_000,
+                    step: rule.wrappedValue.trigger == .time ? 15 : 100
+                ) {
+                    Text(rule.wrappedValue.trigger == .time
+                         ? tr("Every \\(rule.wrappedValue.validatedInterval) seconds",
+                              "Hvert \\(rule.wrappedValue.validatedInterval) sekund")
+                         : tr("Every \\(rule.wrappedValue.validatedInterval) metres",
+                              "Hver \\(rule.wrappedValue.validatedInterval) meter"))
+                }
+                .onChange(of: rule.wrappedValue.trigger) { _, newValue in
+                    rule.wrappedValue.interval = newValue == .time ? 60 : 1_000
+                }
+
+                Picker(tr("First message item", "Første innhold"), selection: rule.metric) {
+                    ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
+                        Text(metric.title).tag(metric)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                multiMetricChoices(
+                    primary: rule.wrappedValue.metric,
+                    selected: Binding(
+                        get: { rule.wrappedValue.additionalMetrics ?? [] },
+                        set: { rule.wrappedValue.additionalMetrics = $0 }
+                    )
+                )
+                if rule.wrappedValue.selectedMetrics.contains(.motivation) {
+                    Picker(tr("Motivation style", "Motivasjonsstil"), selection: Binding(
+                        get: { rule.wrappedValue.encouragementStyle ?? .encouragement },
+                        set: { rule.wrappedValue.encouragementStyle = $0 }
+                    )) {
+                        ForEach(ATHLTHCoachEncouragementStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+                Divider()
+                Button {
+                    guard draft.customRules.count < 20 else { return }
+                    var duplicate = rule.wrappedValue
+                    duplicate.id = UUID()
+                    draft.customRules.append(duplicate)
+                    selectedRule = SelectedRule(id: duplicate.id)
+                } label: {
+                    Label(tr("Duplicate group", "Dupliser gruppe"),
+                          systemImage: "square.on.square")
+                        .frame(minHeight: 44)
+                }
+                .disabled(draft.customRules.count >= 20)
+                Button(role: .destructive) {
+                    draft.customRules.removeAll { $0.id == id }
+                    selectedRule = nil
+                } label: {
+                    Label(tr("Delete group", "Slett gruppe"), systemImage: "trash")
+                        .frame(minHeight: 44)
+                }
+            }
         }
     }
 
