@@ -114,8 +114,10 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     .clipped()
                     // A quieter treatment only for Home's recent-activity strip.
                     // Keep the original photo, crop and geometry unchanged.
-                    .saturation(recentActivityStrip ? 0.78 : (trainDetailStyle ? 0.95 : 0.75))
-                    .contrast(trainDetailStyle ? 0.97 : (recentActivityStrip ? 0.90 : 0.88))
+                    // Compact recent cards favor muscle readability over busy
+                    // photographic detail; the original asset is unchanged.
+                    .saturation(recentActivityStrip ? 0.58 : (trainDetailStyle ? 0.95 : 0.75))
+                    .contrast(trainDetailStyle ? 0.97 : (recentActivityStrip ? 0.83 : 0.88))
 
                 if trainDetailStyle {
                     // Preserve the clean studio image and darken only enough
@@ -211,8 +213,8 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         warmIvoryBase: true
                     )
                     .frame(
-                        width: min(cardWidth * (tight ? 0.52 : 0.43), tight ? 175 : 245),
-                        height: min(cardHeight * (trainDetailStyle ? 0.76 : 0.81), 255)
+                        width: min(cardWidth * (recentActivityStrip && tight ? 0.72 : (tight ? 0.52 : 0.43)), tight ? 175 : 245),
+                        height: min(cardHeight * (recentActivityStrip && tight ? 0.95 : (trainDetailStyle ? 0.76 : 0.81)), 255)
                     )
                     // The slightly narrower silhouettes leave a clear space for
                     // the title, focus label and two information tiles.
@@ -256,17 +258,19 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         Text(ATHLTHLocalization.choose(
                             english: "Strength", norwegian: "Styrke"
                         ))
-                        .font(.system(size: tight ? 20 : (small ? 25 : 35), weight: .bold,
+                        .font(.system(size: recentActivityStrip && tight ? 16 : (tight ? 20 : (small ? 25 : 35)), weight: .bold,
                                       design: .rounded))
                         .tracking(-0.5)
                         .foregroundStyle(trainDetailStyle ? Color.white : ink)
 
-                        Text(focus)
-                            .font(.system(size: tight ? 10 : (small ? 12 : 17),
-                                          weight: .medium))
-                            .foregroundStyle(trainDetailStyle ? ATHLTHTrainDesign.gold : secondaryInk)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.77)
+                        if !(recentActivityStrip && tight) {
+                            Text(focus)
+                                .font(.system(size: tight ? 10 : (small ? 12 : 17),
+                                              weight: .medium))
+                                .foregroundStyle(trainDetailStyle ? ATHLTHTrainDesign.gold : secondaryInk)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.77)
+                        }
                     }
                     .frame(maxWidth: cardWidth * (tight ? 0.52 : (small ? 0.50 : 0.49)),
                            alignment: .leading)
