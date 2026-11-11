@@ -331,7 +331,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                     selected: advanced
                 ) { advanced = true }
             }
-            HStack(spacing: 9) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 148, maximum: 370), spacing: 9)],
+                spacing: 9
+            ) {
                 Button {
                     if let draft = unfinishedPlanDrafts.first {
                         openDraft(draft)
@@ -347,6 +350,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                             ? "plus" : "arrow.uturn.forward"
                     )
                     .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.80)
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .foregroundStyle(.white)
                     .background(graphite, in: RoundedRectangle(cornerRadius: 15))
@@ -361,6 +366,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                         systemImage: browsingMyPlans ? "calendar" : "square.stack"
                     )
                     .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.80)
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .foregroundStyle(graphite)
                     .background(.white, in: RoundedRectangle(cornerRadius: 15))
@@ -840,6 +847,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .font(.system(size: 18, weight: .semibold, design: .serif))
                         .foregroundStyle(graphite)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.82)
                     if isActive {
                         Text(tr("Week \(week + 1) of \(plan.weeks.count) · \(weeklyCount) workouts this week",
                                 "Uke \(week + 1) av \(plan.weeks.count) · \(weeklyCount) økter denne uken"))
@@ -855,6 +863,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                             .foregroundStyle(secondaryInk)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
                 Spacer(minLength: 0)
                 VStack {
                     Image(systemName: "chevron.right")
@@ -1001,7 +1011,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                 ForEach(workouts) { workout in
                     referenceSessionCard(workout, day: day, plan: plan)
                 }
-                HStack(spacing: 9) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 142, maximum: 400), spacing: 9)],
+                    spacing: 9
+                ) {
                     Button {
                         selectedDayID = day.id
                         showingDayDetails = true
