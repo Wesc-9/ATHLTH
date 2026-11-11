@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Common live-workout navigation controls. Sport-specific metrics, maps,
 /// intervals and set cards remain in the individual recording views.
-enum ATHLTHLiveWorkoutControlKind {
+enum ATHLTHLiveWorkoutControlKind: Equatable {
     case minimize
     case add
     case finish
