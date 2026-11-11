@@ -11,7 +11,6 @@ struct ActiveHybridWorkoutPicker: View {
     let onAppend: (PlannedSession, Bool) -> Bool
 
     @State private var unsupportedMessage: String?
-    @State private var pendingRunningWarmup: PlannedSession?
 
     private var plannedWorkouts: [PlannedSession] {
         let all = session.trainingPlans.flatMap { plan in
@@ -84,20 +83,20 @@ struct ActiveHybridWorkoutPicker: View {
                             .font(.subheadline.weight(.semibold))
                             Text(ATHLTHLocalization.choose(
                                 english: runningOnly
-                                    ? "Append a running interval program without stopping your current Apple Watch or iPhone recording."
+                                    ? "Choose intervals now, keep running freely until you tap Start interval. Every previous minute and meter is preserved."
                                     : "Add a saved session or a treadmill interval. Existing sets and Apple Watch measurements are preserved.",
                                 norwegian: runningOnly
-                                    ? "Legg til en intervalløkt uten å stoppe det pågående opptaket fra Apple Watch eller iPhone."
+                                    ? "Velg intervaller og fortsett fri løping til du trykker Start intervall. Tid og distanse fra før beholdes."
                                     : "Legg til en lagret økt eller mølleintervaller. Settene og Apple Watch-målingene beholdes."
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             Text(ATHLTHLocalization.choose(
                                 english: runningOnly
-                                    ? "If intervals are in progress, queue the next program rather than restarting the current one."
+                                    ? "The free part and all subsequent intervals are included in the saved workout."
                                     : "Starting another part saves elapsed time in any active timed set. Existing completed sets and the Watch recording stay intact.",
                                 norwegian: runningOnly
-                                    ? "Hvis intervaller allerede pågår, legger du neste program i kø i stedet for å avbryte det aktive."
+                                    ? "Den frie delen og alle etterfølgende intervaller følger med i sammendraget."
                                     : "Starter du en annen del, lagres faktisk tid i et pågående tidssett. Ferdige sett og klokkeopptaket beholdes."
                             ))
                             .font(.caption2)
@@ -119,18 +118,7 @@ struct ActiveHybridWorkoutPicker: View {
                             duration: nil
                         ) { startNow in
                             let planned = makeRunningSession(template)
-                            if runningOnly {
-                                if startNow {
-                                    append(
-                                        ATHLTHLiveRunningWarmupRecipe.make(session: planned),
-                                        startNow: true
-                                    )
-                                } else {
-                                    pendingRunningWarmup = planned
-                                }
-                            } else {
-                                append(planned, startNow: startNow)
-                            }
+                            append(planned, startNow: runningOnly ? false : startNow)
                         }
                     }
                 }
@@ -148,18 +136,7 @@ struct ActiveHybridWorkoutPicker: View {
                                     ? "figure.run" : "dumbbell.fill",
                                 duration: workout.durationMinutes
                             ) { startNow in
-                                if runningOnly {
-                                    if startNow {
-                                        append(
-                                            ATHLTHLiveRunningWarmupRecipe.make(session: workout),
-                                            startNow: true
-                                        )
-                                    } else {
-                                        pendingRunningWarmup = workout
-                                    }
-                                } else {
-                                    append(workout, startNow: startNow)
-                                }
+                                append(workout, startNow: runningOnly ? false : startNow)
                             }
                         }
                     }
@@ -177,17 +154,6 @@ struct ActiveHybridWorkoutPicker: View {
                         english: "Done", norwegian: "Ferdig"
                     )) { dismiss() }
                 }
-            }
-            .sheet(item: $pendingRunningWarmup) { planned in
-                ATHLTHLiveRunningWarmupSheet(session: planned) { chosen, startNow in
-                    let success = onAppend(chosen, startNow)
-                    if success {
-                        pendingRunningWarmup = nil
-                        dismiss()
-                    }
-                    return success
-                }
-                .presentationDragIndicator(.visible)
             }
             .alert(
                 ATHLTHLocalization.choose(
@@ -257,27 +223,28 @@ struct ActiveHybridWorkoutPicker: View {
                     action(true)
                 } label: {
                     Label(ATHLTHLocalization.choose(
-                        english: runningOnly ? "Start 10 min warm-up" : "Start this part",
-                        norwegian: runningOnly ? "Start 10 min oppvarming" : "Start denne delen"
-                    ), systemImage: "play.fill")
+                        english: runningOnly ? "Add intervals" : "Start this part",
+                        norwegian: runningOnly ? "Legg til intervaller" : "Start denne delen"
+                    ), systemImage: runningOnly ? "plus.circle.fill" : "play.fill")
                         .frame(maxWidth: .infinity, minHeight: 41)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(ATHLTHTheme.primaryText)
                 .background(ATHLTHTheme.champagne, in: Capsule())
 
-                Button {
-                    action(false)
-                } label: {
-                    Text(ATHLTHLocalization.choose(
-                        english: runningOnly ? "Adjust / skip" : "Queue",
-                        norwegian: runningOnly ? "Tilpass / hopp over" : "Legg til senere"
-                    ))
-                    .frame(maxWidth: .infinity, minHeight: 41)
+                if !runningOnly {
+                    Button {
+                        action(false)
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Queue", norwegian: "Legg til senere"
+                        ))
+                        .frame(maxWidth: .infinity, minHeight: 41)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
             }
             .font(.caption.weight(.semibold))
         }
