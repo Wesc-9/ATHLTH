@@ -314,4 +314,54 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         )
         XCTAssertNotEqual(watchKey, later)
     }
+    func testOneKilometreGroupBundlesDistanceTimeAndZone() {
+        var draft = AudioCoachDraft()
+        XCTAssertTrue(draft.addKilometerMetricsBundle())
+        let configuration = draft.configuration(maximumHeartRateBPM: 185)
+        // Custom groups replace the old periodic timer, not duplicate it.
+        XCTAssertNil(configuration.distanceIntervalMeters)
+        XCTAssertNil(configuration.timeIntervalSeconds)
+        XCTAssertEqual(configuration.customRules?.count, 1)
+        let group = try! XCTUnwrap(configuration.customRules?.first)
+        XCTAssertEqual(group.validatedInterval, 1_000)
+        XCTAssertEqual(group.selectedMetrics,
+                       [.distance, .elapsedTime, .heartRateZone])
+        var slots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: [group], distanceMeters: 0, elapsedSeconds: 0
+        )
+        let messages = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [group], distanceMeters: 1_001,
+            elapsedSeconds: 340, paceSecondsPerKilometer: 340,
+            heartRateBPM: 152, norwegian: true,
+            maximumHeartRateBPM: 185, lastSlots: &slots
+        )
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertTrue(messages[0].contains("Distanse"))
+        XCTAssertTrue(messages[0].contains("Tid"))
+        XCTAssertTrue(messages[0].contains("Pulssone"))
+    }
+
+    func testPlannedWorkoutVoiceAndMotivationGroupsLoadIntoQuickStart() {
+        var planned = WatchAudioCoachConfiguration.disabled
+        planned.enabled = true
+        planned.language = .norwegian
+        planned.voiceIdentifier = "system-voice-example"
+        planned.customRules = [
+            ATHLTHAudioCoachRule(
+                trigger: .distance, metric: .elapsedTime,
+                interval: 1_000, additionalMetrics: [.heartRateZone]
+            )
+        ]
+        planned.smartPrompts = ATHLTHAudioCoachSmartSettings()
+        planned.smartPrompts?.motivationEnabled = true
+        planned.smartPrompts?.motivationIntervalSeconds = 60
+        var quickStart = AudioCoachDraft()
+        quickStart.load(configuration: planned)
+        let output = quickStart.configuration(maximumHeartRateBPM: 190)
+        XCTAssertEqual(output.voiceIdentifier, planned.voiceIdentifier)
+        XCTAssertEqual(output.customRules, planned.customRules)
+        XCTAssertEqual(output.smartPrompts?.motivationIntervalSeconds, 60)
+        XCTAssertNil(output.distanceIntervalMeters)
+    }
+
 }
