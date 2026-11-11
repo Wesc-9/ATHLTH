@@ -4826,7 +4826,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             if plan != nil {
                 libraryRow(
                     icon: "sparkles",
-                    title: tr("Adapt your plan", "Tilpass med AI"),
+                    title: tr("Adjust with Coach", "Tilpass med Coach"),
                     subtitle: tr("Suggestions only – you approve changes",
                                  "Kun forslag – du godkjenner endringene")
                 ) {

@@ -71,4 +71,29 @@ final class ATHLTHAccountPlanDocumentsTests: XCTestCase {
         XCTAssertTrue(session.trainingPlans.isEmpty)
         XCTAssertTrue(session.planTemplates.isEmpty)
     }
+
+    func testEditingPlanUpdatesSavedCopyWithoutDuplicatingOrRecreatingIt() throws {
+        let suite = "AccountPlanDocuments.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let session = AppSessionStore(defaults: defaults)
+        let source = plan(owner: session.profile.userID)
+        XCTAssertTrue(session.addTrainingPlan(source))
+        let savedID = try XCTUnwrap(session.planTemplates.first?.id)
+        XCTAssertTrue(session.updateTrainingPlan(
+            planID: source.id, title: "Edited plan", summary: "Updated",
+            visibility: .privateOnly, tags: [],
+            startDate: try XCTUnwrap(source.startDate), weekCount: 2))
+        XCTAssertEqual(session.planTemplates.count, 1)
+        XCTAssertEqual(session.planTemplates.first?.id, savedID)
+        XCTAssertEqual(session.planTemplates.first?.title, "Edited plan")
+        XCTAssertEqual(session.planTemplates.first?.weeks.count, 2)
+        XCTAssertNil(session.planTemplates.first?.startDate)
+        session.deletePlanTemplate(savedID)
+        XCTAssertTrue(session.updateTrainingPlan(
+            planID: source.id, title: "Edit after removing saved copy", summary: "",
+            visibility: .privateOnly, tags: [],
+            startDate: try XCTUnwrap(source.startDate), weekCount: 2))
+        XCTAssertTrue(session.planTemplates.isEmpty)
+    }
 }

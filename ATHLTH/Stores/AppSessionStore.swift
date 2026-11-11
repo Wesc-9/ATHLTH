@@ -2243,6 +2243,7 @@ final class AppSessionStore: ObservableObject {
             scheduledPlans.append(plan)
         }
 
+        refreshLinkedLibraryCopy(plan)
         persistScheduledPlans()
         refreshActivePlanForToday()
         // Covers direct calendar edits and copied workouts as well as the
@@ -4630,6 +4631,25 @@ final class AppSessionStore: ObservableObject {
         )
         planTemplates.insert(template, at: 0)
         persistPlanTemplates()
+    }
+
+    /// A plan saved by default remains usable after the athlete fills its weeks.
+    /// Explicitly deleted copies and opt-outs must never be recreated by editing.
+    private func refreshLinkedLibraryCopy(_ source: TrainingPlan) {
+        let tag = "saved-source:" + source.id.uuidString
+        guard let index = planTemplates.firstIndex(where: { $0.tags.contains(tag) }) else { return }
+        let previous = planTemplates[index]
+        planTemplates[index] = TrainingPlan(
+            id: previous.id, ownerID: profile.userID, title: source.title,
+            summary: source.summary, visibility: previous.visibility,
+            version: previous.version + 1,
+            weeks: source.weeks, tags: source.tags.filter { $0 != tag } + [tag],
+            spotifyPlaylist: source.spotifyPlaylist,
+            spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
+            createdAt: previous.createdAt, updatedAt: source.updatedAt,
+            startDate: nil, builderProfile: source.builderProfile,
+            trainingBlocks: source.trainingBlocks
+        )
     }
 
     /// Transport markers distinguish reusable library plans and lifecycle state.

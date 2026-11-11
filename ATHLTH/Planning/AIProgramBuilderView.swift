@@ -106,7 +106,7 @@ struct AIProgramBuilderView: View {
         self.onProgramCreatedPlanID = onProgramCreatedPlanID
     }
 
-    @State private var saveToLibrary = true
+    @State private var saveToLibrary: Bool
     @State private var selectedGoalIDs: Set<UUID> = []
     @State private var timelineMode: AIProgramTimelineMode = .weeks
     @State private var startDate = Calendar.current.startOfDay(for: Date())
