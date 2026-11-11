@@ -126,12 +126,14 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
                 preferredDayIndexes: [1, 4],
                 injuriesOrLimitations: "Private injury note"
             )
-            let workout = PlannedSession(
+            var workout = PlannedSession(
                 id: UUID(), title: "Easy run", kind: .running,
                 scheduledStart: nil, durationMinutes: 30,
                 targetDistanceKilometers: 5, targetPaceSecondsPerKilometer: nil,
                 routeID: nil, exercises: [], notes: "Private session note"
             )
+            workout.recoveryOriginalExercises = []
+            workout.recoveryAdjustedExercises = []
             let day = TrainingPlanDay(
                 id: UUID(), dayIndex: 1, title: "Monday", sessions: [workout]
             )
@@ -142,6 +144,8 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
             let cloud = ATHLTHStudioPlanSyncStore.accountCopy(of: plan)
             XCTAssertNil(cloud.builderProfile?.injuriesOrLimitations)
             XCTAssertNil(cloud.weeks[0].days[0].sessions[0].notes)
+            XCTAssertNil(cloud.weeks[0].days[0].sessions[0].recoveryOriginalExercises)
+            XCTAssertNil(cloud.weeks[0].days[0].sessions[0].recoveryAdjustedExercises)
             XCTAssertEqual(cloud.weeks[0].days[0].sessions[0].id, workout.id)
             XCTAssertEqual(cloud.weeks[0].days[0].sessions[0].durationMinutes, 30)
             XCTAssertEqual(plan.weeks[0].days[0].sessions[0].notes, "Private session note")
@@ -152,6 +156,8 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
             XCTAssertEqual(
                 restored.weeks[0].days[0].sessions[0].notes, "Private session note"
             )
+            XCTAssertNotNil(restored.weeks[0].days[0].sessions[0].recoveryOriginalExercises)
+            XCTAssertNotNil(restored.weeks[0].days[0].sessions[0].recoveryAdjustedExercises)
             XCTAssertEqual(
                 restored.builderProfile?.injuriesOrLimitations, "Private injury note"
             )
