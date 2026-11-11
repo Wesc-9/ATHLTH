@@ -114,10 +114,11 @@ struct ATHLTHTrainGoalHubView: View {
             Text(plan?.title ?? "")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(muted)
-            Text(tr(
-                "Connect goals to your plan. See planned sessions beside verified results, without turning an estimate into a fact.",
-                "Koble mål til treningsplanen. Se planlagt trening mot registrerte resultater – uten at estimater vises som fakta."
-            ))
+            Text(plan?.builderProfile?.mode == .basic
+                 ? tr("See what you are training towards and get a simple update along the way.",
+                      "Se hva du trener mot, og få en enkel oppdatering underveis.")
+                 : tr("Connect goals to your plan. Compare planned workouts with verified results and review suggested adjustments.",
+                      "Koble mål til planen. Sammenlign økter med registrerte resultater og vurder foreslåtte justeringer."))
             .font(.subheadline)
             .foregroundStyle(muted)
             HStack(spacing: 9) {
