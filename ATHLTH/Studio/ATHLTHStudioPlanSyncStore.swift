@@ -500,9 +500,14 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     }
 
     private func fingerprint(for plan: TrainingPlan) throws -> String {
+        var comparable = Self.accountCopy(of: plan)
+        // Local-only note edits can advance local document metadata. Those
+        // fields are not independently meaningful in shared-content comparison.
+        comparable.version = 0
+        comparable.updatedAt = comparable.createdAt
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        let bytes = try encoder.encode(plan)
+        let bytes = try encoder.encode(comparable)
         return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
     }
 
