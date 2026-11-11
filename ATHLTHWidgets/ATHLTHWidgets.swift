@@ -1768,6 +1768,22 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             }
         } else if metric == .elapsed || metric == .strengthRest {
             compactElapsedClock(context)
+        } else if metric == .runningInterval,
+                  let remaining = context.state.runningStepRemainingSeconds,
+                  remaining.isFinite {
+            TimelineView(.periodic(from: .now, by: 1)) { tick in
+                let isCurrent = ATHLTHLiveActivityDisplayPolicy.isRecent(
+                    updatedAt: context.state.updatedAt, now: tick.date
+                )
+                let spent = context.state.phase == "running"
+                    ? max(0, tick.date.timeIntervalSince(context.state.updatedAt))
+                    : 0
+                let left = max(0, remaining - spent)
+                let value = isCurrent
+                    ? ATHLTHLiveActivityDisplayPolicy.compactDuration(ceil(left))
+                    : "—"
+                compactIslandText(value, condensed: value)
+            }
         } else {
             TimelineView(.periodic(from: .now, by: 15)) { tick in
                 let isCurrent = ATHLTHLiveActivityDisplayPolicy.isRecent(
