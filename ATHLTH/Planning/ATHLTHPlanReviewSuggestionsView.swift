@@ -25,14 +25,16 @@ struct ATHLTHPlanReviewSuggestionsView: View {
     }
 
     var body: some View {
+        let currentPlan = session.trainingPlan(withID: plan.id) ?? plan
+        let isBasic = currentPlan.builderProfile?.mode == .basic
         let editableIDs = ATHLTHPlanReviewEligibility.editableIDs(
-            in: plan, store: session,
+            in: currentPlan, store: session,
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
-        let suggestions = ATHLTHPlanReviewAdvisor.inspect(plan).filter {
+        let suggestions = ATHLTHPlanReviewAdvisor.inspect(currentPlan).filter {
             ATHLTHPlanReviewEligibility.isRelevant(
-                $0, in: plan, editableIDs: editableIDs
+                $0, in: currentPlan, editableIDs: editableIDs
             )
         }
 
@@ -51,10 +53,15 @@ struct ATHLTHPlanReviewSuggestionsView: View {
                     .font(.system(size: 22, weight: .semibold, design: .serif))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
 
-                    Text(ATHLTHLocalization.choose(
-                        english: "Suggestions from the plan structure. Open a day to review a possible adjustment; nothing is changed automatically.",
-                        norwegian: "Forslag basert på planoppsettet. Åpne en dag for å vurdere en endring. Ingenting endres automatisk."
-                    ))
+                    Text(isBasic
+                        ? ATHLTHLocalization.choose(
+                            english: "A simple suggestion for your next workout. You decide whether to change it.",
+                            norwegian: "Et enkelt forslag til neste økt. Du bestemmer om den skal endres."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Suggestions from the plan structure. Open a day to review a possible adjustment; nothing is changed automatically.",
+                            norwegian: "Forslag basert på planoppsettet. Åpne en dag for å vurdere en endring. Ingenting endres automatisk."
+                        ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
@@ -75,11 +82,11 @@ struct ATHLTHPlanReviewSuggestionsView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(Array(suggestions.prefix(
-                        showAll ? suggestions.count : 3
+                        isBasic ? 1 : (showAll ? suggestions.count : 3)
                     ))) { suggestion in
                         Button {
                             if let preview = ATHLTHPlanReviewDurationProposal.suggest(
-                                for: suggestion, in: plan,
+                                for: suggestion, in: currentPlan,
                                 eligibleWorkoutIDs: editableIDs
                             ) {
                                 pendingReview = .duration(preview)
@@ -156,7 +163,7 @@ struct ATHLTHPlanReviewSuggestionsView: View {
                         ))
                     }
                 }
-                if suggestions.count > 3 {
+                if !isBasic && suggestions.count > 3 {
                     Button {
                         showAll.toggle()
                     } label: {
@@ -196,7 +203,7 @@ struct ATHLTHPlanReviewSuggestionsView: View {
             case .move(let proposal):
                 ATHLTHPlanReviewMovePreviewSheet(
                     proposal: proposal,
-                    plan: plan,
+                    plan: currentPlan,
                     onApprove: { selectedProposal in
                         session.applyPlanReviewMoveProposal(
                             selectedProposal,
