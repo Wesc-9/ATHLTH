@@ -449,7 +449,6 @@ final class IPhoneWorkoutStore:
     private var nextFuelAnnouncementSeconds: TimeInterval?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
-    private var lastSpokenRouteTurnAt: Date?
     private var lastSpokenRouteTurnIndex: Int?
     private var routeWasOff = false
     /// Only announce departure after accurate GPS has first acquired the
@@ -2857,7 +2856,6 @@ final class IPhoneWorkoutStore:
     private func resetRouteAlertRuntime() {
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
-        lastSpokenRouteTurnAt = nil
         lastSpokenRouteTurnIndex = nil
         routeWasOff = false
         routeAlertArmed = false
@@ -3112,7 +3110,8 @@ final class IPhoneWorkoutStore:
             location: location,
             route: coordinates,
             index: guidance.nearestRoutePointIndex,
-            deviationMeters: guidance.deviationMeters
+            deviationMeters: guidance.deviationMeters,
+            progressMeters: guidance.traveledAlongRouteMeters
         )
     }
 
@@ -3763,24 +3762,25 @@ final class IPhoneWorkoutStore:
         location: CLLocation,
         route: [CLLocationCoordinate2D],
         index: Int,
-        deviationMeters: Double
+        deviationMeters: Double,
+        progressMeters: Double
     ) {
         guard let configuration = workout.routeAlertConfiguration,
               configuration.enabled,
               workout.audioCoachConfiguration?.enabled == true,
               location.horizontalAccuracy >= 0,
               location.horizontalAccuracy <= 25,
+              abs(location.timestamp.timeIntervalSinceNow) <= 10,
               deviationMeters <= configuration.deviationMeters,
               let cue = ATHLTHRouteNavigationCue.nextTurn(
-                  route: route, nearestIndex: index
+                  route: route, nearestIndex: index,
+                  cumulativeMeters: plannedRouteCumulativeMeters,
+                  progressMeters: progressMeters
               ),
               let turnIndex = cue.pointIndex,
               (25...85).contains(cue.distanceMeters),
-              lastSpokenRouteTurnIndex != turnIndex else { return }
-        if let lastSpokenRouteTurnAt,
-           Date().timeIntervalSince(lastSpokenRouteTurnAt) < 35 { return }
+              turnIndex > (lastSpokenRouteTurnIndex ?? -1) else { return }
         lastSpokenRouteTurnIndex = turnIndex
-        lastSpokenRouteTurnAt = Date()
         let meters = Int(cue.distanceMeters.rounded())
         let isRight = cue.direction == .right
         deliverRouteAlert(
@@ -4198,7 +4198,7 @@ final class IPhoneWorkoutStore:
                     kind: .runningStep,
                     key: "\(nextIndex)-next",
                     priority: .structuredStep,
-                    validFor: 15
+                    validFor: 15, runningStepIndex: nextIndex
                 )
             )
         }
@@ -4251,7 +4251,7 @@ final class IPhoneWorkoutStore:
                 kind: .runningStep,
                 key: "\(workout.structuredStepIndex ?? 0)-\(prefix)",
                 priority: .structuredStep,
-                validFor: 15
+                validFor: 15, runningStepIndex: workout.structuredStepIndex ?? 0
             )
         )
     }
@@ -4333,7 +4333,7 @@ final class IPhoneWorkoutStore:
                     kind: .runningStep,
                     key: "phone-interval-warning:\(workout.id):\(index)",
                     priority: .structuredStep,
-                    validFor: 8
+                    validFor: 2, runningStepIndex: index
                 )
             )
             return
@@ -4746,11 +4746,18 @@ final class IPhoneWorkoutStore:
             spokenPhrase,
             voiceIdentifier: configuration.voiceIdentifier,
             duckMusic: configuration.shouldDuckOtherAudio,
+            shouldStart: { [weak self] in
+                guard let self, self.active != nil,
+                      ATHLTHCoachVoicePausePolicy.allowsSpeech(
+                          coachEnabled: self.active?.audioCoachConfiguration?.enabled == true,
+                          speechPaused: self.coachSpeechPaused, priority: priority
+                      ) else { return false }
+                guard let event else { return true }
+                return event.isFresh() && (event.runningStepIndex == nil ||
+                    event.runningStepIndex == self.currentCoachRunningStepIndex)
+            },
             onFallback: { [weak self] in
-                guard let self,
-                      self.active?.audioCoachConfiguration?.enabled == true,
-                      !self.coachSpeechPaused
-                else { return }
+                guard let self else { return }
                 try? ATHLTHSpokenAudioSession.activate(
                     duckOtherAudio: configuration.shouldDuckOtherAudio,
                     owner: self.audioOwner
@@ -4795,7 +4802,15 @@ final class IPhoneWorkoutStore:
         coachEventLedger.didDeliver(event)
     }
 
+    private var currentCoachRunningStepIndex: Int? {
+        guard let workout = active, workout.resumedAt != nil,
+              workout.structuredWorkoutComplete != true,
+              workout.awaitingMainStart != true else { return nil }
+        return workout.structuredStepIndex ?? 0
+    }
+
     private func deliverNextQueuedCoachCue() {
+        coachCueQueue.discardObsoleteRunningSteps(currentIndex: currentCoachRunningStepIndex)
         guard !speechSynthesizer.isSpeaking,
               !azureCoachSpeech.isBusy,
               let next = coachCueQueue.popNext()

@@ -55,6 +55,7 @@ final class MirroredWorkoutAudioCoach:
     private var lastState:
         WatchWorkoutMirrorState?
     private var lastStepIndex: Int?
+    private var currentRunningStepIndex: Int?
     private var lastIntervalProgressKey: String?
     private var lastIntervalWarningKey: String?
     private var announcedStart = false
@@ -204,6 +205,7 @@ final class MirroredWorkoutAudioCoach:
             }
         }
 
+        currentRunningStepIndex = snapshot.state == .running ? snapshot.runningStepIndex : nil
         if snapshot.state == .running,
            ATHLTHCoachSensorFreshness.isFresh(
                sampledAt: snapshot.capturedAt,
@@ -371,7 +373,7 @@ final class MirroredWorkoutAudioCoach:
                     event: ATHLTHCoachEvent(
                         kind: .runningStep, key: "mirror-warning:\(key)",
                         priority: .structuredStep,
-                        createdAt: snapshot.capturedAt, validFor: 8
+                        createdAt: snapshot.capturedAt, validFor: 2, runningStepIndex: index
                     )
                 )
             }
@@ -454,7 +456,7 @@ final class MirroredWorkoutAudioCoach:
                 key: String(index),
                 priority: .structuredStep,
                 createdAt: snapshot.capturedAt,
-                validFor: 15
+                validFor: 15, runningStepIndex: index
             )
         )
     }
@@ -1120,6 +1122,12 @@ final class MirroredWorkoutAudioCoach:
             spokenText,
             voiceIdentifier: configuration.voiceIdentifier,
             duckMusic: configuration.shouldDuckOtherAudio,
+            shouldStart: { [weak self] in
+                guard let self, self.configuration.enabled, !self.finished else { return false }
+                guard let event else { return true }
+                return event.isFresh() && (event.runningStepIndex == nil ||
+                    event.runningStepIndex == self.currentRunningStepIndex)
+            },
             onFallback: { [weak self] in
                 guard let self, self.configuration.enabled, !self.finished
                 else { return }
@@ -1201,6 +1209,8 @@ final class MirroredWorkoutAudioCoach:
     }
 
     private func deliverNextQueuedCue() {
+        let currentIndex = currentRunningStepIndex
+        cueQueue.discardObsoleteRunningSteps(currentIndex: currentIndex)
         guard !finished, !synthesizer.isSpeaking,
               !azureCoachSpeech.isBusy,
               let next = cueQueue.popNext()

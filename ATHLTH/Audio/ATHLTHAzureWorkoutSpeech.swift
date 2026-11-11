@@ -65,6 +65,7 @@ final class ATHLTHAzureWorkoutSpeech:
         _ phrase: String,
         voiceIdentifier: String?,
         duckMusic: Bool,
+        shouldStart: @escaping () -> Bool = { true },
         onFallback: @escaping () -> Void,
         onStarted: @escaping () -> Void,
         onFinished: @escaping () -> Void
@@ -89,7 +90,7 @@ final class ATHLTHAzureWorkoutSpeech:
         timeoutTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(5.0))
             guard !Task.isCancelled else { return }
-            self?.fallback(generation)
+            self?.fallback(generation, shouldStart: shouldStart)
         }
 
         requestTask = Task { [weak self] in
@@ -109,12 +110,18 @@ final class ATHLTHAzureWorkoutSpeech:
                       !data.isEmpty,
                       data.count <= 250_000
                 else {
-                    self.fallback(generation)
+                    self.fallback(generation, shouldStart: shouldStart)
                     return
                 }
 
                 let player = try AVAudioPlayer(data: data)
                 guard self.identity == generation else { return }
+                guard shouldStart() else {
+                    let done = self.finishHandler
+                    self.cleanup()
+                    done?()
+                    return
+                }
                 do {
                     try ATHLTHSpokenAudioSession.activate(
                         duckOtherAudio: duckMusic,
@@ -123,7 +130,7 @@ final class ATHLTHAzureWorkoutSpeech:
                     self.ownsAudioSession = true
                     player.delegate = self
                     guard player.prepareToPlay(), player.play() else {
-                        self.fallback(generation)
+                        self.fallback(generation, shouldStart: shouldStart)
                         return
                     }
                     self.audio = player
@@ -150,17 +157,23 @@ final class ATHLTHAzureWorkoutSpeech:
                         done?()
                     }
                 } catch {
-                    self.fallback(generation)
+                    self.fallback(generation, shouldStart: shouldStart)
                 }
             } catch {
-                self.fallback(generation)
+                self.fallback(generation, shouldStart: shouldStart)
             }
         }
         return true
     }
 
-    private func fallback(_ generation: UUID) {
+    private func fallback(_ generation: UUID, shouldStart: () -> Bool) {
         guard identity == generation, isBusy else { return }
+        guard shouldStart() else {
+            let done = finishHandler
+            cleanup()
+            done?()
+            return
+        }
         // Transient cold starts should not disable the chosen voice for the
         // entire session. Retry at most twice with a short backoff.
         consecutiveFailures += 1

@@ -24,6 +24,23 @@ final class ATHLTHRouteNavigationCueTests: XCTestCase {
         XCTAssertGreaterThan(instruction?.distanceMeters ?? 0, 90)
     }
 
+    func testUpcomingTurnMeasuresFromProjectedProgressInsteadOfNearestVertex() {
+        let route = [
+            coordinate(60.0000, 10.0000),
+            coordinate(60.00045, 10.0000),
+            coordinate(60.00090, 10.0000),
+            coordinate(60.00090, 10.0010),
+            coordinate(60.00090, 10.0018)
+        ]
+        let instruction = ATHLTHRouteNavigationCue.nextTurn(
+            route: route, nearestIndex: 2,
+            cumulativeMeters: [0, 50, 100, 150, 200],
+            progressMeters: 67
+        )
+        XCTAssertEqual(instruction?.direction, .right)
+        XCTAssertEqual(instruction?.distanceMeters, 33)
+    }
+
     func testStraightRouteDoesNotInventIntersection() {
         let route = (0...6).map {
             coordinate(60.0 + Double($0) * 0.00035, 10.0)

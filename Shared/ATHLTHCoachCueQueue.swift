@@ -90,6 +90,13 @@ struct ATHLTHCoachCueQueue {
         }
     }
 
+    mutating func discardObsoleteRunningSteps(currentIndex: Int?) {
+        pending.removeAll { cue in
+            guard let index = cue.event.runningStepIndex else { return false }
+            return index != currentIndex
+        }
+    }
+
     mutating func reset() {
         pending.removeAll(keepingCapacity: true)
     }

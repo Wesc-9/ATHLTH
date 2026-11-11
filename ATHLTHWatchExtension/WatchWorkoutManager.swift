@@ -231,7 +231,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var ghostLastGapAlertAt: Date?
     private var lastRouteNavigationMapPublishedAt: Date?
     private var lastSpokenRouteTurnIndex: Int?
-    private var lastSpokenRouteTurnAt: Date?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
@@ -416,7 +415,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         cachePlannedRouteGeometry(route)
         lastSpokenRouteTurnIndex = nil
-        lastSpokenRouteTurnAt = nil
 
         publish {
             self.plannedRoute = route
@@ -4945,7 +4943,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     priority: .structuredStep,
                     event: ATHLTHCoachEvent(
                         kind: .runningStep, key: "warning:\(key)",
-                        priority: .structuredStep, validFor: 8
+                        priority: .structuredStep, validFor: 2, runningStepIndex: structuredStepIndex
                     )
                 )
             }
@@ -5147,7 +5145,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 // Shared with the mirrored iPhone cue key for this step.
                 key: String(structuredStepIndex),
                 priority: .structuredStep,
-                validFor: 15
+                validFor: 15, runningStepIndex: structuredStepIndex
             )
         )
     }
@@ -5482,7 +5480,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         evaluateUpcomingRouteTurn(
             location: location,
             nearestIndex: guidance.nearestRoutePointIndex,
-            deviationMeters: guidance.deviationMeters
+            deviationMeters: guidance.deviationMeters,
+            progressMeters: guidance.traveledAlongRouteMeters
         )
     }
 
@@ -6532,26 +6531,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func evaluateUpcomingRouteTurn(
         location: CLLocation,
         nearestIndex: Int,
-        deviationMeters: Double
+        deviationMeters: Double,
+        progressMeters: Double
     ) {
         guard isActive, state == .running,
               routeAlertConfiguration.enabled,
               audioCoachConfiguration.enabled,
               location.horizontalAccuracy >= 0,
               location.horizontalAccuracy <= 25,
+              abs(location.timestamp.timeIntervalSinceNow) <= 10,
               deviationMeters <= routeAlertConfiguration.deviationMeters,
               let cue = ATHLTHRouteNavigationCue.nextTurn(
                   route: plannedRouteLocations.map(\.coordinate),
-                  nearestIndex: nearestIndex
+                  nearestIndex: nearestIndex,
+                   cumulativeMeters: plannedRouteCumulativeMeters,
+                   progressMeters: progressMeters
               ),
               let turnIndex = cue.pointIndex,
               (25...85).contains(cue.distanceMeters),
-              lastSpokenRouteTurnIndex != turnIndex
+              turnIndex > (lastSpokenRouteTurnIndex ?? -1)
         else { return }
-        let now = Date()
-        if let lastSpokenRouteTurnAt,
-           now.timeIntervalSince(lastSpokenRouteTurnAt) < 35 { return }
-        lastSpokenRouteTurnAt = now
         lastSpokenRouteTurnIndex = turnIndex
 
         let distance = spokenDistance(cue.distanceMeters)
@@ -6601,6 +6600,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         guard isOffRoute else {
             offRouteStartedAt = nil
+            lastOffRouteAlertAt = nil
 
             if routeWasOff {
                 routeWasOff = false
@@ -7333,7 +7333,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 // An audio-route activation may outlast a short interval.
                 // Drop expired commentary rather than speak stale guidance.
                 if let event,
-                   !event.isFresh() {
+                   (!event.isFresh() || (event.runningStepIndex != nil &&
+                       event.runningStepIndex != self.currentCoachRunningStepIndex)) {
                     self.guidancePriorityGate.voiceDidFinish()
                     self.deactivateAudioCoachAudioSession()
                     return
@@ -7422,9 +7423,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    private var currentCoachRunningStepIndex: Int? {
+        guard state == .running, !structuredWorkoutComplete, !awaitingMainStart else { return nil }
+        return structuredStepIndex
+    }
+
     private func deliverNextQueuedCoachCue() {
-        guard audioCoachConfiguration.enabled,
-              isActive,
+        coachCueQueue.discardObsoleteRunningSteps(currentIndex: currentCoachRunningStepIndex)
+        guard isActive,
               !speechSynthesizer.isSpeaking,
               audioCoachActivationTask == nil,
               let next = coachCueQueue.popNext()

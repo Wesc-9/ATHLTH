@@ -4401,6 +4401,20 @@ struct WorkoutTemplateBuilderView: View {
         )
     }
 
+    private func openAudioCoach() {
+        loadGuidanceDefaultsIfNeeded()
+        coachIsCustomized = true
+        selectedWorkoutExtra = .audioCoach
+    }
+
+    private var audioCoachEntry: some View {
+        Button(action: openAudioCoach) {
+            ATHLTHAudioCoachEntryLabel(enabled: coachIsCustomized
+                                      ? audioCoachDraft.enabled : settings.audioCoachEnabledByDefault)
+        }
+        .buttonStyle(.plain)
+    }
+
     private var workoutExtrasMenu: some View {
         ATHLTHWorkoutExtrasMenu(
             onGear: { selectedWorkoutExtra = .gear },
@@ -4410,11 +4424,7 @@ struct WorkoutTemplateBuilderView: View {
             },
             onSpotify: { selectedWorkoutExtra = .spotify },
             onHeartRateAndPace: { selectedWorkoutExtra = .heartRateAndPace },
-            onAudioCoach: {
-                loadGuidanceDefaultsIfNeeded()
-                coachIsCustomized = true
-                selectedWorkoutExtra = .audioCoach
-            },
+            onAudioCoach: openAudioCoach,
             onGhostRace: {
                 loadGuidanceDefaultsIfNeeded()
                 if ghostDraft.targetTimeText.isEmpty {
@@ -4864,6 +4874,7 @@ struct WorkoutTemplateBuilderView: View {
                         durationSettings
                         timeline
                     }
+                    audioCoachEntry
                     if draftNotice {
                         Label(tr("Recovered saved draft", "Gjenopprettet lagret utkast"),
                               systemImage: "checkmark.circle.fill")

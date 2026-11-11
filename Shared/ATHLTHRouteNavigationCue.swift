@@ -63,17 +63,22 @@ enum ATHLTHRouteNavigationCue {
 
     static func nextTurn(
         route: [CLLocationCoordinate2D],
-        nearestIndex: Int
+        nearestIndex: Int,
+        cumulativeMeters: [Double]? = nil,
+        progressMeters: Double? = nil
     ) -> Instruction? {
         guard route.count >= 4, route.indices.contains(nearestIndex),
               nearestIndex < route.count - 2 else {
             return nil
         }
-        let cumulative = cumulativeDistance(route)
-        let origin = cumulative[nearestIndex]
+        let cumulative = cumulativeMeters.flatMap { $0.count == route.count ? $0 : nil }
+            ?? cumulativeDistance(route)
+        let origin = progressMeters ?? cumulative[nearestIndex]
+        guard origin.isFinite, origin >= 0 else { return nil }
+        let firstCandidate = max(1, progressMeters == nil ? nearestIndex + 1 : nearestIndex)
         // A meaningful turn must have stable geometry on both sides.
         // Ignore very short GPS zigzags and bends at the finish.
-        for index in (nearestIndex + 1)..<(route.count - 1) {
+        for index in firstCandidate..<(route.count - 1) {
             let distance = cumulative[index] - origin
             if distance < 15 { continue }
             if distance > 220 { break }

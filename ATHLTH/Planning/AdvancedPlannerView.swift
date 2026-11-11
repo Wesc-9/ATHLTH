@@ -6498,6 +6498,17 @@ struct SessionEditorView: View {
             .listRowSeparator(.hidden)
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
 
+            if kind == .running || kind == .walking {
+                Section {
+                    Button { showingAudioCoachEditor = true } label: {
+                        ATHLTHAudioCoachEntryLabel(enabled: resolvedAudioCoachEnabled)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+
             workoutStructurePreviewSection
 
             workoutBasicsSection
@@ -8953,15 +8964,6 @@ struct SessionEditorView: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
                 HStack(spacing: 16) {
-                    Button {
-                        showingAudioCoachEditor = true
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Set up Coach", norwegian: "Tilpass Coach"
-                        ), systemImage: "slider.horizontal.3")
-                    }
-                    .buttonStyle(.plain)
-
                     Button {
                         editorMode = .advanced
                     } label: {

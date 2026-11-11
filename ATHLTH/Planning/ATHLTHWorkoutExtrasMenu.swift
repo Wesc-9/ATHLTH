@@ -80,3 +80,31 @@ struct ATHLTHWorkoutExtrasMenu: View {
         ))
     }
 }
+
+
+/// Shared entry for session-scoped Audio Coach settings.
+struct ATHLTHAudioCoachEntryLabel: View {
+    let enabled: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label(ATHLTHLocalization.choose(english: "Audio Coach", norwegian: "Lydcoach"),
+                  systemImage: "waveform.and.mic")
+                .font(.subheadline.weight(.semibold))
+            Spacer(minLength: 8)
+            Text(enabled
+                 ? ATHLTHLocalization.choose(english: "On", norwegian: "På")
+                 : ATHLTHLocalization.choose(english: "Off", norwegian: "Av"))
+                .font(.caption.weight(.semibold))
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .accessibilityHidden(true)
+        }
+        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+        .padding(.horizontal, 14)
+        .frame(minHeight: 48)
+        .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 12))
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}

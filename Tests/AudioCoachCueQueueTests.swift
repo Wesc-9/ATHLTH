@@ -24,6 +24,29 @@ final class AudioCoachCueQueueTests: XCTestCase {
         )
     }
 
+    func testChangingIntervalsDropsOldSpeechButKeepsRouteAlerts() {
+        var queue = ATHLTHCoachCueQueue()
+        for index in 0...1 {
+            let event = ATHLTHCoachEvent(
+                kind: .runningStep, key: String(index), priority: .structuredStep,
+                createdAt: origin, runningStepIndex: index
+            )
+            XCTAssertTrue(queue.enqueue(
+                ATHLTHCoachQueuedCue(event: event, text: "Interval"),
+                now: origin
+            ))
+        }
+        XCTAssertTrue(queue.enqueue(
+            cue(.routeAlert, key: "route", priority: .routeCritical),
+            now: origin
+        ))
+
+        queue.discardObsoleteRunningSteps(currentIndex: 1)
+        XCTAssertEqual(queue.popNext(now: origin)?.event.kind, .routeAlert)
+        XCTAssertEqual(queue.popNext(now: origin)?.event.runningStepIndex, 1)
+        XCTAssertNil(queue.popNext(now: origin))
+    }
+
     func testRoutineUpdatesAreNeverQueued() {
         var queue = ATHLTHCoachCueQueue()
         XCTAssertFalse(queue.enqueue(

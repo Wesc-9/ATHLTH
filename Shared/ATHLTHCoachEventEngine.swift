@@ -26,18 +26,21 @@ struct ATHLTHCoachEvent: Hashable {
     let priority: ATHLTHGuidancePriority
     let createdAt: Date
     let expiresAt: Date
+    let runningStepIndex: Int?
 
     init(
         kind: ATHLTHCoachEventKind,
         key: String,
         priority: ATHLTHGuidancePriority,
         createdAt: Date = Date(),
-        validFor: TimeInterval = 12
+        validFor: TimeInterval = 12,
+        runningStepIndex: Int? = nil
     ) {
         self.kind = kind
         self.key = key
         self.priority = priority
         self.createdAt = createdAt
+        self.runningStepIndex = runningStepIndex
         self.expiresAt = createdAt.addingTimeInterval(
             max(validFor, 0)
         )

@@ -1607,6 +1607,17 @@ struct RunQuickStartSheet: View {
                         )
                     }
 
+                    NavigationLink {
+                        PerWorkoutAudioCoachView(
+                            draft: $audioCoachDraft,
+                            showRouteOptions: guidanceRoute != nil,
+                            showStructuredOptions: mode == .structured
+                        )
+                    } label: {
+                        ATHLTHAudioCoachEntryLabel(enabled: audioCoachDraft.enabled)
+                    }
+                    .buttonStyle(.plain)
+
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
                         ATHLTHRunQuickStartPlanPreview(

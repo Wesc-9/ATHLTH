@@ -172,7 +172,7 @@ struct PlannedWorkoutDetailView: View {
                     }
                     overviewCard
 
-                    if !simplePresentation && (currentWorkout.kind == .running ||
+                    if (currentWorkout.kind == .running ||
                         currentWorkout.kind == .walking) {
                         runGuidanceCard
                     }
@@ -748,9 +748,9 @@ struct PlannedWorkoutDetailView: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Run guidance",
+                                    "Audio Coach and run guidance",
                                 norwegian:
-                                    "Løpeveiledning"
+                                    "Lydcoach og løpsveiledning"
                             )
                         )
                         .font(
