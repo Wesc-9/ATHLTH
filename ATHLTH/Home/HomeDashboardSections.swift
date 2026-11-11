@@ -3026,7 +3026,7 @@ private struct HomeWeeklyProgressDaySheet: View {
         let highlights: [PlannedSession] = [
             // Keep low-impact choices discoverable even when the catalog is
             // dominated by strength and hybrid sessions.
-            catalog.first(where: { $0.workoutKind == .walking })?.plannedSession(),
+            saved.first(where: { $0.kind == .walking }),
             catalog.first(where: {
                 $0.category == "strength" &&
                 ($0.difficulty == "Beginner" || $0.difficulty == "Nybegynner")
