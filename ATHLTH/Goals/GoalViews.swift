@@ -1682,6 +1682,7 @@ struct GoalCreationView: View {
 
     init(
         initialCategory: GoalCategory = .endurance,
+        initialTitle: String = "",
         embeddedInPlan: Bool = false,
         checkpoint: Binding<Data?> = .constant(nil),
         onCreated: ((UUID) -> Void)? = nil
@@ -1690,6 +1691,7 @@ struct GoalCreationView: View {
         self.onPlanGoalCreated = onCreated
         self._planCheckpoint = checkpoint
         self._category = State(initialValue: initialCategory)
+        self._title = State(initialValue: initialTitle)
     }
 
     private struct PlanCheckpoint: Codable {
@@ -1775,7 +1777,7 @@ struct GoalCreationView: View {
 
     @State private var step = 0
     @State private var category: GoalCategory
-    @State private var title = ""
+    @State private var title: String
     @State private var targetValue = 5.0
     @State private var exerciseName = "Squat"
     @State private var showingExercisePicker = false

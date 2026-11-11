@@ -230,6 +230,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var deliberatelyDiscardedPlanDraft = false
 
     private struct ConfigurationCheckpoint: Codable {
+        var customTitle: String?
+        var workoutTitles: [Int: String]?
+        var workoutMinutes: [Int: Int]?
         var goalDetail: String
         var summary: String
         var injuryFree: Bool
@@ -246,6 +249,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
     private var configurationCheckpoint: Data? {
         try? JSONEncoder().encode(ConfigurationCheckpoint(
+            customTitle: title, workoutTitles: workoutTitleOverridesByDay,
+            workoutMinutes: workoutMinutesByDay,
             goalDetail: goalDetail, summary: planSummary,
             injuryFree: injuryFree, limitations: injuriesOrLimitations,
             muscles: selectedMuscles, primaryMuscle: primaryMuscle,
@@ -1040,7 +1045,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
-                english: "Fill empty days with ATHLTH Coach?",
+                english: "Prepare changes with ATHLTH Coach?",
                 norwegian: "Fylle ut tomme dager med ATHLTH Coach?"),
             isPresented: $showingGuidedAIConsent,
             titleVisibility: .visible
@@ -1480,7 +1485,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     return
                 }
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    step = .basics
+                    step = ATHLTHPlanJourney.next(after: .mode, advanced: mode == .advanced) ?? .basics
                 }
             },
             onCancel: { requestClosePlanCreation() }
@@ -1734,7 +1739,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
                 if selectedGoalIDs.isEmpty {
                     GoalCreationView(
-                        initialCategory: inlineGoalCategory, embeddedInPlan: true,
+                        initialCategory: inlineGoalCategory,
+                        initialTitle: ATHLTHPlanGoalOption.options(for: selectedGoalArea).first { $0.id == selectedGoalChoice }?.title ?? "",
+                        embeddedInPlan: true,
                         checkpoint: $inlineGoalDraft
                     ) { id in
                         selectedGoalIDs = [id]
@@ -7881,6 +7888,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         startDate = draft.startDate
         if let data = draft.configuration,
            let saved = try? JSONDecoder().decode(ConfigurationCheckpoint.self, from: data) {
+            title = saved.customTitle ?? title
             goalDetail = saved.goalDetail
             planSummary = saved.summary
             injuryFree = saved.injuryFree
@@ -7944,6 +7952,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         workoutTitleOverridesByDay = draft.workoutPresetsByDay ?? [:]
         workoutMinutesByDay = draft.workoutMinutesByDay ?? [:]
         structuredWorkoutsByDay = draft.structuredWorkoutsByDay ?? [:]
+        if let data = draft.configuration,
+           let saved = try? JSONDecoder().decode(ConfigurationCheckpoint.self, from: data) {
+            workoutTitleOverridesByDay = saved.workoutTitles ?? workoutTitleOverridesByDay
+            workoutMinutesByDay = saved.workoutMinutes ?? workoutMinutesByDay
+        }
         weekDayEdits = draft.weekDayEdits ?? [:]
         weekPlanningApproach = draft.planningApproach.flatMap(
             ATHLTHPlanWeekPlanningApproach.init(rawValue:)
