@@ -989,8 +989,7 @@ private struct IPhoneStructuredStepCard: View {
                                                     style: StrokeStyle(
                                                         lineWidth: 8, lineCap: .round))
                                             .rotationEffect(.degrees(-90))
-                                            .animation(.easeInOut(duration: 0.5),
-                                                       value: progress)
+
                                         VStack(spacing: 6) {
                                             Text(structuredRemainingText(
                                                 step: step, workout: workout,
@@ -1003,7 +1002,8 @@ private struct IPhoneStructuredStepCard: View {
                                             .lineLimit(1)
                                             .contentTransition(.numericText(countsDown: true))
                                             Text(ATHLTHLocalization.choose(
-                                                english: "REMAINING", norwegian: "GJENSTÅR"))
+                                                english: step.measure == .open ? "ELAPSED" : "REMAINING",
+                                                norwegian: step.measure == .open ? "MEDGÅTT" : "GJENSTÅR"))
                                                 .font(.caption2.weight(.bold))
                                                 .tracking(1.5)
                                         }
@@ -1012,7 +1012,7 @@ private struct IPhoneStructuredStepCard: View {
                                     }
                                     .frame(width: 242, height: 242)
                                     .frame(maxWidth: .infinity)
-                                    .transition(.scale.combined(with: .opacity))
+
                                     }
 
                                     if let pace = step.targetPaceMinSecondsPerKilometer,
@@ -1085,58 +1085,20 @@ private struct IPhoneStructuredStepCard: View {
                                         .font(.subheadline.weight(.semibold))
                                     }
 
-                                    if (workout.awaitingMainStart == true || recorder.nextStructuredStep != nil) &&
-                                       (workout.awaitingMainStart == true ||
-                                       (step.phase == "warmup" &&
-                                        workout.structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
-                                       step.phase == "cooldown" ||
-                                       step.measure == .open ||
-                                       workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false) {
-                                        HStack(spacing: 12) {
-                                            if let next = recorder.nextStructuredStep {
-                                                Label(
-                                                    ATHLTHLocalization.choose(
-                                                        english: "Next", norwegian: "Neste"
-                                                    ) + ": \(next.title)",
-                                                    systemImage: "arrow.right.circle.fill"
-                                                )
-                                                .font(.caption.weight(.semibold))
-                                                .lineLimit(2)
-                                            }
-                                            Spacer(minLength: 6)
-                                            Button {
-                                                recorder.advanceStructuredStepManually()
-                                            } label: {
-                                                Text(ATHLTHLocalization.choose(
-                                                    english: workout.awaitingMainStart == true ||
-                                                        (step.phase == "warmup" &&
-                                                         workout.structuredRunningWorkout?.deferRouteUntilMain == true)
-                                                        ? "Start main section" : step.phase == "warmup"
-                                                        ? "End warm-up" : step.phase == "cooldown"
-                                                        ? "End cool-down" : "Next phase",
-                                                    norwegian: workout.awaitingMainStart == true ||
-                                                        (step.phase == "warmup" &&
-                                                         workout.structuredRunningWorkout?.deferRouteUntilMain == true)
-                                                        ? "Start hoveddel" : step.phase == "warmup"
-                                                        ? "Avslutt oppvarming" : step.phase == "cooldown"
-                                                        ? "Avslutt nedjogging" : "Neste del"
-                                                ))
-                                                .font(.caption.weight(.bold))
-                                                .padding(.horizontal, 11)
-                                                .frame(minHeight: 40)
-                                                .foregroundStyle(.white)
-                                                .background(ATHLTHTheme.accentDeep,
-                                                            in: Capsule())
-                                            }
-                                            .buttonStyle(.plain)
-                                            .accessibilityLabel(
+                                    HStack(spacing: 8) {
+                                        if let next = recorder.nextStructuredStep {
+                                            Label(
                                                 ATHLTHLocalization.choose(
-                                                    english: "Finish current phase and start the next",
-                                                    norwegian: "Fullfør denne delen og start neste"
-                                                )
+                                                    english: "Next", norwegian: "Neste"
+                                                ) + ": \(next.title)",
+                                                systemImage: "arrow.right.circle"
                                             )
+                                            .font(.caption.weight(.semibold))
+                                            .lineLimit(2)
                                         }
+                                        Spacer(minLength: 0)
                                     }
+                                    .frame(height: 42, alignment: .leading)
                                 }
                             }
                         }
@@ -1209,7 +1171,9 @@ private struct IPhoneStructuredStepCard: View {
             ) + " remaining"
 
         case .open:
-            return "Open step · advance by finishing the workout"
+            let elapsed = max(workout.elapsed(at: date) -
+                (workout.structuredStepStartElapsedTime ?? 0), 0)
+            return ATHLTHRunStepCountdown.display(elapsed)
         }
     }
 
@@ -1259,7 +1223,6 @@ struct IPhoneWorkoutView: View {
                         }
 
                         TrainTogetherStatusStrip()
-                        ATHLTHLivePetSelectionCard(distanceMeters: workout.distanceMeters)
 
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
@@ -1921,23 +1884,7 @@ struct IPhoneWorkoutView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let workout = recorder.active {
                     VStack(spacing: 0) {
-                        ATHLTHWorkoutAudioDock(
-                            coachVisible: true,
-                            coachEnabled:
-                                workout.audioCoachConfiguration?.enabled == true,
-                            coachPaused: recorder.coachSpeechPaused,
-                            coachManagedOnWatch: false,
-                            canReplayCoach: recorder.canReplayLastCoachMessage,
-                            onCoachStatus: { recorder.announceCoachStatusNow() },
-                            onCoachTogglePause: {
-                                recorder.setCoachSpeechPaused(
-                                    !recorder.coachSpeechPaused
-                                )
-                            },
-                            onCoachReplay: { recorder.replayLastCoachMessage() },
-                            onCoachSettings: { showingLiveAudioCoach = true }
-                        )
-                        premiumWorkoutControls(workout)
+                        runningNextControl(workout)
                     }
                 }
             }
@@ -2412,7 +2359,38 @@ struct IPhoneWorkoutView: View {
                         norwegian: "Legg til intervalløkt"
                     ))
                 }
+                Button {
+                    confirmFinish = true
+                } label: {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.red)
+                        .frame(width: 43, height: 43)
+                        .background(Color.white.opacity(0.9), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(recorder.saving)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Finish and save workout", norwegian: "Avslutt og lagre økten"
+                ))
             }
+
+            ATHLTHWorkoutAudioDock(
+                compactAlignment: .leading,
+                coachVisible: true,
+                coachEnabled: workout.audioCoachConfiguration?.enabled == true,
+                coachPaused: recorder.coachSpeechPaused,
+                coachManagedOnWatch: false,
+                canReplayCoach: recorder.canReplayLastCoachMessage,
+                onCoachStatus: { recorder.announceCoachStatusNow() },
+                onCoachTogglePause: {
+                    recorder.setCoachSpeechPaused(!recorder.coachSpeechPaused)
+                },
+                onCoachReplay: { recorder.replayLastCoachMessage() },
+                onCoachSettings: { showingLiveAudioCoach = true }
+            )
+            .frame(height: 54, alignment: .topLeading)
+            .zIndex(5)
 
             if workout.runEnvironment == .treadmill &&
                workout.indoorVenue != .indoorRunning {
@@ -2442,22 +2420,6 @@ struct IPhoneWorkoutView: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                     .padding(14)
                     .background(Color.white.opacity(0.93), in: RoundedRectangle(cornerRadius: 17))
-                }
-                .buttonStyle(.plain)
-            }
-
-            if workout.runEnvironment == .outdoor {
-                Button {
-                    showingManualEnvironmentChoice = true
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Change running environment",
-                            norwegian: "Endre treningsmiljø"
-                        ), systemImage: "location.circle"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
                 .buttonStyle(.plain)
             }
@@ -2923,155 +2885,48 @@ struct IPhoneWorkoutView: View {
         )
     }
 
-    private func premiumWorkoutControls(
-        _ workout: PhoneWorkout
-    ) -> some View {
-        HStack(spacing: 10) {
-            Button {
-                if workout.resumedAt == nil {
-                    recorder.resume()
-                } else {
-                    recorder.pause()
-                }
-            } label: {
-                HStack(spacing: 9) {
-                    Image(
-                        systemName:
-                            workout.resumedAt ==
-                                nil
-                                ? "play.fill"
-                                : "pause.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 14,
-                            weight: .bold
-                        )
-                    )
-                    .frame(
-                        width: 32,
-                        height: 32
-                    )
-                    .background(
-                        ATHLTHTheme
-                            .accentDeep,
-                        in: Circle()
-                    )
-                    .foregroundStyle(
-                        .white
-                    )
-
-                    Text(
-                        workout.resumedAt == nil
-                            ? ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Resume",
-                                    norwegian:
-                                        "Fortsett"
-                                )
-                            : ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Pause",
-                                    norwegian:
-                                        "Pause"
-                                )
-                    )
-                    .font(
-                        .headline.weight(
-                            .semibold
-                        )
-                    )
-                }
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-                .frame(
-                    maxWidth: .infinity
-                )
-                .frame(height: 56)
-                .background(
-                    ATHLTHTheme
-                        .accentSoft
-                        .opacity(0.92),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                )
+    /// One primary progression action, separate from the stop confirmation.
+    private func runningNextControl(_ workout: PhoneWorkout) -> some View {
+        let hasNext = recorder.nextStructuredStep != nil ||
+            workout.awaitingMainStart == true
+        let mayAdvance = hasNext && (
+            workout.awaitingMainStart == true ||
+            recorder.currentStructuredStep?.phase == "warmup" ||
+            recorder.currentStructuredStep?.phase == "cooldown" ||
+            recorder.currentStructuredStep?.measure == .open ||
+            workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false
+        )
+        return Button {
+            if mayAdvance {
+                recorder.advanceStructuredStepManually()
+            } else {
+                showingAddRunningWorkout = true
             }
-            .buttonStyle(.plain)
-
-            Button {
-                confirmFinish = true
-            } label: {
-                HStack(spacing: 9) {
-                    Image(
-                        systemName:
-                            "stop.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 12,
-                            weight: .bold
-                        )
-                    )
-                    .frame(
-                        width: 32,
-                        height: 32
-                    )
-                    .background(
-                        Color.black.opacity(
-                            0.14
-                        ),
-                        in: Circle()
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Finish & save",
-                            norwegian:
-                                "Avslutt og lagre"
-                        )
-                    )
-                    .font(
-                        .headline.weight(
-                            .semibold
-                        )
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: mayAdvance ? "arrow.right.circle.fill" : "plus.circle.fill")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(mayAdvance
+                         ? (workout.awaitingMainStart == true
+                            ? ATHLTHLocalization.choose(english: "Start main section", norwegian: "Start hoveddel")
+                            : ATHLTHLocalization.choose(english: "Next interval", norwegian: "Neste intervall"))
+                         : ATHLTHLocalization.choose(english: "Add an interval", norwegian: "Legg til intervall"))
+                        .font(.headline.weight(.semibold))
+                    if mayAdvance, let next = recorder.nextStructuredStep {
+                        Text(next.title).font(.caption).lineLimit(1)
+                    }
                 }
-                .foregroundStyle(.white)
-                .frame(
-                    maxWidth: .infinity
-                )
-                .frame(height: 56)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color.red
-                                .opacity(0.88),
-                            Color.red
-                        ],
-                        startPoint:
-                            .topLeading,
-                        endPoint:
-                            .bottomTrailing
-                    ),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                )
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right")
             }
-            .buttonStyle(.plain)
-            .disabled(recorder.saving)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .background(ATHLTHTheme.accentDeep,
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .disabled(recorder.saving || workout.resumedAt == nil)
         .padding(.horizontal, 14)
         .padding(.top, 8)
         .padding(.bottom, 6)
