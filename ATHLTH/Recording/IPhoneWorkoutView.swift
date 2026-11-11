@@ -1877,6 +1877,9 @@ struct IPhoneWorkoutView: View {
                 }
             }
             .listStyle(.plain)
+            // Realtime sensor updates must not change the viewport anchor.
+            // Particularly important when a planned phase adds/removes labels.
+            .defaultScrollAnchor(.top, for: .sizeChanges)
             .scrollContentBackground(.hidden)
             .background {
                 ATHLTHPremiumCanvas(
