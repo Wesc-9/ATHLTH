@@ -1027,7 +1027,10 @@ struct ATHLTHAudioCoachActiveListView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    NavigationLink {
+                    // Keep voice selection in the same sheet. A nested
+                    // NavigationLink had no guaranteed navigation host when
+                    // this view was opened from a modal workout setup.
+                    DisclosureGroup {
                         ATHLTHCoachVoiceChoices(
                             selectedIdentifier: $draft.voiceIdentifier,
                             language: draft.language,
@@ -1036,6 +1039,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                             duckOtherAudio: draft.duckOtherAudio,
                             speechStyle: draft.speechStyle
                         )
+                        .padding(.top, 8)
                     } label: {
                         Label(tr("Choose and preview voice", "Velg og test stemme"),
                               systemImage: "waveform")
