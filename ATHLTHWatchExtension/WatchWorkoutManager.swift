@@ -7541,6 +7541,36 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// Re-check that Watch music is no longer ducked after a cue finishes.
+    /// Never deactivate a newer cue or a speech route still in use.
+    private func verifyWatchMusicRestored() {
+        audioCoachRestorationTask?.cancel()
+        audioCoachRestorationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            for delay in [Duration.milliseconds(350), .seconds(1)] {
+                do { try await Task.sleep(for: delay) }
+                catch { return }
+                guard !Task.isCancelled,
+                      !self.coachAudioSessionIsActive,
+                      !self.speechSynthesizer.isSpeaking,
+                      self.audioCoachActivationTask == nil else { return }
+                do {
+                    try AVAudioSession.sharedInstance().setCategory(
+                        .playback, mode: .default, options: [.mixWithOthers]
+                    )
+                    try AVAudioSession.sharedInstance().setActive(
+                        false, options: .notifyOthersOnDeactivation
+                    )
+                } catch {
+                    // A short route handoff can reject this check. Continue
+                    // with the next verification rather than affecting capture.
+                    continue
+                }
+            }
+            self.audioCoachRestorationTask = nil
+        }
+    }
+
     private func deactivateAudioCoachAudioSession() {
         audioCoachSpeechWatchdog?.cancel()
         audioCoachSpeechWatchdog = nil
@@ -7557,6 +7587,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             try AVAudioSession.sharedInstance().setActive(
                 false, options: .notifyOthersOnDeactivation)
             coachAudioSessionIsActive = false
+            verifyWatchMusicRestored()
         } catch {
             // watchOS can temporarily refuse deactivation during AirPods /
             // music route handoff. Keep the active flag until deactivation
@@ -7580,7 +7611,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         try AVAudioSession.sharedInstance().setActive(
                             false, options: .notifyOthersOnDeactivation)
                         self.coachAudioSessionIsActive = false
-                        self.audioCoachRestorationTask = nil
+                        self.verifyWatchMusicRestored()
                         return
                     } catch { continue }
                 }
