@@ -1,5 +1,23 @@
 import Foundation
 
+/// A presentation rule only: the underlying recommendation and calendar
+/// content remain unchanged when the caption is hidden.
+enum HomeCalendarRecommendationDisplayPolicy {
+    static func showsRecommendation(
+        plannedWorkoutCount: Int,
+        personalEventCount: Int,
+        clubEventCount: Int,
+        tournamentCount: Int
+    ) -> Bool {
+        let total = max(0, plannedWorkoutCount)
+            + max(0, personalEventCount)
+            + max(0, clubEventCount)
+            + max(0, tournamentCount)
+        return total < 2
+    }
+}
+
+
 /// Training suggestions grounded in recorded activity and available Health signals.
 /// Readiness is not proof of fitness. No plan changes or inferred medical status.
 enum HomeDailyRecommendationPolicy {
