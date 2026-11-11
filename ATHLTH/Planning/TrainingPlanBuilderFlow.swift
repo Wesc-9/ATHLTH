@@ -1526,7 +1526,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     return
                 }
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    step = selected == .advanced ? .goal : .basics
+                    // Goal always precedes customization for BOTH modes.
+                    step = .goal
                 }
             },
             onCancel: { requestClosePlanCreation() }
@@ -8196,7 +8197,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func goBack() {
         if step == .basics {
             // Go back to the goal (step 2), not the initial method selector.
-            withAnimation(.easeInOut(duration: 0.18)) { step = mode == .advanced ? .goal : .mode }
+            withAnimation(.easeInOut(duration: 0.18)) { step = .goal }
             return
         }
         if step == .approach {
