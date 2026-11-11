@@ -893,10 +893,10 @@ struct ATHLTHAudioCoachActiveListView: View {
                     step: rule.wrappedValue.trigger == .time ? 15 : 100
                 ) {
                     Text(rule.wrappedValue.trigger == .time
-                         ? tr("Every \\(rule.wrappedValue.validatedInterval) seconds",
-                              "Hvert \\(rule.wrappedValue.validatedInterval) sekund")
-                         : tr("Every \\(rule.wrappedValue.validatedInterval) metres",
-                              "Hver \\(rule.wrappedValue.validatedInterval) meter"))
+                         ? tr("Every \(rule.wrappedValue.validatedInterval) seconds",
+                              "Hvert \(rule.wrappedValue.validatedInterval) sekund")
+                         : tr("Every \(rule.wrappedValue.validatedInterval) metres",
+                              "Hver \(rule.wrappedValue.validatedInterval) meter"))
                 }
                 .onChange(of: rule.wrappedValue.trigger) { _, newValue in
                     rule.wrappedValue.interval = newValue == .time ? 60 : 1_000
