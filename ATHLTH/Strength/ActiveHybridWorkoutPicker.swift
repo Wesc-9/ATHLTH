@@ -11,6 +11,7 @@ struct ActiveHybridWorkoutPicker: View {
     let onAppend: (PlannedSession, Bool) -> Bool
 
     @State private var unsupportedMessage: String?
+    @State private var pendingRunningWarmup: PlannedSession?
 
     private var plannedWorkouts: [PlannedSession] {
         let all = session.trainingPlans.flatMap { plan in
@@ -117,10 +118,12 @@ struct ActiveHybridWorkoutPicker: View {
                             symbol: "figure.run",
                             duration: nil
                         ) { startNow in
-                            append(
-                                makeRunningSession(template),
-                                startNow: startNow
-                            )
+                            let planned = makeRunningSession(template)
+                            if runningOnly {
+                                pendingRunningWarmup = planned
+                            } else {
+                                append(planned, startNow: startNow)
+                            }
                         }
                     }
                 }
@@ -138,7 +141,11 @@ struct ActiveHybridWorkoutPicker: View {
                                     ? "figure.run" : "dumbbell.fill",
                                 duration: workout.durationMinutes
                             ) { startNow in
-                                append(workout, startNow: startNow)
+                                if runningOnly {
+                                    pendingRunningWarmup = workout
+                                } else {
+                                    append(workout, startNow: startNow)
+                                }
                             }
                         }
                     }
@@ -156,6 +163,12 @@ struct ActiveHybridWorkoutPicker: View {
                         english: "Done", norwegian: "Ferdig"
                     )) { dismiss() }
                 }
+            }
+            .sheet(item: $pendingRunningWarmup) { planned in
+                ATHLTHLiveRunningWarmupSheet(session: planned) { chosen, startNow in
+                    append(chosen, startNow: startNow)
+                }
+                .presentationDragIndicator(.visible)
             }
             .alert(
                 ATHLTHLocalization.choose(
@@ -225,25 +238,28 @@ struct ActiveHybridWorkoutPicker: View {
                     action(true)
                 } label: {
                     Label(ATHLTHLocalization.choose(
-                        english: "Start this part", norwegian: "Start denne delen"
-                    ), systemImage: "play.fill")
+                        english: runningOnly ? "Choose intervals" : "Start this part",
+                        norwegian: runningOnly ? "Velg intervaller" : "Start denne delen"
+                    ), systemImage: runningOnly ? "slider.horizontal.3" : "play.fill")
                         .frame(maxWidth: .infinity, minHeight: 41)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(ATHLTHTheme.primaryText)
                 .background(ATHLTHTheme.champagne, in: Capsule())
 
-                Button {
-                    action(false)
-                } label: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Queue", norwegian: "Legg til senere"
-                    ))
-                    .frame(maxWidth: .infinity, minHeight: 41)
+                if !runningOnly {
+                    Button {
+                        action(false)
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Queue", norwegian: "Legg til senere"
+                        ))
+                        .frame(maxWidth: .infinity, minHeight: 41)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
             }
             .font(.caption.weight(.semibold))
         }
