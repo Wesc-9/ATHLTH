@@ -928,9 +928,9 @@ private struct IPhoneStructuredStepCard: View {
                                 ) {
                                     HStack {
                                         Text(step.title)
-                                            .font(
-                                                .headline
-                                            )
+                                            .font(.headline)
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.75)
 
                                         Spacer()
 
@@ -939,9 +939,11 @@ private struct IPhoneStructuredStepCard: View {
                                            let plan =
                                             active
                                                 .structuredRunningWorkout {
-                                            Text(
-                                                "Step \((active.structuredStepIndex ?? 0) + 1) / \(plan.steps.count)"
-                                            )
+                                            if plan.steps.count > 1 {
+                                                Text(ATHLTHLocalization.choose(
+                                                    english: "Step", norwegian: "Steg"
+                                                ) + " \((active.structuredStepIndex ?? 0) + 1) / \(plan.steps.count)")
+                                            }
                                             .font(
                                                 .caption
                                                     .weight(
@@ -956,8 +958,9 @@ private struct IPhoneStructuredStepCard: View {
 
                                     Text("DENNE DELEN")
                                         .font(.caption2.weight(.semibold))
-                                    ProgressView(value: progress)
+                                    ProgressView(value: step.measure == .open ? 0 : progress)
                                         .tint(ATHLTHTheme.accent)
+                                        .opacity(step.measure == .open ? 0.3 : 1)
                                     if let plan = workout.structuredRunningWorkout {
                                         Text("HELE ØKTEN")
                                             .font(.caption2.weight(.semibold))
@@ -1103,6 +1106,7 @@ private struct IPhoneStructuredStepCard: View {
                             }
                         }
         .padding(17)
+        .frame(maxWidth: .infinity)
         .athlthPlanCard(radius: 21)
     }
 
@@ -1129,7 +1133,7 @@ private struct IPhoneStructuredStepCard: View {
             guard let target =
                 step.durationSeconds
             else {
-                return "Open step"
+                return ATHLTHLocalization.choose(english: "Open step", norwegian: "Åpent steg")
             }
 
             let used =
@@ -1152,7 +1156,7 @@ private struct IPhoneStructuredStepCard: View {
             guard let target =
                 step.distanceMeters
             else {
-                return "Open step"
+                return ATHLTHLocalization.choose(english: "Open step", norwegian: "Åpent steg")
             }
 
             let used =
@@ -1220,9 +1224,11 @@ struct IPhoneWorkoutView: View {
 
                         if let step = recorder.currentStructuredStep {
                             IPhoneStructuredStepCard(workout: workout, step: step)
+                                // Timeline values must never implicitly animate the card's geometry.
+                                .transaction { transaction in
+                                    transaction.animation = nil
+                                }
                         }
-
-                        TrainTogetherStatusStrip()
 
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
@@ -2424,7 +2430,9 @@ struct IPhoneWorkoutView: View {
                 .buttonStyle(.plain)
             }
 
-            Text(workout.title)
+            Text(workout.title == "Free Run"
+                 ? ATHLTHLocalization.choose(english: "Free Run", norwegian: "Fri løping")
+                 : workout.title)
                 .font(
                     .system(
                         size: 35,
@@ -2889,13 +2897,9 @@ struct IPhoneWorkoutView: View {
     private func runningNextControl(_ workout: PhoneWorkout) -> some View {
         let hasNext = recorder.nextStructuredStep != nil ||
             workout.awaitingMainStart == true
-        let mayAdvance = hasNext && (
-            workout.awaitingMainStart == true ||
-            recorder.currentStructuredStep?.phase == "warmup" ||
-            recorder.currentStructuredStep?.phase == "cooldown" ||
-            recorder.currentStructuredStep?.measure == .open ||
-            workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false
-        )
+        // Every explicit Next press must be actionable. Automatic advancement
+        // is controlled independently in the recording engine.
+        let mayAdvance = hasNext
         return Button {
             if mayAdvance {
                 recorder.advanceStructuredStepManually()
@@ -2909,7 +2913,12 @@ struct IPhoneWorkoutView: View {
                     Text(mayAdvance
                          ? (workout.awaitingMainStart == true
                             ? ATHLTHLocalization.choose(english: "Start main section", norwegian: "Start hoveddel")
-                            : ATHLTHLocalization.choose(english: "Next interval", norwegian: "Neste intervall"))
+                            : ATHLTHLocalization.choose(
+                                english: recorder.nextStructuredStep?.phase == "interval"
+                                    ? "Start interval" : "Next step",
+                                norwegian: recorder.nextStructuredStep?.phase == "interval"
+                                    ? "Start intervall" : "Neste steg"
+                            ))
                          : ATHLTHLocalization.choose(english: "Add an interval", norwegian: "Legg til intervall"))
                         .font(.headline.weight(.semibold))
                     if mayAdvance, let next = recorder.nextStructuredStep {
@@ -3031,7 +3040,7 @@ struct IPhoneWorkoutView: View {
             guard let target =
                 step.durationSeconds
             else {
-                return "Open step"
+                return ATHLTHLocalization.choose(english: "Open step", norwegian: "Åpent steg")
             }
 
             let used =
@@ -3054,7 +3063,7 @@ struct IPhoneWorkoutView: View {
             guard let target =
                 step.distanceMeters
             else {
-                return "Open step"
+                return ATHLTHLocalization.choose(english: "Open step", norwegian: "Åpent steg")
             }
 
             let used =
@@ -3073,7 +3082,7 @@ struct IPhoneWorkoutView: View {
             ) + " remaining"
 
         case .open:
-            return "Open step · advance by finishing the workout"
+            return ATHLTHLocalization.choose(english: "Open step", norwegian: "Åpent steg")
         }
     }
 
