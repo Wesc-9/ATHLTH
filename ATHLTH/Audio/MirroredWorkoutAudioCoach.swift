@@ -574,6 +574,15 @@ final class MirroredWorkoutAudioCoach:
               let settings = configuration.smartPrompts
         else { return }
 
+        // The independent periodic group is authoritative when both
+        // legacy automatic motivation and an exact timer are configured.
+        var resolvedSettings = settings
+        if (configuration.customRules ?? []).contains(where: {
+            $0.isEnabled && $0.selectedMetrics.contains(.motivation)
+        }) {
+            resolvedSettings.motivationEnabled = false
+        }
+        let settings = resolvedSettings
         let norwegian = phrase(english: "en", norwegian: "no") == "no"
         let positionCue = smartCoachState.nextLandmark(
             settings: settings,
