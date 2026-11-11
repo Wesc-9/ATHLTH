@@ -4649,11 +4649,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func evaluateSmartAudioCoach() {
         guard !coachSpeechPaused,
               kind == .running || kind == .walking,
-              let settings = audioCoachConfiguration.smartPrompts
+              let configuredSettings = audioCoachConfiguration.smartPrompts
         else { return }
         // Exact scheduled motivation groups own their cadence. Do not also
         // emit the legacy approximate motivation timer for the same workout.
-        var resolvedSettings = settings
+        var resolvedSettings = configuredSettings
         if (audioCoachConfiguration.customRules ?? []).contains(where: {
             $0.isEnabled && $0.selectedMetrics.contains(.motivation)
         }) {
