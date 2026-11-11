@@ -120,7 +120,14 @@ struct ActiveHybridWorkoutPicker: View {
                         ) { startNow in
                             let planned = makeRunningSession(template)
                             if runningOnly {
-                                pendingRunningWarmup = planned
+                                if startNow {
+                                    append(
+                                        ATHLTHLiveRunningWarmupRecipe.make(session: planned),
+                                        startNow: true
+                                    )
+                                } else {
+                                    pendingRunningWarmup = planned
+                                }
                             } else {
                                 append(planned, startNow: startNow)
                             }
@@ -142,7 +149,14 @@ struct ActiveHybridWorkoutPicker: View {
                                 duration: workout.durationMinutes
                             ) { startNow in
                                 if runningOnly {
-                                    pendingRunningWarmup = workout
+                                    if startNow {
+                                        append(
+                                            ATHLTHLiveRunningWarmupRecipe.make(session: workout),
+                                            startNow: true
+                                        )
+                                    } else {
+                                        pendingRunningWarmup = workout
+                                    }
                                 } else {
                                     append(workout, startNow: startNow)
                                 }
@@ -243,28 +257,27 @@ struct ActiveHybridWorkoutPicker: View {
                     action(true)
                 } label: {
                     Label(ATHLTHLocalization.choose(
-                        english: runningOnly ? "Choose intervals" : "Start this part",
-                        norwegian: runningOnly ? "Velg intervaller" : "Start denne delen"
-                    ), systemImage: runningOnly ? "slider.horizontal.3" : "play.fill")
+                        english: runningOnly ? "Start 10 min warm-up" : "Start this part",
+                        norwegian: runningOnly ? "Start 10 min oppvarming" : "Start denne delen"
+                    ), systemImage: "play.fill")
                         .frame(maxWidth: .infinity, minHeight: 41)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(ATHLTHTheme.primaryText)
                 .background(ATHLTHTheme.champagne, in: Capsule())
 
-                if !runningOnly {
-                    Button {
-                        action(false)
-                    } label: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Queue", norwegian: "Legg til senere"
-                        ))
-                        .frame(maxWidth: .infinity, minHeight: 41)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
+                Button {
+                    action(false)
+                } label: {
+                    Text(ATHLTHLocalization.choose(
+                        english: runningOnly ? "Adjust / skip" : "Queue",
+                        norwegian: runningOnly ? "Tilpass / hopp over" : "Legg til senere"
+                    ))
+                    .frame(maxWidth: .infinity, minHeight: 41)
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
             }
             .font(.caption.weight(.semibold))
         }
