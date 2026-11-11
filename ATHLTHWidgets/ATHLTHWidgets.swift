@@ -61,7 +61,7 @@ private struct ATHLTHSurfaceProvider: TimelineProvider {
                 snapshot:
                     context.isPreview
                         ? previewSnapshot
-                        : ATHLTHSurfaceSharedStore.load()
+                        : freshSnapshot()
             )
         )
     }
@@ -73,17 +73,34 @@ private struct ATHLTHSurfaceProvider: TimelineProvider {
     ) {
         let entry = ATHLTHSurfaceEntry(
             date: Date(),
-            snapshot: ATHLTHSurfaceSharedStore.load()
+            snapshot: freshSnapshot()
         )
 
         completion(
             Timeline(
                 entries: [entry],
                 policy: .after(
-                    Date().addingTimeInterval(15 * 60)
+                    Date().addingTimeInterval(
+                        entry.snapshot.activeWorkout == nil ? 15 * 60 : 60
+                    )
                 )
             )
         )
+    }
+
+    /// Prevent stale iPhone/iPad workout telemetry from appearing active
+    /// indefinitely after an app process, relay, or network interruption.
+    private func freshSnapshot(at date: Date = .now) -> ATHLTHSurfaceSnapshot {
+        var value = ATHLTHSurfaceSharedStore.load()
+        if let workout = value.activeWorkout {
+            let age = date.timeIntervalSince(workout.updatedAt)
+            let permittedAge: TimeInterval =
+                workout.state == "remote_strength" ? 90 : 180
+            if age < -10 || age > permittedAge {
+                value.activeWorkout = nil
+            }
+        }
+        return value
     }
 
     private var previewSnapshot: ATHLTHSurfaceSnapshot {
@@ -141,12 +158,64 @@ private struct ATHLTHHomeWidgetView: View {
     let entry: ATHLTHSurfaceEntry
 
     var body: some View {
-        switch family {
-        case .systemMedium:
-            mediumView
-        default:
-            smallView
+        if let workout = entry.snapshot.activeWorkout {
+            activeWorkoutView(workout)
+        } else {
+            switch family {
+            case .systemMedium:
+                mediumView
+            default:
+                smallView
+            }
         }
+    }
+
+    private func activeWorkoutView(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                Text("ATHLTH")
+                    .font(.caption.weight(.black))
+                    .tracking(1.6)
+                Spacer(minLength: 0)
+                Circle()
+                    .fill(ATHLTHWidgetPalette.brandGold)
+                    .frame(width: 7, height: 7)
+            }
+            Text(workout.title)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(ATHLTHWidgetPalette.ink)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Image(systemName: workout.systemImage)
+                    .font(.subheadline)
+                if let started = workout.startedAt,
+                   workout.state != "paused" {
+                    Text(started, style: .timer)
+                        .font(.system(size: 25, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                } else {
+                    Text(duration(workout.elapsedTime))
+                        .font(.system(size: 25, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(ATHLTHWidgetPalette.ink)
+            Text(workout.state == "remote_strength"
+                 ? "LIVE · iPhone"
+                 : workout.state == "paused" ? "PAUSED" : "LIVE")
+                .font(.caption2.weight(.semibold))
+                .tracking(1.0)
+                .foregroundStyle(ATHLTHWidgetPalette.muted)
+        }
+        .padding(3)
     }
 
     private var smallView: some View {
