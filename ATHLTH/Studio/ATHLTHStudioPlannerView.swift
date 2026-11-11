@@ -131,7 +131,10 @@ struct ATHLTHStudioPlannerView: View {
             ATHLTHTrainingPlanBuilderFlow(
                 startsAtSourceChoice: false,
                 initialAdvanced: false,
-                resumesDraftOnAppear: true,
+                // "Create new plan" cannot resume an older partially built
+                // draft and skip the goal screen. Continue Draft uses
+                // a separate, explicit route.
+                resumesDraftOnAppear: false,
                 draftID: nil,
                 onCreated: { id in
                     openedPlanID = id
