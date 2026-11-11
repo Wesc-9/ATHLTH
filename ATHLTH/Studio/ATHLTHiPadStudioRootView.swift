@@ -333,7 +333,7 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .onChange(of: session.trainingPlans) { _, _ in
             // Saving the local plan remains immediate and independent of
-            // network; upload only follows explicit account-scoped consent.
+            // network; account sync preserves legacy opt-outs and conflict checks.
             studioPlanSync.scheduleSync(session: session)
         }
         .onChange(of: scenePhase) { _, phase in
@@ -696,7 +696,7 @@ struct ATHLTHiPadStudioRootView: View {
                     } label: {
                         Label(
                             ATHLTHLocalization.choose(
-                                english: "Plan sync", norwegian: "Plansynkronisering"
+                                english: "Account sync", norwegian: "Kontosynkronisering"
                             ), systemImage: "icloud"
                         )
                     }
