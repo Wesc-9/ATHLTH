@@ -37,6 +37,7 @@ struct ATHLTHTrainGoalHubView: View {
                     introduction
                     if let plan {
                         if plan.builderProfile?.mode != .basic {
+                        if plan.builderProfile?.mode != .basic {
                         Button {
                             showingTrends = true
                         } label: {
@@ -61,6 +62,7 @@ struct ATHLTHTrainGoalHubView: View {
                         }
                         .buttonStyle(.plain)
                         }
+                        }
                         if linkedGoals.isEmpty {
                             noLinkedGoals
                         } else {
@@ -69,7 +71,9 @@ struct ATHLTHTrainGoalHubView: View {
                             }
                         }
                         if plan.builderProfile?.mode != .basic {
+                            if plan.builderProfile?.mode != .basic {
                             blockReview(plan)
+                        }
                         }
                     }
                 }
@@ -180,6 +184,7 @@ struct ATHLTHTrainGoalHubView: View {
                     strengthHistory: strength.workoutHistory
                 ) ? workout.id : nil
             })
+        let isBasic = plan.builderProfile?.mode == .basic
         let evidence = ATHLTHTrainGoalEvidence.evaluate(
             goal: goal,
             plan: plan,
@@ -239,6 +244,7 @@ struct ATHLTHTrainGoalHubView: View {
                         .foregroundStyle(muted)
                 }
             } else {
+            if !isBasic {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(evidence.observed.map { number($0) } ?? "—")
@@ -288,6 +294,7 @@ struct ATHLTHTrainGoalHubView: View {
                     .font(.caption)
                     .foregroundStyle(muted)
             }
+            }
             // Evidence-based next step, not an automatic prescription.
             if goal.status == .active {
                 HStack(alignment: .top, spacing: 9) {
@@ -306,13 +313,13 @@ struct ATHLTHTrainGoalHubView: View {
                 .padding(12)
                 .background(canvas, in: RoundedRectangle(cornerRadius: 12))
             }
-            if goal.target?.metric == .strengthWeightKilograms,
+            if !isBasic, goal.target?.metric == .strengthWeightKilograms,
                let exercise = goal.target?.exerciseName {
                 Text(tr("Exercise", "Øvelse") + ": " + exercise)
                     .font(.caption)
                     .foregroundStyle(muted)
             }
-            if goal.deadline != nil {
+            if !isBasic, goal.deadline != nil {
                 Text(tr("Deadline", "Frist") + ": " +
                      (goal.deadline?.formatted(date: .abbreviated, time: .omitted) ?? ""))
                     .font(.caption)
