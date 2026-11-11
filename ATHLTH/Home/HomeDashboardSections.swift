@@ -4131,16 +4131,22 @@ private struct HomeWeeklyProgressDaySheet: View {
         let completed = !workout.isExplicitRestDay &&
             selection.completedPlannedIDs.contains(workout.id)
 
-        return HStack(spacing: 11) {
+        return HStack(spacing: 10) {
+            Text(workout.scheduledStart?.formatted(date: .omitted, time: .shortened) ?? "—:—")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(width: 49, alignment: .leading)
+
             Image(systemName:
                 completed ? "checkmark" :
                 workout.isExplicitRestDay ? "moon.stars.fill" :
                 workout.kind.systemImage)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(completed
                     ? ATHLTHPlanDesign.surface
                     : ATHLTHPlanDesign.accentInk)
-                .frame(width: 41, height: 41)
+                .frame(width: 34, height: 34)
                 .background(completed ? ATHLTHTheme.vitality :
                             ATHLTHPlanDesign.selectedSurface,
                             in: RoundedRectangle(cornerRadius: 13))
@@ -4176,8 +4182,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                     ? ATHLTHTheme.vitality
                     : ATHLTHPlanDesign.secondaryInk)
         }
-        .padding(.leading, 12)
-        .padding(.vertical, 12)
+        .padding(.leading, 10)
+        .padding(.vertical, 9)
         .padding(.trailing, 8)
     }
 
@@ -4192,7 +4198,13 @@ private struct HomeWeeklyProgressDaySheet: View {
                     event.id
                 )
 
-        return HStack(spacing: 11) {
+        return HStack(spacing: 9) {
+            Text(event.startsAt.formatted(date: .omitted, time: .shortened))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(width: 49, alignment: .leading)
+
             Image(
                 systemName:
                     completed
@@ -4212,8 +4224,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                         .accentDeep
             )
             .frame(
-                width: 36,
-                height: 36
+                width: 32,
+                height: 32
             )
             .background(
                 completed
@@ -4280,7 +4292,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                         .mutedText
             )
         }
-        .padding(11)
+        .padding(9)
         .background(
             Color.white.opacity(0.92),
             in: RoundedRectangle(
@@ -4341,12 +4353,6 @@ private struct HomeWeeklyProgressDaySheet: View {
             )
         }
         var parts: [String] = []
-
-        if let start = workout.scheduledStart {
-            parts.append(
-                start.formatted(date: .omitted, time: .shortened)
-            )
-        }
 
         if let minutes = workout.durationMinutes {
             parts.append("\(minutes) min")
