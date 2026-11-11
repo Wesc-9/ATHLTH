@@ -668,6 +668,7 @@ struct AppRootView: View {
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var trainingBackups: TrainingBackupStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @StateObject private var crossDeviceWorkout = ATHLTHCrossDeviceWorkoutStore()
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
@@ -1340,6 +1341,60 @@ struct AppRootView: View {
     private var lifecycleChromeContent: AnyView {
         AnyView(
             lifecycleWorkoutContent
+        .task(id: appSession.signedIn ? appSession.profile.userID : nil) {
+            if scenePhase == .active {
+                crossDeviceWorkout.didForeground()
+            }
+            if appSession.signedIn {
+                await crossDeviceWorkout.track(
+                    signedIn: true,
+                    accountID: appSession.profile.userID,
+                    phone: phoneWorkout,
+                    strength: strengthWorkout
+                )
+            } else {
+                crossDeviceWorkout.clearLocalState()
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                crossDeviceWorkout.didForeground()
+            } else {
+                crossDeviceWorkout.didBackground()
+            }
+        }
+        .overlay(alignment: .top) {
+            if ATHLTHDeviceRole.isIPad,
+               appSession.signedIn,
+               let remote = crossDeviceWorkout.remote,
+               strengthWorkout.activeWorkout == nil,
+               phoneWorkout.active == nil {
+                if crossDeviceWorkout.isExpanded {
+                    ATHLTHCrossDeviceLiveCard(snapshot: remote) {
+                        crossDeviceWorkout.setExpanded(false)
+                    }
+                    .padding(.top, 12)
+                    .padding(.horizontal, 18)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(70)
+                } else {
+                    ATHLTHMinimizedWorkoutReturnPill(
+                        title: ATHLTHLocalization.choose(
+                            english: "Live workout on iPhone",
+                            norwegian: "Live økt på iPhone"
+                        ),
+                        systemImage: remote.symbol,
+                        detail: remote.title
+                    ) {
+                        crossDeviceWorkout.setExpanded(true)
+                    }
+                    .padding(.top, 12)
+                    .padding(.horizontal, 18)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(70)
+                }
+            }
+        }
         .overlay(alignment: .top) {
             if appSession.signedIn,
                phoneWorkout.active != nil,
