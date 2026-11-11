@@ -43,6 +43,9 @@ struct ATHLTHWorkoutAudioDock: View {
     @State private var isExpanded = false
 
     var showSpotifyLauncher: Bool = true
+    /// Running places the shared strength-style launchers at top left.
+    /// Existing strength and other screens keep the trailing default.
+    var compactAlignment: HorizontalAlignment = .trailing
     let coachVisible: Bool
     let coachEnabled: Bool
     let coachPaused: Bool
@@ -65,7 +68,7 @@ struct ATHLTHWorkoutAudioDock: View {
         Group {
             if coachVisible ||
                 (showSpotifyLauncher && spotify.isConnected) {
-                VStack(alignment: .trailing, spacing: 8) {
+                VStack(alignment: compactAlignment, spacing: 8) {
                     if isExpanded {
                         expandedControlBar
                             .transition(
@@ -86,9 +89,10 @@ struct ATHLTHWorkoutAudioDock: View {
                             launcher(for: .spotify)
                         }
                     }
-                    .padding(.trailing, 18)
+                    .padding(compactAlignment == .leading ? .leading : .trailing, 18)
                 }
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .frame(maxWidth: .infinity,
+                       alignment: compactAlignment == .leading ? .leading : .trailing)
                 .padding(.bottom, 7)
                 .animation(.easeInOut(duration: 0.22), value: isExpanded)
                 .task(id: isExpanded && selectedMode == .spotify
