@@ -216,7 +216,7 @@ struct ATHLTHRunBasicSetupView: View {
 
     private func sectionHeading(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 17, weight: .semibold, design: .serif))
+            .font(.system(size: 16, weight: .semibold, design: .rounded))
             .foregroundStyle(ink)
             .accessibilityAddTraits(.isHeader)
     }
@@ -348,7 +348,7 @@ struct ATHLTHBasicActivityHero: View {
                 }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.system(size: 23, weight: .semibold, design: .serif))
+                        .font(.system(size: 23, weight: .semibold, design: .rounded))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle)
@@ -416,41 +416,49 @@ struct ATHLTHBasicActivityModeTile: View {
     }
 
     private var tileContent: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .top) {
                 Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
-                Spacer()
-                if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                }
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHTrainDesign.paleGold.opacity(0.55),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                Spacer(minLength: 0)
+                Image(systemName: selected
+                      ? "checkmark.circle.fill" : "arrow.up.right")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze.opacity(
+                        selected ? 1 : 0.65))
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .lineLimit(2)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.68))
+                    .lineLimit(2)
+                    .frame(minHeight: 32, alignment: .topLeading)
             }
             Spacer(minLength: 0)
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.68))
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(13)
-        .frame(maxWidth: .infinity, minHeight: 122, alignment: .topLeading)
+        .padding(15)
+        .frame(maxWidth: .infinity, minHeight: 140, alignment: .topLeading)
         .background(
-            selected ? ATHLTHTrainDesign.paleGold.opacity(0.45) : .white,
-            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+            selected ? ATHLTHTrainDesign.paleGold.opacity(0.48) : .white,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(
-                    ATHLTHTrainDesign.bronze.opacity(selected ? 0.6 : 0.2),
-                    lineWidth: selected ? 1 : 0.8
-                )
+                    ATHLTHTrainDesign.bronze.opacity(selected ? 0.6 : 0.16),
+                    lineWidth: selected ? 1.2 : 0.7)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 17))
+        .contentShape(RoundedRectangle(cornerRadius: 20))
         .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
