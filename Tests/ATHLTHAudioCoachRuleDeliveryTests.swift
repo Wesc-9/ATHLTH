@@ -419,8 +419,9 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         let prepared = draft.configuration()
 
         XCTAssertEqual(prepared.customRules?.count, 2)
-        XCTAssertNil(prepared.distanceIntervalMeters)
-        XCTAssertNil(prepared.timeIntervalSeconds)
+        // Adding independent groups must preserve configured standard cadences.
+        XCTAssertEqual(prepared.distanceIntervalMeters, 1_000)
+        XCTAssertEqual(prepared.timeIntervalSeconds, 60)
         XCTAssertEqual(prepared.language, .norwegian)
         XCTAssertEqual(prepared.duckOtherAudio, true)
         XCTAssertTrue(prepared.customRules?[1].selectedMetrics.contains(.motivation) == true)
