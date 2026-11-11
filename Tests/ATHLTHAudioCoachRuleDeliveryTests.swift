@@ -314,4 +314,87 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         )
         XCTAssertNotEqual(watchKey, later)
     }
+    func testMinuteMotivationAndKilometreMetricsAreSeparateGroups() {
+        let kilometres = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 1_000,
+            additionalMetrics: [.elapsedTime, .heartRateZone]
+        )
+        var motivation = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .motivation, interval: 60
+        )
+        motivation.encouragementStyle = .push
+        let rules = [kilometres, motivation]
+        var last = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: rules, distanceMeters: 0, elapsedSeconds: 0
+        )
+
+        let atMinute = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: rules, distanceMeters: 180, elapsedSeconds: 60,
+            paceSecondsPerKilometer: 335, heartRateBPM: 145,
+            norwegian: true, maximumHeartRateBPM: 185, lastSlots: &last
+        )
+        XCTAssertEqual(atMinute.count, 1)
+        XCTAssertTrue(atMinute[0].metrics.contains(.motivation))
+        XCTAssertFalse(atMinute[0].text.contains("Pulssone"))
+
+        let repeatSnapshot = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: rules, distanceMeters: 185, elapsedSeconds: 60.8,
+            paceSecondsPerKilometer: 335, heartRateBPM: 146,
+            norwegian: true, maximumHeartRateBPM: 185, lastSlots: &last
+        )
+        XCTAssertTrue(repeatSnapshot.isEmpty)
+
+        let atKilometreAndMinute = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: rules, distanceMeters: 1_010, elapsedSeconds: 120,
+            paceSecondsPerKilometer: 330, heartRateBPM: 149,
+            norwegian: true, maximumHeartRateBPM: 185, lastSlots: &last
+        )
+        XCTAssertEqual(atKilometreAndMinute.count, 2)
+        XCTAssertTrue(atKilometreAndMinute[0].text.contains("Distanse"))
+        XCTAssertTrue(atKilometreAndMinute[0].text.contains("Tid"))
+        XCTAssertTrue(atKilometreAndMinute[0].text.contains("Pulssone"))
+        XCTAssertEqual(atKilometreAndMinute[1].metrics, [.motivation])
+    }
+
+    func testPausedMotivationGroupDoesNotSpeakAndSurvivesStorage() throws {
+        var motivation = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .motivation, interval: 60
+        )
+        motivation.enabled = false
+        motivation.encouragementStyle = .praise
+        let restored = try JSONDecoder().decode(
+            ATHLTHAudioCoachRule.self, from: JSONEncoder().encode(motivation)
+        )
+        XCTAssertFalse(restored.isEnabled)
+        XCTAssertEqual(restored.encouragementStyle, .praise)
+        var last: [UUID: Int] = [:]
+        let skipped = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [restored], distanceMeters: 200, elapsedSeconds: 60,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil,
+            norwegian: true, lastSlots: &last
+        )
+        XCTAssertTrue(skipped.isEmpty)
+        XCTAssertEqual(last[restored.id], 1)
+    }
+
+    func testMissingHeartRateZoneDoesNotSuppressDistanceOrMotivation() {
+        let distance = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 1_000,
+            additionalMetrics: [.heartRateZone]
+        )
+        let motivation = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .motivation, interval: 60
+        )
+        var slots: [UUID: Int] = [:]
+        let cues = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [distance, motivation], distanceMeters: 1_020,
+            elapsedSeconds: 60, paceSecondsPerKilometer: nil,
+            heartRateBPM: nil, norwegian: true, lastSlots: &slots
+        )
+        XCTAssertEqual(cues.count, 2)
+        XCTAssertTrue(cues[0].contains("Distanse"))
+        XCTAssertFalse(cues[0].contains("Pulssone"))
+        XCTAssertFalse(cues[1].contains("Distanse"))
+    }
+
 }
