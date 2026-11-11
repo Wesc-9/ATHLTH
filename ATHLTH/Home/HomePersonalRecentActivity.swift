@@ -1194,12 +1194,10 @@ struct HomePersonalRecentActivitySection:
         .task(id: recentRevision) {
             rebuildRecentWorkouts()
         }
-        .task {
-            await refreshRecentWorkouts()
-        }
         .onAppear {
-            // Returning from Activity Log may not create a new Home view;
-            // refresh the existing section as it becomes visible again.
+            // One initial/returning refresh is sufficient. The former
+            // additional .task also launched this HealthKit query when Home
+            // mounted, creating duplicate work on first display.
             Task { await refreshRecentWorkouts() }
         }
         .onChange(of: scenePhase) { _, newPhase in
