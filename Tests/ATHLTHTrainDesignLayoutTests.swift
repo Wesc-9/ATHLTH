@@ -119,4 +119,72 @@ final class ATHLTHTrainDesignLayoutTests: XCTestCase {
     }
 
 
+
+    @MainActor
+    func testPlanWeekRowsAndWorkoutCardsFitPhoneAndTabletWidths() throws {
+        let suite = "ATHLTHTrainPlanLayout.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = AppSessionStore(defaults: defaults)
+        let created = try XCTUnwrap(store.createTrainingPlan(
+            title: "Løping og styrke med lang beskrivelse av treningsmålene",
+            summary: "Detailed schedule", weekCount: 2,
+            startDate: Calendar.current.startOfDay(for: .now)
+        ))
+        let workout = PlannedSession(
+            id: UUID(),
+            title: "Lang intervalløkt med oppvarming, hoveddel og nedjogging",
+            kind: .running, scheduledStart: nil, durationMinutes: 60,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        store.addSession(
+            workout, toDay: created.weeks[0].days[0].id, inPlan: created.id
+        )
+        let plan = try XCTUnwrap(store.trainingPlan(withID: created.id))
+        let week = try XCTUnwrap(plan.weeks.first)
+
+        for viewport in [320.0, 375.0, 393.0, 430.0, 768.0] {
+            for textSize in [DynamicTypeSize.large, .accessibility3] {
+                let weekView = ATHLTHPlanWeekOverview(
+                    week: week, plan: plan,
+                    weekday: { _ in "Onsdag" },
+                    planDayDate: { _ in .now },
+                    isCompleted: { _ in false },
+                    onSelectDay: { _ in }
+                )
+                .padding(.horizontal, 17)
+                .environment(\.dynamicTypeSize, textSize)
+                let weekHost = UIHostingController(rootView: weekView)
+                weekHost.loadViewIfNeeded()
+                let weekSize = weekHost.sizeThatFits(
+                    in: CGSize(width: viewport, height: 5_000)
+                )
+                XCTAssertLessThanOrEqual(
+                    weekSize.width, viewport + 1,
+                    "Plan week rows overflow \(Int(viewport))pt in \(textSize)"
+                )
+                XCTAssertGreaterThan(weekSize.height, 0)
+
+                let workoutCard = ATHLTHPlanWorkoutExpandableCard(
+                    workout: workout, completed: false, skipped: false,
+                    onEditBlock: { _, _ in }
+                )
+                .padding(.horizontal, 17)
+                .environment(\.dynamicTypeSize, textSize)
+                let workoutHost = UIHostingController(rootView: workoutCard)
+                workoutHost.loadViewIfNeeded()
+                let workoutSize = workoutHost.sizeThatFits(
+                    in: CGSize(width: viewport, height: 2_000)
+                )
+                XCTAssertLessThanOrEqual(
+                    workoutSize.width, viewport + 1,
+                    "Workout cards overflow \(Int(viewport))pt in \(textSize)"
+                )
+                XCTAssertGreaterThan(workoutSize.height, 0)
+            }
+        }
+    }
+
 }
