@@ -2324,59 +2324,79 @@ final class IPhoneWorkoutStore:
         syncLiveActivity()
     }
 
-    /// Add a timed/distance interval program to the SAME active phone
-    /// recording. Never starts a second HealthKit workout or resets totals.
-    /// Completed and in-flight steps remain intact when another part is
-    /// queued. Start-now is allowed only when no other part is in progress.
+    /// Queue the selected intervals on the SAME recording. While running
+    /// freely, the current open "Fri løping" portion continues to accumulate
+    /// its original time and distance until the athlete explicitly taps Next.
+    /// Never infer/insert a new ten-minute warm-up or reset the recording.
     @discardableResult
     func appendRunningIntervalsDuringWorkout(
         _ template: RunningWorkoutTemplate,
         startNow: Bool
     ) -> Bool {
         guard var workout = active,
-              !workout.walking,
-              !saving,
+              !workout.walking, !saving,
               workout.resumedAt != nil else { return false }
 
-        let addition = watchRunningWorkoutTransfer(from: template)
-        let existing = workout.structuredRunningWorkout
-        let existingComplete = workout.structuredWorkoutComplete == true
-        let priorCount = existing?.steps.count ?? 0
-        // Only an open, final stage can be replaced immediately. A timed
-        // interval must not be silently skipped when a new plan is added.
-        let canStartFromOpenStep = startNow &&
-            existing != nil && !existingComplete &&
-            currentStructuredStep?.measure == .open &&
-            workout.structuredStepIndex == priorCount - 1
-        guard ATHLTHRunningWorkoutAppendPolicy.canAppend(
-            hasInProgressStructuredSteps: existing != nil && !existingComplete,
-            startNow: startNow && !canStartFromOpenStep,
-            steps: addition.steps
-        ) else { return false }
+        var addition = watchRunningWorkoutTransfer(from: template)
+        // The user may already have warmed up during free running.
+        // Keep the selected interval program but do not add a second warm-up.
+        let intervalSteps = Array(addition.steps.drop(while: { $0.phase == "warmup" }))
+        guard !intervalSteps.isEmpty,
+              ATHLTHRunningWorkoutAppendPolicy.canAppend(
+                hasInProgressStructuredSteps: false,
+                startNow: true,
+                steps: intervalSteps
+              ) else { return false }
+        addition.steps = intervalSteps
 
-        if var current = existing {
-            current.steps.append(contentsOf: addition.steps)
-            current.sourceWorkoutID = nil
-            workout.structuredRunningWorkout = current
+        if var existing = workout.structuredRunningWorkout,
+           workout.structuredWorkoutComplete != true {
+            // Even when another structured phase is active, never replace it
+            // on selection. Queue the next part after all existing phases.
+            existing.steps.append(contentsOf: addition.steps)
+            existing.sourceWorkoutID = nil
+            workout.structuredRunningWorkout = existing
         } else {
+            let isAlreadyStructured = workout.structuredRunningWorkout != nil
+            if isAlreadyStructured {
+                // A completed plan may continue with a fresh, open segment;
+                // its recorded phases remain in the immutable evidence list.
+                let previousSteps = workout.structuredRunningWorkout?.steps ?? []
+                addition.steps = previousSteps + addition.steps
+                workout.structuredStepIndex = previousSteps.count
+                workout.structuredStepStartElapsedTime = workout.elapsed(at: Date())
+                workout.structuredStepStartDistanceMeters = workout.distanceMeters
+            } else {
+                // Synthetic open stage represents the actual running already
+                // completed, from its original first second and first meter.
+                // This is not an additional warm-up exercise.
+                let free = WatchRunningWorkoutStep(
+                    id: UUID(),
+                    title: ATHLTHLocalization.choose(
+                        english: "Free running", norwegian: "Fri løping"
+                    ),
+                    measure: .open,
+                    distanceMeters: nil,
+                    durationSeconds: nil,
+                    intensityText: nil,
+                    phase: "free"
+                )
+                addition.steps.insert(free, at: 0)
+                workout.structuredStepIndex = 0
+                workout.structuredStepStartElapsedTime = 0
+                workout.structuredStepStartDistanceMeters = 0
+            }
             workout.structuredRunningWorkout = addition
         }
 
-        if existing == nil || existingComplete {
-            workout.structuredStepIndex = priorCount
-            workout.structuredStepStartElapsedTime = workout.elapsed(at: Date())
-            workout.structuredStepStartDistanceMeters = workout.distanceMeters
-        }
+        // Manual advancement from the freely running portion is mandatory:
+        // merely picking a workout must not start the first interval.
+        workout.awaitingMainStart = false
         workout.structuredWorkoutComplete = false
         active = workout
         persistActiveCheckpoint(force: true)
         startStructuredTicksIfNeeded()
         syncLiveActivity()
-        if canStartFromOpenStep {
-            // The appended first interval is now the next structured step.
-            // Complete the open step without resetting recording or distance.
-            advanceStructuredStepManually()
-        }
         return true
     }
 
