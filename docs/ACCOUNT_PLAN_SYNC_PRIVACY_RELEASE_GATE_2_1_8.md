@@ -27,6 +27,13 @@ Status: CODE STAGED, NOT APPROVED FOR DEPLOYMENT. This is an engineering assessm
 - Added tests for the injury-field gate and staging RLS account isolation. They have not been executed as end-to-end device tests. Test runner must use a disposable account and rollback.
 - The source control work does not prove cross-device sync or GDPR compliance. Running an iOS/iPadOS build and staging database tests remains mandatory.
 
+## Device-private note projection (2026-11-11)
+- Account sync now serializes `ATHLTHStudioPlanSyncStore.accountCopy(of:)` rather than the full `TrainingPlan`. It excludes the plan summary, explicit injury/limitation entry, goal detail, block goal prose, session notes, strength exercise and set notes, workout meeting points and training-place metadata. Local source plans are not mutated.
+- On downloading a matching plan to the same authenticated owner, `restoringDeviceOnlyFields` restores those device-private fields from that device's existing plan. Other devices never receive the excluded text, even if it describes injuries. If a new device has no local copy, excluded notes are intentionally unavailable.
+- Account fingerprints exclude device-only notes and ignore local version/timestamp changes, while retaining the compare-and-set server revision and actual account-plan content.
+- Important limitation: user-supplied titles, exercise instructions, nested workout block data, external references and other descriptive fields could still include health or location details. The projection is **not** a comprehensive de-identification or GDPR Art. 9 solution; require payload inspection and privacy review before enabling production account-sync rollout.
+- Source-level test assertions were added for the projection and restoration. Full Swift/Xcode build and live cross-device tests still need execution.
+
 ## Required test matrix
 - New signed-in account, iPhone -> iPad -> iPhone edits, plus fresh reinstall.
 - Offline edits and reconnect; conflict after both devices edit, including deletion and stale revision.
