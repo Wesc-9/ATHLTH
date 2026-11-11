@@ -1362,96 +1362,68 @@ struct ATHLTHTrainTodayPremiumView: View {
         return primaryTrainGoal
     }
 
+    /// One full-width, low-profile goal row directly below the active plan.
+    /// Goal progress comes only from real milestones or comparable Health data.
     @ViewBuilder
     private var activeGoalSection: some View {
         if let goal = visibleTrainGoal {
-            let total = goal.milestones.count
-            let done = goal.completedMilestones
-            let weightProgress = ATHLTHTrainWeightGoalProgress.evaluate(
-                target: goal.target,
-                latestWeightKilograms: latestHealthWeightKilograms
-            )
-            // Incomplete Apple Health data must never become a fake percentage.
             let fraction = ATHLTHTrainWeightGoalProgress.visibleFraction(
                 goal: goal, latestWeightKilograms: latestHealthWeightKilograms
             )
-
-            VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 0) {
                 NavigationLink {
                     GoalDetailView(goalID: goal.id)
                 } label: {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .center, spacing: 8) {
-                            Image(systemName: "target")
-                                .font(.system(size: 22, weight: .regular))
-                                .foregroundStyle(champagne)
-                                .accessibilityHidden(true)
-                            Text(tr("Active goal", "Aktivt mål"))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(champagne)
-                            Spacer(minLength: 2)
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(champagne)
-                                .accessibilityHidden(true)
-                        }
-
-                        HStack(alignment: .top, spacing: 8) {
-                            Text(goal.title)
-                                .font(.system(.title3, design: .serif).weight(.semibold))
-                                .foregroundStyle(ink)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-
-                            ZStack {
-                                Circle()
-                                    .stroke(ATHLTHTrainDesign.paleGold, lineWidth: 6)
-                                if let fraction {
-                                    Circle()
-                                        .trim(from: 0, to: fraction)
-                                        .stroke(champagne, style: StrokeStyle(
-                                            lineWidth: 6, lineCap: .round))
-                                        .rotationEffect(.degrees(-90))
-                                } else {
-                                    Image(systemName: goal.category.systemImage)
-                                        .font(.caption)
-                                        .foregroundStyle(champagne)
-                                }
-                            }
-                            .frame(width: 43, height: 43)
+                    HStack(spacing: 10) {
+                        Image(systemName: "target")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(champagne)
+                            .frame(width: 36, height: 36)
+                            .background(
+                                ATHLTHTrainDesign.paleGold.opacity(0.38),
+                                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            )
                             .accessibilityHidden(true)
-                        }
 
-                        if let weightProgress {
-                            Text(tr(
-                                "\(weightProgress.achievedKilograms.formatted(.number.precision(.fractionLength(1)))) of \(weightProgress.targetKilograms.formatted(.number.precision(.fractionLength(1)))) kg",
-                                "\(weightProgress.achievedKilograms.formatted(.number.precision(.fractionLength(1)))) av \(weightProgress.targetKilograms.formatted(.number.precision(.fractionLength(1)))) kg"
-                            ))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(muted)
-                        } else if goal.target?.metric == .bodyWeightKilograms {
-                            Text(tr("No comparable Apple Health weight yet",
-                                    "Mangler sammenlignbare vektdata i Apple Health"))
-                                .font(.caption)
-                                .foregroundStyle(muted)
-                        } else if total > 0 {
-                            Text(tr("\(done) of \(total) milestones",
-                                    "\(done) av \(total) delmål"))
-                                .font(.caption)
-                                .foregroundStyle(muted)
-                        } else if let deadline = goal.deadline {
-                            Text(deadline.formatted(date: .abbreviated, time: .omitted))
-                                .font(.caption)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(tr("ACTIVE GOAL", "AKTIVT MÅL"))
+                                .font(.system(size: 10, weight: .bold))
+                                .tracking(1.2)
+                                .foregroundStyle(champagne)
+                            Text(goal.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.80)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if let fraction {
+                            Text("\(Int((fraction * 100).rounded()))%")
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(ink)
+                        } else if !goal.milestones.isEmpty,
+                                  goal.target?.metric != .bodyWeightKilograms {
+                            Text("\(goal.completedMilestones)/\(goal.milestones.count)")
+                                .font(.caption.weight(.medium).monospacedDigit())
                                 .foregroundStyle(muted)
                         }
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(champagne)
+                            .accessibilityHidden(true)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: 48)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(tr("Active goal", "Aktivt mål") + ": " + goal.title +
-                    (fraction.map { ", \(Int(($0 * 100).rounded()))%" } ?? ""))
+                .accessibilityLabel(
+                    tr("Active goal", "Aktivt mål") + ": " + goal.title +
+                    (fraction.map { ", \(Int(($0 * 100).rounded()))%" } ?? "")
+                )
 
+                // Keep the existing relevant-goal switch, but don't use a
+                // second row or enlarge the goal card to show it.
                 if let suggested = relevantGoalSuggestion,
                    suggested.id != primaryTrainGoal?.id {
                     Button {
@@ -1460,164 +1432,75 @@ struct ATHLTHTrainTodayPremiumView: View {
                                 temporarilyFeaturedGoalID == suggested.id ? nil : suggested.id
                         }
                     } label: {
-                        Label(
-                            temporarilyFeaturedGoalID == suggested.id
-                                ? tr("Main goal", "Hovedmål")
-                                : tr("Relevant goal", "Relevant mål"),
-                            systemImage: "sparkles"
-                        )
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(champagne)
-                        .frame(minHeight: 32)
+                        Image(systemName: temporarilyFeaturedGoalID == suggested.id
+                              ? "target" : "sparkles")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(champagne)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        temporarilyFeaturedGoalID == suggested.id
+                            ? tr("Show main goal", "Vis hovedmål")
+                            : tr("Show relevant goal", "Vis relevant mål")
+                    )
                     .accessibilityHint(goalRecommendationReason)
                 }
             }
-            .padding(15)
-            .frame(maxWidth: .infinity, minHeight: 174, alignment: .topLeading)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 6)
             .background(
-                Color.white.opacity(0.95),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                Color.white.opacity(0.96),
+                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
                     .strokeBorder(hairline.opacity(0.43), lineWidth: 0.7)
                     .allowsHitTesting(false)
             }
+            .frame(maxWidth: .infinity)
         } else {
-            // Without an active goal, keep the invitation compact. The taller
-            // progress card above is reserved for an actual active goal.
             NavigationLink {
                 GoalsHubView()
             } label: {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 8) {
-                        Label(tr("Active goal", "Aktivt mål"), systemImage: "target")
+                HStack(spacing: 11) {
+                    Image(systemName: "target")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(champagne)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            ATHLTHTrainDesign.paleGold.opacity(0.38),
+                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("ACTIVE GOAL", "AKTIVT MÅL"))
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundStyle(champagne)
+                        Text(tr("Choose a goal", "Velg et mål"))
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(champagne)
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.up.right")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(champagne)
-                            .accessibilityHidden(true)
+                            .foregroundStyle(ink)
                     }
-                    Text(tr("Choose a goal", "Velg et mål"))
-                        .font(.system(.title3, design: .serif))
-                        .foregroundStyle(ink)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(champagne)
                 }
-                .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
-                .padding(.horizontal, 15)
-                .padding(.vertical, 10)
+                .frame(minHeight: 48)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 6)
                 .background(
-                    Color.white.opacity(0.95),
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    Color.white.opacity(0.96),
+                    in: RoundedRectangle(cornerRadius: 17, style: .continuous)
                 )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: 17, style: .continuous)
                         .strokeBorder(hairline.opacity(0.43), lineWidth: 0.7)
                         .allowsHitTesting(false)
                 }
-                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 17))
             }
             .buttonStyle(.plain)
-        }
-    }
-
-    private var dailyFocusSection: some View {
-        let workout = primaryWorkout
-        let focusTitle: String
-        let focusBody: String
-        let focusIcon: String
-
-        if hasActiveWorkout {
-            focusTitle = tr("Stay with your session", "Fortsett økten")
-            focusBody = tr(
-                "Your workout is being recorded. Resume it from the live card above.",
-                "Økten registreres. Åpne den igjen fra livekortet over."
-            )
-            focusIcon = "waveform.path"
-        } else if let workout, !completedIDs.contains(workout.id) {
-            focusTitle = workout.title
-            focusBody = workout.durationMinutes.map {
-                tr("Planned duration: \($0) min. See workout details before you start.",
-                   "Planlagt varighet: \($0) min. Se øktdetaljene før start.")
-            } ?? tr("Review the planned steps before starting.",
-                    "Se gjennom øktens deler før du starter.")
-            focusIcon = workout.kind.systemImage
-        } else if hasRecordedWorkoutToday {
-            focusTitle = tr("Training recorded", "Trening registrert")
-            focusBody = tr(
-                "Today's workout is in your history. Plan or start another only if you want.",
-                "Dagens økt ligger i historikken. Planlegg eller start en ny hvis du ønsker."
-            )
-            focusIcon = "checkmark.circle"
-        } else if sessions.contains(where: \.isExplicitRestDay) {
-            focusTitle = tr("Scheduled recovery", "Planlagt restitusjon")
-            focusBody = tr("Your plan lists recovery today.",
-                           "Treningsplanen har restitusjon i dag.")
-            focusIcon = "leaf"
-        } else {
-            focusTitle = tr("Choose your training", "Velg dagens trening")
-            focusBody = tr(
-                "Start a familiar activity above or explore an exercise from the library.",
-                "Start en kjent aktivitet over, eller utforsk en økt fra biblioteket."
-            )
-            focusIcon = "sparkles"
-        }
-
-        return ZStack(alignment: .topLeading) {
-            GeometryReader { geometry in
-                Image("GoalMountain")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                    .overlay {
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.95),
-                                Color.white.opacity(0.74),
-                                Color.white.opacity(0.68)
-                            ],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        )
-                    }
-                    .accessibilityHidden(true)
-            }
-            .allowsHitTesting(false)
-
-            VStack(alignment: .leading, spacing: 11) {
-                HStack(spacing: 8) {
-                    Image(systemName: focusIcon)
-                        .font(.system(size: 22, weight: .regular))
-                        .foregroundStyle(champagne)
-                        .accessibilityHidden(true)
-                    Text(tr("Today's focus", "Dagens fokus"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(champagne)
-                }
-
-                Text(focusTitle)
-                    .font(.system(.title3, design: .serif).weight(.semibold))
-                    .foregroundStyle(ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(focusBody)
-                    .font(.caption)
-                    .foregroundStyle(ink.opacity(0.73))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, minHeight: 174, alignment: .topLeading)
-            .padding(15)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(hairline.opacity(0.43), lineWidth: 0.7)
-                .allowsHitTesting(false)
         }
     }
 
