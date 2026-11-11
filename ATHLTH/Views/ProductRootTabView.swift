@@ -123,7 +123,6 @@ struct ProductRootTabView: View {
     @State private var sideMenuFullScreenDestination: ATHLTHSideMenuDestination?
     @State private var friendShareToast: ATHLTHFriendQuickShareKind?
     @State private var friendShareToastDismissTask: Task<Void, Never>?
-    @Environment(\.accessibilityReduceMotion) private var reduceSideMenuMotion
 
     private func openPendingDailyCheckInIfNeeded() {
         guard pushManager.pendingDailyCheckInAccountID ==
@@ -299,9 +298,8 @@ struct ProductRootTabView: View {
                     selectedTab = 1
                 },
                 onOpenSideMenu: {
-                    withAnimation(reduceSideMenuMotion ? nil : .easeOut(duration: 0.22)) {
-                        showingSideMenu = true
-                    }
+                    // Instant overlay: no drawer spring, slide or fade.
+                    showingSideMenu = true
                 },
                 sideMenuUnreadCount: visibleAppBadgeCount,
                 isActive: selectedTab == 0
@@ -704,12 +702,9 @@ struct ProductRootTabView: View {
                     selectedTab: selectedTab,
                     onSelect: selectFromSideMenu,
                     onDismiss: {
-                        withAnimation(reduceSideMenuMotion ? nil : .easeOut(duration: 0.18)) {
-                            showingSideMenu = false
-                        }
+                        showingSideMenu = false
                     }
                 )
-                .transition(.opacity)
                 .zIndex(100)
             }
         }
@@ -739,9 +734,7 @@ struct ProductRootTabView: View {
     }
 
     private func selectFromSideMenu(_ destination: ATHLTHSideMenuDestination) {
-        withAnimation(reduceSideMenuMotion ? nil : .easeOut(duration: 0.18)) {
-            showingSideMenu = false
-        }
+        showingSideMenu = false
 
         switch destination {
         case .home:
