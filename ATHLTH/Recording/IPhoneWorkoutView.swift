@@ -3047,9 +3047,11 @@ struct IPhoneWorkoutView: View {
                          ? (workout.awaitingMainStart == true
                             ? ATHLTHLocalization.choose(english: "Start main section", norwegian: "Start hoveddel")
                             : ATHLTHLocalization.choose(
-                                english: recorder.nextStructuredStep?.phase == "interval"
+                                english: (recorder.nextStructuredStep?.phase == "interval" ||
+                                 recorder.nextStructuredStep?.phase == "work")
                                     ? "Start interval" : "Next step",
-                                norwegian: recorder.nextStructuredStep?.phase == "interval"
+                                norwegian: (recorder.nextStructuredStep?.phase == "interval" ||
+                                 recorder.nextStructuredStep?.phase == "work")
                                     ? "Start intervall" : "Neste steg"
                             ))
                          : ATHLTHLocalization.choose(english: "Add an interval", norwegian: "Legg til intervall"))
