@@ -432,4 +432,66 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertEqual(copied.customRules, prepared.customRules)
     }
 
+    func testAddingOneMinuteMotivationDoesNotDisableExistingKilometreCoach() {
+        var draft = AudioCoachDraft()
+        draft.enabled = true
+        draft.distanceTriggerEnabled = true
+        draft.distanceIntervalKilometers = 1
+        draft.timeTriggerEnabled = false
+        draft.announceDistance = true
+        draft.announceElapsedTime = true
+        draft.customRules = [
+            ATHLTHAudioCoachRule(
+                trigger: .time, metric: .motivation, interval: 60
+            )
+        ]
+        let config = draft.configuration()
+        XCTAssertEqual(config.distanceIntervalMeters, 1_000)
+        XCTAssertNil(config.timeIntervalSeconds)
+        XCTAssertEqual(config.customRules?.count, 1)
+
+        var slots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: config.customRules ?? [],
+            distanceMeters: 0, elapsedSeconds: 0
+        )
+        let minute = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: config.customRules ?? [],
+            distanceMeters: 150, elapsedSeconds: 60,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil,
+            norwegian: true, lastSlots: &slots
+        )
+        XCTAssertEqual(minute.count, 1)
+        XCTAssertEqual(minute.first?.metrics, [.motivation])
+        let kilometre = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: config.customRules ?? [],
+            distanceMeters: 1_005, elapsedSeconds: 95,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil,
+            norwegian: true, lastSlots: &slots
+        )
+        XCTAssertTrue(kilometre.isEmpty,
+            "Custom time motivation does not replace the standard 1km cadence")
+    }
+
+    func testCustomMetricsAndStandardCadencesSurviveSavedProfile() throws {
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.distanceIntervalMeters = 1_000
+        config.timeIntervalSeconds = 90
+        config.customRules = [
+            ATHLTHAudioCoachRule(
+                trigger: .distance, metric: .heartRateZone, interval: 1_000
+            )
+        ]
+        let restored = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self,
+            from: JSONEncoder().encode(config)
+        )
+        var draft = AudioCoachDraft()
+        draft.load(configuration: restored)
+        let launch = draft.configuration()
+        XCTAssertEqual(launch.distanceIntervalMeters, 1_000)
+        XCTAssertEqual(launch.timeIntervalSeconds, 90)
+        XCTAssertEqual(launch.customRules, restored.customRules)
+    }
+
 }
