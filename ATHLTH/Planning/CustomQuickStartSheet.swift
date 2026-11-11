@@ -322,7 +322,14 @@ struct CustomQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 19) {
-                    header
+                    ATHLTHWorkoutDetailsCard(
+                        activityTitle: activity.localizedTitle,
+                        symbol: activity.systemImage
+                    ) {
+                        Label(method.localizedTitle, systemImage: method.systemImage)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                    }
 
                     ATHLTHBasicActivityHero(
                         title: freeWorkoutTitle,
