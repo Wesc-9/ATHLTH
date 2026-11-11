@@ -47,6 +47,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private var lastRemoteExpiry: Date?
     private var hasLoadedRemote = false
     private var foregroundedSinceLastPoll = false
+    private var suppressAutoOpenOnNextPoll = false
 
     func setExpanded(_ expanded: Bool) {
         isExpanded = expanded
@@ -54,6 +55,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     func didBackground() {
         foregroundedSinceLastPoll = false
+        suppressAutoOpenOnNextPoll = true
         isExpanded = false
     }
 
@@ -67,6 +69,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         lastRemoteExpiry = nil
         hasLoadedRemote = false
         foregroundedSinceLastPoll = false
+        suppressAutoOpenOnNextPoll = false
         isExpanded = false
         ATHLTHSurfaceCoordinator.setRemoteWorkout(nil)
     }
@@ -199,13 +202,15 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             }
             let previous = remote?.id
             if previous != next?.id {
-                if hasLoadedRemote && foregroundedSinceLastPoll && next != nil {
+                if hasLoadedRemote && foregroundedSinceLastPoll &&
+                   !suppressAutoOpenOnNextPoll && next != nil {
                     isExpanded = true
                 } else {
                     isExpanded = false
                 }
             }
             remote = next
+            suppressAutoOpenOnNextPoll = false
             lastRemoteExpiry = next == nil ? nil : row?.expiresAt
             hasLoadedRemote = true
             ATHLTHSurfaceCoordinator.setRemoteWorkout(next.map {
