@@ -40,6 +40,12 @@ Status: CODE STAGED, NOT APPROVED FOR DEPLOYMENT. This is an engineering assessm
 - Tests cover exclusion/restoration in Basic and Advanced. This change has not undergone an Xcode build; run the test target before enabling account sync in production.
 - Do not deploy the staged DB migration to production until end-to-end tests and disclosure review pass. No production data or RLS policies were changed in this phase.
 
+## Upload race review (2026-11-11)
+- Normal background uploads and manual keep-local conflict resolution now acknowledge only the snapshot actually uploaded. If the on-device plan changed while the network request was pending, schedule a follow-up reconciliation instead of claiming it is fully up to date.
+- Account fingerprints compare structured shared plan data, excluding private notes and local-only metadata. A local private-note edit alone must not cause an unnecessary repeat upload.
+- XCTest regression cases cover post-upload shared edits, deleted local plans and private-only changes. These tests are committed but **not yet executed on Xcode**; no GitHub Actions build is available for this commit.
+- The live Supabase project still uses the legacy consent-gated RLS. Staged account-owned migration is not yet deployed. Device tests and staged RLS tests remain release blockers.
+
 ## Required test matrix
 - New signed-in account, iPhone -> iPad -> iPhone edits, plus fresh reinstall.
 - Offline edits and reconnect; conflict after both devices edit, including deletion and stale revision.
