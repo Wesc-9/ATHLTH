@@ -258,7 +258,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 // The task starts only after this sync releases its lock.
                 scheduleSync(session: session)
             } else {
-            status = unresolved.isEmpty
+                status = unresolved.isEmpty
                 ? ATHLTHLocalization.choose(
                     english: "Account plans are up to date. Private notes stay on this device.",
                     norwegian: "Kontoplanene er oppdatert. Private notater beholdes på denne enheten."
@@ -342,10 +342,22 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     acknowledge(planID, revision: row.revision,
                                 fingerprint: try fingerprint(for: decoded), owner: userID)
                 } else if let local = reviewedLocal {
+                    let uploadedFingerprint = try fingerprint(for: local)
                     let revision = try await save(local, expected: row.revision)
                     guard accountID == userID else { return }
                     acknowledge(planID, revision: revision,
-                                fingerprint: try fingerprint(for: local), owner: userID)
+                                fingerprint: uploadedFingerprint, owner: userID)
+                    if try Self.needsResyncAfterUpload(
+                        uploadedFingerprint: uploadedFingerprint,
+                        currentPlan: session.accountPlanDocument(withID: planID)
+                    ) {
+                        status = ATHLTHLocalization.choose(
+                            english: "Your newer local edit is waiting to sync.",
+                            norwegian: "Din nyere lokale endring venter på synkronisering."
+                        )
+                        scheduleSync(session: session)
+                        return
+                    }
                 } else {
                     // Explicitly keep the local deletion, but only if the
                     // remote revision still matches the one the user reviewed.
@@ -375,10 +387,22 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             } else if let local = reviewedLocal {
                 // Recreate a previously deleted cloud copy only after the
                 // athlete explicitly chooses to keep their local plan.
+                let uploadedFingerprint = try fingerprint(for: local)
                 let revision = try await save(local, expected: 0)
                 guard accountID == userID else { return }
                 acknowledge(planID, revision: revision,
-                            fingerprint: try fingerprint(for: local), owner: userID)
+                            fingerprint: uploadedFingerprint, owner: userID)
+                if try Self.needsResyncAfterUpload(
+                    uploadedFingerprint: uploadedFingerprint,
+                    currentPlan: session.accountPlanDocument(withID: planID)
+                ) {
+                    status = ATHLTHLocalization.choose(
+                        english: "Your newer local edit is waiting to sync.",
+                        norwegian: "Din nyere lokale endring venter på synkronisering."
+                    )
+                    scheduleSync(session: session)
+                    return
+                }
             } else {
                 status = ATHLTHLocalization.choose(
                     english: "The plan no longer exists on either device.",
