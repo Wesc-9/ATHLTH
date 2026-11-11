@@ -1473,7 +1473,7 @@ struct RunQuickStartSheet: View {
     @State private var advancedWorkout: PlannedSession?
     @State private var basicGoalSelected = false
     @State private var basicGhostSelected = false
-    @State private var basicGoalKind: ATHLTHBasicRunGoalKind = .distance
+    @State private var basicGoals: Set<ATHLTHBasicRunGoalKind> = [.distance]
     @State private var basicGoalDistanceKilometers = 5
     @State private var basicGoalTimeMinutes = 30
     @State private var basicGoalPaceSecondsPerKilometer = 360
@@ -2716,12 +2716,15 @@ struct RunQuickStartSheet: View {
         ATHLTHBasicRunGoalRecipe.make(
             id: basicGoalWorkoutID,
             title: quickWorkoutName,
-            kind: basicGoalKind,
+            kind: basicGoals.contains(.distance) ? .distance
+                : (basicGoals.contains(.time) ? .time
+                    : (basicGoals.contains(.pace) ? .pace : .heartRateZone)),
             distanceKilometers: basicGoalDistanceKilometers,
             timeMinutes: basicGoalTimeMinutes,
             paceSecondsPerKilometer: basicGoalPaceSecondsPerKilometer,
             heartRateZone: basicGoalHeartRateZone,
-            environment: environment
+            environment: environment,
+            selectedGoals: basicGoals
         )
     }
 
@@ -2733,29 +2736,67 @@ struct RunQuickStartSheet: View {
                 ), systemImage: "target")
                     .font(.headline)
                     .foregroundStyle(ATHLTHPlanDesign.ink)
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english: "Goal type", norwegian: "Måltype"
-                    ), selection: $basicGoalKind
-                ) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Combine goals", norwegian: "Kombiner mål"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8)
+                ], spacing: 8) {
                     ForEach(ATHLTHBasicRunGoalKind.allCases) { kind in
-                        Text(kind.title).tag(kind)
+                        let selected = basicGoals.contains(kind)
+                        Button {
+                            if selected {
+                                // Always retain at least one goal.
+                                if basicGoals.count > 1 { basicGoals.remove(kind) }
+                            } else {
+                                basicGoals.insert(kind)
+                            }
+                        } label: {
+                            HStack(spacing: 7) {
+                                Image(systemName: selected
+                                      ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                Text(kind.title)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 46)
+                            .background(selected
+                                ? ATHLTHTrainDesign.paleGold.opacity(0.65)
+                                : Color.white,
+                                in: RoundedRectangle(cornerRadius: 13))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 13)
+                                    .strokeBorder(
+                                        ATHLTHTrainDesign.bronze.opacity(
+                                            selected ? 0.55 : 0.16),
+                                        lineWidth: selected ? 1.2 : 0.8)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selected ? [.isSelected] : [])
                     }
                 }
-                .pickerStyle(.menu)
-                .tint(ATHLTHTrainDesign.bronze)
-                switch basicGoalKind {
-                case .distance:
+                if basicGoals.contains(.distance) {
                     Stepper(
                         "\(basicGoalDistanceKilometers) km",
                         value: $basicGoalDistanceKilometers, in: 1...42
                     )
-                case .time:
+                }
+                if basicGoals.contains(.time) {
                     Stepper(
                         "\(basicGoalTimeMinutes) min",
                         value: $basicGoalTimeMinutes, in: 5...240, step: 5
                     )
-                case .pace:
+                }
+                if basicGoals.contains(.pace) {
                     Stepper(
                         String(format: "%d:%02d min/km",
                                basicGoalPaceSecondsPerKilometer / 60,
@@ -2763,7 +2804,8 @@ struct RunQuickStartSheet: View {
                         value: $basicGoalPaceSecondsPerKilometer,
                         in: 180...900, step: 5
                     )
-                case .heartRateZone:
+                }
+                if basicGoals.contains(.heartRateZone) {
                     Stepper(
                         ATHLTHLocalization.choose(
                             english: "Heart rate zone", norwegian: "Pulssone"
@@ -2771,10 +2813,17 @@ struct RunQuickStartSheet: View {
                         value: $basicGoalHeartRateZone, in: 1...5
                     )
                 }
-                if basicGoalKind == .pace || basicGoalKind == .heartRateZone {
+                if basicGoals.contains(.distance) && basicGoals.contains(.time) {
                     Text(ATHLTHLocalization.choose(
-                        english: "Open run: use Finish when ready. Audio Coach can help you hold your target.",
-                        norwegian: "Åpen økt: avslutt selv når du er ferdig. Audio Coach kan hjelpe deg å holde målet."
+                        english: "Distance completes the run phase; time is a target to aim for.",
+                        norwegian: "Distanse avslutter løpedelen. Tiden er målet du prøver å nå."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                } else if !basicGoals.contains(.distance) && !basicGoals.contains(.time) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Open run: finish when ready. Audio Coach helps maintain your targets.",
+                        norwegian: "Åpen økt: avslutt når du ønsker. Audio Coach hjelper deg å holde målene."
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
