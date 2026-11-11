@@ -8051,6 +8051,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentRunningStep?.targetHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
         )
+        let intervalPosition = structuredRunningWorkout.flatMap {
+            ATHLTHRunningIntervalPosition.resolve(
+                steps: $0.steps, currentIndex: structuredStepIndex
+            )
+        }
         var snapshot = WatchWorkoutLiveSnapshot(
             kind: kind,
             state: stateOverride ?? mirrorState(for: state),
@@ -8120,6 +8125,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             runningStepCount:
                 structuredRunningWorkout?
                     .steps.count,
+            runningIntervalOrdinal: intervalPosition?.ordinal,
+            runningIntervalTotal: intervalPosition?.total,
+            runningInRecovery: intervalPosition?.isRecovery,
             runningStepProgress:
                 runningStepProgress,
             runningNextStepTitle:
