@@ -1915,12 +1915,20 @@ struct IPhoneWorkoutView: View {
                                             }, id: \.index) { phase in
                                                 HStack(alignment: .firstTextBaseline) {
                                                     Text(phase.title)
-                                                        .font(.subheadline)
+                                                        .font(.subheadline.weight(.medium))
                                                     Spacer(minLength: 8)
-                                                    Text(ATHLTHRunStepCountdown.display(
-                                                        phase.activeSeconds
-                                                    ))
-                                                    .font(.subheadline.monospacedDigit())
+                                                    VStack(alignment: .trailing, spacing: 3) {
+                                                        Text(ATHLTHRunStepCountdown.display(
+                                                            phase.activeSeconds
+                                                        ))
+                                                        .font(.subheadline.monospacedDigit())
+                                                        Text(String(
+                                                            format: "%.2f km",
+                                                            max(0, phase.distanceMeters) / 1000
+                                                        ))
+                                                        .font(.caption.monospacedDigit())
+                                                        .foregroundStyle(.secondary)
+                                                    }
                                                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                                 }
                                             }
