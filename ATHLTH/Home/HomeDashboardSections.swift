@@ -3167,12 +3167,8 @@ private struct HomeWeeklyProgressDaySheet: View {
             .filter { ids.contains($0.id.uuidString.lowercased()) }
             .map { $0.plannedSession() }
         let runs = runningLibrary.allTemplates
+            .filter { ids.contains($0.id.uuidString.lowercased()) }
             .map { $0.plannedSession() }
-            .filter { workout in
-                workout.workoutTemplateID.map {
-                    ids.contains($0.uuidString.lowercased())
-                } ?? false
-            }
         var seen = Set<UUID>()
         return (mine + catalog + runs).filter { workout in
             let id = workout.workoutTemplateID ?? workout.id
