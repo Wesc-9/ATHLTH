@@ -44,6 +44,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     private let client = SupabaseEnvironment.client
     private var lastPublishedID: UUID?
+    private var lastRemoteExpiry: Date?
     private var hasLoadedRemote = false
     private var foregroundedSinceLastPoll = false
 
@@ -63,6 +64,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     func clearLocalState() {
         remote = nil
         lastPublishedID = nil
+        lastRemoteExpiry = nil
         hasLoadedRemote = false
         foregroundedSinceLastPoll = false
         isExpanded = false
@@ -204,6 +206,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 }
             }
             remote = next
+            lastRemoteExpiry = next == nil ? nil : row?.expiresAt
             hasLoadedRemote = true
             ATHLTHSurfaceCoordinator.setRemoteWorkout(next.map {
                 ATHLTHSurfaceWorkoutSnapshot(
@@ -218,8 +221,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 )
             })
         } catch {
-            // Keep the last short-lived state while temporarily offline,
-            // but do not present a false permanently active workout.
+            // An offline spectator must not appear permanently live.
+            if lastRemoteExpiry.map({ $0 <= Date() }) ?? true {
+                remote = nil
+                lastRemoteExpiry = nil
+                ATHLTHSurfaceCoordinator.setRemoteWorkout(nil)
+            }
             hasLoadedRemote = true
         }
     }
