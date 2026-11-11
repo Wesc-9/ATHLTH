@@ -182,7 +182,7 @@ struct AudioCoachDraft {
         enabled = true
         let alreadyExists = customRules.contains {
             $0.trigger == .distance && $0.validatedInterval == 1_000 &&
-            $0.selectedMetrics == [.distance, .elapsedTime, .heartRate]
+            $0.selectedMetrics == [.distance, .elapsedTime, .heartRateZone]
         }
         // The combined 1 km rule replaces the standard 1 km cue.
         // Otherwise both are scheduled and the athlete hears duplicates.
@@ -192,7 +192,7 @@ struct AudioCoachDraft {
             trigger: .distance,
             metric: .distance,
             interval: 1_000,
-            additionalMetrics: [.elapsedTime, .heartRate]
+            additionalMetrics: [.elapsedTime, .heartRateZone]
         ))
         return true
     }
@@ -388,11 +388,11 @@ struct AudioCoachDraft {
             enabled: enabled,
             language: language,
             distanceIntervalMeters:
-                enabled && distanceTriggerEnabled
+                enabled && distanceTriggerEnabled && customRules.isEmpty
                     ? distanceIntervalKilometers * 1_000
                     : nil,
             timeIntervalSeconds:
-                enabled && timeTriggerEnabled
+                enabled && timeTriggerEnabled && customRules.isEmpty
                     ? Double(min(max(timeIntervalSeconds, 15), 7_200))
                     : nil,
             customRules: enabled && !customRules.isEmpty
@@ -1653,6 +1653,20 @@ struct RunQuickStartSheet: View {
 
                     ATHLTHWorkoutPetSelectionCard(selectedPetIDs: $selectedPetIDs)
 
+                    if !isAdvancedSetup {
+                        NavigationLink {
+                            PerWorkoutAudioCoachView(
+                                draft: $audioCoachDraft,
+                                showRouteOptions: guidanceRoute != nil,
+                                showStructuredOptions:
+                                    mode == .structured || plannedSession != nil
+                            )
+                        } label: {
+                            ATHLTHQuickAudioCoachEntry(enabled: audioCoachDraft.enabled)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     if isAdvancedSetup {
                         VStack(spacing: 12) {
                             WorkoutGearSelectionCard(
@@ -1831,7 +1845,11 @@ struct RunQuickStartSheet: View {
                 }
 
                 if !didLoadAudioCoachDefaults {
-                    audioCoachDraft.load(from: settings)
+                    if let configured = plannedSession?.audioCoachConfiguration {
+                        audioCoachDraft.load(configuration: configured)
+                    } else {
+                        audioCoachDraft.load(from: settings)
+                    }
                     didLoadAudioCoachDefaults = true
                 }
 
@@ -3608,8 +3626,6 @@ struct WalkQuickStartSheet: View {
                         selectedGearIDs: $selectedGearIDs,
                         activity: .walking
                     )
-                    ATHLTHWorkoutPetSelectionCard(selectedPetIDs: $selectedPetIDs)
-
                     ATHLTHPlanSurface(density: .compact) {
                         VStack(
                             alignment: .leading,
@@ -3631,8 +3647,19 @@ struct WalkQuickStartSheet: View {
                             }
                         }
                     }
-
                     }
+
+                    ATHLTHWorkoutPetSelectionCard(selectedPetIDs: $selectedPetIDs)
+                    NavigationLink {
+                        PerWorkoutAudioCoachView(
+                            draft: $audioCoachDraft,
+                            showRouteOptions: false,
+                            showStructuredOptions: plannedSession != nil
+                        )
+                    } label: {
+                        ATHLTHQuickAudioCoachEntry(enabled: audioCoachDraft.enabled)
+                    }
+                    .buttonStyle(.plain)
 
                     if isAdvancedSetup {
                         QuickStartAutoPauseCard(
@@ -3650,77 +3677,7 @@ struct WalkQuickStartSheet: View {
                             showingSpotifyPicker = true
                         }
 
-                        NavigationLink {
-                            PerWorkoutAudioCoachView(
-                                draft:
-                                    $audioCoachDraft,
-                                showRouteOptions: false,
-                                showStructuredOptions: false
-                            )
-                        } label: {
-                            ATHLTHPlanSurface(density: .compact) {
-                                HStack(spacing: 12) {
-                                    Image(
-                                        systemName:
-                                            "waveform.and.mic"
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .premiumGold
-                                    )
-                                    .frame(
-                                        width: 40,
-                                        height: 40
-                                    )
-                                    .background(
-                                        ATHLTHTheme
-                                            .premiumGoldSoft,
-                                        in:
-                                            RoundedRectangle(
-                                                cornerRadius:
-                                                    12
-                                            )
-                                    )
 
-                                    VStack(
-                                        alignment: .leading,
-                                        spacing: 3
-                                    ) {
-                                        Text(
-                                            "Guidance & Alerts"
-                                        )
-                                        .font(
-                                            .subheadline
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-
-                                        Text(
-                                            audioCoachDraft
-                                                .enabled
-                                                ? "Audio Coach · tap to adjust"
-                                                : "Tap to configure this walk"
-                                        )
-                                        .font(.caption)
-                                        .foregroundStyle(
-                                            .secondary
-                                        )
-                                    }
-
-                                    Spacer()
-
-                                    Image(
-                                        systemName:
-                                            "chevron.right"
-                                    )
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
                     }
 
                 }
@@ -3788,7 +3745,11 @@ struct WalkQuickStartSheet: View {
                 }
 
                 if !didLoadAudioCoachDefaults {
-                    audioCoachDraft.load(from: settings)
+                    if let configured = plannedSession?.audioCoachConfiguration {
+                        audioCoachDraft.load(configuration: configured)
+                    } else {
+                        audioCoachDraft.load(from: settings)
+                    }
                     didLoadAudioCoachDefaults = true
                 }
 
@@ -4370,6 +4331,45 @@ struct StrengthQuickBuilderView: View {
         }
 
         return parts.joined(separator: " · ")
+    }
+}
+
+/// Shared, compact entry used by Quick Run and Quick Walk, including
+/// planned sessions. Both open the same Audio Coach studio.
+private struct ATHLTHQuickAudioCoachEntry: View {
+    let enabled: Bool
+
+    var body: some View {
+        ATHLTHPlanSurface(ghost: false, density: .compact) {
+            HStack(spacing: 12) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 42, height: 42)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Audio Coach")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(enabled
+                        ? ATHLTHLocalization.choose(
+                            english: "Edit announcements, voice and music",
+                            norwegian: "Juster varsler, stemme og musikk")
+                        : ATHLTHLocalization.choose(
+                            english: "Configure audio coaching for this workout",
+                            norwegian: "Tilpass stemmeveiledning for denne økten"))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .frame(minHeight: 50)
+            .contentShape(Rectangle())
+        }
     }
 }
 
