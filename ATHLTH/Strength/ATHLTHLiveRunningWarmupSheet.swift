@@ -1,5 +1,60 @@
 import SwiftUI
 
+/// Modifies only the session copy used for the active workout, never
+/// a catalog/library template or a completed exercise history entry.
+enum ATHLTHLiveRunningWarmupRecipe {
+    static func make(
+        session: PlannedSession,
+        minutes: Int = 10,
+        paceSecondsPerKilometer: Double? = nil,
+        heartRateZone: Int? = nil,
+        inclinePercent: Double? = nil,
+        skipWarmup: Bool = false
+    ) -> PlannedSession {
+        var copy = session
+        guard var template = copy.runningWorkout else { return copy }
+
+        if skipWarmup {
+            template.blocks.removeAll { $0.kind == .warmup }
+        } else {
+            let cleanPace = paceSecondsPerKilometer.flatMap {
+                $0.isFinite && $0 > 0 ? min(max($0, 180), 900) : nil
+            }
+            let cleanZone = heartRateZone.map { min(max($0, 1), 5) }
+            let intensity = RunningIntensityTarget(
+                kind: cleanPace != nil ? .pace :
+                    (cleanZone != nil ? .heartRateZone : .easy),
+                paceMinSecondsPerKilometer: cleanPace,
+                paceMaxSecondsPerKilometer: cleanPace,
+                heartRateZone: cleanZone,
+                rpe: nil
+            )
+            var warmup = template.blocks.first(where: { $0.kind == .warmup })
+                ?? RunningWorkoutBlock(
+                    kind: .warmup,
+                    title: ATHLTHLocalization.choose(
+                        english: "Warm-up", norwegian: "Oppvarming"
+                    ),
+                    work: .time(Double(minutes * 60), intensity: intensity)
+                )
+            warmup.repetitions = 1
+            warmup.work = .time(
+                Double(min(max(minutes, 1), 60) * 60),
+                intensity: intensity
+            )
+            warmup.work.treadmillInclinePercent = inclinePercent.flatMap {
+                $0.isFinite ? min(max($0, 0), 15) : nil
+            }
+            template.blocks.removeAll { $0.kind == .warmup }
+            template.blocks.insert(warmup, at: 0)
+            template.autoStartMainAfterWarmup = true
+        }
+
+        copy.runningWorkout = template
+        return copy
+    }
+}
+
 /// A short setup stage between choosing an interval and attaching it to an
 /// ongoing free run. Reuses the same RunningWorkoutTemplate engine and HK
 /// recording; neither the selected library item nor history is modified.
@@ -17,41 +72,15 @@ struct ATHLTHLiveRunningWarmupSheet: View {
     @State private var inclinePercent = 1.0
 
     private func configuredSession(skipWarmup: Bool) -> PlannedSession {
-        var copy = session
-        guard var template = copy.runningWorkout else { return copy }
-        let pace = Double(paceSecondsPerKilometer)
-        let intensity = RunningIntensityTarget(
-            kind: hasPaceTarget ? .pace : (hasPulseZone ? .heartRateZone : .easy),
-            paceMinSecondsPerKilometer: hasPaceTarget ? pace : nil,
-            paceMaxSecondsPerKilometer: hasPaceTarget ? pace : nil,
+        ATHLTHLiveRunningWarmupRecipe.make(
+            session: session,
+            minutes: minutes,
+            paceSecondsPerKilometer:
+                hasPaceTarget ? Double(paceSecondsPerKilometer) : nil,
             heartRateZone: hasPulseZone ? pulseZone : nil,
-            rpe: nil
+            inclinePercent: hasIncline ? inclinePercent : nil,
+            skipWarmup: skipWarmup
         )
-        if skipWarmup {
-            // Never create a zero-duration warm-up or count skipped time.
-            template.blocks.removeAll { $0.kind == .warmup }
-        } else {
-            var warmup = template.blocks.first(where: { $0.kind == .warmup })
-                ?? RunningWorkoutBlock(
-                    kind: .warmup,
-                    title: ATHLTHLocalization.choose(
-                        english: "Warm-up", norwegian: "Oppvarming"
-                    ),
-                    work: .time(Double(minutes * 60), intensity: intensity)
-                )
-            warmup.repetitions = 1
-            warmup.work = .time(Double(minutes * 60), intensity: intensity)
-            warmup.work.treadmillInclinePercent =
-                hasIncline ? inclinePercent : nil
-            // Exactly one configurable warm-up, before the first interval.
-            template.blocks.removeAll { $0.kind == .warmup }
-            template.blocks.insert(warmup, at: 0)
-            // Time-based warm-up advances automatically after its duration;
-            // the athlete can always use Next step to advance earlier.
-            template.autoStartMainAfterWarmup = true
-        }
-        copy.runningWorkout = template
-        return copy
     }
 
     var body: some View {
