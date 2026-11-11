@@ -122,7 +122,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 currentStep: activeName,
                 nextStep: nil,
                 completedSets: log.totalCompletedSets,
-                totalSets: log.totalWorkingSets
+                totalSets: log.exercises.reduce(0) { $0 + $1.sets.count }
             )
         }
         if let run = phone.active, !run.walking {
@@ -132,7 +132,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 sessionID: run.id,
                 kind: "running",
                 title: run.title,
-                startedAt: run.startedAt,
+                startedAt: run.start,
                 elapsedSeconds: max(0, run.elapsed(at: Date())),
                 distanceMeters: run.distanceMeters.isFinite
                     ? max(0, run.distanceMeters) : nil,
