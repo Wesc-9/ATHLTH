@@ -28,15 +28,13 @@ struct ATHLTHStudioHomeCommunitySummary: View {
     }
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            if !typeSize.isAccessibilitySize {
-                HStack(alignment: .top, spacing: 12) {
-                    clubs.frame(minWidth: 190)
-                    events.frame(minWidth: 190)
-                    friends.frame(minWidth: 190)
-                }
-            }
-            VStack(spacing: 10) { clubs; events; friends }
+        LazyVGrid(columns: typeSize.isAccessibilitySize
+                  ? [GridItem(.flexible())]
+                  : [GridItem(.adaptive(minimum: 210), spacing: 12)],
+                  alignment: .leading, spacing: 12) {
+            clubs
+            events
+            friends
         }
         .sheet(item: $destination) { tab in
             ATHLTHCommunityV5View(initialTab: tab)
