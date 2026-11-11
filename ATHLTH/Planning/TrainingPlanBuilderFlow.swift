@@ -2809,7 +2809,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
         private var simpleContinueBar: some View {
         Button {
-            guard canCreatePlan, !isCreatingPlan, !completedPlanCreation else { return }
+            guard canCreatePlan, !isCreatingPlan, !isGuidedAIFilling, !completedPlanCreation else { return }
             createPlan(seedSuggestedWeek: true)
         } label: {
             HStack(spacing: 12) {
@@ -4942,7 +4942,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     /// The request is explicitly consent-gated and never saves automatically.
     @MainActor
     private func generateGuidedAISuggestions() async {
-        guard !isGuidedAIFilling, session.signedIn,
+        guard !isGuidedAIFilling, !completedPlanCreation, session.signedIn,
               (step == .week || step == .review), mode == .advanced else { return }
 
         isGuidedAIFilling = true
@@ -4999,7 +4999,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
         do {
             let draft = try await guidedAIService.generate(request)
-            guard session.signedIn, session.profile.userID == athleteID,
+            guard !completedPlanCreation, (step == .week || step == .review),
+                  session.signedIn, session.profile.userID == athleteID,
                   startDate == requestedStart, weekCount == requestedWeeks,
                   weekDayEdits == originalEdits, structuredWorkoutsByDay == originalTemplates,
                   selectedDays == originalPreferredDays else {
@@ -5045,7 +5046,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @MainActor
     private func applyGuidedAISuggestions(_ preview: GuidedAIFillPreview) {
-        guard session.signedIn, session.profile.userID == preview.ownerID,
+        guard !completedPlanCreation, session.signedIn, session.profile.userID == preview.ownerID,
               startDate == preview.planStart, weekCount == preview.weekCount,
               weekDayEdits == preview.originalEdits,
               structuredWorkoutsByDay == preview.originalTemplates,
@@ -7768,7 +7769,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .background(ATHLTHTrainDesign.bronze.gradient, in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(.plain)
-                    .disabled(!canCreatePlan || isCreatingPlan)
+                    .disabled(!canCreatePlan || isCreatingPlan || isGuidedAIFilling)
                 }
             }
             .padding(.horizontal, 18)
