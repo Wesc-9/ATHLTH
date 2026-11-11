@@ -7,6 +7,9 @@ struct ATHLTHRouteWarmupConfiguration: Codable, Hashable {
     /// Zero means untimed: the runner decides when to start the route.
     var durationMinutes = 10
     var autoStartMain = true
+    /// Shared phase targets are forwarded to the exact Plan run-step engine.
+    var targetPaceSecondsPerKilometer: Double? = nil
+    var targetHeartRateZone: Int? = nil
 
     static let disabled = ATHLTHRouteWarmupConfiguration()
 
@@ -33,7 +36,12 @@ struct ATHLTHRouteWarmupConfiguration: Codable, Hashable {
             durationSeconds: minutes == 0
                 ? nil : TimeInterval(minutes * 60),
             intensityText: nil,
-            phase: "warmup"
+            targetPaceMinSecondsPerKilometer:
+                targetPaceSecondsPerKilometer,
+            targetPaceMaxSecondsPerKilometer:
+                targetPaceSecondsPerKilometer,
+            phase: "warmup",
+            targetHeartRateZone: targetHeartRateZone
         )
         let main = WatchRunningWorkoutStep(
             id: UUID(),
