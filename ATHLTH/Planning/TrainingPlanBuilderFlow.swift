@@ -4109,15 +4109,43 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         Binding(get: { selectedAIAdjustmentDate }, set: { aiAdjustmentDate = $0 })
     }
 
+    // Reuse the saved goal records as planning inputs. These are targets,
+    // not measurements or proof of readiness.
     private var planAIGoalContext: String {
-        goalStore.activeGoals.filter { selectedGoalIDs.contains($0.id) }.map { linked in
-            var parts = [linked.title]
+        let linkedGoals = goalStore.activeGoals
+            .filter { selectedGoalIDs.contains($0.id) && $0.status == .active }
+            .sorted {
+                if $0.isPrimary != $1.isPrimary { return $0.isPrimary }
+                return $0.createdAt < $1.createdAt
+            }
+        guard !linkedGoals.isEmpty else {
+            return "No linked measurable goal. Respect the athlete's chosen focus."
+        }
+        return linkedGoals.enumerated().map { index, linked in
+            var parts = [
+                "Priority \(index + 1) (" + (index == 0 ? "main" : "secondary") + "): " + linked.title
+            ]
             if let target = linked.target {
-                parts.append("\(target.metric.rawValue): \(target.targetValue) \(target.unit)")
-                if let exercise = target.exerciseName { parts.append(exercise) }
+                parts.append("Metric: \(target.metric.rawValue)")
+                parts.append("Target: \(target.targetValue) \(target.unit)")
+                if let baseline = target.baselineValue, baseline.isFinite {
+                    parts.append("Recorded baseline: \(baseline) \(target.unit)")
+                } else {
+                    parts.append("Baseline not provided; do not invent one")
+                }
+                if let activity = target.activity {
+                    parts.append("Activity: \(activity.rawValue)")
+                }
+                if let exercise = target.exerciseName, !exercise.isEmpty {
+                    parts.append("Exercise: \(exercise)")
+                }
+            } else {
+                parts.append("No numeric target; use milestones or qualitative focus")
             }
             if let deadline = linked.deadline {
                 parts.append("Deadline: " + ISO8601DateFormatter().string(from: deadline))
+            } else {
+                parts.append("No deadline; do not invent one")
             }
             return parts.joined(separator: "; ")
         }.joined(separator: " | ")
@@ -8498,6 +8526,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     norwegian:
                         "Konkret mål: \(detail)."
                 )
+            )
+        }
+
+        if !selectedGoalIDs.isEmpty {
+            focusNotes.append(
+                "Linked ATHLTH goals (priority ordered): " + planAIGoalContext +
+                ". Use these goals to guide session selection, weekly progression and " +
+                "recovery within the athlete's chosen training days and limits. " +
+                "Do not fabricate current performance or promise goal attainment. " +
+                "Keep the plan editable; propose material adjustments for athlete approval."
             )
         }
 
