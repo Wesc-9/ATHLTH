@@ -158,6 +158,16 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
     var workoutLanguage: Binding<WatchAudioCoachLanguage>? = nil
     var workoutDuckOtherAudio: Bool? = nil
 
+    init(
+        workoutVoiceIdentifier: Binding<String?>? = nil,
+        workoutLanguage: Binding<WatchAudioCoachLanguage>? = nil,
+        workoutDuckOtherAudio: Bool? = nil
+    ) {
+        self.workoutVoiceIdentifier = workoutVoiceIdentifier
+        self.workoutLanguage = workoutLanguage
+        self.workoutDuckOtherAudio = workoutDuckOtherAudio
+    }
+
     private var selectedVoiceIdentifier: String? {
         if let workoutVoiceIdentifier { return workoutVoiceIdentifier.wrappedValue }
         return settings.audioCoachVoiceIdentifier
