@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// Keeps the iPhone drawer comfortably narrow while leaving enough of Home
-/// visible to communicate that the menu is a temporary overlay.
+/// Restore the wider, breathable v2.1.3 iPhone drawer proportions.
+/// Leave an outside-tap target even on compact displays.
 enum ATHLTHSideMenuLayoutPolicy {
     static func width(for viewportWidth: CGFloat) -> CGFloat {
-        let preferred = min(max(viewportWidth * 0.76, 260), 320)
-        return max(0, min(preferred, viewportWidth - 56))
+        let preferred = min(max(viewportWidth * 0.84, 270), 390)
+        return max(0, min(preferred, viewportWidth - 34))
     }
 
     static func shouldDismiss(translation: CGSize) -> Bool {
@@ -32,7 +32,7 @@ struct ATHLTHSideMenuView: View {
     let onDismiss: () -> Void
 
     // A restrained porcelain-and-bronze palette, consistent with ATHLTH Home.
-    private let menuSurface = Color(red: 0.983, green: 0.978, blue: 0.968)
+    private let menuSurface = Color(red: 0.992, green: 0.984, blue: 0.969)
     private let menuCard = Color(red: 0.997, green: 0.995, blue: 0.991)
     private let menuInk = Color(red: 0.19, green: 0.18, blue: 0.17)
     private let menuMuted = Color(red: 0.47, green: 0.45, blue: 0.42)
@@ -55,17 +55,17 @@ struct ATHLTHSideMenuView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                        .padding(.horizontal, 17)
-                        .padding(.top, 12)
-                        .padding(.bottom, 12)
+                        .padding(.horizontal, 22)
+                        .padding(.top, max(geometry.safeAreaInsets.top, 48) + 8)
+                        .padding(.bottom, 15)
 
                     Rectangle()
                         .fill(warmDivider)
                         .frame(height: 1)
-                        .padding(.horizontal, 17)
+                        .padding(.horizontal, 22)
 
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
+                        VStack(alignment: .leading, spacing: 22) {
                             menuSection(
                                 english: "HOME",
                                 norwegian: "HJEM"
@@ -124,16 +124,16 @@ struct ATHLTHSideMenuView: View {
                                 )
                             }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.top, 17)
-                        .padding(.bottom, 24)
+                        .padding(.horizontal, 17)
+                        .padding(.top, 22)
+                        .padding(.bottom, 22)
                     }
                     .scrollIndicators(.hidden)
 
                     footer
-                        .padding(.horizontal, 17)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                        .padding(.bottom, max(geometry.safeAreaInsets.bottom, 20) + 6)
                 }
                 .frame(
                     width: ATHLTHSideMenuLayoutPolicy.width(
@@ -154,11 +154,11 @@ struct ATHLTHSideMenuView: View {
                     UnevenRoundedRectangle(
                         topLeadingRadius: 0,
                         bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 28,
-                        topTrailingRadius: 28
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 0
                     )
                 )
-                .shadow(color: .black.opacity(0.15), radius: 28, x: 8, y: 0)
+                .shadow(color: .black.opacity(0.15), radius: 22, x: 8, y: 0)
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 24)
                         .onEnded { value in
@@ -170,10 +170,12 @@ struct ATHLTHSideMenuView: View {
                         }
                 )
                 .accessibilityIdentifier("athlth-side-menu-drawer")
-                .transition(.move(edge: .leading).combined(with: .opacity))
+
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
+        // The entire panel, not only its background, reaches both screen edges.
+        .ignoresSafeArea(.container, edges: .vertical)
     }
 
     private var header: some View {
@@ -212,54 +214,7 @@ struct ATHLTHSideMenuView: View {
                 ))
             }
 
-            Button {
-                onSelect(.profile)
-            } label: {
-                HStack(spacing: 11) {
-                    profileImage
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(session.profile.displayName.isEmpty
-                             ? "ATHLTH"
-                             : session.profile.displayName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(menuInk)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-
-                        Text(session.profile.username.isEmpty
-                             ? ATHLTHLocalization.choose(
-                                 english: "My profile", norwegian: "Min profil"
-                               )
-                             : "@\(session.profile.username)")
-                            .font(.caption)
-                            .foregroundStyle(menuMuted)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 2)
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(menuBronze)
-                        .frame(width: 28, height: 28)
-                        .background(menuSurface, in: Circle())
-                        .accessibilityHidden(true)
-                }
-                .padding(.horizontal, 12)
-                .frame(minHeight: 78)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(menuCard, in: RoundedRectangle(cornerRadius: 18))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(warmDivider, lineWidth: 1)
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 18))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Open my ATHLTH profile",
-                norwegian: "Åpne ATHLTH-profilen min"
-            ))
-            .accessibilityIdentifier("athlth-side-menu-profile")
         }
     }
 
@@ -279,7 +234,7 @@ struct ATHLTHSideMenuView: View {
                 profilePlaceholder
             }
         }
-        .frame(width: 50, height: 50)
+        .frame(width: 58, height: 58)
         .clipShape(Circle())
         .overlay {
             Circle()
@@ -313,12 +268,6 @@ struct ATHLTHSideMenuView: View {
             .padding(.leading, 8)
 
             VStack(spacing: 2, content: content)
-                .padding(5)
-                .background(menuCard, in: RoundedRectangle(cornerRadius: 18))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(warmDivider, lineWidth: 1)
-                }
         }
     }
 
@@ -654,7 +603,60 @@ struct ATHLTHSideMenuView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("athlth-side-menu-settings")
 
-            // Leave breathing room below Settings rather than a tiny slogan.
+            Rectangle()
+                .fill(warmDivider)
+                .frame(height: 1)
+
+            // Profile stays pinned to the bottom, outside the scroll area.
+            Button {
+                onSelect(.profile)
+            } label: {
+                HStack(spacing: 11) {
+                    profileImage
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(session.profile.displayName.isEmpty
+                             ? "ATHLTH"
+                             : session.profile.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(menuInk)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+
+                        Text(session.profile.username.isEmpty
+                             ? ATHLTHLocalization.choose(
+                                 english: "My profile", norwegian: "Min profil"
+                               )
+                             : "@\(session.profile.username)")
+                            .font(.caption)
+                            .foregroundStyle(menuMuted)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 2)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(menuBronze)
+                        .frame(width: 28, height: 28)
+                        .background(menuSurface, in: Circle())
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 78)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(menuCard, in: RoundedRectangle(cornerRadius: 18))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(warmDivider, lineWidth: 1)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 18))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Open my ATHLTH profile",
+                norwegian: "Åpne ATHLTH-profilen min"
+            ))
+            .accessibilityIdentifier("athlth-side-menu-profile")
+
         }
     }
 }
