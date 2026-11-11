@@ -4651,6 +4651,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               kind == .running || kind == .walking,
               let settings = audioCoachConfiguration.smartPrompts
         else { return }
+        // Exact scheduled motivation groups own their cadence. Do not also
+        // emit the legacy approximate motivation timer for the same workout.
+        var resolvedSettings = settings
+        if (audioCoachConfiguration.customRules ?? []).contains(where: {
+            $0.isEnabled && $0.selectedMetrics.contains(.motivation)
+        }) {
+            resolvedSettings.motivationEnabled = false
+        }
+        let settings = resolvedSettings
         let norwegian = coachPhrase(english: "en", norwegian: "no") == "no"
         if usesOutdoorGPS, let location = lastAcceptedOutdoorLocation {
             smartCoachState.observeTerrain(location: location)
