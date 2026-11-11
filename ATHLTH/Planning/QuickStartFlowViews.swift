@@ -3518,6 +3518,19 @@ struct WalkQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    ATHLTHWorkoutDetailsCard(
+                        activityTitle: ATHLTHLocalization.choose(
+                            english: "Walking", norwegian: "Gåing"
+                        ),
+                        symbol: "figure.walk"
+                    ) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Walk outdoors", norwegian: "Gåtur utendørs"
+                        ), systemImage: "location")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                    }
+
                     HStack {
                         Text(ATHLTHLocalization.choose(
                             english: "Walking", norwegian: "Gåing"
@@ -3936,11 +3949,19 @@ struct StrengthQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Strength", norwegian: "Styrketrening"
-                    ))
-                    .font(.system(size: 26, weight: .medium, design: .serif))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    ATHLTHWorkoutDetailsCard(
+                        activityTitle: ATHLTHLocalization.choose(
+                            english: "Strength", norwegian: "Styrketrening"
+                        ),
+                        symbol: "dumbbell"
+                    ) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Free or planned strength workout",
+                            norwegian: "Fri eller planlagt styrkeøkt"
+                        ), systemImage: "list.bullet.rectangle")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                    }
 
                     ATHLTHBasicActivityHero(
                         title: ATHLTHLocalization.choose(
