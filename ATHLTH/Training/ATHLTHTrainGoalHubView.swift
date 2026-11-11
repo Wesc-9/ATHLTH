@@ -24,7 +24,10 @@ struct ATHLTHTrainGoalHubView: View {
     }
     private var linkedGoals: [ATHLTHGoal] {
         goalStore.goals.filter { $0.linkedTrainingPlanID == planID }
-            .sorted { $0.createdAt > $1.createdAt }
+            .sorted {
+                if $0.isPrimary != $1.isPrimary { return $0.isPrimary }
+                return $0.createdAt < $1.createdAt
+            }
     }
 
     var body: some View {
@@ -264,6 +267,24 @@ struct ATHLTHTrainGoalHubView: View {
                     .font(.caption)
                     .foregroundStyle(muted)
             }
+            // Evidence-based next step, not an automatic prescription.
+            if goal.status == .active {
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: "lightbulb")
+                        .foregroundStyle(accent)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("Suggested next step", "Anbefalt neste steg"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ink)
+                        Text(goalNextStep(goal: goal, evidence: evidence))
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .background(canvas, in: RoundedRectangle(cornerRadius: 12))
+            }
             if goal.target?.metric == .strengthWeightKilograms,
                let exercise = goal.target?.exerciseName {
                 Text(tr("Exercise", "Øvelse") + ": " + exercise)
@@ -279,6 +300,49 @@ struct ATHLTHTrainGoalHubView: View {
         }
         .padding(17)
         .goalSurface(line: line)
+    }
+
+    private func goalNextStep(
+        goal: ATHLTHGoal,
+        evidence: ATHLTHTrainGoalEvidence.Result
+    ) -> String {
+        if let deadline = goal.deadline, deadline < Date() {
+            return tr(
+                "Review the target date and results before adjusting the training plan.",
+                "Vurder måldatoen og resultatene før treningsplanen justeres."
+            )
+        }
+        guard let target = goal.target else {
+            return tr(
+                "Review your milestones and decide whether the next training block needs changes.",
+                "Se gjennom delmålene og vurder om neste treningsperiode bør justeres."
+            )
+        }
+        guard let observed = evidence.observed, observed.isFinite else {
+            return tr(
+                "Record a comparable result in a linked workout before changing intensity or progression.",
+                "Registrer et sammenlignbart resultat i en tilknyttet økt før intensitet eller progresjon endres."
+            )
+        }
+        if target.metric == .workoutCount {
+            return observed >= target.targetValue
+                ? tr("The session-count target is recorded. Review the next goal.",
+                     "Målet for antall økter er registrert. Vurder neste mål.")
+                : tr("Continue the planned sessions. Attendance does not prove performance gains.",
+                     "Fortsett de planlagte øktene. Gjennomføring alene dokumenterer ikke prestasjonsfremgang.")
+        }
+        if target.metric == .strengthWeightKilograms {
+            if observed >= target.targetValue {
+                return tr("The target working-set load is recorded. Review the goal before increasing it.",
+                          "Målvekten er registrert i arbeidssett. Vurder målet før du øker.")
+            }
+            return tr("Review completed working sets and recovery before considering a load change.",
+                      "Vurder gjennomførte arbeidssett og restitusjon før du eventuelt endrer belastningen.")
+        }
+        return tr(
+            "Review the verified result against the target. Keep planned changes subject to your approval.",
+            "Sammenlign dokumenterte resultater med målet. Godkjenn eventuelle planendringer selv."
+        )
     }
 
     private func blockReview(_ plan: TrainingPlan) -> some View {
