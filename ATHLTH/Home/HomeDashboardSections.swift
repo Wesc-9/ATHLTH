@@ -3024,6 +3024,9 @@ private struct HomeWeeklyProgressDaySheet: View {
         }
         let runs = runningLibrary.allTemplates
         let highlights: [PlannedSession] = [
+            // Keep low-impact choices discoverable even when the catalog is
+            // dominated by strength and hybrid sessions.
+            catalog.first(where: { $0.workoutKind == .walking })?.plannedSession(),
             catalog.first(where: {
                 $0.category == "strength" &&
                 ($0.difficulty == "Beginner" || $0.difficulty == "Nybegynner")
@@ -3207,11 +3210,11 @@ private struct HomeWeeklyProgressDaySheet: View {
                     Text(selection.date.formatted(
                         .dateTime.weekday(.wide).day().month(.wide)
                     ))
-                    .font(.system(size: 28, weight: .semibold, design: .serif))
+                    .font(.system(size: 24, weight: .semibold, design: .serif))
                     .foregroundStyle(dayInk)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 30)
-                    .padding(.bottom, 7)
+                    .padding(.top, 16)
+                    .padding(.bottom, 4)
 
                     dayActionHeader
 
@@ -3804,7 +3807,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     private var todaysWorkoutList: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 9) {
             // The fixed "Dagens økt" header already identifies this
             // section; avoid repeating "I dag" below the action button.
             if !currentPlanned.isEmpty {
@@ -3840,8 +3843,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                 }
             }
         }
-        .padding(16)
-        .athlthPlanCard(radius: 23)
+        .padding(12)
+        .athlthPlanCard(radius: 20)
     }
 
     private func presentSuggestion(_ workout: PlannedSession) {
