@@ -596,66 +596,112 @@ struct ATHLTHPetDetailView: View {
     }
 }
 
-/// A single compact menu replaces the large multi-row card.
-/// The selected pet IDs are the same binding used by the workout engine.
+/// The same inline companion picker is shared by Quick Run and Quick Walk.
+/// Avoid Menu's floating single-option popup and preserve multi-pet selection.
 struct ATHLTHWorkoutPetSelectionCard: View {
     @EnvironmentObject private var pets: ATHLTHPetStore
     @Binding var selectedPetIDs: Set<UUID>
+    @State private var expanded = false
 
     private var selectedNames: String {
-        let names = pets.pets.filter { selectedPetIDs.contains($0.id) }
-            .map(\.name)
-        if names.isEmpty {
+        let selected = pets.pets.filter { selectedPetIDs.contains($0.id) }
+        if selected.isEmpty {
             return ATHLTHLocalization.choose(
-                english: "Choose", norwegian: "Velg"
+                english: "None selected", norwegian: "Ingen valgt"
             )
         }
-        return names.joined(separator: ", ")
+        if selected.count > 2 {
+            return ATHLTHLocalization.format(
+                english: "%d companions",
+                norwegian: "%d turkamerater",
+                selected.count
+            )
+        }
+        return selected.map(\.name).joined(separator: ", ")
     }
 
     var body: some View {
         if !pets.pets.isEmpty {
-            Menu {
-                ForEach(pets.pets) { pet in
-                    Button {
-                        if selectedPetIDs.contains(pet.id) {
-                            selectedPetIDs.remove(pet.id)
-                        } else {
-                            selectedPetIDs.insert(pet.id)
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.19)) {
+                        expanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "pawprint.fill")
+                            .font(.system(size: 17))
+                            .foregroundStyle(ATHLTHPetStyle.bronze)
+                            .frame(width: 38, height: 38)
+                            .background(ATHLTHTheme.premiumGoldSoft,
+                                        in: RoundedRectangle(cornerRadius: 12))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Companion (optional)",
+                                norwegian: "Turkamerat (valgfritt)"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPetStyle.ink)
+                            Text(selectedNames)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPetStyle.muted)
+                                .lineLimit(1)
                         }
-                    } label: {
-                        Label(pet.name, systemImage: selectedPetIDs.contains(pet.id)
-                            ? "checkmark.circle.fill" : "circle")
+                        Spacer(minLength: 0)
+                        Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPetStyle.bronze)
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Expand to choose one or more pets",
+                    norwegian: "Utvid for å velge ett eller flere kjæledyr"
+                ))
+
+                if expanded {
+                    Divider().padding(.vertical, 9)
+                    ForEach(pets.pets) { pet in
+                        Button {
+                            if selectedPetIDs.contains(pet.id) {
+                                selectedPetIDs.remove(pet.id)
+                            } else {
+                                selectedPetIDs.insert(pet.id)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "pawprint")
+                                    .foregroundStyle(ATHLTHPetStyle.bronze)
+                                    .frame(width: 28)
+                                Text(pet.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHPetStyle.ink)
+                                Spacer()
+                                Image(systemName: selectedPetIDs.contains(pet.id)
+                                    ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 21))
+                                    .foregroundStyle(ATHLTHPetStyle.bronze)
+                            }
+                            .frame(minHeight: 47)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            selectedPetIDs.contains(pet.id) ? .isSelected : []
+                        )
                     }
                 }
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "pawprint.fill")
-                        .foregroundStyle(ATHLTHPetStyle.bronze)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Companion", norwegian: "Turkamerat"
-                    ))
-                    .foregroundStyle(ATHLTHPetStyle.ink)
-                    Spacer(minLength: 4)
-                    Text(selectedNames)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(ATHLTHPetStyle.muted)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(ATHLTHPetStyle.bronze)
-                }
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .background(Color.white.opacity(0.9),
-                            in: RoundedRectangle(cornerRadius: 14))
             }
-            .buttonStyle(.plain)
-            .accessibilityHint(ATHLTHLocalization.choose(
-                english: "Choose one or more pets for the workout",
-                norwegian: "Velg ett eller flere kjæledyr som blir med"
-            ))
+            .padding(.horizontal, 15)
+            .padding(.vertical, 10)
+            .background(ATHLTHTheme.card,
+                        in: RoundedRectangle(cornerRadius: 20))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+            }
         }
     }
 }
