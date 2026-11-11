@@ -275,6 +275,25 @@ enum ATHLTHSpokenAudioSession {
         // retry both operations, without racing a new speaker.
         do {
             try restoreMusicAudio(session)
+            // A successful iOS audio-session call is not a guarantee that
+            // Spotify / Bluetooth has finished recovering its original volume.
+            // Verify restoration again after the voice relinquishes its lease.
+            // Never touch audio if a newer spoken cue has started meanwhile.
+            delayedRestoreTask = Task { @MainActor in
+                for delay in [Duration.milliseconds(350), .seconds(1)] {
+                    do { try await Task.sleep(for: delay) }
+                    catch { return }
+                    guard !Task.isCancelled,
+                          owners.isEmpty, revision == generation else { return }
+                    do { try restoreMusicAudio(AVAudioSession.sharedInstance()) }
+                    catch {
+                        // Re-enter the existing bounded / periodic retry path.
+                        restoreIfIdle(generation: generation)
+                        return
+                    }
+                }
+                delayedRestoreTask = nil
+            }
         } catch {
             // Keep retrying deactivation after route transitions. No retry
             // can remove a new cue's mixing/duck policy: it re-checks revision.
