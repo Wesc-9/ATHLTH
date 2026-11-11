@@ -322,7 +322,9 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertNil(configuration.distanceIntervalMeters)
         XCTAssertNil(configuration.timeIntervalSeconds)
         XCTAssertEqual(configuration.customRules?.count, 1)
-        let group = try! XCTUnwrap(configuration.customRules?.first)
+        guard let group = configuration.customRules?.first else {
+            return XCTFail("Missing bundled Audio Coach group")
+        }
         XCTAssertEqual(group.validatedInterval, 1_000)
         XCTAssertEqual(group.selectedMetrics,
                        [.distance, .elapsedTime, .heartRateZone])
