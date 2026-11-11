@@ -77,7 +77,7 @@ struct ATHLTHPrivateLiveStrengthSnapshot: Codable, Hashable, Identifiable {
     }
 }
 
-/// Same account only, opt-in and short-lived. The existing iPad-to-iPhone
+/// Same account only, optional and short-lived. The existing iPad-to-iPhone
 /// workout command relay remains independent of this read-only status channel.
 @MainActor
 enum ATHLTHPrivateLiveStrengthStatusStore {
@@ -97,7 +97,9 @@ enum ATHLTHPrivateLiveStrengthStatusStore {
     }
 
     static func isEnabled(for userID: UUID) -> Bool {
-        AccountLocalStorage.read(Bool.self, name: preference, userID: userID) ?? false
+        // The user-facing iPhone/iPad companion is on by default for a
+        // signed-in account. A persisted false remains an explicit opt-out.
+        AccountLocalStorage.read(Bool.self, name: preference, userID: userID) ?? true
     }
 
     static func setEnabled(_ enabled: Bool, for userID: UUID) {
