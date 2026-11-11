@@ -106,9 +106,15 @@ struct ATHLTHAudioCoachActiveListView: View {
             && draft.customRules.isEmpty
     }
 
+    private var hasScheduledMotivation: Bool {
+        draft.customRules.contains {
+            $0.isEnabled && $0.selectedMetrics.contains(.motivation)
+        }
+    }
+
     private var activeAnnouncementCount: Int {
         activeOptions.count + draft.customRules.filter(\.isEnabled).count
-            + (draft.smartPrompts.motivationEnabled ? 1 : 0)
+            + (draft.smartPrompts.motivationEnabled && !hasScheduledMotivation ? 1 : 0)
             + (hasStandardAnnouncements ? (draft.distanceTriggerEnabled ? 1 : 0)
                 + (draft.timeTriggerEnabled ? 1 : 0) : 0)
     }
@@ -443,7 +449,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                         Divider().overlay(ATHLTHPlanDesign.warmDivider)
                     }
                 }
-                if draft.smartPrompts.motivationEnabled {
+                if draft.smartPrompts.motivationEnabled && !hasScheduledMotivation {
                     announcementGroupRow(
                         title: tr("Automatic motivation", "Automatisk motivasjon"),
                         detail: tr("Approximately every", "Omtrent hvert") +
@@ -509,7 +515,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .disabled(draft.customRules.count >= 20)
             }
 
-            if !draft.smartPrompts.motivationEnabled {
+            if !draft.smartPrompts.motivationEnabled && !hasScheduledMotivation {
                 Button {
                     draft.smartPrompts.motivationEnabled = true
                     editingOption = .motivation
