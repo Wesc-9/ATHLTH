@@ -1142,8 +1142,6 @@ struct ATHLTHHomeView: View {
 
                     homeDailyRecommendationAndCalendarRow
 
-                    HomeActiveFriendsStrip(isActive: isActive)
-
                     HomePersonalRecentActivitySection()
                 }
                 .padding(.horizontal, 16)
@@ -2296,53 +2294,41 @@ struct ATHLTHHomeView: View {
         }
     }
 
-    // On regular text sizes these two cards form one visual row. Their
-    // backgrounds must end at the same baseline instead of relying on
-    // different content-driven minimum heights.
-    private let homeTodayTwinCardHeight: CGFloat = HomeTodayTwinCardLayout.height
-
+    // Preserve both the recommendation logic and friend data sources.
+    // The recommendation now appears as quiet copy inside the calendar,
+    // while Friends occupies the former recommendation tile.
     private var homeDailyRecommendationAndCalendarRow: some View {
-        let advice = homeDailyRecommendation
-
-        return Group {
+        Group {
             if homeDynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 10) {
-                    HomeDailyRecommendationCard(
-                        advice: advice,
-                        onShowDetails: {
-                            showHomeDailyRecommendationDetails(advice)
-                        },
-                        onStartRecommendedWorkout: {
-                            openHomeDailyRecommendation(advice)
-                        }
-                    )
                     homeTodayCalendarCard
+                    homeFriendsCard
                 }
             } else {
-                // Do not let an intrinsic ideal width collapse this into two
-                // full-width cards. Each tile receives exactly half of Home.
                 HStack(alignment: .top, spacing: 10) {
-                    HomeDailyRecommendationCard(
-                        advice: advice,
-                        onShowDetails: {
-                            showHomeDailyRecommendationDetails(advice)
-                        },
-                        onStartRecommendedWorkout: {
-                            openHomeDailyRecommendation(advice)
-                        },
-                        compact: true
-                    )
-                    .frame(maxWidth: .infinity)
-                    .frame(height: homeTodayTwinCardHeight)
-                    .layoutPriority(1)
-
+                    homeFriendsCard
+                        .frame(maxWidth: .infinity)
                     homeTodayCalendarCard
                         .frame(maxWidth: .infinity)
-                        .frame(height: homeTodayTwinCardHeight)
-                        .layoutPriority(1)
                 }
-                .frame(maxWidth: .infinity, alignment: .top)
             }
+        }
+    }
+
+    private var homeFriendsCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HomeActiveFriendsStrip(isActive: isActive)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 158, alignment: .topLeading)
+        .padding(11)
+        .background(
+            ATHLTHTrainDesign.paper,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.34), lineWidth: 0.8)
         }
     }
 
@@ -2361,6 +2347,12 @@ struct ATHLTHHomeView: View {
         let tournamentItems = tournamentCalendar.events(on: Date())
         // Keep the compact tile the same height while reserving an Arena
         // slot whenever the athlete has a scheduled competition exercise.
+        // Hide the suggestion when multiple activities are already
+        // scheduled; do not change the underlying coaching recommendation.
+        let showCalendarRecommendation =
+            todayWorkouts.count + personalEvents.count +
+            clubEvents.count + tournamentItems.count < 2
+
         let visibleWorkoutCount = tournamentItems.isEmpty
             ? min(todayWorkouts.count, 2)
             : min(todayWorkouts.count, 1)
@@ -2577,6 +2569,37 @@ struct ATHLTHHomeView: View {
                     maxHeight: .infinity,
                     alignment: .center
                 )
+            }
+
+            if showCalendarRecommendation {
+                let advice = homeDailyRecommendation
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Today's recommendation",
+                        norwegian: "Dagens anbefaling"
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+
+                    Button {
+                        showHomeDailyRecommendationDetails(advice)
+                    } label: {
+                        Text(advice.shortDescription)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-home-calendar-recommendation")
+                }
+                .padding(.top, 8)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(ATHLTHTrainDesign.rule.opacity(0.30))
+                        .frame(height: 0.7)
+                }
             }
         }
         .padding(11)
