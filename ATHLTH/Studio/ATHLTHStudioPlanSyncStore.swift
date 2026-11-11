@@ -394,6 +394,13 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     clean.notes = nil
                     clean.meetingPoint = nil
                     clean.plannedTrainingPlace = nil
+                    // Nested structured blocks also carry free-text fields.
+                    clean.workoutBlocks = clean.workoutBlocks?.map { block in
+                        var safeBlock = block
+                        safeBlock.notes = nil
+                        safeBlock.loadNote = nil
+                        return safeBlock
+                    }
                     clean.exercises = workout.exercises.map { exercise in
                         var cleaned = exercise
                         cleaned.notes = nil
@@ -444,6 +451,16 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                         merged.notes = old.notes
                         merged.meetingPoint = old.meetingPoint
                         merged.plannedTrainingPlace = old.plannedTrainingPlace
+                        merged.workoutBlocks = merged.workoutBlocks?.map { block in
+                            var result = block
+                            if let previous = old.workoutBlocks?.first(where: {
+                                $0.sequence == block.sequence && $0.kind == block.kind
+                            }) {
+                                result.notes = previous.notes
+                                result.loadNote = previous.loadNote
+                            }
+                            return result
+                        }
                         merged.exercises = merged.exercises.map { exercise in
                             var clean = exercise
                             if let oldExercise = old.exercises.first(where: { $0.id == exercise.id }) {
