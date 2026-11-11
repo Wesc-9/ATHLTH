@@ -34,6 +34,12 @@ Status: CODE STAGED, NOT APPROVED FOR DEPLOYMENT. This is an engineering assessm
 - Important limitation: user-supplied titles, exercise instructions, nested workout block data, external references and other descriptive fields could still include health or location details. The projection is **not** a comprehensive de-identification or GDPR Art. 9 solution; require payload inspection and privacy review before enabling production account-sync rollout.
 - Source-level test assertions were added for the projection and restoration. Full Swift/Xcode build and live cross-device tests still need execution.
 
+## Additional nested-payload audit (2026-11-11)
+- The account projection now removes stored recovery-before/recovery-after exercise snapshots and original daily-alternative workout snapshots, since these can retain private notes outside the active exercise list.
+- It also removes free-text notes in structured workout blocks and restores those local notes to matching workout/block identities after remote plan import.
+- Tests cover exclusion/restoration in Basic and Advanced. This change has not undergone an Xcode build; run the test target before enabling account sync in production.
+- Do not deploy the staged DB migration to production until end-to-end tests and disclosure review pass. No production data or RLS policies were changed in this phase.
+
 ## Required test matrix
 - New signed-in account, iPhone -> iPad -> iPhone edits, plus fresh reinstall.
 - Offline edits and reconnect; conflict after both devices edit, including deletion and stale revision.
