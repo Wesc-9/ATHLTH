@@ -6886,6 +6886,10 @@ struct ATHLTHTrainView: View {
             onOpenPlan: { selectedSection = .plan },
             onCreatePlan: { beginFreshTrainingPlan() },
             onOpenLibrary: { showingLibrary = true },
+            onOpenWorkouts: {
+                showingLibrary = false
+                personalLibrarySection = .workouts
+            },
             onStartWorkout: { workout, healthCompleted in
                 guard let active else { return }
                 openTodayPrimaryWorkout(
