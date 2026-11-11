@@ -3031,12 +3031,13 @@ private struct HomeWeeklyProgressDaySheet: View {
             runs.first(where: { $0.isBuiltIn })?.plannedSession(),
             catalog.first(where: { $0.category == "hybrid" })?.plannedSession()
         ].compactMap { $0 }
-        // Convert catalog entries only until four unique suggestions are found.
-        // Previously every catalog template was materialized before truncation.
+        // Build a small, diverse candidate pool before the Coach ranks it.
+        // Ranking only the first four catalog entries would bias results.
+        let maxCandidates = 18
         var distinct: [PlannedSession] = []
         var names: Set<String> = []
         func append(_ workout: PlannedSession) {
-            guard distinct.count < 4 else { return }
+            guard distinct.count < maxCandidates else { return }
             let key = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased()
             if !key.isEmpty && names.insert(key).inserted {
@@ -3045,16 +3046,16 @@ private struct HomeWeeklyProgressDaySheet: View {
         }
         for workout in highlights { append(workout) }
         for workout in saved { append(workout) }
-        if distinct.count < 4 {
+        if distinct.count < maxCandidates {
             for entry in catalog {
                 append(entry.plannedSession())
-                if distinct.count == 4 { break }
+                if distinct.count == maxCandidates { break }
             }
         }
-        if distinct.count < 4 {
+        if distinct.count < maxCandidates {
             for entry in runs {
                 append(entry.plannedSession())
-                if distinct.count == 4 { break }
+                if distinct.count == maxCandidates { break }
             }
         }
         return HomeCoachWorkoutSelection.ordered(
@@ -3064,8 +3065,32 @@ private struct HomeWeeklyProgressDaySheet: View {
                 $0.startedAt > $1.startedAt
             }.map(\.kind),
             readiness: coachReadiness,
-            isToday: Calendar.current.isDateInToday(selection.date)
+            isToday: Calendar.current.isDateInToday(selection.date),
+            recommendedKind: coachSuggestedKind
         )
+    }
+
+    private var coachSuggestedKind: WorkoutKind? {
+        guard Calendar.current.isDateInToday(selection.date) else { return nil }
+        let scheduled = currentPlanned.first(where: { !$0.isExplicitRestDay })
+        let activity: HomeDailyRecommendationPolicy.PlannedActivity? =
+            scheduled.map { workout in
+                switch workout.kind {
+                case .running: return .running
+                case .strength: return .strength
+                default: return .other
+                }
+            }
+        return HomeDailyRecommendationPolicy.recommendation(
+            readiness: coachReadiness,
+            hasWorkoutToday: scheduled != nil,
+            trainingLoadRatio: nil,
+            plannedActivity: activity,
+            plannedWorkoutTitle: scheduled?.title,
+            trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
+                workouts: recentWorkouts
+            )
+        ).suggestedWorkout.kind
     }
 
     private var coachReadiness: HomeDailyRecommendationPolicy.Readiness {
@@ -3085,6 +3110,9 @@ private struct HomeWeeklyProgressDaySheet: View {
         // The next planned training sessions inform the suggestion if the
         // selected date is empty; a historical date gets no future prediction.
         let firstDay = Calendar.current.startOfDay(for: selection.date)
+        guard firstDay >= Calendar.current.startOfDay(for: Date()) else {
+            return []
+        }
         return (plan.flatMap { session.trainingPlan(withID: $0.id) } ?? plan)?
             .weeks.flatMap(\.days).flatMap(\.sessions)
             .filter { workout in
@@ -3127,9 +3155,10 @@ private struct HomeWeeklyProgressDaySheet: View {
         // Only materialize favorited catalog entries, not hundreds of
         // expensive templates on each sheet refresh.
         let mine = session.savedWorkoutTemplates.filter {
-            $0.workoutTemplateID.map {
+            ids.contains($0.id.uuidString.lowercased()) ||
+            ($0.workoutTemplateID.map {
                 ids.contains($0.uuidString.lowercased())
-            } ?? false
+            } ?? false)
         }
         let catalog = suggestionCatalogEntries
             .filter { ids.contains($0.id.uuidString.lowercased()) }
@@ -3143,7 +3172,7 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
         var seen = Set<UUID>()
         return (mine + catalog + runs).filter { workout in
-            guard let id = workout.workoutTemplateID else { return false }
+            let id = workout.workoutTemplateID ?? workout.id
             return seen.insert(id).inserted
         }.prefix(5).map { $0 }
     }
