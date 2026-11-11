@@ -76,4 +76,34 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
             ), .conflict
         )
     }
+
+    @MainActor
+    func testPlansWithInjuryNotesNeverQualifyForOrdinaryCloudSync() {
+        var plan = makeMinimalPlan()
+        plan.builderProfile = TrainingPlanBuilderProfile(
+            mode: .basic,
+            primaryFocus: .running,
+            goal: .improveFitness,
+            sessionsPerWeek: 3,
+            preferredDayIndexes: [1, 3, 5],
+            injuriesOrLimitations: "Knee injury"
+        )
+        XCTAssertFalse(ATHLTHStudioPlanSyncStore.isEligibleForOrdinaryAccountSync(plan))
+        plan.builderProfile?.injuriesOrLimitations = "   "
+        XCTAssertTrue(ATHLTHStudioPlanSyncStore.isEligibleForOrdinaryAccountSync(plan))
+    }
+
+    @MainActor
+    func testPlanWithoutInjuryNotesIsEligibleForOrdinaryCloudSync() {
+        let plan = makeMinimalPlan()
+        XCTAssertTrue(ATHLTHStudioPlanSyncStore.isEligibleForOrdinaryAccountSync(plan))
+    }
+
+    private func makeMinimalPlan() -> TrainingPlan {
+        TrainingPlan(
+            id: UUID(), ownerID: UUID(), title: "Example plan",
+            summary: "", visibility: .privateOnly, version: 1,
+            weeks: [], tags: [], createdAt: Date(), updatedAt: Date()
+        )
+    }
 }
