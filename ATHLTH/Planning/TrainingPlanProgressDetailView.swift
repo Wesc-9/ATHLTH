@@ -7,6 +7,7 @@ struct TrainingPlanProgressDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var goalStore: GoalStore
 
     let planID: UUID
 
@@ -34,6 +35,7 @@ struct TrainingPlanProgressDetailView: View {
 
                     LazyVStack(alignment: .leading, spacing: 16) {
                         header(plan: plan)
+                        linkedGoalsCard(plan: plan)
                         overallCard(overall)
                         if health.hasRequestedAuthorization {
                             recoveryContextCard
@@ -116,6 +118,105 @@ struct TrainingPlanProgressDetailView: View {
             .foregroundStyle(ATHLTHTheme.mutedText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // Plan-specific goal evidence is kept separate from program completion.
+    // A completed workout must never be presented as proof of a race time or 1RM.
+    @ViewBuilder
+    private func linkedGoalsCard(plan: TrainingPlan) -> some View {
+        let linkedGoals = goalStore.goals
+            .filter { $0.linkedTrainingPlanID == plan.id && $0.status == .active }
+            .sorted {
+                if $0.isPrimary != $1.isPrimary { return $0.isPrimary }
+                return $0.createdAt < $1.createdAt
+            }
+        if !linkedGoals.isEmpty {
+            let completedSessionIDs = Set(
+                plan.weeks.flatMap(\\.days).flatMap(\\.sessions).compactMap { workout -> UUID? in
+                    session.isPlanSessionCompleted(
+                        planID: plan.id, sessionID: workout.id,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strength.workoutHistory
+                    ) ? workout.id : nil
+                }
+            )
+            ATHLTHPlanSurface {
+                VStack(alignment: .leading, spacing: 13) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Goals linked to this plan",
+                            norwegian: "Mål knyttet til treningsplanen"
+                        ),
+                        systemImage: "target"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    ForEach(Array(linkedGoals.enumerated()), id: \\.element.id) { index, goal in
+                        let evidence = ATHLTHTrainGoalEvidence.evaluate(
+                            goal: goal, plan: plan,
+                            strengthHistory: strength.workoutHistory,
+                            completedSessionIDs: completedSessionIDs
+                        )
+                        VStack(alignment: .leading, spacing: 7) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(goal.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Spacer(minLength: 8)
+                                Text(index == 0
+                                     ? ATHLTHLocalization.choose(english: "Main", norwegian: "Hovedmål")
+                                     : ATHLTHLocalization.choose(english: "Secondary", norwegian: "Delmål"))
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            if let target = goal.target {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Target", norwegian: "Målverdi"
+                                    ) + ": " + target.targetValue.formatted() + " " + target.unit
+                                )
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            if let fraction = evidence.completionFraction {
+                                ProgressView(value: fraction)
+                                    .tint(ATHLTHTheme.accent)
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Verified plan-specific progress",
+                                        norwegian: "Dokumentert fremgang i denne planen"
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            } else {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "No comparable plan-specific result yet. The plan may still be progressing.",
+                                        norwegian: "Ingen sammenlignbare resultater fra denne planen ennå. Planen kan likevel være i fremgang."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            if let deadline = goal.deadline {
+                                Label(
+                                    deadline.formatted(date: .abbreviated, time: .omitted),
+                                    systemImage: "calendar"
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        if index < linkedGoals.count - 1 {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func overallCard(_ progress: TrainingPlanProgressSnapshot) -> some View {
