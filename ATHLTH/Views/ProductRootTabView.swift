@@ -2752,59 +2752,60 @@ struct ATHLTHHomeView: View {
         isTrainTogether: Bool = false,
         trainingPartner: String? = nil
     ) -> some View {
-        HStack(alignment: .center, spacing: 6) {
+        HStack(alignment: .center, spacing: 7) {
+            // Time is the first, leftmost field for every calendar entry.
+            Text(time?.formatted(date: .omitted, time: .shortened) ??
+                 ATHLTHLocalization.choose(
+                    english: "—:—", norwegian: "—:—"
+                 ))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                .frame(width: 48, alignment: .leading)
+                .accessibilityLabel(time.map {
+                    $0.formatted(date: .omitted, time: .shortened)
+                } ?? ATHLTHLocalization.choose(
+                    english: "Time not set", norwegian: "Tid ikke satt"
+                ))
+
+            Rectangle()
+                .fill(ATHLTHTrainDesign.bronze.opacity(0.40))
+                .frame(width: 2, height: 30)
+
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
-                .frame(width: 25, height: 32)
-                .background(ATHLTHTrainDesign.paleGold.opacity(0.30),
-                            in: RoundedRectangle(cornerRadius: 9))
+                .frame(width: 19)
+                .accessibilityHidden(true)
+
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(ATHLTHTrainDesign.ink)
                     .lineLimit(isTrainTogether ? 1 : 2)
                     .multilineTextAlignment(.leading)
-                Text(time?.formatted(date: .omitted, time: .shortened) ??
-                     ATHLTHLocalization.choose(
-                        english: "Time not set", norwegian: "Tid ikke satt"))
+
+                if isTrainTogether {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Train together", norwegian: "Tren sammen"
+                        ) + (trainingPartner.map { " · \($0)" } ?? ""),
+                        systemImage: "person.2.fill"
+                    )
                     .font(.system(size: 9))
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                     .lineLimit(1)
-
-                if isTrainTogether {
-                    HStack(spacing: 3) {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 8, weight: .semibold))
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Train together", norwegian: "Tren sammen"
-                            ) + (trainingPartner.map { " · \($0)" } ?? "")
-                        )
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    }
-                    .font(.system(size: 8.5, weight: .medium))
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel(
-                        trainingPartner.map {
-                            ATHLTHLocalization.choose(
-                                english: "Training together with \($0)",
-                                norwegian: "Trener sammen med \($0)"
-                            )
-                        } ?? ATHLTHLocalization.choose(
-                            english: "Train together", norwegian: "Tren sammen"
-                        )
-                    )
                 }
             }
             Spacer(minLength: 0)
         }
-        .padding(6)
-        .frame(maxWidth: .infinity, minHeight: 55, alignment: .leading)
-        .background(ATHLTHTrainDesign.canvas.opacity(0.55),
-                    in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .background(
+            ATHLTHTrainDesign.canvas.opacity(0.55),
+            in: RoundedRectangle(cornerRadius: 11)
+        )
     }
 
     // The compact Home card displays two slots, but "See all" must expose
