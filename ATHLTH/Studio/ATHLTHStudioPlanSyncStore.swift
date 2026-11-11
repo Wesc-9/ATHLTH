@@ -130,6 +130,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             isBusy = false
         }
         var unresolved: [Conflict] = []
+        var hasNewLocalEdits = false
 
         do {
             // Legacy opt-outs remain a hard block until the user explicitly
@@ -212,8 +213,18 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     do {
                         let revision = try await save(local, expected: expected)
                         guard accountID == userID else { return }
+                        // Acknowledging the uploaded snapshot is safe, but it
+                        // must not imply newer local edits were uploaded too.
                         acknowledge(planID, revision: revision,
                                     fingerprint: localFingerprint ?? "", owner: userID)
+                        if let current = session.accountPlanDocument(withID: planID) {
+                            let currentFingerprint = try fingerprint(for: current)
+                            if currentFingerprint != localFingerprint {
+                                hasNewLocalEdits = true
+                            }
+                        } else {
+                            hasNewLocalEdits = true
+                        }
                     } catch {
                         // CAS detects remote edits between fetch and save.
                         unresolved.append(Conflict(id: planID, title: local.title))
@@ -241,6 +252,14 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
 
             conflicts = unresolved
             lastSuccessfulSync = Date()
+            if hasNewLocalEdits {
+                status = ATHLTHLocalization.choose(
+                    english: "A newer local plan edit is waiting to sync.",
+                    norwegian: "En nyere lokal endring venter på synkronisering."
+                )
+                // The task starts only after this sync releases its lock.
+                scheduleSync(session: session)
+            } else {
             status = unresolved.isEmpty
                 ? ATHLTHLocalization.choose(
                     english: "Account plans are up to date. Private notes stay on this device.",
@@ -250,6 +269,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     english: "\(unresolved.count) plan conflict(s) need your decision. No changes were overwritten.",
                     norwegian: "\(unresolved.count) plankonflikt(er) krever et valg. Ingen endringer ble overskrevet."
                   )
+            }
         } catch {
             if accountID == userID {
                 status = ATHLTHLocalization.choose(
