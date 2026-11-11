@@ -91,3 +91,48 @@ enum ATHLTHRunPulseTargetStatus: Equatable {
         return .within
     }
 }
+
+
+/// A stable interval numerator/denominator derived from the authoritative
+/// expanded workout steps. Warm-up, cooldown, free run and recovery do not
+/// inflate a 4×4 workout into "step 1 of 9".
+struct ATHLTHRunningIntervalPosition: Equatable {
+    let ordinal: Int
+    let total: Int
+    let isRecovery: Bool
+
+    var nextOrdinal: Int {
+        isRecovery ? min(ordinal + 1, total) : ordinal
+    }
+
+    static func resolve(
+        steps: [WatchRunningWorkoutStep],
+        currentIndex: Int
+    ) -> ATHLTHRunningIntervalPosition? {
+        guard steps.indices.contains(currentIndex) else { return nil }
+
+        func isEffort(_ step: WatchRunningWorkoutStep) -> Bool {
+            (step.phase == "work" || step.phase == "interval") &&
+            step.measure != .open
+        }
+        let total = steps.filter(isEffort).count
+        guard total > 1 else { return nil }
+        let completedBefore = steps.prefix(currentIndex).filter(isEffort).count
+        let current = steps[currentIndex]
+        if isEffort(current) {
+            return .init(
+                ordinal: min(completedBefore + 1, total),
+                total: total,
+                isRecovery: false
+            )
+        }
+        if current.phase == "recovery" || current.phase == "rest" {
+            return .init(
+                ordinal: min(max(completedBefore, 1), total),
+                total: total,
+                isRecovery: true
+            )
+        }
+        return nil
+    }
+}
