@@ -1180,32 +1180,14 @@ struct HomePersonalRecentActivitySection:
             if visibleItems.isEmpty {
                 emptyState
             } else {
-                ScrollView(
-                    .horizontal,
-                    showsIndicators: false
-                ) {
-                    LazyHStack(
-                        alignment: .top,
-                        spacing: 10
-                    ) {
-                        ForEach(
-                            visibleItems
-                        ) { item in
-                            horizontalItem(
-                                item
-                            )
-                            .frame(width: 252)
-                        }
+                // Vertical feed uses the existing order, workout evidence,
+                // friend identities and engagement stores unchanged.
+                LazyVStack(spacing: 11) {
+                    ForEach(visibleItems) { item in
+                        verticalItem(item)
                     }
-                    .padding(
-                        .horizontal,
-                        1
-                    )
-                    .scrollTargetLayout()
                 }
-                .scrollTargetBehavior(
-                    .viewAligned
-                )
+                .accessibilityIdentifier("athlth-home-recent-vertical-feed")
             }
         }
         .task(id: recentRevision) {
@@ -1336,6 +1318,129 @@ struct HomePersonalRecentActivitySection:
                 )
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private func verticalItem(_ item: HomeActivityStreamItem) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            switch item.source {
+            case .mine(let workout):
+                NavigationLink {
+                    HomePersonalActivityDestination(
+                        workout: workout,
+                        strengthWorkout: strengthWorkout(for: workout),
+                        phoneWorkout: localPhoneWorkout(for: workout)
+                    )
+                } label: {
+                    HomePersonalWorkoutVisual(
+                        workout: workout,
+                        strengthWorkout: strengthWorkout(for: workout),
+                        phoneWorkout: localPhoneWorkout(for: workout),
+                        height: 158,
+                        recentActivityStrip: true
+                    )
+                    .frame(width: 148, height: 158)
+                    .clipped()
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    NavigationLink {
+                        ATHLTHProfileView()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "My activity", norwegian: "Min aktivitet"
+                            ),
+                            systemImage: "person.crop.circle"
+                        )
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(HomeRecentCardFormat.activity(workout.activity))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(workout.summaryText)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(2)
+
+                    Text(HomeRecentCardFormat.date(workout.endDate))
+                        .font(.system(size: 10))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Spacer(minLength: 0)
+                    HomeCompactActivityEngagementRow(
+                        item: socialFeedItem(for: workout)
+                    )
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            case .following(let feedItem):
+                NavigationLink {
+                    HomeFollowingWorkoutDetailView(item: feedItem)
+                } label: {
+                    HomeFollowingWorkoutArtwork(
+                        item: feedItem,
+                        activity: HomeFollowingWorkoutPresentation.activity(for: feedItem),
+                        height: 158
+                    )
+                    .frame(width: 148, height: 158)
+                    .clipped()
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    NavigationLink {
+                        FriendProfileView(userID: feedItem.actor.userID)
+                    } label: {
+                        Text(feedItem.actor.resolvedName)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(HomeRecentCardFormat.activity(
+                        HomeFollowingWorkoutPresentation.activity(for: feedItem)
+                    ))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(feedItem.activity.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(2)
+
+                    Text(HomeRecentCardFormat.date(feedItem.activity.createdAt))
+                        .font(.system(size: 10))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Spacer(minLength: 0)
+                    HomeCompactActivityEngagementRow(item: feedItem)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(height: 158)
+        .background(
+            Color.white.opacity(0.98),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(ATHLTHTrainDesign.rule.opacity(0.35), lineWidth: 0.8)
+                .allowsHitTesting(false)
         }
     }
 
