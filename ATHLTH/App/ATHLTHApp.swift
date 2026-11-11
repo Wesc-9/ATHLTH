@@ -1581,15 +1581,28 @@ struct AppRootView: View {
                 table: "athlth_account_sync_events"
             )
             await channel.subscribe()
-            defer { Task { await channel.unsubscribe() } }
+            var coalescedRefresh: Task<Void, Never>?
+            defer {
+                coalescedRefresh?.cancel()
+                Task { await channel.unsubscribe() }
+            }
             for await _ in changes {
                 guard !Task.isCancelled, scenePhase == .active,
                       appSession.signedIn,
                       appSession.profile.userID == userID else { break }
-                do { try await Task.sleep(for: .milliseconds(450)) }
-                catch { break }
-                await profileRecords.refresh(userID: userID)
-                await refreshTrophiesAndNotifications()
+                // Publishing a complete set of PRs may emit many row-level
+                // notifications. Keep only one account-scoped refetch per
+                // burst rather than rebuilding trophies dozens of times.
+                coalescedRefresh?.cancel()
+                coalescedRefresh = Task { @MainActor in
+                    do { try await Task.sleep(for: .milliseconds(750)) }
+                    catch { return }
+                    guard !Task.isCancelled, scenePhase == .active,
+                          appSession.signedIn,
+                          appSession.profile.userID == userID else { return }
+                    await profileRecords.refresh(userID: userID)
+                    await refreshTrophiesAndNotifications()
+                }
             }
         }
         .onChange(of: homeAssistant.shareOnlineStatus) { _, _ in
