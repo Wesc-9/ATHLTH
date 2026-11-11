@@ -1647,6 +1647,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     },
                     onChooseNoGoal: {
                         selectedGoalChoice = "none"
+                        goalDetail = ""
+                        hasCompetitionDate = false
                         selectedGoalIDs.removeAll()
                         inlineGoalDraft = nil
                         focus = .generalFitness
@@ -4081,6 +4083,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         Binding(get: { selectedAIAdjustmentDate }, set: { aiAdjustmentDate = $0 })
     }
 
+    private var planAIGoalContext: String {
+        goalStore.activeGoals.filter { selectedGoalIDs.contains($0.id) }.map { linked in
+            var parts = [linked.title]
+            if let target = linked.target {
+                parts.append("\(target.metric.rawValue): \(target.targetValue) \(target.unit)")
+                if let exercise = target.exerciseName { parts.append(exercise) }
+            }
+            if let deadline = linked.deadline {
+                parts.append("Deadline: " + ISO8601DateFormatter().string(from: deadline))
+            }
+            return parts.joined(separator: "; ")
+        }.joined(separator: " | ")
+    }
+
     private var planAITools: some View {
         builderPanel {
             VStack(alignment: .leading, spacing: 12) {
@@ -4974,6 +4990,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 "Equipment: \(equipment.rawValue). Plan progressive, editable training " +
                 "on the selected weekdays; keep recovery days and realistic intensity. " +
                 "No health history or injury data has been shared. " + scopeNotes +
+                " Selected measurable goals: " + planAIGoalContext +
                 " Requested changes: " + String(aiAdjustmentInstruction.prefix(2000)),
             coachStrengthContext: nil,
             goals: [AIProgramGoalInput(focus: aiTrainingFocus)],
