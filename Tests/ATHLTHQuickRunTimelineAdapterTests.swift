@@ -207,6 +207,48 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
         }
     }
 
+    func testBasicGoalsCanCombineDistanceTimePaceAndHeartRate() throws {
+        let goals: Set<ATHLTHBasicRunGoalKind> =
+            [.distance, .time, .pace, .heartRateZone]
+        let planned = ATHLTHBasicRunGoalRecipe.make(
+            id: UUID(), title: "Combined target", kind: .distance,
+            distanceKilometers: 8, timeMinutes: 42,
+            paceSecondsPerKilometer: 315, heartRateZone: 3,
+            environment: .outdoor, selectedGoals: goals
+        )
+        let step = try XCTUnwrap(planned.resolvedWorkoutBlocks.first)
+        XCTAssertEqual(step.distanceMeters, 8_000)
+        XCTAssertEqual(step.durationSeconds, 2_520)
+        XCTAssertEqual(step.targetPaceSecondsPerKilometer, 315)
+        XCTAssertEqual(step.targetHeartRateZone, 3)
+        XCTAssertEqual(planned.targetDistanceKilometers, 8)
+        XCTAssertEqual(planned.durationMinutes, 42)
+        let transfer = try XCTUnwrap(ATHLTHQuickRunTimelineAdapter.transfer(
+            from: planned, title: planned.title,
+            routeAlerts: .standard, autoPauseEnabled: false
+        ))
+        // The distance is the completion trigger; time is the guide.
+        XCTAssertEqual(transfer.steps.first?.measure, .distance)
+        XCTAssertEqual(transfer.steps.first?.durationSeconds, 2_520)
+        XCTAssertEqual(transfer.steps.first?.targetHeartRateZone, 3)
+    }
+
+    func testBasicGoalsWithoutDistanceUseTimeAsCompletionTrigger() throws {
+        let planned = ATHLTHBasicRunGoalRecipe.make(
+            id: UUID(), title: "Time and pace", kind: .time,
+            distanceKilometers: 5, timeMinutes: 35,
+            paceSecondsPerKilometer: 330, heartRateZone: 2,
+            environment: .indoor, selectedGoals: [.time, .pace]
+        )
+        let transfer = try XCTUnwrap(ATHLTHQuickRunTimelineAdapter.transfer(
+            from: planned, title: planned.title,
+            routeAlerts: .standard, autoPauseEnabled: false
+        ))
+        XCTAssertEqual(transfer.steps.first?.measure, .time)
+        XCTAssertEqual(transfer.steps.first?.durationSeconds, 2_100)
+        XCTAssertEqual(transfer.steps.first?.targetPaceMinSecondsPerKilometer, 330)
+    }
+
     func testBasicGoalHasCorrectIndoorEnvironmentWithoutGPS() throws {
         let goal = ATHLTHBasicRunGoalRecipe.make(
             id: UUID(), title: "Easy indoor",
