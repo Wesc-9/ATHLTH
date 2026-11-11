@@ -208,8 +208,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                                     fingerprint: remoteFingerprint, owner: userID)
                     }
                 case let .upload(expected):
-                    if let local, let limitations = local.builderProfile?.injuriesOrLimitations,
-                       !limitations.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if let local, !Self.isEligibleForOrdinaryAccountSync(local) {
                         heldForPrivacy += 1
                         continue
                     }
@@ -379,7 +378,24 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         }
     }
 
+    /// Narrow safety gate for the dedicated injury/limitations field.
+    /// This is NOT a complete assessment of all health information in free text.
+    static func isEligibleForOrdinaryAccountSync(_ plan: TrainingPlan) -> Bool {
+        let limitations = plan.builderProfile?.injuriesOrLimitations?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return limitations.isEmpty
+    }
+
     private func save(_ plan: TrainingPlan, expected: Int64) async throws -> Int64 {
+        // This is the single upload gateway, including manual conflict
+        // resolution. Never bypass privacy restrictions through another path.
+        guard Self.isEligibleForOrdinaryAccountSync(plan) else {
+            throw NSError(
+                domain: "ATHLTH.PlanSync", code: 403,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "This plan contains injury or limitation notes and needs separate health-data authorization."]
+            )
+        }
         guard enabled, accountID == plan.ownerID else {
             throw NSError(domain: "ATHLTH.PlanSync", code: 1)
         }
