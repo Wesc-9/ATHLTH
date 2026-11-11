@@ -2020,20 +2020,48 @@ struct IPhoneWorkoutView: View {
                         value
                 }
             }
-            .confirmationDialog(
-                "Finish this workout?",
-                isPresented: $confirmFinish,
-                titleVisibility: .visible
-            ) {
-                Button("Finish & save") {
-                    Task {
-                        await recorder.finish()
-                        guard recorder.active == nil else { return }
-                        await realtime
-                            .leaveCurrentLiveWorkout()
-                    }
+            .sheet(isPresented: $confirmFinish) {
+                if let active = recorder.active {
+                    ATHLTHWorkoutFinishSheet(
+                        metrics: [
+                            ATHLTHWorkoutFinishMetric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Elapsed", norwegian: "Varighet"
+                                ),
+                                value: "\(Int(max(0, active.elapsed(at: Date())) / 60)) min",
+                                symbol: "clock"
+                            ),
+                            ATHLTHWorkoutFinishMetric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Distance", norwegian: "Distanse"
+                                ),
+                                value: String(
+                                    format: "%.2f km",
+                                    max(active.distanceMeters, 0) / 1000
+                                ),
+                                symbol: active.walking ? "figure.walk" : "figure.run"
+                            )
+                        ],
+                        progress: nil,
+                        remainingWarning: nil,
+                        saveExplanation: ATHLTHLocalization.choose(
+                            english: "The recorded activity will be saved. You can review the full workout summary afterwards.",
+                            norwegian: "Den registrerte aktiviteten lagres. Du kan se hele treningssammendraget etterpå."
+                        ),
+                        saving: recorder.saving,
+                        onFinish: {
+                            Task {
+                                await recorder.finish()
+                                guard recorder.active == nil else { return }
+                                confirmFinish = false
+                                await realtime.leaveCurrentLiveWorkout()
+                            }
+                        },
+                        onContinue: { confirmFinish = false }
+                    )
                 }
             }
+            .interactiveDismissDisabled(recorder.saving)
             .task {
                 while !Task.isCancelled {
                     try? await Task.sleep(
