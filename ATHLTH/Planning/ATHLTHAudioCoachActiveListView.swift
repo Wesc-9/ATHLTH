@@ -82,6 +82,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                 && option.isActive(in: draft)
                 && !bundled.contains(option)
                 && option != .customAnnouncements
+                && option != .motivation
         }
     }
 
@@ -102,6 +103,7 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     private var activeAnnouncementCount: Int {
         activeOptions.count + draft.customRules.count
+            + (draft.smartPrompts.motivationEnabled ? 1 : 0)
             + (hasStandardAnnouncements ? (draft.distanceTriggerEnabled ? 1 : 0)
                 + (draft.timeTriggerEnabled ? 1 : 0) : 0)
     }
@@ -419,6 +421,14 @@ struct ATHLTHAudioCoachActiveListView: View {
                         Divider().overlay(ATHLTHPlanDesign.warmDivider)
                     }
                 }
+                if draft.smartPrompts.motivationEnabled {
+                    announcementGroupRow(
+                        title: tr("Motivation", "Motivasjon"),
+                        detail: tr("Approximately every", "Omtrent hvert") +
+                            " \(draft.smartPrompts.motivationIntervalSeconds) s"
+                    ) { editingOption = .motivation }
+                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                }
                 ForEach(draft.customRules) { rule in
                     announcementGroupRow(
                         title: rule.trigger == .distance
@@ -445,6 +455,19 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(bronze)
+
+            if !draft.smartPrompts.motivationEnabled {
+                Button {
+                    draft.smartPrompts.motivationEnabled = true
+                    draft.smartPrompts.motivationIntervalSeconds = 60
+                    editingOption = .motivation
+                } label: {
+                    Label(tr("Add motivation announcements", "Legg til motivasjonsvarsler"),
+                          systemImage: "sparkles")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+            }
 
             Button {
                 showingCatalogue = true
@@ -551,6 +574,22 @@ struct ATHLTHAudioCoachActiveListView: View {
         .presentationDetents([.large])
     }
 
+    private var standardMetricsEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(tr("Read together in one announcement", "Les opp samlet i én beskjed"))
+                .font(.subheadline.weight(.semibold))
+            Toggle(tr("Distance", "Distanse"), isOn: $draft.announceDistance)
+            Toggle(tr("Elapsed time", "Medgått tid"), isOn: $draft.announceElapsedTime)
+            Toggle(tr("Average pace", "Gjennomsnittstempo"), isOn: $draft.announceAveragePace)
+            Toggle(tr("Clock time", "Klokkeslett"), isOn: $draft.announceClockTime)
+            Toggle(tr("Heart rate", "Puls"), isOn: $draft.announceHeartRate)
+            Text(tr("The selected values use the same distance/time schedule. To set a separate schedule, create an independent group.",
+                    "Valgene bruker samme intervall. Opprett en egen varslingsgruppe hvis du vil ha et annet intervall."))
+                .font(.caption).foregroundStyle(dim)
+        }
+        .tint(bronze)
+    }
+
     @ViewBuilder
     private func editorFields(for option: ATHLTHAudioCoachOption) -> some View {
         switch option {
@@ -566,6 +605,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     Text("5 km").tag(5.0)
                 }
                 .pickerStyle(.menu)
+                standardMetricsEditor
             }
         case .timedUpdates:
             editorCard {
@@ -581,6 +621,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                standardMetricsEditor
             }
         case .currentZone:
             editorCard {
