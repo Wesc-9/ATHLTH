@@ -200,6 +200,35 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testEditsAfterUploadRequireAnotherSyncPass() throws {
+        var plan = makeMinimalPlan()
+        let uploaded = try ATHLTHStudioPlanSyncStore.accountFingerprint(for: plan)
+        XCTAssertFalse(try ATHLTHStudioPlanSyncStore.needsResyncAfterUpload(
+            uploadedFingerprint: uploaded, currentPlan: plan
+        ))
+
+        plan.title = "Changed while upload was in progress"
+        XCTAssertTrue(try ATHLTHStudioPlanSyncStore.needsResyncAfterUpload(
+            uploadedFingerprint: uploaded, currentPlan: plan
+        ))
+        XCTAssertTrue(try ATHLTHStudioPlanSyncStore.needsResyncAfterUpload(
+            uploadedFingerprint: uploaded, currentPlan: nil
+        ))
+    }
+
+    @MainActor
+    func testPrivateNoteEditedDuringUploadDoesNotRequireResync() throws {
+        var plan = makeMinimalPlan()
+        let uploaded = try ATHLTHStudioPlanSyncStore.accountFingerprint(for: plan)
+        plan.summary = "Local note changed during upload"
+        plan.updatedAt = Date().addingTimeInterval(60)
+        plan.version += 1
+        XCTAssertFalse(try ATHLTHStudioPlanSyncStore.needsResyncAfterUpload(
+            uploadedFingerprint: uploaded, currentPlan: plan
+        ))
+    }
+
     private func makeMinimalPlan() -> TrainingPlan {
         TrainingPlan(
             id: UUID(), ownerID: UUID(), title: "Example plan",
