@@ -986,8 +986,11 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                         Label(duration(Double(target)), systemImage: "timer")
                     }
                 } else {
-                    Label(distance(context.state.distanceMeters),
-                          systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    if context.state.distanceMeters.isFinite,
+                       context.state.distanceMeters > 0 {
+                        Label(distance(context.state.distanceMeters),
+                              systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    }
                     if context.state.workoutKindRaw == "running",
                        context.state.currentPaceSecondsPerKilometer != nil {
                         Text(validPace(context.state.currentPaceSecondsPerKilometer) + "/km")
@@ -1044,6 +1047,27 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            if !isStrength,
+               let remaining = context.state.runningStepRemainingSeconds,
+               remaining.isFinite {
+                HStack(spacing: 8) {
+                    Label(localized("Step remaining", "Tid igjen i steget"),
+                          systemImage: "timer")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    Spacer(minLength: 8)
+                    TimelineView(.periodic(from: .now, by: 1)) { tick in
+                        let consumed = context.state.phase == "running"
+                            ? max(0, tick.date.timeIntervalSince(context.state.updatedAt))
+                            : 0
+                        Text(duration(ceil(max(0, remaining - consumed))))
+                            .font(.system(size: 19, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHWidgetPalette.ink)
+                    }
                 }
             }
 
@@ -1283,9 +1307,14 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if let seconds = context.state.runningStepRemainingSeconds,
                        seconds.isFinite {
-                        Text(duration(ceil(max(seconds, 0))))
-                            .font(.title2.weight(.bold))
-                            .monospacedDigit()
+                        TimelineView(.periodic(from: .now, by: 1)) { tick in
+                            let consumed = context.state.phase == "running"
+                                ? max(0, tick.date.timeIntervalSince(context.state.updatedAt))
+                                : 0
+                            Text(duration(ceil(max(seconds - consumed, 0))))
+                                .font(.title2.weight(.bold))
+                                .monospacedDigit()
+                        }
                         Text(localized("left", "igjen"))
                             .font(.caption2)
                     } else if let meters =
