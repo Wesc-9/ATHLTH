@@ -159,23 +159,11 @@ struct ActiveStrengthWorkoutView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
                     if strength.activeWorkout != nil {
-                        Button {
-                            // Keep the recording, completed sets and active
-                            // timers alive; only close this live presentation.
+                        ATHLTHLiveWorkoutControlButton(kind: .minimize) {
+                            // Recording and timers continue after minimization.
                             strength.checkpoint()
                             dismiss()
-                        } label: {
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                .frame(width: 40, height: 40)
-                                .background(ATHLTHTheme.champagneSoft, in: Circle())
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Minimize workout",
-                            norwegian: "Legg ned økten"
-                        ))
                         .accessibilityHint(ATHLTHLocalization.choose(
                             english: "Keep tracking your workout and return to ATHLTH",
                             norwegian: "Fortsett å registrere økten og gå tilbake til ATHLTH"
@@ -247,6 +235,11 @@ struct ActiveStrengthWorkoutView: View {
                             }
                         } label: {
                             Image(systemName: "plus")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 43, height: 43)
+                                .background(.white.opacity(0.90),
+                                            in: RoundedRectangle(cornerRadius: 14))
                         }
                         .accessibilityLabel(ATHLTHLocalization.choose(
                             english: "Add exercise or workout",
@@ -254,20 +247,12 @@ struct ActiveStrengthWorkoutView: View {
                         ))
                     }
 
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Finish",
-                            norwegian: "Avslutt"
-                        )
+                    ATHLTHLiveWorkoutControlButton(
+                        kind: .finish,
+                        disabled: strength.activeWorkout == nil || finishInProgress
                     ) {
-                        showingFinishConfirmation =
-                            true
+                        showingFinishConfirmation = true
                     }
-                    .disabled(
-                        strength.activeWorkout ==
-                            nil ||
-                        finishInProgress
-                    )
                 }
             }
             .sheet(isPresented: $showingTrainingPlacePicker) {
@@ -777,6 +762,7 @@ struct ActiveStrengthWorkoutView: View {
             if let workout = strength.activeWorkout {
                 ATHLTHWorkoutAudioDock(
                     showSpotifyLauncher: false,
+                    compactAlignment: .leading,
                     coachVisible:
                         workout.advancedConfiguration?.audioCoach.enabled == true,
                     coachEnabled:
