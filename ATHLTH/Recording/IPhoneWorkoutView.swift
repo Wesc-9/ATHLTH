@@ -2264,45 +2264,10 @@ struct IPhoneWorkoutView: View {
             spacing: 10
         ) {
             HStack {
-                Button {
+                ATHLTHLiveWorkoutControlButton(kind: .minimize) {
                     recorder.minimizeWorkout()
                     dismiss()
-                } label: {
-                    Image(
-                        systemName:
-                            "chevron.down"
-                    )
-                    .font(
-                        .system(
-                            size: 16,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
-                    )
-                    .frame(
-                        width: 43,
-                        height: 43
-                    )
-                    .background(
-                        Color.white
-                            .opacity(0.90),
-                        in: Circle()
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                Color.black
-                                    .opacity(
-                                        0.045
-                                    ),
-                                lineWidth: 0.8
-                            )
-                    }
                 }
-                .buttonStyle(.plain)
 
                 Spacer()
 
@@ -2376,45 +2341,21 @@ struct IPhoneWorkoutView: View {
                 }
                 .buttonStyle(.plain)
                 if !workout.walking {
-                    Button {
+                    ATHLTHLiveWorkoutControlButton(kind: .add) {
                         showingAddRunningWorkout = true
-                    } label: {
-                        Image(systemName: "plus")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 43, height: 43)
-                        .background(Color.white.opacity(0.90), in: Circle())
-                        .overlay {
-                            Circle().stroke(
-                                Color.black.opacity(0.045), lineWidth: 0.8
-                            )
-                        }
+                    }
                 }
-                .buttonStyle(.plain)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Add interval workout",
-                        norwegian: "Legg til intervalløkt"
-                    ))
-                }
-                Button {
+                ATHLTHLiveWorkoutControlButton(
+                    kind: .finish,
+                    disabled: recorder.saving
+                ) {
                     confirmFinish = true
-                } label: {
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.red)
-                        .frame(width: 43, height: 43)
-                        .background(Color.white.opacity(0.9), in: Circle())
                 }
-                .buttonStyle(.plain)
-                .disabled(recorder.saving)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Finish and save workout", norwegian: "Avslutt og lagre økten"
-                ))
             }
 
             ATHLTHWorkoutAudioDock(
                 compactAlignment: .leading,
-                coachVisible: true,
+                coachVisible: workout.audioCoachConfiguration?.enabled == true,
                 coachEnabled: workout.audioCoachConfiguration?.enabled == true,
                 coachPaused: recorder.coachSpeechPaused,
                 coachManagedOnWatch: false,
