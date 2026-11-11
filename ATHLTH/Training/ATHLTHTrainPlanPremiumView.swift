@@ -659,32 +659,59 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
     }
 
-        private var referencePageIntro: some View {
-        HStack(alignment: .top, spacing: 9) {
-            VStack(alignment: .leading, spacing: 5) {
+    
+    /// Keep Plan navigation within the parent viewport on narrow iPhones.
+    /// Long localizations use an icon-only My plans button automatically.
+    private var referencePageIntro: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .center, spacing: 8) {
                 Text("Plan")
                     .font(.system(size: 40, weight: .regular, design: .serif))
                     .foregroundStyle(graphite)
                     .accessibilityAddTraits(.isHeader)
-                Text(plan == nil
-                    ? (session.trainingPlans.isEmpty
-                        ? tr("Build your first plan and reach your goals.",
-                             "Lag din første treningsplan og nå dine mål.")
-                        : tr("Choose a saved plan or create a new one.",
-                             "Velg en lagret plan eller opprett en ny."))
-                    : tr("Build week by week, with structure and flow.",
-                         "Bygg uke for uke, med struktur og flyt."))
-                    .font(.system(size: 13, weight: .regular, design: .serif))
-                    .foregroundStyle(secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 3)
-            HStack(spacing: 7) {
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                        browsingMyPlans.toggle()
+
+                Spacer(minLength: 4)
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 7) {
+                        referenceMyPlansShortcut(compact: false)
+                        referenceViewSelector
                     }
-                } label: {
+                    HStack(spacing: 7) {
+                        referenceMyPlansShortcut(compact: true)
+                        referenceViewSelector
+                    }
+                }
+            }
+            Text(plan == nil
+                ? (session.trainingPlans.isEmpty
+                    ? tr("Build your first plan and reach your goals.",
+                         "Lag din første treningsplan og nå dine mål.")
+                    : tr("Choose a saved plan or create a new one.",
+                         "Velg en lagret plan eller opprett en ny."))
+                : tr("Build week by week, with structure and flow.",
+                     "Bygg uke for uke, med struktur og flyt."))
+                .font(.system(size: 13, weight: .regular, design: .serif))
+                .foregroundStyle(secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 2)
+    }
+
+    private func referenceMyPlansShortcut(compact: Bool) -> some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                browsingMyPlans.toggle()
+            }
+        } label: {
+            Group {
+                if compact {
+                    Image(systemName: browsingMyPlans ? "calendar" : "square.stack")
+                        .font(.system(size: 17, weight: .medium))
+                        .frame(width: 44, height: 44)
+                } else {
                     Label(
                         browsingMyPlans
                             ? tr("Plan overview", "Planoversikt")
@@ -693,62 +720,65 @@ struct ATHLTHTrainPlanPremiumView: View {
                     )
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
-                    .padding(.horizontal, 12)
+                    .minimumScaleFactor(0.80)
+                    .padding(.horizontal, 10)
                     .frame(minHeight: 44)
-                    .background(.white.opacity(0.85), in: Capsule())
-                    .overlay {
-                        Capsule().strokeBorder(line.opacity(0.55), lineWidth: 0.6)
-                    }
-                }
-                .accessibilityLabel(
-                    browsingMyPlans
-                        ? tr("Show plan overview", "Vis planoversikt")
-                        : tr("Open My plans", "Åpne Mine planer")
-                )
-                // A view switcher rather than a settings affordance. All
-                // layouts of the selected plan are in one predictable place.
-                if plan != nil && !browsingMyPlans {
-                    Menu {
-                        Button {
-                            showPlanWeekOverview = true
-                        } label: {
-                            Label(tr("Whole week", "Hele uken"),
-                                  systemImage: showPlanWeekOverview ? "checkmark" : "calendar")
-                        }
-                        Button {
-                            showPlanWeekOverview = false
-                        } label: {
-                            Label(tr("One day", "Én dag"),
-                                  systemImage: !showPlanWeekOverview
-                                      ? "checkmark" : "calendar.day.timeline.left")
-                        }
-                        Divider()
-                        Button {
-                            planDetailTab = 1
-                            showingPlanDetails = true
-                        } label: {
-                            Label(tr("View full plan", "Se hele planen"),
-                                  systemImage: "list.bullet.rectangle")
-                        }
-                    } label: {
-                        Image(systemName: "rectangle.grid.1x2")
-                            .font(.system(size: 17, weight: .medium))
-                            .frame(width: 44, height: 44)
-                            .background(.white.opacity(0.85), in: Circle())
-                    }
-                    .accessibilityLabel(tr("Change plan view", "Endre planvisning"))
-                    .accessibilityHint(tr("Choose day, week or entire plan",
-                                          "Velg dag, uke eller hele planen"))
                 }
             }
-            .foregroundStyle(graphite)
-            .buttonStyle(.plain)
-            .padding(.top, 5)
+            .background(.white.opacity(0.85), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(line.opacity(0.55), lineWidth: 0.6)
+            }
         }
-        .padding(.bottom, 2)
+        .buttonStyle(.plain)
+        .foregroundStyle(graphite)
+        .accessibilityLabel(
+            browsingMyPlans
+                ? tr("Show plan overview", "Vis planoversikt")
+                : tr("Open My plans", "Åpne Mine planer")
+        )
     }
 
-        private func referenceModePill(
+    @ViewBuilder
+    private var referenceViewSelector: some View {
+        if plan != nil && !browsingMyPlans {
+            Menu {
+                Button {
+                    showPlanWeekOverview = true
+                } label: {
+                    Label(tr("Whole week", "Hele uken"),
+                          systemImage: showPlanWeekOverview ? "checkmark" : "calendar")
+                }
+                Button {
+                    showPlanWeekOverview = false
+                } label: {
+                    Label(tr("One day", "Én dag"),
+                          systemImage: !showPlanWeekOverview
+                              ? "checkmark" : "calendar.day.timeline.left")
+                }
+                Divider()
+                Button {
+                    planDetailTab = 1
+                    showingPlanDetails = true
+                } label: {
+                    Label(tr("View full plan", "Se hele planen"),
+                          systemImage: "list.bullet.rectangle")
+                }
+            } label: {
+                Image(systemName: "rectangle.grid.1x2")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 44, height: 44)
+                    .background(.white.opacity(0.85), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(graphite)
+            .accessibilityLabel(tr("Change plan view", "Endre planvisning"))
+            .accessibilityHint(tr("Choose day, week or entire plan",
+                                  "Velg dag, uke eller hele planen"))
+        }
+    }
+
+    private func referenceModePill(
         _ title: String, selected: Bool, action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
