@@ -180,19 +180,15 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             )
             let allIDs = Set(remoteByID.keys).union(localByID.keys)
 
-            // Plans may contain injury details in the builder profile. Until
-            // special-category data have an approved lawful basis, do not
-            // upload these plans as ordinary account documents. Keep the
-            // original completely intact on this device.
-            var heldForPrivacy = 0
+            // Reconcile sanitized account copies, not private device notes.
             for planID in allIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
                 guard enabled, accountID == userID else { return }
 
                 let local = localByID[planID]
                 let remote = remoteByID[planID]
-                let localFingerprint = try local.map { try fingerprint(for: $0) }
+                let localFingerprint = try local.map { try fingerprint(for: Self.accountCopy(of: $0)) }
                 let remotePlan = try remote.flatMap { try decode($0.body_base64, owner: userID, id: planID) }
-                let remoteFingerprint = try remotePlan.map { try fingerprint(for: $0) }
+                let remoteFingerprint = try remotePlan.map { try fingerprint(for: Self.accountCopy(of: $0)) }
                 let previous = acknowledgements[planID.uuidString]
                 let action = ATHLTHStudioPlanSyncDecision.choose(
                     localFingerprint: localFingerprint,
@@ -208,10 +204,6 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                                     fingerprint: remoteFingerprint, owner: userID)
                     }
                 case let .upload(expected):
-                    if let local, !Self.isEligibleForOrdinaryAccountSync(local) {
-                        heldForPrivacy += 1
-                        continue
-                    }
                     guard let local,
                           session.accountPlanDocument(withID: planID) == local else {
                         unresolved.append(Conflict(id: planID, title: local?.title ?? "Training plan"))
@@ -230,7 +222,9 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     guard let remote, let remotePlan else { continue }
                     // Never replace a plan edited while the network call was pending.
                     guard session.accountPlanDocument(withID: planID) == local,
-                          session.importAccountPlanDocument(remotePlan) else {
+                          session.importAccountPlanDocument(
+                              Self.restoringDeviceOnlyFields(from: local, into: remotePlan)
+                          ) else {
                         unresolved.append(Conflict(id: planID, title: remotePlan.title))
                         continue
                     }
@@ -244,25 +238,16 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             }
 
             conflicts = unresolved
-            // A successful network roundtrip does not mean privacy-held
-            // plans or unresolved conflicts have been synchronized.
             lastSuccessfulSync = Date()
-            if heldForPrivacy > 0 {
-                status = ATHLTHLocalization.choose(
-                    english: "\(heldForPrivacy) plan(s) kept on this device because they include injury/limitation notes. Other eligible plans were checked.",
-                    norwegian: "\(heldForPrivacy) plan(er) beholdes lokalt fordi de inneholder notater om skader/begrensninger. Andre aktuelle planer er kontrollert."
-                )
-            } else {
-                status = unresolved.isEmpty
-                    ? ATHLTHLocalization.choose(
-                        english: "Training plans are up to date on this device.",
-                        norwegian: "Treningsplanene er oppdatert på denne enheten."
-                      )
-                    : ATHLTHLocalization.choose(
-                        english: "\(unresolved.count) plan conflict(s) need your decision. No changes were overwritten.",
-                        norwegian: "\(unresolved.count) plankonflikt(er) krever et valg. Ingen endringer ble overskrevet."
-                      )
-            }
+            status = unresolved.isEmpty
+                ? ATHLTHLocalization.choose(
+                    english: "Account plans are up to date. Private notes stay on this device.",
+                    norwegian: "Kontoplanene er oppdatert. Private notater beholdes på denne enheten."
+                  )
+                : ATHLTHLocalization.choose(
+                    english: "\(unresolved.count) plan conflict(s) need your decision. No changes were overwritten.",
+                    norwegian: "\(unresolved.count) plankonflikt(er) krever et valg. Ingen endringer ble overskrevet."
+                  )
         } catch {
             if accountID == userID {
                 status = ATHLTHLocalization.choose(
@@ -311,7 +296,12 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             if let row = rows.first {
                 if preferRemote {
                     guard let decoded = try decode(row.body_base64, owner: userID, id: planID),
-                          session.importAccountPlanDocument(decoded) else {
+                          session.importAccountPlanDocument(
+                              Self.restoringDeviceOnlyFields(
+                                  from: session.accountPlanDocument(withID: planID),
+                                  into: decoded
+                              )
+                          ) else {
                         status = ATHLTHLocalization.choose(
                             english: "Cannot import plan while another plan conflicts in the calendar.",
                             norwegian: "Planen kan ikke importeres på grunn av en overlappende kalenderplan."
@@ -378,28 +368,110 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         }
     }
 
-    /// Narrow safety gate for the dedicated injury/limitations field.
-    /// This is NOT a complete assessment of all health information in free text.
-    static func isEligibleForOrdinaryAccountSync(_ plan: TrainingPlan) -> Bool {
-        let limitations = plan.builderProfile?.injuriesOrLimitations?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return limitations.isEmpty
+    /// Only structured plan prescriptions cross devices. Free-form health,
+    /// injury and location notes stay with the original device. A projection
+    /// is also used for fingerprints, so editing a private note does not
+    /// produce a false sync conflict.
+    static func accountCopy(of plan: TrainingPlan) -> TrainingPlan {
+        var copy = plan
+        copy.summary = ""
+        copy.builderProfile?.injuriesOrLimitations = nil
+        copy.builderProfile?.goalDetail = nil
+        copy.trainingBlocks = copy.trainingBlocks?.map { block in
+            var clean = block
+            clean.goal = ""
+            return clean
+        }
+        copy.weeks = copy.weeks.map { week in
+            var updatedWeek = week
+            updatedWeek.days = week.days.map { day in
+                var updatedDay = day
+                updatedDay.sessions = day.sessions.map { workout in
+                    var clean = workout
+                    clean.notes = nil
+                    clean.meetingPoint = nil
+                    clean.plannedTrainingPlace = nil
+                    clean.exercises = workout.exercises.map { exercise in
+                        var cleaned = exercise
+                        cleaned.notes = nil
+                        cleaned.setTargets = cleaned.setTargets?.map { target in
+                            var set = target
+                            set.notes = nil
+                            return set
+                        }
+                        return cleaned
+                    }
+                    return clean
+                }
+                return updatedDay
+            }
+            return updatedWeek
+        }
+        return copy
+    }
+
+    /// Reattach this device's notes to matching document identities after
+    /// importing a cloud copy; never apply private fields to a new account.
+    static func restoringDeviceOnlyFields(
+        from local: TrainingPlan?,
+        into remote: TrainingPlan
+    ) -> TrainingPlan {
+        guard let local, local.id == remote.id,
+              local.ownerID == remote.ownerID else { return remote }
+        var restored = remote
+        restored.summary = local.summary
+        restored.builderProfile?.injuriesOrLimitations =
+            local.builderProfile?.injuriesOrLimitations
+        restored.builderProfile?.goalDetail = local.builderProfile?.goalDetail
+        restored.trainingBlocks = restored.trainingBlocks?.map { block in
+            var merged = block
+            if let old = local.trainingBlocks?.first(where: { $0.id == block.id }) {
+                merged.goal = old.goal
+            }
+            return merged
+        }
+        restored.weeks = restored.weeks.map { week in
+            var mergedWeek = week
+            mergedWeek.days = week.days.map { day in
+                var mergedDay = day
+                mergedDay.sessions = day.sessions.map { workout in
+                    var merged = workout
+                    if let old = local.weeks.flatMap(\\.days)
+                        .flatMap(\\.sessions).first(where: { $0.id == workout.id }) {
+                        merged.notes = old.notes
+                        merged.meetingPoint = old.meetingPoint
+                        merged.plannedTrainingPlace = old.plannedTrainingPlace
+                        merged.exercises = merged.exercises.map { exercise in
+                            var clean = exercise
+                            if let oldExercise = old.exercises.first(where: { $0.id == exercise.id }) {
+                                clean.notes = oldExercise.notes
+                                clean.setTargets = clean.setTargets?.map { target in
+                                    var set = target
+                                    if let oldSet = oldExercise.setTargets?.first(where: { $0.id == target.id }) {
+                                        set.notes = oldSet.notes
+                                    }
+                                    return set
+                                }
+                            }
+                            return clean
+                        }
+                    }
+                    return merged
+                }
+                return mergedDay
+            }
+            return mergedWeek
+        }
+        return restored
     }
 
     private func save(_ plan: TrainingPlan, expected: Int64) async throws -> Int64 {
-        // This is the single upload gateway, including manual conflict
-        // resolution. Never bypass privacy restrictions through another path.
-        guard Self.isEligibleForOrdinaryAccountSync(plan) else {
-            throw NSError(
-                domain: "ATHLTH.PlanSync", code: 403,
-                userInfo: [NSLocalizedDescriptionKey:
-                    "This plan contains injury or limitation notes and needs separate health-data authorization."]
-            )
-        }
+        // All upload paths, including conflict resolution, use the same
+        // privacy-preserving account projection.
         guard enabled, accountID == plan.ownerID else {
             throw NSError(domain: "ATHLTH.PlanSync", code: 1)
         }
-        let encoded = try JSONEncoder().encode(plan)
+        let encoded = try JSONEncoder().encode(Self.accountCopy(of: plan))
         guard encoded.count <= 2_000_000 else {
             throw NSError(domain: "ATHLTH.PlanSync", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "Plan exceeds safe cloud size limit."])
