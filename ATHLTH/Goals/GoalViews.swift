@@ -1756,8 +1756,6 @@ struct GoalCreationView: View {
     private var inlinePlanFields: some View {
         VStack(alignment: .leading, spacing: 16) {
             targetStep
-            identityStep
-            milestoneStep
             Button(ATHLTHLocalization.choose(english: "Save and link goal", norwegian: "Lagre og knytt til mål")) {
                 createGoal()
             }
@@ -1912,8 +1910,6 @@ struct GoalCreationView: View {
                     Group {
                         switch step {
                         case 1: targetStep
-                        case 2: identityStep
-                        case 3: milestoneStep
                         default: reviewStep
                         }
                     }
@@ -1995,7 +1991,7 @@ struct GoalCreationView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text(ATHLTHLocalization.format(
-                        english: "STEP %d OF 5", norwegian: "STEG %d AV 5", step + 1
+                        english: "STEP %d OF 3", norwegian: "STEG %d AV 3", step + 1
                     ))
                     .tracking(1.5)
                     Spacer()
@@ -2005,7 +2001,7 @@ struct GoalCreationView: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
                 HStack(spacing: 5) {
-                    ForEach(0..<5, id: \.self) { index in
+                    ForEach(0..<3, id: \.self) { index in
                         Capsule()
                             .fill(index <= step
                                 ? goalFlowGold
@@ -2148,16 +2144,6 @@ struct GoalCreationView: View {
                 english: "Goal details",
                 norwegian: "Måldetaljer"
             )
-        case 2:
-            return ATHLTHLocalization.format(
-                english: "Make it personal",
-                norwegian: "Gjør målet personlig"
-            )
-        case 3:
-            return ATHLTHLocalization.format(
-                english: "Your milestones",
-                norwegian: "Dine delmål"
-            )
         default:
             return ATHLTHLocalization.format(
                 english: "Ready to start",
@@ -2175,20 +2161,6 @@ struct GoalCreationView: View {
                     "Choose a clear target. ATHLTH will use it for progress and milestones.",
                 norwegian:
                     "Velg et tydelig mål. ATHLTH bruker det til fremdrift og delmål."
-            )
-        case 2:
-            return ATHLTHLocalization.format(
-                english:
-                    "Add the details that make this goal personal.",
-                norwegian:
-                    "Legg til detaljene som gjør målet personlig."
-            )
-        case 3:
-            return ATHLTHLocalization.format(
-                english:
-                    "See the path from today to your final target.",
-                norwegian:
-                    "Se veien fra i dag til det endelige målet."
             )
         default:
             return ATHLTHLocalization.format(
@@ -2511,6 +2483,15 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
+            compactGoalImagePicker
+            DisclosureGroup(ATHLTHLocalization.choose(english: "Why this matters and notes", norwegian: "Hvorfor dette er viktig og notater")) {
+                goalPersonalDetails
+            }
+            .tint(goalFlowGold)
+            DisclosureGroup(ATHLTHLocalization.choose(english: "Tracking and milestones", norwegian: "Sporing og delmål")) {
+                milestoneStep
+            }
+            .tint(goalFlowGold)
             goalInputCard(
                 icon: "text.cursor",
                 title:
@@ -2938,7 +2919,7 @@ struct GoalCreationView: View {
         }
     }
 
-    private var identityStep: some View {
+    private var compactGoalImagePicker: some View {
         let imageButtonTitle =
             goalImageButtonTitle
 
@@ -2964,7 +2945,7 @@ struct GoalCreationView: View {
                             .resizable()
                             .scaledToFill()
                             .athlthBoundedFill()
-                            .frame(height: 150)
+                            .frame(height: 64)
                             .frame(
                                 maxWidth:
                                     .infinity
@@ -3090,8 +3071,8 @@ struct GoalCreationView: View {
                                                 }
                                             }
                                             .frame(
-                                                width: 112,
-                                                height: 72
+                                                width: 88,
+                                                height: 54
                                             )
                                             .clipped()
 
@@ -3144,8 +3125,8 @@ struct GoalCreationView: View {
                                             }
                                         }
                                         .frame(
-                                            width: 112,
-                                            height: 72
+                                            width: 88,
+                                            height: 54
                                         )
                                         .clipShape(
                                             RoundedRectangle(
@@ -3182,6 +3163,11 @@ struct GoalCreationView: View {
                 }
             }
 
+        }
+    }
+
+    private var goalPersonalDetails: some View {
+        VStack(alignment: .leading, spacing: 12) {
             goalInputCard(
                 icon: "heart.text.square.fill",
                 title:
@@ -4481,7 +4467,7 @@ struct GoalCreationView: View {
 
     private var footer: some View {
         Button {
-            if step == 4 {
+            if step == 2 {
                 createGoal()
             } else {
                 withAnimation(
@@ -4493,7 +4479,7 @@ struct GoalCreationView: View {
         } label: {
             HStack(spacing: 10) {
                 Text(
-                    step == 4
+                    step == 2
                         ? ATHLTHLocalization.format(
                             english: "Create Goal",
                             norwegian: "Opprett mål"
@@ -4512,7 +4498,7 @@ struct GoalCreationView: View {
 
                 Image(
                     systemName:
-                        step == 4
+                        step == 2
                             ? "checkmark"
                             : "arrow.right"
                 )
@@ -4584,16 +4570,6 @@ struct GoalCreationView: View {
             return ATHLTHLocalization.format(
                 english: "Target",
                 norwegian: "Mål"
-            )
-        case 2:
-            return ATHLTHLocalization.format(
-                english: "Details",
-                norwegian: "Detaljer"
-            )
-        case 3:
-            return ATHLTHLocalization.format(
-                english: "Milestones",
-                norwegian: "Delmål"
             )
         default:
             return ATHLTHLocalization.format(

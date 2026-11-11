@@ -304,6 +304,13 @@ private struct ATHLTHSceneRootView: View {
                 }
             }
         }
+        .task(id: "\(appSession.profile.userID)-\(appSession.signedIn)-\(scenePhase == .active)") {
+            guard appSession.signedIn, scenePhase == .active else { return }
+            while !Task.isCancelled {
+                studioPlanSync.scheduleSync(session: appSession)
+                do { try await Task.sleep(for: .seconds(20)) } catch { return }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(
             for: .athlthTrainingDataDidChange
         )) { message in
@@ -315,6 +322,8 @@ private struct ATHLTHSceneRootView: View {
             scheduleProfileRecordSummaryPublish()
         }
         .onChange(of: appSession.profile.userID) { _, _ in
+            studioPlanSync.switchAccount(appSession.signedIn ? appSession.profile.userID : nil)
+            studioPlanSync.scheduleSync(session: appSession)
             // The account identity can be resolved after the signed-in
             // flag, especially when recovering an older offline install.
             profileRecords.switchAccount(

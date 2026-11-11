@@ -126,7 +126,7 @@ struct ATHLTHiPadStudioRootView: View {
     @EnvironmentObject private var session: AppSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMessagePanelMotion
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var studioPlanSync = ATHLTHStudioPlanSyncStore()
+    @EnvironmentObject private var studioPlanSync: ATHLTHStudioPlanSyncStore
     @SceneStorage("athlth.studio.selectedDestination")
     private var savedDestination = ATHLTHStudioDestination.overview.rawValue
     @State private var selection: ATHLTHStudioDestination = .overview
@@ -259,7 +259,14 @@ struct ATHLTHiPadStudioRootView: View {
                             && sidebarPage == nil ? .hidden : .visible,
                         for: .navigationBar
                     )
+                    .toolbar(removing: .sidebarToggle)
                     .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                withAnimation { sidebarVisibility = sidebarVisibility == .detailOnly ? .all : .detailOnly }
+                            } label: { Image(systemName: "line.3.horizontal") }
+                            .accessibilityLabel(ATHLTHLocalization.choose(english: "Side menu", norwegian: "Sidemeny"))
+                        }
                         // NavigationSplitView supplies the native sidebar
                         // visibility control. Do not draw a second identical
                         // leading button in the detail NavigationStack.

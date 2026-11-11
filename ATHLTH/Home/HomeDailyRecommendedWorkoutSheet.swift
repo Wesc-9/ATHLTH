@@ -10,6 +10,11 @@ struct HomeDailyRecommendedWorkoutSheet: View {
     let onStartOnPhone: () -> Void
     let onStartOnWatch: () -> Void
 
+    var isCalendarWorkout = false
+    var canStart = true
+    var onDelete: (() -> Void)? = nil
+    @State private var confirmingDeletion = false
+
     @Environment(\.dismiss) private var dismiss
 
     private func tr(_ english: String, _ norwegian: String) -> String {
@@ -35,7 +40,7 @@ struct HomeDailyRecommendedWorkoutSheet: View {
 
                     Spacer(minLength: 0)
 
-                    Text(tr("Recommended workout", "Anbefalt treningsøkt"))
+                    Text(isCalendarWorkout ? tr("Planned workout", "Planlagt treningsøkt") : tr("Recommended workout", "Anbefalt treningsøkt"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                         .lineLimit(1)
@@ -43,9 +48,15 @@ struct HomeDailyRecommendedWorkoutSheet: View {
 
                     Spacer(minLength: 0)
                     // Balance the leading close control to keep the title centered.
-                    Color.clear
-                        .frame(width: 42, height: 42)
-                        .accessibilityHidden(true)
+                    if onDelete != nil {
+                        Button { confirmingDeletion = true } label: {
+                            Image(systemName: "trash").frame(width: 42, height: 42)
+                        }
+                        .foregroundStyle(.red)
+                        .accessibilityLabel(tr("Delete workout", "Slett økt"))
+                    } else {
+                        Color.clear.frame(width: 42, height: 42).accessibilityHidden(true)
+                    }
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 12)
@@ -109,6 +120,12 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                 )
                 .ignoresSafeArea()
             }
+            .alert(tr("Delete planned workout?", "Slette planlagt økt?"), isPresented: $confirmingDeletion) {
+                Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+                Button(tr("Delete", "Slett"), role: .destructive) { onDelete?(); dismiss() }
+            } message: {
+                Text(tr("This removes the planned workout. Completed training stays in your history.", "Dette sletter den planlagte økten. Fullført trening beholdes i historikken."))
+            }
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 HomeDailyRecommendedWorkoutActions(
@@ -118,6 +135,7 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                     onStartOnPhone: onStartOnPhone,
                     onStartOnWatch: onStartOnWatch
                 )
+                .disabled(!canStart)
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 12)

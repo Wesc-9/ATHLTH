@@ -1516,15 +1516,7 @@ struct ATHLTHHomeView: View {
                 )
             }
             .sheet(item: $selectedHomeStandaloneWorkout) { workout in
-                NavigationStack {
-                    HomeWeeklyStandaloneWorkoutDetailView(
-                        workout: workout,
-                        onStartWorkout: { selected, device in
-                            selectedHomeStandaloneWorkout = nil
-                            startHomeStandaloneWorkout(selected, device: device)
-                        }
-                    )
-                }
+                homeCalendarWorkoutSheet(workout)
                 .presentationDetents([.fraction(0.76), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
@@ -2453,16 +2445,7 @@ struct ATHLTHHomeView: View {
                     ForEach(Array(todayWorkouts.prefix(visibleWorkoutCount))) { workout in
                         HStack(spacing: 5) {
                             Button {
-                                if let planID =
-                                    HomeWeeklyProgressCalendar.containingPlanID(
-                                        for: workout, in: plan
-                                    ) {
-                                    onOpenTrain(.workout(
-                                        planID: planID, workoutID: workout.id
-                                    ))
-                                } else {
-                                    selectedHomeStandaloneWorkout = workout
-                                }
+                                selectedHomeStandaloneWorkout = workout
                             } label: {
                                 homeCompactCalendarRow(
                                     time: workout.scheduledStart,
@@ -2474,7 +2457,6 @@ struct ATHLTHHomeView: View {
                             }
                             .buttonStyle(.plain)
 
-                            homeCalendarWorkoutActions(workout)
                         }
                     }
 
@@ -2816,17 +2798,7 @@ struct ATHLTHHomeView: View {
                     ForEach(workouts) { workout in
                         HStack(spacing: 8) {
                             Button {
-                                if let planID =
-                                    HomeWeeklyProgressCalendar.containingPlanID(
-                                        for: workout, in: activePlan
-                                    ) {
-                                    showingHomeTodayCalendarAll = false
-                                    onOpenTrain(.workout(
-                                        planID: planID, workoutID: workout.id
-                                    ))
-                                } else {
-                                    selectedHomeAllStandaloneWorkout = workout
-                                }
+                                selectedHomeAllStandaloneWorkout = workout
                             } label: {
                                 homeCalendarPlanRow(workout)
                                     .padding(13)
@@ -2838,7 +2810,6 @@ struct ATHLTHHomeView: View {
                             }
                             .buttonStyle(.plain)
 
-                            homeCalendarWorkoutActions(workout)
                         }
                     }
 
@@ -2972,152 +2943,39 @@ struct ATHLTHHomeView: View {
                     Text(homeWorkoutPendingRemoval?.title ?? "")
                 }
         .sheet(item: $selectedHomeAllStandaloneWorkout) { workout in
-            NavigationStack {
-                HomeWeeklyStandaloneWorkoutDetailView(
-                    workout: workout,
-                    onStartWorkout: { selected, device in
-                        selectedHomeAllStandaloneWorkout = nil
-                        showingHomeTodayCalendarAll = false
-                        startHomeStandaloneWorkout(selected, device: device)
-                    }
-                )
-            }
-            .presentationDetents([.fraction(0.76), .large])
+                homeCalendarWorkoutSheet(workout)
+                .presentationDetents([.fraction(0.76), .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
         }
     }
 
-    /// The calendar's trailing menu is usable without opening a separate
-    /// workout editor. Only sessions not already completed can be launched
-    /// or removed. Watch manual start is not an automatic HealthKit start.
-    private func homeCalendarWorkoutActions(
-        _ workout: PlannedSession
-    ) -> some View {
-        let planID = HomeWeeklyProgressCalendar.containingPlanID(
-            for: workout, in: session.activePlan
+    private func homeCalendarWorkoutSheet(_ workout: PlannedSession) -> some View {
+        let planID = HomeWeeklyProgressCalendar.containingPlanID(for: workout, in: session.activePlan)
+        let completed = planID.map { homeIsPlanSessionCompleted(planID: $0, workout: workout) } ?? false
+        let skipped = planID.map { session.isPlanSessionSkipped(planID: $0, sessionID: workout.id) } ?? false
+        return HomeDailyRecommendedWorkoutSheet(
+            workout: workout,
+            isPlanWorkout: planID != nil,
+            canStartWithWatch: watchConnection.isReady,
+            onOpenPlannedWorkout: { startCalendarPreview(workout, planID: planID, device: .appleWatch) },
+            onStartOnPhone: { startCalendarPreview(workout, planID: planID, device: .iPhone) },
+            onStartOnWatch: { startCalendarPreview(workout, planID: planID, device: .appleWatch) },
+            isCalendarWorkout: true,
+            canStart: !completed && !skipped && !workout.isExplicitRestDay,
+            onDelete: completed ? nil : { removeHomeCalendarWorkout(workout) }
         )
-        let isCompleted = planID.map {
-            homeIsPlanSessionCompleted(planID: $0, workout: workout)
-        } ?? false
-        let isSkipped = planID.map {
-            session.isPlanSessionSkipped(planID: $0, sessionID: workout.id)
-        } ?? false
-        let canStart = !workout.isExplicitRestDay && !isCompleted && !isSkipped
+    }
 
-        return Menu {
-            if canStart {
-                Button {
-                    showingHomeTodayCalendarAll = false
-                    startHomeStandaloneWorkout(workout, device: .iPhone)
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Start on iPhone", norwegian: "Start på iPhone"
-                        ),
-                        systemImage: "iphone"
-                    )
-                }
-                Button {
-                    showingHomeTodayCalendarAll = false
-                    startHomeStandaloneWorkout(workout, device: .appleWatch)
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Start on Apple Watch",
-                            norwegian: "Start på Apple Watch"
-                        ),
-                        systemImage: "applewatch"
-                    )
-                }
-                .disabled(!watchConnection.isReady)
-
-                if workout.kind == .running || workout.kind == .walking {
-                    Button {
-                        showingHomeTodayCalendarAll = false
-                        // A calendar all-sessions sheet may still be dismissing.
-                        // Present the countdown only after it has left.
-                        Task { @MainActor in
-                            do { try await Task.sleep(for: .milliseconds(450)) }
-                            catch { return }
-                            homeDeferredPhoneWorkout = workout
-                        }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "iPhone · start in 30 sec",
-                                norwegian: "iPhone · start om 30 sek"
-                            ),
-                            systemImage: "timer"
-                        )
-                    }
-                    Button {
-                        showingHomeTodayCalendarAll = false
-                        startHomeStandaloneWorkout(
-                            workout,
-                            device: .appleWatch,
-                            watchStartMode: .onWatch
-                        )
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Send to Watch · start there",
-                                norwegian: "Send til klokken · start der"
-                            ),
-                            systemImage: "arrow.up.right"
-                        )
-                    }
-                    .disabled(!watchConnection.isReady)
-
-                    Button {
-                        showingHomeTodayCalendarAll = false
-                        startHomeStandaloneWorkout(
-                            workout,
-                            device: .appleWatch,
-                            watchStartMode: .afterThirtySeconds
-                        )
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Watch · start in 30 sec",
-                                norwegian: "Klokken · start om 30 sek"
-                            ),
-                            systemImage: "timer"
-                        )
-                    }
-                    .disabled(!watchConnection.isReady)
-                }
-            }
-
-            if !isCompleted {
-                Divider()
-                Button(role: .destructive) {
-                    homeWorkoutPendingRemoval = workout
-                    showingHomeWorkoutRemovalConfirmation = true
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Remove from calendar",
-                            norwegian: "Fjern fra kalender"
-                        ),
-                        systemImage: "trash"
-                    )
-                }
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-                .frame(width: 33, height: 46)
-                .contentShape(Rectangle())
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Workout actions",
-                        norwegian: "Øktalternativer"
-                    )
-                )
+    private func startCalendarPreview(_ workout: PlannedSession, planID: UUID?, device: WorkoutCaptureDevice) {
+        selectedHomeStandaloneWorkout = nil
+        selectedHomeAllStandaloneWorkout = nil
+        showingHomeTodayCalendarAll = false
+        Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            if let planID { onOpenTrain(.workout(planID: planID, workoutID: workout.id)) }
+            else { startHomeStandaloneWorkout(workout, device: device) }
         }
-        .menuStyle(.borderlessButton)
     }
 
     private func removeHomeCalendarWorkout(_ workout: PlannedSession) {

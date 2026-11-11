@@ -108,6 +108,25 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 addSectionMenu
             }
 
+            if activity == .strength {
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 12) {
+                        strengthHelp("Superset", "Supersett", "Two or more exercises in sequence before resting.", "To eller flere øvelser etter hverandre før pause.")
+                        strengthHelp("Circuit", "Sirkeltrening", "Repeat a round of stations with an optional transition between them.", "Gjenta en runde med stasjoner, med valgfri overgangspause.")
+                        strengthHelp("EMOM", "EMOM", "Start the prescribed work each minute. Rest for the remaining time.", "Start arbeidet hvert minutt. Hvil resten av minuttet.")
+                        strengthHelp("AMRAP", "AMRAP", "Complete as many controlled rounds or repetitions as you can in the chosen time.", "Gjør så mange kontrollerte runder eller repetisjoner du rekker innen valgt tid.")
+                        strengthHelp("Drop set", "Dropsett", "Lower the weight between stages and continue with little rest.", "Reduser vekten mellom delene og fortsett med kort pause.")
+                        strengthHelp("Free strength", "Fri styrketrening", "Record a strength workout without predefined exercises.", "Registrer styrketrening uten forhåndsbestemte øvelser.")
+                    }.padding(.top, 8)
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "What do the training modes mean?", norwegian: "Hva betyr treningsformene?"), systemImage: "info.circle")
+                        .font(.subheadline)
+                }
+                .tint(bronze)
+                .padding(12)
+                .background(paper, in: RoundedRectangle(cornerRadius: 14))
+            }
+
             if let routeBlock = routeAsWholeWorkout {
                 VStack(alignment: .leading, spacing: 9) {
                     Label(
@@ -1001,6 +1020,13 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     private func endLiveReorder() {
         withAnimation(.easeOut(duration: 0.16)) {
             draggingID = nil
+        }
+    }
+
+    private func strengthHelp(_ title: String, _ norwegianTitle: String, _ detail: String, _ norwegianDetail: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(ATHLTHLocalization.choose(english: title, norwegian: norwegianTitle)).font(.subheadline.weight(.semibold))
+            Text(ATHLTHLocalization.choose(english: detail, norwegian: norwegianDetail)).font(.caption).foregroundStyle(.secondary)
         }
     }
 

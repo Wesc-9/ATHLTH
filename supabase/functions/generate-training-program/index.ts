@@ -1,3 +1,4 @@
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode } from "./provider.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { conflictsWithInjuryRestrictions } from "../_shared/ai-training-injury-guard.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -670,26 +671,16 @@ Hard rules:
   }));
   if (budgetResponse) return budgetResponse;
 
-  const aiResponse = await fetch("https://api.groq.com/openai/v1/responses", {
+  const aiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${groqKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: Deno.env.get("GROQ_TRAINING_MODEL") ?? "openai/gpt-oss-120b",
-      reasoning: { effort: "medium" },
-      instructions,
-      input: JSON.stringify(constraints),
-      text: {
-        format: {
-          type: "json_schema",
-          name: "athlth_training_program",
-          strict: true,
-          schema,
-        },
-      },
-    }),
+    body: JSON.stringify(coachProgramRequest(
+      Deno.env.get("GROQ_TRAINING_MODEL") ?? "openai/gpt-oss-120b",
+      instructions, constraints, schema,
+    )),
   });
 
   await recordGroqQuota(aiResponse, "training-program");
@@ -697,15 +688,17 @@ Hard rules:
   if (!aiResponse.ok) {
     // Provider response bodies can echo consented injury details.
     // Keep health information out of persistent application logs.
+    const providerError = await aiResponse.json().catch(() => null);
     console.error("Groq program generation failed", {
       status: aiResponse.status,
+      code: coachProviderErrorCode(providerError),
       feature: "generate-training-program",
     });
     return json({ error: "AI program generation failed. Please try again." }, 502);
   }
 
   const payload = await aiResponse.json();
-  const outputText = extractOutputText(payload);
+  const outputText = coachProgramOutput(payload);
   if (!outputText) {
     return json({ error: "AI returned an empty program." }, 502);
   }

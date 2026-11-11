@@ -3,9 +3,9 @@ import CryptoKit
 import Foundation
 import Supabase
 
-/// Optional, account-scoped synchronization of *planned* training programs.
+/// Account-scoped synchronization of planned programs and reusable templates.
 /// This never uploads HealthKit samples, completed workout data or GPS traces.
-/// Plans can still contain manually entered personal notes, so consent starts off.
+/// Enabled by default; an explicit account opt-out is retained across devices.
 @MainActor
 final class ATHLTHStudioPlanSyncStore: ObservableObject {
     struct Conflict: Identifiable, Hashable {
@@ -19,7 +19,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     @Published private(set) var status = "Plan sync is off."
     @Published private(set) var lastSuccessfulSync: Date?
 
-    private struct ConsentWrite: Encodable {
+    private struct ConsentWrite: Codable {
         let user_id: UUID
         let enabled: Bool
     }
@@ -57,7 +57,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             AccountLocalStorage.read(
                 Bool.self, name: "studioPlanSyncConsent", userID: $0
             )
-        } ?? false
+        } ?? (userID != nil)
         acknowledgements = userID.flatMap {
             AccountLocalStorage.read(
                 [String: ATHLTHStudioPlanSyncDecision.Acknowledgement].self,
@@ -136,7 +136,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 try await client.from("studio_plan_documents")
                     .delete().eq("user_id", value: userID).execute()
                 try await client.from("studio_plan_sync_consents")
-                    .delete().eq("user_id", value: userID).execute()
+                    .upsert(ConsentWrite(user_id: userID, enabled: false), onConflict: "user_id").execute()
                 guard accountID == userID else { return }
                 acknowledgements = [:]
                 persistAcknowledgements(for: userID)
@@ -155,7 +155,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     }
 
     func scheduleSync(session: AppSessionStore) {
-        guard enabled, accountID == session.profile.userID, session.signedIn else { return }
+        guard session.signedIn else { return }
+        switchAccount(session.profile.userID)
         scheduledTask?.cancel()
         scheduledTask = Task { [weak self, weak session] in
             try? await Task.sleep(for: .milliseconds(850))
@@ -165,23 +166,11 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     }
 
     func sync(session: AppSessionStore) async {
-        guard enabled, !isBusy, session.signedIn,
+        guard !isBusy, session.signedIn,
               let userID = accountID, userID == session.profile.userID,
               client.auth.currentUser?.id == userID
         else { return }
 
-        // Disabling in another iPad window immediately invalidates the
-        // persisted consent. A stale scene must not upload old local plans.
-        guard AccountLocalStorage.read(
-            Bool.self, name: "studioPlanSyncConsent", userID: userID
-        ) == true else {
-            enabled = false
-            status = ATHLTHLocalization.choose(
-                english: "Plan sync is off on this device.",
-                norwegian: "Plansynkronisering er av på denne enheten."
-            )
-            return
-        }
         guard !Self.accountsWithNetworkMutation.contains(userID) else {
             status = ATHLTHLocalization.choose(
                 english: "Another ATHLTH window is synchronizing this account.",
@@ -198,6 +187,21 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         var unresolved: [Conflict] = []
 
         do {
+            let preferences: [ConsentWrite] = try await client.from("studio_plan_sync_consents")
+                .select("user_id,enabled").eq("user_id", value: userID).limit(1).execute().value
+            guard accountID == userID else { return }
+            if preferences.first?.enabled == false {
+                enabled = false
+                AccountLocalStorage.write(false, name: "studioPlanSyncConsent", userID: userID)
+                return
+            }
+            if preferences.isEmpty {
+                guard enabled else { return }
+                try await client.from("studio_plan_sync_consents")
+                    .upsert(ConsentWrite(user_id: userID, enabled: true), onConflict: "user_id").execute()
+            }
+            enabled = true
+            AccountLocalStorage.write(true, name: "studioPlanSyncConsent", userID: userID)
             let remoteRows: [RemotePlan] = try await client
                 .from("studio_plan_documents")
                 .select("plan_id,revision,body_base64")
@@ -209,7 +213,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             let remoteByID = Dictionary(uniqueKeysWithValues: remoteRows.map {
                 ($0.plan_id, $0)
             })
-            let localPlans = session.trainingPlans.filter { $0.ownerID == userID }
+            let localPlans = session.accountPlanDocuments.filter { $0.ownerID == userID }
             // Corrupted/legacy duplicate local plan IDs must never crash sync.
             let localByID = Dictionary(
                 localPlans.map { ($0.id, $0) },
@@ -243,7 +247,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     }
                 case let .upload(expected):
                     guard let local,
-                          session.trainingPlan(withID: planID) == local else {
+                          session.accountPlanDocument(withID: planID) == local else {
                         unresolved.append(Conflict(id: planID, title: local?.title ?? "Training plan"))
                         continue
                     }
@@ -259,8 +263,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 case .download:
                     guard let remote, let remotePlan else { continue }
                     // Never replace a plan edited while the network call was pending.
-                    guard session.trainingPlan(withID: planID) == local,
-                          session.addTrainingPlan(remotePlan) else {
+                    guard session.accountPlanDocument(withID: planID) == local,
+                          session.importAccountPlanDocument(remotePlan) else {
                         unresolved.append(Conflict(id: planID, title: remotePlan.title))
                         continue
                     }
@@ -333,7 +337,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             if let row = rows.first {
                 if preferRemote {
                     guard let decoded = try decode(row.body_base64, owner: userID, id: planID),
-                          session.addTrainingPlan(decoded) else {
+                          session.importAccountPlanDocument(decoded) else {
                         status = ATHLTHLocalization.choose(
                             english: "Cannot import plan while another plan conflicts in the calendar.",
                             norwegian: "Planen kan ikke importeres på grunn av en overlappende kalenderplan."
@@ -342,7 +346,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     }
                     acknowledge(planID, revision: row.revision,
                                 fingerprint: try fingerprint(for: decoded), owner: userID)
-                } else if let local = session.trainingPlan(withID: planID) {
+                } else if let local = session.accountPlanDocument(withID: planID) {
                     let revision = try await save(local, expected: row.revision)
                     guard accountID == userID else { return }
                     acknowledge(planID, revision: revision,
@@ -368,12 +372,12 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             } else if preferRemote {
                 // Remote absence is meaningful only after explicit conflict
                 // review. Never delete local plans automatically in sync().
-                if session.trainingPlan(withID: planID) != nil {
-                    session.deleteTrainingPlan(planID)
+                if session.accountPlanDocument(withID: planID) != nil {
+                    session.deleteAccountPlanDocument(planID)
                 }
                 acknowledgements.removeValue(forKey: planID.uuidString)
                 persistAcknowledgements(for: userID)
-            } else if let local = session.trainingPlan(withID: planID) {
+            } else if let local = session.accountPlanDocument(withID: planID) {
                 // Recreate a previously deleted cloud copy only after the
                 // athlete explicitly chooses to keep their local plan.
                 let revision = try await save(local, expected: 0)

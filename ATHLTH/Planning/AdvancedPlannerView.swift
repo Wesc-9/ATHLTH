@@ -1,6 +1,11 @@
 import SwiftUI
 
 struct AdvancedPlannerView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var suspendedStandaloneEditor = false
+    @State private var suspendedDayEditor = false
+    @State private var suspendedAt: Date?
+
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var health: HealthKitManager
@@ -185,6 +190,24 @@ struct AdvancedPlannerView: View {
         }
         .onChange(of: displayedPlan?.version) { _, _ in
             reconcileSelection()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                if suspendedAt == nil {
+                    suspendedAt = Date()
+                    suspendedStandaloneEditor = showingStandaloneSessionEditor
+                    suspendedDayEditor = showingSessionEditor
+                }
+            } else {
+                let recent = suspendedAt.map { Date().timeIntervalSince($0) < 300 } ?? false
+                if recent {
+                    showingStandaloneSessionEditor = showingStandaloneSessionEditor || suspendedStandaloneEditor
+                    showingSessionEditor = showingSessionEditor || suspendedDayEditor
+                }
+                suspendedAt = nil
+                suspendedStandaloneEditor = false
+                suspendedDayEditor = false
+            }
         }
         .sheet(isPresented: $showingSessionEditor) {
             if let selectedDayID,

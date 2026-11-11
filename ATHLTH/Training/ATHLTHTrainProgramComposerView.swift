@@ -7,7 +7,7 @@ struct ATHLTHTrainProgramComposerView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     /// Pass false when the user chose "New plan" rather than "Continue".
-    var resumesDraftOnAppear = true
+    var resumesDraftOnAppear = false
     var draftID: UUID? = nil
     var onCreated: ((UUID) -> Void)? = nil
 

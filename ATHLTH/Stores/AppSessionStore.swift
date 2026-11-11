@@ -1734,11 +1734,14 @@ final class AppSessionStore: ObservableObject {
 
     @discardableResult
     func addTrainingPlan(
-        _ source: TrainingPlan
+        _ source: TrainingPlan,
+        saveToLibrary: Bool = true
     ) -> Bool {
+        let isNew = trainingPlan(withID: source.id) == nil
         let plan = normalizedTrainingPlan(source)
 
-        if let startDate = plan.startDate,
+        let disabled = isTrainingPlanPaused(plan.id) || isTrainingPlanDeactivated(plan.id)
+        if !disabled, let startDate = plan.startDate,
            let endDate = trainingPlanEndDate(plan),
            trainingPlanConflict(
                startDate: startDate,
@@ -1748,7 +1751,7 @@ final class AppSessionStore: ObservableObject {
             return false
         }
 
-        if trainingPlanStatus(plan) == .active {
+        if !disabled && trainingPlanStatus(plan) == .active {
             guard activePlan == nil || activePlan?.id == plan.id else {
                 return false
             }
@@ -1756,12 +1759,14 @@ final class AppSessionStore: ObservableObject {
             activePlan = plan
             scheduledPlans.removeAll { $0.id == plan.id }
         } else {
+            if disabled && activePlan?.id == plan.id { activePlan = nil }
             scheduledPlans.removeAll { $0.id == plan.id }
             scheduledPlans.append(plan)
         }
 
         persistScheduledPlans()
         refreshActivePlanForToday()
+        if isNew && saveToLibrary { savePlanToLibrary(plan) }
         // This also covers complete plans created by Coach or from a template.
         // Only finalized workouts with an actual main phase are indexed.
         ATHLTHWorkoutMainSectionLibrary.captureAll(
@@ -2515,7 +2520,8 @@ final class AppSessionStore: ObservableObject {
         builderProfile: TrainingPlanBuilderProfile,
         seedSuggestedWeek: Bool,
         structuredWorkoutsByDay: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:],
-        weekDayEdits: [Int: ATHLTHPlanWeekDayEdit] = [:]
+        weekDayEdits: [Int: ATHLTHPlanWeekDayEdit] = [:],
+        saveToLibrary: Bool = true
     ) -> TrainingPlan? {
         let resolvedWeekCount =
             min(max(weekCount, 1), 52)
@@ -2832,7 +2838,7 @@ final class AppSessionStore: ObservableObject {
             builderProfile: builderProfile
         )
 
-        guard addTrainingPlan(plan) else {
+        guard addTrainingPlan(plan, saveToLibrary: saveToLibrary) else {
             return nil
         }
 
@@ -4606,6 +4612,75 @@ final class AppSessionStore: ObservableObject {
             tags: tags,
             startDate: startDate ?? Date()
         )
+    }
+
+    /// Stable source tag prevents duplicate library copies after retries.
+    func savePlanToLibrary(_ source: TrainingPlan) {
+        let tag = "saved-source:" + source.id.uuidString
+        guard !planTemplates.contains(where: { $0.tags.contains(tag) }) else { return }
+        let template = TrainingPlan(
+            id: UUID(), ownerID: profile.userID, title: source.title,
+            summary: source.summary, visibility: .privateOnly, version: 1,
+            weeks: source.weeks, tags: source.tags + [tag],
+            spotifyPlaylist: source.spotifyPlaylist,
+            spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
+            createdAt: source.createdAt, updatedAt: source.updatedAt,
+            startDate: nil, builderProfile: source.builderProfile,
+            trainingBlocks: source.trainingBlocks
+        )
+        planTemplates.insert(template, at: 0)
+        persistPlanTemplates()
+    }
+
+    /// Transport markers distinguish reusable library plans and lifecycle state.
+    /// They never reach the visible plan or change calendar scheduling rules.
+    var accountPlanDocuments: [TrainingPlan] {
+        let plans = trainingPlans.map { source in
+            var plan = source
+            if isTrainingPlanPaused(plan.id) { plan.tags.append("sync:paused") }
+            if isTrainingPlanDeactivated(plan.id) { plan.tags.append("sync:inactive") }
+            return plan
+        }
+        return plans + planTemplates.map { source in
+            var plan = source
+            plan.tags.append("sync:template")
+            return plan
+        }
+    }
+
+    func accountPlanDocument(withID id: UUID) -> TrainingPlan? {
+        accountPlanDocuments.first { $0.id == id }
+    }
+
+    @discardableResult
+    func importAccountPlanDocument(_ source: TrainingPlan) -> Bool {
+        guard source.ownerID == profile.userID else { return false }
+        var plan = source
+        let template = plan.tags.contains("sync:template")
+        let paused = plan.tags.contains("sync:paused")
+        let inactive = plan.tags.contains("sync:inactive")
+        plan.tags.removeAll { ["sync:template", "sync:paused", "sync:inactive"].contains($0) }
+        if template {
+            planTemplates.removeAll { $0.id == plan.id }
+            planTemplates.append(plan)
+            persistPlanTemplates()
+            return true
+        }
+        let oldPaused = pausedTrainingPlanIDs.contains(plan.id)
+        let oldInactive = deactivatedTrainingPlanIDs.contains(plan.id)
+        if paused { pausedTrainingPlanIDs.insert(plan.id) } else { pausedTrainingPlanIDs.remove(plan.id) }
+        if inactive { deactivatedTrainingPlanIDs.insert(plan.id) } else { deactivatedTrainingPlanIDs.remove(plan.id) }
+        guard addTrainingPlan(plan, saveToLibrary: false) else {
+            if oldPaused { pausedTrainingPlanIDs.insert(plan.id) } else { pausedTrainingPlanIDs.remove(plan.id) }
+            if oldInactive { deactivatedTrainingPlanIDs.insert(plan.id) } else { deactivatedTrainingPlanIDs.remove(plan.id) }
+            return false
+        }
+        return true
+    }
+
+    func deleteAccountPlanDocument(_ id: UUID) {
+        if planTemplates.contains(where: { $0.id == id }) { deletePlanTemplate(id) }
+        else { deleteTrainingPlan(id) }
     }
 
     func saveActivePlanAsTemplate() {

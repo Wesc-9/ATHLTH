@@ -206,6 +206,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var showingAIBuilder = false
     @State private var prefersAIPlanBuild = false
     @State private var showingGuidedAIConsent = false
+    @State private var saveToLibrary = true
     @State private var isGuidedAIFilling = false
     @State private var guidedAIError: String?
     @State private var guidedAIFillPreview: GuidedAIFillPreview?
@@ -236,6 +237,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var deliberatelyDiscardedPlanDraft = false
 
     private struct ConfigurationCheckpoint: Codable {
+        var saveToLibrary: Bool?
         var customTitle: String?
         var workoutTitles: [Int: String]?
         var workoutMinutes: [Int: Int]?
@@ -257,7 +259,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         return try? encoder.encode(ConfigurationCheckpoint(
-            customTitle: title, workoutTitles: workoutTitleOverridesByDay,
+            saveToLibrary: saveToLibrary, customTitle: title, workoutTitles: workoutTitleOverridesByDay,
             workoutMinutes: workoutMinutesByDay,
             goalDetail: goalDetail, summary: planSummary,
             injuryFree: injuryFree, limitations: injuriesOrLimitations,
@@ -273,7 +275,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     init(
         startsAtSourceChoice: Bool,
         initialAdvanced: Bool,
-        resumesDraftOnAppear: Bool = true,
+        resumesDraftOnAppear: Bool = false,
         draftID: UUID? = nil,
         onCreated: ((UUID) -> Void)? = nil
     ) {
@@ -1059,23 +1061,46 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             )
         }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Prepare changes with ATHLTH Coach?",
-                norwegian: "Lage endringsforslag med ATHLTH Coach?"),
-            isPresented: $showingGuidedAIConsent,
-            titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Generate suggestions", norwegian: "Lag forslag med AI"
-            )) {
-                Task { await generateGuidedAISuggestions() }
+        .sheet(isPresented: $showingGuidedAIConsent) {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Label("ATHLTH Coach", systemImage: "sparkles")
+                            .font(.title2.weight(.semibold))
+                        Text(ATHLTHLocalization.choose(english: "Use your goal and current plan to prepare changes.", norwegian: "Ta utgangspunkt i målet ditt og planen du har laget."))
+                        Picker(ATHLTHLocalization.choose(english: "Scope", norwegian: "Omfang"), selection: $aiPlanAction) {
+                            Text(ATHLTHLocalization.choose(english: "Empty days", norwegian: "Tomme dager")).tag("fill")
+                            Text(ATHLTHLocalization.choose(english: "Selected day", norwegian: "Valgt dag")).tag("adjust")
+                            Text(ATHLTHLocalization.choose(english: "Entire plan", norwegian: "Hele planen")).tag("rebuild")
+                        }.pickerStyle(.segmented)
+                        if aiPlanAction == "adjust" {
+                            DatePicker(ATHLTHLocalization.choose(english: "Day", norwegian: "Dag"), selection: aiAdjustmentDateBinding, in: startDate...resolvedEndDate, displayedComponents: .date)
+                        }
+                        TextField(ATHLTHLocalization.choose(english: "What should Coach change or keep?", norwegian: "Hva skal Coach endre eller beholde?"), text: $aiAdjustmentInstruction, axis: .vertical)
+                            .lineLimit(3...6).padding(14)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        Text(ATHLTHLocalization.choose(english: "Your goal, plan, equipment and instruction are shared with Coach. Review all suggestions before applying. Health history and injury notes are not included.", norwegian: "Mål, plan, utstyr og instruksjon deles med Coach. Du ser gjennom forslagene før de tas i bruk. Helsehistorikk og skadeopplysninger tas ikke med."))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button {
+                            showingGuidedAIConsent = false
+                            Task { await generateGuidedAISuggestions() }
+                        } label: {
+                            Label(ATHLTHLocalization.choose(english: "Prepare suggestions", norwegian: "Lag forslag"), systemImage: "sparkles")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent).tint(ATHLTHPlanDesign.accentInk)
+                        .disabled(isGuidedAIFilling || (aiPlanAction == "adjust" && aiAdjustmentInstruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                    }.padding(20)
+                }
+                .background(ATHLTHPlanDesign.canvas)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) { showingGuidedAIConsent = false }
+                    }
+                }
             }
-        } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "Your plan focus, goals, equipment, selected days and session duration are sent to Coach. Health history and injury notes are not shared. Your instruction and the current plan are included. Rebuilding may replace all dates; adjusting changes only the selected day. Review suggestions before applying.",
-                norwegian: "Planfokus, mål, utstyr, valgte dager og øktvarighet sendes til Coach. Helsehistorikk og skadeopplysninger deles ikke. Instruksjonen og den gjeldende planen tas med. En ny plan kan erstatte alle dager; justering gjelder bare valgt dag. Se gjennom forslagene før du bruker dem."
-            ))
+            .presentationDetents([.large])
+            .tint(ATHLTHPlanDesign.accentInk)
         }
         .sheet(item: $guidedAIFillPreview) { preview in
             guidedAIFillReview(preview)
@@ -1501,7 +1526,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     return
                 }
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    step = ATHLTHPlanJourney.next(after: .mode, advanced: mode == .advanced) ?? .basics
+                    step = selected == .advanced ? .goal : .basics
                 }
             },
             onCancel: { requestClosePlanCreation() }
@@ -2762,6 +2787,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     onCreateGoal: openGoalCreationFromPlan,
                     onSelectAdvanced: { openModeStart(advanced: true) }
                 )
+                planLibrarySaveChoice
                 if let conflictingPlan, approvedPlanReplacementID != conflictingPlan.id {
                     conflictCard(conflictingPlan)
                 }
@@ -2786,13 +2812,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     /// where Continue leads into that mode's own setup sequence.
     private func openModeStart(advanced: Bool) {
         let target: TrainingPlanBuilderMode = advanced ? .advanced : .basic
-        guard mode != target else { return }
+        if mode == target && !advanced { return }
 
         switchSetupMode(to: advanced)
         entryChoice = advanced ? .advanced : .simple
         sourceRoute.removeAll()
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-            step = .mode
+            step = advanced ? .goal : .basics
         }
     }
 
@@ -4097,6 +4123,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }.joined(separator: " | ")
     }
 
+    private var planLibrarySaveChoice: some View {
+        Toggle(isOn: $saveToLibrary) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ATHLTHLocalization.choose(english: "Save in My plans", norwegian: "Lagre i Mine planer"))
+                    .font(.subheadline.weight(.semibold))
+                Text(ATHLTHLocalization.choose(english: "Keep a reusable copy on your account, available on iPhone and iPad.", norwegian: "Behold en gjenbrukbar kopi på kontoen din, tilgjengelig på iPhone og iPad."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .tint(ATHLTHPlanDesign.accentInk)
+        .padding(16).background(.white, in: RoundedRectangle(cornerRadius: 18))
+    }
+
     private var planAITools: some View {
         builderPanel {
             VStack(alignment: .leading, spacing: 12) {
@@ -5027,8 +5066,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             let proposal = try aiProposal(draft, replacing: replacingKeys, minutes: minutes)
             guard proposal.hasChanges else {
                 guidedAIError = ATHLTHLocalization.choose(
-                    english: "Every date is already planned. AI will not replace workouts or rest days.",
-                    norwegian: "Alle dagene er allerede planlagt. AI erstatter ikke økter eller hviledager."
+                    english: "Every date is already planned. Coach will not replace workouts or rest days.",
+                    norwegian: "Alle dagene er allerede planlagt. Coach erstatter ikke økter eller hviledager."
                 )
                 return
             }
@@ -5040,7 +5079,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 ownerID: athleteID, planStart: requestedStart, weekCount: requestedWeeks
             )
         } catch {
-            guidedAIError = error.localizedDescription
+            guidedAIError = ATHLTHLocalization.choose(
+                english: "Coach could not prepare suggestions. Your plan is unchanged. Please try again shortly.",
+                norwegian: "Coach kunne ikke lage forslag. Planen din er bevart. Prøv igjen om litt."
+            )
         }
     }
 
@@ -5071,7 +5113,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             saveResumableDraft()
         } catch {
             guidedAIFillPreview = nil
-            guidedAIError = error.localizedDescription
+            guidedAIError = ATHLTHLocalization.choose(
+                english: "Coach could not prepare suggestions. Your plan is unchanged. Please try again shortly.",
+                norwegian: "Coach kunne ikke lage forslag. Planen din er bevart. Prøv igjen om litt."
+            )
         }
     }
 
@@ -7220,6 +7265,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 icon: "checkmark.seal.fill"
             )
 
+            planLibrarySaveChoice
             adaptivePlanPair(AnyView(reviewSummaryPanel), AnyView(reviewWeeksPanel))
 
             if !goalStore.goals.isEmpty {
@@ -7638,8 +7684,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 english: "ATHLTH Coach is preparing the plan...",
                                 norwegian: "ATHLTH Coach lager ukeplanen...")
                              : ATHLTHLocalization.choose(
-                                english: "Fill empty days with AI",
-                                norwegian: "Fyll tomme dager med AI"))
+                                english: "Fill empty days with Coach",
+                                norwegian: "Fyll tomme dager med Coach"))
                             .font(.subheadline.weight(.semibold))
                         Spacer(minLength: 0)
                         if !isGuidedAIFilling {
@@ -7915,6 +7961,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         startDate = draft.startDate
         if let data = draft.configuration,
            let saved = try? JSONDecoder().decode(ConfigurationCheckpoint.self, from: data) {
+            saveToLibrary = saved.saveToLibrary ?? true
             title = saved.customTitle ?? title
             goalDetail = saved.goalDetail
             planSummary = saved.summary
@@ -8691,7 +8738,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     seedSuggestedWeek: seedSuggestedWeek,
                     structuredWorkoutsByDay: mode == .advanced
                         ? structuredWorkoutsByDay : [:],
-                    weekDayEdits: mode == .advanced ? weekDayEdits : [:]
+                    weekDayEdits: mode == .advanced ? weekDayEdits : [:],
+                    saveToLibrary: saveToLibrary
                 )
 
         guard let created else {
