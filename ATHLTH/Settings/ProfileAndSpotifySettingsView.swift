@@ -100,6 +100,40 @@ struct ATHLTHEditProfileView: View {
                         gearCard
                     }
 
+                    NavigationLink {
+                        ATHLTHPrivacyCenterView()
+                    } label: {
+                        ATHLTHCard {
+                            HStack(spacing: 13) {
+                                Image(systemName: "person.crop.circle.badge.checkmark")
+                                    .font(.headline)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 43, height: 43)
+                                    .background(ATHLTHTheme.accentSoft,
+                                                in: RoundedRectangle(cornerRadius: 13))
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Visibility & social permissions",
+                                        norwegian: "Synlighet og sosiale tillatelser"
+                                    ))
+                                    .font(.subheadline.weight(.semibold))
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Profile, friend requests, messages, challenges and sharing",
+                                        norwegian: "Profil, venneforespørsler, meldinger, utfordringer og deling"
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 6)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-profile-social-privacy")
+
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 14, weight: .semibold))
@@ -3157,6 +3191,88 @@ struct ATHLTHPrivacyCenterView: View {
                 .foregroundStyle(.secondary)
             }
 
+            Section("Safety") {
+                NavigationLink {
+                    BlockedUsersView()
+                } label: {
+                    Label(
+                        "Blocked users",
+                        systemImage: "person.crop.circle.badge.xmark"
+                    )
+                }
+            }
+        }
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Profile visibility & sharing",
+            norwegian: "Profilsynlighet og deling"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard draft == nil else { return }
+            if social.privacy == nil {
+                await social.refresh()
+            }
+
+            draft = social.privacy
+        }
+    }
+
+    private var draftBinding: Binding<SocialPrivacySettings>? {
+        guard draft != nil else {
+            return nil
+        }
+
+        return Binding(
+            get: { draft! },
+            set: { updated in
+                guard updated != draft else { return }
+                draft = updated
+                schedulePrivacySave()
+            }
+        )
+    }
+
+    @MainActor
+    private func schedulePrivacySave() {
+        saved = false
+        saveError = nil
+        guard !saving, draft != nil else { return }
+        saving = true
+
+        // Keep one writer alive when navigating away. Edits made during a
+        // request are coalesced into the next write, never sent concurrently.
+        Task { @MainActor in
+            defer { saving = false }
+            while let snapshot = draft {
+                let result = await social.updatePrivacy(snapshot)
+                if case .failure(let error) = result {
+                    saveError = error.localizedDescription
+                    return
+                }
+                guard draft == snapshot else { continue }
+
+                // Only mirror the final confirmed values locally. This also
+                // avoids triggering core-privacy observers with stale values.
+                if let visibility = ProfileVisibility(rawValue: snapshot.profileVisibility) {
+                    settings.profileVisibility = visibility
+                }
+                settings.shareTrainingPresence = snapshot.shareTrainingPresence
+                draft = social.privacy ?? snapshot
+                saved = true
+                return
+            }
+        }
+    }
+}
+
+/// Health/AI processing consent belongs under Account & Security, while
+/// social/profile visibility lives under Edit profile. No saved setting is
+/// migrated, reset, duplicated or silently changed by this navigation split.
+struct ATHLTHAccountAIConsentView: View {
+    @EnvironmentObject private var session: AppSessionStore
+
+    var body: some View {
+        Form {
             Section("Health Data") {
                 Label(
                     "Health data is private by default",
@@ -3231,74 +3347,10 @@ struct ATHLTHPrivacyCenterView: View {
                 .foregroundStyle(.secondary)
             }
 
-            Section("Safety") {
-                NavigationLink {
-                    BlockedUsersView()
-                } label: {
-                    Label(
-                        "Blocked users",
-                        systemImage: "person.crop.circle.badge.xmark"
-                    )
-                }
-            }
         }
-        .navigationTitle("Privacy & Data")
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            guard draft == nil else { return }
-            if social.privacy == nil {
-                await social.refresh()
-            }
-
-            draft = social.privacy
-        }
-    }
-
-    private var draftBinding: Binding<SocialPrivacySettings>? {
-        guard draft != nil else {
-            return nil
-        }
-
-        return Binding(
-            get: { draft! },
-            set: { updated in
-                guard updated != draft else { return }
-                draft = updated
-                schedulePrivacySave()
-            }
-        )
-    }
-
-    @MainActor
-    private func schedulePrivacySave() {
-        saved = false
-        saveError = nil
-        guard !saving, draft != nil else { return }
-        saving = true
-
-        // Keep one writer alive when navigating away. Edits made during a
-        // request are coalesced into the next write, never sent concurrently.
-        Task { @MainActor in
-            defer { saving = false }
-            while let snapshot = draft {
-                let result = await social.updatePrivacy(snapshot)
-                if case .failure(let error) = result {
-                    saveError = error.localizedDescription
-                    return
-                }
-                guard draft == snapshot else { continue }
-
-                // Only mirror the final confirmed values locally. This also
-                // avoids triggering core-privacy observers with stale values.
-                if let visibility = ProfileVisibility(rawValue: snapshot.profileVisibility) {
-                    settings.profileVisibility = visibility
-                }
-                settings.shareTrainingPresence = snapshot.shareTrainingPresence
-                draft = social.privacy ?? snapshot
-                saved = true
-                return
-            }
-        }
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "AI & data consent", norwegian: "AI og datasamtykker"
+        ))
     }
 }
 
@@ -3357,12 +3409,12 @@ struct ATHLTHAccountSecurityView: View {
 
             Section {
                 NavigationLink {
-                    ATHLTHPrivacyCenterView()
+                    ATHLTHAccountAIConsentView()
                 } label: {
                     Label(
                         accountText(
-                            english: "Privacy & AI",
-                            norwegian: "Personvern og AI"
+                            english: "AI & data consent",
+                            norwegian: "AI og datasamtykker"
                         ),
                         systemImage: "shield.lefthalf.filled"
                     )
