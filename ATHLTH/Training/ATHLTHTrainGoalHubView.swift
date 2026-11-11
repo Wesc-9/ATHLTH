@@ -36,6 +36,7 @@ struct ATHLTHTrainGoalHubView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     introduction
                     if let plan {
+                        if plan.builderProfile?.mode != .basic {
                         Button {
                             showingTrends = true
                         } label: {
@@ -59,14 +60,17 @@ struct ATHLTHTrainGoalHubView: View {
                             .goalSurface(line: line)
                         }
                         .buttonStyle(.plain)
+                        }
                         if linkedGoals.isEmpty {
                             noLinkedGoals
                         } else {
                             ForEach(linkedGoals) { goal in
-                                goalCard(goal, plan: plan)
+                                goalCard(goal, plan: plan, isBasic: plan.builderProfile?.mode == .basic)
                             }
                         }
-                        blockReview(plan)
+                        if plan.builderProfile?.mode != .basic {
+                            blockReview(plan)
+                        }
                     }
                 }
                 .frame(maxWidth: 740, alignment: .leading)
@@ -164,7 +168,7 @@ struct ATHLTHTrainGoalHubView: View {
         .goalSurface(line: line)
     }
 
-    private func goalCard(_ goal: ATHLTHGoal, plan: TrainingPlan) -> some View {
+    private func goalCard(_ goal: ATHLTHGoal, plan: TrainingPlan, isBasic: Bool) -> some View {
         let completed = Set(plan.weeks.flatMap(\.days)
             .flatMap(\.sessions)
             .compactMap { workout -> UUID? in
@@ -218,6 +222,22 @@ struct ATHLTHTrainGoalHubView: View {
                 }
             }
 
+            if isBasic {
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: "checkmark.circle")
+                        .foregroundStyle(accent)
+                    Text(goal.status == .completed
+                         ? tr("Goal completed. Review your next goal.",
+                              "Målet er fullført. Se på neste mål.")
+                         : goal.status == .paused
+                           ? tr("Goal paused. Resume when you are ready.",
+                                "Målet er satt på pause. Fortsett når du er klar.")
+                           : tr("Keep following your training plan. ATHLTH will use recorded results to follow your progress.",
+                                "Fortsett med treningsplanen. ATHLTH bruker registrerte resultater til å følge fremgangen din."))
+                        .font(.subheadline)
+                        .foregroundStyle(muted)
+                }
+            } else {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(evidence.observed.map { number($0) } ?? "—")
@@ -296,6 +316,7 @@ struct ATHLTHTrainGoalHubView: View {
                      (goal.deadline?.formatted(date: .abbreviated, time: .omitted) ?? ""))
                     .font(.caption)
                     .foregroundStyle(muted)
+            }
             }
         }
         .padding(17)
