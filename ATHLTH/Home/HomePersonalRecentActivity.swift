@@ -1080,6 +1080,7 @@ private struct HomeFriendQuickActionsPopover: View {
 struct HomePersonalRecentActivitySection:
     View {
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health:
         HealthKitManager
     @EnvironmentObject private var strength:
@@ -1350,9 +1351,11 @@ struct HomePersonalRecentActivitySection:
                         ATHLTHProfileView()
                     } label: {
                         Label(
-                            ATHLTHLocalization.choose(
-                                english: "My activity", norwegian: "Min aktivitet"
-                            ),
+                            session.profile.displayName.isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english: "My activity", norwegian: "Min aktivitet"
+                                  )
+                                : session.profile.displayName,
                             systemImage: "person.crop.circle"
                         )
                         .font(.system(size: 11, weight: .semibold))
