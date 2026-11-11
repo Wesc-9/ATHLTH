@@ -201,7 +201,11 @@ private struct ATHLTHHomeWidgetView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                 } else {
-                    Text(duration(workout.elapsedTime))
+                    Text(String(
+                        format: "%d:%02d",
+                        max(Int(workout.elapsedTime), 0) / 60,
+                        max(Int(workout.elapsedTime), 0) % 60
+                    ))
                         .font(.system(size: 25, weight: .bold, design: .rounded))
                         .monospacedDigit()
                 }
