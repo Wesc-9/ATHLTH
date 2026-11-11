@@ -606,24 +606,6 @@ struct ATHLTHEditProfileView: View {
                     editingPublicField = .bio
                 }
 
-                profileDivider
-
-                NavigationLink {
-                    SocialPrivacySettingsView()
-                } label: {
-                    publicProfileRowContent(
-                        title: ATHLTHLocalization.choose(
-                            english: "Visibility", norwegian: "Synlighet"
-                        ),
-                        subtitle: ATHLTHLocalization.choose(
-                            english: "Choose who can see your profile.",
-                            norwegian: "Velg hvem som kan se profilen."
-                        ),
-                        value: visibilityLabel,
-                        icon: "eye"
-                    )
-                }
-                .buttonStyle(.plain)
             }
         }
     }
