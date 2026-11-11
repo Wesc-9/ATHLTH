@@ -380,6 +380,9 @@ struct ProductRootTabView: View {
             await syncApplicationIconBadge()
         }
         .task(id: session.signedIn ? session.profile.userID : nil) {
+            if scenePhase == .active {
+                crossDeviceWorkout.didForeground()
+            }
             if session.signedIn {
                 await crossDeviceWorkout.track(
                     signedIn: true,
