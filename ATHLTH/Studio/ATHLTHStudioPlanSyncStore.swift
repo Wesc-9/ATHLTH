@@ -290,12 +290,22 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             isBusy = false
         }
         do {
+            // Capture the exact document the athlete reviewed. A later
+            // on-device edit must not be overwritten by a stale resolution.
+            let reviewedLocal = session.accountPlanDocument(withID: planID)
             let rows: [RemotePlan] = try await client.from("studio_plan_documents")
                 .select("plan_id,revision,body_base64")
                 .eq("user_id", value: userID)
                 .eq("plan_id", value: planID)
                 .limit(1).execute().value
-            guard accountID == userID, enabled else { return }
+            guard accountID == userID, enabled,
+                  session.accountPlanDocument(withID: planID) == reviewedLocal else {
+                status = ATHLTHLocalization.choose(
+                    english: "The plan changed while reviewing. Check the current version before deciding.",
+                    norwegian: "Planen ble endret under gjennomgangen. Kontroller den oppdaterte versjonen før du velger."
+                )
+                return
+            }
             if let row = rows.first {
                 if preferRemote {
                     guard let decoded = try decode(row.body_base64, owner: userID, id: planID),
@@ -313,7 +323,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     }
                     acknowledge(planID, revision: row.revision,
                                 fingerprint: try fingerprint(for: decoded), owner: userID)
-                } else if let local = session.accountPlanDocument(withID: planID) {
+                } else if let local = reviewedLocal {
                     let revision = try await save(local, expected: row.revision)
                     guard accountID == userID else { return }
                     acknowledge(planID, revision: revision,
@@ -344,7 +354,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 }
                 acknowledgements.removeValue(forKey: planID.uuidString)
                 persistAcknowledgements(for: userID)
-            } else if let local = session.accountPlanDocument(withID: planID) {
+            } else if let local = reviewedLocal {
                 // Recreate a previously deleted cloud copy only after the
                 // athlete explicitly chooses to keep their local plan.
                 let revision = try await save(local, expected: 0)
