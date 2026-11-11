@@ -2269,7 +2269,24 @@ struct IPhoneWorkoutView: View {
                     dismiss()
                 }
 
-                Spacer()
+                ATHLTHWorkoutAudioDock(
+                inlinePopovers: true,
+                compactAlignment: .leading,
+                coachVisible: workout.audioCoachConfiguration?.enabled == true,
+                coachEnabled: workout.audioCoachConfiguration?.enabled == true,
+                coachPaused: recorder.coachSpeechPaused,
+                coachManagedOnWatch: false,
+                canReplayCoach: recorder.canReplayLastCoachMessage,
+                onCoachStatus: { recorder.announceCoachStatusNow() },
+                onCoachTogglePause: {
+                    recorder.setCoachSpeechPaused(!recorder.coachSpeechPaused)
+                },
+                onCoachReplay: { recorder.replayLastCoachMessage() },
+                onCoachSettings: { showingLiveAudioCoach = true }
+            )
+                .fixedSize(horizontal: true, vertical: true)
+
+                Spacer(minLength: 4)
 
                 Button {
                     if workout.runEnvironment == .treadmill &&
@@ -2290,25 +2307,11 @@ struct IPhoneWorkoutView: View {
                                     : "location.fill"
                         )
 
-                        Text(
-                            workout.runEnvironment == .treadmill
-                                ? (workout.indoorVenue == .indoorRunning
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Indoor running", norwegian: "Innendørs løping"
-                                    )
-                                    : ATHLTHLocalization.format(
-                                        english: "Treadmill · %.1f%%",
-                                        norwegian: "Tredemølle · %.1f%%",
-                                        workout.treadmillInclinePercent ?? 0
-                                    ))
-                                : (workout.points.last == nil
-                                    ? ATHLTHLocalization.choose(
-                                        english: "GPS waiting", norwegian: "Venter på GPS"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english: "GPS on", norwegian: "GPS på"
-                                    ))
-                        )
+                        Text(workout.runEnvironment == .treadmill
+                             ? ATHLTHLocalization.choose(
+                                 english: "Indoor", norwegian: "Inne"
+                               )
+                             : "GPS")
                         .font(
                             .caption.weight(
                                 .semibold
@@ -2352,23 +2355,6 @@ struct IPhoneWorkoutView: View {
                     confirmFinish = true
                 }
             }
-
-            ATHLTHWorkoutAudioDock(
-                compactAlignment: .leading,
-                coachVisible: workout.audioCoachConfiguration?.enabled == true,
-                coachEnabled: workout.audioCoachConfiguration?.enabled == true,
-                coachPaused: recorder.coachSpeechPaused,
-                coachManagedOnWatch: false,
-                canReplayCoach: recorder.canReplayLastCoachMessage,
-                onCoachStatus: { recorder.announceCoachStatusNow() },
-                onCoachTogglePause: {
-                    recorder.setCoachSpeechPaused(!recorder.coachSpeechPaused)
-                },
-                onCoachReplay: { recorder.replayLastCoachMessage() },
-                onCoachSettings: { showingLiveAudioCoach = true }
-            )
-            .frame(height: 54, alignment: .topLeading)
-            .zIndex(5)
 
             if workout.runEnvironment == .treadmill &&
                workout.indoorVenue != .indoorRunning {
