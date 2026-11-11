@@ -138,17 +138,6 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if showingSpotifyControls && spotify.isConnected &&
-                   strength.activeWorkout != nil {
-                    inlineSpotifyBar
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 3)
-                        .padding(.bottom, 5)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: "Strength",
@@ -170,39 +159,27 @@ struct ActiveStrengthWorkoutView: View {
                         ))
                     }
 
-                    if strength.activeWorkout?.exercises.isEmpty == false {
-                        Button {
-                            showingExerciseQueue = true
-                        } label: {
-                            Image(systemName: "list.bullet")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                .frame(width: 40, height: 40)
-                                .background(ATHLTHTheme.champagneSoft, in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Exercises and order",
-                            norwegian: "Øvelser og rekkefølge"
-                        ))
+                    if let workout = strength.activeWorkout {
+                        ATHLTHWorkoutAudioDock(
+                            inlinePopovers: true,
+                            compactAlignment: .leading,
+                            coachVisible:
+                                workout.advancedConfiguration?.audioCoach.enabled == true,
+                            coachEnabled:
+                                workout.advancedConfiguration?.audioCoach.enabled == true,
+                            coachPaused: strengthCoach.speechPaused,
+                            coachManagedOnWatch: workout.captureDevice == .appleWatch,
+                            canReplayCoach: strengthCoach.canReplayLastMessage,
+                            onCoachStatus: { announceStrengthCoachStatusNow() },
+                            onCoachTogglePause: {
+                                strengthCoach.setSpeechPaused(!strengthCoach.speechPaused)
+                            },
+                            onCoachReplay: { strengthCoach.replayLastMessage() },
+                            onCoachSettings: nil
+                        )
+                        .fixedSize(horizontal: true, vertical: true)
                     }
 
-                    if spotify.isConnected {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                showingSpotifyControls.toggle()
-                            }
-                        } label: {
-                            ATHLTHSpotifyGlyph()
-                                .frame(width: 30, height: 30)
-                                .frame(width: 38, height: 40)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Spotify controls",
-                            norwegian: "Spotify-kontroller"
-                        ))
-                    }
                 }
 
                 ToolbarItemGroup(
@@ -211,6 +188,14 @@ struct ActiveStrengthWorkoutView: View {
                 ) {
                     if strength.activeWorkout != nil {
                         Menu {
+                            Button {
+                                showingExerciseQueue = true
+                            } label: {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Exercises and order",
+                                    norwegian: "Øvelser og rekkefølge"
+                                ), systemImage: "list.bullet")
+                            }
                             Button {
                                 showingExerciseLibrary = true
                             } label: {
@@ -754,29 +739,6 @@ struct ActiveStrengthWorkoutView: View {
                exercise.isEmbeddedRunningInterval != true,
                canLogOnIPhone(workout) {
                 compactLiveStrengthDock(exercise: exercise)
-            }
-        }
-        // Keep Spotify/coach controls visible directly beneath the live
-        // navigation bar instead of hiding them below long set-entry cards.
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if let workout = strength.activeWorkout {
-                ATHLTHWorkoutAudioDock(
-                    showSpotifyLauncher: false,
-                    compactAlignment: .leading,
-                    coachVisible:
-                        workout.advancedConfiguration?.audioCoach.enabled == true,
-                    coachEnabled:
-                        workout.advancedConfiguration?.audioCoach.enabled == true,
-                    coachPaused: strengthCoach.speechPaused,
-                    coachManagedOnWatch: workout.captureDevice == .appleWatch,
-                    canReplayCoach: strengthCoach.canReplayLastMessage,
-                    onCoachStatus: { announceStrengthCoachStatusNow() },
-                    onCoachTogglePause: {
-                        strengthCoach.setSpeechPaused(!strengthCoach.speechPaused)
-                    },
-                    onCoachReplay: { strengthCoach.replayLastMessage() },
-                    onCoachSettings: nil
-                )
             }
         }
         // A strength workout is a true full-screen surface. Spotify can
