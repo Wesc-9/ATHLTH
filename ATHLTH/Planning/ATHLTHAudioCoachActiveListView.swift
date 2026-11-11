@@ -594,6 +594,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     Text("5 km").tag(5.0)
                 }
                 .pickerStyle(.menu)
+                standardAnnouncementContents
             }
         case .timedUpdates:
             editorCard {
@@ -609,6 +610,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                standardAnnouncementContents
             }
         case .currentZone:
             editorCard {
@@ -700,6 +702,26 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
     }
 
+    private var standardAnnouncementContents: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(tr("Read these values together", "Les opp disse verdiene samlet"))
+                .font(.subheadline.weight(.semibold))
+            Toggle(tr("Distance", "Distanse"), isOn: $draft.announceDistance)
+            Toggle(tr("Elapsed time", "Medgått tid"), isOn: $draft.announceElapsedTime)
+            Toggle(tr("Average pace", "Gjennomsnittstempo"),
+                   isOn: $draft.announceAveragePace)
+            Toggle(tr("Heart rate", "Puls"), isOn: $draft.announceHeartRate)
+            Toggle(tr("Clock time", "Klokkeslett"), isOn: $draft.announceClockTime)
+            Text(tr(
+                "These values apply to standard distance/time updates. To give each interval different content, create a separate announcement group.",
+                "Verdiene gjelder standard distanse- og tidsvarsler. Opprett egne varslingsgrupper for forskjellig innhold per intervall."
+            ))
+            .font(.caption)
+            .foregroundStyle(dim)
+        }
+        .tint(bronze)
+    }
+
     private var independentRulesEditor: some View {
         editorCard {
             Text(tr("Independent announcements", "Egne beskjeder"))
@@ -713,7 +735,8 @@ struct ATHLTHAudioCoachActiveListView: View {
             ForEach($draft.customRules) { $rule in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text(rule.metric.title).font(.subheadline.weight(.semibold))
+                        Text(rule.selectedMetrics.map(\.title).joined(separator: " · "))
+                            .font(.subheadline.weight(.semibold))
                         Spacer()
                         Button(role: .destructive) {
                             let id = rule.id
@@ -769,15 +792,15 @@ struct ATHLTHAudioCoachActiveListView: View {
                     editingOption = nil
                 }
             } label: {
-                Label(tr("Add: Every kilometre · distance, time and pulse",
-                         "Legg til: Hver km · distanse, tid og puls"),
+                Label(tr("Add: Every kilometre · distance, time and heart-rate zone",
+                         "Legg til: Hver km · distanse, tid og pulssone"),
                       systemImage: "plus.circle.fill")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
             .disabled(draft.customRules.count >= 20 || draft.customRules.contains {
                 $0.trigger == .distance && $0.validatedInterval == 1_000 &&
-                $0.selectedMetrics == [.distance, .elapsedTime, .heartRate]
+                $0.selectedMetrics == [.distance, .elapsedTime, .heartRateZone]
             })
             Picker(tr("First value", "Første verdi"), selection: $newRuleMetric) {
                 ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
@@ -1057,8 +1080,13 @@ struct ATHLTHAudioCoachActiveListView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .onChange(of: draft.language) { _, _ in
-                        draft.voiceIdentifier = nil
+                    .onChange(of: draft.language) { _, language in
+                        // Azure selection sets Norwegian and a voice in the
+                        // same action. Keep it; clear incompatible old voices.
+                        if language != .norwegian ||
+                           ATHLTHAzureCoachVoice.key(draft.voiceIdentifier) == nil {
+                            draft.voiceIdentifier = nil
+                        }
                     }
                     Picker(tr("Speaking style", "Snakkestil"),
                            selection: $draft.speechStyle) {
@@ -1077,6 +1105,12 @@ struct ATHLTHAudioCoachActiveListView: View {
                         speechVolume: draft.speechVolume,
                         duckOtherAudio: draft.duckOtherAudio,
                         speechStyle: draft.speechStyle
+                    )
+                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                    ATHLTHAzureCoachVoicePreviewView(
+                        workoutVoiceIdentifier: $draft.voiceIdentifier,
+                        workoutLanguage: $draft.language,
+                        workoutDuckOtherAudio: draft.duckOtherAudio
                     )
                     HStack {
                         Text(tr("Voice speed", "Stemmehastighet"))
