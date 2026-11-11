@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 /// iPad companion to the iPhone-owned strength session. It never edits or
 /// saves workout data: only the phone/Watch remains the recording authority.
@@ -89,10 +90,45 @@ struct ATHLTHStudioRemoteWorkoutOverlay: View {
                     seenSessionID = value.id
                     expanded = true
                 }
+                if value != remote {
+                    // The iPad widget extension reads the same app-group
+                    // snapshot as the iPad app, not the iPhone's local store.
+                    publishLocalWidgetStatus(value)
+                }
                 remote = value
                 if value == nil { seenSessionID = nil }
                 try? await Task.sleep(for: .seconds(value == nil ? 3 : 5))
             }
         }
     }
+    @MainActor
+    private func publishLocalWidgetStatus(
+        _ remote: ATHLTHPrivateLiveStrengthSnapshot?
+    ) {
+        var surface = ATHLTHSurfaceSharedStore.load()
+        if let remote, strength.activeWorkout == nil {
+            let start = Date(timeIntervalSince1970: remote.startedAtEpoch)
+            surface.activeWorkout = ATHLTHSurfaceWorkoutSnapshot(
+                title: remote.title,
+                systemImage: "dumbbell.fill",
+                state: "remote_strength",
+                startedAt: start,
+                // Live duration includes rests; it is not reported as
+                // active movement time or estimated calories.
+                elapsedTime: max(Date().timeIntervalSince(start), 0),
+                distanceMeters: 0,
+                heartRate: 0,
+                updatedAt: Date()
+            )
+        } else if surface.activeWorkout?.state == "remote_strength" {
+            surface.activeWorkout = nil
+        } else {
+            return // Never overwrite a locally owned iPad workout.
+        }
+        surface.updatedAt = Date()
+        ATHLTHSurfaceSharedStore.save(surface)
+        WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHHomeWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHLockScreenWidget")
+    }
+
 }
