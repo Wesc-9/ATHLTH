@@ -133,7 +133,7 @@ struct TrainingPlanProgressDetailView: View {
             }
         if !linkedGoals.isEmpty {
             let completedSessionIDs = Set(
-                plan.weeks.flatMap(\\.days).flatMap(\\.sessions).compactMap { workout -> UUID? in
+                plan.weeks.flatMap(\.days).flatMap(\.sessions).compactMap { workout -> UUID? in
                     session.isPlanSessionCompleted(
                         planID: plan.id, sessionID: workout.id,
                         healthWorkouts: health.workouts,
@@ -153,7 +153,7 @@ struct TrainingPlanProgressDetailView: View {
                     .font(.headline)
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
-                    ForEach(Array(linkedGoals.enumerated()), id: \\.element.id) { index, goal in
+                    ForEach(Array(linkedGoals.enumerated()), id: \.element.id) { index, goal in
                         let evidence = ATHLTHTrainGoalEvidence.evaluate(
                             goal: goal, plan: plan,
                             strengthHistory: strength.workoutHistory,
