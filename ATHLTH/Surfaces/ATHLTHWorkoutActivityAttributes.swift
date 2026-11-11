@@ -17,6 +17,10 @@ struct ATHLTHWorkoutActivityAttributes: ActivityAttributes {
         var runningStepTitle: String? = nil
         var runningStepIndex: Int? = nil
         var runningStepCount: Int? = nil
+    /// Efforts only (not warm-up/recovery). Optional for older snapshots.
+    var runningIntervalOrdinal: Int? = nil
+    var runningIntervalTotal: Int? = nil
+    var runningInRecovery: Bool? = nil
         var runningStepProgress: Double? = nil
         var runningNextStepTitle: String? = nil
         var runningStepRemainingSeconds: TimeInterval? = nil
