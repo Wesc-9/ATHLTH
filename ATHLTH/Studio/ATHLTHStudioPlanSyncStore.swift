@@ -394,6 +394,13 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     clean.notes = nil
                     clean.meetingPoint = nil
                     clean.plannedTrainingPlace = nil
+                    // Recovery snapshots may retain full exercise notes even
+                    // after the current exercise has been sanitized.
+                    clean.recoveryOriginalExercises = nil
+                    clean.recoveryAdjustedExercises = nil
+                    // A previous one-day replacement can contain an entire
+                    // historical workout including private user-entered text.
+                    clean.dailyAlternativeOriginal = nil
                     // Nested structured blocks also carry free-text fields.
                     clean.workoutBlocks = clean.workoutBlocks?.map { block in
                         var safeBlock = block
@@ -451,6 +458,9 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                         merged.notes = old.notes
                         merged.meetingPoint = old.meetingPoint
                         merged.plannedTrainingPlace = old.plannedTrainingPlace
+                        merged.recoveryOriginalExercises = old.recoveryOriginalExercises
+                        merged.recoveryAdjustedExercises = old.recoveryAdjustedExercises
+                        merged.dailyAlternativeOriginal = old.dailyAlternativeOriginal
                         merged.workoutBlocks = merged.workoutBlocks?.map { block in
                             var result = block
                             if let previous = old.workoutBlocks?.first(where: {
