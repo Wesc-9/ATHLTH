@@ -4609,13 +4609,34 @@ final class IPhoneWorkoutStore:
         )
     }
 
-    /// The completion narration is allowed after recording ends, and has
-    /// no network dependency or race with an expired active workout.
+    /// The completion narration uses the SAME selected voice as the workout,
+    /// including Azure if the athlete selected one and enabled third-party TTS.
+    /// A local voice is only a fallback when the chosen provider is unavailable.
+    /// This completion is deliberately allowed after active becomes nil.
     private func speakFinishedWorkoutRecap(
         _ phrase: String,
         configuration: WatchAudioCoachConfiguration
     ) {
         guard !phrase.isEmpty else { return }
+        let routed = azureCoachSpeech.begin(
+            phrase,
+            voiceIdentifier: configuration.voiceIdentifier,
+            duckMusic: configuration.shouldDuckOtherAudio,
+            onFallback: { [weak self] in
+                self?.speakFinishedWorkoutRecapLocally(phrase, configuration: configuration)
+            },
+            onStarted: {},
+            onFinished: {}
+        )
+        if !routed {
+            speakFinishedWorkoutRecapLocally(phrase, configuration: configuration)
+        }
+    }
+
+    private func speakFinishedWorkoutRecapLocally(
+        _ phrase: String,
+        configuration: WatchAudioCoachConfiguration
+    ) {
         let utterance = AVSpeechUtterance(string: phrase)
         utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
             selectedIdentifier: configuration.voiceIdentifier,
