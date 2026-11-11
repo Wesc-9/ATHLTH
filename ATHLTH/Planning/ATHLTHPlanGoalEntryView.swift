@@ -170,6 +170,8 @@ struct ATHLTHPlanGoalEntryView: View {
     let selectedChoice: String
     let onChooseArea: (ATHLTHPlanGoalArea) -> Void
     let onChooseGoal: (ATHLTHPlanGoalOption) -> Void
+    var onChooseNoGoal: () -> Void = {}
+    @Environment(\.horizontalSizeClass) private var widthClass
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -183,10 +185,34 @@ struct ATHLTHPlanGoalEntryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             referenceHero
+            Button(action: onChooseNoGoal) {
+                HStack(spacing: 14) {
+                    Image(systemName: "calendar")
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(ATHLTHLocalization.choose(english: "No specific goal", norwegian: "Ingen spesifikke mål"))
+                            .font(.headline)
+                        Text(ATHLTHLocalization.choose(english: "Build a plan freely, without linking a goal or event.", norwegian: "Bygg planen fritt uten å knytte den til et mål eller arrangement."))
+                            .font(.subheadline)
+                    }
+                    Spacer()
+                    Image(systemName: selectedChoice == "none" ? "checkmark.circle.fill" : "circle")
+                }
+                .foregroundStyle(bronze)
+                .padding(20)
+                .frame(maxWidth: .infinity, minHeight: 118, alignment: .leading)
+                .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18).strokeBorder(
+                        selectedChoice == "none" ? bronze : divider.opacity(0.4))
+                        .allowsHitTesting(false)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(selectedChoice == "none" ? .isSelected : [])
             categoryGrid
-            mainGoalList
+            if !selectedChoice.isEmpty && selectedChoice != "none" { mainGoalList }
         }
-        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+        .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
     }
 
     // Full-width scenic cover, with the editorial copy remaining entirely
@@ -278,7 +304,7 @@ struct ATHLTHPlanGoalEntryView: View {
     }
 
     private func categoryCard(_ item: ATHLTHPlanGoalArea) -> some View {
-        let isSelected = area == item
+        let isSelected = area == item && !selectedChoice.isEmpty && selectedChoice != "none"
         return Button {
             onChooseArea(item)
         } label: {
@@ -465,3 +491,4 @@ struct ATHLTHPlanGoalEntryView: View {
         ))
     }
 }
+

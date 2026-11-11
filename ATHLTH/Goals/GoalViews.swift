@@ -1674,8 +1674,107 @@ struct GoalCreationView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
 
+    var embeddedInPlan = false
+    var onPlanGoalCreated: ((UUID) -> Void)? = nil
+    @Binding var planCheckpoint: Data?
+    @State private var didLoadPlanCheckpoint = false
+    @State private var didSavePlanGoal = false
+
+    init(
+        initialCategory: GoalCategory = .endurance,
+        embeddedInPlan: Bool = false,
+        checkpoint: Binding<Data?> = .constant(nil),
+        onCreated: ((UUID) -> Void)? = nil
+    ) {
+        self.embeddedInPlan = embeddedInPlan
+        self.onPlanGoalCreated = onCreated
+        self._planCheckpoint = checkpoint
+        self._category = State(initialValue: initialCategory)
+    }
+
+    private struct PlanCheckpoint: Codable {
+        let title: String
+        let targetValue: Double
+        let exerciseName: String
+        let activity: GoalActivityFilter
+        let hasDeadline: Bool
+        let deadline: Date
+        let coverStyle: GoalCoverStyle
+        let whyItMatters: String
+        let notes: String
+        let privacy: GoalPrivacy
+        let makePrimary: Bool
+        let imageData: Data?
+        let automaticTracking: Bool
+        let milestones: [GoalMilestone]
+        let milestoneTitle: String
+        let milestoneDetail: String
+    }
+
+    private var encodedPlanCheckpoint: Data? {
+        try? JSONEncoder().encode(PlanCheckpoint(
+            title: title, targetValue: targetValue, exerciseName: exerciseName,
+            activity: activity, hasDeadline: hasDeadline, deadline: deadline,
+            coverStyle: coverStyle, whyItMatters: whyItMatters, notes: notes,
+            privacy: privacy, makePrimary: makePrimary, imageData: imageData,
+            automaticTracking: automaticTracking, milestones: setupMilestones,
+            milestoneTitle: newMilestoneTitle, milestoneDetail: newMilestoneDetail
+        ))
+    }
+
+    private func restorePlanCheckpoint() {
+        guard embeddedInPlan, !didLoadPlanCheckpoint else { return }
+        if let data = planCheckpoint,
+           let saved = try? JSONDecoder().decode(PlanCheckpoint.self, from: data) {
+            title = saved.title
+            targetValue = saved.targetValue
+            exerciseName = saved.exerciseName
+            activity = saved.activity
+            hasDeadline = saved.hasDeadline
+            deadline = saved.deadline
+            coverStyle = saved.coverStyle
+            whyItMatters = saved.whyItMatters
+            notes = saved.notes
+            privacy = saved.privacy
+            makePrimary = saved.makePrimary
+            imageData = saved.imageData
+            automaticTracking = saved.automaticTracking
+            setupMilestones = saved.milestones
+            newMilestoneTitle = saved.milestoneTitle
+            newMilestoneDetail = saved.milestoneDetail
+        } else {
+            applyDefaults(for: category)
+            makePrimary = goalStore.primaryGoal == nil
+        }
+        didLoadPlanCheckpoint = true
+    }
+
+    private var inlinePlanFields: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            targetStep
+            identityStep
+            milestoneStep
+            Button(ATHLTHLocalization.choose(english: "Save and link goal", norwegian: "Lagre og knytt til mål")) {
+                createGoal()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(goalFlowGold)
+            .disabled(targetValue <= 0 || (category == .strength && exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+        }
+        .onAppear { restorePlanCheckpoint() }
+        .onChange(of: encodedPlanCheckpoint) { _, value in
+            if didLoadPlanCheckpoint { planCheckpoint = value }
+        }
+        .onChange(of: selectedPhoto) { _, item in
+            Task { imageData = try? await item?.loadTransferable(type: Data.self) }
+        }
+        .onDisappear {
+            if didLoadPlanCheckpoint && !didSavePlanGoal { planCheckpoint = encodedPlanCheckpoint }
+        }
+    }
+
     @State private var step = 0
-    @State private var category: GoalCategory = .endurance
+    @State private var category: GoalCategory
     @State private var title = ""
     @State private var targetValue = 5.0
     @State private var exerciseName = "Squat"
@@ -1707,6 +1806,10 @@ struct GoalCreationView: View {
     private var goalFlowCanvas: Color { ATHLTHPlanDesign.canvas }
 
     var body: some View {
+        Group {
+            if embeddedInPlan {
+                inlinePlanFields
+            } else {
         NavigationStack {
             Group {
                 if step == 0 {
@@ -1737,6 +1840,8 @@ struct GoalCreationView: View {
                 Task {
                     imageData = try? await item?.loadTransferable(type: Data.self)
                 }
+            }
+        }
             }
         }
         .sheet(
@@ -4713,7 +4818,13 @@ struct GoalCreationView: View {
         }
 
         goalStore.add(goal)
-        dismiss()
+        if embeddedInPlan {
+            didSavePlanGoal = true
+            planCheckpoint = nil
+            onPlanGoalCreated?(goalID)
+        } else {
+            dismiss()
+        }
     }
 
     private func makeMilestones(createdAt: Date) -> [GoalMilestone] {
@@ -5758,3 +5869,4 @@ private extension String {
         isEmpty ? nil : self
     }
 }
+

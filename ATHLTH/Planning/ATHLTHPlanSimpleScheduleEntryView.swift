@@ -36,6 +36,7 @@ struct ATHLTHPlanSimpleScheduleEntryView: View {
 /// Reusable, fully rebuilt visual contract for plan setup.
 /// The wrappers are thin mode entry points, not legacy layouts stacked together.
 struct ATHLTHPlanSetupFields: View {
+    @Environment(\.horizontalSizeClass) private var widthClass
     @Binding var title: String
     @Binding var startDate: Date
     @Binding var weekCount: Int
@@ -101,7 +102,7 @@ struct ATHLTHPlanSetupFields: View {
                 startCard
             }
         }
-        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+        .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
     }
 
     private var advancedIntro: some View {
@@ -186,6 +187,32 @@ struct ATHLTHPlanSetupFields: View {
                         .font(.caption)
                         .foregroundStyle(muted)
                         .fixedSize(horizontal: false, vertical: true)
+                    if choice == .guided {
+                        VStack(spacing: 4) {
+                            ForEach(1...3, id: \.self) { day in
+                                HStack(spacing: 7) {
+                                    Text(tr("Day", "Dag") + " \(day)")
+                                        .frame(width: 42, alignment: .leading)
+                                    Capsule().fill(day == 1 ? bronze : border.opacity(0.4)).frame(height: 5)
+                                    Image(systemName: day == 1 ? "pencil" : "circle")
+                                }
+                            }
+                        }
+                        .font(.caption2).foregroundStyle(bronze).padding(.top, 6)
+                    } else {
+                        HStack(spacing: 4) {
+                            ForEach(1...7, id: \.self) { day in
+                                VStack(spacing: 4) {
+                                    Text("\(day)")
+                                    Image(systemName: selectedDays.contains(day) ? "figure.run" : "moon.stars")
+                                }
+                                .font(.caption2).foregroundStyle(bronze)
+                                .frame(maxWidth: .infinity, minHeight: 33)
+                                .background(ATHLTHTrainDesign.paleGold.opacity(0.4), in: RoundedRectangle(cornerRadius: 5))
+                            }
+                        }
+                        .padding(.top, 6)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
@@ -655,3 +682,4 @@ struct ATHLTHPlanSetupFields: View {
         }
     }
 }
+

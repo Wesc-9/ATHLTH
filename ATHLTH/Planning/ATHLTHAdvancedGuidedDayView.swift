@@ -3,6 +3,7 @@ import SwiftUI
 /// New presentation for the existing dated ATHLTHPlanWeekDayEdit engine.
 /// Never owns a separate draft: every action updates the parent wizard.
 struct ATHLTHAdvancedGuidedDayView: View {
+    @Environment(\.horizontalSizeClass) private var widthClass
     let date: Date
     let weekNumber: Int
     let totalWeeks: Int
@@ -68,7 +69,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 )
             }
         }
-        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+        .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
         .onChange(of: date) { _, _ in
             // Never carry an uncommitted group to another calendar day.
             composingGroup = nil
@@ -483,3 +484,4 @@ struct ATHLTHAdvancedGuidedDayView: View {
         .buttonStyle(.plain)
     }
 }
+

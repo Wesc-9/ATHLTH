@@ -1,8 +1,8 @@
 import Foundation
 
 /// A compact, local-only checkpoint for the plan creation wizard.
-/// Intentionally excludes injuries, health history, free-text notes, goal details
-/// and other potentially sensitive inputs. It never creates an active plan.
+/// Retains entered plan and goal fields in an account-scoped, protected local file.
+/// It never creates an active plan or uploads a draft to Coach.
 struct ATHLTHPlanCreationDraft: Codable, Equatable {
     static let schemaVersion = 1
     static let lifetime: TimeInterval = 45 * 24 * 60 * 60
@@ -33,7 +33,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var workoutPresetsByDay: [Int: String]? = nil
     var workoutMinutesByDay: [Int: Int]? = nil
     // Advanced only. Compact local checkpoint retains equipment/sets/intervals
-    // but strips free-text notes and route IDs for privacy.
+    // and retains workout notes and navigation so resuming is lossless.
     var structuredWorkoutsByDay:
         [Int: ATHLTHPlanStructuredWorkoutBlueprint]? = nil
     var weekDayEdits: [Int: ATHLTHPlanWeekDayEdit]? = nil
@@ -50,6 +50,9 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var editorWorkoutIndex: Int? = nil
     var simpleMinutes: Int? = nil
     var simpleActivityKinds: [String]? = nil
+    var configuration: Data? = nil
+    var inlineGoalDraft: Data? = nil
+    var approvedReplacementID: UUID? = nil
     var savedAt: Date
 
     init(
@@ -86,8 +89,14 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         editorWorkoutIndex: Int? = nil,
         simpleMinutes: Int? = nil,
         simpleActivityKinds: [String]? = nil,
+        configuration: Data? = nil,
+        inlineGoalDraft: Data? = nil,
+        approvedReplacementID: UUID? = nil,
         savedAt: Date = Date()
     ) {
+        self.configuration = configuration
+        self.inlineGoalDraft = inlineGoalDraft
+        self.approvedReplacementID = approvedReplacementID
         self.schemaVersion = Self.schemaVersion
         self.title = String(title.prefix(40))
         self.usedDefaultTitle = usedDefaultTitle
@@ -99,6 +108,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         let parsedArea = entryGoalArea.flatMap(ATHLTHPlanGoalArea.init(rawValue:))
         self.entryGoalArea = parsedArea?.rawValue
         self.entryGoalChoice = entryGoalChoice.flatMap { choice in
+            if ["", "none", "area"].contains(choice) { return choice }
             guard let area = parsedArea,
                   ATHLTHPlanGoalOption.options(for: area).contains(where: { $0.id == choice })
             else { return nil }
@@ -160,7 +170,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
             for (day, original) in structuredWorkoutsByDay
                 where (1...7).contains(day) && original.isValid {
                 var safe = original
-                safe.routeID = nil
+                // Retain local navigation and workout configuration.
                 safe.blocks = Self.safeCheckpointBlocks(original.blocks)
                 guard safe.isValid else { continue }
                 sanitized[day] = safe
@@ -177,14 +187,14 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
                 var safe = original
                 if let blueprint = safe.detailedWorkout {
                     var clean = blueprint
-                    clean.routeID = nil
+                    // Retain local navigation and workout configuration.
                     clean.blocks = Self.safeCheckpointBlocks(blueprint.blocks)
                     safe.detailedWorkout = clean.isValid ? clean : nil
                 }
                 if let extras = safe.additionalDetailedWorkouts {
                     safe.additionalDetailedWorkouts = extras.compactMap { extra in
                         var clean = extra
-                        clean.routeID = nil
+                        // Retain local navigation and workout configuration.
                         clean.blocks = Self.safeCheckpointBlocks(extra.blocks)
                         return clean.isValid ? clean : nil
                     }
@@ -198,23 +208,11 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.savedAt = savedAt
     }
 
-    /// Preserve first-party structured wellness and cycling blocks, which
-    /// use .note as a transport kind, without persisting private free text.
-    /// Arbitrary note-only blocks still never enter the convenience draft.
+    /// Keep the actual editable timeline, including notes and wellness blocks.
     private static func safeCheckpointBlocks(
         _ blocks: [WorkoutTemplateBlock]
     ) -> [WorkoutTemplateBlock] {
-        blocks.compactMap { source in
-            if source.kind == .note &&
-                source.wellnessKind == nil &&
-                source.activityTag != "cycling" {
-                return nil
-            }
-            var copy = source
-            copy.notes = nil
-            copy.loadNote = nil
-            return copy
-        }
+        blocks
     }
 
     func isRestorable(at date: Date = Date()) -> Bool {
@@ -291,19 +289,20 @@ struct ATHLTHPlanCreationDraftStore {
         return folder?.appendingPathComponent(file + ".json")
     }
 
+    @discardableResult
     func save(
         _ draft: ATHLTHPlanCreationDraft,
         userID: UUID,
         draftID: UUID? = nil
-    ) {
+    ) -> Bool {
         guard draft.isRestorable() else {
             clear(userID: userID, draftID: draftID)
-            return
+            return false
         }
         guard let data = try? JSONEncoder().encode(draft),
-              data.count <= 8_000_000,
+              data.count <= 64_000_000,
               let destination = url(for: userID, draftID: draftID),
-              let folder else { return }
+              let folder else { return false }
         do {
             try FileManager.default.createDirectory(
                 at: folder, withIntermediateDirectories: true
@@ -317,8 +316,10 @@ struct ATHLTHPlanCreationDraftStore {
             if draftID == nil {
                 defaults.removeObject(forKey: legacyKey(userID: userID))
             }
+            return true
         } catch {
             // Never destroy the existing valid checkpoint on a write error.
+            return false
         }
     }
 
@@ -396,3 +397,4 @@ struct ATHLTHPlanCreationDraftStore {
         _ = deleteDraft(userID: userID, draftID: draftID)
     }
 }
+

@@ -18,7 +18,7 @@ enum ATHLTHPlanJourney {
         if advanced {
             return [.mode, .goal, .basics, .week, .review]
         }
-        return [.mode, .goal, .basics]
+        return [.mode, .basics]
     }
 
     static func displayedCount(advanced: Bool) -> Int {
@@ -78,3 +78,4 @@ enum ATHLTHPlanJourney {
         return path[position - 1]
     }
 }
+

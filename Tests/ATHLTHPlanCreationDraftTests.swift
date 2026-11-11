@@ -305,7 +305,7 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
     }
 
 
-    func testTimedStretchingSurvivesSanitizedDraftWithoutStoringInstructions() throws {
+    func testTimedStretchingSurvivesLosslessLocalDraft() throws {
         let guide = try XCTUnwrap(ATHLTHWellnessBlockFactory.stretching.first)
         let block = ATHLTHWellnessBlockFactory.block(for: guide, phase: .cooldown)
         let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
@@ -326,11 +326,11 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         let saved = try XCTUnwrap(planDraft.structuredWorkoutsByDay?[2]?.blocks.first)
         XCTAssertEqual(saved.wellnessKind, .stretching)
         XCTAssertEqual(saved.phase, .cooldown)
-        XCTAssertNil(saved.notes)
+        XCTAssertEqual(saved.notes, block.notes)
         let dated = try XCTUnwrap(planDraft.weekDayEdits?[3]?.detailedWorkout)
         XCTAssertTrue(dated.isValid)
         XCTAssertEqual(dated.blocks.first?.wellnessKind, .stretching)
-        XCTAssertNil(dated.blocks.first?.notes)
+        XCTAssertEqual(dated.blocks.first?.notes, block.notes)
     }
 
     func testAdvancedContentPickerRestoresExactTypeAndPhase() throws {
@@ -433,7 +433,7 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertNil(restored.weeklyTimeBudgetMinutes)
     }
 
-    func testAdvancedWorkoutCheckpointRoundTripsWithoutHealthNotesOrRoute() throws {
+    func testAdvancedWorkoutCheckpointRoundTripsNotesAndRoute() throws {
         var squat = WorkoutTemplateBlock(
             sequence: 1, kind: .exercise, title: "Squat",
             exerciseSlug: "repdb-squat", distanceMeters: nil,
@@ -454,20 +454,20 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         )
         let bytes = try JSONEncoder().encode(draft)
         let text = String(decoding: bytes, as: UTF8.self)
-        XCTAssertFalse(text.contains("Private load note"))
-        XCTAssertFalse(text.contains("Private exercise note"))
-        XCTAssertFalse(text.contains(blueprint.routeID!.uuidString))
+        XCTAssertTrue(text.contains("Private load note"))
+        XCTAssertTrue(text.contains("Private exercise note"))
+        XCTAssertTrue(text.contains(blueprint.routeID!.uuidString))
         let saved = try JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: bytes)
         XCTAssertNil(saved.structuredWorkoutsByDay?[8])
         let restored = try XCTUnwrap(saved.structuredWorkoutsByDay?[1])
-        XCTAssertNil(restored.routeID)
+        XCTAssertEqual(restored.routeID, blueprint.routeID)
         XCTAssertEqual(restored.blocks.first?.setCount, 4)
         XCTAssertEqual(restored.blocks.first?.restBetweenSetsSeconds, 90)
-        XCTAssertNil(restored.blocks.first?.notes)
-        XCTAssertNil(restored.blocks.first?.loadNote)
+        XCTAssertEqual(restored.blocks.first?.notes, squat.notes)
+        XCTAssertEqual(restored.blocks.first?.loadNote, squat.loadNote)
     }
 
-    func testSwitchingToSimpleRetainsSanitizedAdvancedWorkoutsForSwitchingBack() throws {
+    func testSwitchingToSimpleRetainsCompleteAdvancedWorkoutsForSwitchingBack() throws {
         // A mode change is not a fresh draft. Structured advanced training
         // must survive even when the last visible page is the Simple wizard.
         let exercise = WorkoutTemplateBlock(
@@ -517,12 +517,12 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertEqual(resumed.simpleActivityKinds, ["walking", "running"])
         let detail = try XCTUnwrap(resumed.structuredWorkoutsByDay?[1])
         XCTAssertEqual(detail.title, "Legs")
-        XCTAssertNil(detail.routeID)
-        XCTAssertNil(detail.blocks.first?.notes)
-        XCTAssertNil(detail.blocks.first?.loadNote)
+        XCTAssertEqual(detail.routeID, blueprint.routeID)
+        XCTAssertEqual(detail.blocks.first?.notes, exercise.notes)
+        XCTAssertEqual(detail.blocks.first?.loadNote, exercise.loadNote)
         let stored = String(decoding: bytes, as: UTF8.self)
-        XCTAssertFalse(stored.contains("Private workout note"))
-        XCTAssertFalse(stored.contains("Private note"))
+        XCTAssertTrue(stored.contains("Private workout note"))
+        XCTAssertTrue(stored.contains("Private note"))
     }
 
     func testFreshDefaultInputsAreIndependentOfPreviousDraft() {
@@ -612,4 +612,24 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertFalse(store.wasEditing(userID: user, draftID: newID))
     }
 
+    func testNoGoalAndInlineGoalDraftRoundTripWithReplacementApproval() throws {
+        let approved = UUID()
+        for choice in ["", "area", "none"] {
+            let original = ATHLTHPlanCreationDraft(
+                title: "Four weeks", weekCount: 4, startDate: Date(),
+                advanced: true, source: "scratch", stage: "goal",
+                entryGoalArea: "running", entryGoalChoice: choice,
+                configuration: Data("entered plan settings".utf8),
+                inlineGoalDraft: Data("unfinished goal fields".utf8),
+                approvedReplacementID: approved)
+            let recovered = try JSONDecoder().decode(ATHLTHPlanCreationDraft.self,
+                from: JSONEncoder().encode(original))
+            XCTAssertEqual(recovered.entryGoalChoice, choice)
+            XCTAssertEqual(recovered.configuration, original.configuration)
+            XCTAssertEqual(recovered.inlineGoalDraft, original.inlineGoalDraft)
+            XCTAssertEqual(recovered.approvedReplacementID, approved)
+        }
+    }
+
 }
+

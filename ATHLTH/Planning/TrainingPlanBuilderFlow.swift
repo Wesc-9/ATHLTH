@@ -13,6 +13,8 @@ enum ATHLTHGuidedPlanDayPolicy {
 
 struct ATHLTHTrainingPlanBuilderFlow: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var widthClass
+    private var planContentWidth: CGFloat { widthClass == .regular ? .infinity : 720 }
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
@@ -75,7 +77,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var focus: TrainingPlanFocus = .running
     @State private var selectedGoalArea: ATHLTHPlanGoalArea = .running
-    @State private var selectedGoalChoice = "fitness"
+    @State private var selectedGoalChoice = ""
+    @State private var inlineGoalDraft: Data?
+    @State private var isCreatingPlan = false
     @State private var secondaryFocus: TrainingPlanFocus?
     @State private var focusWeight = 70
     @State private var goal: TrainingPlanGoalType = .improveFitness
@@ -135,7 +139,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var studioInitialQuickAdd: String?
     @State private var studioInitialPhase: WorkoutPhaseKind?
     // Keep an open content picker across temporary scene deactivation.
-    @State private var suspendedAdvancedAddDestination: AdvancedAddDestination?
     @State private var addingExtraWorkout = false
     @State private var editingWorkoutIndex = 0
     @State private var editingFocusedBlockIndex: Int?
@@ -203,10 +206,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var guidedAIError: String?
     @State private var guidedAIFillPreview: GuidedAIFillPreview?
 
+    @State private var aiPlanAction = "fill"
+    @State private var aiAdjustmentInstruction = ""
     private struct GuidedAIFillPreview: Identifiable {
         let id = UUID()
         let draft: AIProgramDraft
         let proposal: ATHLTHGuidedPlanAutofill.Proposal
+        let originalEdits: [Int: ATHLTHPlanWeekDayEdit]
+        let originalTemplates: [Int: ATHLTHPlanStructuredWorkoutBlueprint]
+        let replacingKeys: Set<Int>?
         let ownerID: UUID
         let planStart: Date
         let weekCount: Int
@@ -220,6 +228,32 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var showingPlanExitSheet = false
     @State private var planDiscardError: String?
     @State private var deliberatelyDiscardedPlanDraft = false
+
+    private struct ConfigurationCheckpoint: Codable {
+        var goalDetail: String
+        var summary: String
+        var injuryFree: Bool
+        var limitations: String
+        var muscles: Set<String>
+        var primaryMuscle: String?
+        var secondaryFocus: TrainingPlanFocus?
+        var focusWeight: Int
+        var hasCompetitionDate: Bool
+        var competitionDate: Date
+        var visibility: ProfileVisibility
+        var selectedDay: Int?
+        var aiInstruction: String
+    }
+    private var configurationCheckpoint: Data? {
+        try? JSONEncoder().encode(ConfigurationCheckpoint(
+            goalDetail: goalDetail, summary: planSummary,
+            injuryFree: injuryFree, limitations: injuriesOrLimitations,
+            muscles: selectedMuscles, primaryMuscle: primaryMuscle,
+            secondaryFocus: secondaryFocus, focusWeight: focusWeight,
+            hasCompetitionDate: hasCompetitionDate, competitionDate: competitionDate,
+            visibility: visibility, selectedDay: selectedAdvancedWeekDay,
+            aiInstruction: aiAdjustmentInstruction))
+    }
 
     private let draftStore = ATHLTHPlanCreationDraftStore()
 
@@ -444,6 +478,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // Bound metadata decoding for the full plan wizard; an unbounded
         // SwiftUI generic chain exhausted the iPhone main-thread stack.
         AnyView(planPresentations)
+            .tint(ATHLTHTrainDesign.bronze)
+            .interactiveDismissDisabled(!completedPlanCreation)
     }
 
     // Footer buttons belong to the *plan* column. The workout editor
@@ -825,6 +861,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var planPrimaryObservers: some View {
         AnyView(planLifecycle)
         .onChange(of: title) { _, _ in saveResumableDraft() }
+        .onChange(of: configurationCheckpoint) { _, _ in saveResumableDraft() }
+        .onChange(of: inlineGoalDraft) { _, _ in saveResumableDraft() }
+        .onChange(of: approvedPlanReplacementID) { _, _ in saveResumableDraft() }
+        .onChange(of: advancedAddDestination?.id) { _, _ in saveResumableDraft() }
         .onChange(of: weekCount) { _, _ in saveResumableDraft() }
         .onChange(of: startDate) { _, _ in saveResumableDraft() }
         .onChange(of: mode) { _, _ in saveResumableDraft() }
@@ -833,7 +873,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: selectedGoalArea) { _, _ in saveResumableDraft() }
         .onChange(of: selectedGoalChoice) { _, _ in saveResumableDraft() }
         .onChange(of: selectedGoalIDs) { _, selected in
-            if let linked = goalStore.activeGoals.first(where: {
+            if !isHydratingPlanDraft,
+               (mode == .basic || selectedGoalChoice.isEmpty || selectedGoalChoice == "area"),
+               let linked = goalStore.activeGoals.first(where: {
                 selected.contains($0.id) && $0.status == .active
             }) {
                 applyExistingGoalFocus(linked)
@@ -864,7 +906,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         AnyView(planPrimaryObservers)
         .onChange(of: weekCount) { _, value in
             selectedPlanWeekIndex = min(selectedPlanWeekIndex, max(0, value - 1))
-            weekDayEdits = weekDayEdits.filter { $0.key <= value * 7 }
             guidedDayCursor = min(guidedDayCursor, value * 7)
             repeatWeekCount = min(repeatWeekCount, max(1, value - 1))
             if let pending = guidedWeekAwaitingDecision, pending >= value - 1 {
@@ -875,16 +916,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             // Simple and Advanced share the chosen weekdays. Do not erase
             // Advanced workout details just because a day was toggled in Simple.
             // Advanced edits remain in their original positions when returning.
-            if mode == .advanced {
-                structuredWorkoutsByDay = structuredWorkoutsByDay
-                    .filter { selectedDays.contains($0.key) }
-                workoutKindOverridesByDay = workoutKindOverridesByDay
-                    .filter { selectedDays.contains($0.key) }
-                workoutTitleOverridesByDay = workoutTitleOverridesByDay
-                    .filter { selectedDays.contains($0.key) }
-                workoutMinutesByDay = workoutMinutesByDay
-                    .filter { selectedDays.contains($0.key) }
-            }
             sessionsPerWeek = selectedDays.count
             saveResumableDraft()
         }
@@ -917,27 +948,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: editingWeekDay) { _, _ in saveResumableDraft() }
         .onChange(of: composingAdvancedDay) { _, _ in saveResumableDraft() }
         .onChange(of: selectingLibraryDay) { _, _ in saveResumableDraft() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase != .active {
-                // UIKit may dismiss a presented sheet when the phone locks.
-                // Hold the destination independently from the sheet binding.
-                if let destination = advancedAddDestination {
-                    suspendedAdvancedAddDestination = destination
-                }
-                saveResumableDraft()
-            } else if let destination = suspendedAdvancedAddDestination {
-                Task { @MainActor in
-                    await Task.yield()
-                    guard step == .week, !completedPlanCreation else {
-                        suspendedAdvancedAddDestination = nil
-                        return
-                    }
-                    if advancedAddDestination == nil {
-                        advancedAddDestination = destination
-                    }
-                    suspendedAdvancedAddDestination = nil
-                }
-            }
+        .onChange(of: scenePhase) { _, _ in
+            saveResumableDraft()
         }
         .onChange(
             of: sessionsPerWeek
@@ -955,38 +967,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var planPresentations: some View {
         AnyView(planSecondaryObservers)
-        .sheet(isPresented: $showingPlanExitSheet) {
-            ATHLTHDiscardDraftSheet(
-                kind: .trainingPlan,
-                onKeepEditing: {
-                    showingPlanExitSheet = false
-                    planDiscardError = nil
-                },
-                onSaveDraftAndClose: {
-                    saveResumableDraft()
-                    draftStore.setEditing(
-                        false, userID: session.profile.userID, draftID: draftID
-                    )
-                    showingPlanExitSheet = false
+        .confirmationDialog(
+            ATHLTHLocalization.choose(english: "Leave plan builder?", norwegian: "Forlate planbyggeren?"),
+            isPresented: $showingPlanExitSheet, titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(english: "Save draft and close", norwegian: "Lagre utkast og lukk")) {
+                guard saveResumableDraft() else { return }
+                draftStore.setEditing(false, userID: session.profile.userID, draftID: draftID)
+                dismiss()
+            }
+            Button(ATHLTHLocalization.choose(english: "Discard draft", norwegian: "Forkast utkast"), role: .destructive) {
+                if draftStore.deleteDraft(userID: session.profile.userID, draftID: draftID) {
+                    deliberatelyDiscardedPlanDraft = true
                     dismiss()
-                },
-                onDiscard: {
-                    if draftStore.deleteDraft(
-                        userID: session.profile.userID, draftID: draftID
-                    ) {
-                        deliberatelyDiscardedPlanDraft = true
-                        planDiscardError = nil
-                        showingPlanExitSheet = false
-                        dismiss()
-                    } else {
-                        planDiscardError = ATHLTHLocalization.choose(
-                            english: "The draft could not be deleted. Try again.",
-                            norwegian: "Utkastet kunne ikke slettes. Prøv på nytt."
-                        )
-                    }
-                },
-                errorMessage: planDiscardError
-            )
+                }
+            }
+            Button(ATHLTHLocalization.choose(english: "Keep editing", norwegian: "Fortsett å redigere"), role: .cancel) {}
         }
         .alert(
             ATHLTHLocalization.choose(
@@ -1056,8 +1052,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
         } message: {
             Text(ATHLTHLocalization.choose(
-                english: "Your plan focus, goals, equipment, selected days and session duration are sent to Coach. Health history and injury notes are not shared. Your existing workouts and rest days will not be changed. Review suggestions before applying.",
-                norwegian: "Planfokus, mål, utstyr, valgte dager og øktvarighet sendes til Coach. Helsehistorikk og skadeopplysninger deles ikke. Økter og hviledager du har lagt inn, beholdes. Du får godkjenne forslagene før de brukes."
+                english: "Your plan focus, goals, equipment, selected days and session duration are sent to Coach. Health history and injury notes are not shared. Your instruction and the current plan are included. Rebuilding may replace all dates; adjusting changes only the selected day. Review suggestions before applying.",
+                norwegian: "Planfokus, mål, utstyr, valgte dager og øktvarighet sendes til Coach. Helsehistorikk og skadeopplysninger deles ikke. Instruksjonen og den gjeldende planen tas med. En ny plan kan erstatte alle dager; justering gjelder bare valgt dag. Se gjennom forslagene før du bruker dem."
             ))
         }
         .sheet(item: $guidedAIFillPreview) { preview in
@@ -1123,10 +1119,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         insertGuidedLibraryExercise(
                             blocks, day: destination.day, week: destination.week,
                             workoutIndex: destination.workoutIndex)
+                        advancedAddDestination = nil
                     },
                     onWorkout: { workout in
                         insertGuidedLibraryWorkout(
                             workout, day: destination.day, week: destination.week)
+                        advancedAddDestination = nil
                     }
                 )
             }
@@ -1302,7 +1300,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 systemImage: "checkmark.seal.fill"
                             )
                             .font(.subheadline.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
 
                             Text(savedPlan.title)
                                 .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -1423,7 +1421,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                 }
             ))
-            .id(mode == .advanced ? (weekPlanningApproach?.rawValue ?? "no-layout") : "simple"))
+            )
         case .review:
             AnyView(wizardScroll(AnyView(reviewStep)))
         }
@@ -1447,7 +1445,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .padding(.horizontal, 18)
             .padding(.top, 14)
             .padding(.bottom, 118)
-            .frame(maxWidth: 720)
+            .frame(maxWidth: planContentWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -1566,18 +1564,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         Button {
             if mode == .basic {
                 updateSimplePlanChoices()
-                weekCount = 4
-                startDate = Calendar.current.startOfDay(for: .now)
             } else {
                 weeklyTimeBudgetMinutes = advancedSessionMinutes * selectedDays.count
-            }
-            // The preselected running card must already affect the plan even
-            // when the user presses Next without tapping a radio row.
-            if let selected = ATHLTHPlanGoalOption.options(for: selectedGoalArea)
-                .first(where: { $0.id == selectedGoalChoice }) {
-                selectGoalOption(selected)
-            } else {
-                selectGoalArea(selectedGoalArea)
             }
             goForward()
         } label: {
@@ -1635,13 +1623,23 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.17)) {
                             selectGoalOption(option)
                         }
+                    },
+                    onChooseNoGoal: {
+                        selectedGoalChoice = "none"
+                        selectedGoalIDs.removeAll()
+                        inlineGoalDraft = nil
+                        focus = .generalFitness
+                        goal = .improveFitness
                     }
                 )
+                if !selectedGoalChoice.isEmpty && !["none", "area"].contains(selectedGoalChoice) {
+                    inlineGoalLinkFields
+                }
             }
             .padding(.horizontal, 18)
             .padding(.top, 10)
             .padding(.bottom, 26)
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: planContentWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -1714,15 +1712,58 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .padding(.top, 4)
     }
 
+    private var inlineGoalCategory: GoalCategory {
+        if selectedGoalArea == .specific { return .event }
+        if focus == .strength || focus == .hypertrophy { return .strength }
+        if selectedGoalArea == .general { return .consistency }
+        return .endurance
+    }
+
+    private var inlineGoalLinkFields: some View {
+        builderPanel {
+            VStack(alignment: .leading, spacing: 14) {
+                Label(ATHLTHLocalization.choose(english: "Link to goal or event", norwegian: "Knytt til mål eller arrangement"), systemImage: "target")
+                    .font(.headline)
+                ForEach(goalStore.activeGoals.filter { $0.status == .active && $0.category == inlineGoalCategory }) { linked in
+                    Button {
+                        selectedGoalIDs = [linked.id]
+                    } label: {
+                        Label(linked.title, systemImage: selectedGoalIDs.contains(linked.id) ? "checkmark.circle.fill" : "circle")
+                    }
+                    .buttonStyle(.bordered)
+                }
+                if selectedGoalIDs.isEmpty {
+                    GoalCreationView(
+                        initialCategory: inlineGoalCategory, embeddedInPlan: true,
+                        checkpoint: $inlineGoalDraft
+                    ) { id in
+                        selectedGoalIDs = [id]
+                        inlineGoalDraft = nil
+                        saveResumableDraft()
+                    }
+                    .id(selectedGoalArea.rawValue + selectedGoalChoice)
+                } else {
+                    Label(ATHLTHLocalization.choose(english: "Goal linked to this plan", norwegian: "Målet er knyttet til planen"), systemImage: "checkmark.circle.fill")
+                    Button(ATHLTHLocalization.choose(english: "Create a different goal", norwegian: "Opprett et annet mål")) {
+                        selectedGoalIDs.removeAll()
+                    }
+                }
+            }
+        }
+    }
+
     private func selectGoalArea(_ newArea: ATHLTHPlanGoalArea) {
         selectedGoalArea = newArea
-        guard let first = ATHLTHPlanGoalOption.options(for: newArea).first else {
-            return
-        }
-        selectGoalOption(first)
+        selectedGoalChoice = "area"
+        selectedGoalIDs.removeAll()
+        inlineGoalDraft = nil
     }
 
     private func selectGoalOption(_ option: ATHLTHPlanGoalOption) {
+        if selectedGoalChoice != option.id {
+            inlineGoalDraft = nil
+            selectedGoalIDs.removeAll()
+        }
         selectedGoalChoice = option.id
         focus = option.focus
         goal = option.goal
@@ -1869,7 +1910,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .padding(.horizontal, 18)
             .padding(.top, 10)
             .padding(.bottom, 24)
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: planContentWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -1976,7 +2017,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .padding(.horizontal, 16)
             .padding(.top, 15)
             .padding(.bottom, 24)
-            .frame(maxWidth: 720)
+            .frame(maxWidth: planContentWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -2298,13 +2339,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .foregroundStyle(
                         prominent
                             ? Color.white
-                            : ATHLTHTheme.accentDeep
+                            : ATHLTHTrainDesign.bronze
                     )
                     .frame(width: 54, height: 54)
                     .background(
                         prominent
                             ? Color.white.opacity(0.13)
-                            : ATHLTHTheme.accentSoft,
+                            : ATHLTHTrainDesign.paleGold,
                         in: RoundedRectangle(
                             cornerRadius: 17,
                             style: .continuous
@@ -2318,7 +2359,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .foregroundStyle(
                         prominent
                             ? Color.white
-                            : ATHLTHTheme.accentDeep
+                            : ATHLTHTrainDesign.bronze
                     )
             }
 
@@ -2364,7 +2405,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .foregroundStyle(
                     prominent
                         ? Color.white.opacity(0.72)
-                        : ATHLTHTheme.accentDeep
+                        : ATHLTHTrainDesign.bronze
                 )
         }
         .padding(20)
@@ -2377,7 +2418,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 colors:
                     prominent
                     ? [
-                        ATHLTHTheme.accentDeep,
+                        ATHLTHTrainDesign.bronze,
                         Color(
                             red: 0.15,
                             green: 0.18,
@@ -2411,7 +2452,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .shadow(
             color:
-                ATHLTHTheme.accentDeep
+                ATHLTHTrainDesign.bronze
                     .opacity(
                         prominent ? 0.17 : 0.06
                     ),
@@ -2434,11 +2475,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.accentDeep
+                    ATHLTHTrainDesign.bronze
                 )
                 .frame(width: 44, height: 44)
                 .background(
-                    ATHLTHTheme.accentSoft,
+                    ATHLTHTrainDesign.paleGold,
                     in: RoundedRectangle(
                         cornerRadius: 13,
                         style: .continuous
@@ -2514,7 +2555,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 Text(stepTitle)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
-                        ATHLTHTheme.accentDeep
+                        ATHLTHTrainDesign.bronze
                     )
             }
 
@@ -2524,7 +2565,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     Capsule()
                         .fill(
                             index <= stepDisplayNumber
-                                ? ATHLTHTheme.accentDeep
+                                ? ATHLTHTrainDesign.bronze
                                 : ATHLTHTheme.accent
                                     .opacity(0.10)
                         )
@@ -2696,14 +2737,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     onCreateGoal: openGoalCreationFromPlan,
                     onSelectAdvanced: { openModeStart(advanced: true) }
                 )
-                if let conflictingPlan {
+                if let conflictingPlan, approvedPlanReplacementID != conflictingPlan.id {
                     conflictCard(conflictingPlan)
                 }
             }
             .padding(.horizontal, 18)
             .padding(.top, 10)
             .padding(.bottom, 22)
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: planContentWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -2743,7 +2784,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
         private var simpleContinueBar: some View {
         Button {
-            guard canCreatePlan else { return }
+            guard canCreatePlan, !isCreatingPlan, !completedPlanCreation else { return }
             createPlan(seedSuggestedWeek: true)
         } label: {
             HStack(spacing: 12) {
@@ -2814,7 +2855,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, minHeight: 58)
             .background(
-                selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.surface,
+                selected ? ATHLTHTrainDesign.bronze : ATHLTHPlanDesign.surface,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             .overlay {
@@ -2824,7 +2865,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         lineWidth: 0.8
                     )
             }
-            .shadow(color: ATHLTHTheme.accentDeep.opacity(selected ? 0.06 : 0.035),
+            .shadow(color: ATHLTHTrainDesign.bronze.opacity(selected ? 0.06 : 0.035),
                     radius: 8, y: 3)
         }
         .buttonStyle(.plain)
@@ -2841,7 +2882,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .foregroundStyle(selected ? Color.white : ATHLTHPlanDesign.ink)
                 .frame(maxWidth: .infinity, minHeight: 60)
                 .background(
-                    selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.surface,
+                    selected ? ATHLTHTrainDesign.bronze : ATHLTHPlanDesign.surface,
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
                 .overlay {
@@ -2851,7 +2892,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             lineWidth: 0.8
                         )
                 }
-                .shadow(color: ATHLTHTheme.accentDeep.opacity(selected ? 0.06 : 0.035),
+                .shadow(color: ATHLTHTrainDesign.bronze.opacity(selected ? 0.06 : 0.035),
                         radius: 8, y: 3)
         }
         .buttonStyle(.plain)
@@ -2920,11 +2961,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     // Only advanced planning uses the new reference-led schedule screen.
     // Basic's original short step intentionally stays unchanged.
-    private var advancedScheduleStep: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 11) {
-                sourceChoiceHeader
-                ATHLTHPlanAdvancedScheduleEntryView(
+    private var advancedScheduleFields: some View {
+        ATHLTHPlanAdvancedScheduleEntryView(
                     title: $title,
                     startDate: $startDate,
                     weekCount: $weekCount,
@@ -2945,14 +2983,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     onCreateGoal: openGoalCreationFromPlan,
                     onSelectSimple: { openModeStart(advanced: false) }
                 )
-                if let conflictingPlan {
+    }
+
+    private var advancedScheduleStep: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 11) {
+                sourceChoiceHeader
+                if widthClass == .regular {
+                    adaptivePlanPair(AnyView(advancedScheduleFields), AnyView(scheduleWeekPreview))
+                } else {
+                    advancedScheduleFields
+                }
+                if let conflictingPlan, approvedPlanReplacementID != conflictingPlan.id {
                     conflictCard(conflictingPlan)
                 }
             }
             .padding(.horizontal, 18)
             .padding(.top, 10)
             .padding(.bottom, 22)
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: planContentWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
@@ -3081,7 +3130,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
 
-            if let conflict = conflictingPlan {
+            if let conflict = conflictingPlan, approvedPlanReplacementID != conflict.id {
                 conflictCard(conflict)
             }
 
@@ -3252,7 +3301,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .frame(maxWidth: .infinity, minHeight: 54)
                     .background(
                         weekCount == value
-                            ? ATHLTHTheme.accentDeep
+                            ? ATHLTHTrainDesign.bronze
                             : Color.white.opacity(0.84),
                         in: RoundedRectangle(cornerRadius: 13, style: .continuous)
                     )
@@ -3310,7 +3359,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .background(
                     [1, 4, 6, 8].contains(weekCount)
                         ? Color.white.opacity(0.84)
-                        : ATHLTHTheme.accentDeep,
+                        : ATHLTHTrainDesign.bronze,
                     in: RoundedRectangle(cornerRadius: 13, style: .continuous)
                 )
                 .overlay {
@@ -3667,7 +3716,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     )
                     .background(
                         focus == item
-                            ? ATHLTHTheme.accentDeep
+                            ? ATHLTHTrainDesign.bronze
                             : Color.white.opacity(0.72),
                         in: RoundedRectangle(
                             cornerRadius: 14,
@@ -3755,12 +3804,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
-                        ATHLTHTheme.accentDeep
+                        ATHLTHTrainDesign.bronze
                     )
                     .padding(.horizontal, 10)
                     .frame(height: 34)
                     .background(
-                        ATHLTHTheme.accentSoft,
+                        ATHLTHTrainDesign.paleGold,
                         in: Capsule()
                     )
                 }
@@ -3781,7 +3830,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .weight(.bold)
                     )
                     .foregroundStyle(
-                        ATHLTHTheme.accentDeep
+                        ATHLTHTrainDesign.bronze
                     )
 
                     Spacer()
@@ -3804,7 +3853,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     in: 50...90,
                     step: 5
                 )
-                .tint(ATHLTHTheme.accentDeep)
+                .tint(ATHLTHTrainDesign.bronze)
             }
         }
     }
@@ -3841,7 +3890,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     )
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundStyle(
-                                        ATHLTHTheme.accentDeep
+                                        ATHLTHTrainDesign.bronze
                                     )
                                 }
                             }
@@ -3864,7 +3913,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     )
                     .background(
                         goal == item
-                            ? ATHLTHTheme.accentDeep
+                            ? ATHLTHTrainDesign.bronze
                             : Color.white.opacity(0.72),
                         in: RoundedRectangle(
                             cornerRadius: 14,
@@ -3934,8 +3983,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         )
                         .background(
                             selected
-                                ? ATHLTHTheme.accentDeep
-                                : ATHLTHTheme.accentSoft,
+                                ? ATHLTHTrainDesign.bronze
+                                : ATHLTHTrainDesign.paleGold,
                             in: Capsule()
                         )
                 }
@@ -3986,7 +4035,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
             .background(
                 selected
-                    ? ATHLTHTheme.accentDeep
+                    ? ATHLTHTrainDesign.bronze
                     : Color.white.opacity(0.72),
                 in: RoundedRectangle(
                     cornerRadius: 14,
@@ -3997,6 +4046,77 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .buttonStyle(.plain)
     }
 
+
+    private var planAITools: some View {
+        builderPanel {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(ATHLTHLocalization.choose(english: "Adjust with ATHLTH Coach", norwegian: "Juster med ATHLTH Coach"), systemImage: "sparkles")
+                    .font(.headline)
+                TextField(ATHLTHLocalization.choose(english: "What would you like to change?", norwegian: "Hva ønsker du å endre?"), text: $aiAdjustmentInstruction, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                Button(ATHLTHLocalization.choose(english: "Fill empty days", norwegian: "Fyll tomme dager")) {
+                    aiPlanAction = "fill"
+                    showingGuidedAIConsent = true
+                }
+                Button(ATHLTHLocalization.choose(english: "Adjust selected day", norwegian: "Juster valgt dag")) {
+                    aiPlanAction = "adjust"
+                    showingGuidedAIConsent = true
+                }
+                .disabled(aiAdjustmentInstruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button(ATHLTHLocalization.choose(english: "Rebuild the entire plan", norwegian: "Lag hele planen på nytt")) {
+                    aiPlanAction = "rebuild"
+                    showingGuidedAIConsent = true
+                }
+                Text(ATHLTHLocalization.choose(english: "Review the suggestions before applying. Small changes affect only the selected day.", norwegian: "Se gjennom forslagene før du bruker dem. Små justeringer gjelder bare valgt dag."))
+                    .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                if isGuidedAIFilling { ProgressView() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(isGuidedAIFilling)
+        }
+    }
+
+    private func aiProposal(
+        _ draft: AIProgramDraft, replacing keys: Set<Int>?, minutes: Int
+    ) throws -> ATHLTHGuidedPlanAutofill.Proposal {
+        guard let keys else {
+            return try ATHLTHGuidedPlanAutofill.propose(
+                draft, existing: weekDayEdits,
+                protectedWeekdays: Set(structuredWorkoutsByDay.keys),
+                weekCount: weekCount, defaultSessionMinutes: minutes)
+        }
+        // Outside the explicitly chosen scope even empty dates are protected.
+        var base = weekDayEdits
+        for key in 1...(weekCount * 7) {
+            if keys.contains(key) { base.removeValue(forKey: key) }
+            else if base[key] == nil {
+                var placeholder = ATHLTHPlanWeekDayEdit()
+                placeholder.isRestDay = true
+                base[key] = placeholder
+            }
+        }
+        let generated = try ATHLTHGuidedPlanAutofill.propose(
+            draft, existing: base, protectedWeekdays: [],
+            weekCount: weekCount, defaultSessionMinutes: minutes)
+        var merged = weekDayEdits
+        for key in keys {
+            guard let fresh = generated.edits[key] else { continue }
+            var edit = merged[key] ?? ATHLTHPlanWeekDayEdit()
+            edit.isRestDay = fresh.isRestDay
+            edit.kind = fresh.kind
+            edit.title = fresh.title
+            edit.durationMinutes = fresh.durationMinutes
+            edit.detailedWorkout = fresh.detailedWorkout
+            edit.additionalDetailedWorkouts = fresh.additionalDetailedWorkouts
+            edit.removeTemplateDetail = true
+            merged[key] = edit
+        }
+        return ATHLTHGuidedPlanAutofill.Proposal(
+            edits: merged, filledDays: keys.count,
+            addedWorkouts: keys.reduce(0) { total, key in
+                total + (merged[key]?.detailedWorkout == nil ? 0 : 1) + (merged[key]?.additionalDetailedWorkouts?.count ?? 0)
+            }, restDays: keys.filter { merged[$0]?.isRestDay == true }.count)
+    }
 
     // Quick week planning and day-by-day planning share one persisted date model.
     private var guidedCurrentWeek: Int { min(guidedDayCursor / 7, max(0, weekCount - 1)) }
@@ -4018,6 +4138,93 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             edit.isRestDay == true || edit.detailedWorkout?.isValid != true
                 ? nil : ((key - 1) % 7 + 1)
         })
+    }
+
+    private func adaptivePlanPair(_ leading: AnyView, _ trailing: AnyView) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 24) {
+                leading.frame(minWidth: 270, maxWidth: 440)
+                trailing.frame(minWidth: 420, maxWidth: .infinity)
+            }
+            VStack(alignment: .leading, spacing: 18) { leading; trailing }
+        }
+    }
+
+    private var scheduleWeekPreview: some View {
+        builderPanel {
+            VStack(alignment: .leading, spacing: 14) {
+                Label(ATHLTHLocalization.choose(english: "Your training weeks", norwegian: "Treningsukene dine"), systemImage: "calendar")
+                    .font(.title3.weight(.semibold))
+                Text(ATHLTHLocalization.choose(english: "Preview · selected training days and recovery", norwegian: "Forhåndsvisning · valgte treningsdager og hvile"))
+                    .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                ForEach(0..<weekCount, id: \.self) { week in
+                    VStack(alignment: .leading, spacing: 8) {
+                        let from = calendarDate(for: week, offset: 0)
+                        let to = calendarDate(for: week, offset: 6)
+                        Text(ATHLTHLocalization.choose(english: "Week", norwegian: "Uke") + " \(week + 1) · " + from.formatted(.dateTime.day().month(.abbreviated)) + " – " + to.formatted(.dateTime.day().month(.abbreviated)))
+                            .font(.subheadline.weight(.semibold))
+                        HStack(spacing: 6) {
+                            ForEach(0..<7, id: \.self) { index in
+                                let date = calendarDate(for: week, offset: index)
+                                let weekday = (Calendar.current.component(.weekday, from: date) + 5) % 7 + 1
+                                let training = selectedDays.contains(weekday)
+                                VStack(spacing: 6) {
+                                    Text(date.formatted(.dateTime.weekday(.abbreviated)))
+                                    Image(systemName: training ? "figure.strengthtraining.traditional" : "moon.stars")
+                                    Text(date.formatted(.dateTime.day()))
+                                }
+                                .font(.caption2)
+                                .frame(maxWidth: .infinity, minHeight: 65)
+                                .foregroundStyle(training ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.secondary)
+                                .background(training ? ATHLTHTrainDesign.paleGold.opacity(0.5) : ATHLTHTrainDesign.canvas, in: RoundedRectangle(cornerRadius: 10))
+                                .accessibilityLabel(date.formatted(date: .complete, time: .omitted) + ": " + ATHLTHLocalization.choose(english: training ? "Training" : "Rest", norwegian: training ? "Trening" : "Hvile"))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var dailyDateSidebar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Button { guidedDayCursor = max(0, guidedDayCursor - 7) } label: { Image(systemName: "chevron.left") }
+                    .disabled(guidedCurrentWeek == 0)
+                Spacer()
+                Text(ATHLTHLocalization.choose(english: "Week", norwegian: "Uke") + " \(guidedCurrentWeek + 1) / \(weekCount)")
+                Spacer()
+                Button { guidedDayCursor = min(weekCount * 7 - 1, guidedDayCursor + 7) } label: { Image(systemName: "chevron.right") }
+                    .disabled(guidedCurrentWeek == weekCount - 1)
+            }
+            .font(.subheadline.weight(.semibold))
+            ForEach(0..<7, id: \.self) { index in
+                let position = guidedCurrentWeek * 7 + index
+                let date = Calendar.current.date(byAdding: .day, value: position, to: startDate) ?? startDate
+                let edit = weekDayEdits[guidedDateKey(at: position)]
+                Button {
+                    guidedWeekAwaitingDecision = nil
+                    guidedDayCursor = position
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(date.formatted(.dateTime.weekday(.wide)))
+                                .font(.subheadline.weight(.semibold))
+                            Text(date.formatted(.dateTime.day().month()))
+                                .font(.caption)
+                        }
+                        Spacer()
+                        Image(systemName: edit?.isRestDay == true ? "moon.stars" : edit?.detailedWorkout?.kind.systemImage ?? "circle.dotted")
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .background(guidedDayCursor == position ? ATHLTHTrainDesign.paleGold : .white, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(guidedDayCursor == position ? .isSelected : [])
+            }
+        }
     }
 
     private var guidedWeekStep: some View {
@@ -4055,8 +4262,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             } else if let finishedWeek = guidedWeekDecisionSource {
                 guidedCompletedWeekDecision(sourceWeek: finishedWeek)
             } else {
-                guidedCurrentDayCard
+                if widthClass == .regular {
+                    adaptivePlanPair(AnyView(dailyDateSidebar), AnyView(guidedCurrentDayCard))
+                } else {
+                    guidedCurrentDayCard
+                }
             }
+            planAITools
         }
     }
 
@@ -4677,8 +4889,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @MainActor
     private func generateGuidedAISuggestions() async {
         guard !isGuidedAIFilling, session.signedIn,
-              step == .week, mode == .advanced,
-              weekPlanningApproach == .guided else { return }
+              (step == .week || step == .review), mode == .advanced else { return }
 
         isGuidedAIFilling = true
         defer { isGuidedAIFilling = false }
@@ -4686,7 +4897,29 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let athleteID = session.profile.userID
         let requestedStart = startDate
         let requestedWeeks = weekCount
-        let availableDays = selectedDays.isEmpty ? Set([1, 3, 5]) : selectedDays
+        let originalEdits = weekDayEdits
+        let originalTemplates = structuredWorkoutsByDay
+        let targetDay = weekPlanningApproach == .guided ? guidedCurrentWeekday :
+            (selectedAdvancedWeekDay ?? advancedWeekItems(for: selectedPlanWeekIndex).sorted { $0.date < $1.date }.first?.weekday ?? 1)
+        let targetWeek = weekPlanningApproach == .guided ? guidedCurrentWeek : selectedPlanWeekIndex
+        let replacingKeys: Set<Int>? = aiPlanAction == "rebuild"
+            ? Set(1...(weekCount * 7))
+            : aiPlanAction == "adjust" ? Set([weekDayKey(targetDay, weekIndex: targetWeek)]) : nil
+        var availableDays = selectedDays.isEmpty ? Set([1, 3, 5]) : selectedDays
+        if aiPlanAction == "adjust" { availableDays.insert(targetDay) }
+        let scopeNotes = aiPlanAction == "adjust"
+            ? "Adjust only week \(targetWeek + 1), weekday \(targetDay). Keep the session's structure and exercises unless the instruction requires changes."
+            : aiPlanAction == "rebuild" ? "Rebuild all weeks using the requested changes." : "Fill only empty dates."
+        let contextDays = (0..<weekCount).flatMap { week in
+            advancedWeekItems(for: week).map { day in
+                AIProgramExistingDay(weekNumber: week + 1, dayIndex: day.weekday,
+                    dayTitle: day.title, existingSessions: day.workouts.map { workout in
+                        workout.title + ": " + workout.blocks.map { block in
+                            block.title + " [sets=\(block.setCount ?? 1), reps=\(block.repetitions ?? 0), seconds=\(block.durationSeconds ?? 0), kg=\(block.targetWeightKilograms ?? 0), rest=\(block.restBetweenSetsSeconds ?? 0)]"
+                        }.joined(separator: ", ")
+                    })
+            }
+        }
         let minutes = min(max(advancedSessionMinutes, 5), 180)
         let request = AIProgramRequest(
             mode: AIProgramGenerationMode.generate.rawValue,
@@ -4699,16 +4932,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             userNotes: "Activity: \(aiTrainingFocus.title). Goal: \(goal.title). " +
                 "Equipment: \(equipment.rawValue). Plan progressive, editable training " +
                 "on the selected weekdays; keep recovery days and realistic intensity. " +
-                "No health history or injury data has been shared.",
+                "No health history or injury data has been shared. " + scopeNotes +
+                " Requested changes: " + String(aiAdjustmentInstruction.prefix(2000)),
             coachStrengthContext: nil,
             goals: [AIProgramGoalInput(focus: aiTrainingFocus)],
-            existingDays: []
+            existingDays: contextDays
         )
 
         do {
             let draft = try await guidedAIService.generate(request)
             guard session.signedIn, session.profile.userID == athleteID,
-                  startDate == requestedStart, weekCount == requestedWeeks else {
+                  startDate == requestedStart, weekCount == requestedWeeks,
+                  weekDayEdits == originalEdits, structuredWorkoutsByDay == originalTemplates else {
                 // Never apply a response to a changed account or date range.
                 return
             }
@@ -4729,13 +4964,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 return
             }
 
-            let proposal = try ATHLTHGuidedPlanAutofill.propose(
-                draft,
-                existing: weekDayEdits,
-                protectedWeekdays: Set(structuredWorkoutsByDay.keys),
-                weekCount: requestedWeeks,
-                defaultSessionMinutes: minutes
-            )
+            let proposal = try aiProposal(draft, replacing: replacingKeys, minutes: minutes)
             guard proposal.hasChanges else {
                 guidedAIError = ATHLTHLocalization.choose(
                     english: "Every date is already planned. AI will not replace workouts or rest days.",
@@ -4745,6 +4974,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             guidedAIFillPreview = GuidedAIFillPreview(
                 draft: draft, proposal: proposal,
+                originalEdits: originalEdits, originalTemplates: originalTemplates,
+                replacingKeys: replacingKeys,
                 ownerID: athleteID, planStart: requestedStart, weekCount: requestedWeeks
             )
         } catch {
@@ -4755,20 +4986,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @MainActor
     private func applyGuidedAISuggestions(_ preview: GuidedAIFillPreview) {
         guard session.signedIn, session.profile.userID == preview.ownerID,
-              startDate == preview.planStart, weekCount == preview.weekCount else {
+              startDate == preview.planStart, weekCount == preview.weekCount,
+              weekDayEdits == preview.originalEdits,
+              structuredWorkoutsByDay == preview.originalTemplates else {
             guidedAIFillPreview = nil
             return
         }
         do {
-            // Re-apply the proposal against CURRENT edits. A newly hand-edited
-            // date is always protected even if the sheet opened earlier.
-            let proposal = try ATHLTHGuidedPlanAutofill.propose(
-                preview.draft,
-                existing: weekDayEdits,
-                protectedWeekdays: Set(structuredWorkoutsByDay.keys),
-                weekCount: weekCount,
-                defaultSessionMinutes: min(max(advancedSessionMinutes, 5), 180)
-            )
+            let proposal = try aiProposal(
+                preview.draft, replacing: preview.replacingKeys,
+                minutes: min(max(advancedSessionMinutes, 5), 180))
             guard proposal.hasChanges else {
                 guidedAIFillPreview = nil
                 return
@@ -4798,8 +5025,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .foregroundStyle(ATHLTHTrainDesign.ink)
 
                     Text(ATHLTHLocalization.choose(
-                        english: "\(preview.proposal.addedWorkouts) new workouts · \(preview.proposal.restDays) rest days. Existing days remain untouched.",
-                        norwegian: "\(preview.proposal.addedWorkouts) nye økter · \(preview.proposal.restDays) hviledager. Dager du har fylt ut, beholdes."
+                        english: "\(preview.proposal.addedWorkouts) new workouts · \(preview.proposal.restDays) rest days. Only the changes shown below will be applied.",
+                        norwegian: "\(preview.proposal.addedWorkouts) nye økter · \(preview.proposal.restDays) hviledager. Bare endringene nedenfor blir brukt."
                     ))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
@@ -4817,8 +5044,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 dateForWeekDay($1.dayIndex, weekIndex: pair.offset)
                             }), id: \.dayIndex) { day in
                                 let key = pair.offset * 7 + day.dayIndex
-                                let protected = weekDayEdits[key] != nil ||
-                                    structuredWorkoutsByDay[day.dayIndex] != nil
+                                let protected = preview.replacingKeys.map { !$0.contains(key) } ??
+                                    (weekDayEdits[key] != nil || structuredWorkoutsByDay[day.dayIndex] != nil)
                                 HStack(alignment: .top, spacing: 9) {
                                     Text(dateForWeekDay(
                                         day.dayIndex, weekIndex: pair.offset
@@ -4866,7 +5093,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     applyGuidedAISuggestions(preview)
                 } label: {
                     Label(ATHLTHLocalization.choose(
-                        english: "Fill empty days", norwegian: "Fyll ut tomme dager"),
+                        english: "Apply suggestions", norwegian: "Bruk forslagene"),
                           systemImage: "checkmark.circle.fill")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 51)
@@ -5435,6 +5662,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // Advanced → Week-by-week is a new single surface. The original
     // weekStep is retained exclusively for the Simple/legacy route.
     private var advancedWeekBuilderStep: some View {
+        VStack(alignment: .leading, spacing: 18) {
         ATHLTHAdvancedWeekBuilderView(
             selectedWeek: $selectedPlanWeekIndex,
             selectedDay: $selectedAdvancedWeekDay,
@@ -5493,11 +5721,32 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectedPlanWeekIndex = current
             },
             onSwitchToDayView: {
+                let chosen = selectedAdvancedWeekDay ?? advancedWeekItems(for: selectedPlanWeekIndex).sorted { $0.date < $1.date }.first?.weekday ?? 1
+                let date = dateForWeekDay(chosen, weekIndex: selectedPlanWeekIndex)
+                guidedDayCursor = max(0, Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: startDate), to: date).day ?? 0)
+                guidedWeekAwaitingDecision = nil
                 selectedAdvancedWeekDay = nil
                 selectBuildMethod(.dayByDay)
                 saveResumableDraft()
             }
         )
+            if selectedPlanWeekIndex < weekCount - 1 {
+                HStack(spacing: 12) {
+                    Button(ATHLTHLocalization.choose(english: "Next week", norwegian: "Neste uke")) {
+                        selectedPlanWeekIndex += 1
+                        selectedAdvancedWeekDay = nil
+                        saveResumableDraft()
+                    }
+                    Button(ATHLTHLocalization.choose(english: "Copy to remaining weeks and review", norwegian: "Kopier til resten og se over")) {
+                        copyAdvancedWeek(from: selectedPlanWeekIndex,
+                            to: Array((selectedPlanWeekIndex + 1)..<weekCount), overwrite: false)
+                        step = .review
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+            planAITools
+        }
     }
 
     private func advancedWeekItems(for week: Int) -> [ATHLTHAdvancedWeekBuilderView.Day] {
@@ -5679,7 +5928,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     height: 34
                                 )
                                 .background(
-                                    ATHLTHTheme.accentSoft,
+                                    ATHLTHTrainDesign.paleGold,
                                     in: Circle()
                                 )
                             }
@@ -5714,7 +5963,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     height: 34
                                 )
                                 .background(
-                                    ATHLTHTheme.accentDeep,
+                                    ATHLTHTrainDesign.bronze,
                                     in: Circle()
                                 )
                                 .foregroundStyle(.white)
@@ -5867,7 +6116,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     )
                     .background(
                         selected
-                            ? ATHLTHTheme.accentDeep
+                            ? ATHLTHTrainDesign.bronze
                             : ATHLTHTheme.recoveryBlueSoft,
                         in: RoundedRectangle(
                             cornerRadius: 13,
@@ -5970,7 +6219,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     Circle()
                                         .fill(week == selectedPlanWeekIndex
                                             ? Color.white.opacity(0.88)
-                                            : ATHLTHTheme.accentDeep.opacity(0.65))
+                                            : ATHLTHTrainDesign.bronze.opacity(0.65))
                                         .frame(width: 4, height: 4)
                                         .opacity(weekDayEdits.keys.contains(where: {
                                             ($0 - 1) / 7 == week
@@ -5981,7 +6230,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .frame(width: 65, height: 64)
                                 .background(
                                     week == selectedPlanWeekIndex
-                                        ? ATHLTHTheme.accentDeep
+                                        ? ATHLTHTrainDesign.bronze
                                         : ATHLTHPlanDesign.selectedSurface,
                                     in: RoundedRectangle(cornerRadius: 13,
                                                          style: .continuous)
@@ -6205,10 +6454,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             ? "moon.stars.fill" : effectiveWorkoutKind(for: day).systemImage)
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(restDay
-                                ? ATHLTHTheme.recoveryBlue : ATHLTHTheme.accentDeep)
+                                ? ATHLTHTheme.recoveryBlue : ATHLTHTrainDesign.bronze)
                             .frame(width: 48, height: 48)
                             .background(restDay
-                                ? ATHLTHTheme.recoveryBlueSoft : ATHLTHTheme.accentSoft,
+                                ? ATHLTHTheme.recoveryBlueSoft : ATHLTHTrainDesign.paleGold,
                                 in: RoundedRectangle(cornerRadius: 14))
                     }
 
@@ -6242,7 +6491,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 Text("\(workouts.count) " + ATHLTHLocalization.choose(
                                     english: "workouts", norwegian: "økter"))
                                     .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
                             } else if let first = workouts.first {
                                 Text("\(first.blocks.count) " + ATHLTHLocalization.choose(
                                     english: "blocks", norwegian: "øktblokker"))
@@ -6372,7 +6621,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .frame(maxWidth: .infinity, minHeight: 42)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
+                .tint(ATHLTHTrainDesign.bronze)
             }
             }
         }
@@ -6425,7 +6674,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .font(.caption.weight(.semibold))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
             }
         }
     }
@@ -6482,7 +6731,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
+                .tint(ATHLTHTrainDesign.bronze)
 
                 Button {
                     selectedPlanWeekIndex = guidedCurrentWeek
@@ -6606,7 +6855,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .frame(maxWidth: .infinity, minHeight: 42)
                         }
                         .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accentDeep)
+                        .tint(ATHLTHTrainDesign.bronze)
 
                         if place != nil {
                             Button {
@@ -6707,7 +6956,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     systemImage: "square.and.pencil")
             }
             .buttonStyle(.bordered)
-            .tint(ATHLTHTheme.accentDeep)
+            .tint(ATHLTHTrainDesign.bronze)
         }
         .font(.caption2.weight(.semibold))
     }
@@ -6761,7 +7010,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         return VStack(alignment: .leading, spacing: 7) {
             Label(section.phase.title, systemImage: section.phase.symbol)
                 .font(.caption.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
             ForEach(Array(section.blocks.enumerated()), id: \.offset) { entry in
                 let block = entry.element
                 let originalIndex = phaseStartIndex + entry.offset
@@ -6795,7 +7044,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     english: "rounds", norwegian: "runder"
                                  ))
                                 .font(.caption2.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
                         }
                         if let seconds = block.restBetweenSetsSeconds, seconds > 0 {
                             Label("\(Int(seconds)) " + ATHLTHLocalization.choose(
@@ -6909,6 +7158,79 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 icon: "checkmark.seal.fill"
             )
 
+            adaptivePlanPair(AnyView(reviewSummaryPanel), AnyView(reviewWeeksPanel))
+
+            if !goalStore.goals.isEmpty {
+                builderPanel {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 9
+                    ) {
+                        fieldLabel(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Connect to goals in Progress",
+                                norwegian:
+                                    "Koble til mål i Progress"
+                            )
+                        )
+
+                        ForEach(
+                            goalStore.goals.prefix(5)
+                        ) { appGoal in
+                            Toggle(
+                                isOn:
+                                    Binding(
+                                        get: {
+                                            selectedGoalIDs
+                                                .contains(
+                                                    appGoal.id
+                                                )
+                                        },
+                                        set: {
+                                            enabled in
+                                            if enabled {
+                                                selectedGoalIDs
+                                                    .insert(
+                                                        appGoal.id
+                                                    )
+                                            } else {
+                                                selectedGoalIDs
+                                                    .remove(
+                                                        appGoal.id
+                                                    )
+                                            }
+                                        }
+                                    )
+                            ) {
+                                Text(appGoal.title)
+                                    .font(.subheadline)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let conflict = conflictingPlan, approvedPlanReplacementID != conflict.id {
+                conflictCard(conflict)
+            }
+
+            Button {
+                createPlan(seedSuggestedWeek: mode == .basic)
+            } label: {
+                creationChoiceCard(
+                    title: ATHLTHLocalization.choose(english: "Finish", norwegian: "Fullfør"),
+                    subtitle: ATHLTHLocalization.choose(english: "Save your workouts and rest days as planned.", norwegian: "Lagre øktene og hviledagene slik du har planlagt dem."),
+                    icon: "checkmark.seal.fill", prominent: true
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!canCreatePlan || isCreatingPlan)
+            planAITools
+        }
+    }
+
+    private var reviewSummaryPanel: some View {
             builderPanel {
                 VStack(spacing: 0) {
                     reviewRow(
@@ -6963,7 +7285,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 english: "Goal",
                                 norwegian: "Mål"
                             ),
-                        value: goal.title
+                        value: selectedGoalChoice == "none"
+                            ? ATHLTHLocalization.choose(english: "No specific goal", norwegian: "Ingen spesifikke mål") : goal.title
                     )
 
                     reviewDivider
@@ -7035,6 +7358,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
 
+    }
+
+    private var reviewWeeksPanel: some View {
             builderPanel {
                 VStack(alignment: .leading, spacing: 11) {
                     Label(
@@ -7045,199 +7371,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         systemImage: "calendar.badge.checkmark"
                     )
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
                     weeklyPreview
                 }
             }
 
-            if !goalStore.goals.isEmpty {
-                builderPanel {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 9
-                    ) {
-                        fieldLabel(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Connect to goals in Progress",
-                                norwegian:
-                                    "Koble til mål i Progress"
-                            )
-                        )
-
-                        ForEach(
-                            goalStore.goals.prefix(5)
-                        ) { appGoal in
-                            Toggle(
-                                isOn:
-                                    Binding(
-                                        get: {
-                                            selectedGoalIDs
-                                                .contains(
-                                                    appGoal.id
-                                                )
-                                        },
-                                        set: {
-                                            enabled in
-                                            if enabled {
-                                                selectedGoalIDs
-                                                    .insert(
-                                                        appGoal.id
-                                                    )
-                                            } else {
-                                                selectedGoalIDs
-                                                    .remove(
-                                                        appGoal.id
-                                                    )
-                                            }
-                                        }
-                                    )
-                            ) {
-                                Text(appGoal.title)
-                                    .font(.subheadline)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if let conflict = conflictingPlan {
-                conflictCard(conflict)
-            }
-
-            if mode == .advanced && weekPlanningApproach == .guided {
-                Button {
-                    createPlan(seedSuggestedWeek: false)
-                } label: {
-                    creationChoiceCard(
-                        title: ATHLTHLocalization.choose(
-                            english: "Save my detailed plan", norwegian: "Lagre den detaljerte planen"
-                        ),
-                        subtitle: ATHLTHLocalization.choose(
-                            english: "Keep your chosen date-by-date workouts and rest days exactly as planned.",
-                            norwegian: "Behold øktene og hviledagene du har valgt, dato for dato."
-                        ),
-                        icon: "checkmark.seal.fill",
-                        prominent: true
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(!canCreatePlan || guidedChosenDays.isEmpty)
-            } else {
-            VStack(
-                alignment: .leading,
-                spacing: 10
-            ) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "HOW TO START THE WEEK",
-                        norwegian: "HVORDAN VIL DU STARTE?"
-                    )
-                )
-                .font(.caption2.weight(.bold))
-                .tracking(1.5)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-
-                Button {
-                    showingAIBuilder = true
-                } label: {
-                    creationChoiceCard(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Get an AI proposal",
-                                norwegian:
-                                    "Få forslag fra AI"
-                            ),
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "ATHLTH Coach uses your focus, goal, available days and time. Training limitations are shared with AI only if you opt in.",
-                                norwegian:
-                                    "ATHLTH Coach bruker fokus, mål, tilgjengelige dager og tid. Treningshensyn deles kun med AI dersom du godkjenner dette."
-                            ),
-                        icon: "sparkles",
-                        prominent: true
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    !canCreatePlan
-                )
-                .opacity(
-                    canCreatePlan ? 1 : 0.42
-                )
-
-                Button {
-                    createPlan(
-                        seedSuggestedWeek: true
-                    )
-                } label: {
-                    creationChoiceCard(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Use a simple starting structure",
-                                norwegian:
-                                    "Bruk enkel startstruktur"
-                            ),
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Create the chosen training days immediately, without AI, and edit every workout yourself.",
-                                norwegian:
-                                    "Opprett de valgte treningsdagene med en gang, uten AI, og rediger øktene selv."
-                            ),
-                        icon:
-                            "calendar.day.timeline.left",
-                        prominent: false
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    !canCreatePlan
-                )
-                .opacity(
-                    canCreatePlan ? 1 : 0.42
-                )
-
-                Button {
-                    createPlan(
-                        seedSuggestedWeek: false
-                    )
-                } label: {
-                    creationChoiceCard(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Start with empty weeks",
-                                norwegian:
-                                    "Start med tomme uker"
-                            ),
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Keep the dates and profile, but add every workout yourself.",
-                                norwegian:
-                                    "Behold datoer og profil, men legg inn alle økter selv."
-                            ),
-                        icon:
-                            "calendar.badge.plus",
-                        prominent: false
-                    )
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    !canCreatePlan
-                )
-                .opacity(
-                    canCreatePlan ? 1 : 0.42
-                )
-            }
-            }
-        }
     }
 
     private func reviewRow(
@@ -7252,11 +7390,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(
-                    ATHLTHTheme.accentDeep
+                    ATHLTHTrainDesign.bronze
                 )
                 .frame(width: 30, height: 30)
                 .background(
-                    ATHLTHTheme.accentSoft,
+                    ATHLTHTrainDesign.paleGold,
                     in: RoundedRectangle(
                         cornerRadius: 9,
                         style: .continuous
@@ -7305,7 +7443,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(
                     prominent
-                        ? ATHLTHTheme.accentDeep
+                        ? ATHLTHTrainDesign.bronze
                         : ATHLTHTheme.premiumGold
                 )
                 .frame(width: 43, height: 43)
@@ -7352,7 +7490,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 ? AnyShapeStyle(
                     LinearGradient(
                         colors: [
-                            ATHLTHTheme.accentDeep,
+                            ATHLTHTrainDesign.bronze,
                             ATHLTHTheme.accent
                         ],
                         startPoint: .leading,
@@ -7385,7 +7523,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 lineWidth: 0.8
             )
         }
-        .shadow(color: ATHLTHTheme.accentDeep.opacity(prominent ? 0.10 : 0.045),
+        .shadow(color: ATHLTHTrainDesign.bronze.opacity(prominent ? 0.10 : 0.045),
                 radius: 12, y: 5)
     }
 
@@ -7433,6 +7571,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             if step == .week && mode == .advanced &&
                weekPlanningApproach == .guided {
                 Button {
+                    aiPlanAction = "fill"
                     showingGuidedAIConsent = true
                 } label: {
                     HStack(spacing: 11) {
@@ -7498,11 +7637,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         )
                         .font(.subheadline.bold())
                         .foregroundStyle(
-                            ATHLTHTheme.accentDeep
+                            ATHLTHTrainDesign.bronze
                         )
                         .frame(width: 48, height: 48)
                         .background(
-                            ATHLTHTheme.accentSoft,
+                            ATHLTHTrainDesign.paleGold,
                             in: RoundedRectangle(
                                 cornerRadius: 15,
                                 style: .continuous
@@ -7556,7 +7695,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             step == .week && mode == .advanced &&
                                 weekPlanningApproach == .guided
                                 ? ATHLTHTrainDesign.bronze
-                                : ATHLTHTheme.accentDeep,
+                                : ATHLTHTrainDesign.bronze,
                             in: RoundedRectangle(
                                 cornerRadius: 15,
                                 style: .continuous
@@ -7581,9 +7720,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Choose how to start the plan above",
+                                    "Review your plan and tap Finish",
                                 norwegian:
-                                    "Velg hvordan planen skal starte over"
+                                    "Se over planen og trykk Fullfør"
                             )
                         )
                         .font(.caption.weight(.semibold))
@@ -7627,8 +7766,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case .mode:
             return true
         case .goal:
-            return ATHLTHPlanGoalOption.options(for: selectedGoalArea)
-                .contains { $0.id == selectedGoalChoice }
+            return selectedGoalChoice == "none" ||
+                (ATHLTHPlanGoalOption.options(for: selectedGoalArea)
+                    .contains { $0.id == selectedGoalChoice } && !selectedGoalIDs.isEmpty)
         case .source:
             return true
         case .approach:
@@ -7732,20 +7872,37 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     /// Restore the last editing position without an alert. The checkpoint is
-    /// intentionally privacy-safe: health notes and personal goal text are not
-    /// silently written to disk and can be reentered when needed.
+    /// account-scoped checkpoint includes entered text and workout configuration.
     private func restorePlanDraft(_ draft: ATHLTHPlanCreationDraft) {
         mode = draft.advanced ? .advanced : .basic
         entryChoice = draft.advanced ? .advanced : .simple
         title = draft.usedDefaultTitle == true ? "" : draft.title
         weekCount = draft.weekCount
-        startDate = max(Calendar.current.startOfDay(for: Date()), draft.startDate)
+        startDate = draft.startDate
+        if let data = draft.configuration,
+           let saved = try? JSONDecoder().decode(ConfigurationCheckpoint.self, from: data) {
+            goalDetail = saved.goalDetail
+            planSummary = saved.summary
+            injuryFree = saved.injuryFree
+            injuriesOrLimitations = saved.limitations
+            selectedMuscles = saved.muscles
+            primaryMuscle = saved.primaryMuscle
+            secondaryFocus = saved.secondaryFocus
+            focusWeight = saved.focusWeight
+            hasCompetitionDate = saved.hasCompetitionDate
+            competitionDate = saved.competitionDate
+            visibility = saved.visibility
+            selectedAdvancedWeekDay = saved.selectedDay
+            aiAdjustmentInstruction = saved.aiInstruction
+        }
+        inlineGoalDraft = draft.inlineGoalDraft
+        approvedPlanReplacementID = draft.approvedReplacementID
         if let savedArea = draft.entryGoalArea.flatMap(ATHLTHPlanGoalArea.init(rawValue:)) {
             selectedGoalArea = savedArea
         }
         if let savedChoice = draft.entryGoalChoice,
-           ATHLTHPlanGoalOption.options(for: selectedGoalArea)
-                .contains(where: { $0.id == savedChoice }) {
+           (["", "none", "area"].contains(savedChoice) || ATHLTHPlanGoalOption.options(for: selectedGoalArea)
+                .contains(where: { $0.id == savedChoice })) {
             selectedGoalChoice = savedChoice
         }
         if let savedFocus = draft.entryPlanFocus.flatMap(TrainingPlanFocus.init(rawValue:)) {
@@ -7812,12 +7969,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    private func saveResumableDraft() {
+    @discardableResult
+    private func saveResumableDraft() -> Bool {
         guard didApplySuggestedStartDate,
               !completedPlanCreation,
               !deliberatelyDiscardedPlanDraft,
               !isHydratingPlanDraft else {
-            return
+            return true
         }
         let draft = ATHLTHPlanCreationDraft(
             title: resolvedPlanTitle,
@@ -7864,9 +8022,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             editorPhase: advancedAddDestination?.phase.rawValue,
             editorWorkoutIndex: advancedAddDestination?.workoutIndex,
             simpleMinutes: simpleMinutes,
-            simpleActivityKinds: simpleActivities.map(\.rawValue).sorted()
+            simpleActivityKinds: simpleActivities.map(\.rawValue).sorted(),
+            configuration: configurationCheckpoint,
+            inlineGoalDraft: inlineGoalDraft,
+            approvedReplacementID: approvedPlanReplacementID
         )
-        draftStore.save(draft, userID: session.profile.userID, draftID: draftID)
+        if !draftStore.save(draft, userID: session.profile.userID, draftID: draftID) {
+            creationError = ATHLTHLocalization.choose(
+                english: "The draft could not be saved. Keep the builder open and try again.",
+                norwegian: "Utkastet kunne ikke lagres. Hold planbyggeren åpen og prøv igjen.")
+            return false
+        }
+        return true
     }
 
     private func requestClosePlanCreation() {
@@ -7912,7 +8079,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func goBack() {
         if step == .basics {
             // Go back to the goal (step 2), not the initial method selector.
-            withAnimation(.easeInOut(duration: 0.18)) { step = .goal }
+            withAnimation(.easeInOut(duration: 0.18)) { step = mode == .advanced ? .goal : .mode }
             return
         }
         if step == .approach {
@@ -8440,10 +8607,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func createPlan(
         seedSuggestedWeek: Bool
     ) {
-        guard canCreatePlan else {
+        guard canCreatePlan, !isCreatingPlan, !completedPlanCreation else {
             return
         }
 
+        isCreatingPlan = true
+        defer { isCreatingPlan = false }
         if mode == .basic {
             // The activity mix is derived from the goal step. Rebuild day
             // suggestions without replacing the selected goal focus, e.g.
@@ -8526,3 +8695,4 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         showingCreatedPlan = true
     }
 }
+

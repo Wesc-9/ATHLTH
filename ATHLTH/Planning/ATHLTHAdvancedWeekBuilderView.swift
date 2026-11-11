@@ -3,6 +3,7 @@ import SwiftUI
 /// The single live UI for Advanced → Week by week. It edits the same
 /// dated training-plan draft as Advanced → Day by day; no nested legacy UI.
 struct ATHLTHAdvancedWeekBuilderView: View {
+    @Environment(\.horizontalSizeClass) private var widthClass
     struct Day: Identifiable {
         let weekday: Int                 // Monday = 1
         let date: Date
@@ -82,7 +83,18 @@ struct ATHLTHAdvancedWeekBuilderView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            if let selectedDay, let day = days.first(where: { $0.weekday == selectedDay }) {
+            if widthClass == .regular && !showingStructure {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 24) {
+                        overview.frame(minWidth: 290, maxWidth: 440)
+                        if let day = orderedDays.first(where: { $0.weekday == selectedDay }) ?? orderedDays.first {
+                            detail(day).frame(minWidth: 400, maxWidth: .infinity)
+                        }
+                    }
+                    if let selectedDay, let day = days.first(where: { $0.weekday == selectedDay }) { detail(day) }
+                    else { overview }
+                }
+            } else if let selectedDay, let day = days.first(where: { $0.weekday == selectedDay }) {
                 detail(day)
             } else if showingStructure {
                 structure
@@ -90,7 +102,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 overview
             }
         }
-        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+        .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
         .animation(.easeInOut(duration: 0.16), value: selectedDay)
         .animation(.easeInOut(duration: 0.16), value: showingStructure)
         .onChange(of: selectedWeek) { _, _ in
@@ -912,3 +924,4 @@ struct ATHLTHAdvancedWeekBuilderView: View {
         .buttonStyle(.plain)
     }
 }
+

@@ -1,3 +1,7 @@
+# Shared iPhone / iPad product rule (2.1.8)
+
+Use the existing shared plan, goal and workout engines and the same persisted data on iPhone and iPad. iPad may add previews, inspectors and editing controls to use its larger screen, with adaptive narrow-window fallbacks. Day and week planning are views of the same draft. Never reset or erase entered plan/workout/goal data on Back, layout changes, resizing or backgrounding. Keep recoverable drafts local and account-scoped; replacing an active plan requires one explicit acknowledged choice. Use warm gold for plan actions.
+
 # ATHLTH development baseline
 
 - **CURRENT ACTIVE VERSION: 2.1.8 (build 126)** on `release/v2.1.8`. Created 2026-11-11 directly from the exact successfully validated and TestFlight-uploaded 2.1.7 commit `3d42ccf38c62a919bb420bdc0f5699538db1dc5a`. Develop and test all new changes only on `release/v2.1.8`. **Do not upload 2.1.8 to TestFlight until the user explicitly requests it.**
@@ -64,3 +68,4 @@
 - App Intents, Siri, Shortcuts, Spotlight, widgets, Control Center and Apple Intelligence exposure: use `.agents/skills/app-intents/SKILL.md` and load only the references needed for the task.
 - **Required ATHLTH skill workflow (2026-10-28):** For every SwiftUI/iOS feature or correction, read `.agents/skills/swiftui-pro/SKILL.md` and the relevant references before editing. For every HealthKit/WorkoutKit, fitness health-data, workout session or workout mirroring change, read `.agents/skills/axiom-health/SKILL.md` and relevant `skills/`. For any watchOS work, read `.agents/skills/axiom-watchos/SKILL.md` and relevant `skills/`. Both Health and watchOS skills apply to Watch workouts. Consult `.agents/skills/app-intents/SKILL.md` for Siri, Shortcuts, App Intents, widgets and related integrations. For relevant changes, describe which skill references were actually used and state build/test results; do not pretend unrun checks passed. See project issue #21 for checklist.
 - Project-pinned skills are guidance, not authorization to broaden scope, add dependencies, deploy, or upload to TestFlight. Preserve ATHLTH deployment targets and verify version-specific API availability.
+

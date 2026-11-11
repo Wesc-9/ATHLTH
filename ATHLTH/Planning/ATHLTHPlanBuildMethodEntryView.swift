@@ -12,6 +12,7 @@ enum ATHLTHPlanBuildMethod: String, CaseIterable, Identifiable {
 }
 
 struct ATHLTHPlanBuildMethodEntryView: View {
+    @Environment(\.horizontalSizeClass) private var widthClass
     let selected: ATHLTHPlanBuildMethod
     let onSelect: (ATHLTHPlanBuildMethod) -> Void
     let onOpenLibrary: () -> Void
@@ -78,7 +79,7 @@ struct ATHLTHPlanBuildMethodEntryView: View {
             }
             .padding(.top, 3)
         }
-        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+        .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
     }
 
     private var introduction: some View {
@@ -276,3 +277,4 @@ struct ATHLTHPlanBuildMethodEntryView: View {
         .buttonStyle(.plain)
     }
 }
+
