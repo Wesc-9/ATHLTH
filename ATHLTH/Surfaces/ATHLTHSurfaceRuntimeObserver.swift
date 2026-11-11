@@ -37,6 +37,21 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                         )
                     )
                 )
+                // iPhone-only treadmill/indoor interval steps do not move
+                // GPS, so a distance/route-point observer cannot update the
+                // Home/Lock Screen widget. Refresh the lightweight snapshot
+                // while recording, never starting a second workout.
+                while !Task.isCancelled {
+                    do {
+                        try await Task.sleep(for: .seconds(5))
+                    } catch {
+                        break
+                    }
+                    if phoneWorkout.active != nil ||
+                       strengthWorkout.activeWorkout != nil {
+                        publishSurface()
+                    }
+                }
             }
             .onChange(of: health.recovery) { _, _ in
                 publishSurface()
@@ -65,6 +80,15 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                 if previous != nil && current == nil {
                     spotify.endLinkedWorkoutPlaybackSession()
                 }
+                publishSurface()
+            }
+            .onChange(of: phoneWorkout.active?.structuredStepIndex) { _, _ in
+                // Publish title/1-of-4/pause transitions without waiting for
+                // the next GPS point or a five-minute widget reload.
+                publishSurface()
+            }
+            .onChange(of: phoneWorkout.active?.structuredWorkoutComplete) { _, _ in
+                publishSurface()
             }
             .onChange(of: workoutMirroring.hasActiveMirroredWorkout) { previous, current in
                 if previous && !current {
