@@ -2372,8 +2372,12 @@ struct ATHLTHHomeView: View {
         // Hide the suggestion when multiple activities are already
         // scheduled; do not change the underlying coaching recommendation.
         let showCalendarRecommendation =
-            todayWorkouts.count + personalEvents.count +
-            clubEvents.count + tournamentItems.count < 2
+            HomeCalendarRecommendationDisplayPolicy.showsRecommendation(
+                plannedWorkoutCount: todayWorkouts.count,
+                personalEventCount: personalEvents.count,
+                clubEventCount: clubEvents.count,
+                tournamentCount: tournamentItems.count
+            )
 
         let visibleWorkoutCount = tournamentItems.isEmpty
             ? min(todayWorkouts.count, 2)
