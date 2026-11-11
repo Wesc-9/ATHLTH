@@ -279,61 +279,31 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     selectedWeekDate: selectedDate
                 )
                 let week = calendarWeek(recorded: workouts, planned: windows.week)
-                let next = nextWorkout(from: windows.upcoming)
-                let recommendation = homeRecommendation(recorded: workouts, next: next)
                 let width = geometry.size.width
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
-                let threeColumns = width >= 880 && !dynamicTypeSize.isAccessibilitySize
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 24) {
                         titleRow(expanded: split)
 
-                        // When the right inspector opens the detail column
-                        // narrows. Keep the week visible above the stacked
-                        // cards so another day can be selected immediately.
-                        if !split {
-                            weekCard(week, width: width)
+                        activePlanSummary
+                        weekCard(week, width: width)
+                        ATHLTHStudioGhostHomeStatusView().id(session.profile.userID)
+                        ATHLTHStudioStrengthHomeStatusView().id(session.profile.userID)
+                        let activeDay = week.days.first {
+                            Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
                         }
-
-                        // Isolated read-only live cards do not trigger
-                        // recomputation of the week and recorded workouts.
-                        ATHLTHStudioGhostHomeStatusView()
-                            .id(session.profile.userID)
-                        ATHLTHStudioStrengthHomeStatusView()
-                            .id(session.profile.userID)
-
-                        // Preserve the approved warm-white Studio appearance.
-                        // The week calendar keeps the entire content width.
-                        if threeColumns {
-                            HStack(alignment: .top, spacing: 15) {
-                                planCard
-                                    .frame(maxWidth: .infinity)
-                                nextWorkoutCard(next)
-                                    .frame(width: max(260, width * 0.26))
-                                compactReadinessCard
-                                    .frame(width: max(220, width * 0.22))
-                            }
-                        } else if split {
-                            HStack(alignment: .top, spacing: 15) {
-                                planCard.frame(maxWidth: .infinity)
-                                nextWorkoutCard(next).frame(width: max(270, width * 0.31))
-                            }
-                            compactReadinessCard
-                        } else {
-                            planCard
-                            nextWorkoutCard(next)
-                            compactReadinessCard
-                        }
-
                         if split {
-                            weekCard(week, width: width)
+                            HStack(alignment: .top, spacing: 24) {
+                                selectedDayPanel(activeDay).frame(maxWidth: .infinity)
+                                compactReadinessCard
+                                    .frame(width: min(360, max(250, (min(width, 1500) - 68) / 3)))
+                            }
+                        } else {
+                            selectedDayPanel(activeDay)
+                            compactReadinessCard
                         }
-
-                        // Fact-based recommendation with an explicit reason.
-                        recommendationCard(recommendation, next: next)
-                        // Coach already lives in the toolbar. Prioritize
-                        // factual progress rather than repeated advice.
+                        ATHLTHStudioHomeCommunitySummary()
                         progressCard(wide: split, recorded: workouts, week: week)
                     }
                     .padding(.horizontal, split ? 22 : 14)
@@ -367,43 +337,119 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private func titleRow(expanded: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                Text("ATHLTH")
-                    .font(.system(size: expanded ? 36 : 29, weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                    .tracking(1.2)
-                Text("Studio")
-                    .font(.system(size: expanded ? 35 : 28, weight: .regular, design: .serif))
-                    .italic()
-                    .foregroundStyle(bronze)
-                Spacer(minLength: 6)
-            }
-            Text(tr("Your training space", "Ditt treningsrom"))
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ATHLTH")
+                .font(.caption.weight(.semibold))
+                .tracking(2.4)
+                .foregroundStyle(bronze)
+            Text(tr("Your training today", "Treningen din i dag"))
+                .font(.system(size: expanded ? 32 : 27, weight: .regular, design: .serif))
+                .foregroundStyle(ink)
+                .accessibilityAddTraits(.isHeader)
+            Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-
-            HStack(spacing: 10) {
-                Spacer(minLength: 0)
+            HStack(spacing: 16) {
                 Button {
                     focusedPlanningDate = Calendar.current.startOfDay(for: .now)
                 } label: {
                     Label(tr("Plan workout", "Planlegg økt"), systemImage: "calendar.badge.plus")
                 }
-                .buttonStyle(.bordered)
-                .tint(ink)
-                .controlSize(.large)
-
+                .buttonStyle(.plain)
+                .foregroundStyle(ink)
+                .frame(minHeight: 44)
                 Button(action: onStartQuick) {
-                    Label(tr("Start workout", "Start økt"), systemImage: "figure.run")
+                    Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ink)
-                .controlSize(.large)
+                .tint(bronze)
+            }
+            .font(.subheadline.weight(.semibold))
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            GeometryReader { bounds in
+                Image("HomeHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: bounds.size.width, height: bounds.size.height)
+                    .clipped()
+                    .overlay {
+                        LinearGradient(colors: [cream, cream.opacity(0.95), cream.opacity(0.45)],
+                                       startPoint: .leading, endPoint: .trailing)
+                    }
+            }
+            .accessibilityHidden(true)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .accessibilityIdentifier("athlth-ipad-training-command-header")
+    }
+
+    private var activePlanSummary: some View {
+        Button(action: onOpenPlanner) {
+            HStack(spacing: 18) {
+                Image(systemName: "calendar")
+                    .font(.title2)
+                    .foregroundStyle(bronze)
+                    .frame(width: 48, height: 48)
+                    .background(cream, in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(program?.id == session.activePlan?.id && program != nil
+                         ? tr("ACTIVE TRAINING PLAN", "AKTIV TRENINGSPLAN")
+                         : tr("TRAINING PLAN", "TRENINGSPLAN"))
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(.secondary)
+                    Text(program?.title ?? tr("Create your training plan", "Lag treningsplanen din"))
+                        .font(.system(.title3, design: .serif, weight: .medium))
+                        .foregroundStyle(ink)
+                        .multilineTextAlignment(.leading)
+                    if let plan = program {
+                        Text(weekLabel(plan)).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").foregroundStyle(bronze)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(tr("Open your training plan", "Åpne treningsplanen din"))
+    }
+
+    private func selectedDayPanel(_ day: ATHLTHStudioHomeWeek.Day?) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(Calendar.current.isDateInToday(selectedDate)
+                 ? tr("Today's training", "Dagens trening")
+                 : selectedDate.formatted(.dateTime.weekday(.wide).day().month()))
+                .font(.system(size: 25, weight: .medium, design: .serif))
+                .foregroundStyle(ink)
+                .accessibilityAddTraits(.isHeader)
+            if let day, !day.planned.isEmpty || !day.recorded.isEmpty {
+                selectedDayWorkouts(day)
+            } else {
+                Label(weekSelectionSummary(day), systemImage: "leaf")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 12)
+                if HomeWeeklyProgressCalendar.canScheduleStandalone(on: selectedDate) {
+                    Button {
+                        focusedPlanningDate = selectedDate
+                    } label: {
+                        Label(tr("Plan a workout", "Planlegg en økt"), systemImage: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(bronze)
+                }
             }
         }
-        .padding(.bottom, 4)
-        .accessibilityIdentifier("athlth-ipad-training-command-header")
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var planCard: some View {
@@ -538,7 +584,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline.opacity(0.45), lineWidth: 0.6))
         .accessibilityIdentifier("athlth-ipad-home-recommendation")
     }
 
@@ -599,7 +645,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .padding(20)
         .frame(maxWidth: .infinity, minHeight: 246, alignment: .leading)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline.opacity(0.45), lineWidth: 0.6))
     }
 
     private func weekCard(_ week: ATHLTHStudioHomeWeek.Snapshot,
@@ -689,7 +735,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
             .frame(minHeight: 44)
             .padding(.top, 2)
-            selectedDayWorkouts(activeDay)
             if !hasHealth {
                 Button(action: onOpenSettings) {
                     Label(
@@ -709,7 +754,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
         .padding(20)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline.opacity(0.45), lineWidth: 0.6))
         .accessibilityIdentifier("athlth-ipad-weekly-overview")
     }
 
@@ -758,7 +803,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             } label: {
                                 Label(tr("Start", "Start"), systemImage: "play.fill")
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.borderedProminent)
                             .tint(bronze)
                         }
                     }
@@ -1066,7 +1111,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .padding(19)
         .frame(maxWidth: .infinity, minHeight: 225, alignment: .leading)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline.opacity(0.45), lineWidth: 0.6))
         .accessibilityIdentifier("athlth-ipad-progress")
     }
 
@@ -1248,7 +1293,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .padding(19)
         .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline.opacity(0.45), lineWidth: 0.6))
         .accessibilityIdentifier("athlth-ipad-readiness-compact")
     }
 
