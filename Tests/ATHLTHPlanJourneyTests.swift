@@ -90,11 +90,14 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
 
     func testSimpleStartsWithModeAndSkipsAdvancedQuestions() {
         let stages = ATHLTHPlanJourney.sequence(advanced: false)
-        XCTAssertEqual(stages, [.mode, .basics])
+        XCTAssertEqual(stages, [.mode, .goal, .basics])
         XCTAssertFalse(stages.contains(.profile))
         XCTAssertFalse(stages.contains(.week))
         XCTAssertNil(ATHLTHPlanJourney.position(of: .review, advanced: false))
         XCTAssertNil(ATHLTHPlanJourney.next(after: .basics, advanced: false))
+        XCTAssertEqual(ATHLTHPlanJourney.next(after: .mode, advanced: false), .goal)
+        XCTAssertEqual(ATHLTHPlanJourney.next(after: .goal, advanced: false), .basics)
+        XCTAssertEqual(ATHLTHPlanJourney.previous(before: .basics, advanced: false), .goal)
     }
 
     func testAdvancedChoosesPlanningMethodWithinSetup() {
@@ -115,7 +118,7 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
 
     func testResumeReturnsToLastAllowedWizardStage() {
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: true), .goal)
-        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: false), .basics)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: false), .goal)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("week", advanced: true), .week)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("profile", advanced: true), .basics)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("approach", advanced: true), .basics)
