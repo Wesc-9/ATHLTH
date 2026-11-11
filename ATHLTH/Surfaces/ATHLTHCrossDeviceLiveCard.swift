@@ -83,9 +83,49 @@ struct ATHLTHCrossDeviceLiveCard: View {
 
             if let step = snapshot.currentStep {
                 Divider()
-                Label(step, systemImage: snapshot.symbol)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
+                HStack(spacing: 8) {
+                    Label(step, systemImage: snapshot.symbol)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                    Spacer(minLength: 4)
+                    if let ordinal = snapshot.runningIntervalOrdinal,
+                       let total = snapshot.runningIntervalTotal, total > 1 {
+                        Text(snapshot.runningInRecovery == true
+                            ? ATHLTHLocalization.choose(
+                                english: "Next", norwegian: "Neste") +
+                                " \(min(ordinal + 1, total)) / \(total)"
+                            : "\(ordinal) / \(total)")
+                        .font(.caption.weight(.bold))
+                        .monospacedDigit()
+                    }
+                }
+            }
+            if let remaining = snapshot.runningStepRemainingSeconds,
+               remaining.isFinite, remaining >= 0 {
+                TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                    let reference = snapshot.capturedAt ?? .now
+                    let spent = snapshot.paused == true ? 0 :
+                        max(0, timeline.date.timeIntervalSince(reference))
+                    let left = max(0, remaining - spent)
+                    HStack(spacing: 9) {
+                        Label(
+                            snapshot.runningInRecovery == true
+                                ? ATHLTHLocalization.choose(
+                                    english: "Next interval in", norwegian: "Neste drag om")
+                                : ATHLTHLocalization.choose(
+                                    english: "Remaining", norwegian: "Gjenstår"),
+                            systemImage: "timer"
+                        )
+                        .font(.caption)
+                        Spacer()
+                        Text(ATHLTHRunStepCountdown.display(left))
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    }
+                    .padding(11)
+                    .background(ATHLTHTrainDesign.paleGold.opacity(0.4),
+                                in: RoundedRectangle(cornerRadius: 13))
+                }
             }
             if let next = snapshot.nextStep {
                 Text(ATHLTHLocalization.choose(
