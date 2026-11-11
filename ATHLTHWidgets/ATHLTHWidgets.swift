@@ -535,32 +535,52 @@ private struct ATHLTHLockScreenWidgetView: View {
             alignment: .leading,
             spacing: 4
         ) {
-            if let workout =
-                entry.snapshot.activeWorkout {
-                Label(
-                    workout.title,
-                    systemImage:
-                        workout.systemImage
+            if let workout = entry.snapshot.activeWorkout {
+                let paused = workout.state == "paused"
+                let anchor = workout.updatedAt.addingTimeInterval(
+                    -max(0, workout.elapsedTime)
                 )
-                .font(.headline)
-
-                HStack {
-                    Text(
-                        duration(
-                            workout.elapsedTime
-                        )
-                    )
-                    .monospacedDigit()
-
-                    if workout.distanceMeters > 0 {
-                        Text(
-                            distance(
-                                workout.distanceMeters
-                            )
-                        )
+                let remaining = workout.runningStepRemainingSeconds
+                HStack(spacing: 4) {
+                    Label(workout.currentStep ?? workout.title,
+                          systemImage: workout.systemImage)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 2)
+                    if let ordinal = workout.runningIntervalOrdinal,
+                       let total = workout.runningIntervalTotal, total > 1 {
+                        Text("\(ordinal)/\(total)")
+                            .font(.system(size: 10, weight: .bold))
+                            .monospacedDigit()
                     }
                 }
-                .font(.caption)
+                if let remaining, remaining.isFinite, remaining >= 0 {
+                    if paused {
+                        Text(duration(remaining))
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    } else {
+                        Text(timerInterval:
+                            workout.updatedAt...workout.updatedAt.addingTimeInterval(remaining),
+                            countsDown: true,
+                            showsHours: false)
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    }
+                } else if paused {
+                    Text(duration(workout.elapsedTime))
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                } else {
+                    Text(anchor, style: .timer)
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                if workout.distanceMeters > 0 {
+                    Text(distance(workout.distanceMeters))
+                        .font(.system(size: 10, weight: .medium))
+                        .lineLimit(1)
+                }
             } else {
                 HStack {
                     Label(
