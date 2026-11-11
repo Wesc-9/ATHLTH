@@ -80,6 +80,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var selectedGoalChoice = ""
     @State private var inlineGoalDraft: Data?
     @State private var isCreatingPlan = false
+    @State private var usesScopedWorkoutDrafts = true
+    private var workoutDraftContextPrefix: String {
+        usesScopedWorkoutDrafts ? "new-program-\(draftID?.uuidString ?? "legacy")" : "new-program"
+    }
     @State private var secondaryFocus: TrainingPlanFocus?
     @State private var focusWeight = 70
     @State private var goal: TrainingPlanGoalType = .improveFitness
@@ -1197,7 +1201,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     ghostTargetDurationSeconds: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.ghostTargetDurationSeconds,
                     ghostUpdates: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.ghostUpdates
                 ),
-                draftContext: "new-program-\(draftID?.uuidString ?? "legacy")-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
+                draftContext: "\(workoutDraftContextPrefix)-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
                 planCopyDays: planCopyDayOptions(
                     excluding: selection.id, sourceWeekIndex: selectedPlanWeekIndex
@@ -7900,6 +7904,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             selectedAdvancedWeekDay = saved.selectedDay
             aiAdjustmentInstruction = saved.aiInstruction
         }
+        usesScopedWorkoutDrafts = draft.workoutDraftContextVersion == 2
         inlineGoalDraft = draft.inlineGoalDraft
         approvedPlanReplacementID = draft.approvedReplacementID
         if let savedArea = draft.entryGoalArea.flatMap(ATHLTHPlanGoalArea.init(rawValue:)) {
@@ -8031,6 +8036,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     : editingWeekDay != nil ? "day" : nil),
             editorPhase: advancedAddDestination?.phase.rawValue,
             editorWorkoutIndex: advancedAddDestination?.workoutIndex,
+            workoutDraftContextVersion: usesScopedWorkoutDrafts ? 2 : 1,
             simpleMinutes: simpleMinutes,
             simpleActivityKinds: simpleActivities.map(\.rawValue).sorted(),
             configuration: configurationCheckpoint,

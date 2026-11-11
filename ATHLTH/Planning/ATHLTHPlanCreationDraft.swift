@@ -48,6 +48,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var editorKind: String? = nil
     var editorPhase: String? = nil
     var editorWorkoutIndex: Int? = nil
+    var workoutDraftContextVersion: Int? = nil
     var simpleMinutes: Int? = nil
     var simpleActivityKinds: [String]? = nil
     var configuration: Data? = nil
@@ -87,6 +88,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         editorKind: String? = nil,
         editorPhase: String? = nil,
         editorWorkoutIndex: Int? = nil,
+        workoutDraftContextVersion: Int? = nil,
         simpleMinutes: Int? = nil,
         simpleActivityKinds: [String]? = nil,
         configuration: Data? = nil,
@@ -94,6 +96,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         approvedReplacementID: UUID? = nil,
         savedAt: Date = Date()
     ) {
+        self.workoutDraftContextVersion = workoutDraftContextVersion
         self.configuration = configuration
         self.inlineGoalDraft = inlineGoalDraft
         self.approvedReplacementID = approvedReplacementID

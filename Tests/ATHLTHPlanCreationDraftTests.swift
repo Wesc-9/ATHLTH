@@ -619,11 +619,13 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
                 title: "Four weeks", weekCount: 4, startDate: Date(),
                 advanced: true, source: "scratch", stage: "goal",
                 entryGoalArea: "running", entryGoalChoice: choice,
+                workoutDraftContextVersion: 2,
                 configuration: Data("entered plan settings".utf8),
                 inlineGoalDraft: Data("unfinished goal fields".utf8),
                 approvedReplacementID: approved)
             let recovered = try JSONDecoder().decode(ATHLTHPlanCreationDraft.self,
                 from: JSONEncoder().encode(original))
+            XCTAssertEqual(recovered.workoutDraftContextVersion, 2)
             XCTAssertEqual(recovered.entryGoalChoice, choice)
             XCTAssertEqual(recovered.configuration, original.configuration)
             XCTAssertEqual(recovered.inlineGoalDraft, original.inlineGoalDraft)
