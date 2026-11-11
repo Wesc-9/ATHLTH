@@ -421,6 +421,9 @@ private final class ATHLTHLiveActivityController {
                     snapshot.runningStepIndex,
                 runningStepCount:
                     snapshot.runningStepCount,
+                runningIntervalOrdinal: snapshot.runningIntervalOrdinal,
+                runningIntervalTotal: snapshot.runningIntervalTotal,
+                runningInRecovery: snapshot.runningInRecovery,
                 runningStepProgress:
                     snapshot.runningStepProgress,
                 runningNextStepTitle:
