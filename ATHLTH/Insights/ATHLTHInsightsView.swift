@@ -1,6 +1,19 @@
 import SwiftUI
 import UIKit
 
+/// Shared cover spacing policy: only Training uses the larger floating card.
+/// Keeping this as a pure function makes compact and accessibility layouts
+/// regression-testable without changing the data-source hierarchy.
+enum ATHLTHInsightsCoverLayout {
+    static func contentTopInset(
+        section: ATHLTHInsightsSection,
+        accessibilitySize: Bool
+    ) -> CGFloat {
+        guard section == .training else { return -26 }
+        return accessibilitySize ? -36 : -58
+    }
+}
+
 struct ATHLTHInsightsView: View {
     var onSelectTab: (Int) -> Void = { _ in }
     var isActive: Bool = true
@@ -9,6 +22,7 @@ struct ATHLTHInsightsView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedSection: ATHLTHInsightsSection = .overview
     @StateObject private var checkInStore = RecoverySorenessStore()
     @State private var showingCheckIn = false
@@ -59,9 +73,14 @@ struct ATHLTHInsightsView: View {
                             developmentSection
                         }
                     }
-                    // Same image/card overlap as Train Today, adjusted for
-                    // the shorter Insights cover and four-option capsule.
-                    .padding(.top, -26)
+                    // Training begins with the load/balance surface floating
+                    // over the cover image, matching Train's premium hero.
+                    // Keep the existing Overview/Development offset unchanged.
+                    // Reduce overlap for accessibility-sized titles.
+                    .padding(.top, ATHLTHInsightsCoverLayout.contentTopInset(
+                        section: selectedSection,
+                        accessibilitySize: dynamicTypeSize.isAccessibilitySize
+                    ))
                     .padding(.bottom, 40)
                     .zIndex(1)
                 }
