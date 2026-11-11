@@ -173,53 +173,94 @@ private struct ATHLTHHomeWidgetView: View {
     private func activeWorkoutView(
         _ workout: ATHLTHSurfaceWorkoutSnapshot
     ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
+        let paused = workout.state == "paused"
+        let activeAnchor = workout.updatedAt.addingTimeInterval(
+            -max(0, workout.elapsedTime.isFinite ? workout.elapsedTime : 0)
+        )
+        let countdownEnd = workout.updatedAt.addingTimeInterval(
+            max(0, workout.runningStepRemainingSeconds ?? 0)
+        )
+        let hasCountdown = workout.runningStepRemainingSeconds.map {
+            $0.isFinite && $0 >= 0
+        } ?? false
+        return VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 7) {
                 Image(systemName: "waveform.path.ecg")
                     .foregroundStyle(ATHLTHWidgetPalette.brandGold)
                 Text("ATHLTH")
-                    .font(.caption.weight(.black))
-                    .tracking(1.6)
-                Spacer(minLength: 0)
-                Circle()
-                    .fill(ATHLTHWidgetPalette.brandGold)
-                    .frame(width: 7, height: 7)
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.4)
+                Spacer(minLength: 3)
+                Text(paused ? "PAUSE" : "LIVE")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(ATHLTHWidgetPalette.brandGold)
             }
-            Text(workout.title)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(ATHLTHWidgetPalette.ink)
-                .lineLimit(2)
-            Spacer(minLength: 0)
-            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                Image(systemName: workout.systemImage)
-                    .font(.subheadline)
-                if let started = workout.startedAt,
-                   workout.state != "paused" {
-                    Text(started, style: .timer)
-                        .font(.system(size: 25, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                } else {
-                    Text(String(
-                        format: "%d:%02d",
-                        max(Int(workout.elapsedTime), 0) / 60,
-                        max(Int(workout.elapsedTime), 0) % 60
-                    ))
-                        .font(.system(size: 25, weight: .bold, design: .rounded))
-                        .monospacedDigit()
+            HStack(spacing: 6) {
+                Text(workout.currentStep ?? workout.title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                Spacer(minLength: 2)
+                if let current = workout.runningIntervalOrdinal,
+                   let total = workout.runningIntervalTotal, total > 1 {
+                    Text(workout.runningInRecovery == true
+                         ? "N \(min(current + 1, total))/\(total)"
+                         : "\(current)/\(total)")
+                    .font(.caption.weight(.bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
                 }
-                Spacer(minLength: 0)
             }
             .foregroundStyle(ATHLTHWidgetPalette.ink)
-            Text(workout.state == "remote_strength"
-                 ? "LIVE · iPhone"
-                 : workout.state == "paused" ? "PAUSED" : "LIVE")
-                .font(.caption2.weight(.semibold))
-                .tracking(1.0)
-                .foregroundStyle(ATHLTHWidgetPalette.muted)
+
+            if hasCountdown, let remaining = workout.runningStepRemainingSeconds {
+                if paused || remaining <= 0 {
+                    Text(duration(remaining))
+                        .font(.system(size: family == .systemMedium ? 35 : 29,
+                                      weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                } else {
+                    Text(timerInterval: workout.updatedAt...countdownEnd,
+                         countsDown: true, showsHours: false)
+                        .font(.system(size: family == .systemMedium ? 35 : 29,
+                                      weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+            } else if paused {
+                Text(duration(workout.elapsedTime))
+                    .font(.system(size: family == .systemMedium ? 35 : 29,
+                                  weight: .bold, design: .rounded))
+                    .monospacedDigit()
+            } else {
+                Text(activeAnchor, style: .timer)
+                    .font(.system(size: family == .systemMedium ? 35 : 29,
+                                  weight: .bold, design: .rounded))
+                    .monospacedDigit()
+            }
+
+            HStack(spacing: 5) {
+                if workout.runningInRecovery == true {
+                    Image(systemName: "pause.circle")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Rest", norwegian: "Pause"
+                    ))
+                } else {
+                    Image(systemName: workout.systemImage)
+                    Text(hasCountdown ? "TID IGJEN" : "ØKTTID")
+                }
+                Spacer(minLength: 4)
+                if workout.distanceMeters.isFinite, workout.distanceMeters > 0 {
+                    Text(String(format: "%.2f km", workout.distanceMeters / 1000))
+                        .monospacedDigit()
+                }
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(ATHLTHWidgetPalette.muted)
+            .lineLimit(1)
         }
+        .foregroundStyle(ATHLTHWidgetPalette.ink)
         .padding(3)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var smallView: some View {
