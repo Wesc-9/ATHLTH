@@ -164,6 +164,42 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testLocalPrivateNotesDoNotChangeAccountFingerprint() throws {
+        var plan = makeMinimalPlan()
+        plan.builderProfile = TrainingPlanBuilderProfile(
+            mode: .advanced,
+            primaryFocus: .running,
+            goal: .improveFitness,
+            sessionsPerWeek: 3,
+            preferredDayIndexes: [1, 3, 5],
+            injuriesOrLimitations: "Private injury"
+        )
+        let initial = try ATHLTHStudioPlanSyncStore.accountFingerprint(for: plan)
+        plan.summary = "Private note edited"
+        plan.builderProfile?.injuriesOrLimitations = "New private injury detail"
+        plan.builderProfile?.goalDetail = "Another private detail"
+        plan.updatedAt = Date().addingTimeInterval(120)
+        plan.version += 1
+        XCTAssertEqual(
+            try ATHLTHStudioPlanSyncStore.accountFingerprint(for: plan),
+            initial,
+            "Changing only local notes must not create a remote conflict"
+        )
+    }
+
+    @MainActor
+    func testTrainingPrescriptionChangeUpdatesAccountFingerprint() throws {
+        var plan = makeMinimalPlan()
+        let before = try ATHLTHStudioPlanSyncStore.accountFingerprint(for: plan)
+        plan.title = "New training plan title"
+        XCTAssertNotEqual(
+            try ATHLTHStudioPlanSyncStore.accountFingerprint(for: plan),
+            before,
+            "Shared content changes must still be synchronized"
+        )
+    }
+
     private func makeMinimalPlan() -> TrainingPlan {
         TrainingPlan(
             id: UUID(), ownerID: UUID(), title: "Example plan",
