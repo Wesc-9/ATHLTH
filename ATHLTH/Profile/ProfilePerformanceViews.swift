@@ -6964,6 +6964,12 @@ struct PerformanceStatsView: View {
         tint: Color,
         fallback: TimedDistancePerformanceRecord? = nil
     ) -> PerformanceMetricItem {
+        if !ATHLTHDeviceRole.isIPhone,
+           let shared = syncedHealthRecordItem(
+               kind: kind, title: title, icon: icon, tint: tint
+           ) {
+            return shared
+        }
         if let record = record(kind) {
             return PerformanceMetricItem(
                 icon: icon,
@@ -6986,7 +6992,9 @@ struct PerformanceStatsView: View {
             )
         }
 
-        return emptyItem(
+        return syncedHealthRecordItem(
+            kind: kind, title: title, icon: icon, tint: tint
+        ) ?? emptyItem(
             icon: icon,
             title: title,
             tint: tint,
@@ -7003,11 +7011,15 @@ struct PerformanceStatsView: View {
         icon: String,
         tint: Color
     ) -> PerformanceMetricItem {
+        if !ATHLTHDeviceRole.isIPhone,
+           let shared = syncedHealthRecordItem(
+               kind: kind, title: title, icon: icon, tint: tint
+           ) { return shared }
         guard let record = record(kind) else {
-            return emptyItem(
-                icon: icon,
-                title: title,
-                tint: tint
+            return syncedHealthRecordItem(
+                kind: kind, title: title, icon: icon, tint: tint
+            ) ?? emptyItem(
+                icon: icon, title: title, tint: tint
             )
         }
 
@@ -7016,6 +7028,27 @@ struct PerformanceStatsView: View {
             title: title,
             value: record.formattedValue,
             detail: formatDate(record.date),
+            tint: tint
+        )
+    }
+
+    private func syncedHealthRecordItem(
+        kind: HealthPersonalRecordKind,
+        title: String,
+        icon: String,
+        tint: Color
+    ) -> PerformanceMetricItem? {
+        guard let featured = ProfileFeaturedRecordKind.allCases.first(
+            where: { $0.healthKind == kind }
+        ), let remote = profileRecords.values[featured.rawValue]
+        else { return nil }
+
+        return PerformanceMetricItem(
+            icon: icon,
+            title: title,
+            value: remote.display_value,
+            detail: remote.supporting_detail.isEmpty
+                ? featured.shortTitle : remote.supporting_detail,
             tint: tint
         )
     }
