@@ -28,6 +28,7 @@ enum HomeCoachWorkoutSelection {
         recentKinds: [WorkoutKind],
         readiness: HomeDailyRecommendationPolicy.Readiness,
         isToday: Bool,
+        recommendedKind: WorkoutKind? = nil,
         limit: Int = 4
     ) -> [PlannedSession] {
         let isRecoveryDay = isToday &&
@@ -43,6 +44,7 @@ enum HomeCoachWorkoutSelection {
         return eligible.sorted { lhs, rhs in
             func score(_ workout: PlannedSession) -> Int {
                 var value = 0
+                if let recommendedKind, workout.kind == recommendedKind { value += 20 }
                 if plannedKinds.contains(workout.kind) { value += 12 }
                 // Another demanding session on a scheduled day should not
                 // automatically jump ahead of low-impact alternatives.
