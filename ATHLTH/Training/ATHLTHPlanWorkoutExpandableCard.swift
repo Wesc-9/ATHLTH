@@ -194,22 +194,24 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                             .foregroundStyle(ink)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                        HStack(spacing: 5) {
-                            if let duration = ATHLTHPlannedWorkoutPresentation.duration(for: workout) {
-                                Text(duration)
-                            }
-                            Text("·")
-                            Text(workout.kind.title)
-                        }
+                        Text([
+                            ATHLTHPlannedWorkoutPresentation.duration(for: workout),
+                            workout.kind.title
+                        ].compactMap { $0 }.joined(separator: " · "))
                         .font(.system(size: 11))
                         .foregroundStyle(secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.80)
                         Text(completed ? tr("Completed", "Fullført") :
                              skipped ? tr("Skipped", "Hoppet over") :
                              expanded ? tr("Tap to collapse", "Trykk for å lukke") :
                              tr("Tap for all exercise details", "Trykk for alle øktdetaljer"))
                             .font(.system(size: 10))
                             .foregroundStyle(completed ? Color.green : secondary)
-                    }
+                            .lineLimit(2)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
                     Spacer(minLength: 0)
                     Image(systemName: expanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 13, weight: .semibold))
@@ -312,7 +314,10 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                             }
                         }
                     }
-                    HStack(spacing: 9) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 140, maximum: 380), spacing: 9)],
+                        spacing: 9
+                    ) {
                         Button {
                             selectedDetail = Selection(
                                 title: workout.title, blocks: timeline.map(\.block),
