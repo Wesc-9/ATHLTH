@@ -16,6 +16,12 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     let completedSets: Int?
     let totalSets: Int?
     var paused: Bool? = nil
+    // Read-only interval metadata. Same semantics as phone and Watch Live Activity.
+    var runningIntervalOrdinal: Int? = nil
+    var runningIntervalTotal: Int? = nil
+    var runningInRecovery: Bool? = nil
+    var runningStepRemainingSeconds: TimeInterval? = nil
+    var capturedAt: Date? = nil
 
     var id: UUID { sessionID }
     var symbol: String {
@@ -156,6 +162,16 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         if let run = phone.active {
             let index = run.structuredStepIndex ?? 0
             let steps = run.structuredRunningWorkout?.steps ?? []
+            let interval = ATHLTHRunningIntervalPosition.resolve(
+                steps: steps, currentIndex: index
+            )
+            let current = steps.indices.contains(index) ? steps[index] : nil
+            let remaining = current?.durationSeconds.map { duration in
+                max(0, duration - max(0,
+                    run.elapsed(at: Date()) -
+                        (run.structuredStepStartElapsedTime ?? 0)
+                ))
+            }
             return ATHLTHCrossDeviceWorkoutSnapshot(
                 sessionID: run.id,
                 kind: run.walking ? "walking" : "running",
@@ -170,7 +186,13 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     ? steps[index + 1].title : nil,
                 completedSets: nil,
                 totalSets: nil,
-                paused: run.resumedAt == nil
+                paused: run.resumedAt == nil,
+                runningIntervalOrdinal: interval?.ordinal,
+                runningIntervalTotal: interval?.total,
+                runningInRecovery: interval?.isRecovery,
+                runningStepRemainingSeconds: current?.measure == .time
+                    ? remaining : nil,
+                capturedAt: .now
             )
         }
         if let watch = mirroredWatch.snapshot,
@@ -199,7 +221,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 nextStep: watch.runningNextStepTitle ?? watch.strengthNextExerciseName,
                 completedSets: nil,
                 totalSets: nil,
-                paused: watch.state == .paused
+                paused: watch.state == .paused,
+                runningIntervalOrdinal: watch.runningIntervalOrdinal,
+                runningIntervalTotal: watch.runningIntervalTotal,
+                runningInRecovery: watch.runningInRecovery,
+                runningStepRemainingSeconds: watch.runningStepRemainingSeconds,
+                capturedAt: watch.capturedAt
             )
         }
         return nil
@@ -280,7 +307,13 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     elapsedTime: $0.elapsedSeconds,
                     distanceMeters: $0.distanceMeters ?? 0,
                     heartRate: 0,
-                    updatedAt: row?.updatedAt ?? .now
+                    updatedAt: row?.updatedAt ?? .now,
+                    currentStep: $0.currentStep,
+                    nextStep: $0.nextStep,
+                    runningIntervalOrdinal: $0.runningIntervalOrdinal,
+                    runningIntervalTotal: $0.runningIntervalTotal,
+                    runningInRecovery: $0.runningInRecovery,
+                    runningStepRemainingSeconds: $0.runningStepRemainingSeconds
                 )
             })
         } catch {
