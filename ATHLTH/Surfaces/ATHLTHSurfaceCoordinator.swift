@@ -8,6 +8,32 @@ enum ATHLTHSurfaceCoordinator {
     private static var lastSnapshotWriteAt: Date?
     private static var accountSurfacesEnabled = false
     private static var accountGeneration: UInt64 = 0
+    private static var remoteWorkout: ATHLTHSurfaceWorkoutSnapshot?
+    private static var lastRemoteWidgetReloadAt: Date?
+
+    /// The remote activity is presentation-only; the owner device records
+    /// the workout. Never start a HealthKit workout on the spectator iPad.
+    static func setRemoteWorkout(_ workout: ATHLTHSurfaceWorkoutSnapshot?) {
+        let previous = remoteWorkout
+        remoteWorkout = workout
+        var shared = ATHLTHSurfaceSharedStore.load()
+        guard shared.activeWorkout == nil ||
+              previous != nil else { return }
+        shared.activeWorkout = workout
+        shared.updatedAt = Date()
+        ATHLTHSurfaceSharedStore.save(shared)
+        let changedSession = previous?.startedAt != workout?.startedAt ||
+            previous?.state != workout?.state ||
+            (previous == nil) != (workout == nil)
+        let stale = lastRemoteWidgetReloadAt.map {
+            Date().timeIntervalSince($0) >= 20
+        } ?? true
+        if changedSession || stale {
+            WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHHomeWidget")
+            WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHLockScreenWidget")
+            lastRemoteWidgetReloadAt = Date()
+        }
+    }
 
     static func publishSnapshot(
         health: HealthKitManager,
@@ -41,6 +67,9 @@ enum ATHLTHSurfaceCoordinator {
                 heartRate: snapshot.heartRate,
                 updatedAt: snapshot.capturedAt
             )
+        } else if let remoteWorkout,
+                  Date().timeIntervalSince(remoteWorkout.updatedAt) < 35 {
+            activeWorkout = remoteWorkout
         } else {
             activeWorkout = nil
         }
@@ -201,6 +230,8 @@ enum ATHLTHSurfaceCoordinator {
     }
 
     static func clearAccountSurfaces() {
+        remoteWorkout = nil
+        lastRemoteWidgetReloadAt = nil
         accountSurfacesEnabled = false
         accountGeneration &+= 1
         ATHLTHSurfaceSharedStore.save(.empty)
