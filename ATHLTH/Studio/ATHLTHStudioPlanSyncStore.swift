@@ -180,6 +180,11 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             )
             let allIDs = Set(remoteByID.keys).union(localByID.keys)
 
+            // Plans may contain injury details in the builder profile. Until
+            // special-category data have an approved lawful basis, do not
+            // upload these plans as ordinary account documents. Keep the
+            // original completely intact on this device.
+            var heldForPrivacy = 0
             for planID in allIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
                 guard enabled, accountID == userID else { return }
 
@@ -203,6 +208,11 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                                     fingerprint: remoteFingerprint, owner: userID)
                     }
                 case let .upload(expected):
+                    if let local, let limitations = local.builderProfile?.injuriesOrLimitations,
+                       !limitations.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        heldForPrivacy += 1
+                        continue
+                    }
                     guard let local,
                           session.accountPlanDocument(withID: planID) == local else {
                         unresolved.append(Conflict(id: planID, title: local?.title ?? "Training plan"))
@@ -235,16 +245,25 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             }
 
             conflicts = unresolved
+            // A successful network roundtrip does not mean privacy-held
+            // plans or unresolved conflicts have been synchronized.
             lastSuccessfulSync = Date()
-            status = unresolved.isEmpty
-                ? ATHLTHLocalization.choose(
-                    english: "Training plans are up to date on this device.",
-                    norwegian: "Treningsplanene er oppdatert på denne enheten."
-                  )
-                : ATHLTHLocalization.choose(
-                    english: "\(unresolved.count) plan conflict(s) need your decision. No changes were overwritten.",
-                    norwegian: "\(unresolved.count) plankonflikt(er) krever et valg. Ingen endringer ble overskrevet."
-                  )
+            if heldForPrivacy > 0 {
+                status = ATHLTHLocalization.choose(
+                    english: "\(heldForPrivacy) plan(s) kept on this device because they include injury/limitation notes. Other eligible plans were checked.",
+                    norwegian: "\(heldForPrivacy) plan(er) beholdes lokalt fordi de inneholder notater om skader/begrensninger. Andre aktuelle planer er kontrollert."
+                )
+            } else {
+                status = unresolved.isEmpty
+                    ? ATHLTHLocalization.choose(
+                        english: "Training plans are up to date on this device.",
+                        norwegian: "Treningsplanene er oppdatert på denne enheten."
+                      )
+                    : ATHLTHLocalization.choose(
+                        english: "\(unresolved.count) plan conflict(s) need your decision. No changes were overwritten.",
+                        norwegian: "\(unresolved.count) plankonflikt(er) krever et valg. Ingen endringer ble overskrevet."
+                      )
+            }
         } catch {
             if accountID == userID {
                 status = ATHLTHLocalization.choose(
