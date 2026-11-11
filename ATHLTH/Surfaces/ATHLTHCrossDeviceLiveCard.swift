@@ -83,7 +83,7 @@ struct ATHLTHCrossDeviceLiveCard: View {
 
             if let step = snapshot.currentStep {
                 Divider()
-                Label(step, systemImage: "figure.run.circle")
+                Label(step, systemImage: snapshot.symbol)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
             }
