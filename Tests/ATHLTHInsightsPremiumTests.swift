@@ -24,6 +24,33 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
         ))
     }
 
+    func testTrainingLoadCardFloatsOverCoverWithoutChangingOtherInsightsTabs() {
+        let normal = ATHLTHInsightsCoverLayout.contentTopInset(
+            section: .training, accessibilitySize: false
+        )
+        let largeText = ATHLTHInsightsCoverLayout.contentTopInset(
+            section: .training, accessibilitySize: true
+        )
+        XCTAssertLessThan(normal, -26)
+        XCTAssertGreaterThan(largeText, normal)
+        XCTAssertLessThan(largeText, 0)
+
+        for tab in [ATHLTHInsightsSection.overview, .development] {
+            XCTAssertEqual(
+                ATHLTHInsightsCoverLayout.contentTopInset(
+                    section: tab, accessibilitySize: false
+                ),
+                -26
+            )
+            XCTAssertEqual(
+                ATHLTHInsightsCoverLayout.contentTopInset(
+                    section: tab, accessibilitySize: true
+                ),
+                -26
+            )
+        }
+    }
+
     func testSectionsAvoidRepeatingHomeHealthMetrics() {
         XCTAssertEqual(
             ATHLTHInsightsSection.allCases,
