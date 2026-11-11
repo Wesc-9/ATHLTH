@@ -1749,8 +1749,8 @@ struct HomeWeeklyProgressStrip:
                 Text("Ukens fremdrift")
                     .font(
                         .system(
-                            size: 13,
-                            weight: .bold
+                            size: 15,
+                            weight: .semibold
                         )
                     )
                     .foregroundStyle(
@@ -1802,12 +1802,10 @@ struct HomeWeeklyProgressStrip:
             ProgressView(
                 value: progress
             )
-            .tint(
-                ATHLTHTheme.vitality
-            )
+            .tint(ATHLTHTrainDesign.bronze)
             .scaleEffect(
                 x: 1,
-                y: 0.62,
+                y: 0.75,
                 anchor: .center
             )
 
@@ -1846,12 +1844,12 @@ struct HomeWeeklyProgressStrip:
 
             compactWeekMetrics
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
         .background(
             ATHLTHTrainDesign.paper,
             in: RoundedRectangle(
-                cornerRadius: 19,
+                cornerRadius: 22,
                 style: .continuous
             )
         )
@@ -1861,7 +1859,7 @@ struct HomeWeeklyProgressStrip:
                 style: .continuous
             )
             .stroke(
-                ATHLTHTrainDesign.rule.opacity(0.34),
+                ATHLTHTrainDesign.rule.opacity(0.40),
                 lineWidth: 0.7
             )
         }
