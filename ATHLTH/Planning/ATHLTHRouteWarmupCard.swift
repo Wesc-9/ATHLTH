@@ -57,6 +57,65 @@ struct ATHLTHRouteWarmupCard: View {
                         .pickerStyle(.menu)
                     }
 
+                    Divider().opacity(0.55)
+
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Target warm-up pace",
+                            norwegian: "Måltempo for oppvarming"
+                        ),
+                        isOn: Binding(
+                            get: { configuration.targetPaceSecondsPerKilometer != nil },
+                            set: {
+                                configuration.targetPaceSecondsPerKilometer =
+                                    $0 ? 360 : nil
+                            }
+                        )
+                    )
+                    .font(.subheadline)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    if let selected = configuration.targetPaceSecondsPerKilometer {
+                        Stepper(value: Binding(
+                            get: {
+                                configuration.targetPaceSecondsPerKilometer ?? selected
+                            },
+                            set: {
+                                configuration.targetPaceSecondsPerKilometer = $0
+                            }
+                        ), in: 180...900, step: 5) {
+                            Text(String(format: "%d:%02d min/km",
+                                Int(selected) / 60, Int(selected) % 60))
+                                .monospacedDigit()
+                        }
+                        .font(.subheadline.weight(.medium))
+                    }
+
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Warm-up heart-rate zone",
+                            norwegian: "Pulssone i oppvarming"
+                        ),
+                        isOn: Binding(
+                            get: { configuration.targetHeartRateZone != nil },
+                            set: { configuration.targetHeartRateZone = $0 ? 2 : nil }
+                        )
+                    )
+                    .font(.subheadline)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    if let zone = configuration.targetHeartRateZone {
+                        Stepper(
+                            ATHLTHLocalization.choose(
+                                english: "Zone", norwegian: "Sone"
+                            ) + " \(zone)",
+                            value: Binding(
+                                get: { configuration.targetHeartRateZone ?? zone },
+                                set: { configuration.targetHeartRateZone = $0 }
+                            ),
+                            in: 1...5
+                        )
+                        .font(.subheadline.weight(.medium))
+                    }
+
                     if configuration.durationMinutes > 0 {
                         Toggle(
                             ATHLTHLocalization.choose(
