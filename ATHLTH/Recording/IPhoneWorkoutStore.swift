@@ -2341,13 +2341,19 @@ final class IPhoneWorkoutStore:
         let addition = watchRunningWorkoutTransfer(from: template)
         let existing = workout.structuredRunningWorkout
         let existingComplete = workout.structuredWorkoutComplete == true
+        let priorCount = existing?.steps.count ?? 0
+        // Only an open, final stage can be replaced immediately. A timed
+        // interval must not be silently skipped when a new plan is added.
+        let canStartFromOpenStep = startNow &&
+            existing != nil && !existingComplete &&
+            currentStructuredStep?.measure == .open &&
+            workout.structuredStepIndex == priorCount - 1
         guard ATHLTHRunningWorkoutAppendPolicy.canAppend(
             hasInProgressStructuredSteps: existing != nil && !existingComplete,
-            startNow: startNow,
+            startNow: startNow && !canStartFromOpenStep,
             steps: addition.steps
         ) else { return false }
 
-        let priorCount = existing?.steps.count ?? 0
         if var current = existing {
             current.steps.append(contentsOf: addition.steps)
             current.sourceWorkoutID = nil
@@ -2366,6 +2372,11 @@ final class IPhoneWorkoutStore:
         persistActiveCheckpoint(force: true)
         startStructuredTicksIfNeeded()
         syncLiveActivity()
+        if canStartFromOpenStep {
+            // The appended first interval is now the next structured step.
+            // Complete the open step without resetting recording or distance.
+            advanceStructuredStepManually()
+        }
         return true
     }
 
@@ -2391,11 +2402,8 @@ final class IPhoneWorkoutStore:
             announceStructuredStepIfNeeded(prefix: "Starting")
             return
         }
-        guard let step = currentStructuredStep,
-              step.phase == "warmup" || step.phase == "cooldown" ||
-              step.measure == .open ||
-              workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false
-        else { return }
+        // This action is an explicit user request to proceed. Automatic
+        // transition rules still apply only to timer-driven progression.
         evaluateStructuredWorkout(&workout, forceManualAdvance: true)
         active = workout
         persistActiveCheckpoint(force: true)
