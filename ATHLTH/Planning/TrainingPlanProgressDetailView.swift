@@ -24,30 +24,31 @@ struct TrainingPlanProgressDetailView: View {
                         healthWorkouts: health.workouts,
                         strengthHistory: strength.workoutHistory
                     )
-                    let report = TrainingPlanStrengthReport.make(
-                        plan: plan,
-                        strengthHistory: strength.workoutHistory
-                    )
-                    let guidance = TrainingPlanLoadAdvisor.evaluate(
-                        plan: plan,
-                        strengthHistory: strength.workoutHistory
-                    )
+                    let isBasic = plan.builderProfile?.mode == .basic
 
                     LazyVStack(alignment: .leading, spacing: 16) {
                         header(plan: plan)
-                        linkedGoalsCard(plan: plan)
+                        linkedGoalsCard(plan: plan, isBasic: isBasic)
                         overallCard(overall)
-                        if health.hasRequestedAuthorization {
-                            recoveryContextCard
+                        if !isBasic {
+                            let report = TrainingPlanStrengthReport.make(
+                                plan: plan, strengthHistory: strength.workoutHistory
+                            )
+                            let guidance = TrainingPlanLoadAdvisor.evaluate(
+                                plan: plan, strengthHistory: strength.workoutHistory
+                            )
+                            if health.hasRequestedAuthorization {
+                                recoveryContextCard
+                            }
+                            strengthCard(report)
+                            exerciseCard(report)
+                            if !guidance.isEmpty {
+                                adjustmentCard(guidance)
+                            }
+                            muscleCard(report)
+                            weeklyCard(report, currentWeek: overall.currentWeek)
+                            sourceNote
                         }
-                        strengthCard(report)
-                        exerciseCard(report)
-                        if !guidance.isEmpty {
-                            adjustmentCard(guidance)
-                        }
-                        muscleCard(report)
-                        weeklyCard(report, currentWeek: overall.currentWeek)
-                        sourceNote
                     }
                     .padding(.horizontal, 18)
                     .padding(.vertical, 18)
@@ -123,7 +124,7 @@ struct TrainingPlanProgressDetailView: View {
     // Plan-specific goal evidence is kept separate from program completion.
     // A completed workout must never be presented as proof of a race time or 1RM.
     @ViewBuilder
-    private func linkedGoalsCard(plan: TrainingPlan) -> some View {
+    private func linkedGoalsCard(plan: TrainingPlan, isBasic: Bool) -> some View {
         let linkedGoals = goalStore.goals
             .filter { $0.linkedTrainingPlanID == plan.id && $0.status == .active }
             .sorted {
@@ -170,7 +171,17 @@ struct TrainingPlanProgressDetailView: View {
                                     .font(.caption2.weight(.medium))
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                             }
-                            if let target = goal.target {
+                            if isBasic {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Keep following your planned sessions. ATHLTH checks recorded results as you train.",
+                                        norwegian: "Følg de planlagte øktene. ATHLTH følger med på registrerte resultater underveis."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            if !isBasic, let target = goal.target {
                                 Text(
                                     ATHLTHLocalization.choose(
                                         english: "Target", norwegian: "Målverdi"
@@ -179,7 +190,7 @@ struct TrainingPlanProgressDetailView: View {
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                             }
-                            if let fraction = evidence.completionFraction {
+                            if !isBasic, let fraction = evidence.completionFraction {
                                 ProgressView(value: fraction)
                                     .tint(ATHLTHTheme.accent)
                                 Text(
@@ -190,7 +201,7 @@ struct TrainingPlanProgressDetailView: View {
                                 )
                                 .font(.caption2)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
-                            } else {
+                            } else if !isBasic {
                                 Text(
                                     ATHLTHLocalization.choose(
                                         english: "No comparable plan-specific result yet. The plan may still be progressing.",
@@ -200,7 +211,7 @@ struct TrainingPlanProgressDetailView: View {
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                             }
-                            if let deadline = goal.deadline {
+                            if !isBasic, let deadline = goal.deadline {
                                 Label(
                                     deadline.formatted(date: .abbreviated, time: .omitted),
                                     systemImage: "calendar"
