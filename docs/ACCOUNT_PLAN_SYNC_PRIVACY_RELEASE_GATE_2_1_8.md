@@ -20,6 +20,13 @@ Status: CODE STAGED, NOT APPROVED FOR DEPLOYMENT. This is an engineering assessm
 7. Review Apple HealthKit rules and App Store privacy disclosures for actual transferred categories. The sync feature itself must never upload raw HealthKit records.
 8. Verify local-at-rest protection, TLS in transit, account switching and sign-out clearing, authentication refresh, and non-identifying logs.
 
+## 2026-11-11 implementation review
+- Live Supabase inspection: 0 cloud plan documents, 0 recorded plan-sync opt-ins and 0 opt-outs at inspection time; deployed RLS STILL requires the older consent record. The account-owned migration is staged in GitHub only, NOT applied to production.
+- The Swift plan-sync upload gateway now blocks plans with populated `builderProfile.injuriesOrLimitations`; this covers normal uploads and manual conflict resolution. The device retains the unmodified plan.
+- WARNING: this is a narrow safety gate, not a complete free-text or special-category data scrubber. `TrainingPlan.summary`, `builderProfile.goalDetail`, block goal text, workout/exercise/set notes and descriptive titles may still contain medical or sensitive data. Do not release default account uploads until those fields are classified and safe processing has been implemented and reviewed.
+- Added tests for the injury-field gate and staging RLS account isolation. They have not been executed as end-to-end device tests. Test runner must use a disposable account and rollback.
+- The source control work does not prove cross-device sync or GDPR compliance. Running an iOS/iPadOS build and staging database tests remains mandatory.
+
 ## Required test matrix
 - New signed-in account, iPhone -> iPad -> iPhone edits, plus fresh reinstall.
 - Offline edits and reconnect; conflict after both devices edit, including deletion and stale revision.
