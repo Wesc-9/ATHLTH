@@ -384,15 +384,19 @@ struct AudioCoachDraft {
            (100...240).contains(maximumHeartRateBPM) {
             prompts.maximumHeartRateBPM = maximumHeartRateBPM
         }
+        // Custom groups are the authoritative periodic schedule. Do not
+        // transmit the legacy kilometre/time triggers alongside them: they
+        // would add unscheduled fields to the requested grouped announcement.
+        let standardCadenceEnabled = enabled && customRules.isEmpty
         return WatchAudioCoachConfiguration(
             enabled: enabled,
             language: language,
             distanceIntervalMeters:
-                enabled && distanceTriggerEnabled
+                standardCadenceEnabled && distanceTriggerEnabled
                     ? distanceIntervalKilometers * 1_000
                     : nil,
             timeIntervalSeconds:
-                enabled && timeTriggerEnabled
+                standardCadenceEnabled && timeTriggerEnabled
                     ? Double(min(max(timeIntervalSeconds, 15), 7_200))
                     : nil,
             customRules: enabled && !customRules.isEmpty
@@ -1832,6 +1836,11 @@ struct RunQuickStartSheet: View {
 
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
+                    // Plan/individual workout choices supersede global defaults.
+                    // Never write these session-scoped overrides back to Settings.
+                    if let savedCoach = plannedSession?.audioCoachConfiguration {
+                        audioCoachDraft.load(configuration: savedCoach)
+                    }
                     didLoadAudioCoachDefaults = true
                 }
 
@@ -3789,6 +3798,11 @@ struct WalkQuickStartSheet: View {
 
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
+                    // Plan/individual workout choices supersede global defaults.
+                    // Never write these session-scoped overrides back to Settings.
+                    if let savedCoach = plannedSession?.audioCoachConfiguration {
+                        audioCoachDraft.load(configuration: savedCoach)
+                    }
                     didLoadAudioCoachDefaults = true
                 }
 
