@@ -1559,8 +1559,10 @@ struct RunQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: isAdvancedSetup ? 16 : 12) {
+                    // Identical details card in Basic and Advanced.
+                    // Quick Train always starts now, so its time is read-only.
+                    advancedWorkoutDetailsCard
                     if isAdvancedSetup {
-                        advancedWorkoutDetailsCard
                         modeCard
                     } else {
                         ATHLTHRunBasicSetupView(
@@ -1970,72 +1972,14 @@ struct RunQuickStartSheet: View {
     /// Advanced reuses the Basic workout-details hierarchy, but keeps
     /// its full mode and coaching tools below the compact identity card.
     private var advancedWorkoutDetailsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "figure.run")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        ATHLTHTrainDesign.paleGold.opacity(0.45),
-                        in: RoundedRectangle(cornerRadius: 13)
-                    )
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "WORKOUT DETAILS", norwegian: "ØKTDETALJER"
-                    ))
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.8)
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Running", norwegian: "Løping"
-                    ))
-                    .font(.system(size: 22, weight: .semibold, design: .serif))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-                }
-                Spacer(minLength: 0)
-            }
-
-            TextField(
-                "", text: $quickWorkoutName,
-                prompt: Text(ATHLTHLocalization.choose(
-                    english: "Workout name (optional)",
-                    norwegian: "Øktnavn (valgfritt)"
-                ))
-                .foregroundStyle(.secondary.opacity(0.55))
-            )
-            .font(.subheadline.weight(.medium))
-            .tint(ATHLTHTrainDesign.bronze)
-            .textInputAutocapitalization(.sentences)
-            .frame(minHeight: 43)
-            .padding(.horizontal, 13)
-            .background(
-                ATHLTHPlanDesign.canvas,
-                in: RoundedRectangle(cornerRadius: 12)
-            )
-
-            HStack(spacing: 8) {
-                Label(
-                    quickDisplayDate.formatted(date: .abbreviated, time: .omitted),
-                    systemImage: "calendar"
-                )
-                Spacer(minLength: 8)
-                Label(
-                    quickDisplayDate.formatted(date: .omitted, time: .shortened),
-                    systemImage: "clock"
-                )
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(ATHLTHTrainDesign.ink)
-            .frame(minHeight: 43)
-            .padding(.horizontal, 12)
-            .background(
-                ATHLTHPlanDesign.canvas,
-                in: RoundedRectangle(cornerRadius: 12)
-            )
-
+        ATHLTHWorkoutDetailsCard(
+            activityTitle: ATHLTHLocalization.choose(
+                english: "Running", norwegian: "Løping"
+            ),
+            symbol: "figure.run",
+            name: $quickWorkoutName
+        ) {
             ATHLTHRunEnvironmentDetailRow(environment: $environment)
-
             if environment == .treadmill,
                let prior = phoneWorkout.lastTreadmillSpeedReference {
                 Label(
@@ -2050,8 +1994,6 @@ struct RunQuickStartSheet: View {
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
             }
         }
-        .padding(15)
-        .athlthTrainPaper()
     }
 
     private var runSetupModeButton: some View {
