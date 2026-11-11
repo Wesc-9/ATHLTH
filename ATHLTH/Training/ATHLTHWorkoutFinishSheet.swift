@@ -17,6 +17,7 @@ struct ATHLTHWorkoutFinishSheet: View {
     let saving: Bool
     let onFinish: () -> Void
     let onContinue: () -> Void
+    var canFinish = true
 
     var body: some View {
         ScrollView {
@@ -120,7 +121,7 @@ struct ATHLTHWorkoutFinishSheet: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(saving)
+                .disabled(saving || !canFinish)
 
                 Button(action: onContinue) {
                     Text(ATHLTHLocalization.choose(
