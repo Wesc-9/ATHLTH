@@ -4552,11 +4552,17 @@ private struct HomeWeeklyProgressDaySheet: View {
         let metrics = HomeCompletedWorkoutPresentation.metrics(for: workout)
 
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 11) {
+            HStack(alignment: .center, spacing: 9) {
+                Text(workout.startDate.formatted(date: .omitted, time: .shortened))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(width: 49, alignment: .leading)
+
                 Image(systemName: workout.activity.icon)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 34, height: 34)
                     .background(
                         ATHLTHPlanDesign.selectedSurface,
                         in: RoundedRectangle(
