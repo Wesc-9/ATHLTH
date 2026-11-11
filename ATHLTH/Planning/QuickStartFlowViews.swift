@@ -1537,6 +1537,7 @@ struct RunQuickStartSheet: View {
 
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
+    @State private var openEditorAfterLibrary = false
     @State private var showingDetailedWorkoutBuilder = false
 
     @State private var audioCoachDraft = AudioCoachDraft()
@@ -1628,22 +1629,10 @@ struct RunQuickStartSheet: View {
                         }
                     }
 
+                    // Basic and Advanced route runs use the same
+                    // configurable warm-up/step engine as planned running.
                     if mode == .route, selectedRoute != nil {
-                        if isAdvancedSetup {
-                            ATHLTHRouteWarmupCard(configuration: $routeWarmup)
-                        } else {
-                            DisclosureGroup {
-                                ATHLTHRouteWarmupCard(configuration: $routeWarmup)
-                            } label: {
-                                Label(ATHLTHLocalization.choose(
-                                    english: "Optional warm-up",
-                                    norwegian: "Valgfri oppvarming"
-                                ), systemImage: "timer")
-                                .font(.subheadline.weight(.medium))
-                                .frame(minHeight: 44)
-                            }
-                            .tint(ATHLTHTrainDesign.bronze)
-                        }
+                        ATHLTHRouteWarmupCard(configuration: $routeWarmup)
                     }
 
                     if isAdvancedSetup {
@@ -1748,13 +1737,25 @@ struct RunQuickStartSheet: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingRunningLibrary) {
+            .sheet(isPresented: $showingRunningLibrary, onDismiss: {
+                // One selected 4x4/30-30 etc. opens the exact studio used
+                // by Plan -> Planlegg ny økt. Do not create a parallel
+                // interval editor or accidentally stack two modal sheets.
+                if openEditorAfterLibrary {
+                    openEditorAfterLibrary = false
+                    showingDetailedWorkoutBuilder = true
+                }
+            }) {
                 NavigationStack {
                     RunningWorkoutLibraryView(
                         selectionTitle: "Choose Workout"
                     ) { workout in
                         advancedWorkout = nil
                         selectedWorkout = workout
+                        basicGoalSelected = false
+                        basicGhostSelected = false
+                        mode = .structured
+                        openEditorAfterLibrary = true
                         showingRunningLibrary = false
                     }
                 }
