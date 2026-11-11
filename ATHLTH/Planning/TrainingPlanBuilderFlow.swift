@@ -1050,7 +1050,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Prepare changes with ATHLTH Coach?",
-                norwegian: "Fylle ut tomme dager med ATHLTH Coach?"),
+                norwegian: "Lage endringsforslag med ATHLTH Coach?"),
             isPresented: $showingGuidedAIConsent,
             titleVisibility: .visible
         ) {
@@ -1197,7 +1197,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     ghostTargetDurationSeconds: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.ghostTargetDurationSeconds,
                     ghostUpdates: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.ghostUpdates
                 ),
-                draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
+                draftContext: "new-program-\(draftID?.uuidString ?? "legacy")-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
                 planCopyDays: planCopyDayOptions(
                     excluding: selection.id, sourceWeekIndex: selectedPlanWeekIndex
