@@ -1003,6 +1003,25 @@ final class MirroredWorkoutAudioCoach:
         synthesizer.stopSpeaking(at: .immediate)
         guidanceGate.reset()
 
+        // The finish recap must use the same selected speaker as the
+        // mirrored workout. Unlike routine cues, completion may speak
+        // after finished=true; Azure's async fallback is still allowed.
+        let routed = azureCoachSpeech.begin(
+            phrase,
+            voiceIdentifier: configuration.voiceIdentifier,
+            duckMusic: configuration.shouldDuckOtherAudio,
+            onFallback: { [weak self] in
+                self?.speakFinishedWorkoutRecapLocally(phrase)
+            },
+            onStarted: {},
+            onFinished: {}
+        )
+        if !routed {
+            speakFinishedWorkoutRecapLocally(phrase)
+        }
+    }
+
+    private func speakFinishedWorkoutRecapLocally(_ phrase: String) {
         let utterance = AVSpeechUtterance(string: phrase)
         utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
             selectedIdentifier: configuration.voiceIdentifier,
