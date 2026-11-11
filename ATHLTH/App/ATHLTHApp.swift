@@ -1350,7 +1350,8 @@ struct AppRootView: View {
                     signedIn: true,
                     accountID: appSession.profile.userID,
                     phone: phoneWorkout,
-                    strength: strengthWorkout
+                    strength: strengthWorkout,
+                    mirroredWatch: workoutMirroring
                 )
             } else {
                 crossDeviceWorkout.clearLocalState()
