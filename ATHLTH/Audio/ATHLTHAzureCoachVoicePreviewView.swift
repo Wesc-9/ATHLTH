@@ -153,6 +153,16 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
     @EnvironmentObject private var session: AppSessionStore
     @StateObject private var preview = ATHLTHAzureVoicePreviewPlayer()
 
+    // Individual workouts use their own selected voice, not global settings.
+    var workoutVoiceIdentifier: Binding<String?>? = nil
+    var workoutLanguage: Binding<WatchAudioCoachLanguage>? = nil
+    var workoutDuckOtherAudio: Bool? = nil
+
+    private var selectedVoiceIdentifier: String? {
+        if let workoutVoiceIdentifier { return workoutVoiceIdentifier.wrappedValue }
+        return settings.audioCoachVoiceIdentifier
+    }
+
     @AppStorage("settings.audioCoach.azureThirdPartyConsent")
     private var allowsAzureWorkoutText = false
     @State private var discoveredVoices: [Voice]?
@@ -213,9 +223,18 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
             pendingConsentVoice = voice
             return
         }
-        settings.audioCoachLanguage = .norwegian
-        settings.audioCoachVoiceIdentifier =
-            ATHLTHAzureCoachVoice.prefix + voice.id
+        if let workoutLanguage {
+            workoutLanguage.wrappedValue = .norwegian
+        } else {
+            settings.audioCoachLanguage = .norwegian
+        }
+        if let workoutVoiceIdentifier {
+            workoutVoiceIdentifier.wrappedValue =
+                ATHLTHAzureCoachVoice.prefix + voice.id
+        } else {
+            settings.audioCoachVoiceIdentifier =
+                ATHLTHAzureCoachVoice.prefix + voice.id
+        }
     }
 
     var body: some View {
@@ -237,7 +256,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName:
-                                settings.audioCoachVoiceIdentifier ==
+                                selectedVoiceIdentifier ==
                                 ATHLTHAzureCoachVoice.prefix + voice.id
                                     ? "checkmark.circle.fill" : "circle"
                             )
@@ -268,7 +287,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                     Button {
                         preview.preview(
                             voice.id,
-                            duckMusic: settings.audioCoachDuckOtherAudio
+                            duckMusic: workoutDuckOtherAudio ?? settings.audioCoachDuckOtherAudio
                         )
                     } label: {
                         if preview.loadingVoice == voice.id {
@@ -356,6 +375,12 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                     settings.audioCoachVoiceIdentifier
                 ) != nil {
                     settings.audioCoachVoiceIdentifier = nil
+                }
+                if let workoutVoiceIdentifier,
+                   ATHLTHAzureCoachVoice.key(
+                    workoutVoiceIdentifier.wrappedValue
+                   ) != nil {
+                    workoutVoiceIdentifier.wrappedValue = nil
                 }
             }
             Button(tr("Cancel", "Avbryt"), role: .cancel) {}
