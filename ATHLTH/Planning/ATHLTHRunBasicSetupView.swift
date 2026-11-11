@@ -84,11 +84,13 @@ struct ATHLTHRunBasicSetupView: View {
                 runTiles
             }
 
-            // Basic has one visible run choice, not a second generic
-            // Workout Details editor that duplicates the schedule screen.
-            ATHLTHRunEnvironmentDetailRow(environment: $environment)
-                .padding(12)
-                .athlthTrainPaper()
+            // Planned scratch work has its own editable details. In Quick
+            // Train the parent renders the identical Basic/Advanced card.
+            if scheduleEditable {
+                ATHLTHRunEnvironmentDetailRow(environment: $environment)
+                    .padding(12)
+                    .athlthTrainPaper()
+            }
 
             if let audioCoachEnabled {
                 DisclosureGroup(isExpanded: $showsBasicCoachSettings) {
