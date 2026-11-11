@@ -61,8 +61,9 @@ enum ATHLTHLiveRunningWarmupRecipe {
 struct ATHLTHLiveRunningWarmupSheet: View {
     @Environment(\.dismiss) private var dismiss
     let session: PlannedSession
-    let onChoose: (PlannedSession, Bool) -> Void
+    let onChoose: (PlannedSession, Bool) -> Bool
 
+    @State private var appendFailure = false
     @State private var minutes = 10
     @State private var hasPaceTarget = false
     @State private var paceSecondsPerKilometer = 360
@@ -81,6 +82,14 @@ struct ATHLTHLiveRunningWarmupSheet: View {
             inclinePercent: hasIncline ? inclinePercent : nil,
             skipWarmup: skipWarmup
         )
+    }
+
+    private func submit(skipWarmup: Bool, startNow: Bool) {
+        if onChoose(configuredSession(skipWarmup: skipWarmup), startNow) {
+            dismiss()
+        } else {
+            appendFailure = true
+        }
     }
 
     var body: some View {
@@ -162,7 +171,7 @@ struct ATHLTHLiveRunningWarmupSheet: View {
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 9) {
                     Button {
-                        onChoose(configuredSession(skipWarmup: false), true)
+                        submit(skipWarmup: false, startNow: true)
                     } label: {
                         Label(ATHLTHLocalization.choose(
                             english: "Start warm-up", norwegian: "Start oppvarming"
@@ -172,7 +181,7 @@ struct ATHLTHLiveRunningWarmupSheet: View {
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHTrainDesign.bronze)
                     Button {
-                        onChoose(configuredSession(skipWarmup: true), true)
+                        submit(skipWarmup: true, startNow: true)
                     } label: {
                         Text(ATHLTHLocalization.choose(
                             english: "Start intervals now", norwegian: "Start intervallene nå"
@@ -181,7 +190,7 @@ struct ATHLTHLiveRunningWarmupSheet: View {
                     }
                     .buttonStyle(.bordered)
                     Button {
-                        onChoose(configuredSession(skipWarmup: false), false)
+                        submit(skipWarmup: false, startNow: false)
                     } label: {
                         Text(ATHLTHLocalization.choose(
                             english: "Queue warm-up and intervals",
@@ -197,6 +206,19 @@ struct ATHLTHLiveRunningWarmupSheet: View {
                 .padding(.bottom, 8)
                 .background(.regularMaterial)
             }
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Intervals not added", norwegian: "Intervallene ble ikke lagt til"
+            ),
+            isPresented: $appendFailure
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "You cannot replace a timed interval already in progress. Queue the next program or finish the current interval first.",
+                norwegian: "Du kan ikke avbryte et tidsstyrt drag som allerede pågår. Legg neste program i kø, eller fullfør draget først."
+            ))
         }
     }
 }
