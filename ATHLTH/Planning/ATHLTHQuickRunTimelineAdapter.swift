@@ -13,35 +13,46 @@ enum ATHLTHBasicRunGoalRecipe {
         timeMinutes: Int,
         paceSecondsPerKilometer: Int,
         heartRateZone: Int,
-        environment: RunEnvironment
+        environment: RunEnvironment,
+        selectedGoals: Set<ATHLTHBasicRunGoalKind>? = nil
     ) -> PlannedSession {
+        // Preserve the original single-goal API used by saved workouts.
+        // Multiple simultaneous goals use the same one-step recording engine.
+        let goals = selectedGoals?.isEmpty == false ? selectedGoals! : Set([kind])
         var step = WorkoutTemplateBlock(
             sequence: 1, kind: .run,
             title: ATHLTHLocalization.choose(
                 english: "Goal-based run", norwegian: "Målstyrt løping"
             ),
             exerciseSlug: nil,
-            distanceMeters: kind == .distance
+            distanceMeters: goals.contains(.distance)
                 ? Double(max(1, distanceKilometers) * 1_000) : nil,
             repetitions: nil,
-            durationSeconds: kind == .time
+            durationSeconds: goals.contains(.time)
                 ? TimeInterval(max(1, timeMinutes) * 60) : nil,
             targetWeightKilograms: nil, loadNote: nil, notes: nil,
             phase: .main
         )
         step.cardioActivity = .running
-        if kind == .pace {
+        if goals.contains(.distance) && goals.contains(.time) {
+            step.notes = ATHLTHLocalization.format(
+                english: "Target time: %d minutes. Distance ends this phase.",
+                norwegian: "Tidsmål: %d minutter. Distanse avslutter denne delen.",
+                max(1, timeMinutes)
+            )
+        }
+        if goals.contains(.pace) {
             step.targetPaceSecondsPerKilometer =
                 Double(min(max(180, paceSecondsPerKilometer), 900))
         }
-        if kind == .heartRateZone {
+        if goals.contains(.heartRateZone) {
             step.targetHeartRateZone = min(max(heartRateZone, 1), 5)
         }
         var result = PlannedSession(
             id: id, title: title.isEmpty ? step.title : title,
             kind: .running, scheduledStart: nil,
-            durationMinutes: kind == .time ? max(1, timeMinutes) : nil,
-            targetDistanceKilometers: kind == .distance
+            durationMinutes: goals.contains(.time) ? max(1, timeMinutes) : nil,
+            targetDistanceKilometers: goals.contains(.distance)
                 ? Double(max(1, distanceKilometers)) : nil,
             targetPaceSecondsPerKilometer: step.targetPaceSecondsPerKilometer,
             routeID: nil, exercises: [], notes: nil
