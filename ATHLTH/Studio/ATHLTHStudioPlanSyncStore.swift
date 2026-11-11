@@ -217,12 +217,10 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                         // must not imply newer local edits were uploaded too.
                         acknowledge(planID, revision: revision,
                                     fingerprint: localFingerprint ?? "", owner: userID)
-                        if let current = session.accountPlanDocument(withID: planID) {
-                            let currentFingerprint = try fingerprint(for: current)
-                            if currentFingerprint != localFingerprint {
-                                hasNewLocalEdits = true
-                            }
-                        } else {
+                        if try Self.needsResyncAfterUpload(
+                            uploadedFingerprint: localFingerprint ?? "",
+                            currentPlan: session.accountPlanDocument(withID: planID)
+                        ) {
                             hasNewLocalEdits = true
                         }
                     } catch {
@@ -557,6 +555,16 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                           userInfo: [NSLocalizedDescriptionKey: "Remote plan owner/identity mismatch."])
         }
         return plan
+    }
+
+    /// A server success applies to the snapshot sent, not later local edits.
+    /// A missing local plan also needs another pass to reconcile deletion.
+    static func needsResyncAfterUpload(
+        uploadedFingerprint: String,
+        currentPlan: TrainingPlan?
+    ) throws -> Bool {
+        guard let currentPlan else { return true }
+        return try accountFingerprint(for: currentPlan) != uploadedFingerprint
     }
 
     private func fingerprint(for plan: TrainingPlan) throws -> String {
