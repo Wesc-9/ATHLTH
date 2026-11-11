@@ -74,7 +74,7 @@ struct ATHLTHRunBasicSetupView: View {
             }
 
             sectionHeading(ATHLTHLocalization.choose(
-                english: "Other ways to run", norwegian: "Andre måter å løpe på"
+                english: "Choose running mode", norwegian: "Velg løpemodus"
             ))
             LazyVGrid(
                 columns: [GridItem(.flexible(), spacing: 10),
@@ -252,7 +252,7 @@ struct ATHLTHRunBasicSetupView: View {
                     english: "Goal-based", norwegian: "Målstyrt"
                 ),
                 subtitle: ATHLTHLocalization.choose(
-                    english: "Time, pace or pulse", norwegian: "Tid, tempo eller puls"
+                    english: "Combine distance, time, pace and pulse", norwegian: "Kombiner distanse, tid, tempo og puls"
                 ),
                 symbol: "target", selected: isGoalSelected,
                 action: onChooseGoal
@@ -332,12 +332,12 @@ struct ATHLTHBasicActivityHero: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: symbol)
-                        .font(.system(size: 25, weight: .medium))
+                        .font(.system(size: 22, weight: .medium))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .frame(width: 52, height: 52)
+                        .frame(width: 43, height: 43)
                         .background(.white.opacity(0.85),
                                     in: RoundedRectangle(cornerRadius: 15))
                     Spacer(minLength: 0)
@@ -348,7 +348,7 @@ struct ATHLTHBasicActivityHero: View {
                 }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.system(size: 23, weight: .semibold, design: .rounded))
+                        .font(.system(size: 21, weight: .semibold, design: .rounded))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle)
@@ -377,10 +377,10 @@ struct ATHLTHBasicActivityHero: View {
                     )
                 }
             }
-            .padding(18)
+            .padding(15)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                ATHLTHTrainDesign.paleGold.opacity(isSelected ? 0.55 : 0.27),
+                ATHLTHTrainDesign.paleGold.opacity(isSelected ? 0.38 : 0.12),
                 in: RoundedRectangle(cornerRadius: 23, style: .continuous)
             )
             .overlay {
@@ -416,12 +416,12 @@ struct ATHLTHBasicActivityModeTile: View {
     }
 
     private var tileContent: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
                 Image(systemName: symbol)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 36, height: 36)
                     .background(
                         ATHLTHTrainDesign.paleGold.opacity(0.55),
                         in: RoundedRectangle(cornerRadius: 13)
@@ -446,8 +446,8 @@ struct ATHLTHBasicActivityModeTile: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(15)
-        .frame(maxWidth: .infinity, minHeight: 140, alignment: .topLeading)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading)
         .background(
             selected ? ATHLTHTrainDesign.paleGold.opacity(0.48) : .white,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
