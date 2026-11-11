@@ -18,6 +18,48 @@ enum HomeCalendarRecommendationDisplayPolicy {
 }
 
 
+/// Ranks existing library workouts using the current plan, recorded
+/// workouts and optional *today-only* Apple Health readiness. Never creates
+/// workout records, changes the plan or claims to predict future readiness.
+enum HomeCoachWorkoutSelection {
+    static func ordered(
+        _ candidates: [PlannedSession],
+        planned: [PlannedSession],
+        recentKinds: [WorkoutKind],
+        readiness: HomeDailyRecommendationPolicy.Readiness,
+        isToday: Bool,
+        limit: Int = 4
+    ) -> [PlannedSession] {
+        let isRecoveryDay = isToday &&
+            (readiness == .recover || readiness == .takeItEasy)
+        // Under recovery warnings, avoid suggesting hard workouts. Existing
+        // scheduled sessions are still accessible unchanged in the calendar.
+        let eligible = candidates.enumerated().filter { _, workout in
+            !workout.isExplicitRestDay &&
+            (!isRecoveryDay || workout.kind == .walking)
+        }
+        let plannedKinds = Set(planned.filter { !$0.isExplicitRestDay }.map(\.kind))
+        let latestKind = recentKinds.first
+        return eligible.sorted { lhs, rhs in
+            func score(_ workout: PlannedSession) -> Int {
+                var value = 0
+                if plannedKinds.contains(workout.kind) { value += 12 }
+                // Another demanding session on a scheduled day should not
+                // automatically jump ahead of low-impact alternatives.
+                if !plannedKinds.isEmpty && workout.kind == .walking { value += 8 }
+                if workout.kind == latestKind { value -= 9 }
+                if workout.kind == .walking && isRecoveryDay { value += 50 }
+                if workout.durationMinutes.map({ $0 <= 45 }) == true { value += 2 }
+                return value
+            }
+            let l = score(lhs.element), r = score(rhs.element)
+            return l == r ? lhs.offset < rhs.offset : l > r
+        }
+        .prefix(limit)
+        .map(\.element)
+    }
+}
+
 /// Training suggestions grounded in recorded activity and available Health signals.
 /// Readiness is not proof of fitness. No plan changes or inferred medical status.
 enum HomeDailyRecommendationPolicy {
