@@ -43,6 +43,7 @@ struct AIProgramBuilderSeed: Hashable {
     var builderProfile: TrainingPlanBuilderProfile? = nil
     var planVisibility: ProfileVisibility? = nil
     var planSummary: String? = nil
+    var saveToLibrary: Bool = true
 
     func applyWizardMetadata(to plan: inout TrainingPlan) {
         guard let builderProfile else { return }
@@ -97,6 +98,7 @@ struct AIProgramBuilderView: View {
         onProgramCreated: (() -> Void)? = nil,
         onProgramCreatedPlanID: ((UUID) -> Void)? = nil
     ) {
+        self._saveToLibrary = State(initialValue: seed?.saveToLibrary ?? true)
         self.mode = mode
         self.seed = seed
         self.saveAsTemplateOnly = saveAsTemplateOnly
@@ -104,6 +106,7 @@ struct AIProgramBuilderView: View {
         self.onProgramCreatedPlanID = onProgramCreatedPlanID
     }
 
+    @State private var saveToLibrary = true
     @State private var selectedGoalIDs: Set<UUID> = []
     @State private var timelineMode: AIProgramTimelineMode = .weeks
     @State private var startDate = Calendar.current.startOfDay(for: Date())
@@ -401,6 +404,9 @@ struct AIProgramBuilderView: View {
                         applyPreview(preview)
                     }
                 )
+                .safeAreaInset(edge: .top) {
+                    librarySaveChoice.padding(.horizontal, 20).padding(.vertical, 8)
+                }
             } else {
                 coachPlanIntake
             }
@@ -2166,8 +2172,23 @@ struct AIProgramBuilderView: View {
     }
 
     @ViewBuilder
+    private var librarySaveChoice: some View {
+        if mode == .generate && !saveAsTemplateOnly {
+            Toggle(isOn: $saveToLibrary) {
+                Label(ATHLTHLocalization.choose(
+                    english: "Save to My plans",
+                    norwegian: "Lagre i Mine planer"
+                ), systemImage: "bookmark")
+                .font(.subheadline.weight(.semibold))
+            }
+            .tint(ATHLTHTheme.accentDeep)
+        }
+    }
+
+    @ViewBuilder
     private func previewSection(_ draft: AIProgramDraft) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            librarySaveChoice
             coachSectionHeading(
                 eyebrow: ATHLTHLocalization.choose(english: "YOUR PLAN", norwegian: "DIN PLAN"),
                 title: ATHLTHLocalization.choose(english: "Coach draft", norwegian: "Forslag fra coach")
@@ -2595,7 +2616,7 @@ struct AIProgramBuilderView: View {
                 dismiss()
                 return
             }
-            guard session.addTrainingPlan(generated) else {
+            guard session.addTrainingPlan(generated, saveToLibrary: saveToLibrary) else {
                 if let endDate = session.trainingPlanEndDate(generated),
                    let conflict = session.trainingPlanConflict(
                        startDate: startDate,

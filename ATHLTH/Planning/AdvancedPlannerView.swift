@@ -564,14 +564,17 @@ struct AdvancedPlannerView: View {
                 }
 
                 if hasStandaloneDraft {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Saved draft · Tap + to continue",
-                            norwegian: "Utkast lagret · Trykk + for å fortsette"
-                        ),
-                        systemImage: "clock.arrow.circlepath"
-                    )
-                    .font(.caption.weight(.semibold))
+                    Button {
+                        showingStandaloneSessionEditor = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Continue workout draft",
+                            norwegian: "Fortsett på øktutkast"
+                        ), systemImage: "clock.arrow.circlepath")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
 

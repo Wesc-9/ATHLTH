@@ -2942,6 +2942,15 @@ enum ATHLTHHomePlannedDayReconciliation {
 }
 
 private struct HomeWeeklyProgressDaySheet: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var suspendedEditor = false
+    @State private var suspendedAt: Date?
+
+    private var hasWorkoutDraft: Bool {
+        let key = "athlth.sessionEditor.draft.v1.\(session.profile.userID.uuidString).standalone"
+        return UserDefaults.standard.data(forKey: key) != nil
+    }
+
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -3217,6 +3226,21 @@ private struct HomeWeeklyProgressDaySheet: View {
                     norwegian: "Planen er endret, eller økten er allerede fullført. Åpne kalenderen på nytt."
                 ))
             }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active {
+                    if suspendedAt == nil {
+                        suspendedAt = Date()
+                        suspendedEditor = showingStandaloneSessionEditor
+                    }
+                } else {
+                    if suspendedAt.map({ Date().timeIntervalSince($0) < 300 }) == true,
+                       suspendedEditor {
+                        showingStandaloneSessionEditor = true
+                    }
+                    suspendedAt = nil
+                    suspendedEditor = false
+                }
+            }
             .sheet(isPresented: $showingStandaloneSessionEditor) {
                 SessionEditorView(standaloneDate: selection.date)
                     .presentationDetents([.large])
@@ -3339,10 +3363,10 @@ private struct HomeWeeklyProgressDaySheet: View {
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "Plan new",
-                            norwegian: "Planlegg ny"
+                            english: hasWorkoutDraft ? "Continue draft" : "Plan new",
+                            norwegian: hasWorkoutDraft ? "Fortsett utkast" : "Planlegg ny"
                         ),
-                        systemImage: "plus"
+                        systemImage: hasWorkoutDraft ? "clock.arrow.circlepath" : "plus"
                     )
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)

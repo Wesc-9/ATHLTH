@@ -8606,7 +8606,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }) : [:],
             builderProfile: currentPlanBuilderProfile,
             planVisibility: visibility,
-            planSummary: planSummary
+            planSummary: planSummary,
+            saveToLibrary: saveToLibrary
         )
     }
 
