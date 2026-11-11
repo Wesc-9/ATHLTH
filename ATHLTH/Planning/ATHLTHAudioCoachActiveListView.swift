@@ -405,7 +405,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     if draft.distanceTriggerEnabled {
                         announcementGroupRow(
                             title: tr("Every distance", "Etter distanse"),
-                            detail: "\(draft.distanceIntervalMeters) m · " +
+                            detail: "\(Int((draft.distanceIntervalKilometers * 1_000).rounded())) m · " +
                                 standardAnnouncementMetrics.joined(separator: ", ")
                         ) { editingOption = .distanceUpdates }
                         Divider().overlay(ATHLTHPlanDesign.warmDivider)
