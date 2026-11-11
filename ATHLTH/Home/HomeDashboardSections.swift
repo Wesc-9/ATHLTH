@@ -2940,6 +2940,8 @@ enum ATHLTHHomePlannedDayReconciliation {
 }
 
 private struct HomeWeeklyProgressDaySheet: View {
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var suspendedEditor = false
     @State private var suspendedAt: Date?
@@ -3055,7 +3057,82 @@ private struct HomeWeeklyProgressDaySheet: View {
                 if distinct.count == 4 { break }
             }
         }
-        return distinct
+        return HomeCoachWorkoutSelection.ordered(
+            distinct,
+            planned: coachRelevantPlanned,
+            recentKinds: recentActivityHints.sorted {
+                $0.startedAt > $1.startedAt
+            }.map(\.kind),
+            readiness: coachReadiness,
+            isToday: Calendar.current.isDateInToday(selection.date)
+        )
+    }
+
+    private var coachReadiness: HomeDailyRecommendationPolicy.Readiness {
+        guard Calendar.current.isDateInToday(selection.date),
+              health.recovery.score != nil else { return .unavailable }
+        switch health.recovery.state {
+        case .ready: return .ready
+        case .balanced: return .balanced
+        case .takeItEasy: return .takeItEasy
+        case .recover: return .recover
+        case .buildingBaseline: return .unavailable
+        }
+    }
+
+    private var coachRelevantPlanned: [PlannedSession] {
+        if !currentPlanned.isEmpty { return currentPlanned }
+        // The next planned training sessions inform the suggestion if the
+        // selected date is empty; a historical date gets no future prediction.
+        let firstDay = Calendar.current.startOfDay(for: selection.date)
+        return (plan.flatMap { session.trainingPlan(withID: $0.id) } ?? plan)?
+            .weeks.flatMap(\.days).flatMap(\.sessions)
+            .filter { workout in
+                guard let start = workout.scheduledStart else { return false }
+                return start >= firstDay && !workout.isExplicitRestDay
+            }
+            .sorted { ($0.scheduledStart ?? .distantFuture) <
+                      ($1.scheduledStart ?? .distantFuture) }
+            .prefix(3)
+            .map { $0 } ?? []
+    }
+
+    private var coachExplanation: String {
+        let today = Calendar.current.isDateInToday(selection.date)
+        if today && (coachReadiness == .recover || coachReadiness == .takeItEasy) {
+            return ATHLTHLocalization.choose(
+                english: "Apple Health suggests a lighter day. Only gentle sessions are proposed; your plan stays unchanged.",
+                norwegian: "Apple Health tilsier en roligere dag. Bare lette økter foreslås. Treningsplanen endres ikke."
+            )
+        }
+        if !coachRelevantPlanned.isEmpty {
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH Coach considers your training plan and recorded workouts" +
+                    (today && coachReadiness != .unavailable ? " together with today's Apple Health recovery." : "."),
+                norwegian: "ATHLTH Coach vurderer treningsplanen og registrerte økter" +
+                    (today && coachReadiness != .unavailable ? " sammen med dagens form fra Apple Health." : ".")
+            )
+        }
+        return ATHLTHLocalization.choose(
+            english: "Suggested from your recorded workouts. With limited data, suggestions remain general.",
+            norwegian: "Forslag basert på registrerte økter. Ved lite data er forslagene generelle."
+        )
+    }
+
+    private var favoriteWorkouts: [PlannedSession] {
+        let ids = Set(favorites.favorites
+            .filter { $0.itemType == .workout }
+            .map { $0.itemID.lowercased() })
+        guard !ids.isEmpty else { return [] }
+        let available = session.savedWorkoutTemplates +
+            suggestionCatalogEntries.map { $0.plannedSession() } +
+            runningLibrary.allTemplates.map { $0.plannedSession() }
+        var seen = Set<String>()
+        return available.filter { workout in
+            guard let id = workout.workoutTemplateID?.uuidString.lowercased(),
+                  ids.contains(id), seen.insert(id).inserted else { return false }
+            return true
+        }.prefix(5).map { $0 }
     }
 
     /// Training history is optional; an empty history yields a transparent,
@@ -3121,6 +3198,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     // The day schedule itself never waits for library or chat.
                     if suggestionsReady {
                         workoutSuggestionSection
+                        favoriteWorkoutSection
                     }
                 }
                 .padding(.horizontal, 16)
@@ -3339,6 +3417,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                 guard !Task.isCancelled else { return }
                 suggestionCatalogEntries = catalog.entries
                 suggestionsReady = true
+                await favorites.refresh()
 
                 // Refresh supplemental recommendations and shared messages
                 // after first paint; never gate the day's initial UI on I/O.
