@@ -30,6 +30,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onOpenPlan: () -> Void
     let onCreatePlan: () -> Void
     let onOpenLibrary: () -> Void
+    let onOpenWorkouts: () -> Void
     let onStartWorkout: (PlannedSession, Bool) -> Void
     let onWorkoutDetails: (PlannedSession, Bool) -> Void
     /// Long-press actions are handled by the owning validated launch flow.
@@ -1649,7 +1650,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .foregroundStyle(ink)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 3)
-                Button(action: onOpenLibrary) {
+                Button(action: onOpenWorkouts) {
                     HStack(spacing: 5) {
                         Text(tr("See all workouts", "Se alle økter"))
                         Image(systemName: "arrow.right")
