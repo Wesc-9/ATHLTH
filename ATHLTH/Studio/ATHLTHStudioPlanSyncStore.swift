@@ -223,7 +223,9 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     // Never replace a plan edited while the network call was pending.
                     guard session.accountPlanDocument(withID: planID) == local,
                           session.importAccountPlanDocument(
-                              Self.restoringDeviceOnlyFields(from: local, into: remotePlan)
+                              Self.restoringDeviceOnlyFields(
+                                  from: local, into: Self.accountCopy(of: remotePlan)
+                              )
                           ) else {
                         unresolved.append(Conflict(id: planID, title: remotePlan.title))
                         continue
@@ -266,7 +268,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     ) async {
         guard enabled, !isBusy,
               let userID = accountID,
-              userID == session.profile.userID, session.signedIn
+              userID == session.profile.userID, session.signedIn,
+              client.auth.currentUser?.id == userID
         else { return }
         // A historic opt-out also blocks conflict resolution.
         guard enabled,
@@ -299,7 +302,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                           session.importAccountPlanDocument(
                               Self.restoringDeviceOnlyFields(
                                   from: session.accountPlanDocument(withID: planID),
-                                  into: decoded
+                                  into: Self.accountCopy(of: decoded)
                               )
                           ) else {
                         status = ATHLTHLocalization.choose(
