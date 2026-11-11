@@ -1365,10 +1365,28 @@ struct HomePersonalRecentActivitySection:
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
-                    Text(workout.summaryText)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineLimit(2)
+                    if workout.activity == .running {
+                        HStack(spacing: 9) {
+                            Label(HomeRecentCardFormat.distance(workout.distanceMeters),
+                                  systemImage: "figure.run")
+                            Label(HomeRecentCardFormat.duration(workout.duration),
+                                  systemImage: "clock")
+                        }
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    } else if workout.activity == .strength {
+                        Text(workout.summaryText)
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(2)
+                    } else {
+                        Text(workout.summaryText)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(2)
+                    }
 
                     Text(HomeRecentCardFormat.date(workout.endDate))
                         .font(.system(size: 10))
@@ -1414,10 +1432,25 @@ struct HomePersonalRecentActivitySection:
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
-                    Text(feedItem.activity.title)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineLimit(2)
+                    if HomeFollowingWorkoutPresentation.activity(for: feedItem) == .running {
+                        HStack(spacing: 9) {
+                            Label(HomeRecentCardFormat.distance(
+                                HomeRecentCardFormat.number(feedItem, key: "distance_meters")
+                            ), systemImage: "figure.run")
+                            Label(HomeRecentCardFormat.duration(
+                                HomeRecentCardFormat.number(feedItem, key: "duration_seconds")
+                            ), systemImage: "clock")
+                        }
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    } else {
+                        Text(feedItem.activity.title)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(2)
+                    }
 
                     Text(HomeRecentCardFormat.date(feedItem.activity.createdAt))
                         .font(.system(size: 10))
@@ -5824,7 +5857,7 @@ private struct HomePersonalWorkoutVisual:
         case .running,
              .walking,
              .hiking:
-            return ATHLTHTheme.vitality
+            return ATHLTHTheme.premiumGold
         case .strength:
             return ATHLTHTheme.premiumGold
         default:
