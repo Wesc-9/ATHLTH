@@ -3387,10 +3387,10 @@ final class
             )
 
         guard !sampled.isEmpty else {
-            return "activity-v3-empty"
+            return "activity-v4-gold-empty"
         }
 
-        return "activity-v3|" +
+        return "activity-v4-gold|" +
             sampled.map {
                 String(
                     format: "%.4f,%.4f",
@@ -3674,10 +3674,12 @@ final class
         path.lineWidth = 7
         path.stroke()
 
+        // Warm, restrained metallic-gold route is an appearance-only change.
+        // Coordinates, path geometry and user activity data are untouched.
         UIColor(
-            red: 0.10,
-            green: 0.61,
-            blue: 0.45,
+            red: 0.69,
+            green: 0.48,
+            blue: 0.20,
             alpha: 1
         )
         .setStroke()
@@ -3716,9 +3718,9 @@ final class
         .fill()
 
         UIColor(
-            red: 0.02,
-            green: 0.64,
-            blue: 0.53,
+            red: 0.73,
+            green: 0.52,
+            blue: 0.25,
             alpha: 1
         )
         .setFill()
@@ -3799,9 +3801,9 @@ final class
         inner.close()
 
         UIColor(
-            red: 0.08,
-            green: 0.23,
-            blue: 0.18,
+            red: 0.34,
+            green: 0.25,
+            blue: 0.17,
             alpha: 1
         )
         .setFill()
