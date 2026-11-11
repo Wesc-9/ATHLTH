@@ -276,7 +276,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(
-                        settings.audioCoachVoiceIdentifier ==
+                        selectedVoiceIdentifier ==
                         ATHLTHAzureCoachVoice.prefix + voice.id
                             ? .isSelected : []
                     )
