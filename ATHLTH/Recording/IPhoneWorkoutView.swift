@@ -245,7 +245,8 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                 walkingMetricsPanel(
                     distance: distance,
                     elapsed: elapsed,
-                    averagePace: measuredAveragePace
+                    averagePace: measuredAveragePace,
+                    at: context.date
                 )
             } else {
             VStack(spacing: 0) {
@@ -349,6 +350,8 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                     .padding(.horizontal, 18)
                     .padding(.vertical, 12)
                 }
+
+                stepFooter(at: context.date)
             }
             .background(
                 Color.white.opacity(0.97),
@@ -384,7 +387,8 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
     private func walkingMetricsPanel(
         distance: Double,
         elapsed: TimeInterval,
-        averagePace: Double?
+        averagePace: Double?,
+        at date: Date
     ) -> some View {
         VStack(alignment: .leading, spacing: 17) {
             HStack {
@@ -448,12 +452,110 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                     .monospacedDigit()
             }
             .font(.subheadline)
+
+            stepFooter(at: date)
         }
         .foregroundStyle(ATHLTHTheme.primaryText)
         .padding(19)
         .frame(maxWidth: .infinity, alignment: .leading)
         .athlthPlanCard(radius: 23)
         .transaction { $0.animation = nil }
+    }
+
+    /// One compact, stable footer inside the main metric card; never show
+    /// the previous 242-point circular step card above workout metrics.
+    @ViewBuilder
+    private func stepFooter(at date: Date) -> some View {
+        if let plan = workout.structuredRunningWorkout,
+           let index = workout.structuredStepIndex,
+           plan.steps.indices.contains(index),
+           workout.structuredWorkoutComplete != true {
+            let step = plan.steps[index]
+            let interval = ATHLTHRunningIntervalPosition.resolve(
+                steps: plan.steps, currentIndex: index
+            )
+            let remainingTime = step.durationSeconds.map { target in
+                max(0, target - max(0,
+                    workout.elapsed(at: date) -
+                        (workout.structuredStepStartElapsedTime ?? 0)
+                ))
+            }
+            let elapsed = max(0, workout.elapsed(at: date) -
+                (workout.structuredStepStartElapsedTime ?? 0))
+            let remainingMeters = step.distanceMeters.map { target in
+                max(0, target - max(0,
+                    workout.distanceMeters -
+                        (workout.structuredStepStartDistanceMeters ?? 0)
+                ))
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Divider().opacity(0.45)
+                HStack(alignment: .center, spacing: 13) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(step.phase == "free"
+                            ? ATHLTHLocalization.choose(
+                                english: "Free running", norwegian: "Fri løping")
+                            : (interval?.isRecovery == true
+                                ? ATHLTHLocalization.choose(
+                                    english: "Recovery", norwegian: "Pause")
+                                : step.title))
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                        if let interval {
+                            Text(interval.isRecovery
+                                ? ATHLTHLocalization.choose(
+                                    english: "Next", norwegian: "Neste") +
+                                    " \(interval.nextOrdinal) / \(interval.total)"
+                                : "\(interval.ordinal) / \(interval.total)")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        } else if let next = plan.steps.dropFirst(index + 1).first {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Next", norwegian: "Neste"
+                            ) + ": " + next.title)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            .lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 5)
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(step.measure == .open
+                             ? ATHLTHLocalization.choose(
+                                english: "ELAPSED", norwegian: "MEDGÅTT")
+                             : ATHLTHLocalization.choose(
+                                english: "REMAINING", norwegian: "GJENSTÅR"))
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.8)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        if let remainingTime, step.measure == .time {
+                            Text(ATHLTHRunStepCountdown.display(remainingTime))
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                        } else if let remainingMeters, step.measure == .distance {
+                            Text(String(format: "%.0f m", remainingMeters))
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                        } else {
+                            Text(ATHLTHRunStepCountdown.display(elapsed))
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                        }
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.73)
+                }
+                .padding(.horizontal, 15)
+                .padding(.vertical, 11)
+                .background(
+                    ATHLTHTrainDesign.paleGold.opacity(0.32),
+                    in: RoundedRectangle(cornerRadius: 16)
+                )
+                .padding(.horizontal, workout.walking ? 0 : 15)
+                .padding(.bottom, workout.walking ? 0 : 14)
+            }
+        }
     }
 
     private func heroMetric(
@@ -1388,14 +1490,6 @@ struct IPhoneWorkoutView: View {
                         spacing: 13
                     ) {
                         premiumWorkoutHeader(workout)
-
-                        if let step = recorder.currentStructuredStep {
-                            IPhoneStructuredStepCard(workout: workout, step: step)
-                                // Timeline values must never implicitly animate the card's geometry.
-                                .transaction { transaction in
-                                    transaction.animation = nil
-                                }
-                        }
 
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
