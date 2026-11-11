@@ -86,7 +86,12 @@ struct ATHLTHTrainTodayPremiumView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let plan {
-                activePlanSection(plan)
+                VStack(spacing: 9) {
+                    activePlanSection(plan)
+                    activeGoalSection
+                }
+            } else {
+                activeGoalSection
             }
 
             // The live recording replaces the planned hero, never creates
@@ -122,7 +127,8 @@ struct ATHLTHTrainTodayPremiumView: View {
             ghostRaceSection
                 .frame(maxWidth: .infinity)
 
-            todayGoalAndFocus
+            // The compact active-goal row now lives directly under Active Plan.
+            // Daily Focus was removed: it repeated workout/context information.
 
             // Hide an empty disclosure when no additional workout is available.
             if primaryWorkout != nil {
@@ -210,33 +216,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "Only this unfinished workout changes. The original stays available to restore.",
                 "Kun denne ufullførte økten endres. Du kan når som helst gjenopprette den opprinnelige økten."
             ))
-        }
-    }
-
-    /// At ordinary text sizes the goal and daily coaching note share a
-    /// pair of quiet tiles, like the Today reference. At accessibility
-    /// sizes they stack instead of clipping text or reducing tap targets.
-    private var todayGoalAndFocus: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: 10) {
-                    activeGoalSection
-                    dailyFocusSection
-                }
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 10) {
-                        activeGoalSection.frame(maxWidth: .infinity, alignment: .topLeading)
-                        dailyFocusSection.frame(maxWidth: .infinity, alignment: .topLeading)
-                    }
-                    .frame(minWidth: 335)
-
-                    VStack(spacing: 10) {
-                        activeGoalSection
-                        dailyFocusSection
-                    }
-                }
-            }
         }
     }
 
@@ -520,14 +499,14 @@ struct ATHLTHTrainTodayPremiumView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         workoutPortrait(workout)
-                            .frame(width: 110, height: 188)
+                            .frame(width: 100, height: 148)
                     }
                     .frame(minWidth: 313)
 
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
                         workoutPortrait(workout)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 158)
+                            .frame(height: 124)
                         workoutTextAndStart(
                             workout, finished: finished,
                             exerciseCount: exerciseCount, pauseCount: pauseCount
@@ -571,7 +550,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .accessibilityLabel(tr("Workout options", "Flere valg for økten"))
                 }
             }
-            .padding(15)
+            .padding(13)
             .background(
                 Color.white.opacity(0.96),
                 in: RoundedRectangle(cornerRadius: 23, style: .continuous)
@@ -708,7 +687,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 }
             }
         }
-        .frame(minHeight: 188, alignment: .topLeading)
+        .frame(minHeight: 148, alignment: .topLeading)
     }
 
     /// Keep every scheduled session reachable even while the recorder owns
@@ -1269,7 +1248,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             case .strength: return "dumbbell.fill"
             case .cycling: return "bicycle"
             case .yoga: return "figure.yoga"
-            case .custom: return "slider.horizontal.3"
+            case .custom: return "figure.mixed.cardio"
             }
         }
 
