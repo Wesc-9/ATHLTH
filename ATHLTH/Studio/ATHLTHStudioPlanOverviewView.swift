@@ -12,6 +12,7 @@ struct ATHLTHStudioPlanOverviewView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var goalStore: GoalStore
 
     let plan: TrainingPlan
     let display: Display
@@ -64,6 +65,7 @@ struct ATHLTHStudioPlanOverviewView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     summaryHeader
+                    linkedGoalSummary
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 13) {
                         ForEach(weeks) { week in
                             weekCard(week)
@@ -154,6 +156,108 @@ struct ATHLTHStudioPlanOverviewView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 18)
                 .stroke(ATHLTHStudioStyle.outline.opacity(0.5))
+        }
+    }
+
+    // Same persisted plan mode and goal records on iPhone and iPad.
+    // Keep Basic lightweight; show verified measurements only in Advanced.
+    @ViewBuilder
+    private var linkedGoalSummary: some View {
+        let goals = goalStore.goals
+            .filter { $0.linkedTrainingPlanID == plan.id && $0.status == .active }
+            .sorted {
+                if $0.isPrimary != $1.isPrimary { return $0.isPrimary }
+                return $0.createdAt < $1.createdAt
+            }
+        if !goals.isEmpty {
+            let basic = plan.builderProfile?.mode == .basic
+            let completedIDs = Set(
+                plan.weeks.flatMap(\\.days).flatMap(\\.sessions).compactMap { workout -> UUID? in
+                    session.isPlanSessionCompleted(
+                        planID: plan.id, sessionID: workout.id,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strength.workoutHistory
+                    ) ? workout.id : nil
+                }
+            )
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "My training goals", norwegian: "Mine treningsmål"
+                    ),
+                    systemImage: "target"
+                )
+                .font(.headline)
+                .foregroundStyle(ATHLTHStudioStyle.ink)
+
+                ForEach(Array(goals.enumerated()), id: \\.element.id) { index, goal in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(goal.title)
+                                .font(.subheadline.weight(.semibold))
+                            Spacer(minLength: 8)
+                            Text(index == 0
+                                ? ATHLTHLocalization.choose(english: "Main", norwegian: "Hovedmål")
+                                : ATHLTHLocalization.choose(english: "Secondary", norwegian: "Delmål"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        if basic {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Follow your planned sessions. ATHLTH will track recorded results.",
+                                norwegian: "Følg øktene i planen. ATHLTH følger med på registrerte resultater."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        } else {
+                            let evidence = ATHLTHTrainGoalEvidence.evaluate(
+                                goal: goal, plan: plan,
+                                strengthHistory: strength.workoutHistory,
+                                completedSessionIDs: completedIDs
+                            )
+                            if let target = goal.target {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Target: ", norwegian: "Målverdi: "
+                                ) + target.targetValue.formatted() + " " + target.unit)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let fraction = evidence.completionFraction {
+                                ProgressView(value: fraction)
+                                    .tint(ATHLTHStudioStyle.gold)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Verified plan-specific progress",
+                                    norwegian: "Dokumentert fremgang i denne planen"
+                                ))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            } else {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Awaiting comparable recorded results",
+                                    norwegian: "Venter på sammenlignbare registrerte resultater"
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                            if let deadline = goal.deadline {
+                                Label(deadline.formatted(date: .abbreviated, time: .omitted),
+                                      systemImage: "calendar")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                    if index < goals.count - 1 { Divider() }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(ATHLTHStudioStyle.outline.opacity(0.5))
+            }
         }
     }
 
