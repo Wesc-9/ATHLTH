@@ -1714,6 +1714,10 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepTitle: String? = nil
     var runningStepIndex: Int? = nil
     var runningStepCount: Int? = nil
+    /// Efforts only (not warm-up/recovery). Optional for older snapshots.
+    var runningIntervalOrdinal: Int? = nil
+    var runningIntervalTotal: Int? = nil
+    var runningInRecovery: Bool? = nil
     var runningStepProgress: Double? = nil
     var runningOverallProgress: Double? = nil
     var runningStepTargetTreadmillInclinePercent: Double? = nil
