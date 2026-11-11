@@ -5,7 +5,7 @@ import Supabase
 
 /// Account-scoped synchronization of planned programs and reusable templates.
 /// This never uploads HealthKit samples, completed workout data or GPS traces.
-/// Enabled by default; an explicit account opt-out is retained across devices.
+/// Account sync is part of authenticated plans. Legacy explicit opt-outs remain respected.
 @MainActor
 final class ATHLTHStudioPlanSyncStore: ObservableObject {
     struct Conflict: Identifiable, Hashable {
@@ -16,7 +16,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     @Published private(set) var enabled = false
     @Published private(set) var isBusy = false
     @Published private(set) var conflicts: [Conflict] = []
-    @Published private(set) var status = "Plan sync is off."
+    @Published private(set) var status = "Sign in to synchronize training plans."
     @Published private(set) var lastSuccessfulSync: Date?
 
     private struct ConsentWrite: Codable {
@@ -53,11 +53,12 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         accountID = userID
         conflicts = []
         isBusy = false
-        enabled = userID.flatMap {
+        // Existing explicit opt-outs must not be silently reversed by an update.
+        enabled = userID.map {
             AccountLocalStorage.read(
                 Bool.self, name: "studioPlanSyncConsent", userID: $0
-            )
-        } ?? (userID != nil)
+            ) != false
+        } ?? false
         acknowledgements = userID.flatMap {
             AccountLocalStorage.read(
                 [String: ATHLTHStudioPlanSyncDecision.Acknowledgement].self,
@@ -67,90 +68,34 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         } ?? [:]
         status = enabled
             ? ATHLTHLocalization.choose(
-                english: "Plan sync is enabled on this device.",
-                norwegian: "Plansynkronisering er aktivert på denne enheten."
+                english: "Your signed-in training plans sync across devices.",
+                norwegian: "Treningsplanene synkroniseres gjennom kontoen din."
               )
             : ATHLTHLocalization.choose(
-                english: "Plan sync is off.",
-                norwegian: "Plansynkronisering er av."
+                english: "Sign in to sync or review your previous privacy choice.",
+                norwegian: "Logg inn for å synkronisere, eller se ditt tidligere personvernvalg."
               )
     }
 
-    func setEnabled(_ shouldEnable: Bool, session: AppSessionStore) async {
-        guard !isBusy, session.signedIn,
-              accountID == session.profile.userID
-        else { return }
-
+    /// Upgrades an explicit legacy opt-out only on the user's request.
+    /// New accounts do not require an additional synchronization switch.
+    func acknowledgeLegacyOptOut(session: AppSessionStore) async {
+        guard session.signedIn, accountID == session.profile.userID,
+              client.auth.currentUser?.id == session.profile.userID else { return }
         let userID = session.profile.userID
-        guard !Self.accountsWithNetworkMutation.contains(userID) else {
+        do {
+            try await client.from("studio_plan_sync_consents")
+                .upsert(ConsentWrite(user_id: userID, enabled: true),
+                        onConflict: "user_id").execute()
+            guard accountID == userID else { return }
+            AccountLocalStorage.write(true, name: "studioPlanSyncConsent", userID: userID)
+            enabled = true
+            scheduleSync(session: session)
+        } catch {
             status = ATHLTHLocalization.choose(
-                english: "Another ATHLTH window is updating this account. Retry shortly.",
-                norwegian: "Et annet ATHLTH-vindu oppdaterer kontoen. Prøv igjen om litt."
-            )
-            return
-        }
-        Self.accountsWithNetworkMutation.insert(userID)
-        isBusy = true
-        defer {
-            Self.accountsWithNetworkMutation.remove(userID)
-            isBusy = false
-        }
-        if shouldEnable {
-            do {
-                guard client.auth.currentUser?.id == userID else {
-                    throw NSError(
-                        domain: "ATHLTH.PlanSync", code: 401,
-                        userInfo: [NSLocalizedDescriptionKey:
-                            "An online signed-in session is required to enable synchronization."]
-                    )
-                }
-                try await client.from("studio_plan_sync_consents")
-                    .upsert(ConsentWrite(user_id: userID, enabled: true),
-                            onConflict: "user_id")
-                    .execute()
-                guard accountID == userID else { return }
-                enabled = true
-                AccountLocalStorage.write(
-                    true, name: "studioPlanSyncConsent", userID: userID
-                )
-                status = ATHLTHLocalization.choose(
-                    english: "Plan sync enabled. Check for changes on this device or the other device.",
-                    norwegian: "Plansynkronisering er aktivert. Se etter endringer på denne eller den andre enheten."
-                )
-            } catch {
-                status = ATHLTHLocalization.choose(
-                    english: "Could not enable plan sync: ",
-                    norwegian: "Kunne ikke aktivere plansynkronisering: "
-                ) + error.localizedDescription
-            }
-        } else {
-            // Immediately stop new network work, even if remote deletion fails.
-            enabled = false
-            scheduledTask?.cancel()
-            AccountLocalStorage.write(
-                false, name: "studioPlanSyncConsent", userID: userID
-            )
-            do {
-                // Delete documents *before* revoking consent. RLS requires consent
-                // for access, so reversing this order would strand the copies.
-                try await client.from("studio_plan_documents")
-                    .delete().eq("user_id", value: userID).execute()
-                try await client.from("studio_plan_sync_consents")
-                    .upsert(ConsentWrite(user_id: userID, enabled: false), onConflict: "user_id").execute()
-                guard accountID == userID else { return }
-                acknowledgements = [:]
-                persistAcknowledgements(for: userID)
-                conflicts = []
-                status = ATHLTHLocalization.choose(
-                    english: "Plan sync stopped; remote plan copies deleted. Your local plans remain.",
-                    norwegian: "Plansynkronisering stoppet og sky-kopier slettet. Lokale planer er beholdt."
-                )
-            } catch {
-                status = ATHLTHLocalization.choose(
-                    english: "Plan sync stopped on this device, but cloud copies could not be confirmed deleted. Reconnect and try disabling again: ",
-                    norwegian: "Synkronisering stoppet lokalt, men sletting av sky-kopier er ikke bekreftet. Koble til og prøv å slå av igjen: "
-                ) + error.localizedDescription
-            }
+                english: "Could not update the previous sync preference: ",
+                norwegian: "Kunne ikke oppdatere tidligere synkroniseringsvalg: "
+            ) + error.localizedDescription
         }
     }
 
@@ -187,21 +132,23 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         var unresolved: [Conflict] = []
 
         do {
+            // Legacy opt-outs remain a hard block until the user explicitly
+            // acknowledges the change. New accounts need no separate opt-in.
             let preferences: [ConsentWrite] = try await client.from("studio_plan_sync_consents")
                 .select("user_id,enabled").eq("user_id", value: userID).limit(1).execute().value
             guard accountID == userID else { return }
-            if preferences.first?.enabled == false {
+            if preferences.first?.enabled == false ||
+                AccountLocalStorage.read(
+                    Bool.self, name: "studioPlanSyncConsent", userID: userID
+                ) == false {
                 enabled = false
-                AccountLocalStorage.write(false, name: "studioPlanSyncConsent", userID: userID)
+                status = ATHLTHLocalization.choose(
+                    english: "Your previous sync opt-out is respected. Review it in account settings.",
+                    norwegian: "Tidligere fravalg av synkronisering er beholdt. Se kontoinnstillinger."
+                )
                 return
             }
-            if preferences.isEmpty {
-                guard enabled else { return }
-                try await client.from("studio_plan_sync_consents")
-                    .upsert(ConsentWrite(user_id: userID, enabled: true), onConflict: "user_id").execute()
-            }
             enabled = true
-            AccountLocalStorage.write(true, name: "studioPlanSyncConsent", userID: userID)
             // Fetch every page before interpreting an absent document as deleted.
             var remoteRows: [RemotePlan] = []
             let pageSize = 250
@@ -318,12 +265,11 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
               let userID = accountID,
               userID == session.profile.userID, session.signedIn
         else { return }
-        guard AccountLocalStorage.read(
-            Bool.self, name: "studioPlanSyncConsent", userID: userID
-        ) == true else {
-            enabled = false
-            return
-        }
+        // A historic opt-out also blocks conflict resolution.
+        guard enabled,
+              AccountLocalStorage.read(
+                  Bool.self, name: "studioPlanSyncConsent", userID: userID
+              ) != false else { return }
         guard !Self.accountsWithNetworkMutation.contains(userID) else {
             status = ATHLTHLocalization.choose(
                 english: "Plan changes are in progress in another window.",
