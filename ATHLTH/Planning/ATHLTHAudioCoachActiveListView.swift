@@ -102,8 +102,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     }
 
     private var hasStandardAnnouncements: Bool {
-        (draft.distanceTriggerEnabled || draft.timeTriggerEnabled)
-            && draft.customRules.isEmpty
+        draft.distanceTriggerEnabled || draft.timeTriggerEnabled
     }
 
     private var hasScheduledMotivation: Bool {
@@ -539,8 +538,8 @@ struct ATHLTHAudioCoachActiveListView: View {
 
             if !draft.customRules.isEmpty {
                 Text(tr(
-                    "Custom groups replace standard periodic announcements to prevent duplicates.",
-                    "Egne grupper erstatter standard intervallvarsler for å unngå doble beskjeder."
+                    "Custom groups and standard intervals are independent. Shared measurements are read only once when they trigger together.",
+                    "Egne grupper og standardintervaller virker uavhengig. Samme måleverdi leses bare én gang når de utløses samtidig."
                 ))
                 .font(.caption).foregroundStyle(dim)
             }
