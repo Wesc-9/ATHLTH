@@ -436,15 +436,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 12)
-                if HomeWeeklyProgressCalendar.canScheduleStandalone(on: selectedDate) {
-                    Button {
-                        focusedPlanningDate = selectedDate
-                    } label: {
-                        Label(tr("Plan a workout", "Planlegg en økt"), systemImage: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(bronze)
-                }
             }
         }
         .padding(22)
@@ -766,6 +757,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     // Completion can consult both HealthKit and local logs.
                     // Resolve once for the status label and Start control.
                     let isCompleted = completed(entry)
+                    let isSkipped = entry.planID.map {
+                        session.isPlanSessionSkipped(planID: $0, sessionID: entry.workout.id)
+                    } ?? false
                     HStack(spacing: 12) {
                         Image(systemName: entry.workout.kind.systemImage)
                             .font(.system(size: 17, weight: .medium))
@@ -782,6 +776,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                 if isCompleted {
                                     Label(tr("Completed", "Fullført"),
                                           systemImage: "checkmark.circle.fill")
+                                } else if isSkipped {
+                                    Text(tr("Skipped", "Hoppet over"))
                                 } else {
                                     Text(tr("Planned", "Planlagt"))
                                 }
@@ -794,7 +790,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             onOpenWorkout(entry)
                         } label: {
                             Image(systemName: "info.circle")
-                                .frame(width: 38, height: 38)
+                                .frame(width: 44, height: 44)
                         }
                         .accessibilityLabel(tr("Workout details", "Øktdetaljer"))
                         if canStart(entry, alreadyCompleted: isCompleted) {
