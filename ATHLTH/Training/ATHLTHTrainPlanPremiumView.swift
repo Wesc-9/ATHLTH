@@ -1089,52 +1089,51 @@ struct ATHLTHTrainPlanPremiumView: View {
         let completed = planned.filter {
             isPremiumPlanWorkoutCompleted($0, plan: plan)
         }.count
-        return VStack(alignment: .leading, spacing: 13) {
-            HStack {
-                Text(tr("This week", "Denne uken"))
-                    .font(.system(size: 17, weight: .semibold, design: .serif))
-                    .foregroundStyle(graphite)
-                Spacer()
-                Button(tr("Full overview", "Hele oversikten")) {
-                    planDetailTab = 1
-                    showingPlanDetails = true
-                }
-                .font(.caption)
-                .foregroundStyle(warmGold)
-            }
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(completed)/\(planned.count)")
-                        .font(.system(size: 21, weight: .semibold, design: .serif))
-                    Text(tr("Workouts completed", "Økter fullført"))
-                        .font(.system(size: 10))
+        let stats = VStack(alignment: .leading, spacing: 4) {
+            Text("\(completed)/\(planned.count)")
+                .font(.system(size: 21, weight: .semibold, design: .serif))
+            Text(tr("Workouts completed", "Økter fullført"))
+                .font(.system(size: 10))
+                .foregroundStyle(secondaryInk)
+        }
+        let dayBars = HStack(alignment: .bottom, spacing: 7) {
+            ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                let count = day.sessions.filter { !$0.isExplicitRestDay }.count
+                let done = day.sessions.filter {
+                    !$0.isExplicitRestDay &&
+                    isPremiumPlanWorkoutCompleted($0, plan: plan)
+                }.count
+                VStack(spacing: 5) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(done > 0 ? warmGold :
+                              (count > 0 ? warmGold.opacity(0.34) : line))
+                        .frame(width: 12,
+                               height: CGFloat(count > 0 ? 17 + count * 8 : 11))
+                    Text(weekday(day.dayIndex, plan: plan).prefix(1))
+                        .font(.system(size: 9))
                         .foregroundStyle(secondaryInk)
                 }
-                Spacer()
-                HStack(alignment: .bottom, spacing: 7) {
-                    ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
-                        let plannedCount = day.sessions.filter {
-                            !$0.isExplicitRestDay
-                        }.count
-                        let doneCount = day.sessions.filter {
-                            !$0.isExplicitRestDay &&
-                            isPremiumPlanWorkoutCompleted($0, plan: plan)
-                        }.count
-                        VStack(spacing: 5) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(doneCount > 0 ? warmGold :
-                                      (plannedCount > 0 ? warmGold.opacity(0.34) : line))
-                                .frame(width: 12,
-                                       height: CGFloat(plannedCount > 0 ? 17 + plannedCount * 8 : 11))
-                            Text(weekday(day.dayIndex, plan: plan).prefix(1))
-                                .font(.system(size: 9))
-                                .foregroundStyle(secondaryInk)
-                        }
-                        .frame(width: 17, height: 57, alignment: .bottom)
-                    }
+                .frame(width: 17, height: 57, alignment: .bottom)
+            }
+        }
+        return VStack(alignment: .leading, spacing: 13) {
+            Text(tr("This week", "Denne uken"))
+                .font(.system(size: 17, weight: .semibold, design: .serif))
+                .foregroundStyle(graphite)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    stats
+                    Spacer(minLength: 0)
+                    dayBars
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    stats
+                    dayBars
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(.white, in: RoundedRectangle(cornerRadius: 18))
     }
@@ -2595,13 +2594,17 @@ struct ATHLTHTrainPlanPremiumView: View {
                 (rhs.startDate ?? rhs.createdAt)
         }
         return VStack(alignment: .leading, spacing: 11) {
-            HStack {
+            HStack(spacing: 8) {
                 Text(tr("My training plans", "Mine treningsplaner"))
                     .font(.system(size: 23, weight: .regular, design: .serif))
-                Spacer()
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text("\(plans.count) " + tr("plans", "planer"))
                     .font(.caption)
                     .foregroundStyle(secondaryInk)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
 
             if plans.isEmpty {
