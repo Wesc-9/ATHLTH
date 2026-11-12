@@ -28,9 +28,21 @@ struct ATHLTHTrainingProfile: Codable, Equatable {
     }
 
     func save(userID: UUID) {
+        let prior = AccountLocalStorage.read(
+            Self.self, name: "personalTrainingProfile", userID: userID
+        )
         AccountLocalStorage.write(
             self, name: "personalTrainingProfile", userID: userID
         )
+        // Only user-entered measurement changes trigger private cloud sync.
+        // Training notes, injuries and other private profile fields stay local.
+        if prior?.measurements != measurements {
+            NotificationCenter.default.post(
+                name: Notification.Name("athlth.privateMeasurementsDidChange"),
+                object: nil,
+                userInfo: ["accountID": userID]
+            )
+        }
     }
 
     mutating func record(
