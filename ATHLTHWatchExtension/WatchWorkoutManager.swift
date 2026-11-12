@@ -5225,7 +5225,35 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             }
         } else {
-            announceCurrentStructuredStep(prefix: "Next")
+            let action = ATHLTHCoachRecoveryBoundary.afterAction(
+                finishedPhase: finishedStep?.phase,
+                nextPhase: workout.steps[nextIndex].phase,
+                configuration: audioCoachConfiguration
+            )
+            if action == nil {
+                announceCurrentStructuredStep(prefix: "Next")
+            } else if action != .numbersOnly {
+                Task { @MainActor [weak self] in
+                    do { try await Task.sleep(for: .milliseconds(650)) }
+                    catch { return }
+                    guard let self, self.state == .running,
+                          self.structuredStepIndex == nextIndex else { return }
+                    if action == .nextStep {
+                        self.announceCurrentStructuredStep(prefix: "Next")
+                    } else {
+                        let norwegian = self.coachPhrase(
+                            english: "en", norwegian: "no"
+                        ) == "no"
+                        self.speak(
+                            ATHLTHCoachRecoveryBoundary.shortMessage(
+                                finishedPhase: finishedStep?.phase,
+                                norwegian: norwegian
+                            ),
+                            priority: .structuredStep
+                        )
+                    }
+                }
+            }
         }
     }
 
