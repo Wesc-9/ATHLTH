@@ -55,6 +55,9 @@ final class MirroredWorkoutAudioCoach:
     private var lastState:
         WatchWorkoutMirrorState?
     private var lastStepIndex: Int?
+    private var lastStepPhase: String?
+    private var priorityCountdownUntil: Date?
+    private var priorityCountdownKey: String?
     private var currentRunningStepIndex: Int?
     private var lastIntervalProgressKey: String?
     private var lastIntervalWarningKey: String?
@@ -83,6 +86,9 @@ final class MirroredWorkoutAudioCoach:
         onLastSpokenCoachMessage?(nil)
         lastState = nil
         lastStepIndex = nil
+        lastStepPhase = nil
+        priorityCountdownUntil = nil
+        priorityCountdownKey = nil
         lastIntervalProgressKey = nil
         lastIntervalWarningKey = nil
         announcedStart = false
@@ -215,6 +221,7 @@ final class MirroredWorkoutAudioCoach:
                 speak(report.text(norwegian: phrase(english: "en", norwegian: "no") == "no"),
                       priority: .structuredStep, event: report.event)
             }
+            announceCriticalCountdownIfDue(snapshot)
             announceStepIfNeeded(snapshot)
             announceIntervalProgressIfDue(snapshot)
             announceFuelIfNeeded(snapshot)
@@ -350,6 +357,57 @@ final class MirroredWorkoutAudioCoach:
         pendingLocalSpokenEvent = nil
     }
 
+    /// Watch sends the exact step clock and timestamp. Subtract transport age
+    /// and drop late snapshots; never voice an old number after the deadline.
+    private func announceCriticalCountdownIfDue(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        guard snapshot.state == .running,
+              let index = snapshot.runningStepIndex,
+              let phase = snapshot.runningStepPhase,
+              let nextPhase = snapshot.runningNextStepPhase,
+              let sampledRemaining = snapshot.runningStepRemainingSeconds
+        else { return }
+        let length: Int?
+        if phase == "work", nextPhase == "recovery" {
+            length = configuration.resolvedIntervalCountdownToRecovery
+        } else if phase == "recovery" {
+            length = configuration.resolvedIntervalCountdownFromRecovery
+        } else { return }
+        let age = Date().timeIntervalSince(snapshot.capturedAt)
+        guard age >= -0.3, age <= 1.1 else { return }
+        let remaining = sampledRemaining - max(0, age)
+        let identity = "mirrored:\(snapshot.startedAt?.timeIntervalSince1970 ?? 0):\(index)"
+        let previous = priorityCountdownKey.flatMap { key -> Int? in
+            guard key.hasPrefix(identity + ":") else { return nil }
+            return Int(key.split(separator: ":").last ?? "")
+        }
+        guard let number = ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: remaining, length: length, previousNumber: previous
+        ) else { return }
+        let key = "\(identity):\(number)"
+        guard priorityCountdownKey != key else { return }
+        priorityCountdownKey = key
+        priorityCountdownUntil = Date().addingTimeInterval(remaining)
+        cueQueue.reset()
+        azureCoachSpeech.stop()
+        synthesizer.stopSpeaking(at: .immediate)
+        guidanceGate.voiceDidFinish()
+        let utterance = AVSpeechUtterance(string: String(number))
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: configuration.voiceIdentifier,
+            language: configuration.language
+        )
+        utterance.rate = max(configuration.resolvedSpeechRate, 0.55)
+        utterance.volume = configuration.resolvedSpeechVolume
+        try? ATHLTHSpokenAudioSession.activate(
+            duckOtherAudio: configuration.shouldDuckOtherAudio,
+            owner: audioOwner
+        )
+        synthesizer.speak(utterance)
+        watchLocalSpeech(utterance)
+    }
+
     private func announceIntervalProgressIfDue(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) {
@@ -429,22 +487,47 @@ final class MirroredWorkoutAudioCoach:
     }
 
     private func announceStepIfNeeded(
-        _ snapshot:
-            WatchWorkoutLiveSnapshot
+        _ snapshot: WatchWorkoutLiveSnapshot
     ) {
         guard snapshot.runningAwaitingMainStart != true,
-              configuration.announceCurrentWorkoutStep,
-              let index =
-                snapshot.runningStepIndex,
+              let index = snapshot.runningStepIndex,
               index != lastStepIndex,
-              let title =
-                snapshot.runningStepTitle,
-              !title.isEmpty
-        else {
+              let title = snapshot.runningStepTitle,
+              !title.isEmpty else { return }
+
+        let priorPhase = lastStepPhase
+        lastStepIndex = index
+        lastStepPhase = snapshot.runningStepPhase
+        priorityCountdownUntil = nil
+        let action = ATHLTHCoachRecoveryBoundary.afterAction(
+            finishedPhase: priorPhase,
+            nextPhase: snapshot.runningStepPhase,
+            configuration: configuration
+        )
+        if action == .numbersOnly { return }
+        if action == .shortAlert {
+            let capturedAt = snapshot.capturedAt
+            Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: .milliseconds(650)) }
+                catch { return }
+                guard let self, self.lastStepIndex == index, !self.finished else { return }
+                let norwegian = self.phrase(english: "en", norwegian: "no") == "no"
+                self.speak(
+                    ATHLTHCoachRecoveryBoundary.shortMessage(
+                        finishedPhase: priorPhase, norwegian: norwegian
+                    ),
+                    priority: .structuredStep,
+                    event: ATHLTHCoachEvent(
+                        kind: .runningStep,
+                        key: "recovery:\(index)",
+                        priority: .structuredStep,
+                        createdAt: capturedAt, validFor: 15, runningStepIndex: index
+                    )
+                )
+            }
             return
         }
-
-        lastStepIndex = index
+        guard configuration.announceCurrentWorkoutStep || action == .nextStep else { return }
 
         var text =
             phrase(
@@ -1073,6 +1156,8 @@ final class MirroredWorkoutAudioCoach:
         event: ATHLTHCoachEvent? = nil,
         rememberForReplay: Bool = true
     ) {
+        if let priorityCountdownUntil, Date() < priorityCountdownUntil,
+           priority < .targetCritical { return }
         guard !text.isEmpty,
               configuration.enabled,
               !finished
