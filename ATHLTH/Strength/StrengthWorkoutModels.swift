@@ -111,6 +111,7 @@ struct StrengthAudioCoachConfiguration:
     var spokenCountdownFromRestSeconds: Int? = nil
     var afterCountdownToRest: ATHLTHCoachCountdownAfter? = nil
     var afterCountdownFromRest: ATHLTHCoachCountdownAfter? = nil
+    var boundaryCountdownRules: [ATHLTHCoachBoundaryCountdownRule]? = nil
 
     var shouldAnnounceNextSetDetails: Bool {
         announceNextSetDetails ?? true
@@ -196,6 +197,7 @@ struct StrengthAudioCoachConfiguration:
         configuration.strengthCountdownFromRestSeconds = resolvedCountdownFromRest
         configuration.strengthAfterCountdownToRest = afterCountdownToRest
         configuration.strengthAfterCountdownFromRest = afterCountdownFromRest
+        configuration.boundaryCountdownRules = boundaryCountdownRules
         configuration
             .strengthStatusIntervalSeconds =
             announceWorkoutStatus
