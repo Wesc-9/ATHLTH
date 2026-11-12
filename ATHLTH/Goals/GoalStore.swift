@@ -194,29 +194,41 @@ final class GoalStore: ObservableObject {
     }
 
     func saveImageData(_ data: Data, for goalID: UUID) throws -> String {
-        guard let directory = Self.goalImagesDirectory else {
-            throw GoalStoreError.storageUnavailable
-        }
+        guard let accountID,
+              let directory = Self.goalImagesDirectory?
+                  .appendingPathComponent(accountID.uuidString, isDirectory: true)
+        else { throw GoalStoreError.storageUnavailable }
 
         try FileManager.default.createDirectory(
-            at: directory,
-            withIntermediateDirectories: true
+            at: directory, withIntermediateDirectories: true
         )
-
         let filename = "\(goalID.uuidString).jpg"
-        let url = directory.appendingPathComponent(filename)
-        try data.write(to: url, options: .atomic)
+        try data.write(to: directory.appendingPathComponent(filename), options: .atomic)
         return filename
     }
 
     func imageURL(for goal: ATHLTHGoal) -> URL? {
         guard let filename = goal.imageFilename,
-              let directory = Self.goalImagesDirectory
-        else {
-            return nil
-        }
+              let accountID,
+              let base = Self.goalImagesDirectory else { return nil }
+        let scoped = base.appendingPathComponent(
+            accountID.uuidString, isDirectory: true
+        ).appendingPathComponent(filename)
+        if FileManager.default.fileExists(atPath: scoped.path) { return scoped }
 
-        return directory.appendingPathComponent(filename)
+        // Only an account-owned goal can reach this compatibility fallback.
+        // Legacy local images are copied on the next photo edit or import.
+        let legacy = base.appendingPathComponent(filename)
+        if FileManager.default.fileExists(atPath: legacy.path) { return legacy }
+        return scoped
+    }
+
+    static func removeAccountImagesAfterDeletion(_ userID: UUID) {
+        guard let base = goalImagesDirectory else { return }
+        let directory = base.appendingPathComponent(
+            userID.uuidString, isDirectory: true
+        )
+        try? FileManager.default.removeItem(at: directory)
     }
 
     func refreshAutomaticMilestones(
