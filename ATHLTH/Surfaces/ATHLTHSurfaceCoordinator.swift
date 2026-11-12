@@ -94,7 +94,13 @@ enum ATHLTHSurfaceCoordinator {
             nextWorkoutTitle: next?.session.title,
             nextWorkoutDate: next?.date,
             primaryGoalTitle: goal?.title,
-            primaryGoalProgress: goal?.progress,
+            primaryGoalProgress: goal.map {
+                ATHLTHGoalProgressPolicy.progress(
+                    for: $0,
+                    profile: ATHLTHTrainingProfile.load(userID: session.profile.userID),
+                    latestBodyWeightKilograms: health.personalDetails.weightKilograms
+                )
+            },
             activeWorkout: activeWorkout,
             updatedAt: Date()
         )
