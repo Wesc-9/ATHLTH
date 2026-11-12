@@ -207,7 +207,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 return
             }
             if merged != ATHLTHGoalMergePolicy.ordered(localItems) {
-                try applySnapshot(merged, to: goals, accountID: userID)
+                try applySnapshot(merged, previous: localItems, to: goals, accountID: userID)
             }
             conflictingGoalIDs = []
             lastSuccessfulSync = .now
@@ -293,8 +293,13 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
     }
 
     private func applySnapshot(
-        _ items: [ATHLTHCloudGoal], to store: GoalStore, accountID: UUID
+        _ items: [ATHLTHCloudGoal],
+        previous: [ATHLTHCloudGoal],
+        to store: GoalStore,
+        accountID: UUID
     ) throws {
+        let localByID = Dictionary(previous.map { ($0.id, $0) },
+                                    uniquingKeysWith: { old, _ in old })
         var restored: [ATHLTHGoal] = []
         for entry in items {
             var goal = entry.goal
@@ -307,7 +312,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 let alreadyExists = store.imageURL(for: goal).map {
                     FileManager.default.fileExists(atPath: $0.path)
                 } ?? false
-                if !alreadyExists {
+                if !alreadyExists || localByID[goal.id]?.coverBase64 != imageString {
                     goal.imageFilename = try store.saveImageData(image, for: goal.id)
                 }
             } else {
