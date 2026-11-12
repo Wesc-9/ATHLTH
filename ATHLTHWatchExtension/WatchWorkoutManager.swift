@@ -136,6 +136,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var audioCoachReadyAnnouncedForWorkout = false
     private var strengthRestCoachTask:
         Task<Void, Never>?
+    private var countdownPriorityEndsAt: Date?
+    private var countdownNumberKey: String?
     /// Watch rest haptics are independent from speech and work with Coach off.
     private var strengthRestHapticTask: Task<Void, Never>?
     private var strengthRestHapticScheduleKey: String?
@@ -1793,16 +1795,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 0
             )
 
-        if audioCoachConfiguration
-            .shouldAnnounceStrengthRestStarted {
-            speak(
-                coachPhrase(
-                    english:
-                        "Rest started. \(remaining) seconds.",
-                    norwegian:
-                        "Hvile startet. \(remaining) sekunder."
-                )
-            )
+        let beforeRestAction = audioCoachConfiguration.resolvedStrengthCountdownToRest == nil
+            ? nil : (audioCoachConfiguration.strengthAfterCountdownToRest ?? .shortAlert)
+        if beforeRestAction == nil
+            ? audioCoachConfiguration.shouldAnnounceStrengthRestStarted
+            : beforeRestAction != .numbersOnly {
+            let spoken = beforeRestAction == .shortAlert
+                ? ("Rest started.", "Pausen starter.")
+                : ("Rest started. \(remaining) seconds.",
+                   "Pausen starter. \(remaining) sekunder.")
+            speak(coachPhrase(english: spoken.0, norwegian: spoken.1))
         }
 
         strengthRestCoachTask =
@@ -1811,46 +1813,46 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     return
                 }
 
-                let countdownDelay =
-                    restEndsAt
-                        .timeIntervalSinceNow -
-                    TimeInterval(
-                        countdownSeconds
-                    )
-
-                if countdownDelay > 0 {
-                    try? await Task.sleep(
-                        for:
-                            .seconds(
-                                countdownDelay
+                if let length = self.audioCoachConfiguration.resolvedStrengthCountdownFromRest {
+                    var previousNumber: Int?
+                    while !Task.isCancelled {
+                        guard self.strengthSession?.workoutID == snapshot.workoutID,
+                              self.strengthSession?.restEndsAt == restEndsAt else { return }
+                        let remaining = restEndsAt.timeIntervalSinceNow
+                        if remaining <= 0 { break }
+                        if let number = ATHLTHCoachSecondCountdown.dueNumber(
+                            remaining: remaining, length: length,
+                            previousNumber: previousNumber
+                        ) {
+                            previousNumber = number
+                            self.speakCriticalCountdown(
+                                number, deadline: restEndsAt,
+                                identity: "strength-rest:\(snapshot.workoutID):\(restEndsAt.timeIntervalSince1970)",
+                                captureOnWatch: true
                             )
-                    )
-                }
-
-                guard !Task.isCancelled,
-                      self.strengthSession?
-                        .restEndsAt ==
-                        restEndsAt
-                else {
-                    return
-                }
-
-                if self.audioCoachConfiguration
-                    .shouldUseStrengthHaptics {
-                    WKInterfaceDevice.current()
-                        .play(.click)
-                }
-
-                if self.audioCoachConfiguration
-                    .shouldAnnounceStrengthRestCountdown {
-                    self.speak(
-                        self.coachPhrase(
-                            english:
-                                "\(countdownSeconds) seconds left.",
-                            norwegian:
-                                "\(countdownSeconds) sekunder igjen."
-                        )
-                    )
+                        }
+                        do { try await Task.sleep(for: .milliseconds(120)) }
+                        catch { return }
+                    }
+                } else {
+                    let countdownDelay = restEndsAt.timeIntervalSinceNow -
+                        TimeInterval(countdownSeconds)
+                    if countdownDelay > 0 {
+                        do { try await Task.sleep(for: .seconds(countdownDelay)) }
+                        catch { return }
+                    }
+                    guard !Task.isCancelled, self.strengthSession?.restEndsAt == restEndsAt else {
+                        return
+                    }
+                    if self.audioCoachConfiguration.shouldUseStrengthHaptics {
+                        WKInterfaceDevice.current().play(.click)
+                    }
+                    if self.audioCoachConfiguration.shouldAnnounceStrengthRestCountdown {
+                        self.speak(self.coachPhrase(
+                            english: "\(countdownSeconds) seconds left.",
+                            norwegian: "\(countdownSeconds) sekunder igjen."
+                        ))
+                    }
                 }
 
                 let finalDelay =
@@ -1880,22 +1882,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 var norwegianParts:
                     [String] = []
 
-                if self.audioCoachConfiguration
-                    .shouldAnnounceStrengthRestComplete {
+                let after = self.audioCoachConfiguration.resolvedStrengthCountdownFromRest == nil
+                    ? nil : (self.audioCoachConfiguration.strengthAfterCountdownFromRest ?? .nextStep)
+                if after == nil
+                    ? self.audioCoachConfiguration.shouldAnnounceStrengthRestComplete
+                    : after != .numbersOnly {
                     englishParts.append(
-                        snapshot
-                            .currentExerciseComplete
-                            ? "Rest complete. Ready for the next exercise."
-                            : "Rest complete."
+                        after == .shortAlert ? "Rest complete." :
+                            snapshot.currentExerciseComplete
+                                ? "Rest complete. Ready for the next exercise."
+                                : "Rest complete."
                     )
                     norwegianParts.append(
-                        snapshot
-                            .currentExerciseComplete
-                            ? "Hvilen er ferdig. Klar for neste øvelse."
-                            : "Hvilen er ferdig."
+                        after == .shortAlert ? "Pausen er ferdig." :
+                            snapshot.currentExerciseComplete
+                                ? "Pausen er ferdig. Klar for neste øvelse."
+                                : "Pausen er ferdig."
                     )
                 }
 
+                if after == nil || after == .nextStep {
                 if let currentSnapshot =
                         self.strengthSession {
                     if currentSnapshot
@@ -1928,6 +1934,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                             nextSet.norwegian
                         )
                     }
+                }
+
                 }
 
                 if !englishParts.isEmpty {
@@ -7252,6 +7260,39 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// Cancel routine announcements and replace stale numbers rather than
+    /// queuing them. Always prefer the local synthesized voice for one-second
+    /// deadlines; remote services cannot promise this cadence.
+    private func speakCriticalCountdown(
+        _ number: Int,
+        deadline: Date,
+        identity: String,
+        captureOnWatch: Bool
+    ) {
+        guard (1...30).contains(number), Date() < deadline,
+              audioCoachConfiguration.enabled,
+              !coachSpeechPaused,
+              captureOnWatch || shouldSpeakLocally(priority: .structuredStep)
+        else { return }
+        countdownPriorityEndsAt = deadline
+        let key = "\(identity):\(number)"
+        guard countdownNumberKey != key else { return }
+        countdownNumberKey = key
+        coachCueQueue.reset()
+        audioCoachSpeechWatchdog?.cancel()
+        audioCoachSpeechWatchdog = nil
+        audioCoachActivationTask?.cancel()
+        audioCoachActivationTask = nil
+        audioCoachActivationGeneration = UUID()
+        speechSynthesizer.stopSpeaking(at: .immediate)
+        guidancePriorityGate.voiceDidFinish()
+        // The activation task rechecks its generation before it can speak.
+        speak(
+            String(number), priority: .targetCritical,
+            forceLocal: true, rememberForReplay: false
+        )
+    }
+
     private func speak(
         _ text: String,
         priority:
@@ -7261,6 +7302,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         forceLocal: Bool = false,
         rememberForReplay: Bool = true
     ) {
+        if let countdownPriorityEndsAt, Date() < countdownPriorityEndsAt,
+           priority < .targetCritical { return }
         guard !text.isEmpty,
               ATHLTHCoachVoicePausePolicy.allowsSpeech(
                   coachEnabled: audioCoachConfiguration.enabled,
