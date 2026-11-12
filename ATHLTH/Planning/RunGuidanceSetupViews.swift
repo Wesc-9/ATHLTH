@@ -371,30 +371,6 @@ struct RunGuidanceSetupView: View {
                 }
 
                 Text(ATHLTHLocalization.choose(
-                                    english: "Default guidance settings",
-                                    norwegian: "Standardinnstillinger for veiledning"
-                                ))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                                Text(ATHLTHLocalization.choose(
-                                    english: "For future workouts",
-                                    norwegian: "Gjelder kommende økter"
-                                ))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Text(ATHLTHLocalization.choose(
                     english: "Changes here apply to this workout only. They are ready when you return.",
                     norwegian: "Endringer her gjelder bare denne økten, og lagres når du går tilbake."
                 ))
