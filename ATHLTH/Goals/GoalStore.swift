@@ -5,6 +5,7 @@ final class GoalStore: ObservableObject {
     @Published private(set) var goals: [ATHLTHGoal] = []
 
     private var accountID: UUID?
+    var ownerAccountID: UUID? { accountID }
     @Published private(set) var hasLegacyGoals = false
 
     init() {}
