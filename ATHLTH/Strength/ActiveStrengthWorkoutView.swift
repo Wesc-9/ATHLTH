@@ -44,6 +44,8 @@ struct ActiveStrengthWorkoutView: View {
         StrengthAudioCoachSpeaker()
     @State private var restCueTask:
         Task<Void, Never>?
+    @State private var lastPreRestCountdownSetID: UUID?
+    @State private var lastPreRestCountdownNumber: Int?
     @State private var statusCoachTask:
         Task<Void, Never>?
     @State private var focusedExerciseMediaIndex = 0
@@ -622,6 +624,7 @@ struct ActiveStrengthWorkoutView: View {
                     strength.currentExercise?.isEmbeddedRunningInterval == true {
                     strength.advanceEmbeddedIntervalIfNeeded(at: timestamp)
                 }
+                announceCountdownIntoStrengthRestIfDue(at: timestamp)
             }
             .onChange(
                 of:
@@ -1319,6 +1322,39 @@ struct ActiveStrengthWorkoutView: View {
         )
     }
 
+    /// A timed strength set has a real deadline. Rep-based/open sets have no
+    /// predictable finish and must never invent a countdown into rest.
+    @MainActor
+    private func announceCountdownIntoStrengthRestIfDue(at now: Date) {
+        guard let workout = strength.activeWorkout,
+              workout.captureDevice == .iPhone,
+              let configuration = workout.advancedConfiguration?.audioCoach,
+              configuration.enabled,
+              let length = configuration.resolvedCountdownToRest,
+              let countdown = strength.timedSetCountdown,
+              countdown.isRunning,
+              strength.restEndsAt == nil
+        else {
+            lastPreRestCountdownSetID = nil
+            lastPreRestCountdownNumber = nil
+            return
+        }
+        if lastPreRestCountdownSetID != countdown.setID {
+            lastPreRestCountdownSetID = countdown.setID
+            lastPreRestCountdownNumber = nil
+        }
+        let remaining = countdown.remaining(at: now)
+        guard let number = ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: remaining, length: length,
+            previousNumber: lastPreRestCountdownNumber
+        ) else { return }
+        lastPreRestCountdownNumber = number
+        strengthCoach.speakCountdownSecond(
+            number, deadline: now.addingTimeInterval(remaining),
+            configuration: configuration
+        )
+    }
+
     @MainActor
     private func scheduleRestCues(
         for restEndsAt: Date?
@@ -1355,57 +1391,63 @@ struct ActiveStrengthWorkoutView: View {
                 0
             )
 
-        if coachConfiguration.enabled &&
-            coachConfiguration
-                .announceRestStarted {
-            strengthCoach.speak(
-                english:
-                    "Rest started. \(initialRemaining) seconds.",
-                norwegian:
-                    "Hvile startet. \(initialRemaining) sekunder.",
-                configuration:
-                    coachConfiguration,
-                cueKind: .strengthRest
-            )
+        if coachConfiguration.enabled {
+            let action = coachConfiguration.resolvedCountdownToRest == nil
+                ? nil : (coachConfiguration.afterCountdownToRest ?? .shortAlert)
+            let shouldAnnounce = action == nil
+                ? coachConfiguration.announceRestStarted
+                : action != .numbersOnly
+            if shouldAnnounce {
+                let text = action == .shortAlert
+                    ? ("Rest started.", "Pausen starter.")
+                    : ("Rest started. \(initialRemaining) seconds.",
+                       "Pausen starter. \(initialRemaining) sekunder.")
+                strengthCoach.speak(
+                    english: text.0, norwegian: text.1,
+                    configuration: coachConfiguration, cueKind: .strengthRest
+                )
+            }
         }
 
         restCueTask =
             Task { @MainActor in
-                let countdownDelay =
-                    restEndsAt
-                        .timeIntervalSinceNow -
-                    TimeInterval(
-                        countdownSeconds
-                    )
-
-                if countdownDelay > 0 {
-                    try? await Task.sleep(
-                        for:
-                            .seconds(
-                                countdownDelay
+                if let duration = coachConfiguration.resolvedCountdownFromRest {
+                    // Re-evaluate the absolute rest deadline at 120 ms cadence.
+                    // Busy audio never queues a late number: missing ticks are skipped.
+                    var previousNumber: Int? = nil
+                    while !Task.isCancelled {
+                        guard strength.restEndsAt == restEndsAt else { return }
+                        let remaining = restEndsAt.timeIntervalSinceNow
+                        if remaining <= 0 { break }
+                        if let number = ATHLTHCoachSecondCountdown.dueNumber(
+                            remaining: remaining, length: duration,
+                            previousNumber: previousNumber
+                        ) {
+                            previousNumber = number
+                            strengthCoach.speakCountdownSecond(
+                                number, deadline: restEndsAt,
+                                configuration: coachConfiguration
                             )
-                    )
-                }
-
-                guard !Task.isCancelled,
-                      strength.restEndsAt ==
-                        restEndsAt
-                else {
-                    return
-                }
-
-                if coachConfiguration.enabled &&
-                    coachConfiguration
-                        .announceRestCountdown {
-                    strengthCoach.speak(
-                        english:
-                            "\(countdownSeconds) seconds left.",
-                        norwegian:
-                            "\(countdownSeconds) sekunder igjen.",
-                        configuration:
-                            coachConfiguration,
-                        cueKind: .strengthRest
-                    )
+                        }
+                        do { try await Task.sleep(for: .milliseconds(120)) }
+                        catch { return }
+                    }
+                } else {
+                    let countdownDelay = restEndsAt.timeIntervalSinceNow -
+                        TimeInterval(countdownSeconds)
+                    if countdownDelay > 0 {
+                        do { try await Task.sleep(for: .seconds(countdownDelay)) }
+                        catch { return }
+                    }
+                    guard !Task.isCancelled, strength.restEndsAt == restEndsAt else { return }
+                    if coachConfiguration.enabled && coachConfiguration.announceRestCountdown {
+                        strengthCoach.speak(
+                            english: "\(countdownSeconds) seconds left.",
+                            norwegian: "\(countdownSeconds) sekunder igjen.",
+                            configuration: coachConfiguration,
+                            cueKind: .strengthRest
+                        )
+                    }
                 }
 
                 let finalDelay =
@@ -1443,22 +1485,26 @@ struct ActiveStrengthWorkoutView: View {
                     var norwegianParts:
                         [String] = []
 
-                    if coachConfiguration
-                        .announceRestComplete {
+                    let after = coachConfiguration.resolvedCountdownFromRest == nil
+                        ? nil : (coachConfiguration.afterCountdownFromRest ?? .nextStep)
+                    if after == nil
+                        ? coachConfiguration.announceRestComplete
+                        : after != .numbersOnly {
                         englishParts.append(
-                            strength
-                                .currentExerciseAllSetsCompleted
-                                ? "Rest complete. Ready for the next exercise."
-                                : "Rest complete."
+                            after == .shortAlert ? "Rest complete." :
+                                strength.currentExerciseAllSetsCompleted
+                                    ? "Rest complete. Ready for the next exercise." :
+                                      "Rest complete."
                         )
                         norwegianParts.append(
-                            strength
-                                .currentExerciseAllSetsCompleted
-                                ? "Hvilen er ferdig. Klar for neste øvelse."
-                                : "Hvilen er ferdig."
+                            after == .shortAlert ? "Pausen er ferdig." :
+                                strength.currentExerciseAllSetsCompleted
+                                    ? "Pausen er ferdig. Klar for neste øvelse." :
+                                      "Pausen er ferdig."
                         )
                     }
 
+                    if after == nil || after == .nextStep {
                     if strength
                         .currentExerciseAllSetsCompleted {
                         if coachConfiguration
@@ -1482,6 +1528,7 @@ struct ActiveStrengthWorkoutView: View {
                         )
                     }
 
+                    }
                     if !englishParts.isEmpty {
                         strengthCoach.speak(
                             english:
