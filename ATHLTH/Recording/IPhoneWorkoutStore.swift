@@ -4266,7 +4266,7 @@ final class IPhoneWorkoutStore:
                         norwegian: "Oppvarming avsluttet. Start hoveddelen når du er klar.",
                         configuration: workout.audioCoachConfiguration ?? .disabled
                     ),
-                    configuration: audioConfiguration,
+                    configuration: workout.audioCoachConfiguration,
                     priority: .structuredStep
                 )
             }
