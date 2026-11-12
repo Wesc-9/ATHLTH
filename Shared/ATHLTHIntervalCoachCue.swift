@@ -259,3 +259,109 @@ enum ATHLTHCoachRecoveryBoundary {
         return norwegian ? "Pausen er ferdig." : "Recovery complete."
     }
 }
+
+
+/// A named, reusable Audio Coach countdown, independent of the workout editor.
+/// The 'starts' boundary is counted during the preceding timed unit; the start
+/// of the recording itself has no preceding timer and is deliberately excluded.
+struct ATHLTHCoachBoundaryCountdownRule: Codable, Hashable, Identifiable {
+    enum Scope: String, Codable, CaseIterable, Identifiable {
+        case step, section, group, plannedWorkout
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .step: return ATHLTHLocalization.choose(english: "Each step / effort", norwegian: "Hvert drag / delsteg")
+            case .section: return ATHLTHLocalization.choose(english: "Workout section", norwegian: "Deløkt")
+            case .group: return ATHLTHLocalization.choose(english: "Interval group", norwegian: "Draggruppe")
+            case .plannedWorkout: return ATHLTHLocalization.choose(english: "Whole planned workout", norwegian: "Hele planlagte økten")
+            }
+        }
+    }
+
+    enum Boundary: String, Codable, CaseIterable, Identifiable {
+        case starts, ends
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .starts: return ATHLTHLocalization.choose(english: "Before it starts", norwegian: "Før den starter")
+            case .ends: return ATHLTHLocalization.choose(english: "Before it ends", norwegian: "Før den avsluttes")
+            }
+        }
+    }
+
+    var id = UUID()
+    var scope: Scope = .step
+    var boundary: Boundary = .ends
+    var seconds = 10
+    var after: ATHLTHCoachCountdownAfter = .numbersOnly
+    /// nil = every section; warmup/main/cooldown limit a rule to that part.
+    var sectionFilter: String? = nil
+    var enabled = true
+
+    var resolvedSeconds: Int? {
+        guard enabled, (1...30).contains(seconds) else { return nil }
+        return seconds
+    }
+}
+
+/// Pure boundary resolver: one deadline gets one set of spoken numbers.
+/// Longest selected countdown wins; on a tie prefer the more specific rule.
+/// Without an actual timed deadline callers must never ask for spoken numbers.
+enum ATHLTHCoachBoundaryCountdown {
+    static func section(for phase: String?) -> String? {
+        switch phase {
+        case "warmup": return "warmup"
+        case "cooldown": return "cooldown"
+        case "work", "recovery", "main": return "main"
+        default: return phase
+        }
+    }
+
+    static func chosenRule(
+        _ rules: [ATHLTHCoachBoundaryCountdownRule],
+        currentPhase: String?,
+        nextPhase: String?,
+        currentGroupID: UUID?,
+        nextGroupID: UUID?,
+        stepIndex: Int,
+        stepCount: Int
+    ) -> ATHLTHCoachBoundaryCountdownRule? {
+        guard stepIndex >= 0, stepIndex < stepCount else { return nil }
+        let currentSection = section(for: currentPhase)
+        let nextSection = section(for: nextPhase)
+        let isLast = stepIndex == stepCount - 1
+        let isSectionBoundary = isLast || currentSection != nextSection
+        // Legacy plans with no group IDs have one contiguous main section.
+        let currentInGroup = currentGroupID != nil || currentSection == "main"
+        let nextInGroup = nextGroupID != nil || nextSection == "main"
+        let changesGroup = currentGroupID != nil || nextGroupID != nil
+            ? currentGroupID != nextGroupID
+            : currentSection != nextSection
+        let eligible = rules.filter { rule in
+            guard rule.resolvedSeconds != nil else { return false }
+            let targetSection = rule.boundary == .starts ? nextSection : currentSection
+            if let filter = rule.sectionFilter, rule.scope == .section,
+               filter != targetSection { return false }
+            switch (rule.scope, rule.boundary) {
+            case (.step, .ends): return true
+            case (.step, .starts): return !isLast
+            case (.section, .ends): return isSectionBoundary
+            case (.section, .starts): return !isLast && isSectionBoundary
+            case (.group, .ends): return currentInGroup && changesGroup
+            case (.group, .starts): return !isLast && nextInGroup && changesGroup
+            case (.plannedWorkout, .ends): return isLast
+            case (.plannedWorkout, .starts): return false
+            }
+        }
+        let rank: [ATHLTHCoachBoundaryCountdownRule.Scope: Int] = [
+            .step: 0, .section: 1, .group: 2, .plannedWorkout: 3
+        ]
+        return eligible.sorted {
+            if $0.seconds != $1.seconds { return $0.seconds > $1.seconds }
+            if rank[$0.scope] != rank[$1.scope] {
+                return (rank[$0.scope] ?? 0) > (rank[$1.scope] ?? 0)
+            }
+            return $0.id.uuidString < $1.id.uuidString
+        }.first
+    }
+}
