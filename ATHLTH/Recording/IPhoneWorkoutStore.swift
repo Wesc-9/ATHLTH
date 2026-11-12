@@ -4304,7 +4304,7 @@ final class IPhoneWorkoutStore:
                     } ?? ATHLTHCoachRecoveryBoundary.shortMessage(
                         finishedPhase: step.phase, norwegian: norwegian
                     ),
-                    configuration: workout.audioCoachConfiguration,
+                    configuration: audioConfiguration,
                     priority: .structuredStep
                 )
             }
