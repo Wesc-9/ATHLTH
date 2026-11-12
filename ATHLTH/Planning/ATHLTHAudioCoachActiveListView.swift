@@ -681,6 +681,83 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .pickerStyle(.menu)
                 standardMetricsEditor
             }
+        case .intervalRecoveryCountdown:
+            editorCard {
+                Text(tr("Spoken interval rest countdown", "Hørbar nedtelling ved intervallpause"))
+                    .font(.headline)
+                Text(tr(
+                    "Individual numbers are spoken against the interval timer, not queued as ordinary reminders. Requires timed intervals.",
+                    "Enkeltall leses etter intervallklokken, ikke som vanlige varsler i kø. Krever tidsstyrte intervaller."
+                ))
+                .font(.caption)
+                .foregroundStyle(dim)
+
+                Toggle(
+                    tr("Count down into rest", "Tell ned til pausen starter"),
+                    isOn: Binding(
+                        get: { draft.smartPrompts.intervalCountdownToRecoverySeconds != nil },
+                        set: { draft.smartPrompts.intervalCountdownToRecoverySeconds = $0 ? 10 : nil }
+                    )
+                )
+                .tint(bronze)
+                if draft.smartPrompts.intervalCountdownToRecoverySeconds != nil {
+                    Picker(tr("Start counting from", "Start nedtelling fra"),
+                           selection: Binding(
+                            get: { draft.smartPrompts.intervalCountdownToRecoverySeconds ?? 10 },
+                            set: { draft.smartPrompts.intervalCountdownToRecoverySeconds = $0 }
+                           )) {
+                        ForEach(ATHLTHCoachSecondCountdown.offeredLengths, id: \.self) { seconds in
+                            Text("\(seconds) s").tag(seconds)
+                        }
+                    }
+                    Picker(tr("After countdown", "Etter nedtelling"),
+                           selection: Binding(
+                            get: { draft.smartPrompts.intervalAfterCountdownToRecovery ?? .shortAlert },
+                            set: { draft.smartPrompts.intervalAfterCountdownToRecovery = $0 }
+                           )) {
+                        ForEach(ATHLTHCoachCountdownAfter.allCases) { action in
+                            Text(action.title).tag(action)
+                        }
+                    }
+                }
+
+                Divider()
+
+                Toggle(
+                    tr("Count down while resting", "Tell ned til pausen er ferdig"),
+                    isOn: Binding(
+                        get: { draft.smartPrompts.intervalCountdownFromRecoverySeconds != nil },
+                        set: { draft.smartPrompts.intervalCountdownFromRecoverySeconds = $0 ? 10 : nil }
+                    )
+                )
+                .tint(bronze)
+                if draft.smartPrompts.intervalCountdownFromRecoverySeconds != nil {
+                    Picker(tr("Start counting from", "Start nedtelling fra"),
+                           selection: Binding(
+                            get: { draft.smartPrompts.intervalCountdownFromRecoverySeconds ?? 10 },
+                            set: { draft.smartPrompts.intervalCountdownFromRecoverySeconds = $0 }
+                           )) {
+                        ForEach(ATHLTHCoachSecondCountdown.offeredLengths, id: \.self) { seconds in
+                            Text("\(seconds) s").tag(seconds)
+                        }
+                    }
+                    Picker(tr("After countdown", "Etter nedtelling"),
+                           selection: Binding(
+                            get: { draft.smartPrompts.intervalAfterCountdownFromRecovery ?? .nextStep },
+                            set: { draft.smartPrompts.intervalAfterCountdownFromRecovery = $0 }
+                           )) {
+                        ForEach(ATHLTHCoachCountdownAfter.allCases) { action in
+                            Text(action.title).tag(action)
+                        }
+                    }
+                }
+                Text(tr(
+                    "Numbers only: silence after 1. Short announcement: 'Rest begins/ends'. Announce what is next: include the next interval details.",
+                    "Bare tallene: stille etter 1. Kort beskjed: «Pause starter/ferdig». Fortell hva som er neste: inkluder neste drag."
+                ))
+                .font(.caption)
+                .foregroundStyle(dim)
+            }
         case .currentZone:
             editorCard {
                 Text(tr("Measured heart-rate zone", "Målt pulssone")).font(.headline)
