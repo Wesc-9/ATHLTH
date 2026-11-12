@@ -5444,11 +5444,12 @@ struct GoalEditView: View {
             goal.bodyMeasurementGoal = config
         } else if isValidTarget, var target = goal.target,
                   target.metric == .bodyWeightKilograms {
+            let updatedBaseline: Double? = editedBaselineValue > 0 ? editedBaselineValue : nil
             let changed = target.targetValue != editedTargetValue ||
-                target.baselineValue != editedBaselineValue
+                target.baselineValue != updatedBaseline
             if changed {
                 target.targetValue = editedTargetValue
-                target.baselineValue = editedBaselineValue > 0 ? editedBaselineValue : nil
+                target.baselineValue = updatedBaseline
                 goal.target = target
                 let halfway = (editedBaselineValue + editedTargetValue) / 2
                 for index in goal.milestones.indices {
