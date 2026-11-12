@@ -694,10 +694,7 @@ struct TargetGhostSetupView: View {
         }
         .background(
             ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme
-                        .vitality
-                        .opacity(0.20)
+                accent: ATHLTHPlanDesign.accentInk.opacity(0.08)
             )
         )
         .navigationTitle(ATHLTHLocalization.choose(
