@@ -88,4 +88,106 @@ final class AudioCoachStrengthStatusTests: XCTestCase {
         XCTAssertFalse(delivery.voice)
         XCTAssertTrue(delivery.haptic)
     }
+
+    func testSecondCountdownFollowsRealDeadlineAndSkipsStaleNumbers() {
+        XCTAssertNil(ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: 10.2, length: 10, previousNumber: nil
+        ))
+        XCTAssertEqual(ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: 9.8, length: 10, previousNumber: nil
+        ), 10)
+        XCTAssertEqual(ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: 8.9, length: 10, previousNumber: 10
+        ), 9)
+        XCTAssertEqual(ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: 5.8, length: 10, previousNumber: 9
+        ), 6) // Delayed tick skips 8 and 7; never plays them late.
+        XCTAssertNil(ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: 7.2, length: 10, previousNumber: 6
+        ))
+        XCTAssertNil(ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: 0, length: 10, previousNumber: 1
+        ))
+        XCTAssertNil(ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: -4, length: 10, previousNumber: 1
+        ))
+        XCTAssertNil(ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: .infinity, length: 10, previousNumber: nil
+        ))
+    }
+
+    func testStrengthOnlyCountdownOptionsSurviveWatchTransfer() throws {
+        var coach = StrengthAudioCoachConfiguration()
+        coach.enabled = true
+        coach.spokenCountdownToRestSeconds = 5
+        coach.spokenCountdownFromRestSeconds = 15
+        coach.afterCountdownToRest = .numbersOnly
+        coach.afterCountdownFromRest = .nextStep
+        coach.motivationEveryCompletedSets = 3
+        coach.personalMotivationPhrase = "Du klarer dette."
+        let transfer = coach.watchConfiguration
+        XCTAssertEqual(transfer.resolvedStrengthCountdownToRest, 5)
+        XCTAssertEqual(transfer.resolvedStrengthCountdownFromRest, 15)
+        XCTAssertEqual(transfer.strengthAfterCountdownToRest, .numbersOnly)
+        XCTAssertEqual(transfer.strengthAfterCountdownFromRest, .nextStep)
+        let restored = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self,
+            from: JSONEncoder().encode(transfer)
+        )
+        XCTAssertEqual(restored, transfer)
+        XCTAssertNil(WatchAudioCoachConfiguration.disabled.resolvedStrengthCountdownToRest)
+    }
+
+    func testRunRecoveryCountdownAppearsOnlyForStructuredExercise() {
+        XCTAssertTrue(ATHLTHAudioCoachOption.intervalRecoveryCountdown.isVisible(
+            route: false, structured: true
+        ))
+        XCTAssertFalse(ATHLTHAudioCoachOption.intervalRecoveryCountdown.isVisible(
+            route: false, structured: false
+        ))
+        var draft = AudioCoachDraft()
+        XCTAssertFalse(ATHLTHAudioCoachOption.intervalRecoveryCountdown.isActive(in: draft))
+        ATHLTHAudioCoachOption.intervalRecoveryCountdown.setActive(true, in: &draft)
+        XCTAssertTrue(ATHLTHAudioCoachOption.intervalRecoveryCountdown.isActive(in: draft))
+        let config = draft.configuration()
+        XCTAssertEqual(config.resolvedIntervalCountdownToRecovery, 10)
+        XCTAssertEqual(config.resolvedIntervalCountdownFromRecovery, 10)
+    }
+
+    func testRecoveryEndChoiceCanSilenceOldAutomaticPhaseMessage() {
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        var smart = ATHLTHAudioCoachSmartSettings()
+        smart.intervalCountdownToRecoverySeconds = 10
+        smart.intervalCountdownFromRecoverySeconds = 5
+        smart.intervalAfterCountdownToRecovery = .numbersOnly
+        smart.intervalAfterCountdownFromRecovery = .shortAlert
+        config.smartPrompts = smart
+        XCTAssertEqual(
+            ATHLTHCoachRecoveryBoundary.afterAction(
+                finishedPhase: "work", nextPhase: "recovery", configuration: config
+            ), .numbersOnly
+        )
+        XCTAssertEqual(
+            ATHLTHCoachRecoveryBoundary.afterAction(
+                finishedPhase: "recovery", nextPhase: "work", configuration: config
+            ), .shortAlert
+        )
+        XCTAssertNil(ATHLTHCoachRecoveryBoundary.afterAction(
+            finishedPhase: "warmup", nextPhase: "work", configuration: config
+        ))
+    }
+
+    func testStrengthSetMotivationIsOnlyDueOnRequestedMilestone() {
+        XCTAssertNil(ATHLTHStrengthCoachStatusMessage.setMilestoneMotivation(
+            completedSets: 2, everySets: 3, personalMessage: "Heia", norwegian: true
+        ))
+        XCTAssertEqual(ATHLTHStrengthCoachStatusMessage.setMilestoneMotivation(
+            completedSets: 3, everySets: 3, personalMessage: "Heia", norwegian: true
+        ), "Heia")
+        XCTAssertNil(ATHLTHStrengthCoachStatusMessage.setMilestoneMotivation(
+            completedSets: 4, everySets: nil, personalMessage: "Heia", norwegian: true
+        ))
+    }
+
 }
