@@ -8342,6 +8342,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             runningNextStepTitle:
                 nextStructuredRunningStep?.title,
             runningNextStepPhase: nextStructuredRunningStep?.phase,
+            runningStepCoachGroupID: currentRunningStep?.coachGroupID,
+            runningNextStepCoachGroupID: nextStructuredRunningStep?.coachGroupID,
             runningStepRemainingSeconds:
                 runningStepReadout?.unit == .seconds
                     ? runningStepReadout?.remaining : nil,
