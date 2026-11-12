@@ -5254,7 +5254,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             ))
         }
 
-        if audioCoachConfiguration.enabled,
+        let onlyNumbersAtBoundary = finishedStep?.measure == .time &&
+            ATHLTHCoachBoundaryCountdown.forRunningStep(
+                workout.steps, at: finishedIndex,
+                configuration: audioCoachConfiguration
+            )?.after == .numbersOnly
+        if audioCoachConfiguration.enabled, !onlyNumbersAtBoundary,
            let report = ATHLTHRunningCoachReport.make(
                steps: workout.steps, finishedIndex: finishedIndex,
                recorded: recordedStructuredRunSteps
