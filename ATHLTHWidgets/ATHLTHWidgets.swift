@@ -236,8 +236,7 @@ private struct ATHLTHHomeWidgetView: View {
             } else if let stepSeconds {
                 if stepSeconds > 0 {
                     Text(
-                        timerInterval: workout.updatedAt...
-                            workout.updatedAt.addingTimeInterval(stepSeconds),
+                        timerInterval: workout.updatedAt...workout.updatedAt.addingTimeInterval(stepSeconds),
                         countsDown: true, showsHours: false
                     )
                 } else {
