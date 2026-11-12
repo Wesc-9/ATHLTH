@@ -46,6 +46,8 @@ on:
       - ATHLTH/**/*.swift
       - ATHLTH/Assets.xcassets/**
       - Shared/**/*.swift
+      - ATHLTHWidgets/**/*.swift
+      - ATHLTHWidgets/Localizable.xcstrings
       - project.yml
       - scripts/optimize_hero_assets.sh
       - .github/workflows/ipad-smoke.yml
