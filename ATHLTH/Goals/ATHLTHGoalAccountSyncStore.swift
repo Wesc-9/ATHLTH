@@ -109,6 +109,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
     @Published private(set) var conflictingGoalIDs: [UUID] = []
     @Published private(set) var conflictingMeasurementIDs: [UUID] = []
     @Published private(set) var lastSuccessfulSync: Date?
+    @Published private(set) var lastSyncError: String?
 
     private struct RemoteDocument: Decodable {
         let revision: Int64
@@ -141,6 +142,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
         conflictingGoalIDs = []
         conflictingMeasurementIDs = []
         lastSuccessfulSync = nil
+        lastSyncError = nil
         acknowledgement = userID.flatMap {
             AccountLocalStorage.read(
                 Acknowledgement.self, name: "goalAccountSyncAcknowledgement", userID: $0
@@ -230,11 +232,13 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
             let remote = ATHLTHGoalMergePolicy.ordered(remoteItems)
             let remoteMeasurementsSorted = ATHLTHGoalMergePolicy.ordered(remoteMeasurements)
 
+            var effectiveRevision = remoteRevision
+            var didUpload = false
             if merged != remote || mergedMeasurements != remoteMeasurementsSorted {
                 let encoded = try Self.encode(ATHLTHCloudGoalDocument(
                     goals: merged, measurements: mergedMeasurements
                 ))
-                let savedRevision: Int64 = try await client
+                effectiveRevision = try await client
                     .rpc(
                         "athlth_save_goal_document",
                         params: SaveParams(
@@ -243,23 +247,22 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                         )
                     )
                     .execute().value
-
-                guard accountID == userID, session.profile.userID == userID,
-                      client.auth.currentUser?.id == userID else { return }
-                saveAcknowledgement(
-                    goals: merged, measurements: mergedMeasurements,
-                    revision: savedRevision, userID: userID
-                )
-            } else {
-                saveAcknowledgement(
-                    goals: remote, measurements: remoteMeasurementsSorted,
-                    revision: remoteRevision, userID: userID
-                )
+                didUpload = true
             }
+            guard accountID == userID, session.profile.userID == userID,
+                  client.auth.currentUser?.id == userID else { return }
 
             // Do not replace a more recent edit made during the upload.
             guard goals.goals == capturedLocalGoals,
                   ATHLTHTrainingProfile.load(userID: userID).measurements == capturedMeasurements else {
+                // Our uploaded snapshot must be acknowledged before merging
+                // a newer edit created while the network call was pending.
+                if didUpload {
+                    saveAcknowledgement(
+                        goals: merged, measurements: mergedMeasurements,
+                        revision: effectiveRevision, userID: userID
+                    )
+                }
                 scheduleSync(session: session, goals: goals)
                 return
             }
@@ -273,8 +276,15 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 profile.save(userID: userID)
                 NotificationCenter.default.post(name: .athlthTrainingDataDidChange, object: nil)
             }
+            // Commit the acknowledgement only after all imported files/data
+            // were persisted. A failed photo write must never clear remote goals.
+            saveAcknowledgement(
+                goals: merged, measurements: mergedMeasurements,
+                revision: effectiveRevision, userID: userID
+            )
             conflictingGoalIDs = []
             conflictingMeasurementIDs = []
+            lastSyncError = nil
             lastSuccessfulSync = .now
             status = ATHLTHLocalization.choose(
                 english: "Your goals are synchronized.",
@@ -282,6 +292,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
             )
         } catch {
             guard accountID == userID else { return }
+            lastSyncError = error.localizedDescription
             status = ATHLTHLocalization.choose(
                 english: "Goals are safe offline. Sync failed: ",
                 norwegian: "Målene er lagret lokalt. Synkronisering feilet: "
