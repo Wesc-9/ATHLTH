@@ -51,7 +51,7 @@ enum ATHLTHPlanJourney {
         // Source is retained as a valid legacy branch; it is not in today's
         // standard simple/advanced progression.
         if candidate == .source { return .source }
-        return sequence(advanced: advanced).contains(candidate) ? candidate : .goal
+        return sequence(advanced: advanced).contains(candidate) ? candidate : (advanced ? .goal : .basics)
     }
 
     static func next(
