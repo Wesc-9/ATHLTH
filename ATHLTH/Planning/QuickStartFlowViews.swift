@@ -787,23 +787,13 @@ private struct QuickStartSpotifyCard: View {
         SpotifyPlaylistReference?
     @Binding var autoplay: Bool
     let onChoose: () -> Void
+    @State private var isExpanded = false
 
     var body: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Label("Spotify", systemImage: "music.note.list")
-                        .font(.subheadline.weight(.semibold))
-
-                    Spacer()
-
-                    if spotify.isRefreshingPlaylists {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-
-                if spotify.isConnected {
+            DisclosureGroup(isExpanded: $isExpanded) {
+                VStack(alignment: .leading, spacing: 10) {
+                    if spotify.isConnected {
                     Button(action: onChoose) {
                         HStack(spacing: 10) {
                             VStack(alignment: .leading, spacing: 2) {
@@ -888,8 +878,36 @@ private struct QuickStartSpotifyCard: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    }
                 }
+                .padding(.top, 10)
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 36, height: 36)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 11))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Spotify")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        if let playlist {
+                            Text(playlist.name)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    if spotify.isRefreshingPlaylists {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                .frame(minHeight: 48)
             }
+            .tint(ATHLTHPlanDesign.accentInk)
         }
         .onChange(of: playlist?.id) { _, playlistID in
             if playlistID == nil {
@@ -3130,30 +3148,6 @@ struct RunQuickStartSheet: View {
                     }
                 }
 
-                Text(
-                    guidanceRoute == nil
-                        ? ATHLTHLocalization.choose(
-                            english:
-                                "Tap a tool to turn it on or off. Choose a route to unlock Ghost and Route.",
-                            norwegian:
-                                "Trykk på et verktøy for å skru det av eller på. Velg en rute for å bruke Ghost og Rute."
-                        )
-                        : guidanceSummary
-                )
-                .font(
-                    .system(
-                        size: 11,
-                        weight: .medium
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
             }
         }
     }
