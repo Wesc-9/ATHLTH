@@ -1657,14 +1657,6 @@ struct RunQuickStartSheet: View {
                                 activity: .running
                             )
 
-                            if environment == .outdoor {
-                                QuickStartAutoPauseCard(
-                                    preference: $autoPausePreference,
-                                    appDefaultEnabled:
-                                        settings.autoPauseOutdoorWorkouts
-                                )
-                            }
-
                             QuickStartSpotifyCard(
                                 captureDevice: captureDevice,
                                 playlist:
@@ -2910,15 +2902,7 @@ struct RunQuickStartSheet: View {
                               ) : nil),
                 autoPauseEnabled:
                     runEnvironment == .outdoor &&
-                    (
-                        isAdvancedSetup
-                            ? autoPausePreference
-                            : .appDefault
-                    )
-                    .resolved(
-                        appDefault:
-                            settings.autoPauseOutdoorWorkouts
-                    ),
+                    settings.autoPauseOutdoorWorkouts,
                 spotifyPlaylist:
                     isAdvancedSetup &&
                     spotifyAutoplay
@@ -3651,12 +3635,6 @@ struct WalkQuickStartSheet: View {
                     }
 
                     if isAdvancedSetup {
-                        QuickStartAutoPauseCard(
-                            preference: $autoPausePreference,
-                            appDefaultEnabled:
-                                settings.autoPauseOutdoorWorkouts
-                        )
-
                         QuickStartSpotifyCard(
                             playlist:
                                 $selectedSpotifyPlaylist,
@@ -3852,15 +3830,7 @@ struct WalkQuickStartSheet: View {
                         ? audioCoachDraft.configuration()
                         : .disabled,
                 autoPauseEnabled:
-                    (
-                        isAdvancedSetup
-                            ? autoPausePreference
-                            : .appDefault
-                    )
-                    .resolved(
-                        appDefault:
-                            settings.autoPauseOutdoorWorkouts
-                    ),
+                    settings.autoPauseOutdoorWorkouts,
                 spotifyPlaylist:
                     isAdvancedSetup &&
                     spotifyAutoplay
