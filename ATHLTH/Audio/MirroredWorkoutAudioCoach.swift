@@ -211,6 +211,10 @@ final class MirroredWorkoutAudioCoach:
                sampledAt: snapshot.capturedAt,
                maximumAge: ATHLTHCoachSensorFreshness.maximumSnapshotAge
            ) {
+            if let report = snapshot.runningCoachReport, report.event.isFresh() {
+                speak(report.text(norwegian: phrase(english: "en", norwegian: "no") == "no"),
+                      priority: .structuredStep, event: report.event)
+            }
             announceStepIfNeeded(snapshot)
             announceIntervalProgressIfDue(snapshot)
             announceFuelIfNeeded(snapshot)
@@ -361,7 +365,14 @@ final class MirroredWorkoutAudioCoach:
         if let motivation = ATHLTHIntervalCoachCue.motivation(
             snapshot.runningStepMotivation, phase: snapshot.runningStepPhase,
             elapsed: elapsed, remaining: remaining,
-            norwegian: phrase(english: "en", norwegian: "no") == "no"
+            norwegian: phrase(english: "en", norwegian: "no") == "no",
+            measuredZone: ATHLTHCoachSensorFreshness.validHeartRate(
+                snapshot.heartRate, sampledAt: snapshot.coachHeartRateSampleAt
+            ) ? ATHLTHHeartRateZones.measuredZone(
+                heartRateBPM: snapshot.heartRate,
+                maximumBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
+                    configuration.smartPrompts?.maximumHeartRateBPM
+            ) : nil
         ) {
             speak(motivation.text, priority: .structuredStep,
                   event: ATHLTHCoachEvent(

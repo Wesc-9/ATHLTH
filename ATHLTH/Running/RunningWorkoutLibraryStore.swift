@@ -188,7 +188,9 @@ final class RunningWorkoutLibraryStore: ObservableObject {
                     recovery: $0.recovery,
                     notes: $0.notes,
                     repetitionOverrides: $0.repetitionOverrides,
-                    intervalMotivation: $0.intervalMotivation
+                    intervalMotivation: $0.intervalMotivation,
+                    recoveryStyle: $0.recoveryStyle,
+                    spokenReport: $0.spokenReport
                 )
             },
             routeID: source.routeID,

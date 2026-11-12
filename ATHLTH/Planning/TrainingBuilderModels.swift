@@ -286,6 +286,8 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
     var notes: String?
     var repetitionOverrides: [RunningRepetitionOverride]? = nil
     var intervalMotivation: ATHLTHIntervalMotivationSettings? = nil
+    var recoveryStyle: ATHLTHRunningRecoveryStyle? = nil
+    var spokenReport: ATHLTHIntervalSpokenReport? = nil
     // Planning-only cue for this phase. Playback changes require explicit
     // runtime authorization and must not start music from a preview.
     var spotifyPlaylist: SpotifyPlaylistReference? = nil
@@ -314,7 +316,9 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
         notes: String? = nil,
         repetitionOverrides: [RunningRepetitionOverride]? = nil,
         spotifyPlaylist: SpotifyPlaylistReference? = nil,
-        intervalMotivation: ATHLTHIntervalMotivationSettings? = nil
+        intervalMotivation: ATHLTHIntervalMotivationSettings? = nil,
+        recoveryStyle: ATHLTHRunningRecoveryStyle? = nil,
+        spokenReport: ATHLTHIntervalSpokenReport? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -326,6 +330,8 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
         self.repetitionOverrides = repetitionOverrides
         self.spotifyPlaylist = spotifyPlaylist
         self.intervalMotivation = intervalMotivation
+        self.recoveryStyle = recoveryStyle
+        self.spokenReport = spokenReport
     }
 }
 

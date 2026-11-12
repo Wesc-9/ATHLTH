@@ -174,6 +174,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var structuredStepStartElapsedTime: TimeInterval = 0
     private var structuredStepStartDistanceMeters: Double = 0
     private var structuredWorkoutComplete = false
+    private var latestRunningCoachReport: ATHLTHRunningCoachReport?
     private var recordedStructuredRunSteps: [ATHLTHRecordedRunningStep] = []
     private var recordedStructuredRunMinutes: [ATHLTHRecordedRunningMinute] = []
     private var lastIntervalProgressCueKey: String?
@@ -4511,6 +4512,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func resetAudioCoachThresholds() {
+        latestRunningCoachReport = nil
         lastGoalEncouragementAt = nil
         measuredCoachZoneCandidate = nil
         measuredCoachZoneStartedAt = nil
@@ -4932,7 +4934,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         if let motivation = ATHLTHIntervalCoachCue.motivation(
             step.intervalMotivation, phase: step.phase,
-            elapsed: elapsed, remaining: remaining, norwegian: norwegian
+            elapsed: elapsed, remaining: remaining, norwegian: norwegian,
+            measuredZone: hasFreshHeartRate ? ATHLTHHeartRateZones.measuredZone(
+                heartRateBPM: heartRate,
+                maximumBPM: audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM ??
+                    structuredRunningWorkout?.heartRateZoneMaximumBPM
+            ) : nil
         ) {
             speak(motivation.text, priority: .structuredStep,
                   event: ATHLTHCoachEvent(
@@ -5060,6 +5067,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 targetTreadmillInclinePercent:
                     finishedStep.targetTreadmillInclinePercent
             ))
+        }
+
+        if audioCoachConfiguration.enabled,
+           let report = ATHLTHRunningCoachReport.make(
+               steps: workout.steps, finishedIndex: finishedIndex,
+               recorded: recordedStructuredRunSteps
+           ) {
+            latestRunningCoachReport = report
+            let norwegian = coachPhrase(english: "en", norwegian: "no") == "no"
+            speak(report.text(norwegian: norwegian), priority: .structuredStep, event: report.event)
         }
 
         let nextIndex = finishedIndex + 1
@@ -8159,6 +8176,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     ? runningStepReadout?.remaining : nil,
             runningStepCoachBrief: currentRunningStep?.coachBrief,
             runningStepMotivation: currentRunningStep?.intervalMotivation,
+            runningCoachReport: latestRunningCoachReport,
             runningStepPhase: currentRunningStep?.phase,
             runningStepTargetHeartRateZone: currentRunningStep?.targetHeartRateZone,
             heartRateTargetZone:

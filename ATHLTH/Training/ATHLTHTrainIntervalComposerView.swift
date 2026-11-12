@@ -44,6 +44,11 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var editingRepetition: IntervalRepetitionSelection?
     @State private var coachBrief: String
     @State private var motivateHalfway = false
+    @State private var halfwayMessage: ATHLTHIntervalHalfwayMessage = .motivation
+    @State private var customHalfwayText = ""
+    @State private var reportEffortPace = false
+    @State private var reportGroupDistance = false
+    @State private var recoveryStyle: ATHLTHRunningRecoveryStyle = .passive
     @State private var motivateBeforeFinish = false
     @State private var motivationLeadSeconds = 15
 
@@ -427,6 +432,12 @@ struct ATHLTHTrainIntervalComposerView: View {
                     } else {
                         if editingBlockID == nil {
                             motivateHalfway = false
+                            halfwayMessage = .motivation
+                            customHalfwayText = ""
+                            reportEffortPace = false
+                            reportGroupDistance = false
+                            recoveryStyle = .passive
+                            if recoveryMeasure == .distance { recoveryMeasure = .time }
                             motivateBeforeFinish = false
                             motivationLeadSeconds = 15
                         }
@@ -518,6 +529,19 @@ struct ATHLTHTrainIntervalComposerView: View {
                 if measure == .time {
                     Toggle(tr("Motivate halfway", "Motiver halvveis"), isOn: $motivateHalfway)
                         .tint(bronze)
+                    if motivateHalfway {
+                        Picker(tr("Halfway message", "Melding halvveis"), selection: $halfwayMessage) {
+                            Text(tr("Motivation", "Motivasjon")).tag(ATHLTHIntervalHalfwayMessage.motivation)
+                            Text(tr("Praise", "Skryt")).tag(ATHLTHIntervalHalfwayMessage.praise)
+                            Text(tr("Measured heart rate zone", "Målt pulssone")).tag(ATHLTHIntervalHalfwayMessage.heartRateZone)
+                            Text(tr("Custom text", "Egen tekst")).tag(ATHLTHIntervalHalfwayMessage.custom)
+                        }
+                        if halfwayMessage == .custom {
+                            TextField(tr("What should the coach say?", "Hva skal Lydcoach si?"),
+                                      text: $customHalfwayText, axis: .vertical)
+                                .lineLimit(1...3)
+                        }
+                    }
                     Toggle(tr("Final push", "Siste push"), isOn: $motivateBeforeFinish)
                         .tint(bronze)
                     if motivateBeforeFinish {
@@ -525,13 +549,28 @@ struct ATHLTHTrainIntervalComposerView: View {
                                 value: $motivationLeadSeconds, in: 5...60, step: 5)
                     }
                 }
+                DisclosureGroup(tr("Spoken results", "Oppleste resultater")) {
+                    Toggle(tr("Pace after each effort", "Tempo etter hvert drag"), isOn: $reportEffortPace)
+                    Toggle(tr("Effort distance when group ends", "Samlet dragdistanse etter gruppen"),
+                           isOn: $reportGroupDistance)
+                }
+                .tint(bronze)
                 Toggle(tr("Rest between efforts", "Pause mellom drag"),
                        isOn: $pauseEnabled)
                     .tint(ATHLTHPlanDesign.accentInk)
                 if pauseEnabled && repetitions > 1 {
+                    Picker(tr("Recovery type", "Type pause"), selection: $recoveryStyle) {
+                        Text(tr("Stand still", "Stillestående")).tag(ATHLTHRunningRecoveryStyle.passive)
+                        Text(tr("Easy jog", "Rolig jogging")).tag(ATHLTHRunningRecoveryStyle.activeJog)
+                    }
+                    .onChange(of: recoveryStyle) { _, style in
+                        if style == .passive && recoveryMeasure == .distance { recoveryMeasure = .time }
+                    }
                     Picker(tr("Recovery target", "Pausemål"), selection: $recoveryMeasure) {
                         Text(tr("Time", "Tid")).tag(RunningMeasureKind.time)
-                        Text(tr("Distance", "Distanse")).tag(RunningMeasureKind.distance)
+                        if recoveryStyle == .activeJog {
+                            Text(tr("Distance", "Distanse")).tag(RunningMeasureKind.distance)
+                        }
                         Text(tr("Open", "Åpen")).tag(RunningMeasureKind.open)
                     }
                     if recoveryMeasure == .time {
@@ -793,6 +832,13 @@ struct ATHLTHTrainIntervalComposerView: View {
         targetEffort = block.work.intensity.kind
         repetitions = block.repetitions
         motivateHalfway = block.intervalMotivation?.halfway ?? false
+        halfwayMessage = block.intervalMotivation?.halfwayMessage ?? .motivation
+        customHalfwayText = block.intervalMotivation?.customHalfwayText ?? ""
+        reportEffortPace = block.spokenReport?.effortPace ?? false
+        reportGroupDistance = block.spokenReport?.groupDistance ?? false
+        recoveryStyle = block.recoveryStyle ??
+            ((block.recovery?.measure == .distance || block.recovery?.intensity.paceMinSecondsPerKilometer != nil)
+             ? .activeJog : .passive)
         motivateBeforeFinish = block.intervalMotivation?.finalSeconds != nil
         motivationLeadSeconds = block.intervalMotivation?.finalSeconds ?? 15
         if block.work.measure == .distance {
@@ -866,8 +912,18 @@ struct ATHLTHTrainIntervalComposerView: View {
         if kind == .work, measure == .time, motivateHalfway || motivateBeforeFinish {
             entry.intervalMotivation = ATHLTHIntervalMotivationSettings(
                 halfway: motivateHalfway,
-                finalSeconds: motivateBeforeFinish ? motivationLeadSeconds : nil
+                finalSeconds: motivateBeforeFinish ? motivationLeadSeconds : nil,
+                halfwayMessage: halfwayMessage,
+                customHalfwayText: halfwayMessage == .custom ? String(customHalfwayText.prefix(120)) : nil
             )
+        }
+        if kind == .work {
+            if entry.recovery != nil { entry.recoveryStyle = recoveryStyle }
+            if reportEffortPace || reportGroupDistance {
+                entry.spokenReport = ATHLTHIntervalSpokenReport(
+                    effortPace: reportEffortPace, groupDistance: reportGroupDistance
+                )
+            }
         }
         if let id = editingBlockID, let index = blocks.firstIndex(where: { $0.id == id }) {
             blocks[index] = entry

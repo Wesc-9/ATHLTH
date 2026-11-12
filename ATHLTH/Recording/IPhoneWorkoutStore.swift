@@ -4111,6 +4111,19 @@ final class IPhoneWorkoutStore:
             }
         }
 
+        if workout.audioCoachConfiguration?.enabled == true,
+           let report = ATHLTHRunningCoachReport.make(
+               steps: plan.steps, finishedIndex: finishedIndex,
+               recorded: workout.recordedRunningSteps ?? [], now: now
+           ) {
+            let norwegian = localizedCoachPhrase(
+                english: "en", norwegian: "no",
+                configuration: workout.audioCoachConfiguration
+            ) == "no"
+            speak(report.text(norwegian: norwegian), configuration: workout.audioCoachConfiguration,
+                  priority: .structuredStep, event: report.event)
+        }
+
         let nextIndex = finishedIndex + 1
 
         guard plan.steps.indices.contains(

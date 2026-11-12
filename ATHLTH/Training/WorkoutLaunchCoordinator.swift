@@ -326,7 +326,8 @@ struct PlannedWorkoutWatchBuilder {
                 phase: phase, targetHeartRateZone: block.targetHeartRateZone,
                 targetTreadmillInclinePercent:
                     block.isIndoor == true ? block.treadmillInclinePercent : nil,
-                coachBrief: phase == "work" ? block.notes : nil
+                coachBrief: phase == "work" ? block.notes : nil,
+                recoveryStyle: phase == "recovery" ? (block.kind == .rest ? .passive : .activeJog) : nil
             )
         }
     }
@@ -507,23 +508,30 @@ struct PlannedWorkoutWatchBuilder {
                            template.intervalGhostPaceSecondsPerKilometer)
                         : nil,
                     coachBrief: working && !guidance.isEmpty ? guidance : nil,
-                    intervalMotivation: working ? block.intervalMotivation : nil
+                    intervalMotivation: working ? block.intervalMotivation : nil,
+                    coachGroupID: working ? block.id : nil,
+                    spokenReport: working ? block.spokenReport : nil
                 ))
 
                 if let recovery = block.resolvedRecovery(after: position) {
+                    let style = block.recoveryStyle ??
+                        ((recovery.measure == .distance || recovery.intensity.paceMinSecondsPerKilometer != nil)
+                         ? .activeJog : .passive)
                     steps.append(runningStep(
-                        title: ATHLTHLocalization.choose(
-                            english: "Recovery \(position)",
-                            norwegian: "Pause \(position)"
-                        ),
+                        title: style == .activeJog
+                            ? ATHLTHLocalization.choose(english: "Easy jog \(position)", norwegian: "Joggepause \(position)")
+                            : ATHLTHLocalization.choose(english: "Standing rest \(position)", norwegian: "Stillestående pause \(position)"),
                         target: recovery,
                         phase: RunningBlockKind.recovery.rawValue,
-                        ghostPace: template.intervalGhostFollowRecovery == true
+                        ghostPace: style == .activeJog && template.intervalGhostFollowRecovery == true
                             ? template.intervalGhostPaceSecondsPerKilometer : nil,
                         ghostFollowsRecovery:
-                            template.intervalGhostFollowRecovery == true &&
+                            style == .activeJog && template.intervalGhostFollowRecovery == true &&
                             template.intervalGhostPaceSecondsPerKilometer != nil,
-                        slowdownPercent: template.intervalGhostRecoverySlowdownPercent
+                        slowdownPercent: template.intervalGhostRecoverySlowdownPercent,
+                        recoveryStyle: style,
+                        coachGroupID: block.id,
+                        spokenReport: block.spokenReport
                     ))
                 }
             }
@@ -539,8 +547,12 @@ struct PlannedWorkoutWatchBuilder {
         ghostFollowsRecovery: Bool? = nil,
         slowdownPercent: Int? = nil,
         coachBrief: String? = nil,
-        intervalMotivation: ATHLTHIntervalMotivationSettings? = nil
+        intervalMotivation: ATHLTHIntervalMotivationSettings? = nil,
+        recoveryStyle: ATHLTHRunningRecoveryStyle? = nil,
+        coachGroupID: UUID? = nil,
+        spokenReport: ATHLTHIntervalSpokenReport? = nil
     ) -> WatchRunningWorkoutStep {
+        let passive = recoveryStyle == .passive
         let measure: WatchRunningStepMeasure
         switch target.measure {
         case .distance: measure = .distance
@@ -554,16 +566,19 @@ struct PlannedWorkoutWatchBuilder {
             distanceMeters: target.distanceMeters,
             durationSeconds: target.durationSeconds,
             intensityText: runningIntensityText(target.intensity),
-            targetPaceMinSecondsPerKilometer: target.intensity.paceMinSecondsPerKilometer,
-            targetPaceMaxSecondsPerKilometer: target.intensity.paceMaxSecondsPerKilometer,
+            targetPaceMinSecondsPerKilometer: passive ? nil : target.intensity.paceMinSecondsPerKilometer,
+            targetPaceMaxSecondsPerKilometer: passive ? nil : target.intensity.paceMaxSecondsPerKilometer,
             phase: phase,
-            targetHeartRateZone: target.intensity.heartRateZone,
-            targetTreadmillInclinePercent: target.treadmillInclinePercent,
+            targetHeartRateZone: passive ? nil : target.intensity.heartRateZone,
+            targetTreadmillInclinePercent: passive ? nil : target.treadmillInclinePercent,
             ghostPaceSecondsPerKilometer: ghostPace,
             ghostFollowsRecovery: ghostFollowsRecovery,
             ghostRecoverySlowdownPercent: slowdownPercent,
             coachBrief: coachBrief,
-            intervalMotivation: intervalMotivation
+            intervalMotivation: intervalMotivation,
+            recoveryStyle: recoveryStyle,
+            coachGroupID: coachGroupID,
+            spokenReport: spokenReport
         )
     }
 

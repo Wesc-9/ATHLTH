@@ -951,6 +951,9 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
     var ghostRecoverySlowdownPercent: Int? = nil
     var coachBrief: String? = nil
     var intervalMotivation: ATHLTHIntervalMotivationSettings? = nil
+    var recoveryStyle: ATHLTHRunningRecoveryStyle? = nil
+    var coachGroupID: UUID? = nil
+    var spokenReport: ATHLTHIntervalSpokenReport? = nil
 }
 
 enum ATHLTHRunningStepEngine {
@@ -1738,6 +1741,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepRemainingMeters: Double? = nil
     var runningStepCoachBrief: String? = nil
     var runningStepMotivation: ATHLTHIntervalMotivationSettings? = nil
+    var runningCoachReport: ATHLTHRunningCoachReport? = nil
     var runningStepPhase: String? = nil
     var runningStepTargetHeartRateZone: Int? = nil
 
