@@ -283,40 +283,44 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: split ? 20 : 16) {
-                        // Home is one cohesive workspace. The current form
-                        // belongs at the top right, never below the week or
-                        // alongside the selected-day schedule.
-                        if split {
-                            HStack(alignment: .top, spacing: 18) {
-                                VStack(alignment: .leading, spacing: 16) {
-                                    titleRow(expanded: true)
+                    VStack(alignment: .leading, spacing: 0) {
+                        // The mountain hero belongs to the full detail canvas,
+                        // including the area behind the iPad top navigation.
+                        // Only the hero escapes the normal content margins.
+                        mountainPlanHero
+                            .frame(maxWidth: .infinity)
+                            .frame(height: split ? 344 : 308)
+
+                        VStack(alignment: .leading, spacing: split ? 20 : 16) {
+                            // Preserve all existing dashboard cards, actions,
+                            // content, and their own styling below the new hero.
+                            if split {
+                                HStack(alignment: .top, spacing: 18) {
                                     activePlanSummary
+                                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                                    compactReadinessCard
+                                        .frame(width: min(390, max(310, width * 0.30)))
                                 }
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
-
+                            } else {
+                                activePlanSummary
                                 compactReadinessCard
-                                    .frame(width: min(390, max(310, width * 0.30)))
                             }
-                        } else {
-                            titleRow(expanded: false)
-                            compactReadinessCard
-                            activePlanSummary
-                        }
-                        // The selected day's full schedule is INSIDE the
-                        // weekly card, immediately below its summary.
-                        weekCard(week, width: width)
 
-                        ATHLTHStudioGhostHomeStatusView().id(session.profile.userID)
-                        ATHLTHStudioStrengthHomeStatusView().id(session.profile.userID)
-                        ATHLTHStudioHomeCommunitySummary()
-                        progressCard(wide: split, recorded: workouts, week: week)
+                            weekCard(week, width: width)
+
+                            ATHLTHStudioGhostHomeStatusView().id(session.profile.userID)
+                            ATHLTHStudioStrengthHomeStatusView().id(session.profile.userID)
+                            ATHLTHStudioHomeCommunitySummary()
+                            progressCard(wide: split, recorded: workouts, week: week)
+                        }
+                        .padding(.horizontal, split ? 22 : 14)
+                        .padding(.vertical, 17)
+                        .frame(maxWidth: 1500)
+                        .frame(maxWidth: .infinity)
                     }
-                    .padding(.horizontal, split ? 22 : 14)
-                    .padding(.vertical, 17)
-                    .frame(maxWidth: 1500)
                     .frame(maxWidth: .infinity)
                 }
+                .ignoresSafeArea(.container, edges: .top)
                 .scrollIndicators(.hidden)
             }
         }
@@ -340,6 +344,119 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 heart: health.heart
             )
         }
+    }
+
+    /// Full-bleed premium plan banner. Render real plan details over an
+    /// existing bundled mountain photograph; no static plan text in the image.
+    /// The rest of Studio Home retains its established cards and interactions.
+    private var mountainPlanHero: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                Image("GoalMountain")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    .overlay {
+                        Color(red: 0.74, green: 0.46, blue: 0.22)
+                            .opacity(0.22)
+                    }
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.83),
+                                Color.black.opacity(0.48),
+                                Color.black.opacity(0.12),
+                                Color.black.opacity(0.06)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    }
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.12),
+                                .clear,
+                                Color.black.opacity(0.30)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 11) {
+                    Text("A T H L T H")
+                        .font(.caption.weight(.semibold))
+                        .tracking(2.6)
+                        .foregroundStyle(Color(red: 0.88, green: 0.70, blue: 0.43))
+
+                    Text(tr("Your training plan", "Din treningsplan"))
+                        .font(.system(size: geometry.size.width < 620 ? 33 : 47,
+                                      weight: .regular, design: .serif))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.76)
+                        .lineLimit(2)
+                        .shadow(color: .black.opacity(0.2), radius: 4)
+
+                    Rectangle()
+                        .fill(Color(red: 0.83, green: 0.64, blue: 0.36))
+                        .frame(width: 55, height: 3)
+                        .padding(.top, 1)
+
+                    Spacer(minLength: 8)
+
+                    HStack(alignment: .bottom, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(tr("ACTIVE TRAINING PLAN", "AKTIV TRENINGSPLAN"))
+                                .font(.system(size: 10, weight: .semibold))
+                                .tracking(1.3)
+                                .foregroundStyle(.white.opacity(0.86))
+
+                            Text(program?.title ??
+                                 tr("Create your training plan", "Lag treningsplanen din"))
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.75)
+
+                            if let plan = program {
+                                Text(weekLabel(plan))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white.opacity(0.90))
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Button(action: onOpenPlanner) {
+                            HStack(spacing: 8) {
+                                Text(tr("View plan", "Se planen"))
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                            .padding(.horizontal, 17)
+                            .frame(minHeight: 44)
+                            .background(.white, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-ipad-hero-open-plan")
+                    }
+                }
+                .padding(.leading, geometry.size.width < 620 ? 23 : 42)
+                .padding(.trailing, 26)
+                // Content stays clear of status bar and the native Studio
+                // navigation buttons overlaid on the edge-to-edge photograph.
+                .padding(.top, 87)
+                .padding(.bottom, 33)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: .topLeading)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
+        }
+        .accessibilityIdentifier("athlth-ipad-full-bleed-plan-hero")
     }
 
     private func titleRow(expanded: Bool) -> some View {
