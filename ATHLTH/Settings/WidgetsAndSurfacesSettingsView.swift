@@ -1,56 +1,71 @@
 import SwiftUI
 
 struct ATHLTHWidgetsAndSurfacesSettingsView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @EnvironmentObject private var watchConnection:
         AppleWatchConnectionStore
 
     @State private var liveConfiguration =
         ATHLTHLiveWorkoutPreferencesStore.load()
 
+    private var settingsColumns: [GridItem] {
+        [GridItem(.adaptive(
+            minimum: horizontalSizeClass == .regular ? 410 : 270
+        ), spacing: 18)]
+    }
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.canvasTop,
-                    ATHLTHTheme.canvasBottom
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                intro
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    intro
-
+                LazyVGrid(columns: settingsColumns, alignment: .leading, spacing: 18) {
                     liveWorkoutSettings
+                    ATHLTHCard {
+                        watchPersonalizationSettings
+                    }
+                }
 
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(tr("Widgets and other surfaces", "Widgeter og andre flater"))
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                    Text(tr(
+                        "These are visual examples. Live information comes from your devices.",
+                        "Dette er illustrasjoner. Reelle data hentes fra enhetene dine."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+
+                LazyVGrid(columns: settingsColumns, alignment: .leading, spacing: 18) {
                     ForEach(ATHLTHExternalSurface.allCases) { surface in
                         surfaceCard(surface)
                     }
-
-                    availabilityNote
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 32)
-                .frame(maxWidth: 760)
-                .frame(maxWidth: .infinity)
+
+                availabilityNote
             }
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 34)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle("Widgets & Surfaces")
+        .scrollIndicators(.hidden)
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .navigationTitle(tr("Widgets & Surfaces", "Widgeter og flater"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            liveConfiguration =
-                ATHLTHLiveWorkoutPreferencesStore.load()
+            liveConfiguration = ATHLTHLiveWorkoutPreferencesStore.load()
         }
         .onChange(of: liveConfiguration) { _, configuration in
-            ATHLTHLiveWorkoutPreferencesStore.save(
-                configuration
-            )
-            watchConnection.sendLiveSurfaceConfiguration(
-                configuration
-            )
+            ATHLTHLiveWorkoutPreferencesStore.save(configuration)
+            watchConnection.sendLiveSurfaceConfiguration(configuration)
         }
     }
 
@@ -111,8 +126,6 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                     isOn: $liveConfiguration.audioAlertsEnabled
                 )
 
-                watchPersonalizationSettings
-
                 Text(
                     "These are the same master alert controls shown under Workout Guidance. They affect Route Guardian, target and Ghost alerts on iPhone and Apple Watch; Audio Coach remains separately configurable."
                 )
@@ -146,8 +159,6 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
 
     private var watchPersonalizationSettings: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Divider()
-
             Label(
                 ATHLTHLocalization.choose(
                     english: "Apple Watch display",
