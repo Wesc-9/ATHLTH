@@ -198,28 +198,29 @@ struct GoalsHubView: View {
     }
 
     private var filterControl: some View {
-        HStack(spacing: 5) {
-            ForEach(GoalHubFilter.allCases) { option in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        filter = option
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                ForEach(GoalHubFilter.allCases) { option in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { filter = option }
+                    } label: {
+                        Text(option.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(filter == option ? Color.white : ink)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 40)
+                            .background(filter == option ? ink : Color.clear,
+                                        in: RoundedRectangle(cornerRadius: 13))
                     }
-                } label: {
-                    Text(option.title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(filter == option ? .white : ink)
-                        .frame(maxWidth: .infinity, minHeight: 40)
-                        .background(filter == option ? ink : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 13))
-                        .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(filter == option ? .isSelected : [])
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(filter == option ? .isSelected : [])
             }
+            .padding(4)
+            .background(ATHLTHPlanDesign.warmSurface,
+                        in: RoundedRectangle(cornerRadius: 17))
         }
-        .padding(4)
-        .background(ATHLTHPlanDesign.warmSurface,
-                    in: RoundedRectangle(cornerRadius: 17))
+        .scrollIndicators(.hidden)
     }
 
     private func sectionHeading(_ title: String, detail: String) -> some View {
@@ -562,6 +563,7 @@ struct GoalCoverView: View {
 }
 
 struct GoalDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -727,6 +729,7 @@ struct GoalDetailView: View {
                 ) {
                     Button("Delete Goal", role: .destructive) {
                         goalStore.delete(goal.id)
+                        dismiss()
                     }
                     Button("Cancel", role: .cancel) {}
                 }
@@ -1650,7 +1653,7 @@ struct GoalCreationView: View {
                 }
             }
             .background(
-                ATHLTHTheme.canvasTop
+                goalFlowCanvas
                     .ignoresSafeArea()
             )
             .toolbar(.hidden, for: .navigationBar)
@@ -2216,7 +2219,7 @@ struct GoalCreationView: View {
             }
             .padding(18)
             .background(
-                ATHLTHTheme.canvasTop
+                goalFlowCanvas
                     .ignoresSafeArea()
             )
             .navigationTitle(
@@ -2266,43 +2269,6 @@ struct GoalCreationView: View {
         .presentationDetents(
             [.medium, .large]
         )
-    }
-
-    private func goalCategoryTint(
-        _ category: GoalCategory
-    ) -> Color {
-        switch category {
-        case .event:
-            return ATHLTHPlanDesign.accentInk
-        case .endurance:
-            return ATHLTHPlanDesign.accentInk
-        case .strength:
-            return Color(
-                red: 0.13,
-                green: 0.20,
-                blue: 0.34
-            )
-        case .body:
-            return Color(
-                red: 0.16,
-                green: 0.56,
-                blue: 0.40
-            )
-        case .consistency:
-            return Color(
-                red: 0.38,
-                green: 0.32,
-                blue: 0.74
-            )
-        case .recovery:
-            return ATHLTHPlanDesign.accentInk
-        case .custom:
-            return Color(
-                red: 0.28,
-                green: 0.34,
-                blue: 0.46
-            )
-        }
     }
 
     @ViewBuilder
@@ -5280,9 +5246,14 @@ struct GoalEditView: View {
 
     private var isValidTarget: Bool {
         guard hasEditableMeasurementTarget else { return true }
-        return editedTargetValue.isFinite && editedTargetValue > 0 &&
-            editedBaselineValue.isFinite && editedBaselineValue > 0 &&
-            editedTargetValue != editedBaselineValue
+        guard editedTargetValue.isFinite && editedTargetValue > 0 &&
+              editedBaselineValue.isFinite else { return false }
+        if goal?.bodyMeasurementGoal != nil {
+            return editedBaselineValue > 0 && editedTargetValue != editedBaselineValue
+        }
+        // An Apple Health weight goal may not have a recorded baseline yet.
+        return editedBaselineValue == 0 ||
+            (editedBaselineValue > 0 && editedTargetValue != editedBaselineValue)
     }
 
     var body: some View {
@@ -5467,7 +5438,7 @@ struct GoalEditView: View {
                 target.baselineValue != editedBaselineValue
             if changed {
                 target.targetValue = editedTargetValue
-                target.baselineValue = editedBaselineValue
+                target.baselineValue = editedBaselineValue > 0 ? editedBaselineValue : nil
                 goal.target = target
                 let halfway = (editedBaselineValue + editedTargetValue) / 2
                 for index in goal.milestones.indices {
