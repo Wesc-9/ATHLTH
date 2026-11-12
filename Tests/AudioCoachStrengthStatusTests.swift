@@ -190,4 +190,174 @@ final class AudioCoachStrengthStatusTests: XCTestCase {
         ))
     }
 
+
+    func testScopedCountdownForWarmupMainGroupAndWholePlannedWorkout() {
+        let group = UUID()
+        let nextGroup = UUID()
+        var groupEnd = ATHLTHCoachBoundaryCountdownRule()
+        groupEnd.scope = .group
+        groupEnd.boundary = .ends
+        groupEnd.seconds = 10
+        groupEnd.after = .shortAlert
+        var phaseEnd = ATHLTHCoachBoundaryCountdownRule()
+        phaseEnd.scope = .section
+        phaseEnd.boundary = .ends
+        phaseEnd.seconds = 15
+        phaseEnd.sectionFilter = "main"
+        var groupStart = ATHLTHCoachBoundaryCountdownRule()
+        groupStart.scope = .group
+        groupStart.boundary = .starts
+        groupStart.seconds = 5
+        var finish = ATHLTHCoachBoundaryCountdownRule()
+        finish.scope = .plannedWorkout
+        finish.boundary = .ends
+        finish.seconds = 20
+        finish.after = .numbersOnly
+
+        let rules = [groupEnd, phaseEnd, groupStart, finish]
+        let noneWithinGroup = ATHLTHCoachBoundaryCountdown.chosenRule(
+            rules, currentPhase: "work", nextPhase: "recovery",
+            currentGroupID: group, nextGroupID: group,
+            stepIndex: 1, stepCount: 5
+        )
+        XCTAssertNil(noneWithinGroup)
+
+        let betweenGroups = ATHLTHCoachBoundaryCountdown.chosenRule(
+            rules, currentPhase: "recovery", nextPhase: "work",
+            currentGroupID: group, nextGroupID: nextGroup,
+            stepIndex: 2, stepCount: 5
+        )
+        XCTAssertEqual(betweenGroups?.scope, .group)
+        XCTAssertEqual(betweenGroups?.boundary, .ends)
+        XCTAssertEqual(betweenGroups?.seconds, 10)
+
+        let fromMainToCooldown = ATHLTHCoachBoundaryCountdown.chosenRule(
+            rules, currentPhase: "work", nextPhase: "cooldown",
+            currentGroupID: group, nextGroupID: nil,
+            stepIndex: 3, stepCount: 5
+        )
+        XCTAssertEqual(fromMainToCooldown?.scope, .section)
+        XCTAssertEqual(fromMainToCooldown?.seconds, 15)
+        XCTAssertEqual(fromMainToCooldown?.sectionFilter, "main")
+
+        let finalCountdown = ATHLTHCoachBoundaryCountdown.chosenRule(
+            rules, currentPhase: "cooldown", nextPhase: nil,
+            currentGroupID: nil, nextGroupID: nil,
+            stepIndex: 4, stepCount: 5
+        )
+        XCTAssertEqual(finalCountdown?.scope, .plannedWorkout)
+        XCTAssertEqual(finalCountdown?.seconds, 20)
+        XCTAssertEqual(finalCountdown?.after, .numbersOnly)
+    }
+
+    func testSectionStartCountdownOnlyWhenASectionActuallyChanges() {
+        var beforeMain = ATHLTHCoachBoundaryCountdownRule()
+        beforeMain.scope = .section
+        beforeMain.boundary = .starts
+        beforeMain.sectionFilter = "main"
+        beforeMain.seconds = 10
+
+        XCTAssertNil(ATHLTHCoachBoundaryCountdown.chosenRule(
+            [beforeMain], currentPhase: "work", nextPhase: "recovery",
+            currentGroupID: nil, nextGroupID: nil, stepIndex: 1, stepCount: 4
+        ))
+        let selection = ATHLTHCoachBoundaryCountdown.chosenRule(
+            [beforeMain], currentPhase: "warmup", nextPhase: "work",
+            currentGroupID: nil, nextGroupID: UUID(),
+            stepIndex: 0, stepCount: 4
+        )
+        XCTAssertEqual(selection?.scope, .section)
+        XCTAssertEqual(selection?.boundary, .starts)
+
+        var startWhole = ATHLTHCoachBoundaryCountdownRule()
+        startWhole.scope = .plannedWorkout
+        startWhole.boundary = .starts
+        XCTAssertNil(ATHLTHCoachBoundaryCountdown.chosenRule(
+            [startWhole], currentPhase: "warmup", nextPhase: "work",
+            currentGroupID: nil, nextGroupID: nil, stepIndex: 0, stepCount: 4
+        ))
+    }
+
+    func testLengthWinsWhenMultipleCountdownRulesShareOneBoundary() {
+        var dragEnd = ATHLTHCoachBoundaryCountdownRule()
+        dragEnd.scope = .step
+        dragEnd.seconds = 5
+        var groupEnd = ATHLTHCoachBoundaryCountdownRule()
+        groupEnd.scope = .group
+        groupEnd.seconds = 15
+        let selected = ATHLTHCoachBoundaryCountdown.chosenRule(
+            [dragEnd, groupEnd],
+            currentPhase: "work", nextPhase: "cooldown",
+            currentGroupID: UUID(), nextGroupID: nil,
+            stepIndex: 2, stepCount: 4
+        )
+        XCTAssertEqual(selected?.scope, .group)
+        XCTAssertEqual(selected?.seconds, 15)
+    }
+
+    func testStrengthScopedCountdownOnlyAtKnownEndsAndStarts() {
+        var step = ATHLTHCoachBoundaryCountdownRule()
+        step.scope = .step
+        step.boundary = .ends
+        step.seconds = 5
+        var section = ATHLTHCoachBoundaryCountdownRule()
+        section.scope = .section
+        section.boundary = .ends
+        section.seconds = 10
+        var whole = ATHLTHCoachBoundaryCountdownRule()
+        whole.scope = .plannedWorkout
+        whole.boundary = .ends
+        whole.seconds = 15
+        let rules = [step, section, whole]
+        XCTAssertEqual(
+            ATHLTHCoachBoundaryCountdown.forStrengthTimedSet(
+                rules, exerciseIndex: 0, exerciseCount: 3,
+                setIndex: 0, setCount: 3
+            )?.scope, .step
+        )
+        XCTAssertEqual(
+            ATHLTHCoachBoundaryCountdown.forStrengthTimedSet(
+                rules, exerciseIndex: 1, exerciseCount: 3,
+                setIndex: 2, setCount: 3
+            )?.scope, .section
+        )
+        XCTAssertEqual(
+            ATHLTHCoachBoundaryCountdown.forStrengthTimedSet(
+                rules, exerciseIndex: 2, exerciseCount: 3,
+                setIndex: 2, setCount: 3
+            )?.scope, .plannedWorkout
+        )
+        var begin = ATHLTHCoachBoundaryCountdownRule()
+        begin.scope = .section
+        begin.boundary = .starts
+        XCTAssertNil(ATHLTHCoachBoundaryCountdown.forStrengthAfterRest(
+            [begin], nextExercise: false
+        ))
+        XCTAssertEqual(ATHLTHCoachBoundaryCountdown.forStrengthAfterRest(
+            [begin], nextExercise: true
+        )?.scope, .section)
+    }
+
+    func testScopedRulesSurviveProfileAndWatchTransfer() throws {
+        var rule = ATHLTHCoachBoundaryCountdownRule()
+        rule.scope = .section
+        rule.sectionFilter = "cooldown"
+        rule.boundary = .starts
+        rule.seconds = 20
+        rule.after = .shortAlert
+        var draft = AudioCoachDraft()
+        draft.smartPrompts.boundaryCountdownRules = [rule]
+        let original = draft.configuration()
+        XCTAssertEqual(original.effectiveBoundaryCountdownRules, [rule])
+        let restored = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self,
+            from: JSONEncoder().encode(original)
+        )
+        XCTAssertEqual(restored.effectiveBoundaryCountdownRules, [rule])
+        var strength = StrengthAudioCoachConfiguration()
+        strength.boundaryCountdownRules = [rule]
+        let transfer = strength.watchConfiguration
+        XCTAssertEqual(transfer.effectiveBoundaryCountdownRules, [rule])
+    }
+
 }
