@@ -14,7 +14,7 @@ struct GoalsHubView: View {
     private let canvas = ATHLTHPlanDesign.canvas
 
     private enum GoalHubFilter: String, CaseIterable, Identifiable {
-        case all, active, paused
+        case all, active, paused, completed, archived
 
         var id: String { rawValue }
         var title: String {
@@ -22,6 +22,8 @@ struct GoalsHubView: View {
             case .all: return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
             case .active: return ATHLTHLocalization.choose(english: "Active", norwegian: "Aktive")
             case .paused: return ATHLTHLocalization.choose(english: "Paused", norwegian: "Deaktiverte")
+            case .completed: return ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullførte")
+            case .archived: return ATHLTHLocalization.choose(english: "Archived", norwegian: "Arkiverte")
             }
         }
     }
@@ -45,6 +47,8 @@ struct GoalsHubView: View {
                 case .all: return true
                 case .active: return goal.status == .active
                 case .paused: return goal.status == .paused
+                case .completed: return goal.status == .completed
+                case .archived: return goal.status == .abandoned
                 }
             }
             .sorted { lhs, rhs in
@@ -555,34 +559,6 @@ struct GoalCoverView: View {
     }
 }
 
-private enum ATHLTHGoalDetailTab: String, CaseIterable, Identifiable {
-    case overview
-    case milestones
-    case progress
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .overview:
-            return ATHLTHLocalization.choose(
-                english: "Overview",
-                norwegian: "Oversikt"
-            )
-        case .milestones:
-            return ATHLTHLocalization.choose(
-                english: "Milestones",
-                norwegian: "Delmål"
-            )
-        case .progress:
-            return ATHLTHLocalization.choose(
-                english: "Progress",
-                norwegian: "Fremdrift"
-            )
-        }
-    }
-}
-
 struct GoalDetailView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var health: HealthKitManager
@@ -596,7 +572,7 @@ struct GoalDetailView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingAddMilestone = false
     @State private var showingEditGoal = false
-    @State private var selectedGoalTab: ATHLTHGoalDetailTab = .overview
+    @State private var measurementProfile = ATHLTHTrainingProfile()
 
     private var goal: ATHLTHGoal? {
         goalStore.goals.first { $0.id == goalID }
@@ -608,62 +584,43 @@ struct GoalDetailView: View {
                 ScrollView(.vertical) {
                     VStack(spacing: 16) {
                         hero(goal)
-                        goalDetailTabPicker
-                            .padding(.horizontal, 16)
-
-                        switch selectedGoalTab {
-                        case .overview:
-                            if goal.bodyMeasurementGoal != nil {
-                                ATHLTHBodyGoalProgressView(goal: goal)
-                                    .padding(.horizontal, 16)
-                            } else {
-                                progressCard(goal)
-                                milestonesCard(goal)
-                            }
-
-                            if let why = goal.whyItMatters, !why.isEmpty {
-                                infoCard(
-                                    title: ATHLTHLocalization.choose(
-                                        english: "Why this matters",
-                                        norwegian: "Hvorfor dette betyr noe"
-                                    ),
-                                    icon: "heart.fill",
-                                    text: why
-                                )
-                            }
-
-                            trackingCard(goal)
-
-                            if let notes = goal.notes, !notes.isEmpty {
-                                infoCard(
-                                    title: ATHLTHLocalization.choose(
-                                        english: "Notes",
-                                        norwegian: "Notater"
-                                    ),
-                                    icon: "note.text",
-                                    text: notes
-                                )
-                            }
-
-                            actionsCard(goal)
-                        case .milestones:
-                            if goal.bodyMeasurementGoal != nil {
-                                ATHLTHBodyGoalProgressView(goal: goal)
-                                    .padding(.horizontal, 16)
-                            } else {
-                                milestonesCard(goal)
-                                trackingCard(goal)
-                            }
-                        case .progress:
-                            if goal.bodyMeasurementGoal != nil {
-                                ATHLTHBodyGoalProgressView(goal: goal)
-                                    .padding(.horizontal, 16)
-                            } else {
-                                progressCard(goal)
-                                goalProgressInsightCard(goal)
-                                trackingCard(goal)
-                            }
+                        progressCard(goal)
+                        milestonesCard(goal)
+                        if goal.bodyMeasurementGoal != nil {
+                            ATHLTHBodyGoalProgressView(goal: goal)
+                                .padding(.horizontal, 16)
+                        } else {
+                            goalProgressInsightCard(goal)
                         }
+                        if let why = goal.whyItMatters, !why.isEmpty {
+                            infoCard(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Why this matters", norwegian: "Hvorfor dette betyr noe"
+                                ),
+                                icon: "heart", text: why
+                            )
+                        }
+                        if let notes = goal.notes, !notes.isEmpty {
+                            infoCard(
+                                title: ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater"),
+                                icon: "note.text", text: notes
+                            )
+                        }
+                        DisclosureGroup {
+                            trackingCard(goal)
+                            actionsCard(goal)
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(english: "More details", norwegian: "Flere detaljer"),
+                                systemImage: "slider.horizontal.3"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        }
+                        .tint(ATHLTHPlanDesign.accentInk)
+                        .padding(16)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
+                        .padding(.horizontal, 16)
                     }
                     .frame(
                         maxWidth: .infinity,
@@ -683,10 +640,7 @@ struct GoalDetailView: View {
                 .ignoresSafeArea(
                     edges: .top
                 )
-                .background(
-                    Color(red: 0.965, green: 0.975, blue: 0.992)
-                        .ignoresSafeArea()
-                )
+                .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
                 .safeAreaInset(
                     edge: .bottom,
                     spacing: 0
@@ -697,8 +651,23 @@ struct GoalDetailView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            GoalsHubView()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(english: "All goals", norwegian: "Alle mål"),
+                                systemImage: "list.bullet"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .background(.regularMaterial, in: Capsule())
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         Menu {
-                            Button("Edit Goal", systemImage: "pencil") {
+                            Button(ATHLTHLocalization.choose(english: "Edit goal", norwegian: "Rediger mål"), systemImage: "pencil") {
                                 showingEditGoal = true
                             }
 
@@ -708,19 +677,26 @@ struct GoalDetailView: View {
                                 }
                             }
 
-                            Button("Add Milestone", systemImage: "plus.circle") {
+                            Button(ATHLTHLocalization.choose(english: "Add milestone", norwegian: "Legg til delmål"), systemImage: "plus.circle") {
                                 showingAddMilestone = true
                             }
 
                             Divider()
 
-                            Button("Delete Goal", systemImage: "trash", role: .destructive) {
+                            Button(ATHLTHLocalization.choose(english: "Delete goal", norwegian: "Slett mål"), systemImage: "trash", role: .destructive) {
                                 showingDeleteConfirmation = true
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
+                                .accessibilityLabel(ATHLTHLocalization.choose(english: "Manage goal", norwegian: "Administrer mål"))
                         }
                     }
+                }
+                .onAppear {
+                    measurementProfile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+                    measurementProfile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
                 }
                 .task {
                     await goalStore.refreshAutomaticMilestones(
@@ -942,53 +918,6 @@ struct GoalDetailView: View {
         .clipped()
     }
 
-    private var goalDetailTabPicker: some View {
-        HStack(spacing: 4) {
-            ForEach(ATHLTHGoalDetailTab.allCases) { tab in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        selectedGoalTab = tab
-                    }
-                } label: {
-                    Text(tab.title)
-                        .font(.subheadline.weight(
-                            selectedGoalTab == tab ? .semibold : .medium
-                        ))
-                        .foregroundStyle(
-                            selectedGoalTab == tab
-                                ? ATHLTHTheme.accentDeep
-                                : ATHLTHTheme.mutedText
-                        )
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 39)
-                        .background(
-                            selectedGoalTab == tab
-                                ? Color.white
-                                : Color.clear,
-                            in: RoundedRectangle(
-                                cornerRadius: 13,
-                                style: .continuous
-                            )
-                        )
-                        .shadow(
-                            color: selectedGoalTab == tab
-                                ? Color.black.opacity(0.055)
-                                : Color.clear,
-                            radius: 7,
-                            y: 2
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(4)
-        .background(
-            Color(red: 0.91, green: 0.94, blue: 0.98),
-            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
-        )
-        .accessibilityElement(children: .contain)
-    }
-
     private func goalStatTile(
         icon: String,
         value: String,
@@ -1117,7 +1046,9 @@ struct GoalDetailView: View {
     }
 
     private func progressCard(_ goal: ATHLTHGoal) -> some View {
-        let progress = min(max(goal.progress, 0), 1)
+        let progress = goal.bodyMeasurementGoal == nil
+            ? min(max(goal.progress, 0), 1)
+            : ATHLTHBodyGoalCheckInPolicy.progress(goal, profile: measurementProfile)
         let remainingDays = goal.deadline.map {
             max(Calendar.current.dateComponents(
                 [.day],
@@ -1131,13 +1062,13 @@ struct GoalDetailView: View {
                 ZStack {
                     Circle()
                         .stroke(
-                            Color(red: 0.90, green: 0.94, blue: 0.98),
+                            ATHLTHPlanDesign.warmDivider,
                             lineWidth: 13
                         )
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(
-                            ATHLTHTheme.accentDeep,
+                            ATHLTHPlanDesign.accent,
                             style: StrokeStyle(
                                 lineWidth: 13,
                                 lineCap: .round
@@ -2040,8 +1971,7 @@ struct GoalCreationView: View {
 
     private var goalSelectedCategoryCard:
         some View {
-        let tint =
-            goalCategoryTint(category)
+        let tint = goalFlowGold
 
         return HStack(spacing: 12) {
             Image(
@@ -5534,7 +5464,7 @@ struct GoalEditView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color(red: 0.965, green: 0.975, blue: 0.992).ignoresSafeArea())
-            .tint(ATHLTHTheme.accentDeep)
+            .tint(ATHLTHPlanDesign.accentInk)
             .navigationTitle(ATHLTHLocalization.choose(english: "Edit Goal", norwegian: "Rediger mål"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
