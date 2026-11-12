@@ -289,17 +289,20 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         // alongside the selected-day schedule.
                         if split {
                             HStack(alignment: .top, spacing: 18) {
-                                titleRow(expanded: true)
-                                    .frame(maxWidth: .infinity)
+                                VStack(alignment: .leading, spacing: 16) {
+                                    titleRow(expanded: true)
+                                    activePlanSummary
+                                }
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+
                                 compactReadinessCard
                                     .frame(width: min(390, max(310, width * 0.30)))
                             }
                         } else {
                             titleRow(expanded: false)
                             compactReadinessCard
+                            activePlanSummary
                         }
-
-                        activePlanSummary
                         // The selected day's full schedule is INSIDE the
                         // weekly card, immediately below its summary.
                         weekCard(week, width: width)
