@@ -368,14 +368,16 @@ struct GoalsHubView: View {
 
 struct GoalSummaryCard: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
     let goal: ATHLTHGoal
     let prominent: Bool
 
     private var measuredProgress: Double {
-        goal.bodyMeasurementGoal == nil ? goal.progress :
-            ATHLTHBodyGoalCheckInPolicy.progress(
-                goal, profile: ATHLTHTrainingProfile.load(userID: session.profile.userID)
-            )
+        ATHLTHGoalProgressPolicy.progress(
+            for: goal,
+            profile: ATHLTHTrainingProfile.load(userID: session.profile.userID),
+            latestBodyWeightKilograms: health.personalDetails.weightKilograms
+        )
     }
 
     private var statusLabel: String {
@@ -918,278 +920,174 @@ struct GoalDetailView: View {
         .clipped()
     }
 
-    private func goalStatTile(
-        icon: String,
-        value: String,
-        label: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-
-            Text(value)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .frame(minHeight: 105, alignment: .topLeading)
-        .background(
-            Color(red: 0.962, green: 0.975, blue: 0.995),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
-    }
-
     private func goalProgressInsightCard(_ goal: ATHLTHGoal) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Your milestones",
-                        norwegian: "Dine delmål"
-                    ),
-                    systemImage: "chart.bar.xaxis"
-                )
-                .font(.headline)
-                .foregroundStyle(ATHLTHTheme.primaryText)
-
-                Spacer()
-
-                Text("\(goal.completedMilestones)/\(goal.milestones.count)")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-            }
+        VStack(alignment: .leading, spacing: 13) {
+            Text(ATHLTHLocalization.choose(english: "Development", norwegian: "Utvikling"))
+                .font(.title3.weight(.bold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
 
             if goal.milestones.isEmpty {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Add milestones to see your progress.",
-                        norwegian: "Legg til delmål for å se fremdriften."
-                    )
-                )
+                Text(ATHLTHLocalization.choose(
+                    english: "Add milestones to follow progress.",
+                    norwegian: "Legg til delmål for å følge utviklingen."
+                ))
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             } else {
                 HStack(spacing: 6) {
-                    ForEach(Array(goal.milestones.enumerated()), id: \.element.id) {
-                        index, milestone in
+                    ForEach(goal.milestones) { milestone in
                         Capsule()
-                            .fill(
-                                milestone.isCompleted
-                                    ? ATHLTHTheme.accentDeep
-                                    : ATHLTHTheme.accentSoft
-                            )
+                            .fill(milestone.isCompleted
+                                  ? ATHLTHPlanDesign.accent
+                                  : ATHLTHPlanDesign.warmDivider)
                             .frame(maxWidth: .infinity)
                             .frame(height: 9)
-                            .accessibilityLabel(
-                                "\(index + 1): \(milestone.title)"
-                            )
-                            .accessibilityValue(
-                                milestone.isCompleted
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Completed",
-                                        norwegian: "Fullført"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english: "Not completed",
-                                        norwegian: "Ikke fullført"
-                                    )
-                            )
+                            .accessibilityLabel(milestone.title)
+                            .accessibilityValue(milestone.isCompleted
+                                ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
+                                : ATHLTHLocalization.choose(english: "Incomplete", norwegian: "Ikke fullført"))
                     }
                 }
-
-                ForEach(Array(goal.milestones.enumerated()), id: \.element.id) {
-                    index, milestone in
-                    HStack(alignment: .top, spacing: 11) {
-                        Image(
-                            systemName: milestone.isCompleted
-                                ? "checkmark.circle.fill"
-                                : "circle"
-                        )
-                        .font(.system(size: 19))
-                        .foregroundStyle(
-                            milestone.isCompleted
-                                ? Color.green
-                                : ATHLTHTheme.accentDeep
-                        )
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(milestone.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                            Text(milestone.targetDescription)
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .lineLimit(2)
-                        }
-                        Spacer(minLength: 4)
-                        Text("\(index + 1)")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                    .padding(.vertical, 4)
-                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Completed milestones appear in gold. Records update your progress automatically when enabled.",
+                    norwegian: "Fullførte delmål vises i gull. Registrerte resultater oppdaterer fremdriften automatisk når sporing er aktivert."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
         }
-        .padding(16)
+        .padding(18)
         .goalCard()
         .padding(.horizontal, 16)
     }
 
     private func progressCard(_ goal: ATHLTHGoal) -> some View {
-        let progress = goal.bodyMeasurementGoal == nil
-            ? min(max(goal.progress, 0), 1)
-            : ATHLTHBodyGoalCheckInPolicy.progress(goal, profile: measurementProfile)
-        let remainingDays = goal.deadline.map {
-            max(Calendar.current.dateComponents(
-                [.day],
-                from: Calendar.current.startOfDay(for: Date()),
-                to: Calendar.current.startOfDay(for: $0)
-            ).day ?? 0, 0)
-        }
+        let progress = ATHLTHGoalProgressPolicy.progress(
+            for: goal,
+            profile: measurementProfile,
+            latestBodyWeightKilograms: health.personalDetails.weightKilograms
+        )
+        let metric = goal.target?.metric
+        let startingValue = goal.bodyMeasurementGoal?.baseline ?? goal.target?.baselineValue
+        let targetValue = goal.bodyMeasurementGoal?.target ?? goal.target?.targetValue
+        let unit = goal.bodyMeasurementGoal?.metric.unit ?? goal.target?.unit ?? ""
 
-        return VStack(alignment: .leading, spacing: 17) {
-            HStack(spacing: 17) {
-                ZStack {
-                    Circle()
-                        .stroke(
-                            ATHLTHPlanDesign.warmDivider,
-                            lineWidth: 13
-                        )
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(
-                            ATHLTHPlanDesign.accent,
-                            style: StrokeStyle(
-                                lineWidth: 13,
-                                lineCap: .round
-                            )
-                        )
-                        .rotationEffect(.degrees(-90))
+        return HStack(alignment: .center, spacing: 15) {
+            ZStack {
+                Circle()
+                    .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 12)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(ATHLTHPlanDesign.accent,
+                            style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text("\(Int((progress * 100).rounded()))%")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .monospacedDigit()
+            }
+            .frame(width: 112, height: 112)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Goal progress", norwegian: "Målfremdrift"
+            ))
+            .accessibilityValue("\(Int((progress * 100).rounded()))%")
 
-                    VStack(spacing: 2) {
-                        Text("\(Int((progress * 100).rounded()))%")
-                            .font(
-                                .system(
-                                    size: 29,
-                                    weight: .bold,
-                                    design: .rounded
-                                )
-                            )
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+            Rectangle()
+                .fill(ATHLTHPlanDesign.warmDivider)
+                .frame(width: 1)
 
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Milestones",
-                                norwegian: "Delmål"
+            VStack(alignment: .leading, spacing: 10) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Your progress", norwegian: "Din fremdrift"
+                ))
+                .font(.headline.weight(.bold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "\(goal.completedMilestones) of \(goal.milestones.count) milestones completed",
+                    norwegian: "\(goal.completedMilestones) av \(goal.milestones.count) delmål fullført"
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                if let targetValue {
+                    Divider()
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        if let startingValue {
+                            valueTile(
+                                ATHLTHLocalization.choose(english: "Start", norwegian: "Start"),
+                                number: startingValue, unit: unit, metric: metric
                             )
+                        }
+                        Spacer(minLength: 0)
+                        valueTile(
+                            ATHLTHLocalization.choose(english: "Target", norwegian: "Mål"),
+                            number: targetValue, unit: unit, metric: metric
                         )
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
                     }
-                }
-                .frame(width: 130, height: 130)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(
-                    ATHLTHLocalization.format(
-                        english: "%d percent of milestones complete",
-                        norwegian: "%d prosent av delmålene fullført",
-                        Int((progress * 100).rounded())
-                    )
-                )
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Label(
-                        goal.category.title,
-                        systemImage: goal.category.systemImage
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                    Text(goal.title)
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(3)
-
-                    if let deadline = goal.deadline {
-                        Label(
-                            deadline.formatted(date: .abbreviated, time: .omitted),
-                            systemImage: "calendar"
-                        )
+                } else if let deadline = goal.deadline {
+                    Label(deadline.formatted(date: .abbreviated, time: .omitted),
+                          systemImage: "calendar")
                         .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
-                Spacer(minLength: 0)
             }
-
-            HStack(spacing: 9) {
-                goalStatTile(
-                    icon: "checkmark.circle.fill",
-                    value: "\(goal.completedMilestones)",
-                    label: ATHLTHLocalization.choose(
-                        english: "Completed",
-                        norwegian: "Fullført"
-                    )
-                )
-                goalStatTile(
-                    icon: "list.number",
-                    value: "\(goal.milestones.count)",
-                    label: ATHLTHLocalization.choose(
-                        english: "Milestones",
-                        norwegian: "Delmål"
-                    )
-                )
-                goalStatTile(
-                    icon: "calendar",
-                    value: remainingDays.map { String($0) } ?? "—",
-                    label: ATHLTHLocalization.choose(
-                        english: "Days left",
-                        norwegian: "Dager igjen"
-                    )
-                )
-            }
-
-            if let latestEvidence = goal.milestones
-                .compactMap(\.lastEvidenceDescription)
-                .last {
-                Label(latestEvidence, systemImage: "waveform.path.ecg")
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .lineLimit(3)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
+        .padding(17)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .goalCard()
         .padding(.horizontal, 16)
+    }
+
+    private func valueTile(
+        _ title: String, number: Double, unit: String, metric: GoalMetric?
+    ) -> some View {
+        let displayValue: Double
+        let displayUnit: String
+        switch metric {
+        case .singleWorkoutDistanceMeters:
+            displayValue = number / 1_000
+            displayUnit = "km"
+        case .sleepDurationSeconds:
+            displayValue = number / 3_600
+            displayUnit = "h"
+        default:
+            displayValue = number
+            displayUnit = unit
+        }
+
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            Text(displayValue.formatted(.number.precision(.fractionLength(0...1)))
+                 + " " + displayUnit)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
     }
 
     private func milestonesCard(_ goal: ATHLTHGoal) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("Milestones")
+                Text(ATHLTHLocalization.choose(english: "Milestones", norwegian: "Delmål"))
                     .font(.title3.bold())
                 Spacer()
                 Button {
                     showingAddMilestone = true
                 } label: {
-                    Label("Add", systemImage: "plus")
+                    Label(ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til"), systemImage: "plus")
                         .font(.caption.bold())
                 }
             }
             .padding(.bottom, 8)
 
             if goal.milestones.isEmpty {
-                Text("No milestones yet.")
+                Text(ATHLTHLocalization.choose(english: "No milestones yet.", norwegian: "Ingen delmål ennå."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 12)
