@@ -5267,9 +5267,22 @@ struct GoalEditView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
     @State private var didLoad = false
+    @State private var editedTargetValue = 0.0
+    @State private var editedBaselineValue = 0.0
 
     private var goal: ATHLTHGoal? {
         goalStore.goals.first { $0.id == goalID }
+    }
+
+    private var hasEditableMeasurementTarget: Bool {
+        goal?.bodyMeasurementGoal != nil || goal?.target?.metric == .bodyWeightKilograms
+    }
+
+    private var isValidTarget: Bool {
+        guard hasEditableMeasurementTarget else { return true }
+        return editedTargetValue.isFinite && editedTargetValue > 0 &&
+            editedBaselineValue.isFinite && editedBaselineValue > 0 &&
+            editedTargetValue != editedBaselineValue
     }
 
     var body: some View {
@@ -5294,6 +5307,36 @@ struct GoalEditView: View {
                     }
 
                     Toggle(ATHLTHLocalization.choose(english: "Primary Goal", norwegian: "Hovedmål"), isOn: $makePrimary)
+                }
+
+                if hasEditableMeasurementTarget {
+                    Section(ATHLTHLocalization.choose(
+                        english: "Target and starting point",
+                        norwegian: "Mål og utgangspunkt"
+                    )) {
+                        TextField(
+                            ATHLTHLocalization.choose(english: "Starting measurement",
+                                                      norwegian: "Startmåling"),
+                            value: $editedBaselineValue,
+                            format: .number.precision(.fractionLength(0...2))
+                        )
+                        .keyboardType(.decimalPad)
+
+                        TextField(
+                            ATHLTHLocalization.choose(english: "Target measurement",
+                                                      norwegian: "Måleverdi"),
+                            value: $editedTargetValue,
+                            format: .number.precision(.fractionLength(0...2))
+                        )
+                        .keyboardType(.decimalPad)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Recorded measurements are retained. Automatic weight milestones are recalculated on save.",
+                            norwegian: "Registrerte målinger beholdes. Automatiske delmål for vekt oppdateres når du lagrer."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
                 }
 
                 Section(ATHLTHLocalization.choose(english: "Identity", norwegian: "Utseende og motivasjon")) {
@@ -5355,13 +5398,13 @@ struct GoalEditView: View {
                 }
 
                 Section {
-                    Text(ATHLTHLocalization.choose(english: "Target rules and existing automatic milestones are kept unchanged when editing metadata. This prevents accidental changes to what counts as completion.", norwegian: "Målregler og automatiske delmål beholdes uendret når du redigerer. Dette hindrer at fullføringskriteriene endres ved et uhell."))
+                    Text(ATHLTHLocalization.choose(english: "Other goal types keep their existing automatic completion rules.", norwegian: "Andre måltyper beholder eksisterende regler for automatisk fullføring."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color(red: 0.965, green: 0.975, blue: 0.992).ignoresSafeArea())
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .tint(ATHLTHPlanDesign.accentInk)
             .navigationTitle(ATHLTHLocalization.choose(english: "Edit Goal", norwegian: "Rediger mål"))
             .navigationBarTitleDisplayMode(.inline)
@@ -5372,7 +5415,7 @@ struct GoalEditView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) { save() }
-                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !isValidTarget)
                 }
             }
             .task {
@@ -5396,6 +5439,8 @@ struct GoalEditView: View {
         whyItMatters = goal.whyItMatters ?? ""
         notes = goal.notes ?? ""
         privacy = goal.privacy
+        editedTargetValue = goal.bodyMeasurementGoal?.target ?? goal.target?.targetValue ?? 0
+        editedBaselineValue = goal.bodyMeasurementGoal?.baseline ?? goal.target?.baselineValue ?? 0
         makePrimary = goal.isPrimary
         selectedTrainingPlanID =
             goal.linkedTrainingPlanID
@@ -5410,6 +5455,47 @@ struct GoalEditView: View {
         goal.whyItMatters = whyItMatters.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         goal.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         goal.privacy = privacy
+
+        if isValidTarget, let original = goal.bodyMeasurementGoal {
+            var config = original
+            config.baseline = editedBaselineValue
+            config.target = editedTargetValue
+            goal.bodyMeasurementGoal = config
+        } else if isValidTarget, var target = goal.target,
+                  target.metric == .bodyWeightKilograms {
+            let changed = target.targetValue != editedTargetValue ||
+                target.baselineValue != editedBaselineValue
+            if changed {
+                target.targetValue = editedTargetValue
+                target.baselineValue = editedBaselineValue
+                goal.target = target
+                let halfway = (editedBaselineValue + editedTargetValue) / 2
+                for index in goal.milestones.indices {
+                    guard var rule = goal.milestones[index].automationRule,
+                          rule.metric == .bodyWeightKilograms else { continue }
+                    let threshold = goal.milestones[index].completesGoal
+                        ? editedTargetValue : halfway
+                    rule.targetValue = threshold
+                    rule.baselineValue = editedBaselineValue
+                    rule.comparison = editedTargetValue < editedBaselineValue
+                        ? .atMost : .atLeast
+                    goal.milestones[index].automationRule = rule
+                    goal.milestones[index].title = ATHLTHLocalization.choose(
+                        english: "Reach \(threshold.formatted(.number.precision(.fractionLength(0...1)))) kg",
+                        norwegian: "Nå \(threshold.formatted(.number.precision(.fractionLength(0...1)))) kg"
+                    )
+                    if goal.milestones[index].completionMethod != .manual {
+                        goal.milestones[index].completedAt = nil
+                        goal.milestones[index].completionMethod = nil
+                        goal.milestones[index].lastEvidenceDescription = nil
+                    }
+                }
+                if goal.status == .completed {
+                    goal.status = .active
+                    goal.completedAt = nil
+                }
+            }
+        }
         goal.isPrimary = makePrimary
         goal.linkedTrainingPlanID =
             selectedTrainingPlanID
