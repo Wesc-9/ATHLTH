@@ -372,6 +372,7 @@ struct GoalSummaryCard: View {
     @EnvironmentObject private var health: HealthKitManager
     let goal: ATHLTHGoal
     let prominent: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var measuredProgress: Double {
         ATHLTHGoalProgressPolicy.progress(
@@ -395,65 +396,85 @@ struct GoalSummaryCard: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            GoalCoverView(goal: goal)
-                .frame(width: prominent ? 100 : 80,
-                       height: prominent ? 126 : 95)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .opacity(goal.status == .paused ? 0.55 : 1)
-                .accessibilityHidden(true)
+        GeometryReader { geometry in
+            // Give the photo more visual weight while keeping text readable
+            // on compact iPhones and resizable iPad windows.
+            let availableWidth = geometry.size.width
+            let imageFraction: CGFloat = prominent ? 0.46 : 0.44
+            let minimumImageWidth: CGFloat = dynamicTypeSize.isAccessibilitySize ? 92 : 116
+            let imageWidth = min(max(availableWidth * imageFraction, minimumImageWidth), 280)
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 5) {
-                    if goal.isPrimary && goal.status == .active {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Main goal", norwegian: "Hovedmål"
-                        ), systemImage: "star.fill")
-                        .foregroundStyle(ATHLTHPlanDesign.accent)
-                    }
-                    Text(statusLabel)
-                        .foregroundStyle(goal.status == .active
-                            ? ATHLTHPlanDesign.ink
-                            : ATHLTHPlanDesign.secondaryInk)
-                }
-                .font(.system(size: 10, weight: .semibold))
-                .lineLimit(1)
+            HStack(alignment: .center, spacing: 11) {
+                GoalCoverView(goal: goal)
+                    .frame(width: imageWidth, height: prominent ? 146 : 126)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .opacity(goal.status == .paused ? 0.55 : 1)
+                    .accessibilityHidden(true)
 
-                Text(goal.title)
-                    .font(.system(size: prominent ? 21 : 18,
-                                  weight: .semibold, design: .serif))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-
-                Text(goal.category.title)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    .lineLimit(1)
-
-                HStack(spacing: 6) {
-                    Text("\(Int((measuredProgress * 100).rounded()))%")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                    GeometryReader { proxy in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(ATHLTHPlanDesign.warmDivider)
-                            Capsule().fill(ATHLTHPlanDesign.accent)
-                                .frame(width: proxy.size.width *
-                                       min(1, max(0, measuredProgress)))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 5) {
+                        if goal.isPrimary && goal.status == .active {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Main goal", norwegian: "Hovedmål"
+                            ), systemImage: "star.fill")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        } else {
+                            Text(statusLabel)
+                                .foregroundStyle(goal.status == .active
+                                    ? ATHLTHPlanDesign.ink
+                                    : ATHLTHPlanDesign.secondaryInk)
                         }
                     }
-                    .frame(height: 5)
-                }
-                if let deadline = goal.deadline {
-                    Text(deadline.formatted(.dateTime.day().month(.abbreviated).year()))
-                        .font(.system(size: 10))
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                    Text(goal.title)
+                        .font(.system(size: prominent ? 18 : 16,
+                                      weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(goal.category.title)
+                        .font(.caption2)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+
+                    HStack(spacing: 6) {
+                        Text("\(Int((measuredProgress * 100).rounded()))%")
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        GeometryReader { progressGeometry in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(ATHLTHPlanDesign.warmDivider)
+                                Capsule().fill(ATHLTHPlanDesign.accent)
+                                    .frame(width: progressGeometry.size.width *
+                                           min(1, max(0, measuredProgress)))
+                            }
+                        }
+                        .frame(height: 5)
+                    }
+                    if let deadline = goal.deadline {
+                        Text(deadline.formatted(.dateTime.day().month(.abbreviated).year()))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.leading, 11)
+        .frame(height: prominent ? 146 : 126)
+        .padding(.leading, 10)
         .padding(.trailing, 4)
     }
 }
