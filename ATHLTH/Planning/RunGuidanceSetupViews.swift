@@ -319,7 +319,6 @@ struct RunGuidanceSetupView: View {
 
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
 
-                    if routeAvailable {
                         NavigationLink {
                             PerWorkoutGhostView(draft: $ghost, route: route)
                         } label: {
@@ -336,10 +335,11 @@ struct RunGuidanceSetupView: View {
                                         english: "Choose a target time and Ghost updates",
                                         norwegian: "Velg måltid og Ghost-oppdateringer"
                                     ),
-                                enabled: ghost.enabled
+                                enabled: routeAvailable && ghost.enabled
                             )
                         }
                         .buttonStyle(.plain)
+                        .disabled(!routeAvailable)
 
                         Divider().overlay(ATHLTHPlanDesign.warmDivider)
 
@@ -362,41 +362,15 @@ struct RunGuidanceSetupView: View {
                                         english: "Deviation, recovery and alert settings",
                                         norwegian: "Avvik, retur til ruten og varsler"
                                     ),
-                                enabled: routeGuardian.enabled
+                                enabled: routeAvailable && routeGuardian.enabled
                             )
                         }
                         .buttonStyle(.plain)
-                    } else {
-                        HStack(spacing: 10) {
-                            Image(systemName: "map")
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            Text(ATHLTHLocalization.choose(
-                                english: "Select a route to set up Ghost Race and Navigation.",
-                                norwegian: "Velg en rute for å tilpasse Ghost Race og navigasjon."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 5)
-                    }
+                        .disabled(!routeAvailable)
+
                 }
 
-                ATHLTHPlanSurface(ghost: false, density: .compact) {
-                    NavigationLink {
-                        ATHLTHWorkoutGuidanceSettingsView()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                .frame(width: 39, height: 39)
-                                .background(
-                                    ATHLTHPlanDesign.selectedSurface,
-                                    in: RoundedRectangle(cornerRadius: 12)
-                                )
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(ATHLTHLocalization.choose(
+                Text(ATHLTHLocalization.choose(
                                     english: "Default guidance settings",
                                     norwegian: "Standardinnstillinger for veiledning"
                                 ))
