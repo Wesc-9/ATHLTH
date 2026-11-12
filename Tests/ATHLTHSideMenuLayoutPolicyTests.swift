@@ -6,37 +6,36 @@ final class ATHLTHSideMenuLayoutPolicyTests: XCTestCase {
     func testTypicalIPhoneWidthsLeaveVisibleHomeSpace() {
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 375),
-            315,
+            187.5,
             accuracy: 0.01
         )
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 393),
-            330.12,
+            196.5,
             accuracy: 0.01
         )
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 440),
-            369.6,
+            220,
             accuracy: 0.01
         )
     }
 
-    func testRestoredDrawerIsWiderWithoutCoveringEntireScreen() {
+    func testDrawerOccupiesExactlyHalfTheScreen() {
         for width: CGFloat in [280, 320, 375, 393, 440] {
             let drawerWidth = ATHLTHSideMenuLayoutPolicy.width(for: width)
-            XCTAssertGreaterThan(drawerWidth, 0)
-            XCTAssertLessThanOrEqual(drawerWidth, width - 34)
+            XCTAssertEqual(drawerWidth, width * 0.5, accuracy: 0.01)
         }
     }
 
     func testSmallScreensKeepSpaceForDismissTap() {
         XCTAssertLessThanOrEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 320),
-            286
+            160
         )
         XCTAssertLessThanOrEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 280),
-            246
+            140
         )
     }
 
