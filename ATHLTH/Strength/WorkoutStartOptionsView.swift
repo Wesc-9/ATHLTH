@@ -1475,9 +1475,9 @@ struct StrengthAudioCoachSettingsView: View {
                 Section {
                     Toggle(tr("When rest starts", "Når pausen starter"),
                            isOn: $configuration.announceRestStarted)
-                    Toggle(tr("Countdown before the next set", "Nedtelling før neste sett"),
+                    Toggle(tr("One spoken time-left reminder", "Én påminnelse om gjenværende tid"),
                            isOn: $configuration.announceRestCountdown)
-                    if configuration.announceRestCountdown {
+                    if configuration.announceRestCountdown && configuration.resolvedCountdownFromRest == nil {
                         Picker(tr("Announce with time left", "Varsle når det gjenstår"),
                                selection: $configuration.restCountdownSeconds) {
                             ForEach([3, 5, 10, 15, 20, 30], id: \.self) { seconds in
@@ -1487,6 +1487,61 @@ struct StrengthAudioCoachSettingsView: View {
                     }
                     Toggle(tr("When rest is finished", "Når pausen er ferdig"),
                            isOn: $configuration.announceRestComplete)
+
+                    Toggle(tr("Count aloud before rest begins", "Tell høyt ned til pause"),
+                           isOn: Binding(
+                               get: { configuration.resolvedCountdownToRest != nil },
+                               set: { configuration.spokenCountdownToRestSeconds = $0 ? 10 : nil }
+                           ))
+                    if configuration.resolvedCountdownToRest != nil {
+                        Picker(tr("Count from", "Start nedtelling fra"),
+                               selection: Binding(
+                                   get: { configuration.resolvedCountdownToRest ?? 10 },
+                                   set: { configuration.spokenCountdownToRestSeconds = $0 }
+                               )) {
+                            ForEach(ATHLTHCoachSecondCountdown.offeredLengths, id: \.self) { seconds in
+                                Text("\(seconds) s").tag(seconds)
+                            }
+                        }
+                        Picker(tr("After countdown", "Etter nedtelling"),
+                               selection: Binding(
+                                   get: { configuration.afterCountdownToRest ?? .shortAlert },
+                                   set: { configuration.afterCountdownToRest = $0 }
+                               )) {
+                            ForEach(ATHLTHCoachCountdownAfter.allCases) { value in
+                                Text(value.title).tag(value)
+                            }
+                        }
+                    }
+
+                    Toggle(tr("Count aloud until rest is over", "Tell høyt ned til pausen er over"),
+                           isOn: Binding(
+                               get: { configuration.resolvedCountdownFromRest != nil },
+                               set: { enabled in
+                                   configuration.spokenCountdownFromRestSeconds = enabled ? 10 : nil
+                                   if enabled { configuration.announceRestCountdown = false }
+                               }
+                           ))
+                    if configuration.resolvedCountdownFromRest != nil {
+                        Picker(tr("Count from", "Start nedtelling fra"),
+                               selection: Binding(
+                                   get: { configuration.resolvedCountdownFromRest ?? 10 },
+                                   set: { configuration.spokenCountdownFromRestSeconds = $0 }
+                               )) {
+                            ForEach(ATHLTHCoachSecondCountdown.offeredLengths, id: \.self) { seconds in
+                                Text("\(seconds) s").tag(seconds)
+                            }
+                        }
+                        Picker(tr("After countdown", "Etter nedtelling"),
+                               selection: Binding(
+                                   get: { configuration.afterCountdownFromRest ?? .nextStep },
+                                   set: { configuration.afterCountdownFromRest = $0 }
+                               )) {
+                            ForEach(ATHLTHCoachCountdownAfter.allCases) { value in
+                                Text(value.title).tag(value)
+                            }
+                        }
+                    }
                 } header: {
                     Label(tr("Rest and recovery", "Pause og hvile"), systemImage: "timer")
                 } footer: {
