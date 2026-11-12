@@ -1553,6 +1553,16 @@ struct StrengthAudioCoachSettingsView: View {
                 .disabled(!configuration.enabled)
 
                 Section {
+                    ATHLTHScopedCountdownRulesEditor(
+                        rules: $configuration.boundaryCountdownRules,
+                        strengthOnly: true
+                    )
+                } header: {
+                    Label(tr("Custom countdowns", "Egendefinerte nedtellinger"), systemImage: "timer")
+                }
+                .disabled(!configuration.enabled)
+
+                Section {
                     Toggle(tr("Motivation after completed sets", "Motivasjon etter fullførte sett"),
                            isOn: Binding(
                                get: { configuration.resolvedMotivationEveryCompletedSets != nil },
