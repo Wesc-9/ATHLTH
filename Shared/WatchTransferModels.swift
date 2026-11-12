@@ -466,6 +466,15 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announceStrengthExerciseComplete: Bool? = nil
     var strengthMotivationEverySets: Int? = nil
     var strengthPersonalMotivationPhrase: String? = nil
+    var strengthCountdownToRestSeconds: Int? = nil
+    var strengthCountdownFromRestSeconds: Int? = nil
+    var strengthAfterCountdownToRest: ATHLTHCoachCountdownAfter? = nil
+    var strengthAfterCountdownFromRest: ATHLTHCoachCountdownAfter? = nil
+    // Running/walking interval recovery only. Manual workout pause is distinct.
+    var intervalCountdownToRecoverySeconds: Int? = nil
+    var intervalCountdownFromRecoverySeconds: Int? = nil
+    var intervalAfterCountdownToRecovery: ATHLTHCoachCountdownAfter? = nil
+    var intervalAfterCountdownFromRecovery: ATHLTHCoachCountdownAfter? = nil
 
     var resolvedFuelIntervalSeconds: TimeInterval? {
         guard enabled,
@@ -568,6 +577,23 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var resolvedStrengthMotivationEverySets: Int? {
         guard let count = strengthMotivationEverySets, (1...10).contains(count) else { return nil }
         return count
+    }
+
+    var resolvedStrengthCountdownToRest: Int? {
+        guard let seconds = strengthCountdownToRestSeconds, (1...30).contains(seconds) else { return nil }
+        return seconds
+    }
+    var resolvedStrengthCountdownFromRest: Int? {
+        guard let seconds = strengthCountdownFromRestSeconds, (1...30).contains(seconds) else { return nil }
+        return seconds
+    }
+    var resolvedIntervalCountdownToRecovery: Int? {
+        guard let seconds = intervalCountdownToRecoverySeconds, (1...30).contains(seconds) else { return nil }
+        return seconds
+    }
+    var resolvedIntervalCountdownFromRecovery: Int? {
+        guard let seconds = intervalCountdownFromRecoverySeconds, (1...30).contains(seconds) else { return nil }
+        return seconds
     }
 
     var resolvedStrengthRestCountdownSeconds: Int {
