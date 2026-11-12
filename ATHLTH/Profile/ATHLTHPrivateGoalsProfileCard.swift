@@ -5,6 +5,7 @@ import SwiftUI
 struct ATHLTHPrivateGoalsProfileCard: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
 
     @State private var showingCreateGoal = false
     @State private var measurementProfile = ATHLTHTrainingProfile()
@@ -23,10 +24,11 @@ struct ATHLTHPrivateGoalsProfileCard: View {
     }
 
     private func progress(for goal: ATHLTHGoal) -> Double {
-        if goal.bodyMeasurementGoal != nil {
-            return ATHLTHBodyGoalCheckInPolicy.progress(goal, profile: measurementProfile)
-        }
-        return min(1, max(0, goal.progress))
+        ATHLTHGoalProgressPolicy.progress(
+            for: goal,
+            profile: measurementProfile,
+            latestBodyWeightKilograms: health.personalDetails.weightKilograms
+        )
     }
 
     var body: some View {
@@ -44,7 +46,7 @@ struct ATHLTHPrivateGoalsProfileCard: View {
                         .font(.headline.weight(.bold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
 
-                    Label(tr("Only visible to you here", "Vises bare for deg her"),
+                    Label(tr("Private owner overview", "Privat måloversikt"),
                           systemImage: "lock.fill")
                         .font(.caption2)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
