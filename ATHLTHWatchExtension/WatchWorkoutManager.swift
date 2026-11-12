@@ -1261,58 +1261,65 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         if let previous,
-           current.completedSets >
-            previous.completedSets,
-           audioCoachConfiguration
-            .shouldAnnounceStrengthSetComplete {
-            let setNumber =
-                previous.setNumber ??
-                current.setNumber ??
-                current.completedSets
-
-            let weight =
-                previous
-                    .draftWeightKilograms
-            let reps =
-                previous.draftReps
-            let formattedWeight =
-                weight.rounded() == weight
-                    ? String(Int(weight))
-                    : String(
-                        format: "%.1f",
-                        weight
-                    )
-
-            speak(
-                coachPhrase(
-                    english:
-                        "Set \(setNumber) complete. \(reps) reps at \(formattedWeight) kilograms.",
-                    norwegian:
-                        "Sett \(setNumber) fullført. \(reps) repetisjoner på \(formattedWeight) kilo."
-                )
-            )
-
+           current.completedSets > previous.completedSets {
+            var english: [String] = []
+            var norwegian: [String] = []
+            if audioCoachConfiguration.shouldAnnounceStrengthSetComplete {
+                let setNumber = previous.setNumber ??
+                    current.setNumber ?? current.completedSets
+                let weight = previous.draftWeightKilograms
+                let reps = previous.draftReps
+                let formattedWeight = weight.rounded() == weight
+                    ? String(Int(weight)) : String(format: "%.1f", weight)
+                english.append("Set \(setNumber) complete. \(reps) reps at \(formattedWeight) kilograms.")
+                norwegian.append("Sett \(setNumber) fullført. \(reps) repetisjoner på \(formattedWeight) kilo.")
+            }
+            if let message = ATHLTHStrengthCoachStatusMessage.setMilestoneMotivation(
+                completedSets: current.completedSets,
+                everySets: audioCoachConfiguration.resolvedStrengthMotivationEverySets,
+                personalMessage: audioCoachConfiguration.strengthPersonalMotivationPhrase,
+                norwegian: false
+            ) {
+                english.append(message)
+            }
+            if let message = ATHLTHStrengthCoachStatusMessage.setMilestoneMotivation(
+                completedSets: current.completedSets,
+                everySets: audioCoachConfiguration.resolvedStrengthMotivationEverySets,
+                personalMessage: audioCoachConfiguration.strengthPersonalMotivationPhrase,
+                norwegian: true
+            ) {
+                norwegian.append(message)
+            }
+            if !english.isEmpty {
+                speak(coachPhrase(
+                    english: english.joined(separator: " "),
+                    norwegian: norwegian.joined(separator: " ")
+                ))
+            }
         }
 
         if let previous,
-           current.exerciseIndex !=
-            previous.exerciseIndex,
-           audioCoachConfiguration
-            .shouldAnnounceStrengthNextExercise,
-           current.exerciseName != nil {
-            let phrase =
-                strengthNextExerciseCoachPhrase(
-                    current
-                )
-
-            speak(
-                coachPhrase(
-                    english:
-                        phrase.english,
-                    norwegian:
-                        phrase.norwegian
-                )
-            )
+           current.exerciseIndex != previous.exerciseIndex {
+            var english: [String] = []
+            var norwegian: [String] = []
+            if audioCoachConfiguration.shouldAnnounceStrengthExerciseComplete,
+               previous.currentExerciseComplete,
+               let name = previous.exerciseName {
+                english.append("Exercise completed. \(name).")
+                norwegian.append("Øvelse fullført. \(name).")
+            }
+            if audioCoachConfiguration.shouldAnnounceStrengthNextExercise,
+               current.exerciseName != nil {
+                let phrase = strengthNextExerciseCoachPhrase(current)
+                english.append(phrase.english)
+                norwegian.append(phrase.norwegian)
+            }
+            if !english.isEmpty {
+                speak(coachPhrase(
+                    english: english.joined(separator: " "),
+                    norwegian: norwegian.joined(separator: " ")
+                ))
+            }
         }
 
         if previous?.restEndsAt !=
