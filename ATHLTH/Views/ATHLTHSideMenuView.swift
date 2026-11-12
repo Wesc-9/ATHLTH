@@ -1,11 +1,9 @@
 import SwiftUI
 
-/// Restore the wider, breathable v2.1.3 iPhone drawer proportions.
-/// Leave an outside-tap target even on compact displays.
+/// Half-screen iPhone drawer. Keep the other half visible for outside-tap dismissal.
 enum ATHLTHSideMenuLayoutPolicy {
     static func width(for viewportWidth: CGFloat) -> CGFloat {
-        let preferred = min(max(viewportWidth * 0.84, 270), 390)
-        return max(0, min(preferred, viewportWidth - 34))
+        return max(0, viewportWidth * 0.5)
     }
 
     static func shouldDismiss(translation: CGSize) -> Bool {
@@ -32,7 +30,7 @@ struct ATHLTHSideMenuView: View {
     let onDismiss: () -> Void
 
     // A restrained porcelain-and-bronze palette, consistent with ATHLTH Home.
-    private let menuSurface = Color(red: 0.992, green: 0.984, blue: 0.969)
+    private let menuSurface = ATHLTHTheme.canvasTop
     private let menuCard = Color(red: 0.997, green: 0.995, blue: 0.991)
     private let menuInk = Color(red: 0.19, green: 0.18, blue: 0.17)
     private let menuMuted = Color(red: 0.47, green: 0.45, blue: 0.42)
@@ -55,17 +53,17 @@ struct ATHLTHSideMenuView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                        .padding(.horizontal, 22)
+                        .padding(.horizontal, 10)
                         .padding(.top, max(geometry.safeAreaInsets.top, 48) + 8)
                         .padding(.bottom, 15)
 
                     Rectangle()
                         .fill(warmDivider)
                         .frame(height: 1)
-                        .padding(.horizontal, 22)
+                        .padding(.horizontal, 10)
 
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 22) {
+                        VStack(alignment: .leading, spacing: 17) {
                             menuSection(
                                 english: "HOME",
                                 norwegian: "HJEM"
@@ -124,14 +122,14 @@ struct ATHLTHSideMenuView: View {
                                 )
                             }
                         }
-                        .padding(.horizontal, 17)
-                        .padding(.top, 22)
-                        .padding(.bottom, 22)
+                        .padding(.horizontal, 7)
+                        .padding(.top, 16)
+                        .padding(.bottom, 16)
                     }
                     .scrollIndicators(.hidden)
 
                     footer
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 7)
                         .padding(.top, 10)
                         .padding(.bottom, max(geometry.safeAreaInsets.bottom, 20) + 6)
                 }
@@ -180,31 +178,32 @@ struct ATHLTHSideMenuView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .center, spacing: 4) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("ATHLTH")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .tracking(2.0)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .tracking(1.0)
                         .foregroundStyle(menuInk)
                     Text(ATHLTHLocalization.choose(
                         english: "YOUR TRAINING SPACE",
                         norwegian: "DITT TRENINGSROM"
                     ))
-                    .font(.system(size: 9, weight: .medium))
-                    .tracking(1.25)
+                    .font(.system(size: 7, weight: .medium))
+                    .tracking(0.5)
+                    .lineLimit(2)
                     .foregroundStyle(menuMuted)
                 }
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
 
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(menuInk)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 26, height: 28)
                         .background(menuCard, in: Circle())
                         .overlay(Circle().strokeBorder(warmDivider, lineWidth: 1))
-                        .frame(width: 44, height: 44)
+                        .frame(width: 36, height: 36)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -234,7 +233,7 @@ struct ATHLTHSideMenuView: View {
                 profilePlaceholder
             }
         }
-        .frame(width: 58, height: 58)
+        .frame(width: 36, height: 36)
         .clipShape(Circle())
         .overlay {
             Circle()
@@ -262,10 +261,11 @@ struct ATHLTHSideMenuView: View {
                 english: english,
                 norwegian: norwegian
             ))
-            .font(.system(size: 11, weight: .semibold))
-            .tracking(1.6)
+            .font(.system(size: 9, weight: .semibold))
+            .tracking(0.55)
+            .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(menuBronze)
-            .padding(.leading, 13)
+            .padding(.leading, 7)
 
             VStack(spacing: 2, content: content)
         }
@@ -279,25 +279,25 @@ struct ATHLTHSideMenuView: View {
                 Button {
                     onSelect(.trainingLibrary)
                 } label: {
-                    HStack(spacing: 15) {
+                    HStack(spacing: 7) {
                         Image(systemName: "books.vertical")
-                            .font(.system(size: 18, weight: .regular))
+                            .font(.system(size: 15, weight: .regular))
                             .foregroundStyle(menuBronze)
-                            .frame(width: 24)
+                            .frame(width: 18)
                             .accessibilityHidden(true)
 
                         Text(ATHLTHLocalization.choose(
                             english: "Training library",
                             norwegian: "Treningsbibliotek"
                         ))
-                        .font(.subheadline.weight(.medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(menuInk)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                        .minimumScaleFactor(0.85)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                     }
-                    .padding(.leading, 13)
-                    .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 48)
+                    .padding(.leading, 7)
+                    .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 70 : 50)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
@@ -317,8 +317,8 @@ struct ATHLTHSideMenuView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(menuBronze)
                         .rotationEffect(.degrees(isTrainingLibraryExpanded ? 180 : 0))
-                        .frame(width: 42,
-                               height: dynamicTypeSize.isAccessibilitySize ? 58 : 48)
+                        .frame(width: 25,
+                               height: dynamicTypeSize.isAccessibilitySize ? 70 : 50)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -389,23 +389,23 @@ struct ATHLTHSideMenuView: View {
         Button {
             onSelect(destination)
         } label: {
-            HStack(spacing: 15) {
+            HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .regular))
+                    .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(menuBronze)
-                    .frame(width: 24)
+                    .frame(width: 18)
                     .accessibilityHidden(true)
 
                 Text(ATHLTHLocalization.choose(
                     english: english, norwegian: norwegian
                 ))
-                .font(.subheadline.weight(selected ? .semibold : .medium))
+                .font(.system(size: 12, weight: selected ? .semibold : .medium))
                 .foregroundStyle(menuInk)
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                .minimumScaleFactor(0.86)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)
 
-                Spacer(minLength: 2)
+                Spacer(minLength: 0)
                 if selected {
                     Circle()
                         .fill(menuBronze)
@@ -418,8 +418,8 @@ struct ATHLTHSideMenuView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .padding(.horizontal, 13)
-            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 48)
+            .padding(.horizontal, 7)
+            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 70 : 50)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 if selected {
@@ -517,9 +517,9 @@ struct ATHLTHSideMenuView: View {
             VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: icon)
-                        .font(.system(size: 17, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(menuBronze)
-                        .frame(width: 35, height: 34)
+                        .frame(width: 27, height: 29)
                         .background(
                             menuSurface,
                             in: RoundedRectangle(cornerRadius: 10)
@@ -538,14 +538,14 @@ struct ATHLTHSideMenuView: View {
                 }
 
                 Text(name)
-                    .font(.caption.weight(.medium))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(menuInk)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     .minimumScaleFactor(0.84)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
-            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 82 : 69)
+            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 80 : 61)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -564,7 +564,7 @@ struct ATHLTHSideMenuView: View {
             Button {
                 onSelect(.settings)
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: 5) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(menuBronze)
@@ -575,16 +575,17 @@ struct ATHLTHSideMenuView: View {
                     Text(ATHLTHLocalization.choose(
                         english: "Settings", norwegian: "Innstillinger"
                     ))
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(2)
                     .foregroundStyle(menuInk)
-                    Spacer(minLength: 5)
+                    Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(menuMuted.opacity(0.6))
                         .accessibilityHidden(true)
                 }
-                .padding(.horizontal, 13)
-                .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 50)
+                .padding(.horizontal, 7)
+                .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 68 : 47)
                 .background(menuCard, in: RoundedRectangle(cornerRadius: 15))
                 .overlay {
                     RoundedRectangle(cornerRadius: 15)
@@ -603,16 +604,17 @@ struct ATHLTHSideMenuView: View {
             Button {
                 onSelect(.profile)
             } label: {
-                HStack(spacing: 11) {
+                HStack(spacing: 5) {
                     profileImage
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(session.profile.displayName.isEmpty
                              ? "ATHLTH"
                              : session.profile.displayName)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(menuInk)
-                            .lineLimit(2)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
 
                         Text(session.profile.username.isEmpty
@@ -620,20 +622,20 @@ struct ATHLTHSideMenuView: View {
                                  english: "My profile", norwegian: "Min profil"
                                )
                              : "@\(session.profile.username)")
-                            .font(.caption)
+                            .font(.system(size: 9))
                             .foregroundStyle(menuMuted)
                             .lineLimit(1)
                     }
-                    Spacer(minLength: 2)
+                    Spacer(minLength: 0)
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(menuBronze)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 16, height: 20)
                         .background(menuSurface, in: Circle())
                         .accessibilityHidden(true)
                 }
-                .padding(.horizontal, 12)
-                .frame(minHeight: 78)
+                .padding(.horizontal, 6)
+                .frame(minHeight: 72)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(menuCard, in: RoundedRectangle(cornerRadius: 18))
                 .overlay {
