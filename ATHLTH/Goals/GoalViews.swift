@@ -676,7 +676,7 @@ struct GoalDetailView: View {
                             }
 
                             if !goal.isPrimary && goal.status != .completed {
-                                Button("Make Primary", systemImage: "star.fill") {
+                                Button(ATHLTHLocalization.choose(english: "Make primary", norwegian: "Sett som hovedmål"), systemImage: "star.fill") {
                                     goalStore.setPrimary(goal.id)
                                 }
                             }
@@ -723,15 +723,15 @@ struct GoalDetailView: View {
                     GoalEditView(goalID: goal.id)
                 }
                 .confirmationDialog(
-                    "Delete this goal?",
+                    ATHLTHLocalization.choose(english: "Delete this goal?", norwegian: "Slette dette målet?"),
                     isPresented: $showingDeleteConfirmation,
                     titleVisibility: .visible
                 ) {
-                    Button("Delete Goal", role: .destructive) {
+                    Button(ATHLTHLocalization.choose(english: "Delete goal", norwegian: "Slett mål"), role: .destructive) {
                         goalStore.delete(goal.id)
                         dismiss()
                     }
-                    Button("Cancel", role: .cancel) {}
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
                 }
             } else {
                 ContentUnavailableView("Goal unavailable", systemImage: "target")
@@ -1167,7 +1167,7 @@ struct GoalDetailView: View {
 
             if milestone.manualOverride == .forceIncomplete,
                milestone.automationRule?.isEnabled == true {
-                Button("Resume automatic tracking") {
+                Button(ATHLTHLocalization.choose(english: "Resume automatic tracking", norwegian: "Gjenoppta automatisk sporing")) {
                     goalStore.resumeAutomaticTracking(
                         goalID: goal.id,
                         milestoneID: milestone.id
@@ -1189,7 +1189,7 @@ struct GoalDetailView: View {
 
     private func trackingCard(_ goal: ATHLTHGoal) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Tracking")
+            Text(ATHLTHLocalization.choose(english: "Tracking", norwegian: "Sporing"))
                 .font(.headline)
 
             Label(
@@ -1224,7 +1224,7 @@ struct GoalDetailView: View {
 
             if let deadline = goal.deadline {
                 Divider()
-                LabeledContent("Deadline") {
+                LabeledContent(ATHLTHLocalization.choose(english: "Deadline", norwegian: "Frist")) {
                     Text(deadline.formatted(date: .abbreviated, time: .omitted))
                 }
                 .font(.caption)
@@ -1232,7 +1232,7 @@ struct GoalDetailView: View {
 
             if let linkedPlanID = goal.linkedTrainingPlanID {
                 Divider()
-                LabeledContent("Training plan") {
+                LabeledContent(ATHLTHLocalization.choose(english: "Training plan", norwegian: "Treningsplan")) {
                     Text(
                         session.trainingPlan(
                             withID:
@@ -1247,7 +1247,7 @@ struct GoalDetailView: View {
                 .font(.caption)
             }
 
-            LabeledContent("Privacy") {
+            LabeledContent(ATHLTHLocalization.choose(english: "Privacy", norwegian: "Personvern")) {
                 Text(goal.privacy.title)
             }
             .font(.caption)
@@ -5366,6 +5366,12 @@ struct GoalEditView: View {
                             Text(option.title).tag(option)
                         }
                     }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Goals are private by default. Sharing with followers or publicly requires your explicit choice and profile sharing settings.",
+                        norwegian: "Mål er private som standard. Deling med følgere eller offentlig krever at du selv velger det og aktiverer deling i profilinnstillingene."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
 
                 Section {
