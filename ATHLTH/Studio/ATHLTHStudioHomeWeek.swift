@@ -4,6 +4,16 @@ import Foundation
 /// Planned sessions and recorded workouts are deliberately separate:
 /// a recorded workout never implies that a specific plan item was completed.
 enum ATHLTHStudioHomeWeek {
+    /// Single source for the Home weekly summary. Counts are always actual
+    /// scheduled occurrences, not recorded HealthKit sessions.
+    static func plannedCountLabel(_ count: Int, norwegian: Bool) -> String {
+        let count = max(0, count)
+        if norwegian {
+            return count == 1 ? "1 planlagt økt" : "\(count) planlagte økter"
+        }
+        return count == 1 ? "1 planned workout" : "\(count) planned workouts"
+    }
+
     struct Day: Identifiable {
         let date: Date
         let planned: [ATHLTHStudioSchedule.Occurrence]
