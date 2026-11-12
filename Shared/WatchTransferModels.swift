@@ -462,6 +462,10 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var strengthStatusIntervalSeconds: TimeInterval? = nil
     var strengthRestCountdownSeconds: Int? = nil
     var strengthHapticsEnabled: Bool? = nil
+    // Strength-only optional cues, never interpreted by run/walk audio.
+    var announceStrengthExerciseComplete: Bool? = nil
+    var strengthMotivationEverySets: Int? = nil
+    var strengthPersonalMotivationPhrase: String? = nil
 
     var resolvedFuelIntervalSeconds: TimeInterval? {
         guard enabled,
@@ -555,6 +559,15 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
 
     var shouldAnnounceStrengthExerciseProgress: Bool {
         announceStrengthExerciseProgress ?? false
+    }
+
+    var shouldAnnounceStrengthExerciseComplete: Bool {
+        announceStrengthExerciseComplete ?? false
+    }
+
+    var resolvedStrengthMotivationEverySets: Int? {
+        guard let count = strengthMotivationEverySets, (1...10).contains(count) else { return nil }
+        return count
     }
 
     var resolvedStrengthRestCountdownSeconds: Int {
