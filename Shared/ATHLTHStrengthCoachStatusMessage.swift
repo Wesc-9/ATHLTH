@@ -41,4 +41,28 @@ enum ATHLTHStrengthCoachStatusMessage {
 
         return parts.joined(separator: " ")
     }
+    
+    /// One optional, strength-only motivation cue after an exact set milestone.
+    /// A personal sentence takes precedence and is never auto-generated for other sports.
+    static func setMilestoneMotivation(
+        completedSets: Int,
+        everySets: Int?,
+        personalMessage: String?,
+        norwegian: Bool
+    ) -> String? {
+        guard let everySets, (1...10).contains(everySets),
+              completedSets > 0, completedSets % everySets == 0 else { return nil }
+        let personal = (personalMessage ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !personal.isEmpty { return String(personal.prefix(180)) }
+        let phrases = norwegian
+            ? ["Bra jobbet! Fortsett med samme fokus.",
+               "Sterk innsats! Ta med deg energien inn i neste sett.",
+               "Godt gjennomført! Hold teknikken kontrollert."]
+            : ["Great work! Keep your focus.",
+               "Strong effort! Bring that energy into the next set.",
+               "Well done! Keep your technique controlled."]
+        return phrases[((completedSets / everySets) - 1) % phrases.count]
+    }
+
 }
