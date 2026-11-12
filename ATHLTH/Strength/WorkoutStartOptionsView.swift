@@ -1418,88 +1418,149 @@ struct WorkoutStartOptionsView: View {
 
 }
 
-private struct StrengthAudioCoachSettingsView: View {
+/// The workout-scoped Audio Coach editor for strength sessions only.
+/// Running, walking and other sports use their existing session editors.
+struct StrengthAudioCoachSettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var configuration:
-        StrengthAudioCoachConfiguration
-    @State private var showDetailedOptions = false
+    @Binding var configuration: StrengthAudioCoachConfiguration
+    @State private var showingVoiceChoices = false
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle(
-                        "Audio Coach",
-                        isOn: $configuration.enabled
-                    )
+                    Toggle("Audio Coach", isOn: $configuration.enabled)
+                        .tint(ATHLTHTheme.premiumGold)
+                } footer: {
+                    Text(tr(
+                        "These controls are available only for strength workouts, including supersets, circuits, EMOM, AMRAP and drop sets. Other sports keep their own Audio Coach options.",
+                        "Disse valgene gjelder bare styrketrening, også supersett, sirkeltrening, EMOM, AMRAP og dropsett. Andre treningsformer beholder sine egne Audio Coach-valg."
+                    ))
                 }
 
                 Section {
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Tell me when rest is over",
-                            norwegian: "Si fra når pausen er over"
-                        ),
-                        isOn: $configuration.announceRestComplete
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Announce the next exercise and goal",
-                            norwegian: "Si neste øvelse og mål"
-                        ),
-                        isOn: $configuration.announceNextExercise
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Announce the next set, reps and weight",
-                            norwegian: "Si neste sett, reps og vekt"
-                        ),
-                        isOn: Binding(
-                            get: { configuration.shouldAnnounceNextSetDetails },
-                            set: { configuration.announceNextSetDetails = $0 }
-                        )
-                    )
+                    Toggle(tr("Completed set: reps and weight", "Fullført sett: reps og vekt"),
+                           isOn: $configuration.announceSetComplete)
+                    Toggle(tr("When an exercise is finished", "Når en øvelse er fullført"),
+                           isOn: Binding(
+                               get: { configuration.shouldAnnounceExerciseComplete },
+                               set: { configuration.announceExerciseComplete = $0 }
+                           ))
+                    Toggle(tr("Next exercise and its target", "Neste øvelse og målet"),
+                           isOn: $configuration.announceNextExercise)
+                    Toggle(tr("Next set: reps, weight or time", "Neste sett: reps, vekt eller tid"),
+                           isOn: Binding(
+                               get: { configuration.shouldAnnounceNextSetDetails },
+                               set: { configuration.announceNextSetDetails = $0 }
+                           ))
+                    Toggle(tr("Progress through the exercise list", "Fremdrift i øvelseslisten"),
+                           isOn: Binding(
+                               get: { configuration.shouldAnnounceExerciseProgress },
+                               set: { configuration.announceExerciseProgress = $0 }
+                           ))
+                } header: {
+                    Label(tr("Sets and exercises", "Sett og øvelser"), systemImage: "dumbbell")
+                } footer: {
+                    Text(tr(
+                        "Targets are taken from the actual exercise and set. Time-based sets and machine resistance are read when available.",
+                        "Målene hentes fra den aktuelle øvelsen og settet. Tid og apparatmotstand leses opp når det er oppgitt."
+                    ))
+                }
+                .disabled(!configuration.enabled)
+
+                Section {
+                    Toggle(tr("When rest starts", "Når pausen starter"),
+                           isOn: $configuration.announceRestStarted)
+                    Toggle(tr("Countdown before the next set", "Nedtelling før neste sett"),
+                           isOn: $configuration.announceRestCountdown)
                     if configuration.announceRestCountdown {
-                        Stepper(
-                            value: $configuration.restCountdownSeconds,
-                            in: 3...30
-                        ) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Countdown \(configuration.restCountdownSeconds) s before",
-                                norwegian: "Nedtelling \(configuration.restCountdownSeconds) s før"
-                            ))
+                        Picker(tr("Announce with time left", "Varsle når det gjenstår"),
+                               selection: $configuration.restCountdownSeconds) {
+                            ForEach([3, 5, 10, 15, 20, 30], id: \.self) { seconds in
+                                Text("\(seconds) s").tag(seconds)
+                            }
                         }
                     }
+                    Toggle(tr("When rest is finished", "Når pausen er ferdig"),
+                           isOn: $configuration.announceRestComplete)
                 } header: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "During a strength session",
-                        norwegian: "Under styrkeøkten"
-                    ))
+                    Label(tr("Rest and recovery", "Pause og hvile"), systemImage: "timer")
                 } footer: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "These messages work on the device recording the workout and respect music ducking.",
-                        norwegian: "Meldingene brukes på enheten som registrerer økten, og tar hensyn til musikkvolum."
+                    Text(tr(
+                        "Uses the existing rest timer. Voice is optional and never replaces Watch haptics.",
+                        "Bruker den eksisterende hviletimeren. Tale er valgfritt og erstatter aldri haptikk på klokken."
                     ))
                 }
-
+                .disabled(!configuration.enabled)
 
                 Section {
+                    Toggle(tr("Motivation after completed sets", "Motivasjon etter fullførte sett"),
+                           isOn: Binding(
+                               get: { configuration.resolvedMotivationEveryCompletedSets != nil },
+                               set: { configuration.motivationEveryCompletedSets = $0 ? 3 : nil }
+                           ))
+                    if configuration.resolvedMotivationEveryCompletedSets != nil {
+                        Picker(tr("Every", "Etter hvert"),
+                               selection: Binding(
+                                   get: { configuration.resolvedMotivationEveryCompletedSets ?? 3 },
+                                   set: { configuration.motivationEveryCompletedSets = $0 }
+                               )) {
+                            ForEach([1, 2, 3, 5, 10], id: \.self) { count in
+                                Text(tr("\(count) completed sets", "\(count) fullførte sett"))
+                                    .tag(count)
+                            }
+                        }
+                        TextField(
+                            tr("Optional personal coaching sentence", "Valgfri egen coach-setning"),
+                            text: Binding(
+                                get: { configuration.personalMotivationPhrase ?? "" },
+                                set: { configuration.personalMotivationPhrase = String($0.prefix(180)) }
+                            ),
+                            axis: .vertical
+                        )
+                        .lineLimit(2...4)
+                        Text(tr(
+                            "Leave the sentence empty for varied praise and encouragement. A personal sentence is spoken only at the chosen set milestones.",
+                            "La feltet stå tomt for varierte skryt- og motivasjonsmeldinger. En egen setning leses kun ved antall sett du har valgt."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Label(tr("Your strength motivation", "Din styrkemotivasjon"),
+                          systemImage: "sparkles")
+                }
+                .disabled(!configuration.enabled)
+
+                Section {
+                    Toggle(tr("Training progress summary", "Oppsummer øktfremdrift"),
+                           isOn: $configuration.announceWorkoutStatus)
+                    if configuration.announceWorkoutStatus {
+                        Picker(tr("Every", "Hvert"),
+                               selection: $configuration.workoutStatusIntervalMinutes) {
+                            ForEach([5, 10, 15, 30], id: \.self) { minutes in
+                                Text("\(minutes) min").tag(minutes)
+                            }
+                        }
+                    }
                     HStack(spacing: 7) {
                         ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
                             Button {
                                 applyExperience(preset)
                             } label: {
-                                VStack(spacing: 5) {
+                                VStack(spacing: 4) {
                                     Text(preset.title)
                                         .font(.subheadline.weight(.semibold))
                                     Text(preset.subtitle)
                                         .font(.caption2)
                                         .multilineTextAlignment(.center)
                                         .lineLimit(2)
-                                        .minimumScaleFactor(0.85)
                                 }
-                                .frame(maxWidth: .infinity, minHeight: 64)
-                                .padding(.horizontal, 5)
+                                .frame(maxWidth: .infinity, minHeight: 60)
                                 .foregroundStyle(selectedExperience == preset
                                     ? Color.white : ATHLTHTheme.primaryText)
                                 .background(selectedExperience == preset
@@ -1507,226 +1568,73 @@ private struct StrengthAudioCoachSettingsView: View {
                                     in: RoundedRectangle(cornerRadius: 13))
                             }
                             .buttonStyle(.plain)
-                            .accessibilityAddTraits(
-                                selectedExperience == preset ? .isSelected : []
-                            )
-                        }
-                    }
-                    if selectedExperience == nil {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Your custom setup is kept until you choose a level.",
-                            norwegian: "Ditt tilpassede oppsett beholdes til du velger et nivå."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "How much guidance?", norwegian: "Hvor mye veiledning?"
-                    ))
-                } footer: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Speech adapts to sets and rest periods.",
-                        norwegian: "Talebeskjeder tilpasses sett og hvile."
-                    ))
-                }
-
-                Section {
-                    HStack(spacing: 9) {
-                        ForEach([
-                            ATHLTHCoachSpeechStyle.balanced,
-                            .motivating
-                        ]) { style in
-                            Button {
-                                configuration.speechStyle = style
-                            } label: {
-                                Label(style.title, systemImage: style == .motivating
-                                    ? "flame.fill" : "waveform")
-                                    .font(.caption.weight(.semibold))
-                                    .frame(maxWidth: .infinity, minHeight: 42)
-                                    .foregroundStyle((configuration.speechStyle ?? .balanced) == style
-                                        ? Color.white : ATHLTHTheme.primaryText)
-                                    .background((configuration.speechStyle ?? .balanced) == style
-                                        ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
-                                        in: RoundedRectangle(cornerRadius: 13))
-                            }
-                            .buttonStyle(.plain)
                         }
                     }
                 } header: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Coach personality", norwegian: "Coachen sin talemåte"
-                    ))
+                    Label(tr("Coaching frequency", "Hyppighet"), systemImage: "waveform")
                 }
+                .disabled(!configuration.enabled)
 
                 Section {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showDetailedOptions.toggle()
-                        }
-                    } label: {
-                        HStack {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "More settings", norwegian: "Flere innstillinger"
-                                ),
-                                systemImage: "slider.horizontal.3"
-                            )
-                            Spacer()
-                            Image(systemName: showDetailedOptions
-                                ? "chevron.up" : "chevron.down")
+                    Picker(tr("Language", "Språk"), selection: $configuration.language) {
+                        ForEach(WatchAudioCoachLanguage.allCases, id: \.rawValue) { language in
+                            Text(language.title).tag(language)
                         }
                     }
-                }
+                    .onChange(of: configuration.language) { _, _ in
+                        configuration.voiceIdentifier = nil
+                    }
 
-                if showDetailedOptions {
-                Section {
-                    Picker(
-                        ATHLTHLocalization.choose(
-                            english: "Speaking style",
-                            norwegian: "Talemåte"
-                        ),
-                        selection: Binding(
-                            get: { configuration.speechStyle ?? .balanced },
-                            set: { configuration.speechStyle = $0 }
-                        )
+                    DisclosureGroup(
+                        isExpanded: $showingVoiceChoices
                     ) {
+                        ATHLTHCoachVoiceChoices(
+                            selectedIdentifier: $configuration.voiceIdentifier,
+                            language: configuration.language,
+                            speechRate: configuration.speechRate,
+                            speechVolume: configuration.speechVolume,
+                            duckOtherAudio: configuration.duckOtherAudio,
+                            speechStyle: configuration.speechStyle ?? .balanced
+                        )
+                    } label: {
+                        Label(tr("Choose and test voice", "Velg og test stemme"),
+                              systemImage: "speaker.wave.2")
+                    }
+                    Picker(tr("Speaking style", "Talemåte"),
+                           selection: Binding(
+                               get: { configuration.speechStyle ?? .balanced },
+                               set: { configuration.speechStyle = $0 }
+                           )) {
                         ForEach(ATHLTHCoachSpeechStyle.allCases) { style in
                             Text(style.title).tag(style)
                         }
                     }
-                    Text(ATHLTHLocalization.choose(
-                        english: "Changes the wording, not the number of messages or the voice speed.",
-                        norwegian: "Endrer ordlyden, ikke antall meldinger eller talehastigheten."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Set completed",
-                            norwegian: "Sett fullført"
-                        ),
-                        isOn:
-                            $configuration
-                                .announceSetComplete
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Rest started",
-                            norwegian: "Hvile startet"
-                        ),
-                        isOn:
-                            $configuration
-                                .announceRestStarted
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Rest countdown",
-                            norwegian: "Nedtelling av hvile"
-                        ),
-                        isOn:
-                            $configuration
-                                .announceRestCountdown
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Exercise progress",
-                            norwegian:
-                                "Øktfremdrift"
-                        ),
-                        isOn:
-                            Binding(
-                                get: {
-                                    configuration
-                                        .shouldAnnounceExerciseProgress
-                                },
-                                set: {
-                                    configuration
-                                        .announceExerciseProgress =
-                                        $0
-                                }
-                            )
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Workout status",
-                            norwegian: "Øktstatus"
-                        ),
-                        isOn:
-                            $configuration
-                                .announceWorkoutStatus
-                    )
-                } header: {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Announcements",
-                            norwegian: "Meldinger"
-                        )
-                    )
-                } footer: {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Next exercise includes its name and first target. Next set can announce reps, load, time or machine level when available. Exercise progress adds where you are in the workout.",
-                            norwegian:
-                                "Neste øvelse sier navn og første mål. Neste sett kan si reps, vekt, tid eller maskinnivå når det finnes. Øktfremdrift legger til hvor langt du har kommet i økta."
-                        )
-                    )
-                }
-
-                if configuration.announceWorkoutStatus {
-                    Section(
-                        ATHLTHLocalization.choose(
-                            english: "Workout status",
-                            norwegian: "Øktstatus"
-                        )
-                    ) {
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Every",
-                                norwegian: "Hvert"
-                            ),
-                            selection:
-                                $configuration
-                                    .workoutStatusIntervalMinutes
-                        ) {
-                            Text("15 min").tag(15)
-                            Text("30 min").tag(30)
-                        }
+                    HStack {
+                        Text(tr("Voice speed", "Stemmehastighet"))
+                        Spacer()
+                        Text(configuration.speechRate.formatted(.number.precision(.fractionLength(2))))
+                            .monospacedDigit()
                     }
+                    Slider(value: $configuration.speechRate, in: 0.35...0.65, step: 0.01)
+                    HStack {
+                        Text(tr("Voice volume", "Stemmevolum"))
+                        Spacer()
+                        Text("\(Int((configuration.speechVolume * 100).rounded())) %")
+                            .monospacedDigit()
+                    }
+                    Slider(value: $configuration.speechVolume, in: 0.2...1, step: 0.05)
+                    Toggle(tr("Lower music while Coach speaks", "Demp musikk når coachen snakker"),
+                           isOn: $configuration.duckOtherAudio)
+                } header: {
+                    Label(tr("Voice and music", "Stemme og musikk"), systemImage: "speaker.wave.2")
                 }
-
-                Section {
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Lower music while speaking",
-                            norwegian: "Senk musikken mens stemmen snakker"
-                        ),
-                        isOn:
-                            $configuration
-                                .duckOtherAudio
-                    )
-                }
-                }
+                .disabled(!configuration.enabled)
             }
-            .navigationTitle("Audio Coach")
+            .navigationTitle(tr("Audio Coach · Strength", "Audio Coach · Styrke"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(
-                    placement: .confirmationAction
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Done",
-                            norwegian: "Ferdig"
-                        )
-                    ) {
-                        dismiss()
-                    }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Done", "Ferdig")) { dismiss() }
                 }
             }
         }
