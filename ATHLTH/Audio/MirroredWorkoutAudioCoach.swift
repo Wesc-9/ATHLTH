@@ -58,6 +58,8 @@ final class MirroredWorkoutAudioCoach:
     private var lastStepPhase: String?
     private var priorityCountdownUntil: Date?
     private var priorityCountdownKey: String?
+    private var lastScopedCountdownRule: ATHLTHCoachBoundaryCountdownRule?
+    private var lastScopedCountdownStepIndex: Int?
     private var currentRunningStepIndex: Int?
     private var lastIntervalProgressKey: String?
     private var lastIntervalWarningKey: String?
@@ -89,6 +91,8 @@ final class MirroredWorkoutAudioCoach:
         lastStepPhase = nil
         priorityCountdownUntil = nil
         priorityCountdownKey = nil
+        lastScopedCountdownRule = nil
+        lastScopedCountdownStepIndex = nil
         lastIntervalProgressKey = nil
         lastIntervalWarningKey = nil
         announcedStart = false
@@ -359,21 +363,33 @@ final class MirroredWorkoutAudioCoach:
 
     /// Watch sends the exact step clock and timestamp. Subtract transport age
     /// and drop late snapshots; never voice an old number after the deadline.
+    /// A mirrored snapshot carries actual countdown time, group identity and
+    /// adjacent phases. Late snapshots are skipped instead of playing stale digits.
     private func announceCriticalCountdownIfDue(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) {
         guard snapshot.state == .running,
               let index = snapshot.runningStepIndex,
+              let count = snapshot.runningStepCount,
               let phase = snapshot.runningStepPhase,
-              let nextPhase = snapshot.runningNextStepPhase,
               let sampledRemaining = snapshot.runningStepRemainingSeconds
         else { return }
-        let length: Int?
-        if phase == "work", nextPhase == "recovery" {
-            length = configuration.resolvedIntervalCountdownToRecovery
-        } else if phase == "recovery" {
-            length = configuration.resolvedIntervalCountdownFromRecovery
-        } else { return }
+
+        let scoped = ATHLTHCoachBoundaryCountdown.chosenRule(
+            configuration.effectiveBoundaryCountdownRules,
+            currentPhase: phase,
+            nextPhase: snapshot.runningNextStepPhase,
+            currentGroupID: snapshot.runningStepCoachGroupID,
+            nextGroupID: snapshot.runningNextStepCoachGroupID,
+            stepIndex: index, stepCount: count
+        )
+        let nextPhase = snapshot.runningNextStepPhase
+        let legacyLength: Int? = phase == "work" && nextPhase == "recovery"
+            ? configuration.resolvedIntervalCountdownToRecovery
+            : phase == "recovery" ? configuration.resolvedIntervalCountdownFromRecovery
+            : nil
+        guard let length = scoped?.resolvedSeconds ?? legacyLength else { return }
+
         let age = Date().timeIntervalSince(snapshot.capturedAt)
         guard age >= -0.3, age <= 1.1 else { return }
         let remaining = sampledRemaining - max(0, age)
@@ -388,6 +404,10 @@ final class MirroredWorkoutAudioCoach:
         let key = "\(identity):\(number)"
         guard priorityCountdownKey != key else { return }
         priorityCountdownKey = key
+        if let scoped {
+            lastScopedCountdownRule = scoped
+            lastScopedCountdownStepIndex = index
+        }
         priorityCountdownUntil = Date().addingTimeInterval(remaining)
         cueQueue.reset()
         azureCoachSpeech.stop()
@@ -496,10 +516,15 @@ final class MirroredWorkoutAudioCoach:
               !title.isEmpty else { return }
 
         let priorPhase = lastStepPhase
+        let priorStepIndex = lastStepIndex
+        let scoped = priorStepIndex == lastScopedCountdownStepIndex
+            ? lastScopedCountdownRule : nil
         lastStepIndex = index
         lastStepPhase = snapshot.runningStepPhase
         priorityCountdownUntil = nil
-        let action = ATHLTHCoachRecoveryBoundary.afterAction(
+        lastScopedCountdownRule = nil
+        lastScopedCountdownStepIndex = nil
+        let action = scoped?.after ?? ATHLTHCoachRecoveryBoundary.afterAction(
             finishedPhase: priorPhase,
             nextPhase: snapshot.runningStepPhase,
             configuration: configuration
@@ -513,7 +538,11 @@ final class MirroredWorkoutAudioCoach:
                 guard let self, self.lastStepIndex == index, !self.finished else { return }
                 let norwegian = self.phrase(english: "en", norwegian: "no") == "no"
                 self.speak(
-                    ATHLTHCoachRecoveryBoundary.shortMessage(
+                    scoped.map {
+                        ATHLTHCoachBoundaryCountdown.shortMessage(
+                            for: $0, norwegian: norwegian
+                        )
+                    } ?? ATHLTHCoachRecoveryBoundary.shortMessage(
                         finishedPhase: priorPhase, norwegian: norwegian
                     ),
                     priority: .structuredStep,
