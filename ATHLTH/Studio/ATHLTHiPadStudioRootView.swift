@@ -584,10 +584,9 @@ struct ATHLTHiPadStudioRootView: View {
             .padding(.top, 26)
             .padding(.bottom, 17)
 
-            sidebarProfileRow
-                .padding(.horizontal, 11)
-                .padding(.bottom, 14)
-
+            // Keep the top area dedicated to ATHLTH navigation.
+            // The signed-in athlete profile is pinned below Settings,
+            // matching the iPhone side menu.
             Divider().padding(.horizontal, 18)
 
             ScrollView {
@@ -723,7 +722,15 @@ struct ATHLTHiPadStudioRootView: View {
                     }
                 }
                 .padding(.horizontal, 11)
-                .padding(.vertical, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+
+            Divider().padding(.horizontal, 18)
+
+            sidebarProfileRow
+                .padding(.horizontal, 11)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
         }
         .background(canvas)
     }
@@ -780,12 +787,14 @@ struct ATHLTHiPadStudioRootView: View {
                 .frame(width: 40, height: 40)
                 .clipShape(Circle())
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(session.profile.displayName.isEmpty
                          ? "ATHLTH" : session.profile.displayName)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .multilineTextAlignment(.leading)
                     Text(session.profile.username.isEmpty
                          ? ATHLTHLocalization.choose(english: "My profile", norwegian: "Min profil")
                          : "@\(session.profile.username)")
@@ -794,14 +803,33 @@ struct ATHLTHiPadStudioRootView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(gold)
+                    .frame(width: 28, height: 28)
+                    .background(ATHLTHStudioStyle.paper, in: Circle())
+                    .accessibilityHidden(true)
             }
-            .frame(minHeight: 52)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 12)
+            .frame(minHeight: 74)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                sidebarPage == .profile ? ATHLTHPlanDesign.selectedSurface : Color.white,
+                in: RoundedRectangle(cornerRadius: 17)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17)
+                    .strokeBorder(gold.opacity(0.19), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 17))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Open my ATHLTH profile",
+            norwegian: "Åpne ATHLTH-profilen min"
+        ))
+        .accessibilityAddTraits(sidebarPage == .profile ? .isSelected : [])
         .accessibilityIdentifier("athlth-ipad-profile-footer")
     }
 
