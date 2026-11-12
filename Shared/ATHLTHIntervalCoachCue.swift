@@ -308,6 +308,46 @@ struct ATHLTHCoachBoundaryCountdownRule: Codable, Hashable, Identifiable {
 /// Longest selected countdown wins; on a tie prefer the more specific rule.
 /// Without an actual timed deadline callers must never ask for spoken numbers.
 enum ATHLTHCoachBoundaryCountdown {
+    static func forRunningStep(
+        _ steps: [WatchRunningWorkoutStep],
+        at index: Int,
+        configuration: WatchAudioCoachConfiguration
+    ) -> ATHLTHCoachBoundaryCountdownRule? {
+        guard steps.indices.contains(index) else { return nil }
+        return chosenRule(
+            configuration.effectiveBoundaryCountdownRules,
+            currentPhase: steps[index].phase,
+            nextPhase: steps.indices.contains(index + 1) ? steps[index + 1].phase : nil,
+            currentGroupID: steps[index].coachGroupID,
+            nextGroupID: steps.indices.contains(index + 1) ? steps[index + 1].coachGroupID : nil,
+            stepIndex: index,
+            stepCount: steps.count
+        )
+    }
+
+    static func shortMessage(
+        for rule: ATHLTHCoachBoundaryCountdownRule,
+        norwegian: Bool
+    ) -> String {
+        let started = rule.boundary == .starts
+        switch rule.scope {
+        case .step:
+            return norwegian
+                ? (started ? "Neste drag starter." : "Delsteget er ferdig.")
+                : (started ? "Next effort starts." : "Step completed.")
+        case .section:
+            return norwegian
+                ? (started ? "Neste deløkt starter." : "Deløkten er ferdig.")
+                : (started ? "Next section starts." : "Section complete.")
+        case .group:
+            return norwegian
+                ? (started ? "Neste gruppe starter." : "Gruppen er ferdig.")
+                : (started ? "Next group starts." : "Group complete.")
+        case .plannedWorkout:
+            return norwegian ? "Den planlagte økten er ferdig." : "Planned workout complete."
+        }
+    }
+
     static func section(for phase: String?) -> String? {
         switch phase {
         case "warmup": return "warmup"
