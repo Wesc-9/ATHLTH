@@ -51,6 +51,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
     @State private var showingSpotifyControls = false
+    @State private var showingStrengthAudioCoachSettings = false
     @State private var showingNextExerciseDetails = false
     @State private var showingOmitRemainingSetsConfirmation = false
     @State private var showingSkipCurrentSetConfirmation = false
@@ -163,8 +164,7 @@ struct ActiveStrengthWorkoutView: View {
                         ATHLTHWorkoutAudioDock(
                             inlinePopovers: true,
                             compactAlignment: .leading,
-                            coachVisible:
-                                workout.advancedConfiguration?.audioCoach.enabled == true,
+                            coachVisible: true,
                             coachEnabled:
                                 workout.advancedConfiguration?.audioCoach.enabled == true,
                             coachPaused: strengthCoach.speechPaused,
@@ -175,7 +175,9 @@ struct ActiveStrengthWorkoutView: View {
                                 strengthCoach.setSpeechPaused(!strengthCoach.speechPaused)
                             },
                             onCoachReplay: { strengthCoach.replayLastMessage() },
-                            onCoachSettings: nil
+                            onCoachSettings: workout.captureDevice == .iPhone
+                                ? { showingStrengthAudioCoachSettings = true }
+                                : nil
                         )
                         .fixedSize(horizontal: true, vertical: true)
                     }
@@ -238,6 +240,22 @@ struct ActiveStrengthWorkoutView: View {
                     ) {
                         showingFinishConfirmation = true
                     }
+                }
+            }
+            .sheet(isPresented: $showingStrengthAudioCoachSettings) {
+                if strength.activeWorkout?.captureDevice == .iPhone {
+                    StrengthAudioCoachSettingsView(
+                        configuration: Binding(
+                            get: {
+                                strength.activeWorkout?.advancedConfiguration?.audioCoach ??
+                                    StrengthAudioCoachConfiguration()
+                            },
+                            set: { updated in
+                                strength.updateActiveAudioCoachConfiguration(updated)
+                                scheduleStatusCoach()
+                            }
+                        )
+                    )
                 }
             }
             .sheet(isPresented: $showingTrainingPlacePicker) {
