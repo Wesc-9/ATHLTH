@@ -352,22 +352,18 @@ struct ATHLTHStudioEditorialDashboardView: View {
     private var mountainPlanHero: some View {
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
-                Image("GoalMountain")
+                Image("StudioMountainSunrise")
                     .resizable()
                     .scaledToFill()
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
                     .overlay {
-                        Color(red: 0.74, green: 0.46, blue: 0.22)
-                            .opacity(0.22)
-                    }
-                    .overlay {
                         LinearGradient(
                             colors: [
-                                Color.black.opacity(0.83),
-                                Color.black.opacity(0.48),
-                                Color.black.opacity(0.12),
-                                Color.black.opacity(0.06)
+                                Color.black.opacity(0.44),
+                                Color.black.opacity(0.23),
+                                Color.black.opacity(0.08),
+                                Color.black.opacity(0.02)
                             ],
                             startPoint: .leading,
                             endPoint: .trailing
