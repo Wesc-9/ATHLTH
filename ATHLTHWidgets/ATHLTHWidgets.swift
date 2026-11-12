@@ -506,126 +506,167 @@ private struct ATHLTHHomeWidgetView: View {
     }
 
     private var mediumView: some View {
-        HStack(spacing: 14) {
-            VStack(
-                alignment: .leading,
-                spacing: 6
-            ) {
-                Text("RECOVERY")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.4)
-                    .foregroundStyle(
-                        ATHLTHWidgetPalette.muted
-                    )
+        HStack(alignment: .top, spacing: 13) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("RESTITUSJON")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(ATHLTHWidgetPalette.muted)
 
-                Text(
-                    entry.snapshot.recoveryScore
-                        .map(String.init) ?? "—"
-                )
-                .font(.system(
-                    size: 32,
-                    weight: .bold,
-                    design: .rounded
-                ))
+                Text(entry.snapshot.recoveryScore.map(String.init) ?? "—")
+                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHWidgetPalette.ink)
+                    .minimumScaleFactor(0.70)
 
                 Text(entry.snapshot.recoveryState)
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHWidgetPalette.muted
-                    )
-                    .lineLimit(1)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.80)
             }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
+            .frame(maxWidth: 104, alignment: .leading)
 
-            Divider()
+            Rectangle()
+                .fill(ATHLTHWidgetPalette.brandGold.opacity(0.18))
+                .frame(width: 1)
 
-            VStack(
-                alignment: .leading,
-                spacing: 7
-            ) {
-                Text("NEXT")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.4)
-                    .foregroundStyle(
-                        ATHLTHWidgetPalette.muted
-                    )
-
-                Label(
-                    entry.snapshot.nextWorkoutTitle ??
-                        "No workout planned",
-                    systemImage: "figure.run"
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(
-                    ATHLTHWidgetPalette.ink
-                )
-                .lineLimit(2)
-
-                if let date =
-                    entry.snapshot.nextWorkoutDate {
-                    Text(
-                        date,
-                        format:
-                            .dateTime
-                            .weekday(.abbreviated)
-                            .hour()
-                            .minute()
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHWidgetPalette.muted
-                    )
-                }
-            }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-
-            if let goal =
-                entry.snapshot.primaryGoalTitle {
-                Divider()
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 7
-                ) {
-                    Text("GOAL")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.4)
-                        .foregroundStyle(
-                            ATHLTHWidgetPalette.muted
-                        )
-
-                    Text(goal)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHWidgetPalette.ink
-                        )
+            VStack(alignment: .leading, spacing: 9) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("NESTE ØKT")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    Text(entry.snapshot.nextWorkoutTitle ?? "Ingen økt planlagt")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHWidgetPalette.ink)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.80)
 
-                    if let progress =
-                        entry.snapshot
-                            .primaryGoalProgress {
-                        ProgressView(
-                            value:
-                                min(max(progress, 0), 1)
-                        )
-                        .tint(
-                            ATHLTHWidgetPalette.vitality
-                        )
+                    if let date = entry.snapshot.nextWorkoutDate {
+                        Text(date, format: .dateTime.weekday(.abbreviated)
+                            .hour().minute())
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHWidgetPalette.muted)
                     }
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    alignment: .leading
-                )
+
+                if let goal = entry.snapshot.primaryGoalTitle {
+                    Rectangle()
+                        .fill(ATHLTHWidgetPalette.brandGold.opacity(0.18))
+                        .frame(height: 1)
+
+                    HStack(spacing: 9) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("HOVEDMÅL")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(ATHLTHWidgetPalette.muted)
+                            Text(goal)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHWidgetPalette.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if let progress = entry.snapshot.primaryGoalProgress,
+                           progress.isFinite {
+                            Text("\(Int((min(max(progress, 0), 1) * 100).rounded()))%")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                                .monospacedDigit()
+                        }
+                    }
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+
+    private var largeView: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 8) {
+                ATHLTHMarkShape()
+                    .fill(ATHLTHWidgetPalette.brandGold)
+                    .frame(width: 23, height: 19)
+                Text("ATHLTH")
+                    .font(.caption.weight(.bold))
+                    .tracking(1.5)
+                    .foregroundStyle(ATHLTHWidgetPalette.ink)
+                Spacer()
+                Text("DIN DAG")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHWidgetPalette.muted)
+            }
+
+            HStack(alignment: .top, spacing: 13) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("RESTITUSJON")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    Text(entry.snapshot.recoveryScore.map(String.init) ?? "—")
+                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                        .foregroundStyle(ATHLTHWidgetPalette.ink)
+                    Text(entry.snapshot.recoveryState)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Label("NESTE ØKT", systemImage: "calendar")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                    Text(entry.snapshot.nextWorkoutTitle ?? "Ingen økt planlagt")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(ATHLTHWidgetPalette.ink)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.80)
+                    if let date = entry.snapshot.nextWorkoutDate {
+                        Text(date, format: .dateTime.weekday(.wide)
+                            .day().month(.abbreviated).hour().minute())
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    }
+                }
+                .padding(13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ATHLTHWidgetPalette.card,
+                            in: RoundedRectangle(cornerRadius: 16))
+            }
+
+            Rectangle()
+                .fill(ATHLTHWidgetPalette.brandGold.opacity(0.22))
+                .frame(height: 1)
+
+            VStack(alignment: .leading, spacing: 9) {
+                Label("HOVEDMÅL", systemImage: "target")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                Text(entry.snapshot.primaryGoalTitle ?? "Opprett ditt første mål")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(ATHLTHWidgetPalette.ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+                if let value = entry.snapshot.primaryGoalProgress,
+                   value.isFinite {
+                    let progress = min(max(value, 0), 1)
+                    HStack(spacing: 10) {
+                        ProgressView(value: progress)
+                            .tint(ATHLTHWidgetPalette.brandGold)
+                        Text("\(Int((progress * 100).rounded()))%")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                            .monospacedDigit()
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
 }
 
 struct ATHLTHLockScreenWidget: Widget {
