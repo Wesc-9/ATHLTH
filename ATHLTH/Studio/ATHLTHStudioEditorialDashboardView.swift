@@ -922,10 +922,12 @@ struct ATHLTHStudioEditorialDashboardView: View {
             return tr("Select a day in the calendar", "Velg en dag i kalenderen")
         }
         if !day.planned.isEmpty {
-            let plannedLabel = ATHLTHStudioHomeWeek.plannedCountLabel(
-                day.planned.count,
-                norwegian: ATHLTHLocalization.choose(
-                    english: false, norwegian: true
+            let plannedLabel = tr(
+                ATHLTHStudioHomeWeek.plannedCountLabel(
+                    day.planned.count, norwegian: false
+                ),
+                ATHLTHStudioHomeWeek.plannedCountLabel(
+                    day.planned.count, norwegian: true
                 )
             )
             guard !day.recorded.isEmpty else { return plannedLabel }
@@ -1286,76 +1288,144 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .accessibilityIdentifier("athlth-ipad-week-totals")
     }
 
+    /// Shared HealthKit recovery data; compact premium iPad presentation
+    /// mirrors the iPhone Insights hierarchy without inventing a score.
     private var compactReadinessCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(tr("Today's readiness", "Dagens form"))
-                    .font(.system(size: 21, weight: .medium, design: .serif))
-                    .foregroundStyle(ink)
-                Spacer(minLength: 6)
-                Image(systemName: "waveform.path.ecg")
-                    .foregroundStyle(bronze)
-                    .font(.subheadline)
-            }
-            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil {
-                ProgressView(tr("Updating", "Oppdaterer"))
-                    .font(.caption)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else if hasHealth, let score = health.recovery.score {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(score)")
-                        .font(.system(size: 36, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("ATHLTH INSIGHT", "ATHLTH INNSIKT"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(bronze)
+                    Text(tr("Today's readiness", "Dagens form"))
+                        .font(.system(size: 23, weight: .medium, design: .serif))
                         .foregroundStyle(ink)
-                    Text(readinessTitle)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                Spacer(minLength: 4)
+                Button(action: onOpenInsights) {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(bronze)
+                        .frame(width: 38, height: 38)
+                        .background(cream, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Open Insights", "Åpne Innsikt"))
+            }
+
+            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil {
+                HStack(spacing: 12) {
+                    ProgressView().tint(bronze)
+                    Text(tr("Updating signals", "Oppdaterer treningssignaler"))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 114, alignment: .leading)
+            } else if hasHealth, let score = health.recovery.score {
+                HStack(alignment: .center, spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .stroke(bronze.opacity(0.13), lineWidth: 8)
+                        Circle()
+                            .trim(from: 0, to: CGFloat(min(max(score, 0), 100)) / 100)
+                            .stroke(
+                                bronze,
+                                style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                            )
+                            .rotationEffect(.degrees(-90))
+                        VStack(spacing: 1) {
+                            Text("\(score)")
+                                .font(.system(size: 33, weight: .semibold,
+                                              design: .rounded))
+                                .foregroundStyle(ink)
+                                .monospacedDigit()
+                            Text("/ 100")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(width: 108, height: 108)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(tr(
+                        "Readiness score", "Dagsform"
+                    ))
+                    .accessibilityValue("\(score) av 100")
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(readinessTitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(tr(
+                            "Your recovery, sleep and cardiovascular signals.",
+                            "Restitusjon, søvn og kroppens signaler."
+                        ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else if hasHealth, let diagnostics = health.recovery.diagnostics {
-                Text(tr("Building your baseline", "Kartlegger dagsform"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ink)
-                Text("\(diagnostics.completeDays)/\(diagnostics.requiredDays) " +
-                     tr("complete days", "komplette dager"))
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(tr("Building your baseline", "Kartlegger dagsformen"),
+                          systemImage: "chart.xyaxis.line")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text("\(diagnostics.completeDays)/\(diagnostics.requiredDays) " +
+                         tr("complete days", "dager med fullstendige data"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 114,
+                       alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.title2)
+                        .foregroundStyle(bronze)
+                    Text(tr("Connect health data", "Koble til helsedata"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(tr(
+                        "Your readiness appears here when enough data is available.",
+                        "Dagsformen vises her når det finnes tilstrekkelig med data."
+                    ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else {
-                Text(tr(
-                    "Apple Health data unavailable",
-                    "Helsedata er ikke tilgjengelige"
-                ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 114,
+                       alignment: .leading)
             }
 
-            Divider().overlay(outline)
-            Text(tr("TRAINING SIGNALS", "TRENINGSSIGNALER"))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.1)
-                .foregroundStyle(bronze)
+            Rectangle()
+                .fill(outline.opacity(0.60))
+                .frame(height: 1)
 
-            VStack(alignment: .leading, spacing: 7) {
-                compactMetric(
+            HStack(alignment: .top, spacing: 7) {
+                readinessSignal(
                     title: tr("Sleep", "Søvn"),
                     value: hasHealth && health.sleep.totalAsleep > 0
-                        ? String(format: "%.1f t", health.sleep.totalAsleep / 3_600)
+                        ? String(format: "%.1f t",
+                                 health.sleep.totalAsleep / 3_600)
                         : "—"
                 )
-                compactMetric(
+                readinessSignal(
                     title: "HRV",
                     value: hasHealth ? health.heart.hrvMilliseconds.map {
                         String(format: "%.0f ms", $0)
                     } ?? "—" : "—"
                 )
-                compactMetric(
+                readinessSignal(
                     title: tr("Resting HR", "Hvilepuls"),
                     value: hasHealth ? health.heart.restingHeartRate.map {
                         String(format: "%.0f bpm", $0)
                     } ?? "—" : "—"
                 )
             }
-            Spacer(minLength: 0)
+
             Button {
                 if hasHealth {
                     showingReadinessExplanation = true
@@ -1363,34 +1433,53 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     onOpenSettings()
                 }
             } label: {
-                Label(tr("Details", "Detaljer"),
-                      systemImage: "arrow.up.right")
-                    .font(.caption.weight(.semibold))
+                HStack(spacing: 6) {
+                    Text(tr("Understand today's form", "Forstå dagens form"))
+                    Image(systemName: "arrow.up.right")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(bronze)
+                .frame(minHeight: 38)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(bronze)
-            .frame(minHeight: 40)
         }
-        .padding(19)
-        .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline.opacity(0.45), lineWidth: 0.6))
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background {
+            RoundedRectangle(cornerRadius: 22)
+                .fill(LinearGradient(
+                    colors: [.white, cream],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(bronze.opacity(0.17), lineWidth: 1)
+                .allowsHitTesting(false)
+        }
         .accessibilityIdentifier("athlth-ipad-readiness-compact")
     }
 
-    private func compactMetric(title: String, value: String) -> some View {
-        HStack(spacing: 7) {
+    private func readinessSignal(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(.caption)
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
-            Spacer(minLength: 4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
             Text(value)
                 .font(.caption.weight(.semibold))
-                .monospacedDigit()
                 .foregroundStyle(ink)
+                .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.80)
         }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.86),
+                    in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var readinessTitle: String {
