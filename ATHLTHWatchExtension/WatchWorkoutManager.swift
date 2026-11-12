@@ -138,6 +138,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         Task<Void, Never>?
     private var countdownPriorityEndsAt: Date?
     private var countdownNumberKey: String?
+    private var lastTimedSetCountdownFollowupKey: String?
+    private var lastTimedGroupCountdownFollowupKey: String?
     /// Watch rest haptics are independent from speech and work with Coach off.
     private var strengthRestHapticTask: Task<Void, Never>?
     private var strengthRestHapticScheduleKey: String?
@@ -4516,6 +4518,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             guard key.hasPrefix(identity + ":") else { return nil }
             return Int(key.split(separator: ":").last ?? "")
         }
+        if remaining <= 0,
+           let scoped, scoped.after != .numbersOnly,
+           countdownNumberKey?.hasPrefix(identity + ":") == true,
+           lastTimedSetCountdownFollowupKey != identity {
+            lastTimedSetCountdownFollowupKey = identity
+            let detail = scoped.after == .shortAlert
+                ? coachPhrase(english: "Time target reached.", norwegian: "Tidsmålet er nådd.")
+                : coachPhrase(
+                    english: "Time target reached. Confirm your set when ready.",
+                    norwegian: "Tidsmålet er nådd. Registrer settet når du er klar."
+                )
+            speak(detail, priority: .structuredStep, forceLocal: true)
+            return
+        }
         guard let number = ATHLTHCoachSecondCountdown.dueNumber(
             remaining: remaining, length: length, previousNumber: previous
         ) else { return }
@@ -4558,6 +4574,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let previous = countdownNumberKey.flatMap { key -> Int? in
             guard key.hasPrefix(identity + ":") else { return nil }
             return Int(key.split(separator: ":").last ?? "")
+        }
+        if deadline <= Date(),
+           rule.after != .numbersOnly,
+           countdownNumberKey?.hasPrefix(identity + ":") == true,
+           lastTimedGroupCountdownFollowupKey != identity {
+            lastTimedGroupCountdownFollowupKey = identity
+            let detail = rule.after == .shortAlert
+                ? coachPhrase(english: "Group time is up.", norwegian: "Gruppens tid er ute.")
+                : coachPhrase(
+                    english: "Group time is up. Continue when ready.",
+                    norwegian: "Gruppens tid er ute. Fortsett når du er klar."
+                )
+            speak(detail, priority: .structuredStep, forceLocal: true)
+            return
         }
         guard let number = ATHLTHCoachSecondCountdown.dueNumber(
             remaining: deadline.timeIntervalSinceNow,
