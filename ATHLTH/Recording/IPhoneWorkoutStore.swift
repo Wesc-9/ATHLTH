@@ -4185,7 +4185,13 @@ final class IPhoneWorkoutStore:
             }
         }
 
+        let onlyNumbersAtBoundary = step.measure == .time &&
+            ATHLTHCoachBoundaryCountdown.forRunningStep(
+                plan.steps, at: finishedIndex,
+                configuration: workout.audioCoachConfiguration ?? .disabled
+            )?.after == .numbersOnly
         if workout.audioCoachConfiguration?.enabled == true,
+           !onlyNumbersAtBoundary,
            let report = ATHLTHRunningCoachReport.make(
                steps: plan.steps, finishedIndex: finishedIndex,
                recorded: workout.recordedRunningSteps ?? [], now: now
