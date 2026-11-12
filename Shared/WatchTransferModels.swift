@@ -470,6 +470,8 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var strengthCountdownFromRestSeconds: Int? = nil
     var strengthAfterCountdownToRest: ATHLTHCoachCountdownAfter? = nil
     var strengthAfterCountdownFromRest: ATHLTHCoachCountdownAfter? = nil
+    // Optional cross-mode scope rules; nil keeps old Watch payload decoding.
+    var boundaryCountdownRules: [ATHLTHCoachBoundaryCountdownRule]? = nil
     // Running/walking interval recovery only. Manual workout pause is distinct.
     var intervalCountdownToRecoverySeconds: Int? = nil
     var intervalCountdownFromRecoverySeconds: Int? = nil
