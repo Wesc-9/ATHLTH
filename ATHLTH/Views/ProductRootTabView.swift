@@ -425,6 +425,13 @@ struct ProductRootTabView: View {
                   session.signedIn, accountID == session.profile.userID else { return }
             goalAccountSync.scheduleSync(session: session, goals: goalStore)
         }
+        .onReceive(NotificationCenter.default.publisher(
+            for: Notification.Name("athlth.privateMeasurementsDidChange")
+        )) { notification in
+            guard let accountID = notification.userInfo?["accountID"] as? UUID,
+                  session.signedIn, accountID == session.profile.userID else { return }
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
+        }
         .onChange(of: session.signedIn) { _, signedIn in
             goalAccountSync.switchAccount(signedIn ? session.profile.userID : nil)
             if signedIn {
