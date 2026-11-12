@@ -428,9 +428,21 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
 
             if activeAnnouncementCount == 0 {
-                Text(tr("Add a time or distance announcement group to begin.",
-                        "Legg til en varslingsgruppe etter tid eller distanse."))
+                Text(tr("Create a coach message or choose a preset to get started.",
+                        "Opprett en coach-beskjed eller velg et ferdig oppsett."))
                     .font(.subheadline).foregroundStyle(dim)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(tr("Choose what activates the coach", "Velg hva som aktiverer coachen"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                Text(tr(
+                    "Distance and time are only two options. Use event alerts for heart-rate zones, pace, workout phases and interval transitions.",
+                    "Tid og distanse er bare to muligheter. Under hendelsesvarsler finner du pulssoner, tempo, øktfaser og intervalloverganger."
+                ))
+                .font(.caption)
+                .foregroundStyle(dim)
             }
 
             VStack(spacing: 0) {
@@ -489,7 +501,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                 draft.customRules.append(group)
                 selectedRule = SelectedRule(id: group.id)
             } label: {
-                Label(tr("Create announcement group", "Opprett varslingsgruppe"),
+                Label(tr("Create coach message", "Opprett coach-beskjed"),
                       systemImage: "plus.circle.fill")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 47)
@@ -533,7 +545,7 @@ struct ATHLTHAudioCoachActiveListView: View {
             Button {
                 showingCatalogue = true
             } label: {
-                Label(tr("Other coaching and event alerts", "Andre coach- og hendelsesvarsler"),
+                Label(tr("Heart rate, pace, intervals and event alerts", "Puls, tempo, intervaller og hendelsesvarsler"),
                       systemImage: "slider.horizontal.3")
                     .font(.caption.weight(.medium))
             }
@@ -996,6 +1008,12 @@ struct ATHLTHAudioCoachActiveListView: View {
                     get: { rule.wrappedValue.scope ?? .workout },
                     set: { rule.wrappedValue.scope = $0 }
                 ))
+                Text(tr("1 · When should this message play?", "1 · Når skal beskjeden komme?"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                Text(tr("For heart-rate zone, pace or interval events, use the event alert catalogue.", "For pulssone, tempo eller intervallhendelser bruker du hendelsesvarslene."))
+                    .font(.caption)
+                    .foregroundStyle(dim)
                 Picker(tr("Trigger", "Utløser"), selection: rule.trigger) {
                     ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                         Text(trigger.title).tag(trigger)
@@ -1018,6 +1036,9 @@ struct ATHLTHAudioCoachActiveListView: View {
                     rule.wrappedValue.interval = newValue == .time ? 60 : 1_000
                 }
 
+                Text(tr("2 · What should the coach say?", "2 · Hva skal coachen si?"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
                 Picker(tr("First message item", "Første innhold"), selection: rule.metric) {
                     ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
                         Text(metric.title).tag(metric)
