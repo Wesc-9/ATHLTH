@@ -10,9 +10,9 @@ private enum ATHLTHWidgetPalette {
         blue: 0.962
     )
     static let card = Color(
-        red: 0.955,
-        green: 0.958,
-        blue: 0.950
+        red: 0.965,
+        green: 0.950,
+        blue: 0.926
     )
     static let ink = Color(
         red: 0.07,
@@ -21,13 +21,13 @@ private enum ATHLTHWidgetPalette {
     )
     static let muted = Color(
         red: 0.43,
-        green: 0.46,
-        blue: 0.53
+        green: 0.40,
+        blue: 0.35
     )
     static let vitality = Color(
-        red: 0.24,
-        green: 0.47,
-        blue: 0.38
+        red: 0.69,
+        green: 0.53,
+        blue: 0.31
     )
     static let brandGold = Color(
         red: 0.71,
@@ -146,7 +146,8 @@ struct ATHLTHHomeWidget: Widget {
         )
         .supportedFamilies([
             .systemSmall,
-            .systemMedium
+            .systemMedium,
+            .systemLarge
         ])
     }
 }
@@ -159,9 +160,15 @@ private struct ATHLTHHomeWidgetView: View {
 
     var body: some View {
         if let workout = entry.snapshot.activeWorkout {
-            activeWorkoutView(workout)
+            if family == .systemLarge {
+                activeLargeView(workout)
+            } else {
+                activeWorkoutView(workout)
+            }
         } else {
             switch family {
+            case .systemLarge:
+                largeView
             case .systemMedium:
                 mediumView
             default:
@@ -170,100 +177,277 @@ private struct ATHLTHHomeWidgetView: View {
         }
     }
 
+    private func counterLabel(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot
+    ) -> String? {
+        if let strengthCount = workout.strengthSetCount,
+           strengthCount > 0,
+           let setIndex = workout.strengthSetIndex {
+            return "Sett \(min(max(setIndex, 1), strengthCount)) av \(strengthCount)"
+        }
+        return ATHLTHWidgetPresentationPolicy.intervalLabel(
+            ordinal: workout.runningIntervalOrdinal,
+            total: workout.runningIntervalTotal,
+            isRecovery: workout.runningInRecovery == true
+        )
+    }
+
+    private func timerCaption(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot
+    ) -> String {
+        if workout.strengthRestEndsAt != nil { return "SETTPAUSE" }
+        if workout.runningInRecovery == true { return "PAUSE" }
+        if ATHLTHWidgetPresentationPolicy.remainingSeconds(
+            workout.runningStepRemainingSeconds
+        ) != nil {
+            return "TID IGJEN"
+        }
+        return "ØKTTID"
+    }
+
+    @ViewBuilder
+    private func workoutTimer(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot,
+        size: CGFloat
+    ) -> some View {
+        let paused = workout.state == "paused"
+        let stepSeconds = ATHLTHWidgetPresentationPolicy.remainingSeconds(
+            workout.runningStepRemainingSeconds
+        )
+        let anchor = ATHLTHWidgetPresentationPolicy.elapsedAnchor(
+            updatedAt: workout.updatedAt,
+            elapsedSeconds: workout.elapsedTime
+        )
+
+        Group {
+            if paused {
+                Text(ATHLTHWidgetPresentationPolicy.duration(
+                    workout.strengthRestEndsAt.map {
+                        max(0, $0.timeIntervalSince(workout.updatedAt))
+                    } ?? stepSeconds ?? workout.elapsedTime
+                ))
+            } else if let restEnd = workout.strengthRestEndsAt {
+                if restEnd > entry.date {
+                    Text(timerInterval: workout.updatedAt...restEnd,
+                         countsDown: true, showsHours: false)
+                } else {
+                    Text("KLAR")
+                }
+            } else if let stepSeconds {
+                if stepSeconds > 0 {
+                    Text(
+                        timerInterval: workout.updatedAt...
+                            workout.updatedAt.addingTimeInterval(stepSeconds),
+                        countsDown: true, showsHours: false
+                    )
+                } else {
+                    Text("00:00")
+                }
+            } else {
+                Text(anchor, style: .timer)
+            }
+        }
+        .font(.system(size: size, weight: .bold, design: .rounded))
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.55)
+        .foregroundStyle(ATHLTHWidgetPalette.ink)
+    }
+
+    private func activityHeader(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot
+    ) -> some View {
+        HStack(spacing: 6) {
+            ATHLTHMarkShape()
+                .fill(ATHLTHWidgetPalette.brandGold)
+                .frame(width: 18, height: 15)
+                .accessibilityHidden(true)
+            Text("ATHLTH")
+                .font(.caption2.weight(.bold))
+                .tracking(1.4)
+                .foregroundStyle(ATHLTHWidgetPalette.ink)
+            Spacer(minLength: 3)
+            Text(workout.state == "paused" ? "PAUSET" : "PÅGÅR")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                .lineLimit(1)
+        }
+    }
+
     private func activeWorkoutView(
         _ workout: ATHLTHSurfaceWorkoutSnapshot
     ) -> some View {
-        let paused = workout.state == "paused"
-        let activeAnchor = workout.updatedAt.addingTimeInterval(
-            -max(0, workout.elapsedTime.isFinite ? workout.elapsedTime : 0)
-        )
-        let countdownEnd = workout.updatedAt.addingTimeInterval(
-            max(0, workout.runningStepRemainingSeconds ?? 0)
-        )
-        let hasCountdown = workout.runningStepRemainingSeconds.map {
-            $0.isFinite && $0 >= 0
-        } ?? false
-        return VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 7) {
-                Image(systemName: "waveform.path.ecg")
-                    .foregroundStyle(ATHLTHWidgetPalette.brandGold)
-                Text("ATHLTH")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.4)
-                Spacer(minLength: 3)
-                Text(paused ? "PAUSE" : "LIVE")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(ATHLTHWidgetPalette.brandGold)
-            }
-            HStack(spacing: 6) {
-                Text(workout.currentStep ?? workout.title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Spacer(minLength: 2)
-                if let current = workout.runningIntervalOrdinal,
-                   let total = workout.runningIntervalTotal, total > 1 {
-                    Text(workout.runningInRecovery == true
-                         ? "N \(min(current + 1, total))/\(total)"
-                         : "\(current)/\(total)")
-                    .font(.caption.weight(.bold))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                }
-            }
-            .foregroundStyle(ATHLTHWidgetPalette.ink)
-
-            if hasCountdown, let remaining = workout.runningStepRemainingSeconds {
-                if paused || remaining <= 0 {
-                    Text(duration(remaining))
-                        .font(.system(size: family == .systemMedium ? 35 : 29,
-                                      weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                } else {
-                    Text(timerInterval: workout.updatedAt...countdownEnd,
-                         countsDown: true, showsHours: false)
-                        .font(.system(size: family == .systemMedium ? 35 : 29,
-                                      weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                }
-            } else if paused {
-                Text(duration(workout.elapsedTime))
-                    .font(.system(size: family == .systemMedium ? 35 : 29,
-                                  weight: .bold, design: .rounded))
-                    .monospacedDigit()
-            } else {
-                Text(activeAnchor, style: .timer)
-                    .font(.system(size: family == .systemMedium ? 35 : 29,
-                                  weight: .bold, design: .rounded))
-                    .monospacedDigit()
-            }
-
-            HStack(spacing: 5) {
-                if workout.runningInRecovery == true {
-                    Image(systemName: "pause.circle")
-                    Text("Pause")
-                } else {
-                    Image(systemName: workout.systemImage)
-                    Text(hasCountdown ? "TID IGJEN" : "ØKTTID")
-                }
-                Spacer(minLength: 4)
-                if workout.distanceMeters.isFinite, workout.distanceMeters > 0 {
-                    Text(String(format: "%.2f km", workout.distanceMeters / 1000))
-                        .monospacedDigit()
-                }
-            }
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(ATHLTHWidgetPalette.muted)
-            .lineLimit(1)
+        if family == .systemMedium {
+            activeMediumView(workout)
+        } else {
+            activeSmallView(workout)
         }
-        .foregroundStyle(ATHLTHWidgetPalette.ink)
-        .padding(3)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func duration(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.isFinite ? seconds.rounded(.up) : 0))
-        return String(format: "%02d:%02d", total / 60, total % 60)
+    private func activeSmallView(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            activityHeader(workout)
+
+            Text(workout.currentStep ?? workout.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHWidgetPalette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+            Text(timerCaption(workout))
+                .font(.system(size: 10, weight: .medium))
+                .tracking(0.5)
+                .foregroundStyle(ATHLTHWidgetPalette.muted)
+
+            workoutTimer(workout, size: 33)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 6) {
+                if let position = counterLabel(workout) {
+                    Text(position)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                } else if let distance = ATHLTHWidgetPresentationPolicy.distanceLabel(
+                    workout.distanceMeters
+                ) {
+                    Text(distance)
+                } else if let pulse = ATHLTHWidgetPresentationPolicy.heartRateLabel(
+                    workout.heartRate
+                ) {
+                    Text(pulse)
+                } else {
+                    Text(workout.title)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func activeMediumView(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            activityHeader(workout)
+            HStack(alignment: .center, spacing: 13) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(timerCaption(workout))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    workoutTimer(workout, size: 39)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Rectangle()
+                    .fill(ATHLTHWidgetPalette.brandGold.opacity(0.18))
+                    .frame(width: 1)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(workout.currentStep ?? workout.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHWidgetPalette.ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+
+                    if let position = counterLabel(workout) {
+                        Text(position)
+                            .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                            .font(.caption.weight(.bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+
+                    HStack(spacing: 8) {
+                        if let distance = ATHLTHWidgetPresentationPolicy.distanceLabel(
+                            workout.distanceMeters
+                        ) {
+                            Label(distance, systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                        }
+                        if let heart = ATHLTHWidgetPresentationPolicy.heartRateLabel(
+                            workout.heartRate
+                        ) {
+                            Label(heart, systemImage: "heart.fill")
+                        }
+                    }
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func activeLargeView(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            activityHeader(workout)
+            Text(workout.currentStep ?? workout.title)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(ATHLTHWidgetPalette.ink)
+                .lineLimit(2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(timerCaption(workout))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHWidgetPalette.muted)
+                workoutTimer(workout, size: 58)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 10) {
+                if let interval = counterLabel(workout) {
+                    activeMetric("INTERVALL / SETT", interval)
+                }
+                if let distance = ATHLTHWidgetPresentationPolicy.distanceLabel(
+                    workout.distanceMeters
+                ) {
+                    activeMetric("DISTANSE", distance)
+                }
+                if let pulse = ATHLTHWidgetPresentationPolicy.heartRateLabel(
+                    workout.heartRate
+                ) {
+                    activeMetric("PULS", pulse)
+                }
+            }
+
+            if let next = workout.nextStep, !next.isEmpty {
+                Label("Neste: \(next)", systemImage: "arrow.right.circle")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func activeMetric(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(ATHLTHWidgetPalette.muted)
+            Text(value)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(ATHLTHWidgetPalette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHWidgetPalette.card, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var smallView: some View {
