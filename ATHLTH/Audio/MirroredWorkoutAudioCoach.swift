@@ -358,7 +358,22 @@ final class MirroredWorkoutAudioCoach:
               elapsed.isFinite, elapsed >= 0,
               remaining.isFinite, remaining >= 0 else { return }
 
+        if let motivation = ATHLTHIntervalCoachCue.motivation(
+            snapshot.runningStepMotivation, phase: snapshot.runningStepPhase,
+            elapsed: elapsed, remaining: remaining,
+            norwegian: phrase(english: "en", norwegian: "no") == "no"
+        ) {
+            speak(motivation.text, priority: .structuredStep,
+                  event: ATHLTHCoachEvent(
+                    kind: .runningStep, key: "motivation:\(index):\(motivation.key)",
+                    priority: .structuredStep, createdAt: snapshot.capturedAt,
+                    validFor: 2, runningStepIndex: index
+                  ))
+            return
+        }
+
         if let warning = snapshot.runningIntervalCoachCountdownSeconds,
+           snapshot.runningStepMotivation?.finalSeconds.map(Double.init) != warning,
            warning >= 5, warning.isFinite,
            remaining > 0, remaining <= warning {
             let key = "\(snapshot.startedAt?.timeIntervalSince1970 ?? 0):\(index):\(Int(warning))"

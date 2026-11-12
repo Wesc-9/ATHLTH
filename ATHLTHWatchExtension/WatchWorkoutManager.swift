@@ -4930,7 +4930,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let remaining = max(total - elapsed, 0)
         let norwegian = coachPhrase(english: "en", norwegian: "no") == "no"
 
+        if let motivation = ATHLTHIntervalCoachCue.motivation(
+            step.intervalMotivation, phase: step.phase,
+            elapsed: elapsed, remaining: remaining, norwegian: norwegian
+        ) {
+            speak(motivation.text, priority: .structuredStep,
+                  event: ATHLTHCoachEvent(
+                    kind: .runningStep, key: "motivation:\(structuredStepIndex):\(motivation.key)",
+                    priority: .structuredStep, validFor: 2, runningStepIndex: structuredStepIndex
+                  ))
+            return
+        }
+
         if let lead = configuration.intervalCoachCountdownSeconds,
+           step.intervalMotivation?.finalSeconds.map(Double.init) != lead,
            lead >= 5, lead < total,
            remaining > 0, remaining <= lead,
            remaining > lead - 2.5 {
@@ -8145,6 +8158,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 runningStepReadout?.unit == .meters
                     ? runningStepReadout?.remaining : nil,
             runningStepCoachBrief: currentRunningStep?.coachBrief,
+            runningStepMotivation: currentRunningStep?.intervalMotivation,
             runningStepPhase: currentRunningStep?.phase,
             runningStepTargetHeartRateZone: currentRunningStep?.targetHeartRateZone,
             heartRateTargetZone:

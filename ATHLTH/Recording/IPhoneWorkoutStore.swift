@@ -4319,7 +4319,20 @@ final class IPhoneWorkoutStore:
             english: "en", norwegian: "no", configuration: audio
         ) == "no"
 
+        if let motivation = ATHLTHIntervalCoachCue.motivation(
+            step.intervalMotivation, phase: step.phase,
+            elapsed: passed, remaining: remaining, norwegian: norwegian
+        ) {
+            speak(motivation.text, configuration: audio, priority: .structuredStep,
+                  event: ATHLTHCoachEvent(
+                    kind: .runningStep, key: "motivation:\(index):\(motivation.key)",
+                    priority: .structuredStep, validFor: 2, runningStepIndex: index
+                  ))
+            return
+        }
+
         if let warning = plan.intervalCoachCountdownSeconds,
+           step.intervalMotivation?.finalSeconds.map(Double.init) != warning,
            warning >= 5, warning < length,
            remaining > 0, remaining <= warning,
            remaining > warning - 1.5 {

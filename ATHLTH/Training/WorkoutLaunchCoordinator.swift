@@ -506,7 +506,8 @@ struct PlannedWorkoutWatchBuilder {
                         ? (override?.ghostPaceSecondsPerKilometer ??
                            template.intervalGhostPaceSecondsPerKilometer)
                         : nil,
-                    coachBrief: working && !guidance.isEmpty ? guidance : nil
+                    coachBrief: working && !guidance.isEmpty ? guidance : nil,
+                    intervalMotivation: working ? block.intervalMotivation : nil
                 ))
 
                 if let recovery = block.resolvedRecovery(after: position) {
@@ -537,7 +538,8 @@ struct PlannedWorkoutWatchBuilder {
         ghostPace: Double? = nil,
         ghostFollowsRecovery: Bool? = nil,
         slowdownPercent: Int? = nil,
-        coachBrief: String? = nil
+        coachBrief: String? = nil,
+        intervalMotivation: ATHLTHIntervalMotivationSettings? = nil
     ) -> WatchRunningWorkoutStep {
         let measure: WatchRunningStepMeasure
         switch target.measure {
@@ -560,7 +562,8 @@ struct PlannedWorkoutWatchBuilder {
             ghostPaceSecondsPerKilometer: ghostPace,
             ghostFollowsRecovery: ghostFollowsRecovery,
             ghostRecoverySlowdownPercent: slowdownPercent,
-            coachBrief: coachBrief
+            coachBrief: coachBrief,
+            intervalMotivation: intervalMotivation
         )
     }
 

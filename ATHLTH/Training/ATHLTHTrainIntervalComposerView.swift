@@ -43,6 +43,9 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var ghostRecoverySlowdownPercent: Int
     @State private var editingRepetition: IntervalRepetitionSelection?
     @State private var coachBrief: String
+    @State private var motivateHalfway = false
+    @State private var motivateBeforeFinish = false
+    @State private var motivationLeadSeconds = 15
 
     private struct IntervalRepetitionSelection: Identifiable {
         let blockID: UUID
@@ -422,6 +425,11 @@ struct ATHLTHTrainIntervalComposerView: View {
                         editingBlockID = nil
                         isComposerExpanded = false
                     } else {
+                        if editingBlockID == nil {
+                            motivateHalfway = false
+                            motivateBeforeFinish = false
+                            motivationLeadSeconds = 15
+                        }
                         isComposerExpanded = true
                     }
                 }
@@ -507,6 +515,16 @@ struct ATHLTHTrainIntervalComposerView: View {
             if kind == .work {
                 Stepper("\(repetitions) " + tr("repetitions", "drag"),
                         value: $repetitions, in: 1...40)
+                if measure == .time {
+                    Toggle(tr("Motivate halfway", "Motiver halvveis"), isOn: $motivateHalfway)
+                        .tint(bronze)
+                    Toggle(tr("Final push", "Siste push"), isOn: $motivateBeforeFinish)
+                        .tint(bronze)
+                    if motivateBeforeFinish {
+                        Stepper(tr("Before finish", "Før slutt") + " · \(motivationLeadSeconds) s",
+                                value: $motivationLeadSeconds, in: 5...60, step: 5)
+                    }
+                }
                 Toggle(tr("Rest between efforts", "Pause mellom drag"),
                        isOn: $pauseEnabled)
                     .tint(ATHLTHPlanDesign.accentInk)
@@ -774,6 +792,9 @@ struct ATHLTHTrainIntervalComposerView: View {
         activityName = block.title
         targetEffort = block.work.intensity.kind
         repetitions = block.repetitions
+        motivateHalfway = block.intervalMotivation?.halfway ?? false
+        motivateBeforeFinish = block.intervalMotivation?.finalSeconds != nil
+        motivationLeadSeconds = block.intervalMotivation?.finalSeconds ?? 15
         if block.work.measure == .distance {
             measure = .distance
             distanceMeters = max(Int(block.work.distanceMeters ?? 1000), 1)
@@ -830,7 +851,7 @@ struct ATHLTHTrainIntervalComposerView: View {
         let priorOverrides = editingBlockID.flatMap { id in
             blocks.first(where: { $0.id == id })?.repetitionOverrides
         }
-        let entry = RunningWorkoutBlock(
+        var entry = RunningWorkoutBlock(
             id: editingBlockID ?? UUID(),
             kind: kind,
             title: activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -842,6 +863,12 @@ struct ATHLTHTrainIntervalComposerView: View {
             repetitionOverrides: priorOverrides?.filter { $0.repetition <= (kind == .work ? repetitions : 1) },
             spotifyPlaylist: phasePlaylist
         )
+        if kind == .work, measure == .time, motivateHalfway || motivateBeforeFinish {
+            entry.intervalMotivation = ATHLTHIntervalMotivationSettings(
+                halfway: motivateHalfway,
+                finalSeconds: motivateBeforeFinish ? motivationLeadSeconds : nil
+            )
+        }
         if let id = editingBlockID, let index = blocks.firstIndex(where: { $0.id == id }) {
             blocks[index] = entry
         } else {

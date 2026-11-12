@@ -1,9 +1,46 @@
 import Foundation
 
+struct ATHLTHIntervalMotivationSettings: Codable, Hashable {
+    var halfway: Bool
+    var finalSeconds: Int?
+}
+
 /// Lightweight, offline interpretation of a runner's pre-workout coach brief.
 /// Never treats a request as an AI-generated performance assessment: only
 /// deterministic advice is added when a new work interval starts.
 enum ATHLTHIntervalCoachCue {
+    struct Motivation {
+        let key: String
+        let text: String
+    }
+
+    static func motivation(
+        _ settings: ATHLTHIntervalMotivationSettings?,
+        phase: String?, elapsed: TimeInterval, remaining: TimeInterval,
+        norwegian: Bool
+    ) -> Motivation? {
+        guard phase == "work", let settings,
+              elapsed.isFinite, remaining.isFinite, elapsed >= 0, remaining > 0
+        else { return nil }
+        let duration = elapsed + remaining
+        let window: TimeInterval = 2
+        if let seconds = settings.finalSeconds, (5...60).contains(seconds),
+           Double(seconds) < duration, remaining <= Double(seconds),
+           remaining > Double(seconds) - window {
+            let left = Int(ceil(remaining))
+            return Motivation(key: "finish", text: norwegian
+                ? "\(left) sekunder igjen. Hold trykket helt inn!"
+                : "\(left) seconds left. Keep pushing to the finish!")
+        }
+        if settings.halfway, duration >= 10,
+           elapsed >= duration / 2, elapsed < duration / 2 + window {
+            return Motivation(key: "halfway", text: norwegian
+                ? "Halvveis. Hold rytmen, du klarer dette!"
+                : "Halfway. Stay smooth, you've got this!")
+        }
+        return nil
+    }
+
     static func phrase(
         for step: WatchRunningWorkoutStep,
         norwegian: Bool
