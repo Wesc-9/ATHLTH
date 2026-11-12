@@ -48,6 +48,8 @@ struct ActiveStrengthWorkoutView: View {
     @State private var lastPreRestCountdownNumber: Int?
     @State private var lastPreRestScopedCountdown: ATHLTHCoachBoundaryCountdownRule?
     @State private var lastStrengthGroupCountdownKey: String?
+    @State private var lastTimedSetFollowupID: UUID?
+    @State private var lastGroupFollowupIdentity: String?
     @State private var statusCoachTask:
         Task<Void, Never>?
     @State private var focusedExerciseMediaIndex = 0
@@ -1357,6 +1359,22 @@ struct ActiveStrengthWorkoutView: View {
         guard let length = scoped?.resolvedSeconds ??
                 configuration.resolvedCountdownToRest else { return }
         let remaining = countdown.remaining(at: now)
+        if remaining <= 0 {
+            guard lastTimedSetFollowupID != countdown.setID,
+                  lastPreRestCountdownNumber != nil,
+                  let scoped = lastPreRestScopedCountdown,
+                  scoped.after != .numbersOnly else { return }
+            lastTimedSetFollowupID = countdown.setID
+            let detail = scoped.after == .shortAlert
+                ? ("Time target reached.", "Tidsmålet er nådd.")
+                : ("Time target reached. Confirm the set when ready.",
+                   "Tidsmålet er nådd. Registrer settet når du er klar.")
+            strengthCoach.speak(
+                english: detail.0, norwegian: detail.1,
+                configuration: configuration, cueKind: .strengthSet
+            )
+            return
+        }
         guard let number = ATHLTHCoachSecondCountdown.dueNumber(
             remaining: remaining, length: length,
             previousNumber: lastPreRestCountdownNumber
@@ -1393,9 +1411,23 @@ struct ActiveStrengthWorkoutView: View {
             guard key.hasPrefix(identity + ":") else { return nil }
             return Int(key.split(separator: ":").last ?? "")
         }
+        let remaining = deadline.timeIntervalSince(now)
+        if remaining <= 0 {
+            guard lastGroupFollowupIdentity != identity,
+                  previous != nil, rule.after != .numbersOnly else { return }
+            lastGroupFollowupIdentity = identity
+            let detail = rule.after == .shortAlert
+                ? ("Group time is up.", "Gruppens tid er ute.")
+                : ("Group time is up. Continue when ready.",
+                   "Gruppens tid er ute. Fortsett når du er klar.")
+            strengthCoach.speak(
+                english: detail.0, norwegian: detail.1,
+                configuration: config, cueKind: .strengthSet
+            )
+            return
+        }
         guard let number = ATHLTHCoachSecondCountdown.dueNumber(
-            remaining: deadline.timeIntervalSince(now),
-            length: length, previousNumber: previous
+            remaining: remaining, length: length, previousNumber: previous
         ) else { return }
         lastStrengthGroupCountdownKey = "\(identity):\(number)"
         strengthCoach.speakCountdownSecond(
