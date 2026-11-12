@@ -6,6 +6,7 @@ struct ATHLTHPrivateGoalsProfileCard: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var goalAccountSync: ATHLTHGoalAccountSyncStore
 
     @State private var showingCreateGoal = false
     @State private var measurementProfile = ATHLTHTrainingProfile()
@@ -58,6 +59,38 @@ struct ATHLTHPrivateGoalsProfileCard: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .lineLimit(1)
+            }
+
+            if !goalAccountSync.conflictingGoalIDs.isEmpty ||
+                !goalAccountSync.conflictingMeasurementIDs.isEmpty {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Goals changed on both devices. Check sync before editing further.",
+                        norwegian: "Mål er endret på begge enheter. Kontroller synkronisering før du redigerer videre."
+                    ),
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            } else if goalAccountSync.isSyncing {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Syncing goals", norwegian: "Synkroniserer mål"
+                    ),
+                    systemImage: "arrow.triangle.2.circlepath"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else if goalAccountSync.lastSuccessfulSync != nil {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Goals synced to your account",
+                        norwegian: "Målene er synkronisert med kontoen"
+                    ),
+                    systemImage: "checkmark.icloud"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
             if orderedActiveGoals.isEmpty {
