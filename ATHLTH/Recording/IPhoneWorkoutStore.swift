@@ -443,6 +443,8 @@ final class IPhoneWorkoutStore:
         utterance: AVSpeechUtterance, event: ATHLTHCoachEvent
     )?
     private var coachCueQueue = ATHLTHCoachCueQueue()
+    private var criticalCountdownEndsAt: Date?
+    private var criticalCountdownKey: String?
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var customAudioCoachLastSlots: [UUID: Int] = [:]
@@ -2255,6 +2257,7 @@ final class IPhoneWorkoutStore:
                       current.structuredWorkoutComplete != true,
                       current.awaitingMainStart != true,
                       let step = self.currentStructuredStep else { continue }
+                self.announceTimedRecoveryCountdownIfDue(current, at: Date())
                 // Write a sample at each active minute even without GPS movement.
                 let elapsed = current.elapsed(at: Date())
                 let elapsedInStep = max(elapsed -
@@ -4025,6 +4028,75 @@ final class IPhoneWorkoutStore:
         workout.recordedRunningMinutes = timeline
     }
 
+    /// Timing comes from the running step's active elapsed time. Counts are
+    /// local, higher-priority and never queued through the network TTS path.
+    private func announceTimedRecoveryCountdownIfDue(
+        _ workout: PhoneWorkout, at now: Date
+    ) {
+        guard workout.audioCoachConfiguration?.enabled == true,
+              workout.resumedAt != nil, !coachSpeechPaused,
+              let configuration = workout.audioCoachConfiguration,
+              let steps = workout.structuredRunningWorkout?.steps,
+              let index = workout.structuredStepIndex,
+              steps.indices.contains(index), steps.indices.contains(index + 1),
+              steps[index].measure == .time,
+              let duration = steps[index].durationSeconds, duration > 0 else { return }
+        let phase = steps[index].phase
+        let next = steps[index + 1].phase
+        let length: Int?
+        if phase == "work", next == "recovery" {
+            length = configuration.resolvedIntervalCountdownToRecovery
+        } else if phase == "recovery" {
+            length = configuration.resolvedIntervalCountdownFromRecovery
+        } else { return }
+
+        let elapsed = workout.elapsed(at: now) -
+            (workout.structuredStepStartElapsedTime ?? 0)
+        let remaining = duration - elapsed
+        let identity = "run:\(workout.id):\(index)"
+        let previous = criticalCountdownKey.flatMap { key -> Int? in
+            guard key.hasPrefix(identity + ":") else { return nil }
+            return Int(key.split(separator: ":").last ?? "")
+        }
+        guard let number = ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: remaining, length: length, previousNumber: previous
+        ) else { return }
+        speakCriticalCountdownNumber(
+            number, identity: identity,
+            deadline: now.addingTimeInterval(remaining),
+            configuration: configuration
+        )
+    }
+
+    private func speakCriticalCountdownNumber(
+        _ number: Int, identity: String, deadline: Date,
+        configuration: WatchAudioCoachConfiguration
+    ) {
+        guard (1...30).contains(number), deadline > Date() else { return }
+        if guidancePriorityGate.activeVoicePriority == .routeCritical { return }
+        let key = "\(identity):\(number)"
+        guard criticalCountdownKey != key else { return }
+        criticalCountdownKey = key
+        criticalCountdownEndsAt = deadline
+        coachCueQueue.reset()
+        azureCoachSpeech.stop()
+        speechSynthesizer.stopSpeaking(at: .immediate)
+        guidancePriorityGate.voiceDidFinish()
+        let utterance = AVSpeechUtterance(string: String(number))
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: configuration.voiceIdentifier,
+            language: configuration.language
+        )
+        utterance.rate = max(configuration.resolvedSpeechRate, 0.55)
+        utterance.volume = configuration.resolvedSpeechVolume
+        try? ATHLTHSpokenAudioSession.activate(
+            duckOtherAudio: configuration.shouldDuckOtherAudio,
+            owner: audioOwner
+        )
+        speechSynthesizer.speak(utterance)
+        watchLocalCoachSpeech(utterance)
+    }
+
     private func evaluateStructuredWorkout(
         _ workout: inout PhoneWorkout,
         forceManualAdvance: Bool = false,
@@ -4185,9 +4257,38 @@ final class IPhoneWorkoutStore:
             }
             return
         }
+        let recoveryAction = ATHLTHCoachRecoveryBoundary.afterAction(
+            finishedPhase: step.phase,
+            nextPhase: plan.steps[nextIndex].phase,
+            configuration: workout.audioCoachConfiguration ?? .disabled
+        )
+        if recoveryAction == .numbersOnly { return }
+        if recoveryAction == .shortAlert {
+            // Let number "1" finish before the short phase announcement.
+            let sessionID = workout.id
+            Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: .milliseconds(650)) }
+                catch { return }
+                guard let self, self.active?.id == sessionID,
+                      self.active?.structuredStepIndex == nextIndex else { return }
+                let norwegian = self.localizedCoachPhrase(
+                    english: "en", norwegian: "no",
+                    configuration: workout.audioCoachConfiguration
+                ) == "no"
+                self.speak(
+                    ATHLTHCoachRecoveryBoundary.shortMessage(
+                        finishedPhase: step.phase, norwegian: norwegian
+                    ),
+                    configuration: workout.audioCoachConfiguration,
+                    priority: .structuredStep
+                )
+            }
+            return
+        }
         if workout
             .audioCoachConfiguration?
-            .announceCurrentWorkoutStep == true {
+            .announceCurrentWorkoutStep == true ||
+            recoveryAction == .nextStep {
             let next = plan.steps[nextIndex]
             let norwegian = localizedCoachPhrase(
                 english: "en",
@@ -4688,6 +4789,8 @@ final class IPhoneWorkoutStore:
         event: ATHLTHCoachEvent? = nil,
         rememberForReplay: Bool = true
     ) {
+        if let criticalCountdownEndsAt, Date() < criticalCountdownEndsAt,
+           priority < .targetCritical { return }
         guard !phrase.isEmpty,
               ATHLTHCoachVoicePausePolicy.allowsSpeech(
                   coachEnabled:
