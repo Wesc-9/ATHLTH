@@ -171,6 +171,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
     func sync(session: AppSessionStore, goals: GoalStore) async {
         guard !isSyncing, session.signedIn,
               let userID = accountID, userID == session.profile.userID,
+              goals.ownerAccountID == userID,
               client.auth.currentUser?.id == userID
         else { return }
         guard !Self.activeAccounts.contains(userID) else { return }
@@ -196,6 +197,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 .limit(1)
                 .execute().value
             guard accountID == userID, session.profile.userID == userID,
+                  goals.ownerAccountID == userID,
                   client.auth.currentUser?.id == userID else { return }
 
             let remoteRevision = rows.first?.revision ?? 0
@@ -250,6 +252,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 didUpload = true
             }
             guard accountID == userID, session.profile.userID == userID,
+                  goals.ownerAccountID == userID,
                   client.auth.currentUser?.id == userID else { return }
 
             // Do not replace a more recent edit made during the upload.
