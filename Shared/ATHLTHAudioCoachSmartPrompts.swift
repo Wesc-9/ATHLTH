@@ -170,6 +170,12 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     var belowZoneRepeatSeconds: Int? = nil
     var belowPaceRepeatSeconds: Int? = nil
     var unexpectedDropRepeatSeconds: Int? = nil
+    // Only structured running/walking interval recovery uses these options.
+    // Older saved profiles remain decodable because every field is optional.
+    var intervalCountdownToRecoverySeconds: Int? = nil
+    var intervalCountdownFromRecoverySeconds: Int? = nil
+    var intervalAfterCountdownToRecovery: ATHLTHCoachCountdownAfter? = nil
+    var intervalAfterCountdownFromRecovery: ATHLTHCoachCountdownAfter? = nil
 
     var resolvedBelowZoneRepeat: TimeInterval {
         TimeInterval(min(max(belowZoneRepeatSeconds ?? 180, 60), 900))
