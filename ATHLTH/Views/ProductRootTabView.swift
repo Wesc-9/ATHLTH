@@ -99,6 +99,7 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
+    @StateObject private var goalAccountSync = ATHLTHGoalAccountSyncStore()
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
@@ -347,6 +348,7 @@ struct ProductRootTabView: View {
         // TabView is already a complex generic container. Erase its type
         // before attaching global notifications, overlays and state hooks.
         .athlthStablePresentationBoundary()
+        .environmentObject(goalAccountSync)
     }
 
     private var tabsWithNotificationSheets: some View {
@@ -375,6 +377,8 @@ struct ProductRootTabView: View {
             updateDailyCheckInReminder()
             updateBodyGoalCheckInReminders()
             openPendingDailyCheckInIfNeeded()
+            goalAccountSync.switchAccount(session.signedIn ? session.profile.userID : nil)
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
             await syncApplicationIconBadge()
         }
         .onChange(of: pushManager.pendingDailyCheckInAccountID) { _, _ in
@@ -412,6 +416,20 @@ struct ProductRootTabView: View {
         }
         .onChange(of: goalStore.goals) { _, _ in
             updateBodyGoalCheckInReminders()
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: Notification.Name("athlth.goalDocumentDidChange")
+        )) { notification in
+            guard let accountID = notification.userInfo?["accountID"] as? UUID,
+                  session.signedIn, accountID == session.profile.userID else { return }
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
+        }
+        .onChange(of: session.signedIn) { _, signedIn in
+            goalAccountSync.switchAccount(signedIn ? session.profile.userID : nil)
+            if signedIn {
+                goalAccountSync.scheduleSync(session: session, goals: goalStore)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .athlthTrainingDataDidChange
@@ -419,6 +437,8 @@ struct ProductRootTabView: View {
             updateBodyGoalCheckInReminders()
         }
         .onChange(of: session.profile.userID) { _, _ in
+            goalAccountSync.switchAccount(session.signedIn ? session.profile.userID : nil)
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
             showingDailyCheckInFromNotification = false
             updateDailyCheckInReminder()
             updateBodyGoalCheckInReminders()
@@ -442,6 +462,7 @@ struct ProductRootTabView: View {
             updateDailyCheckInReminder()
             updateBodyGoalCheckInReminders()
             openPendingDailyCheckInIfNeeded()
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
             Task {
                 await syncApplicationIconBadge()
             }
