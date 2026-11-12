@@ -5251,7 +5251,11 @@ struct GoalEditView: View {
         if goal?.bodyMeasurementGoal != nil {
             return editedBaselineValue > 0 && editedTargetValue != editedBaselineValue
         }
-        // An Apple Health weight goal may not have a recorded baseline yet.
+        // A weight goal without an Apple Health baseline can still be edited.
+        // Existing baselines must not be cleared by entering zero.
+        if goal?.target?.baselineValue != nil {
+            return editedBaselineValue > 0 && editedTargetValue != editedBaselineValue
+        }
         return editedBaselineValue == 0 ||
             (editedBaselineValue > 0 && editedTargetValue != editedBaselineValue)
     }
@@ -5701,8 +5705,7 @@ private extension View {
             .overlay {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(
-                        Color(red: 0.82, green: 0.87, blue: 0.94)
-                            .opacity(0.46),
+                        ATHLTHPlanDesign.warmDivider.opacity(0.65),
                         lineWidth: 0.8
                     )
             }
