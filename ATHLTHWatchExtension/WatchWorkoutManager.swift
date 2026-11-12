@@ -4484,6 +4484,66 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         WKInterfaceDevice.current().play(.notification)
     }
 
+    /// Timed strength sets only. No countdown is fabricated for repetition
+    /// sets, open exercises, or a Watch merely mirroring iPhone-owned input.
+    private func evaluateCriticalCountToStrengthRest() {
+        guard kind == .strength, state == .running,
+              let snapshot = strengthSession,
+              snapshot.inputMode != .iPhone,
+              !snapshot.isResting, !snapshot.currentExerciseComplete,
+              let length = audioCoachConfiguration.resolvedStrengthCountdownToRest,
+              let countdown = snapshot.timedSetCountdown,
+              countdown.isRunning else { return }
+        let now = Date()
+        let remaining = countdown.remaining(at: now)
+        let identity = "strength-work:\(snapshot.workoutID):\(snapshot.exerciseIndex):\(snapshot.setIndex)"
+        let previous = countdownNumberKey.flatMap { key -> Int? in
+            guard key.hasPrefix(identity + ":") else { return nil }
+            return Int(key.split(separator: ":").last ?? "")
+        }
+        guard let number = ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: remaining, length: length, previousNumber: previous
+        ) else { return }
+        speakCriticalCountdown(
+            number, deadline: now.addingTimeInterval(remaining),
+            identity: identity, captureOnWatch: true
+        )
+    }
+
+    /// Running and walking recoveries use the existing structured-step clock.
+    /// The next phase must be known; distance/open stages never invent an ETA.
+    private func evaluateCriticalRunningRecoveryCountdown() {
+        guard (kind == .running || kind == .walking),
+              state == .running, !awaitingMainStart,
+              !structuredWorkoutComplete,
+              let current = currentStructuredRunningStep,
+              let next = nextStructuredRunningStep,
+              current.measure == .time,
+              let duration = current.durationSeconds, duration > 0
+        else { return }
+        let length: Int?
+        if current.phase == "work", next.phase == "recovery" {
+            length = audioCoachConfiguration.resolvedIntervalCountdownToRecovery
+        } else if current.phase == "recovery" {
+            length = audioCoachConfiguration.resolvedIntervalCountdownFromRecovery
+        } else {
+            return
+        }
+        let remaining = duration - currentStructuredStepElapsedTime
+        let identity = "running:\(startedAt?.timeIntervalSince1970 ?? 0):\(structuredStepIndex)"
+        let previous = countdownNumberKey.flatMap { key -> Int? in
+            guard key.hasPrefix(identity + ":") else { return nil }
+            return Int(key.split(separator: ":").last ?? "")
+        }
+        guard let number = ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: remaining, length: length, previousNumber: previous
+        ) else { return }
+        speakCriticalCountdown(
+            number, deadline: Date().addingTimeInterval(remaining),
+            identity: identity, captureOnWatch: false
+        )
+    }
+
     private func startTimer() {
         stopTimer()
 
@@ -4513,6 +4573,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     )
 
                 self.evaluateIndoorSuggestion(now: Date())
+                self.evaluateCriticalCountToStrengthRest()
+                self.evaluateCriticalRunningRecoveryCountdown()
                 self.announceStrengthEMOMMinuteIfDue(now: Date())
                 self.recordRunningMinuteIfDue()
                 self.advanceEmbeddedHybridIntervalIfNeeded(at: Date())
@@ -7274,6 +7336,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               !coachSpeechPaused,
               captureOnWatch || shouldSpeakLocally(priority: .structuredStep)
         else { return }
+        // Route safety instructions always outrank exercise timing.
+        if guidancePriorityGate.activeVoicePriority == .routeCritical { return }
         countdownPriorityEndsAt = deadline
         let key = "\(identity):\(number)"
         guard countdownNumberKey != key else { return }
