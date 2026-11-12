@@ -611,6 +611,11 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
             smartPrompts?.intervalAfterCountdownFromRecovery ?? .nextStep
     }
 
+    var effectiveBoundaryCountdownRules: [ATHLTHCoachBoundaryCountdownRule] {
+        Array((boundaryCountdownRules ?? smartPrompts?.boundaryCountdownRules ?? [])
+            .filter { $0.resolvedSeconds != nil }.prefix(20))
+    }
+
     var resolvedStrengthRestCountdownSeconds: Int {
         min(max(strengthRestCountdownSeconds ?? 10, 3), 30)
     }
