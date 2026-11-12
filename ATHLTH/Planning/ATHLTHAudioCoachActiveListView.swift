@@ -487,7 +487,8 @@ struct ATHLTHAudioCoachActiveListView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "waveform")
                                     .foregroundStyle(bronze)
-                                    .frame(width: 30)
+                                    .frame(width: 34, height: 34)
+                                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(rule.trigger == .distance
                                          ? tr("Every \(rule.validatedInterval) m", "Hver \(rule.validatedInterval) m")
@@ -544,7 +545,17 @@ struct ATHLTHAudioCoachActiveListView: View {
                             .padding(.bottom, 8)
                         }
                     }
-                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 6)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface.opacity(0.35),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+                    }
+                    .padding(.bottom, 7)
                 }
                 ForEach(activeOptions) { option in
                     activeRow(option)
