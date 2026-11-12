@@ -84,6 +84,16 @@ final class GoalStore: ObservableObject {
         persist()
     }
 
+    /// Import a verified private account snapshot. Local persistence stays
+    /// offline-first, and account guards prevent data crossing sign-ins.
+    func replaceFromAccountSync(_ incoming: [ATHLTHGoal], for userID: UUID) {
+        guard accountID == userID else { return }
+        guard goals != incoming else { return }
+        goals = incoming
+        normalizePrimaryGoal()
+        persist()
+    }
+
     func setLinkedPlan(
         _ planID: UUID,
         goalIDs: Set<UUID>
