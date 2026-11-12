@@ -211,6 +211,7 @@ targets:
       - path: Shared/ATHLTHSurfaceSnapshot.swift
       - path: Shared/ATHLTHLiveWorkoutSurfaceModels.swift
       - path: Shared/ATHLTHLiveActivityDisplayPolicy.swift
+      - path: Shared/ATHLTHWidgetPresentationPolicy.swift
       - path: Shared/ATHLTHBrandMark.swift
       - path: ATHLTH/Surfaces/ATHLTHWorkoutActivityAttributes.swift
       - path: ATHLTH/Surfaces/ATHLTHAliveActivityAttributes.swift
