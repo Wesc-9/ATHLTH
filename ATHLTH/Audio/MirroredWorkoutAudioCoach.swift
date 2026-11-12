@@ -221,7 +221,10 @@ final class MirroredWorkoutAudioCoach:
                sampledAt: snapshot.capturedAt,
                maximumAge: ATHLTHCoachSensorFreshness.maximumSnapshotAge
            ) {
-            if let report = snapshot.runningCoachReport, report.event.isFresh() {
+            if let report = snapshot.runningCoachReport,
+               !(lastScopedCountdownRule?.after == .numbersOnly &&
+                 lastScopedCountdownStepIndex == report.stepIndex),
+               report.event.isFresh() {
                 speak(report.text(norwegian: phrase(english: "en", norwegian: "no") == "no"),
                       priority: .structuredStep, event: report.event)
             }
