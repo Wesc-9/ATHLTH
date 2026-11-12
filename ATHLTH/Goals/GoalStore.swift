@@ -338,6 +338,11 @@ final class GoalStore: ObservableObject {
         guard let accountID else { return }
         AccountLocalStorage.write(goals, name: "goals", userID: accountID)
         ATHLTHTrainingDataChangeSignal.post(userID: accountID)
+        NotificationCenter.default.post(
+            name: Notification.Name("athlth.goalDocumentDidChange"),
+            object: nil,
+            userInfo: ["accountID": accountID]
+        )
     }
 
     private static func loadGoals() -> [ATHLTHGoal] {
