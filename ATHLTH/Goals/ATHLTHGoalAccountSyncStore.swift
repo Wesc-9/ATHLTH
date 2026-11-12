@@ -168,7 +168,11 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
         }
     }
 
-    func sync(session: AppSessionStore, goals: GoalStore) async {
+    func sync(
+        session: AppSessionStore,
+        goals: GoalStore,
+        preferLocalOnConflict: Bool? = nil
+    ) async {
         guard !isSyncing, session.signedIn,
               let userID = accountID, userID == session.profile.userID,
               goals.ownerAccountID == userID,
@@ -212,15 +216,42 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 base: baseMeasurements, local: capturedMeasurements, remote: remoteMeasurements
             )
 
-            guard result.conflictingIDs.isEmpty,
-                  measurementResult.conflictingIDs.isEmpty else {
+            let hasConflicts = !result.conflictingIDs.isEmpty ||
+                !measurementResult.conflictingIDs.isEmpty
+            if hasConflicts && preferLocalOnConflict == nil {
                 conflictingGoalIDs = result.conflictingIDs
                 conflictingMeasurementIDs = measurementResult.conflictingIDs
                 status = ATHLTHLocalization.choose(
-                    english: "Some goals were edited on both devices. Both copies are preserved; review the conflict before overwriting.",
-                    norwegian: "Noen mål er endret på begge enheter. Begge kopier er beholdt; kontroller konflikten før noe overskrives."
+                    english: "The same goal was changed on multiple devices. Choose which version to keep.",
+                    norwegian: "Det samme målet ble endret på flere enheter. Velg hvilken versjon du vil beholde."
                 )
                 return
+            }
+
+            // Conflict choice is scoped to the specific colliding identities.
+            // Independent additions/edits from both devices are still merged.
+            var resolvedGoals = result.merged
+            var resolvedMeasurements = measurementResult.merged
+            if let preferLocalOnConflict {
+                let chosenGoals = Dictionary(
+                    (preferLocalOnConflict ? localItems : remoteItems)
+                        .map { ($0.id, $0) },
+                    uniquingKeysWith: { old, _ in old }
+                )
+                for id in result.conflictingIDs {
+                    if let chosen = chosenGoals[id] { resolvedGoals.append(chosen) }
+                    // An absent selected value represents a deliberate deletion.
+                }
+                let chosenMeasurements = Dictionary(
+                    (preferLocalOnConflict ? capturedMeasurements : remoteMeasurements)
+                        .map { ($0.id, $0) },
+                    uniquingKeysWith: { old, _ in old }
+                )
+                for id in measurementResult.conflictingIDs {
+                    if let chosen = chosenMeasurements[id] {
+                        resolvedMeasurements.append(chosen)
+                    }
+                }
             }
 
             // Local goals could change while the remote request is pending.
@@ -229,8 +260,8 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 scheduleSync(session: session, goals: goals)
                 return
             }
-            let merged = ATHLTHGoalMergePolicy.ordered(result.merged)
-            let mergedMeasurements = ATHLTHGoalMergePolicy.ordered(measurementResult.merged)
+            let merged = ATHLTHGoalMergePolicy.ordered(resolvedGoals)
+            let mergedMeasurements = ATHLTHGoalMergePolicy.ordered(resolvedMeasurements)
             let remote = ATHLTHGoalMergePolicy.ordered(remoteItems)
             let remoteMeasurementsSorted = ATHLTHGoalMergePolicy.ordered(remoteMeasurements)
 
