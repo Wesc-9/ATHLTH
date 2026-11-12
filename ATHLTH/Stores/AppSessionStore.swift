@@ -677,9 +677,10 @@ final class AppSessionStore: ObservableObject {
         if let deletedID { defaults.set(true, forKey: AccountLocalStorage.key("deleted", userID: deletedID)) }
         clearAfterSignOut()
         if let deletedID {
+            GoalStore.removeAccountImagesAfterDeletion(deletedID)
             defaults.removeObject(forKey: AccountLocalStorage.key("training", userID: deletedID))
             defaults.removeObject(forKey: AccountLocalStorage.key("coach", userID: deletedID))
-            for name in ["arenaDrafts", "goals", "strengthHistory", "strengthHistoryBeforeTimedFixV1", "strengthBarDefaultMassV1", "strengthBarExerciseMassV1", "strengthActive", "phoneHistory", "phoneActive", "workoutCompletionImpacts", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt"] {
+            for name in ["arenaDrafts", "goals", "goalAccountSyncAcknowledgement", "personalTrainingProfile", "profileRecordDisplayCache", "featuredProfileRecords", "featuredProfileRecordsPending", "strengthHistory", "strengthHistoryBeforeTimedFixV1", "strengthBarDefaultMassV1", "strengthBarExerciseMassV1", "strengthActive", "phoneHistory", "phoneActive", "workoutCompletionImpacts", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt"] {
                 defaults.removeObject(forKey: AccountLocalStorage.key(name, userID: deletedID))
             }
             AccountLocalStorage.write([RunningWorkoutTemplate](), name: "runningLibrary", userID: deletedID, defaults: defaults)
