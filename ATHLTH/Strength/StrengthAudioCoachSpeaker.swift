@@ -17,6 +17,7 @@ final class StrengthAudioCoachSpeaker:
     private var eventLedger = ATHLTHCoachEventLedger()
     private var latestConfiguration: StrengthAudioCoachConfiguration?
     private var replayMemory = ATHLTHCoachReplayMemory()
+    private var priorityCountdownUntil: Date? = nil
 
     @Published private(set) var speechPaused = false
     @Published private(set) var lastCoachMessage: String?
@@ -104,6 +105,8 @@ final class StrengthAudioCoachSpeaker:
 
         latestConfiguration = configuration
         guard !speechPaused else { return }
+        // Routine coaching cannot delay a live, deadline-anchored countdown.
+        if let until = priorityCountdownUntil, Date() < until { return }
 
         let resolvedEvent = event ?? ATHLTHCoachEvent(
             kind: cueKind,
@@ -199,6 +202,32 @@ final class StrengthAudioCoachSpeaker:
         }
     }
 
+    /// Critical local numbers bypass Azure/network latency and do not enter the
+    /// generic coaching queue. On a delayed tick only the current number is said.
+    func speakCountdownSecond(
+        _ number: Int,
+        deadline: Date,
+        configuration: StrengthAudioCoachConfiguration
+    ) {
+        guard configuration.enabled, !speechPaused,
+              (1...30).contains(number), Date() < deadline else { return }
+        priorityCountdownUntil = deadline
+        latestConfiguration = configuration
+        cueQueue.reset()
+        azureSpeech.stop()
+        synthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: String(number))
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: configuration.voiceIdentifier,
+            language: configuration.language
+        )
+        utterance.rate = Float(min(max(configuration.speechRate, 0.55), 0.65))
+        utterance.volume = Float(min(max(configuration.speechVolume, 0.2), 1))
+        activateLocalAudio(duck: configuration.duckOtherAudio)
+        synthesizer.speak(utterance)
+        watchLocalSpeech(utterance)
+    }
+
     private func deliverNextQueuedCue() {
         guard !synthesizer.isSpeaking,
               !azureSpeech.isBusy,
@@ -220,6 +249,7 @@ final class StrengthAudioCoachSpeaker:
         localSpeechWatchdog?.cancel()
         localSpeechWatchdog = nil
         cueQueue.reset()
+        priorityCountdownUntil = nil
         eventLedger.reset()
         replayMemory.reset()
         lastCoachMessage = nil
