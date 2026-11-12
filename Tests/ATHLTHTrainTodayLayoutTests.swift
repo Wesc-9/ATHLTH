@@ -430,6 +430,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     onOpenPlan: {},
                     onCreatePlan: {},
                     onOpenLibrary: {},
+                    onOpenWorkouts: {},
                     onStartWorkout: { _, _ in },
                     onWorkoutDetails: { _, _ in },
                     onSendWorkoutToWatch: { _ in },
