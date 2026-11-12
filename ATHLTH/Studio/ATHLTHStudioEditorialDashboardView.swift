@@ -680,14 +680,26 @@ struct ATHLTHStudioEditorialDashboardView: View {
             Rectangle()
                 .fill(outline)
                 .frame(height: 1)
-            HStack(spacing: 9) {
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: activeDay?.restDays.isEmpty == false
                       ? "moon.zzz" : "calendar.badge.clock")
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(bronze)
-                Text(weekSelectionSummary(activeDay))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .frame(width: 42, height: 42)
+                    .background(cream, in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(weekSelectionSummary(activeDay))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ink)
+                        .accessibilityAddTraits(.isHeader)
+                    if let activeDay {
+                        Text(activeDay.date.formatted(
+                            .dateTime.weekday(.wide).day().month(.wide)
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer(minLength: 8)
                 if let activeDay, activeDay.restDays.isEmpty,
                    HomeWeeklyProgressCalendar.canScheduleStandalone(
@@ -698,15 +710,33 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     } label: {
                         Label(tr("Plan workout", "Planlegg økt"),
                               systemImage: "plus")
-                            .font(.subheadline.weight(.medium))
+                            .font(.subheadline.weight(.semibold))
+                            .frame(minHeight: 44)
                     }
                     .buttonStyle(.bordered)
                     .tint(bronze)
                     .accessibilityIdentifier("athlth-ipad-week-plan-selected-day")
                 }
             }
-            .frame(minHeight: 44)
-            .padding(.top, 2)
+
+            if let activeDay,
+               !activeDay.planned.isEmpty || !activeDay.recorded.isEmpty {
+                selectedDayWorkouts(activeDay)
+                    .accessibilityIdentifier("athlth-ipad-selected-week-day-details")
+            } else if let activeDay, !activeDay.restDays.isEmpty {
+                Label(tr("Planned rest day", "Planlagt hviledag"),
+                      systemImage: "moon.zzz")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+            } else {
+                Label(tr("No workout scheduled", "Ingen økt planlagt"),
+                      systemImage: "calendar")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+            }
+
             if !hasHealth {
                 Button(action: onOpenSettings) {
                     Label(
@@ -730,115 +760,189 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .accessibilityIdentifier("athlth-ipad-weekly-overview")
     }
 
-    @ViewBuilder
-    private func selectedDayWorkouts(_ day: ATHLTHStudioHomeWeek.Day?) -> some View {
-        if let day {
-            VStack(alignment: .leading, spacing: 9) {
-                ForEach(day.planned, id: \.workout.id) { entry in
-                    // Completion can consult both HealthKit and local logs.
-                    // Resolve once for the status label and Start control.
-                    let isCompleted = completed(entry)
-                    let isSkipped = entry.planID.map {
-                        session.isPlanSessionSkipped(planID: $0, sessionID: entry.workout.id)
-                    } ?? false
-                    HStack(spacing: 12) {
-                        Image(systemName: entry.workout.kind.systemImage)
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(bronze)
-                            .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(entry.workout.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ink)
-                            HStack(spacing: 8) {
-                                if let minutes = entry.workout.durationMinutes {
-                                    Text("\(minutes) min")
-                                }
-                                if isCompleted {
-                                    Label(tr("Completed", "Fullført"),
-                                          systemImage: "checkmark.circle.fill")
-                                } else if isSkipped {
-                                    Text(tr("Skipped", "Hoppet over"))
-                                } else {
-                                    Text(tr("Planned", "Planlagt"))
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 4)
-                        Button {
-                            onOpenWorkout(entry)
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .frame(width: 44, height: 44)
-                        }
-                        .accessibilityLabel(tr("Workout details", "Øktdetaljer"))
-                        if canStart(entry, alreadyCompleted: isCompleted) {
-                            Button {
-                                onStartWorkout(entry)
-                            } label: {
-                                Label(tr("Start", "Start"), systemImage: "play.fill")
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(bronze)
-                        }
-                    }
-                    .padding(12)
-                    .background(cream, in: RoundedRectangle(cornerRadius: 13))
-                }
-                ForEach(day.recorded) { workout in
+    /// Full planned workout details sit immediately below the selected-day
+    /// count. Reuses the same occurrence and workout detail actions as Plan.
+    private func selectedDayWorkouts(_ day: ATHLTHStudioHomeWeek.Day) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(day.planned) { entry in
+                let isCompleted = completed(entry)
+                let isSkipped = entry.planID.map {
+                    session.isPlanSessionSkipped(
+                        planID: $0, sessionID: entry.workout.id
+                    )
+                } ?? false
+
+                HStack(spacing: 8) {
                     Button {
-                        onInspect(workout)
+                        onOpenWorkout(entry)
                     } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(bronze)
-                                .frame(width: 28)
+                        HStack(alignment: .center, spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(workout.activity.rawValue.capitalized)
-                                    .font(.subheadline.weight(.semibold))
+                                if let scheduled = entry.workout.scheduledStart {
+                                    Text(scheduled.formatted(
+                                        date: .omitted, time: .shortened
+                                    ))
+                                    .font(.system(size: 17, weight: .bold,
+                                                  design: .rounded))
+                                    .monospacedDigit()
                                     .foregroundStyle(ink)
-                                Text("\(Int(workout.duration / 60)) min · " +
-                                     tr("Recorded workout", "Registrert økt"))
-                                    .font(.caption)
+                                } else {
+                                    Text(tr("No time", "Uten tid"))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(tr("Start time", "Klokkeslett"))
+                                    .font(.system(size: 10, weight: .medium))
                                     .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right")
+                            .frame(width: 84, alignment: .leading)
+
+                            Rectangle()
+                                .fill(outline.opacity(0.8))
+                                .frame(width: 1, height: 40)
+
+                            Image(systemName: entry.workout.kind.systemImage)
+                                .font(.system(size: 19, weight: .medium))
+                                .foregroundStyle(bronze)
+                                .frame(width: 35, height: 35)
+                                .background(.white.opacity(0.7),
+                                            in: RoundedRectangle(cornerRadius: 11))
+
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(entry.workout.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                HStack(spacing: 8) {
+                                    if let minutes = entry.workout.durationMinutes {
+                                        Label("\(minutes) min", systemImage: "clock")
+                                    }
+                                    if isCompleted {
+                                        Label(tr("Completed", "Fullført"),
+                                              systemImage: "checkmark.circle.fill")
+                                    } else if isSkipped {
+                                        Text(tr("Skipped", "Hoppet over"))
+                                    } else {
+                                        Text(tr("Planned", "Planlagt"))
+                                    }
+                                }
+                                .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(bronze)
                         }
-                        .padding(12)
-                        .background(cream, in: RoundedRectangle(cornerRadius: 13))
+                        .padding(.horizontal, 13)
+                        .frame(minHeight: 74)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(cream, in: RoundedRectangle(cornerRadius: 15))
+                        .contentShape(RoundedRectangle(cornerRadius: 15))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        (entry.workout.scheduledStart?.formatted(
+                            date: .omitted, time: .shortened
+                        ) ?? tr("No set time", "Uten klokkeslett"))
+                        + ", " + entry.workout.title
+                    )
+                    .accessibilityHint(tr(
+                        "Open full workout details",
+                        "Åpne alle detaljer for treningsøkten"
+                    ))
+                    .accessibilityIdentifier(
+                        "athlth-ipad-planned-workout-\(entry.id)"
+                    )
+                    .contextMenu { workoutActions(entry) }
+
+                    Menu {
+                        workoutActions(entry)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.headline)
+                            .foregroundStyle(ink)
+                            .frame(width: 42, height: 44)
+                            .background(cream,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .accessibilityLabel(tr("Workout actions", "Valg for økten"))
                 }
             }
-            .accessibilityIdentifier("athlth-ipad-selected-day-workouts")
+
+            ForEach(day.recorded) { workout in
+                Button {
+                    onInspect(workout)
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(workout.startDate.formatted(
+                            date: .omitted, time: .shortened
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .frame(width: 84, alignment: .leading)
+
+                        Rectangle()
+                            .fill(outline.opacity(0.8))
+                            .frame(width: 1, height: 30)
+
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(bronze)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(workout.activity.rawValue.capitalized)
+                                .font(.subheadline.weight(.semibold))
+                            Text("\(Int(workout.duration / 60)) min · " +
+                                 tr("Recorded workout", "Registrert økt"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "arrow.up.right")
+                            .foregroundStyle(bronze)
+                    }
+                    .foregroundStyle(ink)
+                    .padding(13)
+                    .background(cream, in: RoundedRectangle(cornerRadius: 15))
+                    .contentShape(RoundedRectangle(cornerRadius: 15))
+                }
+                .buttonStyle(.plain)
+            }
         }
+        .accessibilityIdentifier("athlth-ipad-selected-day-workouts")
     }
 
     private func weekSelectionSummary(
         _ day: ATHLTHStudioHomeWeek.Day?
     ) -> String {
         guard let day else {
-            return tr("Select a day in the calendar",
-                      "Velg en dag i kalenderen")
-        }
-        if !day.planned.isEmpty && !day.recorded.isEmpty {
-            return "\(day.planned.count) " + tr("planned", "planlagt") +
-                " · \(day.recorded.count) " + tr("recorded", "registrert")
+            return tr("Select a day in the calendar", "Velg en dag i kalenderen")
         }
         if !day.planned.isEmpty {
-            return "\(day.planned.count) " +
-                tr("planned workouts", "planlagte økter")
+            let plannedLabel = ATHLTHStudioHomeWeek.plannedCountLabel(
+                day.planned.count,
+                norwegian: ATHLTHLocalization.choose(
+                    english: false, norwegian: true
+                )
+            )
+            guard !day.recorded.isEmpty else { return plannedLabel }
+            let logged = day.recorded.count == 1
+                ? tr("1 recorded workout", "1 registrert økt")
+                : tr("\(day.recorded.count) recorded workouts",
+                     "\(day.recorded.count) registrerte økter")
+            return plannedLabel + " · " + logged
         }
         if !day.restDays.isEmpty {
             return tr("Planned rest day", "Planlagt hviledag")
         }
         if !day.recorded.isEmpty {
-            return "\(day.recorded.count) " +
-                tr("recorded workouts", "registrerte økter")
+            return day.recorded.count == 1
+                ? tr("1 recorded workout", "1 registrert økt")
+                : tr("\(day.recorded.count) recorded workouts",
+                     "\(day.recorded.count) registrerte økter")
         }
         return tr("No workout scheduled", "Ingen økt planlagt")
     }
