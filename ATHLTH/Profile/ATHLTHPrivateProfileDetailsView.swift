@@ -41,8 +41,8 @@ struct ATHLTHPrivateProfileDetailsView: View {
             }
             notesCard
             Text(localized(
-                "Private to this account on this device. Body measurements are not automatically shared with Coach, Apple Health or your public profile. If you reinstall the app, locally stored readings may be lost until cloud backup is supported.",
-                "Privat for denne kontoen på denne enheten. Kroppsmål sendes ikke automatisk til Coach, Apple Helse eller din offentlige profil. Ved reinstallasjon kan lokale målinger gå tapt til sikkerhetskopiering i skyen er støttet."
+                "Manual body measurements synchronize privately between your signed-in devices. Personal notes and injury restrictions remain on this device. None of this appears on your public profile or is automatically shared with Coach or Apple Health.",
+                "Kroppsmål du registrerer selv synkroniseres privat mellom innloggede enheter. Personlige notater og skadebegrensninger beholdes på denne enheten. Ingenting vises på din offentlige profil eller deles automatisk med Coach eller Apple Helse."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
