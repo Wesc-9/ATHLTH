@@ -186,3 +186,45 @@ enum ATHLTHIntervalCoachCue {
         return announcement + " " + cue
     }
 }
+
+
+/// What Audio Coach says after a timed countdown reaches the real boundary.
+/// Optional fields on saved workouts keep old configurations decoding.
+enum ATHLTHCoachCountdownAfter: String, Codable, CaseIterable, Identifiable {
+    case numbersOnly
+    case shortAlert
+    case nextStep
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .numbersOnly:
+            return ATHLTHLocalization.choose(english: "Numbers only", norwegian: "Bare tallene")
+        case .shortAlert:
+            return ATHLTHLocalization.choose(english: "Short announcement", norwegian: "Kort beskjed")
+        case .nextStep:
+            return ATHLTHLocalization.choose(english: "Announce what is next", norwegian: "Fortell hva som er neste")
+        }
+    }
+}
+
+/// One-second deadlines always win over routine coach messages. A delayed tick
+/// SKIPS a number instead of speaking a stale one; no countdown is inferred
+/// from a distance-only or open-ended target.
+enum ATHLTHCoachSecondCountdown {
+    static let offeredLengths = [3, 5, 10, 15, 20, 30]
+
+    static func dueNumber(
+        remaining: TimeInterval,
+        length: Int?,
+        previousNumber: Int?
+    ) -> Int? {
+        guard let length, (1...30).contains(length),
+              remaining.isFinite, remaining > 0 else { return nil }
+        let number = Int(ceil(remaining))
+        guard number >= 1, number <= length else { return nil }
+        if let previousNumber, number >= previousNumber { return nil }
+        return number
+    }
+}
