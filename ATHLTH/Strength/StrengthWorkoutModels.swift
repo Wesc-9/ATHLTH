@@ -98,6 +98,10 @@ struct StrengthAudioCoachConfiguration:
     // earlier 1.6.8 builds while allowing richer, less repetitive coaching.
     var announceNextSetDetails: Bool? = nil
     var announceExerciseProgress: Bool? = nil
+    // Optional: older saved workouts decode without these strength-only cues.
+    var announceExerciseComplete: Bool? = nil
+    var motivationEveryCompletedSets: Int? = nil
+    var personalMotivationPhrase: String? = nil
 
     var announceWorkoutStatus = false
     var workoutStatusIntervalMinutes = 15
@@ -109,6 +113,17 @@ struct StrengthAudioCoachConfiguration:
 
     var shouldAnnounceExerciseProgress: Bool {
         announceExerciseProgress ?? false
+    }
+
+    var shouldAnnounceExerciseComplete: Bool {
+        announceExerciseComplete ?? false
+    }
+
+    var resolvedMotivationEveryCompletedSets: Int? {
+        guard let count = motivationEveryCompletedSets, (1...10).contains(count) else {
+            return nil
+        }
+        return count
     }
 
     var watchConfiguration:
@@ -159,6 +174,9 @@ struct StrengthAudioCoachConfiguration:
         configuration
             .announceStrengthExerciseProgress =
             shouldAnnounceExerciseProgress
+        configuration.announceStrengthExerciseComplete = shouldAnnounceExerciseComplete
+        configuration.strengthMotivationEverySets = resolvedMotivationEveryCompletedSets
+        configuration.strengthPersonalMotivationPhrase = personalMotivationPhrase
         configuration
             .strengthStatusIntervalSeconds =
             announceWorkoutStatus
