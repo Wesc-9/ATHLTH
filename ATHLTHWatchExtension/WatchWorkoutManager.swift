@@ -1784,9 +1784,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        let nextGroup: Bool = {
+            guard snapshot.currentExerciseComplete,
+                  let queue = snapshot.exerciseQueue,
+                  let current = queue.first(where: { $0.index == snapshot.exerciseIndex }),
+                  let next = queue.filter({ $0.index > snapshot.exerciseIndex }).min(
+                    by: { $0.index < $1.index }
+                  ),
+                  let groupID = next.strengthGroupID else { return false }
+            return groupID != current.strengthGroupID
+        }()
         let scopedRest = ATHLTHCoachBoundaryCountdown.forStrengthAfterRest(
             audioCoachConfiguration.effectiveBoundaryCountdownRules,
-            nextExercise: snapshot.currentExerciseComplete
+            nextExercise: snapshot.currentExerciseComplete,
+            nextGroup: nextGroup
         )
         let countdownSeconds =
             audioCoachConfiguration
