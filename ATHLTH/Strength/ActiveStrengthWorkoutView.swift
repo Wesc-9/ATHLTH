@@ -655,7 +655,7 @@ struct ActiveStrengthWorkoutView: View {
                 focusedExerciseMediaIndex = 0
                 showingExerciseInstructions = false
                 showingWorkoutReview = false
-                announceNextExerciseIfNeeded()
+                announceNextExerciseIfNeeded(previousIndex: oldValue)
             }
             .onChange(
                 of:
@@ -847,101 +847,87 @@ struct ActiveStrengthWorkoutView: View {
 
     @MainActor
     private func announceCompletedSetIfNeeded() {
-        guard let workout =
-                strength.activeWorkout,
-              workout.captureDevice ==
-                .iPhone,
-              let configuration =
-                workout
-                    .advancedConfiguration,
-              configuration.audioCoach.enabled,
-              configuration.audioCoach
-                .announceSetComplete,
-              let completed =
-                workout.exercises
-                    .flatMap(\.sets)
-                    .filter(\.isCompleted)
-                    .max(
-                        by: {
-                            ($0.completedAt ?? .distantPast) <
-                            ($1.completedAt ?? .distantPast)
-                        }
-                    )
-        else {
-            return
+        guard let workout = strength.activeWorkout,
+              workout.captureDevice == .iPhone,
+              let coach = workout.advancedConfiguration?.audioCoach,
+              coach.enabled,
+              let completed = workout.exercises
+                .flatMap(\.sets)
+                .filter(\.isCompleted)
+                .max(by: { ($0.completedAt ?? .distantPast) <
+                           ($1.completedAt ?? .distantPast) })
+        else { return }
+
+        var english: [String] = []
+        var norwegian: [String] = []
+        if coach.announceSetComplete {
+            let setNumber = completed.setNumber
+            if let reps = completed.completedReps,
+               let weight = completed.completedWeightKilograms {
+                let formattedWeight = weight.rounded() == weight
+                    ? String(Int(weight)) : String(format: "%.1f", weight)
+                english.append("Set \(setNumber) complete. \(reps) reps at \(formattedWeight) kilograms.")
+                norwegian.append("Sett \(setNumber) fullført. \(reps) repetisjoner på \(formattedWeight) kilo.")
+            } else {
+                english.append("Set \(setNumber) complete.")
+                norwegian.append("Sett \(setNumber) fullført.")
+            }
         }
 
-        let setNumber =
-            completed.setNumber
-
-        if let reps =
-                completed.completedReps,
-           let weight =
-                completed
-                    .completedWeightKilograms {
-            let formattedWeight =
-                weight.rounded() == weight
-                    ? String(
-                        Int(weight)
-                    )
-                    : String(
-                        format: "%.1f",
-                        weight
-                    )
-
-            strengthCoach.speak(
-                english:
-                    "Set \(setNumber) complete. \(reps) reps at \(formattedWeight) kilograms.",
-                norwegian:
-                    "Sett \(setNumber) fullført. \(reps) repetisjoner på \(formattedWeight) kilo.",
-                configuration:
-                    configuration.audioCoach
-            )
-        } else {
-            strengthCoach.speak(
-                english:
-                    "Set \(setNumber) complete.",
-                norwegian:
-                    "Sett \(setNumber) fullført.",
-                configuration:
-                    configuration.audioCoach
-            )
+        if let motivation = ATHLTHStrengthCoachStatusMessage.setMilestoneMotivation(
+            completedSets: workout.totalCompletedSets,
+            everySets: coach.resolvedMotivationEveryCompletedSets,
+            personalMessage: coach.personalMotivationPhrase,
+            norwegian: false
+        ) {
+            english.append(motivation)
         }
+        if let motivation = ATHLTHStrengthCoachStatusMessage.setMilestoneMotivation(
+            completedSets: workout.totalCompletedSets,
+            everySets: coach.resolvedMotivationEveryCompletedSets,
+            personalMessage: coach.personalMotivationPhrase,
+            norwegian: true
+        ) {
+            norwegian.append(motivation)
+        }
+        guard !english.isEmpty else { return }
+        strengthCoach.speak(
+            english: english.joined(separator: " "),
+            norwegian: norwegian.joined(separator: " "),
+            configuration: coach
+        )
     }
 
     @MainActor
-    private func announceNextExerciseIfNeeded() {
-        guard let workout =
-                strength.activeWorkout,
-              workout.captureDevice ==
-                .iPhone,
-              let configuration =
-                workout
-                    .advancedConfiguration,
-              configuration.audioCoach.enabled,
-              configuration.audioCoach
-                .announceNextExercise,
-              let exercise =
-                strength.currentExercise
-        else {
-            return
+    private func announceNextExerciseIfNeeded(previousIndex: Int) {
+        guard let workout = strength.activeWorkout,
+              workout.captureDevice == .iPhone,
+              let configuration = workout.advancedConfiguration,
+              configuration.audioCoach.enabled
+        else { return }
+
+        var english: [String] = []
+        var norwegian: [String] = []
+        if configuration.audioCoach.shouldAnnounceExerciseComplete,
+           workout.exercises.indices.contains(previousIndex),
+           workout.exercises[previousIndex].isCompleted {
+            let name = workout.exercises[previousIndex].exercise.displayName
+            english.append("Exercise completed. \(name).")
+            norwegian.append("Øvelse fullført. \(name).")
         }
-
-        let phrase =
-            nextExerciseCoachPhrase(
-                workout: workout,
-                exercise: exercise,
-                configuration:
-                    configuration
+        if configuration.audioCoach.announceNextExercise,
+           let exercise = strength.currentExercise {
+            let next = nextExerciseCoachPhrase(
+                workout: workout, exercise: exercise, configuration: configuration
             )
-
+            english.append(next.english)
+            norwegian.append(next.norwegian)
+        }
+        guard !english.isEmpty else { return }
         strengthCoach.speak(
-            english:
-                phrase.english,
-            norwegian:
-                phrase.norwegian,
-            configuration:
-                configuration.audioCoach
+            english: english.joined(separator: " "),
+            norwegian: norwegian.joined(separator: " "),
+            configuration: configuration.audioCoach
         )
     }
 
