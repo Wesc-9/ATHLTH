@@ -75,10 +75,10 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "waveform.path.ecg.rectangle")
                         .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .frame(width: 42, height: 42)
                         .background(
-                            ATHLTHTheme.vitalitySoft,
+                            ATHLTHPlanDesign.selectedSurface,
                             in: RoundedRectangle(
                                 cornerRadius: 13,
                                 style: .continuous
@@ -86,12 +86,12 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Live Workout Display")
+                        Text(tr("Live workout display", "Live-visning av økt"))
                             .font(.headline)
                             .foregroundStyle(ATHLTHTheme.primaryText)
 
                         Text(
-                            "Choose what ATHLTH can surface during an active workout. Smart Priority automatically shows the most useful signal right now."
+                            tr("Choose what ATHLTH shows during an active workout. Smart priority highlights the most relevant information.", "Velg hva ATHLTH skal vise under økten. Smart prioritet fremhever den viktigste informasjonen.")
                         )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -102,32 +102,32 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 Divider()
 
                 Toggle(
-                    "Dynamic Island & Live Activity",
+                    tr("Dynamic Island & Live Activity", "Dynamic Island og Live Activity"),
                     isOn: $liveConfiguration.dynamicIslandEnabled
                 )
 
                 Toggle(
-                    "Apple Watch Live Info",
+                    tr("Apple Watch Live Info", "Live-info på Apple Watch"),
                     isOn: $liveConfiguration.watchEnabled
                 )
 
                 Toggle(
-                    "Smart Priority",
+                    tr("Smart Priority", "Smart prioritet"),
                     isOn: $liveConfiguration.smartPriorityEnabled
                 )
 
                 Toggle(
-                    "Guidance haptics",
+                    tr("Guidance haptics", "Haptiske veiledningsvarsler"),
                     isOn: $liveConfiguration.hapticsEnabled
                 )
 
                 Toggle(
-                    "Guidance voice alerts",
+                    tr("Guidance voice alerts", "Talevarsler for veiledning"),
                     isOn: $liveConfiguration.audioAlertsEnabled
                 )
 
                 Text(
-                    "These are the same master alert controls shown under Workout Guidance. They affect Route Guardian, target and Ghost alerts on iPhone and Apple Watch; Audio Coach remains separately configurable."
+                    tr("These master controls also apply in Workout Guidance. They affect Route Guardian, goal and Ghost alerts on iPhone and Apple Watch. Audio Coach is configured separately.", "Dette er de samme hovedvalgene som under Øktveiledning. De påvirker Route Guardian-, mål- og Ghost-varsler på iPhone og Apple Watch. Audio Coach styres separat.")
                 )
                 .font(.caption2)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -268,17 +268,17 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
 
     private var intro: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("ATHLTH EVERYWHERE")
+            Text(tr("ATHLTH EVERYWHERE", "ATHLTH OVERALT"))
                 .font(.caption2.weight(.bold))
                 .tracking(2.1)
-                .foregroundStyle(ATHLTHTheme.vitality)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
-            Text("Widgets & Surfaces")
+            Text(tr("Widgets & Surfaces", "Widgeter og flater"))
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .foregroundStyle(ATHLTHTheme.primaryText)
 
             Text(
-                "This is the home for how ATHLTH appears outside the app — on your Home Screen, during live workouts, through Siri and on the Lock Screen."
+                tr("Control how ATHLTH appears outside the app: on the Home Screen, during workouts, through Siri and on the Lock Screen.", "Her bestemmer du hvordan ATHLTH vises utenfor appen – på Hjem-skjermen, under økter, via Siri og på låseskjermen.")
             )
             .font(.subheadline)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -322,11 +322,11 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
 
                     Text(surface.statusTitle)
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 6)
                         .background(
-                            ATHLTHTheme.vitalitySoft,
+                            ATHLTHPlanDesign.selectedSurface,
                             in: Capsule()
                         )
                 }
@@ -346,7 +346,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Label("Recovery", systemImage: "heart.fill")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.vitality)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     Text("82")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(ATHLTHTheme.primaryText)
@@ -358,12 +358,12 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 Spacer()
 
                 ProgressView(value: 0.82)
-                    .tint(ATHLTHTheme.vitality)
+                    .tint(ATHLTHPlanDesign.accentInk)
                     .frame(maxWidth: 130)
             }
             .padding(14)
             .background(
-                ATHLTHTheme.surfaceSage,
+                ATHLTHPlanDesign.selectedSurface,
                 in: RoundedRectangle(
                     cornerRadius: 18,
                     style: .continuous
@@ -373,7 +373,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
         case .liveActivity:
             HStack(spacing: 12) {
                 Image(systemName: "figure.run")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .font(.headline)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -409,10 +409,10 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
             HStack(spacing: 12) {
                 Image(systemName: "waveform")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .frame(width: 42, height: 42)
                     .background(
-                        ATHLTHTheme.recoveryBlueSoft,
+                        ATHLTHPlanDesign.selectedSurface,
                         in: Circle()
                     )
 
@@ -424,7 +424,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
             }
             .padding(14)
             .background(
-                ATHLTHTheme.surfaceStone,
+                ATHLTHPlanDesign.selectedSurface,
                 in: RoundedRectangle(
                     cornerRadius: 18,
                     style: .continuous
@@ -460,7 +460,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 LinearGradient(
                     colors: [
                         ATHLTHTheme.accentDeep,
-                        ATHLTHTheme.vitality
+                        ATHLTHPlanDesign.accentInk
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -563,11 +563,11 @@ private enum ATHLTHExternalSurface: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .homeScreen:
-            return ATHLTHTheme.vitality
+            return ATHLTHPlanDesign.accentInk
         case .liveActivity:
             return ATHLTHTheme.accentDeep
         case .siriShortcuts:
-            return ATHLTHTheme.recoveryBlue
+            return ATHLTHPlanDesign.accentInk
         case .lockScreen:
             return ATHLTHTheme.primaryText
         }
