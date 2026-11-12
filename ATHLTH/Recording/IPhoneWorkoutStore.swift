@@ -4038,17 +4038,19 @@ final class IPhoneWorkoutStore:
               let configuration = workout.audioCoachConfiguration,
               let steps = workout.structuredRunningWorkout?.steps,
               let index = workout.structuredStepIndex,
-              steps.indices.contains(index), steps.indices.contains(index + 1),
+              steps.indices.contains(index),
               steps[index].measure == .time,
               let duration = steps[index].durationSeconds, duration > 0 else { return }
+
+        let scoped = ATHLTHCoachBoundaryCountdown.forRunningStep(
+            steps, at: index, configuration: configuration
+        )
         let phase = steps[index].phase
-        let next = steps[index + 1].phase
-        let length: Int?
-        if phase == "work", next == "recovery" {
-            length = configuration.resolvedIntervalCountdownToRecovery
-        } else if phase == "recovery" {
-            length = configuration.resolvedIntervalCountdownFromRecovery
-        } else { return }
+        let next = steps.indices.contains(index + 1) ? steps[index + 1].phase : nil
+        let legacyLength: Int? = phase == "work" && next == "recovery"
+            ? configuration.resolvedIntervalCountdownToRecovery
+            : phase == "recovery" ? configuration.resolvedIntervalCountdownFromRecovery : nil
+        guard let length = scoped?.resolvedSeconds ?? legacyLength else { return }
 
         let elapsed = workout.elapsed(at: now) -
             (workout.structuredStepStartElapsedTime ?? 0)
@@ -4204,21 +4206,28 @@ final class IPhoneWorkoutStore:
             workout.structuredWorkoutComplete = true
             UINotificationFeedbackGenerator()
                 .notificationOccurred(.success)
-
-            if workout
-                .audioCoachConfiguration?
-                .enabled == true {
-                speak(
-                    localizedCoachPhrase(
+            let scoped = step.measure == .time
+                ? ATHLTHCoachBoundaryCountdown.forRunningStep(
+                    plan.steps, at: finishedIndex,
+                    configuration: workout.audioCoachConfiguration ?? .disabled
+                  ) : nil
+            if workout.audioCoachConfiguration?.enabled == true,
+               scoped?.after != .numbersOnly {
+                let norwegian = localizedCoachPhrase(
+                    english: "en", norwegian: "no",
+                    configuration: workout.audioCoachConfiguration ?? .disabled
+                ) == "no"
+                let text = scoped?.after == .shortAlert
+                    ? ATHLTHCoachBoundaryCountdown.shortMessage(
+                        for: scoped!, norwegian: norwegian
+                      )
+                    : localizedCoachPhrase(
                         english: "Structured workout complete. Continue easy or finish when ready.",
                         norwegian: "Den planlagte økten er fullført. Fortsett rolig eller avslutt når du er klar.",
                         configuration: workout.audioCoachConfiguration ?? .disabled
-                    ),
-                    configuration:
-                        workout.audioCoachConfiguration,
-                    priority:
-                        .structuredStep
-                )
+                      )
+                speak(text, configuration: workout.audioCoachConfiguration,
+                      priority: .structuredStep)
             }
             return
         }
@@ -4257,7 +4266,12 @@ final class IPhoneWorkoutStore:
             }
             return
         }
-        let recoveryAction = ATHLTHCoachRecoveryBoundary.afterAction(
+        let scoped = step.measure == .time
+            ? ATHLTHCoachBoundaryCountdown.forRunningStep(
+                plan.steps, at: finishedIndex,
+                configuration: workout.audioCoachConfiguration ?? .disabled
+              ) : nil
+        let recoveryAction = scoped?.after ?? ATHLTHCoachRecoveryBoundary.afterAction(
             finishedPhase: step.phase,
             nextPhase: plan.steps[nextIndex].phase,
             configuration: workout.audioCoachConfiguration ?? .disabled
@@ -4276,7 +4290,11 @@ final class IPhoneWorkoutStore:
                     configuration: workout.audioCoachConfiguration
                 ) == "no"
                 self.speak(
-                    ATHLTHCoachRecoveryBoundary.shortMessage(
+                    scoped.map {
+                        ATHLTHCoachBoundaryCountdown.shortMessage(
+                            for: $0, norwegian: norwegian
+                        )
+                    } ?? ATHLTHCoachRecoveryBoundary.shortMessage(
                         finishedPhase: step.phase, norwegian: norwegian
                     ),
                     configuration: workout.audioCoachConfiguration,
