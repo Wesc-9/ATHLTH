@@ -7,7 +7,7 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
     case distance, elapsedTime, averagePace, clockTime, heartRate, currentZone
     case motivation, contextual, randomEncouragement
     case targetZoneCoach, adaptiveMotivation
-    case workoutStart, pauseResume, workoutFinish, intervalRecoveryCountdown
+    case workoutStart, pauseResume, workoutFinish, intervalRecoveryCountdown, scopedCountdowns
     case routeRemaining, routeETA
     case currentStep, remainingStepTime, remainingStepDistance
     case customAnnouncements, customPhrases, landmarks
@@ -36,6 +36,7 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .workoutStart: return tr("Workout start", "Øktstart")
         case .pauseResume: return tr("Pause and resume", "Pause og fortsett")
         case .intervalRecoveryCountdown: return tr("Spoken rest countdown", "Hørbar nedtelling til og fra pause")
+        case .scopedCountdowns: return tr("Countdown for workout parts", "Nedtelling ved deler av økten")
         case .workoutFinish: return tr("Finish summary", "Oppsummering ved mål")
         case .routeRemaining: return tr("Remaining route distance", "Gjenstående rutelengde")
         case .routeETA: return tr("Estimated time to finish", "Estimert tid til mål")
@@ -58,7 +59,7 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .motivation, .contextual, .randomEncouragement, .adaptiveMotivation,
              .customPhrases, .landmarks:
             return tr("Motivation", "Motivasjon")
-        case .workoutStart, .pauseResume, .workoutFinish, .intervalRecoveryCountdown:
+        case .workoutStart, .pauseResume, .workoutFinish, .intervalRecoveryCountdown, .scopedCountdowns:
             return tr("Events", "Hendelser")
         case .routeRemaining, .routeETA, .currentStep, .remainingStepTime,
              .remainingStepDistance:
@@ -82,7 +83,7 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
             return "sparkles"
         case .workoutStart: return "play.circle"
         case .pauseResume: return "pause.circle"
-        case .intervalRecoveryCountdown: return "timer"
+        case .intervalRecoveryCountdown, .scopedCountdowns: return "timer"
         case .workoutFinish: return "flag.checkered"
         case .routeRemaining, .routeETA: return "map"
         case .currentStep, .remainingStepTime, .remainingStepDistance: return "repeat"
@@ -97,6 +98,7 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .distanceUpdates, .timedUpdates, .currentZone, .targetZoneCoach,
              .adaptiveMotivation, .motivation, .randomEncouragement,
              .customAnnouncements, .customPhrases, .intervalRecoveryCountdown,
+             .scopedCountdowns,
              .landmarks:
             return true
         default:
@@ -111,7 +113,7 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
     func isVisible(route: Bool, structured: Bool) -> Bool {
         switch self {
         case .routeRemaining, .routeETA: return route
-        case .currentStep, .remainingStepTime, .remainingStepDistance, .intervalRecoveryCountdown:
+        case .currentStep, .remainingStepTime, .remainingStepDistance, .intervalRecoveryCountdown, .scopedCountdowns:
             return structured
         case .landmarks: return route
         default: return true
@@ -149,6 +151,8 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .intervalRecoveryCountdown:
             return d.smartPrompts.intervalCountdownToRecoverySeconds != nil ||
                 d.smartPrompts.intervalCountdownFromRecoverySeconds != nil
+        case .scopedCountdowns:
+            return !(d.smartPrompts.boundaryCountdownRules ?? []).isEmpty
         case .workoutFinish: return d.announceWorkoutComplete
         case .routeRemaining: return d.announceRemainingRouteDistance
         case .routeETA: return d.announceEstimatedRemainingRouteTime
@@ -223,6 +227,9 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .intervalRecoveryCountdown:
             d.smartPrompts.intervalCountdownToRecoverySeconds = active ? 10 : nil
             d.smartPrompts.intervalCountdownFromRecoverySeconds = active ? 10 : nil
+        case .scopedCountdowns:
+            d.smartPrompts.boundaryCountdownRules = active
+                ? [ATHLTHCoachBoundaryCountdownRule()] : nil
         case .workoutFinish: d.announceWorkoutComplete = active
         case .routeRemaining: d.announceRemainingRouteDistance = active
         case .routeETA: d.announceEstimatedRemainingRouteTime = active
@@ -273,6 +280,8 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
             return tr("Based on live effort and targets", "Styres av faktisk innsats og mål")
         case .intervalRecoveryCountdown:
             return tr("Before and during interval recovery", "Før og under intervallpause")
+        case .scopedCountdowns:
+            return "\(draft.smartPrompts.boundaryCountdownRules?.count ?? 0) " + tr("countdowns", "nedtellinger")
         default: return tr("Enabled", "Aktiv")
         }
     }
