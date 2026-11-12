@@ -147,6 +147,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     private var hasAdvancedConfiguration: Bool {
         draft.smartPrompts.intervalCountdownToRecoverySeconds != nil ||
         draft.smartPrompts.intervalCountdownFromRecoverySeconds != nil ||
+        !(draft.smartPrompts.boundaryCountdownRules ?? []).isEmpty ||
         !draft.customRules.isEmpty ||
         draft.smartPrompts.coachingMode == .custom ||
         draft.smartPrompts.preferredHeartRateZone != nil ||
@@ -682,6 +683,10 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
                 .pickerStyle(.menu)
                 standardMetricsEditor
+            }
+        case .scopedCountdowns:
+            editorCard {
+                ATHLTHScopedCountdownRulesEditor(rules: $draft.smartPrompts.boundaryCountdownRules)
             }
         case .intervalRecoveryCountdown:
             editorCard {
