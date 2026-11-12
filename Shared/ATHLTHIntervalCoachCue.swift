@@ -334,14 +334,15 @@ enum ATHLTHCoachBoundaryCountdown {
     /// set, or for the next exercise if the current one is complete.
     static func forStrengthAfterRest(
         _ rules: [ATHLTHCoachBoundaryCountdownRule],
-        nextExercise: Bool
+        nextExercise: Bool,
+        nextGroup: Bool = false
     ) -> ATHLTHCoachBoundaryCountdownRule? {
         best(rules.filter { rule in
             guard rule.resolvedSeconds != nil, rule.boundary == .starts else { return false }
             switch rule.scope {
             case .step: return true
             case .section: return nextExercise
-            case .group: return false
+            case .group: return nextGroup
             case .plannedWorkout: return false
             }
         })
