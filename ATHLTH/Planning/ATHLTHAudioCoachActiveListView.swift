@@ -1633,7 +1633,8 @@ struct ATHLTHScopedCountdownRulesEditor: View {
 
     @ViewBuilder
     private func countdownRuleCard(at index: Int) -> some View {
-        if let rule = rules, rule.indices.contains(index) {
+        if let rules, rules.indices.contains(index) {
+            let rule = rules[index]
             VStack(alignment: .leading, spacing: 10) {
                 ruleHeader(at: index)
                 ruleSelectors(at: index, scope: rule.scope)
