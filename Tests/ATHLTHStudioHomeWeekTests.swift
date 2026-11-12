@@ -264,6 +264,7 @@ final class ATHLTHStudioHomeWeekTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testUntimedPlanDayNeverInventsClockTime() throws {
         let defaults = try XCTUnwrap(
             UserDefaults(suiteName: "ATHLTHStudioUntimed.\(UUID().uuidString)")
