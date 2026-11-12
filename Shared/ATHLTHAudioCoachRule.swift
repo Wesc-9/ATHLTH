@@ -24,6 +24,17 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case heartRate
         case heartRateZone
         case motivation
+        case averagePace
+        case speed
+        case clockTime
+        case date
+        case stepName
+        case stepRemainingTime
+        case groupRemainingTime
+        case workoutRemainingTime
+        case estimatedFinishTime
+        case routeRemainingDistance
+        case estimatedRouteTime
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -39,6 +50,29 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 english: "Heart-rate zone", norwegian: "Pulssone")
             case .motivation: return ATHLTHLocalization.choose(
                 english: "Motivation", norwegian: "Motivasjon")
+            case .averagePace: return ATHLTHLocalization.choose(english: "Average pace", norwegian: "Snittempo")
+            case .speed: return ATHLTHLocalization.choose(english: "Speed", norwegian: "Hastighet")
+            case .clockTime: return ATHLTHLocalization.choose(english: "Clock time", norwegian: "Klokkeslett")
+            case .date: return ATHLTHLocalization.choose(english: "Date", norwegian: "Dato")
+            case .stepName: return ATHLTHLocalization.choose(english: "Current phase", norwegian: "Gjeldende deløvelse")
+            case .stepRemainingTime: return ATHLTHLocalization.choose(english: "Time left in phase", norwegian: "Tid igjen av deløvelsen")
+            case .groupRemainingTime: return ATHLTHLocalization.choose(english: "Estimated time left in group", norwegian: "Estimert tid igjen av gruppen")
+            case .workoutRemainingTime: return ATHLTHLocalization.choose(english: "Estimated time left in workout", norwegian: "Estimert tid igjen av økten")
+            case .estimatedFinishTime: return ATHLTHLocalization.choose(english: "Estimated finish time", norwegian: "Estimert sluttid")
+            case .routeRemainingDistance: return ATHLTHLocalization.choose(english: "Route distance remaining", norwegian: "Distanse igjen av ruten")
+            case .estimatedRouteTime: return ATHLTHLocalization.choose(english: "Estimated route time remaining", norwegian: "Estimert tid igjen av ruten")
+            }
+        }
+    }
+
+    enum Scope: String, Codable, CaseIterable, Identifiable {
+        case workout, effort, group
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .workout: return ATHLTHLocalization.choose(english: "Whole workout", norwegian: "Hele økten")
+            case .effort: return ATHLTHLocalization.choose(english: "Each effort", norwegian: "Hvert drag")
+            case .group: return ATHLTHLocalization.choose(english: "Each interval group", norwegian: "Hver draggruppe")
             }
         }
     }
@@ -55,6 +89,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     /// Disabled groups remain visible/editable but never create a spoken cue.
     var enabled: Bool? = nil
     var encouragementStyle: ATHLTHCoachEncouragementStyle? = nil
+    var scope: Scope? = nil
 
     var isEnabled: Bool { enabled ?? true }
 
@@ -63,7 +98,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         for next in additionalMetrics ?? [] where !ordered.contains(next) {
             ordered.append(next)
         }
-        return Array(ordered.prefix(5))
+        return ordered
     }
 
     var validatedInterval: Int {
@@ -80,6 +115,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         heartRateBPM: Double?,
         norwegian: Bool,
         maximumHeartRateBPM: Double? = nil,
+        context: ATHLTHCoachReadoutContext = .init(),
+        now: Date = .now,
         excluding excludedMetrics: Set<Metric> = []
     ) -> String? {
         let intervalValue = trigger == .distance ? distanceMeters : elapsedSeconds
@@ -96,7 +133,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 paceSecondsPerKilometer: paceSecondsPerKilometer,
                 heartRateBPM: heartRateBPM, norwegian: norwegian,
                 maximumHeartRateBPM: maximumHeartRateBPM,
-                motivationSlot: motivationSlot
+                motivationSlot: motivationSlot, context: context, now: now
             )
         }
         return parts.isEmpty ? nil : parts.joined(separator: ". ")
@@ -110,7 +147,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         heartRateBPM: Double?,
         norwegian: Bool,
         maximumHeartRateBPM: Double?,
-        motivationSlot: Int
+        motivationSlot: Int,
+        context: ATHLTHCoachReadoutContext,
+        now: Date
     ) -> String? {
         switch metric {
         case .pace:
@@ -145,6 +184,53 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 heartRateBPM: heartRateBPM, maximumBPM: maximumHeartRateBPM
             ) else { return nil }
             return norwegian ? "Pulssone \(zone)" : "Heart-rate zone \(zone)"
+        case .averagePace:
+            guard distanceMeters >= 100 else { return nil }
+            return component(.pace, distanceMeters: distanceMeters, elapsedSeconds: elapsedSeconds,
+                             paceSecondsPerKilometer: elapsedSeconds * 1000 / distanceMeters,
+                             heartRateBPM: nil, norwegian: norwegian, maximumHeartRateBPM: nil,
+                             motivationSlot: motivationSlot, context: context, now: now)
+                .map { (norwegian ? "Gjennomsnitt. " : "Average. ") + $0 }
+        case .speed:
+            guard let pace = paceSecondsPerKilometer, pace.isFinite, (30...3_600).contains(pace) else { return nil }
+            let speed = (3600 / pace).formatted(.number.precision(.fractionLength(1)))
+            return norwegian ? "Hastighet \(speed) kilometer i timen" : "Speed \(speed) kilometers per hour"
+        case .clockTime:
+            let time = now.formatted(.dateTime.hour().minute().locale(Locale(identifier: norwegian ? "nb_NO" : "en_US")))
+            return norwegian ? "Klokken er \(time)" : "The time is \(time)"
+        case .date:
+            return now.formatted(.dateTime.weekday(.wide).day().month(.wide)
+                .locale(Locale(identifier: norwegian ? "nb_NO" : "en_US")))
+        case .stepName:
+            return context.stepName
+        case .stepRemainingTime:
+            return context.stepRemainingSeconds.flatMap {
+                Self.remaining($0, label: norwegian ? "Igjen av deløvelsen" : "Time left in this phase", norwegian: norwegian)
+            }
+        case .groupRemainingTime:
+            return context.groupRemainingSeconds.flatMap {
+                Self.remaining($0, label: norwegian ? "Estimert igjen av gruppen" : "Estimated time left in group", norwegian: norwegian)
+            }
+        case .workoutRemainingTime:
+            return context.workoutRemainingSeconds.flatMap {
+                Self.remaining($0, label: norwegian ? "Estimert igjen av økten" : "Estimated time left in workout", norwegian: norwegian)
+            }
+        case .estimatedFinishTime:
+            guard let seconds = context.workoutRemainingSeconds, seconds.isFinite,
+                  (0...604_800).contains(seconds) else { return nil }
+            let time = now.addingTimeInterval(seconds).formatted(.dateTime.hour().minute()
+                .locale(Locale(identifier: norwegian ? "nb_NO" : "en_US")))
+            return norwegian ? "Estimert ferdig klokken \(time)" : "Estimated finish at \(time)"
+        case .routeRemainingDistance:
+            guard let meters = context.routeRemainingMeters, meters.isFinite, meters >= 0 else { return nil }
+            let km = (meters / 1000).formatted(.number.precision(.fractionLength(2)))
+            return norwegian ? "\(km) kilometer igjen av ruten" : "\(km) kilometers left on route"
+        case .estimatedRouteTime:
+            guard let meters = context.routeRemainingMeters, let pace = paceSecondsPerKilometer,
+                  pace.isFinite, (30...3_600).contains(pace) else { return nil }
+            return Self.remaining(meters * pace / 1000,
+                                  label: norwegian ? "Estimert igjen av ruten" : "Estimated route time left",
+                                  norwegian: norwegian)
         case .motivation:
             return ATHLTHAudioCoachScheduledMotivation.phrase(
                 slot: motivationSlot,
@@ -152,6 +238,18 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 norwegian: norwegian
             )
         }
+    }
+
+    private static func remaining(_ value: Double, label: String, norwegian: Bool) -> String? {
+        guard value.isFinite, (0...604_800).contains(value) else { return nil }
+        let seconds = Int(value.rounded())
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let tail = seconds % 60
+        let duration = norwegian ? "\(minutes) minutter og \(tail) sekunder"
+            : "\(minutes) minutes and \(tail) seconds"
+        let prefix = hours > 0 ? (norwegian ? "\(hours) timer, " : "\(hours) hours, ") : ""
+        return "\(label): \(prefix)\(duration)"
     }
 }
 
@@ -206,7 +304,7 @@ enum ATHLTHAudioCoachRuleDelivery {
         elapsedSeconds: TimeInterval
     ) -> [UUID: Int] {
         var result: [UUID: Int] = [:]
-        for rule in rules {
+        for rule in rules where (rule.scope ?? .workout) == .workout {
             result[rule.id] = slot(
                 for: rule,
                 distanceMeters: distanceMeters,
@@ -224,6 +322,7 @@ enum ATHLTHAudioCoachRuleDelivery {
         heartRateBPM: Double?,
         norwegian: Bool,
         maximumHeartRateBPM: Double? = nil,
+        context: ATHLTHCoachReadoutContext = .init(),
         lastSlots: inout [UUID: Int]
     ) -> [String] {
         dueAnnouncements(
@@ -234,6 +333,7 @@ enum ATHLTHAudioCoachRuleDelivery {
             heartRateBPM: heartRateBPM,
             norwegian: norwegian,
             maximumHeartRateBPM: maximumHeartRateBPM,
+            context: context,
             lastSlots: &lastSlots
         ).map(\.text)
     }
@@ -246,16 +346,35 @@ enum ATHLTHAudioCoachRuleDelivery {
         heartRateBPM: Double?,
         norwegian: Bool,
         maximumHeartRateBPM: Double? = nil,
+        context: ATHLTHCoachReadoutContext = .init(),
         lastSlots: inout [UUID: Int]
     ) -> [ATHLTHAudioCoachDueAnnouncement] {
         var messages: [ATHLTHAudioCoachDueAnnouncement] = []
-        var spokenMetrics: Set<ATHLTHAudioCoachRule.Metric> = []
+        var spokenByScope: [ATHLTHAudioCoachRule.Scope: Set<ATHLTHAudioCoachRule.Metric>] = [:]
         for rule in rules.prefix(20) {
-            let current = slot(
-                for: rule,
-                distanceMeters: distanceMeters,
-                elapsedSeconds: elapsedSeconds
-            )
+            let scope = rule.scope ?? .workout
+            let distance: Double
+            let elapsed: Double
+            let segment: Int?
+            switch scope {
+            case .workout:
+                distance = distanceMeters
+                elapsed = elapsedSeconds
+                segment = nil
+            case .effort:
+                guard context.isEffort, let index = context.stepIndex else { continue }
+                distance = context.stepDistanceMeters
+                elapsed = context.stepElapsedSeconds
+                segment = index
+            case .group:
+                guard let index = context.groupStartIndex else { continue }
+                distance = context.groupDistanceMeters
+                elapsed = context.groupElapsedSeconds
+                segment = index
+            }
+            let milestone = slot(for: rule, distanceMeters: distance, elapsedSeconds: elapsed)
+            guard milestone > 0 else { continue }
+            let current = segment.map { ($0 + 1) * 100_000 + min(milestone, 99_999) } ?? milestone
             let previous = lastSlots[rule.id] ?? 0
             guard current > previous else { continue }
             // Consume the crossed milestone even if a sensor value is missing.
@@ -273,27 +392,28 @@ enum ATHLTHAudioCoachRuleDelivery {
                         maximumBPM: maximumHeartRateBPM
                     ) != nil
                 case .pace: return paceSecondsPerKilometer != nil
-                case .distance, .elapsedTime, .motivation: return true
+                default: return true
                 }
             }
-            let effective = available.filter { !spokenMetrics.contains($0) }
+            let effective = available.filter { !(spokenByScope[scope] ?? []).contains($0) }
             guard !effective.isEmpty,
                   let message = rule.phrase(
-                    distanceMeters: distanceMeters,
-                    elapsedSeconds: elapsedSeconds,
+                    distanceMeters: distance,
+                    elapsedSeconds: elapsed,
                     paceSecondsPerKilometer: paceSecondsPerKilometer,
                     heartRateBPM: heartRateBPM,
                     norwegian: norwegian,
                     maximumHeartRateBPM: maximumHeartRateBPM,
+                    context: context,
                     excluding: Set(rule.selectedMetrics).subtracting(effective)
                   ) else { continue }
             let covered = Set(effective)
             messages.append(ATHLTHAudioCoachDueAnnouncement(
                 text: message,
-                metrics: covered,
+                metrics: scope == .workout ? covered : covered.subtracting([.distance, .elapsedTime, .averagePace]),
                 milestoneKey: rule.id.uuidString + ":" + String(current)
             ))
-            spokenMetrics.formUnion(covered)
+            spokenByScope[scope, default: []].formUnion(covered)
         }
         return messages
     }
@@ -336,4 +456,97 @@ struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {
     var id: UUID = UUID()
     var title: String
     var rules: [ATHLTHAudioCoachRule]
+}
+
+
+/// Planned estimates and segment measurements supplied by the recording owner.
+struct ATHLTHCoachReadoutContext: Codable, Hashable {
+    var stepName: String?
+    var stepIndex: Int?
+    var isEffort = false
+    var stepElapsedSeconds: Double = 0
+    var stepDistanceMeters: Double = 0
+    var groupStartIndex: Int?
+    var groupElapsedSeconds: Double = 0
+    var groupDistanceMeters: Double = 0
+    var stepRemainingSeconds: Double?
+    var groupRemainingSeconds: Double?
+    var workoutRemainingSeconds: Double?
+    var routeRemainingMeters: Double?
+
+    static func needsSegmentData(_ rules: [ATHLTHAudioCoachRule]) -> Bool {
+        rules.contains { rule in
+            rule.isEnabled && ((rule.scope ?? .workout) != .workout ||
+                rule.selectedMetrics.contains { metric in
+                    switch metric {
+                    case .stepName, .stepRemainingTime, .groupRemainingTime,
+                         .workoutRemainingTime, .estimatedFinishTime: return true
+                    default: return false
+                    }
+                })
+        }
+    }
+
+    static func make(
+        plan: WatchRunningWorkoutTransfer?, index: Int?,
+        elapsed: Double, distance: Double,
+        recorded: [ATHLTHRecordedRunningStep], routeRemainingMeters: Double?
+    ) -> Self {
+        var context = Self(routeRemainingMeters: routeRemainingMeters)
+        guard let steps = plan?.steps, let index, steps.indices.contains(index) else { return context }
+        let step = steps[index]
+        context.stepName = step.title
+        context.stepIndex = index
+        context.isEffort = step.phase == "work"
+        context.stepElapsedSeconds = max(0, elapsed)
+        context.stepDistanceMeters = max(0, distance)
+        context.stepRemainingSeconds = estimate(step, elapsed: elapsed, distance: distance)
+        context.workoutRemainingSeconds = total(steps[index...], elapsed: elapsed, distance: distance)
+
+        // Use explicit drag-group IDs where present. Older sessions group the
+        // contiguous work/recovery phases of the main section.
+        let inGroup: (WatchRunningWorkoutStep) -> Bool = { candidate in
+            if let groupID = step.coachGroupID { return candidate.coachGroupID == groupID }
+            return candidate.coachGroupID == nil &&
+                (candidate.phase == "work" || candidate.phase == "recovery")
+        }
+        if inGroup(step) {
+            var first = index
+            while first > 0, inGroup(steps[first - 1]) { first -= 1 }
+            var end = index + 1
+            while end < steps.count, inGroup(steps[end]) { end += 1 }
+            context.groupStartIndex = first
+            context.groupRemainingSeconds = total(steps[index..<end], elapsed: elapsed, distance: distance)
+            let previous = recorded.filter { (first..<index).contains($0.index) }
+            context.groupElapsedSeconds = context.stepElapsedSeconds + previous.reduce(0) { $0 + $1.activeSeconds }
+            context.groupDistanceMeters = context.stepDistanceMeters + previous.reduce(0) { $0 + $1.distanceMeters }
+        }
+        return context
+    }
+
+    private static func total(_ steps: ArraySlice<WatchRunningWorkoutStep>, elapsed: Double, distance: Double) -> Double? {
+        var sum: Double = 0
+        for index in steps.indices {
+            let current = index == steps.startIndex
+            guard let seconds = estimate(steps[index], elapsed: current ? elapsed : 0,
+                                         distance: current ? distance : 0) else { return nil }
+            sum += seconds
+        }
+        return sum
+    }
+
+    private static func estimate(_ step: WatchRunningWorkoutStep, elapsed: Double, distance: Double) -> Double? {
+        switch step.measure {
+        case .time:
+            guard let duration = step.durationSeconds, duration.isFinite, duration > 0 else { return nil }
+            return max(0, duration - elapsed)
+        case .distance:
+            guard let meters = step.distanceMeters, meters.isFinite, meters > 0,
+                  let pace = step.targetPaceMinSecondsPerKilometer ?? step.targetPaceMaxSecondsPerKilometer,
+                  pace.isFinite, (30...3_600).contains(pace) else { return nil }
+            return max(0, meters - distance) * pace / 1000
+        case .open:
+            return nil
+        }
+    }
 }

@@ -495,4 +495,50 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertEqual(launch.customRules, restored.customRules)
     }
 
+
+    func testPerEffortRuleRestartsAndStaysSilentDuringRecovery() {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .elapsedTime, interval: 30, scope: .effort
+        )
+        var slots: [UUID: Int] = [:]
+        func count(index: Int, elapsed: Double, isEffort: Bool) -> Int {
+            ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+                rules: [rule], distanceMeters: 1000, elapsedSeconds: 500,
+                paceSecondsPerKilometer: nil, heartRateBPM: nil, norwegian: true,
+                context: .init(stepIndex: index, isEffort: isEffort, stepElapsedSeconds: elapsed),
+                lastSlots: &slots
+            ).count
+        }
+        XCTAssertEqual(count(index: 0, elapsed: 30, isEffort: true), 1)
+        XCTAssertEqual(count(index: 0, elapsed: 31, isEffort: true), 0)
+        XCTAssertEqual(count(index: 1, elapsed: 30, isEffort: false), 0)
+        XCTAssertEqual(count(index: 2, elapsed: 29, isEffort: true), 0)
+        XCTAssertEqual(count(index: 2, elapsed: 30, isEffort: true), 1)
+    }
+
+    func testOpenCooldownDoesNotInventAnEstimatedFinishTime() throws {
+        let groupID = UUID()
+        let steps = [
+            WatchRunningWorkoutStep(id: UUID(), title: "Effort", measure: .time,
+                                    distanceMeters: nil, durationSeconds: 120, intensityText: nil,
+                                    phase: "work", coachGroupID: groupID),
+            WatchRunningWorkoutStep(id: UUID(), title: "Recovery", measure: .time,
+                                    distanceMeters: nil, durationSeconds: 30, intensityText: nil,
+                                    phase: "recovery", coachGroupID: groupID),
+            WatchRunningWorkoutStep(id: UUID(), title: "Cooldown", measure: .open,
+                                    distanceMeters: nil, durationSeconds: nil, intensityText: nil,
+                                    phase: "cooldown")
+        ]
+        let context = ATHLTHCoachReadoutContext.make(
+            plan: .init(title: "Intervals", steps: steps), index: 0,
+            elapsed: 60, distance: 150, recorded: [], routeRemainingMeters: nil
+        )
+        XCTAssertEqual(context.stepRemainingSeconds, 60)
+        XCTAssertEqual(context.groupRemainingSeconds, 90)
+        XCTAssertNil(context.workoutRemainingSeconds)
+        let rule = ATHLTHAudioCoachRule(trigger: .time, metric: .workoutRemainingTime, interval: 60)
+        XCTAssertNil(rule.phrase(distanceMeters: 150, elapsedSeconds: 60,
+                                 paceSecondsPerKilometer: nil, heartRateBPM: nil,
+                                 norwegian: true, context: context))
+    }
 }

@@ -4626,6 +4626,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     /// Read only crossed rule milestones; the routine scheduler merges
     /// these with basic distance/time updates before speaking.
+    private var coachReadoutContext: ATHLTHCoachReadoutContext {
+        let rules = audioCoachConfiguration.customRules ?? []
+        return ATHLTHCoachReadoutContext.make(
+            plan: ATHLTHCoachReadoutContext.needsSegmentData(rules) ? structuredRunningWorkout : nil,
+            index: currentCoachRunningStepIndex,
+            elapsed: currentStructuredStepElapsedTime,
+            distance: currentStructuredStepDistanceMeters,
+            recorded: recordedStructuredRunSteps,
+            routeRemainingMeters: routeRemainingMeters
+        )
+    }
+
     private func evaluateCustomAudioCoachRules() -> [ATHLTHAudioCoachDueAnnouncement] {
         guard !coachSpeechPaused, kind == .running || kind == .walking else {
             return []
@@ -4642,6 +4654,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             norwegian: coachPhrase(english: "en", norwegian: "no") == "no",
             maximumHeartRateBPM: audioCoachConfiguration.smartPrompts?
                 .maximumHeartRateBPM ?? structuredRunningWorkout?.heartRateZoneMaximumBPM,
+            context: coachReadoutContext,
             lastSlots: &customAudioCoachLastSlots
         )
     }
@@ -5285,7 +5298,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
         }
 
-        if configuration.announceClockTime {
+        if configuration.announceClockTime, !metrics.contains(.clockTime) {
             let formatter = DateFormatter()
             formatter.timeStyle = .short
             formatter.dateStyle = .none
@@ -5309,7 +5322,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
 
             if configuration
-                .announceRemainingRouteDistance {
+                .announceRemainingRouteDistance, !metrics.contains(.routeRemainingDistance) {
                 parts.append(
                     coachPhrase(
                         english: "Remaining distance",
@@ -5320,7 +5333,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
 
             if configuration
-                .announceEstimatedRemainingRouteTime,
+                .announceEstimatedRemainingRouteTime, !metrics.contains(.estimatedRouteTime),
                let averageSecondsPerKilometer,
                remainingMeters > 0 {
                 let estimatedRemaining =
@@ -8177,6 +8190,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             runningStepCoachBrief: currentRunningStep?.coachBrief,
             runningStepMotivation: currentRunningStep?.intervalMotivation,
             runningCoachReport: latestRunningCoachReport,
+            coachReadoutContext: ATHLTHCoachReadoutContext.needsSegmentData(audioCoachConfiguration.customRules ?? [])
+                ? coachReadoutContext : nil,
             runningStepPhase: currentRunningStep?.phase,
             runningStepTargetHeartRateZone: currentRunningStep?.targetHeartRateZone,
             heartRateTargetZone:

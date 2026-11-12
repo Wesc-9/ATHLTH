@@ -4397,7 +4397,8 @@ final class IPhoneWorkoutStore:
         }
 
         announceFuelIfDue(workout, configuration: configuration)
-        evaluateCustomAudioCoachRules(workout, configuration: configuration)
+        let customDue = evaluateCustomAudioCoachRules(workout, configuration: configuration)
+        let customMetrics = Set(customDue.flatMap(\.metrics))
 
         var shouldAnnounce = false
         var milestoneKeys: [String] = []
@@ -4447,9 +4448,7 @@ final class IPhoneWorkoutStore:
             shouldAnnounce = true
         }
 
-        guard shouldAnnounce else {
-            return
-        }
+        guard shouldAnnounce || !customDue.isEmpty else { return }
 
         let activeStep: WatchRunningWorkoutStep? = {
             guard workout.structuredWorkoutComplete != true,
@@ -4458,15 +4457,15 @@ final class IPhoneWorkoutStore:
             else { return nil }
             return plan.steps[workout.structuredStepIndex ?? 0]
         }()
-        guard ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+        let standardAllowed = shouldAnnounce && ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
             step: activeStep,
             elapsedInStep: workout.elapsed(at: Date()) -
                 (workout.structuredStepStartElapsedTime ?? 0),
             distanceInStepMeters: workout.distanceMeters -
                 (workout.structuredStepStartDistanceMeters ?? 0)
-        ) else { return }
+        )
 
-        var parts: [String] = []
+        var parts = customDue.map(\.text)
         let norwegian =
             localizedCoachPhrase(
                 english: "en",
@@ -4474,7 +4473,7 @@ final class IPhoneWorkoutStore:
                 configuration: configuration
             ) == "no"
 
-        if configuration.announceDistance {
+        if standardAllowed, configuration.announceDistance, !customMetrics.contains(.distance) {
             parts.append(
                 String(
                     format:
@@ -4485,13 +4484,14 @@ final class IPhoneWorkoutStore:
             )
         }
 
-        if configuration.announceElapsedTime {
+        if standardAllowed, configuration.announceElapsedTime, !customMetrics.contains(.elapsedTime) {
             parts.append(
                 durationPhrase(elapsed, norwegian: norwegian)
             )
         }
 
-        if configuration.announceAveragePace,
+        if standardAllowed, configuration.announceAveragePace,
+           !customMetrics.contains(.averagePace),
            workout.distanceMeters >= 100 {
             let pace =
                 elapsed /
@@ -4505,8 +4505,8 @@ final class IPhoneWorkoutStore:
             )
         }
 
-        if configuration
-            .announceRemainingRouteDistance,
+        if standardAllowed, configuration.announceRemainingRouteDistance,
+           !customMetrics.contains(.routeRemainingDistance),
            let remaining =
                 workout.routeRemainingMeters {
             parts.append(
@@ -4524,8 +4524,8 @@ final class IPhoneWorkoutStore:
             )
         }
 
-        if configuration
-            .announceEstimatedRemainingRouteTime,
+        if standardAllowed, configuration.announceEstimatedRemainingRouteTime,
+           !customMetrics.contains(.estimatedRouteTime),
            let remaining =
                 workout.routeRemainingMeters,
            ATHLTHCoachSensorFreshness.validPace(
@@ -4542,7 +4542,7 @@ final class IPhoneWorkoutStore:
             )
         }
 
-        if configuration.announceClockTime {
+        if standardAllowed, configuration.announceClockTime, !customMetrics.contains(.clockTime) {
             parts.append(
                 Date().formatted(
                     date: .omitted,
@@ -4551,14 +4551,14 @@ final class IPhoneWorkoutStore:
             )
         }
 
-        if let activeStep,
+        if standardAllowed, let activeStep,
            let remaining = ATHLTHCoachStructuredStepSpeech.remainingSummary(
                 for: activeStep,
                 elapsedInStep: elapsed -
                     (workout.structuredStepStartElapsedTime ?? 0),
                 distanceInStepMeters: workout.distanceMeters -
                     (workout.structuredStepStartDistanceMeters ?? 0),
-                announceTime: configuration.announceRemainingStepTime,
+                announceTime: configuration.announceRemainingStepTime && !customMetrics.contains(.stepRemainingTime),
                 announceDistance: configuration.announceRemainingStepDistance,
                 norwegian: norwegian
            ) {
@@ -4569,7 +4569,7 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        if let feedback = ATHLTHCoachGoalEncouragement.phrase(
+        if standardAllowed, let feedback = ATHLTHCoachGoalEncouragement.phrase(
             style: configuration.speechStyle ?? .balanced,
             step: activeStep,
             paceSecondsPerKilometer: workout.currentPaceSecondsPerKilometer,
@@ -4591,7 +4591,9 @@ final class IPhoneWorkoutStore:
             priority: .routineCoach,
             event: ATHLTHCoachEvent(
                 kind: .routineMilestone,
-                key: milestoneKeys.joined(separator: "-"),
+                key: ATHLTHAudioCoachRuleDelivery.stableDeliveryKey(
+                    standardMilestones: milestoneKeys, customAnnouncements: customDue
+                ),
                 priority: .routineCoach,
                 validFor: 10
             )
@@ -4601,7 +4603,7 @@ final class IPhoneWorkoutStore:
     private func evaluateCustomAudioCoachRules(
         _ workout: PhoneWorkout,
         configuration: WatchAudioCoachConfiguration
-    ) {
+    ) -> [ATHLTHAudioCoachDueAnnouncement] {
         let elapsed = workout.elapsed(at: Date())
         let freshPace = ATHLTHCoachSensorFreshness.validPace(
             workout.currentPaceSecondsPerKilometer,
@@ -4612,26 +4614,24 @@ final class IPhoneWorkoutStore:
             norwegian: "no",
             configuration: configuration
         ) == "no"
-        let messages = ATHLTHAudioCoachRuleDelivery.dueMessages(
-            rules: configuration.customRules ?? [],
+        let rules = configuration.customRules ?? []
+        let context = ATHLTHCoachReadoutContext.make(
+            plan: ATHLTHCoachReadoutContext.needsSegmentData(rules) ? workout.structuredRunningWorkout : nil,
+            index: currentCoachRunningStepIndex,
+            elapsed: elapsed - (workout.structuredStepStartElapsedTime ?? 0),
+            distance: workout.distanceMeters - (workout.structuredStepStartDistanceMeters ?? 0),
+            recorded: workout.recordedRunningSteps ?? [],
+            routeRemainingMeters: workout.routeRemainingMeters
+        )
+        return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: rules,
             distanceMeters: workout.distanceMeters,
             elapsedSeconds: elapsed,
             paceSecondsPerKilometer: freshPace,
             heartRateBPM: nil,
             norwegian: norwegian,
+            context: context,
             lastSlots: &customAudioCoachLastSlots
-        )
-        guard !messages.isEmpty else { return }
-        speak(
-            messages.joined(separator: ". "),
-            configuration: configuration,
-            priority: .routineCoach,
-            event: ATHLTHCoachEvent(
-                kind: .routineMilestone,
-                key: "custom:\(Int(elapsed)):\(Int(workout.distanceMeters))",
-                priority: .routineCoach,
-                validFor: 10
-            )
         )
     }
 

@@ -1133,16 +1133,9 @@ private struct IPhoneStructuredStepCard: View {
                                                 Text(ATHLTHLocalization.choose(
                                                     english: "Step", norwegian: "Steg"
                                                 ) + " \((active.structuredStepIndex ?? 0) + 1) / \(plan.steps.count)")
+                                                    .font(.caption.weight(.semibold))
+                                                    .foregroundStyle(.secondary)
                                             }
-                                            .font(
-                                                .caption
-                                                    .weight(
-                                                        .semibold
-                                                    )
-                                            )
-                                            .foregroundStyle(
-                                                .secondary
-                                            )
                                         }
                                     }
 

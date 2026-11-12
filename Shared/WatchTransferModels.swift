@@ -1742,6 +1742,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepCoachBrief: String? = nil
     var runningStepMotivation: ATHLTHIntervalMotivationSettings? = nil
     var runningCoachReport: ATHLTHRunningCoachReport? = nil
+    var coachReadoutContext: ATHLTHCoachReadoutContext? = nil
     var runningStepPhase: String? = nil
     var runningStepTargetHeartRateZone: Int? = nil
 

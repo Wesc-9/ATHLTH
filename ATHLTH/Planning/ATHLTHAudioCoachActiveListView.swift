@@ -32,6 +32,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var ruleSetName = ""
     @State private var phraseText = ""
     @State private var newRuleTrigger: ATHLTHAudioCoachRule.Trigger = .distance
+    @State private var newRuleScope: ATHLTHAudioCoachRule.Scope = .workout
     @State private var newRuleMetric: ATHLTHAudioCoachRule.Metric = .pace
     @State private var newRuleAdditionalMetrics: [ATHLTHAudioCoachRule.Metric] = []
     @State private var newRuleInterval = 1_000
@@ -804,6 +805,10 @@ struct ATHLTHAudioCoachActiveListView: View {
                             set: { rule.additionalMetrics = $0 }
                         )
                     )
+                    ruleScopePicker(selection: Binding(
+                        get: { rule.scope ?? .workout },
+                        set: { rule.scope = $0 }
+                    ))
                     Picker(tr("When", "Utløser"), selection: $rule.trigger) {
                         ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                             Text(trigger.title).tag(trigger)
@@ -844,6 +849,7 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             multiMetricChoices(primary: newRuleMetric,
                                selected: $newRuleAdditionalMetrics)
+            ruleScopePicker(selection: $newRuleScope)
             Picker(tr("When", "Utløser"), selection: $newRuleTrigger) {
                 ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                     Text(trigger.title).tag(trigger)
@@ -863,7 +869,8 @@ struct ATHLTHAudioCoachActiveListView: View {
                     trigger: newRuleTrigger, metric: newRuleMetric, interval: newRuleInterval,
                     additionalMetrics: newRuleAdditionalMetrics.filter {
                         $0 != newRuleMetric
-                    }
+                    },
+                    scope: newRuleScope
                 ))
             } label: {
                 Label(tr("Add rule", "Legg til regel"), systemImage: "plus")
@@ -885,6 +892,10 @@ struct ATHLTHAudioCoachActiveListView: View {
                 ))
                 .tint(bronze)
 
+                ruleScopePicker(selection: Binding(
+                    get: { rule.wrappedValue.scope ?? .workout },
+                    set: { rule.wrappedValue.scope = $0 }
+                ))
                 Picker(tr("Trigger", "Utløser"), selection: rule.trigger) {
                     ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                         Text(trigger.title).tag(trigger)
@@ -952,6 +963,14 @@ struct ATHLTHAudioCoachActiveListView: View {
                     Label(tr("Delete group", "Slett gruppe"), systemImage: "trash")
                         .frame(minHeight: 44)
                 }
+            }
+        }
+    }
+
+    private func ruleScopePicker(selection: Binding<ATHLTHAudioCoachRule.Scope>) -> some View {
+        Picker(tr("Count from", "Tell fra"), selection: selection) {
+            ForEach(ATHLTHAudioCoachRule.Scope.allCases) { scope in
+                Text(scope.title).tag(scope)
             }
         }
     }

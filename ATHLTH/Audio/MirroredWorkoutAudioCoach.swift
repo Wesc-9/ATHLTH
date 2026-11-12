@@ -537,6 +537,7 @@ final class MirroredWorkoutAudioCoach:
             norwegian: phrase(english: "en", norwegian: "no") == "no",
             maximumHeartRateBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
                 configuration.smartPrompts?.maximumHeartRateBPM,
+            context: snapshot.coachReadoutContext ?? .init(routeRemainingMeters: snapshot.routeRemainingMeters),
             lastSlots: &customAudioCoachLastSlots
         )
     }
@@ -885,7 +886,7 @@ final class MirroredWorkoutAudioCoach:
         }
 
         if configuration
-            .announceClockTime {
+            .announceClockTime, !metrics.contains(.clockTime) {
             let formatter =
                 DateFormatter()
             formatter.timeStyle = .short
@@ -903,7 +904,7 @@ final class MirroredWorkoutAudioCoach:
         }
 
         if configuration
-            .announceRemainingRouteDistance,
+            .announceRemainingRouteDistance, !metrics.contains(.routeRemainingDistance),
            let remaining =
                 snapshot
                     .routeRemainingMeters {
@@ -930,7 +931,7 @@ final class MirroredWorkoutAudioCoach:
         }
 
         if configuration
-            .announceEstimatedRemainingRouteTime,
+            .announceEstimatedRemainingRouteTime, !metrics.contains(.estimatedRouteTime),
            let remaining =
                 snapshot
                     .routeRemainingMeters,
