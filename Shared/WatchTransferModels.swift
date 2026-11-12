@@ -1797,6 +1797,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningIntervalCoachCountdownSeconds: TimeInterval? = nil
     var runningNextStepTitle: String? = nil
     var runningNextStepPhase: String? = nil
+    var runningStepCoachGroupID: UUID? = nil
+    var runningNextStepCoachGroupID: UUID? = nil
     var runningStepRemainingSeconds: TimeInterval? = nil
     var runningStepRemainingMeters: Double? = nil
     var runningStepCoachBrief: String? = nil
