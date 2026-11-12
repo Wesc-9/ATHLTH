@@ -308,6 +308,71 @@ struct ATHLTHCoachBoundaryCountdownRule: Codable, Hashable, Identifiable {
 /// Longest selected countdown wins; on a tie prefer the more specific rule.
 /// Without an actual timed deadline callers must never ask for spoken numbers.
 enum ATHLTHCoachBoundaryCountdown {
+    /// Strength: only an actual timed set can trigger an ending cue. Ending
+    /// a time target does NOT mark the set as completed by the athlete.
+    static func forStrengthTimedSet(
+        _ rules: [ATHLTHCoachBoundaryCountdownRule],
+        exerciseIndex: Int, exerciseCount: Int,
+        setIndex: Int, setCount: Int
+    ) -> ATHLTHCoachBoundaryCountdownRule? {
+        guard exerciseIndex >= 0, exerciseIndex < exerciseCount,
+              setIndex >= 0, setIndex < setCount else { return nil }
+        let lastSet = setIndex == setCount - 1
+        let lastExercise = exerciseIndex == exerciseCount - 1
+        return best(rules.filter { rule in
+            guard rule.resolvedSeconds != nil, rule.boundary == .ends else { return false }
+            switch rule.scope {
+            case .step: return true
+            case .section: return lastSet
+            case .group: return false // requires a real timed group anchor
+            case .plannedWorkout: return lastSet && lastExercise
+            }
+        })
+    }
+
+    /// Strength: a finite rest deadline is also a known start for the next
+    /// set, or for the next exercise if the current one is complete.
+    static func forStrengthAfterRest(
+        _ rules: [ATHLTHCoachBoundaryCountdownRule],
+        nextExercise: Bool
+    ) -> ATHLTHCoachBoundaryCountdownRule? {
+        best(rules.filter { rule in
+            guard rule.resolvedSeconds != nil, rule.boundary == .starts else { return false }
+            switch rule.scope {
+            case .step: return true
+            case .section: return nextExercise
+            case .group: return false
+            case .plannedWorkout: return false
+            }
+        })
+    }
+
+    /// A time-capped group can have a precise spoken ending even when the
+    /// individual repetitions inside it are open-ended.
+    static func forStrengthTimedGroup(
+        _ rules: [ATHLTHCoachBoundaryCountdownRule]
+    ) -> ATHLTHCoachBoundaryCountdownRule? {
+        best(rules.filter {
+            $0.scope == .group && $0.boundary == .ends &&
+                $0.resolvedSeconds != nil
+        })
+    }
+
+    private static func best(
+        _ rules: [ATHLTHCoachBoundaryCountdownRule]
+    ) -> ATHLTHCoachBoundaryCountdownRule? {
+        let rank: [ATHLTHCoachBoundaryCountdownRule.Scope: Int] = [
+            .step: 0, .section: 1, .group: 2, .plannedWorkout: 3
+        ]
+        return rules.sorted {
+            if $0.seconds != $1.seconds { return $0.seconds > $1.seconds }
+            if rank[$0.scope] != rank[$1.scope] {
+                return (rank[$0.scope] ?? 0) > (rank[$1.scope] ?? 0)
+            }
+            return $0.id.uuidString < $1.id.uuidString
+        }.first
+    }
+
     static func forRunningStep(
         _ steps: [WatchRunningWorkoutStep],
         at index: Int,
