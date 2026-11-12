@@ -34,27 +34,22 @@ struct TrainingDataSettingsView: View {
         english: "Plan sync between devices",
         norwegian: "Plansynkronisering mellom enheter"
     )) {
-        Toggle(
-            ATHLTHLocalization.choose(
-                english: "Sync my training plans with other ATHLTH devices",
-                norwegian: "Synkroniser treningsplaner mellom ATHLTH-enheter"
-            ),
-            isOn: Binding(
-                get: { studioPlanSync.enabled },
-                set: { newValue in
-                    Task {
-                        await studioPlanSync.setEnabled(newValue, session: session)
-                    }
-                }
-            )
-        )
-        .disabled(studioPlanSync.isBusy || !session.signedIn)
         Text(ATHLTHLocalization.choose(
-            english: "Optional and off by default. When enabled, your saved plans can be stored with ATHLTH’s cloud provider (Supabase), including manually entered notes, injuries and planned places. Completed workouts, Apple Health readings, GPS traces and readiness scores are never included. Enable it separately on each device. Disabling attempts to delete remote plan copies; local plans remain.",
-            norwegian: "Valgfritt og av som standard. Når du aktiverer dette, kan lagrede treningsplaner lagres hos ATHLTHs skyleverandør (Supabase), inkludert egne notater, eventuelle skader og planlagte steder. Gjennomførte økter, Apple Health-data, GPS-spor og restitusjonsscore inngår aldri. Aktiver separat på hver enhet. Ved deaktivering forsøkes sky-kopiene slettet; lokale planer beholdes."
+            english: "Signed-in training plans sync privately across your ATHLTH devices. This service does not upload Apple Health readings, recorded workouts or GPS traces. Plan notes may contain personal information.",
+            norwegian: "Treningsplaner synkroniseres privat mellom ATHLTH-enheter når du er logget inn. Tjenesten laster ikke opp Apple Health-målinger, gjennomførte økter eller GPS-spor. Plannotater kan inneholde personopplysninger."
         ))
         .font(.footnote)
-    
+        if session.signedIn && !studioPlanSync.enabled {
+            Button {
+                Task { await studioPlanSync.acknowledgeLegacyOptOut(session: session) }
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Use account synchronization",
+                    norwegian: "Bruk kontosynkronisering"
+                ), systemImage: "checkmark.icloud")
+            }
+            .disabled(studioPlanSync.isBusy)
+        }
         Text(studioPlanSync.status)
             .font(.footnote)
         if let updated = studioPlanSync.lastSuccessfulSync {
