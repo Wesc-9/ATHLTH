@@ -140,6 +140,10 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var libraryPage: ATHLTHStudioLibraryPage?
     /// Reset pushed detail cards when switching sidebar destinations.
     @State private var detailNavigationPath = NavigationPath()
+    // Some destination-based links do not round-trip through NavigationPath.
+    // Recreating the detail stack when a sidebar item is tapped guarantees
+    // that a deep Settings/Widgets page cannot remain above the new destination.
+    @State private var detailNavigationIdentity = UUID()
     /// The right inspector is for Messages only; Activity remains in Notifications.
     @State private var showingInspector = false
     /// Secondary Studio tools also replace the detail column, not modal sheets.
@@ -283,6 +287,7 @@ struct ATHLTHiPadStudioRootView: View {
                         }
                     }
             }
+            .id(detailNavigationIdentity)
         }
         .navigationSplitViewStyle(.balanced)
         // Visible across every Studio tab while an iPhone-owned workout
@@ -353,7 +358,7 @@ struct ATHLTHiPadStudioRootView: View {
             // library selection without dismissing any modal.
             libraryPage = nil
             sidebarPage = nil
-            detailNavigationPath = NavigationPath()
+            resetDetailNavigation()
             savedDestination = destination.rawValue
             // Inbox stays docked until the user closes it; Coach is a page.
             if destination != .overview { focusedPlanningDate = nil }
@@ -590,7 +595,8 @@ struct ATHLTHiPadStudioRootView: View {
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Home", norwegian: "Hjem"),
                         symbol: "house",
-                        selected: selection == .overview && libraryPage == nil
+                        selected: selection == .overview && libraryPage == nil &&
+                            sidebarPage == nil
                     ) { openStudio(.overview) }
 
                     sidebarAction(
@@ -896,11 +902,16 @@ struct ATHLTHiPadStudioRootView: View {
         )
     }
 
+    private func resetDetailNavigation() {
+        detailNavigationPath = NavigationPath()
+        detailNavigationIdentity = UUID()
+    }
+
     private func openLibrary(_ page: ATHLTHStudioLibraryPage) {
         clearWeekInspectorIfNeeded()
         libraryExpanded = true
         focusedPlanningDate = nil
-        detailNavigationPath = NavigationPath()
+        resetDetailNavigation()
         sidebarPage = nil
         libraryPage = page
         // The selected library replaces the Studio detail page. It never
@@ -917,7 +928,7 @@ struct ATHLTHiPadStudioRootView: View {
     private func openSidebarPage(_ destination: ATHLTHSideMenuDestination) {
         clearWeekInspectorIfNeeded()
         focusedPlanningDate = nil
-        detailNavigationPath = NavigationPath()
+        resetDetailNavigation()
         libraryPage = nil
         sidebarPage = destination
         withAnimation(.easeInOut(duration: 0.18)) {
@@ -926,7 +937,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func returnFromSidebarPage() {
-        detailNavigationPath = NavigationPath()
+        resetDetailNavigation()
         libraryPage = nil
         sidebarPage = nil
         withAnimation(.easeInOut(duration: 0.18)) {
@@ -936,7 +947,7 @@ struct ATHLTHiPadStudioRootView: View {
 
     private func openStudio(_ destination: ATHLTHStudioDestination) {
         clearWeekInspectorIfNeeded()
-        detailNavigationPath = NavigationPath()
+        resetDetailNavigation()
         libraryPage = nil
         sidebarPage = nil
         selection = destination
