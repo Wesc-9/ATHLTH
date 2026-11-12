@@ -514,8 +514,17 @@ struct PlannedWorkoutWatchBuilder {
                 ))
 
                 if let recovery = block.resolvedRecovery(after: position) {
+                    // An explicitly enabled recovery Ghost implies moving recovery
+                    // unless the athlete deliberately chose standing rest.
+                    // Without this, legacy time-only rests become passive and
+                    // silently discard the user's follow-recovery preference.
+                    let followRecovery = template.intervalGhostFollowRecovery == true &&
+                        (template.intervalGhostPaceSecondsPerKilometer.map {
+                            $0.isFinite && $0 > 0
+                        } ?? false)
                     let style = block.recoveryStyle ??
-                        ((recovery.measure == .distance || recovery.intensity.paceMinSecondsPerKilometer != nil)
+                        ((followRecovery || recovery.measure == .distance ||
+                          recovery.intensity.paceMinSecondsPerKilometer != nil)
                          ? .activeJog : .passive)
                     steps.append(runningStep(
                         title: style == .activeJog
@@ -523,11 +532,9 @@ struct PlannedWorkoutWatchBuilder {
                             : ATHLTHLocalization.choose(english: "Standing rest \(position)", norwegian: "Stillestående pause \(position)"),
                         target: recovery,
                         phase: RunningBlockKind.recovery.rawValue,
-                        ghostPace: style == .activeJog && template.intervalGhostFollowRecovery == true
+                        ghostPace: style == .activeJog && followRecovery
                             ? template.intervalGhostPaceSecondsPerKilometer : nil,
-                        ghostFollowsRecovery:
-                            style == .activeJog && template.intervalGhostFollowRecovery == true &&
-                            template.intervalGhostPaceSecondsPerKilometer != nil,
+                        ghostFollowsRecovery: style == .activeJog && followRecovery,
                         slowdownPercent: template.intervalGhostRecoverySlowdownPercent,
                         recoveryStyle: style,
                         coachGroupID: block.id,
@@ -569,7 +576,9 @@ struct PlannedWorkoutWatchBuilder {
             targetPaceMinSecondsPerKilometer: passive ? nil : target.intensity.paceMinSecondsPerKilometer,
             targetPaceMaxSecondsPerKilometer: passive ? nil : target.intensity.paceMaxSecondsPerKilometer,
             phase: phase,
-            targetHeartRateZone: passive ? nil : target.intensity.heartRateZone,
+            // Preserve a zone deliberately prescribed for recovery even when
+            // the movement style is passive (only pace/incline are suppressed).
+            targetHeartRateZone: target.intensity.heartRateZone,
             targetTreadmillInclinePercent: passive ? nil : target.treadmillInclinePercent,
             ghostPaceSecondsPerKilometer: ghostPace,
             ghostFollowsRecovery: ghostFollowsRecovery,
