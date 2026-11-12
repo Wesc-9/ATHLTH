@@ -38,6 +38,10 @@ struct ATHLTHSurfaceWorkoutSnapshot: Codable, Equatable {
     var runningIntervalTotal: Int? = nil
     var runningInRecovery: Bool? = nil
     var runningStepRemainingSeconds: TimeInterval? = nil
+    // Additive so old app-group snapshots remain decodable on upgrade.
+    var strengthRestEndsAt: Date? = nil
+    var strengthSetIndex: Int? = nil
+    var strengthSetCount: Int? = nil
 }
 
 enum ATHLTHSurfaceSharedStore {
