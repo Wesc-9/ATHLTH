@@ -145,6 +145,8 @@ struct ATHLTHAudioCoachActiveListView: View {
     }
 
     private var hasAdvancedConfiguration: Bool {
+        draft.smartPrompts.intervalCountdownToRecoverySeconds != nil ||
+        draft.smartPrompts.intervalCountdownFromRecoverySeconds != nil ||
         !draft.customRules.isEmpty ||
         draft.smartPrompts.coachingMode == .custom ||
         draft.smartPrompts.preferredHeartRateZone != nil ||
