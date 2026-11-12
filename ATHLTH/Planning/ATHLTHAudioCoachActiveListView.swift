@@ -19,6 +19,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var showingProfiles = false
     @State private var editingOption: ATHLTHAudioCoachOption?
     @State private var selectedRule: SelectedRule?
+    @State private var expandedCoachGroups: Set<UUID> = []
 
     private struct SelectedRule: Identifiable {
         let id: UUID
@@ -472,15 +473,77 @@ struct ATHLTHAudioCoachActiveListView: View {
                     ) { editingOption = .motivation }
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 }
-                ForEach(draft.customRules) { rule in
-                    announcementGroupRow(
-                        title: !rule.isEnabled
-                            ? tr("Paused group", "Pauset gruppe")
-                            : rule.trigger == .distance
-                                ? tr("Every \(rule.validatedInterval) m", "Hver \(rule.validatedInterval) m")
-                                : tr("Every \(rule.validatedInterval) s", "Hvert \(rule.validatedInterval) s"),
-                        detail: rule.selectedMetrics.map(\.title).joined(separator: ", ")
-                    ) { selectedRule = SelectedRule(id: rule.id) }
+                ForEach(draft.customRules.filter(\.isEnabled)) { rule in
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                if expandedCoachGroups.contains(rule.id) {
+                                    expandedCoachGroups.remove(rule.id)
+                                } else {
+                                    expandedCoachGroups.insert(rule.id)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "waveform")
+                                    .foregroundStyle(bronze)
+                                    .frame(width: 30)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(rule.trigger == .distance
+                                         ? tr("Every \(rule.validatedInterval) m", "Hver \(rule.validatedInterval) m")
+                                         : tr("Every \(rule.validatedInterval) s", "Hvert \(rule.validatedInterval) s"))
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ink)
+                                    Text(rule.selectedMetrics.map(\.title).joined(separator: " · "))
+                                        .font(.caption)
+                                        .foregroundStyle(dim)
+                                        .lineLimit(2)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: expandedCoachGroups.contains(rule.id)
+                                      ? "chevron.up" : "chevron.down")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(dim)
+                            }
+                            .frame(minHeight: 56)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if expandedCoachGroups.contains(rule.id) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(tr("Coach will announce", "Coachen leser opp"))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(dim)
+                                ForEach(Array(rule.selectedMetrics.enumerated()), id: \.offset) { index, metric in
+                                    HStack(spacing: 10) {
+                                        Text(String(format: "%02d", index + 1))
+                                            .font(.caption.monospacedDigit())
+                                            .foregroundStyle(bronze)
+                                        Text(metric.title)
+                                            .font(.subheadline)
+                                            .foregroundStyle(ink)
+                                        Spacer()
+                                    }
+                                }
+                                HStack {
+                                    Spacer()
+                                    Button {
+                                        selectedRule = SelectedRule(id: rule.id)
+                                    } label: {
+                                        Label(tr("Edit group", "Rediger gruppe"), systemImage: "pencil")
+                                            .font(.subheadline.weight(.medium))
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(bronze)
+                                }
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 16))
+                            .padding(.bottom, 8)
+                        }
+                    }
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 }
                 ForEach(activeOptions) { option in
