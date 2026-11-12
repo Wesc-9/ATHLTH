@@ -218,4 +218,73 @@ final class ATHLTHStudioHomeWeekTests: XCTestCase {
         XCTAssertTrue(day.restDays.isEmpty)
     }
 
+    func testPlannedCountUsesCorrectNorwegianSingularAndPlural() {
+        XCTAssertEqual(
+            ATHLTHStudioHomeWeek.plannedCountLabel(0, norwegian: true),
+            "0 planlagte økter"
+        )
+        XCTAssertEqual(
+            ATHLTHStudioHomeWeek.plannedCountLabel(1, norwegian: true),
+            "1 planlagt økt"
+        )
+        XCTAssertEqual(
+            ATHLTHStudioHomeWeek.plannedCountLabel(2, norwegian: true),
+            "2 planlagte økter"
+        )
+        XCTAssertEqual(
+            ATHLTHStudioHomeWeek.plannedCountLabel(1, norwegian: false),
+            "1 planned workout"
+        )
+        XCTAssertEqual(
+            ATHLTHStudioHomeWeek.plannedCountLabel(3, norwegian: false),
+            "3 planned workouts"
+        )
+    }
+
+    func testSelectedDayRetainsScheduledStartTimeForHomeDetails() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 12, hour: 17, minute: 45
+        )))
+        let scheduled = session("Intervals", on: start)
+        let week = ATHLTHStudioHomeWeek.make(
+            plans: [], standalone: [scheduled], recorded: [],
+            now: start, calendar: calendar
+        )
+        let day = try XCTUnwrap(week.days.first {
+            calendar.isDate($0.date, inSameDayAs: start)
+        })
+        XCTAssertEqual(day.planned.count, 1)
+        XCTAssertEqual(day.planned[0].workout.title, "Intervals")
+        XCTAssertEqual(day.planned[0].workout.scheduledStart, start)
+        XCTAssertEqual(
+            calendar.dateComponents([.hour, .minute], from: day.planned[0].date),
+            DateComponents(hour: 17, minute: 45)
+        )
+    }
+
+    func testUntimedPlanDayNeverInventsClockTime() throws {
+        let defaults = try XCTUnwrap(
+            UserDefaults(suiteName: "ATHLTHStudioUntimed.\(UUID().uuidString)")
+        )
+        let store = AppSessionStore(defaults: defaults)
+        let monday = ATHLTHStudioHomeWeek.weekRange(containing: .now).start
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Untimed", summary: "", weekCount: 1,
+            startDate: monday
+        ))
+        store.addSession(
+            session("Run", on: nil),
+            toDay: plan.weeks[0].days[0].id,
+            inPlan: plan.id
+        )
+        let saved = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let week = ATHLTHStudioHomeWeek.make(
+            plans: [saved], standalone: [], recorded: [], now: monday
+        )
+        let entry = try XCTUnwrap(week.days[0].planned.first)
+        XCTAssertNil(entry.workout.scheduledStart)
+    }
+
 }
