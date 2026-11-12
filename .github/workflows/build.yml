@@ -107,6 +107,7 @@ on:
       - release/v2.1.6
       - release/v2.1.7
       - release/v2.1.8
+      - release/v2.1.9
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
