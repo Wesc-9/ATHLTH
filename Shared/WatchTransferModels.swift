@@ -588,12 +588,25 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
         return seconds
     }
     var resolvedIntervalCountdownToRecovery: Int? {
-        guard let seconds = intervalCountdownToRecoverySeconds, (1...30).contains(seconds) else { return nil }
+        guard let seconds = intervalCountdownToRecoverySeconds ??
+            smartPrompts?.intervalCountdownToRecoverySeconds,
+            (1...30).contains(seconds) else { return nil }
         return seconds
     }
     var resolvedIntervalCountdownFromRecovery: Int? {
-        guard let seconds = intervalCountdownFromRecoverySeconds, (1...30).contains(seconds) else { return nil }
+        guard let seconds = intervalCountdownFromRecoverySeconds ??
+            smartPrompts?.intervalCountdownFromRecoverySeconds,
+            (1...30).contains(seconds) else { return nil }
         return seconds
+    }
+
+    var resolvedIntervalAfterCountdownToRecovery: ATHLTHCoachCountdownAfter {
+        intervalAfterCountdownToRecovery ??
+            smartPrompts?.intervalAfterCountdownToRecovery ?? .shortAlert
+    }
+    var resolvedIntervalAfterCountdownFromRecovery: ATHLTHCoachCountdownAfter {
+        intervalAfterCountdownFromRecovery ??
+            smartPrompts?.intervalAfterCountdownFromRecovery ?? .nextStep
     }
 
     var resolvedStrengthRestCountdownSeconds: Int {
