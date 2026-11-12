@@ -176,6 +176,8 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     var intervalCountdownFromRecoverySeconds: Int? = nil
     var intervalAfterCountdownToRecovery: ATHLTHCoachCountdownAfter? = nil
     var intervalAfterCountdownFromRecovery: ATHLTHCoachCountdownAfter? = nil
+    // User-authored countdowns at step, section, group and planned-workout boundaries.
+    var boundaryCountdownRules: [ATHLTHCoachBoundaryCountdownRule]? = nil
 
     var resolvedBelowZoneRepeat: TimeInterval {
         TimeInterval(min(max(belowZoneRepeatSeconds ?? 180, 60), 900))
