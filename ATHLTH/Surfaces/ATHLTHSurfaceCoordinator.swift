@@ -145,9 +145,14 @@ enum ATHLTHSurfaceCoordinator {
             lastSnapshotWriteAt = Date()
         }
 
+        // Native timers continue ticking without new data, but distance,
+        // heart rate and step labels need periodic WidgetKit refreshes.
+        // Throttle to protect battery and avoid excessive reload requests.
+        let refreshSeconds: TimeInterval =
+            surfaceSnapshot.activeWorkout == nil ? 300 : 45
         let shouldReloadForAge =
             lastWidgetReloadAt.map {
-                Date().timeIntervalSince($0) >= 300
+                Date().timeIntervalSince($0) >= refreshSeconds
             } ?? true
 
         if surfaceChanged ||
