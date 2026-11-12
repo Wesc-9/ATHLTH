@@ -228,3 +228,34 @@ enum ATHLTHCoachSecondCountdown {
         return number
     }
 }
+
+
+/// Running/walking recovery speech is configured solely in Audio Coach.
+/// An explicit numbers-only selection suppresses the legacy step announcement.
+enum ATHLTHCoachRecoveryBoundary {
+    static func afterAction(
+        finishedPhase: String?,
+        nextPhase: String?,
+        configuration: WatchAudioCoachConfiguration
+    ) -> ATHLTHCoachCountdownAfter? {
+        if finishedPhase == "work", nextPhase == "recovery",
+           configuration.resolvedIntervalCountdownToRecovery != nil {
+            return configuration.resolvedIntervalAfterCountdownToRecovery
+        }
+        if finishedPhase == "recovery",
+           configuration.resolvedIntervalCountdownFromRecovery != nil {
+            return configuration.resolvedIntervalAfterCountdownFromRecovery
+        }
+        return nil
+    }
+
+    static func shortMessage(
+        finishedPhase: String?,
+        norwegian: Bool
+    ) -> String {
+        if finishedPhase == "work" {
+            return norwegian ? "Pausen starter." : "Recovery starts."
+        }
+        return norwegian ? "Pausen er ferdig." : "Recovery complete."
+    }
+}
