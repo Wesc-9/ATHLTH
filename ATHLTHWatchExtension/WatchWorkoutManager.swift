@@ -1782,6 +1782,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        let scopedRest = ATHLTHCoachBoundaryCountdown.forStrengthAfterRest(
+            audioCoachConfiguration.effectiveBoundaryCountdownRules,
+            nextExercise: snapshot.currentExerciseComplete
+        )
         let countdownSeconds =
             audioCoachConfiguration
                 .resolvedStrengthRestCountdownSeconds
@@ -1813,7 +1817,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     return
                 }
 
-                if let length = self.audioCoachConfiguration.resolvedStrengthCountdownFromRest {
+                if let length = scopedRest?.resolvedSeconds ??
+                    self.audioCoachConfiguration.resolvedStrengthCountdownFromRest {
                     var previousNumber: Int?
                     while !Task.isCancelled {
                         guard self.strengthSession?.workoutID == snapshot.workoutID,
@@ -1882,8 +1887,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 var norwegianParts:
                     [String] = []
 
-                let after = self.audioCoachConfiguration.resolvedStrengthCountdownFromRest == nil
-                    ? nil : (self.audioCoachConfiguration.strengthAfterCountdownFromRest ?? .nextStep)
+                let after = scopedRest?.after ?? (
+                    self.audioCoachConfiguration.resolvedStrengthCountdownFromRest == nil
+                        ? nil : (self.audioCoachConfiguration.strengthAfterCountdownFromRest ?? .nextStep)
+                )
                 if after == nil
                     ? self.audioCoachConfiguration.shouldAnnounceStrengthRestComplete
                     : after != .numbersOnly {
@@ -4491,9 +4498,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               let snapshot = strengthSession,
               snapshot.inputMode != .iPhone,
               !snapshot.isResting, !snapshot.currentExerciseComplete,
-              let length = audioCoachConfiguration.resolvedStrengthCountdownToRest,
               let countdown = snapshot.timedSetCountdown,
               countdown.isRunning else { return }
+        let scoped = ATHLTHCoachBoundaryCountdown.forStrengthTimedSet(
+            audioCoachConfiguration.effectiveBoundaryCountdownRules,
+            exerciseIndex: snapshot.exerciseIndex,
+            exerciseCount: snapshot.exerciseCount,
+            setIndex: snapshot.setIndex,
+            setCount: snapshot.setCount
+        )
+        guard let length = scoped?.resolvedSeconds ??
+                audioCoachConfiguration.resolvedStrengthCountdownToRest else { return }
         let now = Date()
         let remaining = countdown.remaining(at: now)
         let identity = "strength-work:\(snapshot.workoutID):\(snapshot.exerciseIndex):\(snapshot.setIndex)"
@@ -4512,6 +4527,48 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     /// Running and walking recoveries use the existing structured-step clock.
     /// The next phase must be known; distance/open stages never invent an ETA.
+    /// Only anchored, time-limited group modes support an exact end.
+    /// EMOM has a fixed slot length and total round/station count; AMRAP has
+    /// a single overall clock. Untimed supersets and circuits do not qualify.
+    private func evaluateCriticalStrengthGroupCountdown() {
+        guard kind == .strength, state == .running,
+              let snapshot = strengthSession,
+              let rule = ATHLTHCoachBoundaryCountdown.forStrengthTimedGroup(
+                  audioCoachConfiguration.effectiveBoundaryCountdownRules
+              ),
+              let started = snapshot.strengthModeStartedAt,
+              let unitSeconds = snapshot.strengthModeClockSeconds,
+              unitSeconds.isFinite, unitSeconds > 0
+        else { return }
+
+        let duration: TimeInterval
+        switch snapshot.strengthModeRaw {
+        case "amrap":
+            duration = unitSeconds
+        case "emom":
+            guard let rounds = snapshot.strengthModeTotalRounds,
+                  let stations = snapshot.strengthModeStationCount,
+                  rounds > 0, stations > 0 else { return }
+            duration = Double(rounds * stations) * unitSeconds
+        default:
+            return
+        }
+        let deadline = started.addingTimeInterval(duration)
+        let identity = "strength-group:\(snapshot.workoutID):\(started.timeIntervalSince1970)"
+        let previous = countdownNumberKey.flatMap { key -> Int? in
+            guard key.hasPrefix(identity + ":") else { return nil }
+            return Int(key.split(separator: ":").last ?? "")
+        }
+        guard let number = ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: deadline.timeIntervalSinceNow,
+            length: rule.seconds, previousNumber: previous
+        ) else { return }
+        speakCriticalCountdown(
+            number, deadline: deadline, identity: identity,
+            captureOnWatch: true
+        )
+    }
+
     private func evaluateCriticalRunningRecoveryCountdown() {
         guard (kind == .running || kind == .walking),
               state == .running, !awaitingMainStart,
@@ -4581,6 +4638,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
                 self.evaluateIndoorSuggestion(now: Date())
                 self.evaluateCriticalCountToStrengthRest()
+                self.evaluateCriticalStrengthGroupCountdown()
                 self.evaluateCriticalRunningRecoveryCountdown()
                 self.announceStrengthEMOMMinuteIfDue(now: Date())
                 self.recordRunningMinuteIfDue()
