@@ -283,26 +283,29 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        titleRow(expanded: split)
-
-                        activePlanSummary
-                        weekCard(week, width: width)
-                        ATHLTHStudioGhostHomeStatusView().id(session.profile.userID)
-                        ATHLTHStudioStrengthHomeStatusView().id(session.profile.userID)
-                        let activeDay = week.days.first {
-                            Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
-                        }
+                    VStack(alignment: .leading, spacing: split ? 20 : 16) {
+                        // Home is one cohesive workspace. The current form
+                        // belongs at the top right, never below the week or
+                        // alongside the selected-day schedule.
                         if split {
-                            HStack(alignment: .top, spacing: 24) {
-                                selectedDayPanel(activeDay).frame(maxWidth: .infinity)
+                            HStack(alignment: .top, spacing: 18) {
+                                titleRow(expanded: true)
+                                    .frame(maxWidth: .infinity)
                                 compactReadinessCard
-                                    .frame(width: min(360, max(250, (min(width, 1500) - 68) / 3)))
+                                    .frame(width: min(390, max(310, width * 0.30)))
                             }
                         } else {
-                            selectedDayPanel(activeDay)
+                            titleRow(expanded: false)
                             compactReadinessCard
                         }
+
+                        activePlanSummary
+                        // The selected day's full schedule is INSIDE the
+                        // weekly card, immediately below its summary.
+                        weekCard(week, width: width)
+
+                        ATHLTHStudioGhostHomeStatusView().id(session.profile.userID)
+                        ATHLTHStudioStrengthHomeStatusView().id(session.profile.userID)
                         ATHLTHStudioHomeCommunitySummary()
                         progressCard(wide: split, recorded: workouts, week: week)
                     }
@@ -419,28 +422,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint(tr("Open your training plan", "Åpne treningsplanen din"))
-    }
-
-    private func selectedDayPanel(_ day: ATHLTHStudioHomeWeek.Day?) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(Calendar.current.isDateInToday(selectedDate)
-                 ? tr("Today's training", "Dagens trening")
-                 : selectedDate.formatted(.dateTime.weekday(.wide).day().month()))
-                .font(.system(size: 25, weight: .medium, design: .serif))
-                .foregroundStyle(ink)
-                .accessibilityAddTraits(.isHeader)
-            if let day, !day.planned.isEmpty || !day.recorded.isEmpty {
-                selectedDayWorkouts(day)
-            } else {
-                Label(weekSelectionSummary(day), systemImage: "leaf")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 12)
-            }
-        }
-        .padding(22)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var planCard: some View {
