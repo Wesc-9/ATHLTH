@@ -106,6 +106,11 @@ struct StrengthAudioCoachConfiguration:
     var announceWorkoutStatus = false
     var workoutStatusIntervalMinutes = 15
     var restCountdownSeconds = 10
+    // Optional strength-only second-by-second speech controls.
+    var spokenCountdownToRestSeconds: Int? = nil
+    var spokenCountdownFromRestSeconds: Int? = nil
+    var afterCountdownToRest: ATHLTHCoachCountdownAfter? = nil
+    var afterCountdownFromRest: ATHLTHCoachCountdownAfter? = nil
 
     var shouldAnnounceNextSetDetails: Bool {
         announceNextSetDetails ?? true
@@ -124,6 +129,16 @@ struct StrengthAudioCoachConfiguration:
             return nil
         }
         return count
+    }
+
+    var resolvedCountdownToRest: Int? {
+        guard let value = spokenCountdownToRestSeconds, (1...30).contains(value) else { return nil }
+        return value
+    }
+
+    var resolvedCountdownFromRest: Int? {
+        guard let value = spokenCountdownFromRestSeconds, (1...30).contains(value) else { return nil }
+        return value
     }
 
     var watchConfiguration:
@@ -177,6 +192,10 @@ struct StrengthAudioCoachConfiguration:
         configuration.announceStrengthExerciseComplete = shouldAnnounceExerciseComplete
         configuration.strengthMotivationEverySets = resolvedMotivationEveryCompletedSets
         configuration.strengthPersonalMotivationPhrase = personalMotivationPhrase
+        configuration.strengthCountdownToRestSeconds = resolvedCountdownToRest
+        configuration.strengthCountdownFromRestSeconds = resolvedCountdownFromRest
+        configuration.strengthAfterCountdownToRest = afterCountdownToRest
+        configuration.strengthAfterCountdownFromRest = afterCountdownFromRest
         configuration
             .strengthStatusIntervalSeconds =
             announceWorkoutStatus
