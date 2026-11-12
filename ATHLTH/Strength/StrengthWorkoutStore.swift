@@ -4507,6 +4507,23 @@ final class StrengthWorkoutStore: ObservableObject {
         return false
     }
 
+    /// Edits only this live, iPhone-owned strength session.
+    /// Watch-owned sessions receive their settings at workout launch.
+    /// This never modifies saved defaults or any other sport's coach.
+    func updateActiveAudioCoachConfiguration(
+        _ coach: StrengthAudioCoachConfiguration
+    ) {
+        guard var workout = activeWorkout, workout.captureDevice == .iPhone else {
+            return
+        }
+        var advanced = workout.advancedConfiguration ??
+            StrengthAdvancedConfiguration.savedDefaults()
+        guard advanced.audioCoach != coach else { return }
+        advanced.audioCoach = coach
+        workout.advancedConfiguration = advanced
+        activeWorkout = workout
+    }
+
     func enableAdvancedTracking() {
         guard var workout = activeWorkout else {
             return
