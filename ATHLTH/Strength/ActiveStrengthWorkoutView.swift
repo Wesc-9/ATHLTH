@@ -1458,9 +1458,16 @@ struct ActiveStrengthWorkoutView: View {
 
         let coachConfiguration =
             configuration.audioCoach
+        let nextIndex = strength.currentExerciseIndex + 1
+        let currentGroupID = strength.currentExercise?.groupID
+        let upcomingGroupID = workout.exercises.indices.contains(nextIndex)
+            ? workout.exercises[nextIndex].groupID : nil
+        let nextGroup = strength.currentExerciseAllSetsCompleted &&
+            upcomingGroupID != nil && upcomingGroupID != currentGroupID
         let scopedRest = ATHLTHCoachBoundaryCountdown.forStrengthAfterRest(
             coachConfiguration.boundaryCountdownRules ?? [],
-            nextExercise: strength.currentExerciseAllSetsCompleted
+            nextExercise: strength.currentExerciseAllSetsCompleted,
+            nextGroup: nextGroup
         )
         let countdownSeconds =
             coachConfiguration
