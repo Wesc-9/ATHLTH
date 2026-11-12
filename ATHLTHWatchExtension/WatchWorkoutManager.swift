@@ -4516,19 +4516,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard (kind == .running || kind == .walking),
               state == .running, !awaitingMainStart,
               !structuredWorkoutComplete,
-              let current = currentStructuredRunningStep,
-              let next = nextStructuredRunningStep,
-              current.measure == .time,
-              let duration = current.durationSeconds, duration > 0
+              let steps = structuredRunningWorkout?.steps,
+              steps.indices.contains(structuredStepIndex)
         else { return }
-        let length: Int?
-        if current.phase == "work", next.phase == "recovery" {
-            length = audioCoachConfiguration.resolvedIntervalCountdownToRecovery
-        } else if current.phase == "recovery" {
-            length = audioCoachConfiguration.resolvedIntervalCountdownFromRecovery
-        } else {
-            return
-        }
+        let current = steps[structuredStepIndex]
+        guard current.measure == .time,
+              let duration = current.durationSeconds, duration > 0 else { return }
+
+        let scoped = ATHLTHCoachBoundaryCountdown.forRunningStep(
+            steps, at: structuredStepIndex, configuration: audioCoachConfiguration
+        )
+        let next = steps.indices.contains(structuredStepIndex + 1)
+            ? steps[structuredStepIndex + 1] : nil
+        let legacyLength: Int? =
+            current.phase == "work" && next?.phase == "recovery"
+                ? audioCoachConfiguration.resolvedIntervalCountdownToRecovery
+                : current.phase == "recovery"
+                    ? audioCoachConfiguration.resolvedIntervalCountdownFromRecovery
+                    : nil
+        guard let length = scoped?.resolvedSeconds ?? legacyLength else { return }
+
         let remaining = duration - currentStructuredStepElapsedTime
         let identity = "running:\(startedAt?.timeIntervalSince1970 ?? 0):\(structuredStepIndex)"
         let previous = countdownNumberKey.flatMap { key -> Int? in
@@ -5174,18 +5181,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard workout.steps.indices.contains(nextIndex) else {
             structuredWorkoutComplete = true
             WKInterfaceDevice.current().play(.success)
-            if audioCoachConfiguration.enabled &&
-                audioCoachConfiguration.announceCurrentWorkoutStep {
-                speak(
-                    coachPhrase(
-                        english:
-                            "Structured workout complete. Continue easy or finish your workout when ready.",
-                        norwegian:
-                            "Den strukturerte økten er fullført. Fortsett rolig eller avslutt økten når du er klar."
-                    ),
-                    priority:
-                        .structuredStep
-                )
+            let scoped = ATHLTHCoachBoundaryCountdown.forRunningStep(
+                workout.steps, at: finishedIndex, configuration: audioCoachConfiguration
+            )
+            if audioCoachConfiguration.enabled,
+               scoped?.after != .numbersOnly,
+               (scoped != nil || audioCoachConfiguration.announceCurrentWorkoutStep) {
+                let norwegian = coachPhrase(english: "en", norwegian: "no") == "no"
+                let message = scoped?.after == .shortAlert
+                    ? ATHLTHCoachBoundaryCountdown.shortMessage(
+                        for: scoped!, norwegian: norwegian
+                      )
+                    : coachPhrase(
+                        english: "Structured workout complete. Continue easy or finish your workout when ready.",
+                        norwegian: "Den strukturerte økten er fullført. Fortsett rolig eller avslutt økten når du er klar."
+                      )
+                speak(message, priority: .structuredStep)
             }
             return
         }
@@ -5225,7 +5236,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             }
         } else {
-            let action = ATHLTHCoachRecoveryBoundary.afterAction(
+            let scoped = ATHLTHCoachBoundaryCountdown.forRunningStep(
+                workout.steps, at: finishedIndex, configuration: audioCoachConfiguration
+            )
+            let action = scoped?.after ?? ATHLTHCoachRecoveryBoundary.afterAction(
                 finishedPhase: finishedStep?.phase,
                 nextPhase: workout.steps[nextIndex].phase,
                 configuration: audioCoachConfiguration
@@ -5245,7 +5259,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                             english: "en", norwegian: "no"
                         ) == "no"
                         self.speak(
-                            ATHLTHCoachRecoveryBoundary.shortMessage(
+                            scoped.map {
+                                ATHLTHCoachBoundaryCountdown.shortMessage(
+                                    for: $0, norwegian: norwegian
+                                )
+                            } ?? ATHLTHCoachRecoveryBoundary.shortMessage(
                                 finishedPhase: finishedStep?.phase,
                                 norwegian: norwegian
                             ),
