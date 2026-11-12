@@ -771,6 +771,7 @@ struct ProductRootTabView: View {
         .fullScreenCover(item: $sideMenuFullScreenDestination) { destination in
             ATHLTHSideMenuDeepLinkView(destination: destination)
         }
+        .environmentObject(goalAccountSync)
     }
 
     private func selectFromSideMenu(_ destination: ATHLTHSideMenuDestination) {
