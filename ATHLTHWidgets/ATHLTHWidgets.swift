@@ -273,6 +273,7 @@ private struct ATHLTHHomeWidgetView: View {
         }
     }
 
+    @ViewBuilder
     private func activeWorkoutView(
         _ workout: ATHLTHSurfaceWorkoutSnapshot
     ) -> some View {
@@ -716,6 +717,7 @@ private struct ATHLTHLockScreenWidgetView: View {
         }
     }
 
+    @ViewBuilder
     private var circular: some View {
         if let workout = entry.snapshot.activeWorkout {
             VStack(spacing: 2) {
@@ -751,6 +753,7 @@ private struct ATHLTHLockScreenWidgetView: View {
         }
     }
 
+    @ViewBuilder
     private var inline: some View {
         if let workout = entry.snapshot.activeWorkout {
             Label {
