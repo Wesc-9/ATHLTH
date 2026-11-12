@@ -12,6 +12,11 @@ struct ATHLTHCloudGoal: Codable, Equatable, Identifiable {
     var id: UUID { goal.id }
 }
 
+struct ATHLTHCloudGoalDocument: Codable, Equatable {
+    let goals: [ATHLTHCloudGoal]
+    let measurements: [ATHLTHBodyMeasurement]
+}
+
 /// Three-way reconciliation: independent edits on different devices merge.
 /// Concurrent changes to the same goal are held as conflicts rather than
 /// silently overwriting either copy. Removal is treated as an actual edit.
@@ -58,6 +63,37 @@ enum ATHLTHGoalMergePolicy {
         return Result(merged: merged, conflictingIDs: conflicts)
     }
 
+    struct MeasurementResult {
+        let merged: [ATHLTHBodyMeasurement]
+        let conflictingIDs: [UUID]
+    }
+
+    static func reconcileMeasurements(
+        base: [ATHLTHBodyMeasurement],
+        local: [ATHLTHBodyMeasurement],
+        remote: [ATHLTHBodyMeasurement]
+    ) -> MeasurementResult {
+        let b = Dictionary(base.map { ($0.id, $0) }, uniquingKeysWith: { old, _ in old })
+        let l = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { old, _ in old })
+        let r = Dictionary(remote.map { ($0.id, $0) }, uniquingKeysWith: { old, _ in old })
+        var merged: [ATHLTHBodyMeasurement] = []
+        var conflicts: [UUID] = []
+        for id in Set(b.keys).union(l.keys).union(r.keys)
+            .sorted(by: { $0.uuidString < $1.uuidString }) {
+            let chosen: ATHLTHBodyMeasurement?
+            if l[id] == r[id] { chosen = l[id] }
+            else if l[id] == b[id] { chosen = r[id] }
+            else if r[id] == b[id] { chosen = l[id] }
+            else { conflicts.append(id); continue }
+            if let chosen { merged.append(chosen) }
+        }
+        return MeasurementResult(merged: merged, conflictingIDs: conflicts)
+    }
+
+    static func ordered(_ values: [ATHLTHBodyMeasurement]) -> [ATHLTHBodyMeasurement] {
+        values.sorted { $0.id.uuidString < $1.id.uuidString }
+    }
+
     static func ordered(_ items: [ATHLTHCloudGoal]) -> [ATHLTHCloudGoal] {
         items.sorted { $0.id.uuidString < $1.id.uuidString }
     }
@@ -71,6 +107,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
     @Published private(set) var status = ""
     @Published private(set) var isSyncing = false
     @Published private(set) var conflictingGoalIDs: [UUID] = []
+    @Published private(set) var conflictingMeasurementIDs: [UUID] = []
     @Published private(set) var lastSuccessfulSync: Date?
 
     private struct RemoteDocument: Decodable {
@@ -86,6 +123,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
     private struct Acknowledgement: Codable {
         let revision: Int64
         let goals: [ATHLTHCloudGoal]
+        let measurements: [ATHLTHBodyMeasurement]
     }
 
     private static var activeAccounts = Set<UUID>()
@@ -101,6 +139,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
         accountID = userID
         isSyncing = false
         conflictingGoalIDs = []
+        conflictingMeasurementIDs = []
         lastSuccessfulSync = nil
         acknowledgement = userID.flatMap {
             AccountLocalStorage.read(
@@ -141,7 +180,9 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
         }
 
         let capturedLocalGoals = goals.goals
+        let capturedMeasurements = ATHLTHTrainingProfile.load(userID: userID).measurements
         let baseItems = acknowledgement?.goals ?? []
+        let baseMeasurements = acknowledgement?.measurements ?? []
         do {
             let localItems = try Self.capture(
                 goals: capturedLocalGoals, baseline: baseItems, from: goals
@@ -156,13 +197,21 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                   client.auth.currentUser?.id == userID else { return }
 
             let remoteRevision = rows.first?.revision ?? 0
-            let remoteItems = try rows.first.map { try Self.decode($0.body_base64) } ?? []
+            let document = try rows.first.map { try Self.decode($0.body_base64) }
+                ?? ATHLTHCloudGoalDocument(goals: [], measurements: [])
+            let remoteItems = document.goals
+            let remoteMeasurements = document.measurements
             let result = ATHLTHGoalMergePolicy.reconcile(
                 base: baseItems, local: localItems, remote: remoteItems
             )
+            let measurementResult = ATHLTHGoalMergePolicy.reconcileMeasurements(
+                base: baseMeasurements, local: capturedMeasurements, remote: remoteMeasurements
+            )
 
-            guard result.conflictingIDs.isEmpty else {
+            guard result.conflictingIDs.isEmpty,
+                  measurementResult.conflictingIDs.isEmpty else {
                 conflictingGoalIDs = result.conflictingIDs
+                conflictingMeasurementIDs = measurementResult.conflictingIDs
                 status = ATHLTHLocalization.choose(
                     english: "Some goals were edited on both devices. Both copies are preserved; review the conflict before overwriting.",
                     norwegian: "Noen mål er endret på begge enheter. Begge kopier er beholdt; kontroller konflikten før noe overskrives."
@@ -171,15 +220,20 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
             }
 
             // Local goals could change while the remote request is pending.
-            guard goals.goals == capturedLocalGoals else {
+            guard goals.goals == capturedLocalGoals,
+                  ATHLTHTrainingProfile.load(userID: userID).measurements == capturedMeasurements else {
                 scheduleSync(session: session, goals: goals)
                 return
             }
             let merged = ATHLTHGoalMergePolicy.ordered(result.merged)
+            let mergedMeasurements = ATHLTHGoalMergePolicy.ordered(measurementResult.merged)
             let remote = ATHLTHGoalMergePolicy.ordered(remoteItems)
+            let remoteMeasurementsSorted = ATHLTHGoalMergePolicy.ordered(remoteMeasurements)
 
-            if merged != remote {
-                let encoded = try Self.encode(merged)
+            if merged != remote || mergedMeasurements != remoteMeasurementsSorted {
+                let encoded = try Self.encode(ATHLTHCloudGoalDocument(
+                    goals: merged, measurements: mergedMeasurements
+                ))
                 let savedRevision: Int64 = try await client
                     .rpc(
                         "athlth_save_goal_document",
@@ -193,23 +247,34 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 guard accountID == userID, session.profile.userID == userID,
                       client.auth.currentUser?.id == userID else { return }
                 saveAcknowledgement(
-                    goals: merged, revision: savedRevision, userID: userID
+                    goals: merged, measurements: mergedMeasurements,
+                    revision: savedRevision, userID: userID
                 )
             } else {
                 saveAcknowledgement(
-                    goals: remote, revision: remoteRevision, userID: userID
+                    goals: remote, measurements: remoteMeasurementsSorted,
+                    revision: remoteRevision, userID: userID
                 )
             }
 
             // Do not replace a more recent edit made during the upload.
-            guard goals.goals == capturedLocalGoals else {
+            guard goals.goals == capturedLocalGoals,
+                  ATHLTHTrainingProfile.load(userID: userID).measurements == capturedMeasurements else {
                 scheduleSync(session: session, goals: goals)
                 return
             }
             if merged != ATHLTHGoalMergePolicy.ordered(localItems) {
                 try applySnapshot(merged, previous: localItems, to: goals, accountID: userID)
             }
+            if mergedMeasurements != ATHLTHGoalMergePolicy.ordered(capturedMeasurements) {
+                var profile = ATHLTHTrainingProfile.load(userID: userID)
+                profile.measurements = mergedMeasurements
+                profile.updatedAt = .now
+                profile.save(userID: userID)
+                NotificationCenter.default.post(name: .athlthTrainingDataDidChange, object: nil)
+            }
             conflictingGoalIDs = []
+            conflictingMeasurementIDs = []
             lastSuccessfulSync = .now
             status = ATHLTHLocalization.choose(
                 english: "Your goals are synchronized.",
@@ -225,10 +290,12 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
     }
 
     private func saveAcknowledgement(
-        goals: [ATHLTHCloudGoal], revision: Int64, userID: UUID
+        goals: [ATHLTHCloudGoal], measurements: [ATHLTHBodyMeasurement],
+        revision: Int64, userID: UUID
     ) {
         guard accountID == userID else { return }
-        let state = Acknowledgement(revision: revision, goals: goals)
+        let state = Acknowledgement(revision: revision, goals: goals,
+                                    measurements: measurements)
         acknowledgement = state
         AccountLocalStorage.write(
             state, name: "goalAccountSyncAcknowledgement", userID: userID
@@ -273,23 +340,27 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
         }
     }
 
-    private static func encode(_ items: [ATHLTHCloudGoal]) throws -> String {
+    private static func encode(_ document: ATHLTHCloudGoalDocument) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let bytes = try encoder.encode(items)
+        let bytes = try encoder.encode(document)
         guard bytes.count <= 6_200_000 else { throw GoalAccountSyncError.tooLarge }
         return bytes.base64EncodedString()
     }
 
-    private static func decode(_ body: String) throws -> [ATHLTHCloudGoal] {
+    private static func decode(_ body: String) throws -> ATHLTHCloudGoalDocument {
         guard let bytes = Data(base64Encoded: body) else {
             throw GoalAccountSyncError.invalidRemoteDocument
         }
-        let items = try JSONDecoder().decode([ATHLTHCloudGoal].self, from: bytes)
-        guard Set(items.map(\.id)).count == items.count else {
+        let document = try JSONDecoder().decode(ATHLTHCloudGoalDocument.self, from: bytes)
+        guard Set(document.goals.map(\.id)).count == document.goals.count,
+              Set(document.measurements.map(\.id)).count == document.measurements.count else {
             throw GoalAccountSyncError.invalidRemoteDocument
         }
-        return ATHLTHGoalMergePolicy.ordered(items)
+        return ATHLTHCloudGoalDocument(
+            goals: ATHLTHGoalMergePolicy.ordered(document.goals),
+            measurements: ATHLTHGoalMergePolicy.ordered(document.measurements)
+        )
     }
 
     private func applySnapshot(
