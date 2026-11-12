@@ -965,10 +965,26 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
     }
 
+    // Resolve by stable rule ID on every access. A sheet can outlive its row
+    // while SwiftUI finishes dismissing it after a deletion.
+    private func ruleBinding(for id: UUID) -> Binding<ATHLTHAudioCoachRule>? {
+        guard let initial = draft.customRules.first(where: { $0.id == id }) else {
+            return nil
+        }
+        return Binding(
+            get: { draft.customRules.first(where: { $0.id == id }) ?? initial },
+            set: { updated in
+                guard let index = draft.customRules.firstIndex(where: { $0.id == id }) else {
+                    return
+                }
+                draft.customRules[index] = updated
+            }
+        )
+    }
+
     @ViewBuilder
     private func ruleGroupEditor(_ id: UUID) -> some View {
-        if let index = draft.customRules.firstIndex(where: { $0.id == id }) {
-            let rule = $draft.customRules[index]
+        if let rule = ruleBinding(for: id) {
             editorCard {
                 Toggle(tr("Active", "Aktiv"), isOn: Binding(
                     get: { rule.wrappedValue.isEnabled },
