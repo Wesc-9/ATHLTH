@@ -10629,6 +10629,7 @@ struct ATHLTHProfileView: View {
         } content: {
             LazyVStack(spacing: 12) {
                 trophyCabinetSection
+                ATHLTHPrivateGoalsProfileCard()
                 personalRecordsSection
                 gearSection
                 ATHLTHPetProfileSection()
