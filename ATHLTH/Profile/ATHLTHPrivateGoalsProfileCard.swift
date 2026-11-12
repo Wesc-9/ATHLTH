@@ -72,6 +72,16 @@ struct ATHLTHPrivateGoalsProfileCard: View {
                 )
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.ink)
+            } else if goalAccountSync.lastSyncError != nil {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Waiting for account sync. Your goals are saved on this device.",
+                        norwegian: "Venter på kontosynkronisering. Målene er lagret på denne enheten."
+                    ),
+                    systemImage: "icloud.slash"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             } else if goalAccountSync.isSyncing {
                 Label(
                     ATHLTHLocalization.choose(
