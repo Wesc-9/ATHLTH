@@ -4266,7 +4266,7 @@ final class IPhoneWorkoutStore:
                         norwegian: "Oppvarming avsluttet. Start hoveddelen når du er klar.",
                         configuration: workout.audioCoachConfiguration ?? .disabled
                     ),
-                    configuration: workout.audioCoachConfiguration,
+                    configuration: audioConfiguration,
                     priority: .structuredStep
                 )
             }
@@ -4286,6 +4286,7 @@ final class IPhoneWorkoutStore:
         if recoveryAction == .shortAlert {
             // Let number "1" finish before the short phase announcement.
             let sessionID = workout.id
+            let audioConfiguration = workout.audioCoachConfiguration
             Task { @MainActor [weak self] in
                 do { try await Task.sleep(for: .milliseconds(650)) }
                 catch { return }
@@ -4293,7 +4294,7 @@ final class IPhoneWorkoutStore:
                       self.active?.structuredStepIndex == nextIndex else { return }
                 let norwegian = self.localizedCoachPhrase(
                     english: "en", norwegian: "no",
-                    configuration: workout.audioCoachConfiguration
+                    configuration: audioConfiguration
                 ) == "no"
                 self.speak(
                     scoped.map {
