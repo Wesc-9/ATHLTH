@@ -310,6 +310,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(surface.title)
                             .font(.headline)
+                            .lineLimit(2)
                             .foregroundStyle(ATHLTHTheme.primaryText)
 
                         Text(surface.subtitle)
@@ -322,6 +323,8 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
 
                     Text(surface.statusTitle)
                         .font(.caption2.weight(.bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 6)
@@ -344,13 +347,13 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
         case .homeScreen:
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Label("Recovery", systemImage: "heart.fill")
+                    Label(tr("Recovery", "Restitusjon"), systemImage: "heart.fill")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     Text("82")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(ATHLTHTheme.primaryText)
-                    Text("Good")
+                    Text(tr("Good", "God"))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                 }
@@ -377,7 +380,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                     .font(.headline)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Outdoor Run")
+                    Text(tr("Outdoor run", "Utendørsløping"))
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.76))
                     Text("32:18")
@@ -416,7 +419,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                         in: Circle()
                     )
 
-                Text("“What’s my recovery today?”")
+                Text(tr("“What’s my recovery today?”", "«Hvordan er formen min i dag?»"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
@@ -437,7 +440,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                     Text("9:41")
                         .font(.system(size: 30, weight: .medium, design: .rounded))
                         .monospacedDigit()
-                    Text("Recovery 82")
+                    Text(tr("Recovery 82", "Restitusjon 82"))
                         .font(.caption.weight(.semibold))
                 }
 
@@ -445,7 +448,7 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                     .frame(height: 38)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("In progress", systemImage: "figure.run")
+                    Label(tr("In progress", "Pågående økt"), systemImage: "figure.run")
                         .font(.caption)
                     Text("32:18")
                         .font(.headline.weight(.bold))
@@ -479,12 +482,12 @@ struct ATHLTHWidgetsAndSurfacesSettingsView: View {
                 .foregroundStyle(ATHLTHTheme.accentDeep)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Available in iOS")
+                Text(tr("Available in iOS", "Tilgjengelig i iOS"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
                 Text(
-                    "Add ATHLTH from the Home Screen or Lock Screen widget gallery. Live Activity starts automatically for supported active workouts when Live Activities are allowed in iOS. ATHLTH recovery, next-workout and goal actions are available to Siri and the Shortcuts app."
+                    tr("Add ATHLTH using the Home Screen or Lock Screen widget gallery. Supported workouts can show a Live Activity when iOS permissions allow it. Siri and Shortcuts provide ATHLTH actions.", "Legg til ATHLTH fra widgetgalleriet på Hjem-skjermen eller låseskjermen. Støttede treningsøkter kan vise Live Activity når iOS-tillatelser er aktivert. ATHLTH-handlinger er tilgjengelige i Siri og Snarveier.")
                 )
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -513,37 +516,37 @@ private enum ATHLTHExternalSurface: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .homeScreen:
-            return "Home Screen Widget"
+            return ATHLTHLocalization.choose(english: "Home Screen widget", norwegian: "Hjem-skjermwidget")
         case .liveActivity:
             return "Live Activity"
         case .siriShortcuts:
-            return "Siri & Shortcuts"
+            return ATHLTHLocalization.choose(english: "Siri & Shortcuts", norwegian: "Siri og Snarveier")
         case .lockScreen:
-            return "Lock Screen"
+            return ATHLTHLocalization.choose(english: "Lock Screen", norwegian: "Låseskjerm")
         }
     }
 
     var statusTitle: String {
         switch self {
         case .homeScreen, .lockScreen:
-            return "Ready"
+            return ATHLTHLocalization.choose(english: "Ready", norwegian: "Klar")
         case .liveActivity:
-            return "Automatic"
+            return ATHLTHLocalization.choose(english: "Automatic", norwegian: "Automatisk")
         case .siriShortcuts:
-            return "Available"
+            return ATHLTHLocalization.choose(english: "Available", norwegian: "Tilgjengelig")
         }
     }
 
     var subtitle: String {
         switch self {
         case .homeScreen:
-            return "Recovery, your next session and key insights at a glance."
+            return ATHLTHLocalization.choose(english: "Recovery, your next session and key insights at a glance.", norwegian: "Restitusjon, neste økt og viktige treningssignaler i én oversikt.")
         case .liveActivity:
-            return "Follow an active workout from the Lock Screen and Dynamic Island."
+            return ATHLTHLocalization.choose(english: "Follow an active workout from the Lock Screen and Dynamic Island.", norwegian: "Følg økten direkte fra låseskjermen og Dynamic Island.")
         case .siriShortcuts:
-            return "Ask for recovery, your next workout and goal progress with Siri or Shortcuts."
+            return ATHLTHLocalization.choose(english: "Ask Siri about recovery, upcoming workouts and goals.", norwegian: "Bruk Siri og Snarveier til å spørre om restitusjon, økter og mål.")
         case .lockScreen:
-            return "Surface recovery, the next session and live workout status without opening the app."
+            return ATHLTHLocalization.choose(english: "See recovery, your next session and live activity without opening the app.", norwegian: "Se restitusjon, neste økt og pågående aktivitet uten å åpne appen.")
         }
     }
 
