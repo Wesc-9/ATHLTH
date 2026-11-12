@@ -718,37 +718,70 @@ private struct ATHLTHLockScreenWidgetView: View {
     }
 
     private var circular: some View {
-        Gauge(
-            value:
-                Double(
-                    entry.snapshot.recoveryScore ?? 0
-                ),
-            in: 0...100
-        ) {
-            Image(systemName: "heart.fill")
-        } currentValueLabel: {
-            Text(
-                entry.snapshot.recoveryScore
-                    .map(String.init) ?? "—"
-            )
-            .font(.caption.weight(.bold))
+        if let workout = entry.snapshot.activeWorkout {
+            VStack(spacing: 2) {
+                Image(systemName: workout.systemImage)
+                    .font(.caption2)
+                if let current = workout.runningIntervalOrdinal,
+                   let total = workout.runningIntervalTotal, total > 1 {
+                    Text("\(min(max(current, 1), total))/\(total)")
+                        .font(.caption.weight(.bold))
+                        .monospacedDigit()
+                } else if let count = workout.strengthSetCount,
+                          let current = workout.strengthSetIndex, count > 0 {
+                    Text("\(min(max(current, 1), count))/\(count)")
+                        .font(.caption.weight(.bold))
+                        .monospacedDigit()
+                } else {
+                    Text(workout.state == "paused" ? "PAUSE" : "LIVE")
+                        .font(.system(size: 9, weight: .bold))
+                }
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            Gauge(
+                value: Double(entry.snapshot.recoveryScore ?? 0),
+                in: 0...100
+            ) {
+                Image(systemName: "heart.fill")
+            } currentValueLabel: {
+                Text(entry.snapshot.recoveryScore.map(String.init) ?? "—")
+                    .font(.caption.weight(.bold))
+            }
+            .gaugeStyle(.accessoryCircular)
         }
-        .gaugeStyle(.accessoryCircular)
     }
 
     private var inline: some View {
-        if let workout =
-            entry.snapshot.activeWorkout {
-            Label(
-                "\(workout.title) · \(duration(workout.elapsedTime))",
-                systemImage: workout.systemImage
-            )
+        if let workout = entry.snapshot.activeWorkout {
+            Label {
+                HStack(spacing: 4) {
+                    Text(ATHLTHWidgetPresentationPolicy.intervalLabel(
+                        ordinal: workout.runningIntervalOrdinal,
+                        total: workout.runningIntervalTotal,
+                        isRecovery: workout.runningInRecovery == true
+                    ) ?? workout.title)
+                        .lineLimit(1)
+
+                    if workout.state == "paused" {
+                        Text(ATHLTHWidgetPresentationPolicy.duration(
+                            workout.elapsedTime
+                        ))
+                    } else {
+                        Text(ATHLTHWidgetPresentationPolicy.elapsedAnchor(
+                            updatedAt: workout.updatedAt,
+                            elapsedSeconds: workout.elapsedTime
+                        ), style: .timer)
+                            .monospacedDigit()
+                    }
+                }
+            } icon: {
+                Image(systemName: workout.systemImage)
+            }
         } else {
             Label {
                 Text("Recovery") +
-                Text(
-                    " \(entry.snapshot.recoveryScore.map(String.init) ?? "—")"
-                )
+                Text(" \(entry.snapshot.recoveryScore.map(String.init) ?? "—")")
             } icon: {
                 Image(systemName: "heart.fill")
             }
@@ -772,14 +805,31 @@ private struct ATHLTHLockScreenWidgetView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .lineLimit(1)
                     Spacer(minLength: 2)
-                    if let ordinal = workout.runningIntervalOrdinal,
-                       let total = workout.runningIntervalTotal, total > 1 {
-                        Text("\(ordinal)/\(total)")
+                    if let label = ATHLTHWidgetPresentationPolicy.intervalLabel(
+                        ordinal: workout.runningIntervalOrdinal,
+                        total: workout.runningIntervalTotal,
+                        isRecovery: workout.runningInRecovery == true
+                    ) {
+                        Text(label)
                             .font(.system(size: 10, weight: .bold))
                             .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
-                if let remaining, remaining.isFinite, remaining >= 0 {
+                if let restEnd = workout.strengthRestEndsAt, !paused {
+                    if restEnd > entry.date {
+                        Text(timerInterval: workout.updatedAt...restEnd,
+                             countsDown: true, showsHours: false)
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    } else {
+                        Text("KLAR")
+                            .font(.system(size: 23, weight: .bold, design: .rounded))
+                    }
+                } else if let remaining, remaining.isFinite, remaining >= 0 {
                     if paused {
                         Text(duration(remaining))
                             .font(.system(size: 26, weight: .bold, design: .rounded))
@@ -801,8 +851,10 @@ private struct ATHLTHLockScreenWidgetView: View {
                         .font(.system(size: 26, weight: .bold, design: .rounded))
                         .monospacedDigit()
                 }
-                if workout.distanceMeters > 0 {
-                    Text(distance(workout.distanceMeters))
+                if let distance = ATHLTHWidgetPresentationPolicy.distanceLabel(
+                    workout.distanceMeters
+                ) {
+                    Text(distance)
                         .font(.system(size: 10, weight: .medium))
                         .lineLimit(1)
                 }
@@ -834,25 +886,14 @@ private struct ATHLTHLockScreenWidgetView: View {
         }
     }
 
-    private func duration(
-        _ seconds: TimeInterval
-    ) -> String {
-        let total = max(Int(seconds), 0)
-        return String(
-            format: "%d:%02d",
-            total / 60,
-            total % 60
-        )
+    private func duration(_ seconds: TimeInterval) -> String {
+        ATHLTHWidgetPresentationPolicy.duration(seconds)
     }
 
-    private func distance(
-        _ meters: Double
-    ) -> String {
-        String(
-            format: "%.1f km",
-            meters / 1000
-        )
+    private func distance(_ meters: Double) -> String {
+        ATHLTHWidgetPresentationPolicy.distanceLabel(meters) ?? "—"
     }
+
 }
 
 /// iOS 27 can place two Live Activities side by side with reduced width.
