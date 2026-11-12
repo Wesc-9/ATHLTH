@@ -46,6 +46,8 @@ struct ActiveStrengthWorkoutView: View {
         Task<Void, Never>?
     @State private var lastPreRestCountdownSetID: UUID?
     @State private var lastPreRestCountdownNumber: Int?
+    @State private var lastPreRestScopedCountdown: ATHLTHCoachBoundaryCountdownRule?
+    @State private var lastStrengthGroupCountdownKey: String?
     @State private var statusCoachTask:
         Task<Void, Never>?
     @State private var focusedExerciseMediaIndex = 0
@@ -625,6 +627,7 @@ struct ActiveStrengthWorkoutView: View {
                     strength.advanceEmbeddedIntervalIfNeeded(at: timestamp)
                 }
                 announceCountdownIntoStrengthRestIfDue(at: timestamp)
+                announceTimedStrengthGroupCountdownIfDue(at: timestamp)
             }
             .onChange(
                 of:
@@ -1330,28 +1333,73 @@ struct ActiveStrengthWorkoutView: View {
               workout.captureDevice == .iPhone,
               let configuration = workout.advancedConfiguration?.audioCoach,
               configuration.enabled,
-              let length = configuration.resolvedCountdownToRest,
               let countdown = strength.timedSetCountdown,
-              countdown.isRunning,
-              strength.restEndsAt == nil
+              countdown.isRunning, strength.restEndsAt == nil,
+              let exercise = strength.currentExercise
         else {
             lastPreRestCountdownSetID = nil
             lastPreRestCountdownNumber = nil
+            lastPreRestScopedCountdown = nil
             return
         }
         if lastPreRestCountdownSetID != countdown.setID {
             lastPreRestCountdownSetID = countdown.setID
             lastPreRestCountdownNumber = nil
+            lastPreRestScopedCountdown = nil
         }
+        let scoped = ATHLTHCoachBoundaryCountdown.forStrengthTimedSet(
+            configuration.boundaryCountdownRules ?? [],
+            exerciseIndex: strength.currentExerciseIndex,
+            exerciseCount: workout.exercises.count,
+            setIndex: strength.currentSetIndex,
+            setCount: exercise.sets.count
+        )
+        guard let length = scoped?.resolvedSeconds ??
+                configuration.resolvedCountdownToRest else { return }
         let remaining = countdown.remaining(at: now)
         guard let number = ATHLTHCoachSecondCountdown.dueNumber(
             remaining: remaining, length: length,
             previousNumber: lastPreRestCountdownNumber
         ) else { return }
         lastPreRestCountdownNumber = number
+        lastPreRestScopedCountdown = scoped
         strengthCoach.speakCountdownSecond(
             number, deadline: now.addingTimeInterval(remaining),
             configuration: configuration
+        )
+    }
+
+    /// An AMRAP group has one real wall-clock deadline. For an ordinary
+    /// circuit/superset or open repetitions no estimated group end is voiced.
+    @MainActor
+    private func announceTimedStrengthGroupCountdownIfDue(at now: Date) {
+        guard let workout = strength.activeWorkout,
+              workout.captureDevice == .iPhone,
+              let config = workout.advancedConfiguration?.audioCoach,
+              config.enabled,
+              let exercise = strength.currentExercise,
+              exercise.groupStyle == .amrap,
+              let started = exercise.groupStartedAt,
+              let duration = exercise.groupClockSeconds,
+              duration.isFinite, duration > 0,
+              let rule = ATHLTHCoachBoundaryCountdown.forStrengthTimedGroup(
+                  config.boundaryCountdownRules ?? []
+              ),
+              let length = rule.resolvedSeconds
+        else { return }
+        let deadline = started.addingTimeInterval(duration)
+        let identity = "strength-group:\(workout.id):\(started.timeIntervalSince1970)"
+        let previous = lastStrengthGroupCountdownKey.flatMap { key -> Int? in
+            guard key.hasPrefix(identity + ":") else { return nil }
+            return Int(key.split(separator: ":").last ?? "")
+        }
+        guard let number = ATHLTHCoachSecondCountdown.dueNumber(
+            remaining: deadline.timeIntervalSince(now),
+            length: length, previousNumber: previous
+        ) else { return }
+        lastStrengthGroupCountdownKey = "\(identity):\(number)"
+        strengthCoach.speakCountdownSecond(
+            number, deadline: deadline, configuration: config
         )
     }
 
@@ -1378,6 +1426,10 @@ struct ActiveStrengthWorkoutView: View {
 
         let coachConfiguration =
             configuration.audioCoach
+        let scopedRest = ATHLTHCoachBoundaryCountdown.forStrengthAfterRest(
+            coachConfiguration.boundaryCountdownRules ?? [],
+            nextExercise: strength.currentExerciseAllSetsCompleted
+        )
         let countdownSeconds =
             coachConfiguration
                 .restCountdownSeconds
@@ -1392,8 +1444,10 @@ struct ActiveStrengthWorkoutView: View {
             )
 
         if coachConfiguration.enabled {
-            let action = coachConfiguration.resolvedCountdownToRest == nil
-                ? nil : (coachConfiguration.afterCountdownToRest ?? .shortAlert)
+            let action = lastPreRestScopedCountdown?.after ?? (
+                coachConfiguration.resolvedCountdownToRest == nil
+                    ? nil : (coachConfiguration.afterCountdownToRest ?? .shortAlert)
+            )
             let shouldAnnounce = action == nil
                 ? coachConfiguration.announceRestStarted
                 : action != .numbersOnly
@@ -1411,7 +1465,7 @@ struct ActiveStrengthWorkoutView: View {
 
         restCueTask =
             Task { @MainActor in
-                if let duration = coachConfiguration.resolvedCountdownFromRest {
+                if let duration = scopedRest?.resolvedSeconds ?? coachConfiguration.resolvedCountdownFromRest {
                     // Re-evaluate the absolute rest deadline at 120 ms cadence.
                     // Busy audio never queues a late number: missing ticks are skipped.
                     var previousNumber: Int? = nil
@@ -1485,8 +1539,10 @@ struct ActiveStrengthWorkoutView: View {
                     var norwegianParts:
                         [String] = []
 
-                    let after = coachConfiguration.resolvedCountdownFromRest == nil
-                        ? nil : (coachConfiguration.afterCountdownFromRest ?? .nextStep)
+                    let after = scopedRest?.after ?? (
+                        coachConfiguration.resolvedCountdownFromRest == nil
+                            ? nil : (coachConfiguration.afterCountdownFromRest ?? .nextStep)
+                    )
                     if after == nil
                         ? coachConfiguration.announceRestComplete
                         : after != .numbersOnly {
