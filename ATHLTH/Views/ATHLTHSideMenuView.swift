@@ -200,7 +200,7 @@ struct ATHLTHSideMenuView: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(menuInk)
-                        .frame(width: 26, height: 28)
+                        .frame(width: 32, height: 32)
                         .background(menuCard, in: Circle())
                         .overlay(Circle().strokeBorder(warmDivider, lineWidth: 1))
                         .frame(width: 36, height: 36)
@@ -568,7 +568,7 @@ struct ATHLTHSideMenuView: View {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(menuBronze)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 26, height: 28)
                         .background(menuSurface, in: RoundedRectangle(cornerRadius: 10))
                         .accessibilityHidden(true)
 
