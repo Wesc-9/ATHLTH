@@ -114,6 +114,37 @@ final class ATHLTHDetailedIntervalBuilderTests: XCTestCase {
         ) ?? -1, 50, accuracy: 0.001)
     }
 
+    func testGhostFollowRecoveryRespectsExplicitStandingRest() {
+        var plan = template()
+        plan.intervalGhostPaceSecondsPerKilometer = 300
+        plan.intervalGhostFollowRecovery = true
+        plan.blocks[1].recoveryStyle = .passive
+
+        let steps = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: plan, routeAlerts: .standard
+        ).steps
+        let recovery = steps[2]
+        XCTAssertEqual(recovery.recoveryStyle, .passive)
+        XCTAssertNotEqual(recovery.ghostFollowsRecovery, true)
+        XCTAssertNil(recovery.ghostPaceSecondsPerKilometer)
+        XCTAssertFalse(ATHLTHIntervalGhostPacer.followsRecovery(
+            step: recovery, observedPaceSecondsPerKilometer: 420
+        ))
+    }
+
+    func testPassiveRecoveryPreservesUserChosenHeartRateZoneOnWatch() {
+        var plan = template()
+        plan.blocks[1].recoveryStyle = .passive
+        plan.blocks[1].recovery?.intensity.heartRateZone = 2
+
+        let steps = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: plan, routeAlerts: .standard
+        ).steps
+        XCTAssertEqual(steps[2].recoveryStyle, .passive)
+        XCTAssertEqual(steps[2].targetHeartRateZone, 2)
+        XCTAssertNil(steps[2].targetPaceMinSecondsPerKilometer)
+    }
+
     func testWarmupCooldownAndIndividualEffortTargetsReachWatch() {
         let warm = RunningIntensityTarget(
             kind: .pace, paceMinSecondsPerKilometer: 420,
