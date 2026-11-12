@@ -167,12 +167,16 @@ struct ATHLTHSettingsView: View {
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 12)
-                .frame(maxWidth: 700)
                 .frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .toolbar(.hidden, for: .navigationBar)
+        // Keep the enclosing iPad Studio sidebar and its navigation active
+        // while the user opens nested settings and widget pages.
+        .toolbar(
+            UIDevice.current.userInterfaceIdiom == .pad ? .visible : .hidden,
+            for: .navigationBar
+        )
         .sheet(isPresented: $showingMembership) {
             SubscriptionOfferView {
                 showingMembership = false
@@ -530,7 +534,6 @@ struct ATHLTHSettingsView: View {
             .padding(.horizontal, 18)
             .padding(.top, 22)
             .padding(.bottom, 32)
-            .frame(maxWidth: 700)
             .frame(maxWidth: .infinity)
         }
         .background(settingsBackground)
@@ -1146,7 +1149,6 @@ settingsSection(ATHLTHLocalization.choose(
             .padding(.horizontal, 18)
             .padding(.top, 22)
             .padding(.bottom, 34)
-            .frame(maxWidth: 700)
             .frame(maxWidth: .infinity)
         }
         .background(settingsBackground)
