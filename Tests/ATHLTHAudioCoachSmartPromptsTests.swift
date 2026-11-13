@@ -3,6 +3,26 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAudioCoachSmartPromptsTests: XCTestCase {
+    func testZoneWarningTimingSupportsOneMinuteIntervalsAndOldProfiles() throws {
+        var settings = ATHLTHAudioCoachSmartSettings()
+        XCTAssertEqual(settings.resolvedTargetZoneGrace, 10)
+        XCTAssertEqual(settings.resolvedTargetZoneRepeat, 120)
+
+        settings.targetZoneGraceSeconds = 5
+        settings.targetZoneRepeatSeconds = 30
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(
+            ATHLTHAudioCoachSmartSettings.self, from: data
+        )
+        XCTAssertEqual(decoded.resolvedTargetZoneGrace, 5)
+        XCTAssertEqual(decoded.resolvedTargetZoneRepeat, 30)
+
+        settings.targetZoneGraceSeconds = -5
+        settings.targetZoneRepeatSeconds = 10_000
+        XCTAssertEqual(settings.resolvedTargetZoneGrace, 5)
+        XCTAssertEqual(settings.resolvedTargetZoneRepeat, 600)
+    }
+
     func testMotivationIsOptInAndDoesNotRepeatWithinOneSlot() {
         var state = ATHLTHAudioCoachSmartState()
         var config = ATHLTHAudioCoachSmartSettings()
