@@ -1056,17 +1056,6 @@ struct PostWorkoutReviewView: View {
 
                     reflectionCard
 
-                    sectionLabel(
-                        "ATHLTH REPLAY",
-                        subtitle:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "A quick look back at how the session unfolded.",
-                                norwegian:
-                                    "Et raskt tilbakeblikk på hvordan økten utviklet seg."
-                            )
-                    )
-
                     ATHLTHWorkoutReplayCard(
                         workout: workout,
                         context: replayContext
