@@ -17,7 +17,6 @@ struct MirroredWorkoutLiveView: View {
     @State private var showingTreadmillInclineEditor = false
     @State private var treadmillInclineDraft = 0.0
     @State private var coachOutputName: String?
-    @State private var showingAIConversation = false
     @State private var showingAddRunningWorkout = false
     @State private var showingAddStrengthWorkout = false
     @State private var showingStrengthExerciseLibrary = false
@@ -110,11 +109,6 @@ struct MirroredWorkoutLiveView: View {
                         showingAddStrengthWorkout = true
                     }
                 }
-                Button(ATHLTHLocalization.choose(
-                    english: "Talk to AI Coach", norwegian: "Snakk med AI Coach"
-                )) {
-                    showingAIConversation = true
-                }
                 if mirroring.canReplayMirroredCoachMessage {
                     Button(ATHLTHLocalization.choose(
                         english: "Replay last coach message",
@@ -178,13 +172,6 @@ struct MirroredWorkoutLiveView: View {
                 )
             }
             .environmentObject(runningLibrary)
-        }
-        .sheet(isPresented: $showingAIConversation) {
-            ATHLTHGroqVoiceCoachView(source: .mirroredWatchWorkout)
-                .environmentObject(settings)
-                .environmentObject(mirroring)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
         }
         .sheet(
             isPresented:
