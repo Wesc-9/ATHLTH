@@ -318,8 +318,12 @@ struct PlannedWorkoutWatchBuilder {
             let pace = block.targetPaceSecondsPerKilometer
             return WatchRunningWorkoutStep(
                 id: UUID(), title: block.title, measure: measure,
-                distanceMeters: measure == .distance ? block.distanceMeters : nil,
-                durationSeconds: measure == .time ? block.durationSeconds : nil,
+                // Preserve both authored targets even when the selected
+                // completion criterion is time OR distance. Some terrain
+                // plans prescribe a time cap and a distance benchmark.
+                // The Watch engine still completes by the explicit measure.
+                distanceMeters: block.distanceMeters,
+                durationSeconds: block.durationSeconds,
                 intensityText: block.targetText,
                 targetPaceMinSecondsPerKilometer: pace,
                 targetPaceMaxSecondsPerKilometer: pace,
