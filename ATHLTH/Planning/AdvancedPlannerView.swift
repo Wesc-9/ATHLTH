@@ -6928,11 +6928,11 @@ struct SessionEditorView: View {
                     initialTitle: title,
                     initialBlocks: workoutPlanningPreviewBlocks,
                     initialRouteID: selectedRouteID,
-                    initialExtras: currentWorkoutPlannerExtras,
                     initialQuickAdd: workoutBlocks.isEmpty &&
                         plannedExercises.isEmpty &&
                         selectedRunningWorkouts.isEmpty
                         ? scratchQuickAdd : nil,
+                    initialExtras: currentWorkoutPlannerExtras,
                     draftContext: "session-scratch.\(session.profile.userID.uuidString).\(scratchTimelineDraftID.uuidString)",
                     resumeSavedScratchDraft: scratchResumingSavedComposer,
                     plannedDate: scheduledTime,
