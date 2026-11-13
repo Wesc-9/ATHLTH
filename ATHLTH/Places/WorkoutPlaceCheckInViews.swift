@@ -305,7 +305,7 @@ struct WorkoutPlaceCheckInSection: View {
             }
 
             Text(
-                placeTR("ATHLTH stores the Apple Place ID, not a separate copy of the venue address. Place check-ins are private unless you explicitly choose to share them later.", "ATHLTH lagrer stedets Apple-ID, ikke en egen kopi av adressen. Innsjekkinger er private med mindre du velger å dele dem senere.")
+                placeTR("ATHLTH stores the Apple Maps place ID. A manually selected training place is private and is not proof of attendance.", "ATHLTH lagrer stedets Apple Maps-ID. Et manuelt valgt treningssted er privat og bekrefter ikke fysisk oppmøte.")
             )
             .font(.caption2)
             .foregroundStyle(
@@ -373,12 +373,12 @@ struct WorkoutPlaceCheckInSection: View {
             )
 
         if count == 1 {
-            return placeTR("First workout here", "Første økt her")
+            return placeTR("First registered workout with this place", "Første økt registrert med dette stedet")
         }
 
         return ATHLTHLocalization.choose(
-            english: "\(count) workouts here",
-            norwegian: "\(count) økter her"
+            english: "\(count) workouts assigned to this place",
+            norwegian: "\(count) økter registrert med dette stedet"
         )
     }
 }
