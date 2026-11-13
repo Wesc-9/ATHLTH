@@ -35,6 +35,22 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     var runningOverallProgress: Double? = nil
     var routeTitle: String? = nil
     var ghostRaceTitle: String? = nil
+    var ghostDistanceDeltaMeters: Double? = nil
+    var ghostTimeDeltaSeconds: Double? = nil
+    var runningSteps: [ATHLTHLiveWorkoutStage]? = nil
+    var runningStepIndex: Int? = nil
+    var runningStepCount: Int? = nil
+    var runningStepRemainingMeters: Double? = nil
+    var routeProgressPercent: Double? = nil
+    var routeRemainingMeters: Double? = nil
+    var strengthSetNumber: Int? = nil
+    var strengthSetTotal: Int? = nil
+    var strengthReps: Int? = nil
+    var strengthWeightKilograms: Double? = nil
+    var strengthRestEndsAt: Date? = nil
+    var strengthExercises: [ATHLTHLiveStrengthExercise]? = nil
+    var paceIsTreadmillTarget: Bool? = nil
+    var spotifyPlaying: Bool? = nil
 
     var id: UUID { sessionID }
     var symbol: String {
@@ -221,7 +237,23 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 completedSets: log.totalCompletedSets,
                 totalSets: log.exercises.reduce(0) { $0 + $1.sets.count },
                 capturedAt: .now,
-                sourceDevice: "iphone"
+                sourceDevice: log.captureDevice == .appleWatch
+                    ? "watch" : "iphone",
+                strengthSetNumber: strength.currentSet?.setNumber,
+                strengthSetTotal: strength.currentExercise?.sets.count,
+                strengthReps: strength.currentSet?.plannedReps,
+                strengthWeightKilograms:
+                    strength.currentSet?.plannedWeightKilograms,
+                strengthRestEndsAt: strength.restEndsAt,
+                strengthExercises: log.exercises.prefix(30).enumerated().map {
+                    index, entry in
+                    ATHLTHLiveStrengthExercise(
+                        index: index,
+                        name: entry.exercise.displayName,
+                        completedSets: entry.sets.filter(\.isCompleted).count,
+                        totalSets: entry.sets.count
+                    )
+                }
             )
         }
         if let run = phone.active {
@@ -259,8 +291,16 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     ? remaining : nil,
                 capturedAt: .now,
                 sourceDevice: "iphone",
-                currentPaceSecondsPerKilometer:
-                    run.currentPaceSecondsPerKilometer,
+                currentPaceSecondsPerKilometer: {
+                    if run.runEnvironment == .treadmill {
+                        guard let speed = run.treadmillSpeedKilometersPerHour,
+                              speed > 0 else { return nil }
+                        return 3_600 / speed
+                    }
+                    return ATHLTHPhoneRunEnvironmentPolicy.isIndoor(
+                        run.runEnvironment
+                    ) ? nil : run.currentPaceSecondsPerKilometer
+                }(),
                 targetPaceSecondsPerKilometer:
                     current?.targetPaceMinSecondsPerKilometer,
                 targetHeartRateZone: current?.targetHeartRateZone,
@@ -270,7 +310,39 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     return min(1, max(0, 1 - remaining / target))
                 }(),
                 routeTitle: run.plannedRouteTitle,
-                ghostRaceTitle: run.ghostRaceTitle
+                ghostRaceTitle: run.ghostRaceTitle,
+                ghostDistanceDeltaMeters: run.ghostDistanceDeltaMeters,
+                ghostTimeDeltaSeconds: run.ghostTimeDeltaSeconds,
+                runningSteps: steps.enumerated().map { index, step in
+                    ATHLTHLiveWorkoutStage(
+                        index: index,
+                        title: step.title,
+                        phase: step.phase,
+                        durationSeconds: step.durationSeconds,
+                        distanceMeters: step.distanceMeters
+                    )
+                },
+                runningStepIndex: steps.isEmpty ? nil : index,
+                runningStepCount: steps.isEmpty ? nil : steps.count,
+                runningStepRemainingMeters: current?.distanceMeters.map {
+                    max(0, $0 - max(0, run.distanceMeters -
+                        (run.structuredStepStartDistanceMeters ??
+                         run.distanceMeters)))
+                },
+                runningOverallProgress: {
+                    guard !steps.isEmpty, steps.indices.contains(index),
+                          let seconds = current?.durationSeconds,
+                          seconds > 0, let remaining else { return nil }
+                    return ATHLTHRunningStepEngine.overallProgress(
+                        steps: steps,
+                        index: index,
+                        currentStepProgress:
+                            min(1, max(0, 1 - remaining / seconds))
+                    )
+                }(),
+                routeProgressPercent: run.routeProgressPercent,
+                routeRemainingMeters: run.routeRemainingMeters,
+                paceIsTreadmillTarget: run.runEnvironment == .treadmill
             )
         }
         if let watch = mirroredWatch.snapshot,
@@ -318,7 +390,19 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 runningStepProgress: watch.runningStepProgress,
                 runningOverallProgress: watch.runningOverallProgress,
                 routeTitle: watch.routeTitle,
-                ghostRaceTitle: watch.ghostRaceTitle
+                ghostRaceTitle: watch.ghostRaceTitle,
+                ghostDistanceDeltaMeters: watch.ghostDistanceDeltaMeters,
+                ghostTimeDeltaSeconds: watch.ghostTimeDeltaSeconds,
+                runningStepIndex: watch.runningStepIndex,
+                runningStepCount: watch.runningStepCount,
+                runningStepRemainingMeters: watch.runningStepRemainingMeters,
+                routeProgressPercent: watch.routeProgressPercent,
+                routeRemainingMeters: watch.routeRemainingMeters,
+                strengthSetNumber: watch.strengthSetIndex.map { $0 + 1 },
+                strengthSetTotal: watch.strengthSetCount,
+                strengthReps: watch.strengthReps,
+                strengthWeightKilograms: watch.strengthWeightKilograms,
+                strengthRestEndsAt: watch.strengthRestEndsAt
             )
         }
         return nil
