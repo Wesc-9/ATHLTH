@@ -134,6 +134,11 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
             ATHLTHWorkoutStepTargetSummary.highlightedZones(for: recoveries[0]),
             Set([1])
         )
+        let overview = ATHLTHSimpleWorkoutOutline.stages(for: sourceBlocks)
+        let main = try XCTUnwrap(overview.first { $0.phase == .main })
+        XCTAssertTrue(main.items.contains {
+            $0.detail.contains("Z5") && $0.detail.contains("Z1")
+        })
     }
 
     @MainActor
