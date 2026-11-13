@@ -421,14 +421,12 @@ enum ATHLTHZonedPlanLibrary {
                 durationSeconds: effectiveDuration,
                 isRunning: !isCycling
             )
-            let notes: [String] = [
-                copy.instructions,
-                step.vmaPercent.map { ATHLTHLocalization.choose(english: "VMA target: \($0) %", norwegian: "VMA-mål: \($0) %") },
-                step.intensityType.map { ATHLTHLocalization.choose(english: "Pace intensity: \($0)", norwegian: "Fartsintensitet: \($0)") },
-                step.elevationGainM.map { ATHLTHLocalization.choose(english: "Elevation gain: \($0) m", norwegian: "Høydemeter: \($0) m") },
-                step.gradientPercent.map { ATHLTHLocalization.choose(english: "Gradient: \($0) %", norwegian: "Stigning: \($0) %") },
-                step.terrainType.map { ATHLTHLocalization.choose(english: "Terrain: \($0)", norwegian: "Terreng: \(ATHLTHZonedLocalization.text($0))") }
-            ].compactMap { $0 }
+            // Source percentages, hill grade, altitude and terrain are
+            // separate executable/inspectable targets, never "hidden" in
+            // the combined instructions. The prose only retains coaching.
+            let instructions = copy.instructions.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
             let zone = step.zone.flatMap(zonePrescription)
             var block = WorkoutTemplateBlock(
                 sequence: result.count + 1,
@@ -441,7 +439,7 @@ enum ATHLTHZonedPlanLibrary {
                 durationSeconds: effectiveDuration,
                 targetWeightKilograms: nil,
                 loadNote: nil,
-                notes: notes.isEmpty ? nil : notes.joined(separator: " · "),
+                notes: instructions.isEmpty ? nil : instructions,
                 phase: blockPhase,
                 targetHeartRateZone: zone?.athlthZone,
                 cardioActivity: isCycling ? nil : .running
@@ -452,6 +450,11 @@ enum ATHLTHZonedPlanLibrary {
             block.sourceIntensityZoneLabel = zone?.label
             block.targetHeartRatePercentMin = zone?.minimum
             block.targetHeartRatePercentMax = zone?.maximum
+            block.targetVMAPercent = step.vmaPercent
+            block.targetIntensityType = step.intensityType
+            block.targetElevationGainMeters = step.elevationGainM
+            block.targetGradientPercent = step.gradientPercent
+            block.targetTerrainType = step.terrainType
             result.append(block)
         }
     }
