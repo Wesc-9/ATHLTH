@@ -13,6 +13,27 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
     }
 
     @MainActor
+    func testAll240PublishedWorkoutsResolveOriginalCoachingAndEnvironmentDetails() {
+        let entries = ATHLTHZonedPlanLibrary.workoutCatalogEntries
+        XCTAssertEqual(entries.count, 240)
+        for entry in entries {
+            let original = ATHLTHZonedPlanLibrary.workout(
+                forCatalogSlug: entry.slug
+            )
+            XCTAssertNotNil(original, entry.slug)
+            XCTAssertFalse(original?.coachingTipsEn?.isEmpty ?? true,
+                           "\(entry.slug): source coaching tips missing")
+            XCTAssertFalse(original?.commonMistakesEn?.isEmpty ?? true,
+                           "\(entry.slug): source mistakes missing")
+            XCTAssertNotNil(original?.environment,
+                            "\(entry.slug): environment metadata missing")
+        }
+        XCTAssertNil(ATHLTHZonedPlanLibrary.workout(
+            forCatalogSlug: "unrelated-workout"
+        ))
+    }
+
+    @MainActor
     func testEveryRequiredSessionResolvesToRealWorkoutIncludingRaceDay() {
         for plan in ATHLTHZonedPlanLibrary.plans {
             XCTAssertEqual(plan.weeks.count, plan.totalWeeks, plan.id)
