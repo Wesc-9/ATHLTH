@@ -46,8 +46,8 @@ final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
         // personal pace estimate to discard when the workout is copied.
         XCTAssertEqual(result[0].targetHeartRateZone, 4)
         XCTAssertNil(result[0].targetWeightKilograms)
-        XCTAssertNil(result[0].targetEffortRPE)
-        XCTAssertNil(result[0].loadNote)
+        XCTAssertEqual(result[0].targetEffortRPE, 8)
+        XCTAssertEqual(result[0].loadNote, "Personal load")
         XCTAssertEqual(withIncline.targetPaceSecondsPerKilometer, 285)
     }
 
@@ -65,7 +65,7 @@ final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
         let result = ATHLTHWorkoutLibraryPersonalization.blankTargets([source])
 
         XCTAssertNil(result[0].targetWeightKilograms)
-        XCTAssertNil(result[0].loadNote)
+        XCTAssertEqual(result[0].loadNote, "Personal load")
         XCTAssertEqual(result[0].setCount, 3)
         XCTAssertEqual(result[0].repetitions, 10)
         XCTAssertEqual(result[0].restBetweenSetsSeconds, 75)
