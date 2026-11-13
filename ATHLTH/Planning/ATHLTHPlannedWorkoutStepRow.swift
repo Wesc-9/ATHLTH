@@ -55,6 +55,13 @@ struct ATHLTHPlannedWorkoutStepRow: View {
             }
             return "\(Int(meters.rounded())) m"
         }
+        if block.kind == .run || block.kind == .rest {
+            // Open-ended tests and return-to-start recoveries deliberately
+            // lack a time/distance target; they require an explicit Next.
+            return ATHLTHLocalization.choose(
+                english: "Manual", norwegian: "Manuell"
+            )
+        }
         return "–"
     }
 
