@@ -172,16 +172,38 @@ struct ATHLTHAudioCoachActiveListView: View {
         VStack(alignment: .leading, spacing: 14) {
             masterCard
             if draft.enabled {
-                Picker(tr("Editor mode", "Redigeringsmodus"), selection: $editorMode) {
-                    Text(tr("Basic", "Enkel")).tag("basic")
-                    Text(tr("Advanced", "Avansert")).tag("advanced")
-                }
-                .pickerStyle(.segmented)
-                .accessibilityIdentifier("athlth-audio-coach-editor-mode")
-
                 if editorMode == "basic" {
-                    basicCard
+                    ATHLTHAudioCoachCircleOverview(
+                        draft: $draft,
+                        selectedProfileName: $selectedProfileName,
+                        showStructuredOptions: showStructuredOptions,
+                        showRouteOptions: showRouteOptions,
+                        onEditRule: { id in
+                            selectedRule = SelectedRule(id: id)
+                        },
+                        onEditOption: { option in
+                            editingOption = option
+                        },
+                        onShowProfiles: {
+                            showingProfiles = true
+                        },
+                        onAddMessage: {
+                            showingCatalogue = true
+                        },
+                        onShowAdvanced: {
+                            editorMode = "advanced"
+                        }
+                    )
                 } else {
+                    Button {
+                        editorMode = "basic"
+                    } label: {
+                        Label(tr("Back to my Coach", "Tilbake til min coach"),
+                              systemImage: "arrow.left")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(bronze)
                     advancedCard
                 }
                 compactNavigationCard
@@ -1366,22 +1388,6 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            if editorMode == "advanced" {
-                Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                Button { showingProfiles = true } label: {
-                    HStack {
-                        Label(tr("Saved Coach profiles", "Lagrede coach-profiler"),
-                              systemImage: "square.stack")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text("\(settings.audioCoachProfiles.count)")
-                            .foregroundStyle(dim)
-                        Image(systemName: "chevron.right").foregroundStyle(dim)
-                    }
-                    .frame(minHeight: 50)
-                }
-                .buttonStyle(.plain)
-            }
             if globalScope {
                 Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 NavigationLink {
