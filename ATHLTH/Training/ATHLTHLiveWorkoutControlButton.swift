@@ -138,7 +138,7 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                         .minimumScaleFactor(0.7)
                 }
             }
-            .frame(maxWidth: .infinity, minWidth: 36)
+            .frame(minWidth: 36, maxWidth: .infinity)
             .accessibilityElement(children: .combine)
 
             HStack(spacing: 0) {
