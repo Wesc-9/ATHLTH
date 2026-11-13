@@ -82,4 +82,35 @@ final class ATHLTHWorkoutPacePlanTests: XCTestCase {
         XCTAssertEqual(updated.map(\.sequence), original.map(\.sequence))
         XCTAssertEqual(updated.map(\.distanceMeters), original.map(\.distanceMeters))
     }
+    @MainActor
+    func testTenKPaceCatalogKeepsItsEightStepsAndSourceZones() throws {
+        let source = try XCTUnwrap(
+            ATHLTHZonedPlanLibrary.workoutCatalogEntries.first {
+                $0.title == "10K Fart"
+            }
+        )
+        XCTAssertEqual(source.blocks.count, 8)
+        let personal = ATHLTHWorkoutLibraryPersonalization.blankTargets(source.blocks)
+        XCTAssertEqual(personal.count, 8)
+        let plan = ATHLTHWorkoutPacePlan(
+            scope: .allWork,
+            sharedPaceSecondsPerKilometer: 300
+        )
+        let updated = ATHLTHWorkoutQuickGoalApplier.apply(
+            .pacePlan(plan), to: personal
+        )
+        XCTAssertEqual(updated.count, 8)
+        XCTAssertEqual(updated.map(\.title), personal.map(\.title))
+        XCTAssertEqual(updated.map(\.durationSeconds),
+                       personal.map(\.durationSeconds))
+        XCTAssertEqual(updated.map(\.distanceMeters),
+                       personal.map(\.distanceMeters))
+        XCTAssertEqual(updated.map(\.sourceIntensityZoneLabel),
+                       personal.map(\.sourceIntensityZoneLabel))
+        XCTAssertTrue(updated.contains {
+            $0.resolvedPhase == .main &&
+                $0.targetPaceSecondsPerKilometer == 300
+        })
+    }
+
 }
