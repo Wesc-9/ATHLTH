@@ -232,3 +232,5 @@ ATHLTH 2.1.7 build 125 — explicit user-authorized TestFlight upload 2026-11-10
 ATHLTH 2.1.8 build 126 — explicitly authorized TestFlight launch 2026-11-12 02:30 CET. Upload active release/v2.1.8 only after same-commit Build ATHLTH and backend regressions are green, verified signed iOS/Watch/Widgets archive, and confirmed App Store Connect upload. Monitor hourly, diagnose and fix failures, retry on current release branch, do not alter frozen versions.
 
 ATHLTH 2.1.8 build 126 — user-authorized retry 2026-11-12; upload only after same-commit Build ATHLTH and backend regressions succeed, signed archive validated; no new distribution certificates; verify App Store Connect acceptance before reporting success.
+
+ATHLTH 2.1.9 build 127 – authorized TestFlight release, 2026-11-13, full iPad live workout and one-session consent
