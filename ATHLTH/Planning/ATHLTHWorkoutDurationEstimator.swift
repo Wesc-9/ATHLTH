@@ -143,7 +143,13 @@ enum ATHLTHWorkoutDurationEstimator {
                 if let time = block.durationSeconds {
                     guard time.isFinite, time > 0 else { return nil }
                     seconds += time
-                    hasActivity = true
+                    // Timed notes such as a strength warm-up contribute to
+                    // real workouts, but an instruction-only "workout" is not
+                    // an activity by itself.
+                    if block.wellnessKind != nil ||
+                       block.activityTag == "cycling" {
+                        hasActivity = true
+                    }
                 } else if block.wellnessKind != nil ||
                             block.activityTag == "cycling" {
                     // Timed cycling and wellness must never silently become
