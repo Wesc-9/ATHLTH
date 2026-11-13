@@ -94,15 +94,13 @@ struct ATHLTHSideMenuDeepLinkView: View {
             return ATHLTHLocalization.choose(
                 english: "Train Together", norwegian: "Tren sammen"
             )
+        case .challenges:
+            return ATHLTHLocalization.choose(english: "Challenges", norwegian: "Utfordringer")
         case .arena:
             return "Arena"
         case .clubs:
             return ATHLTHLocalization.choose(
                 english: "Clubs", norwegian: "Klubber"
-            )
-        case .exerciseProgress:
-            return ATHLTHLocalization.choose(
-                english: "Exercise progression", norwegian: "Øvelsesfremdrift"
             )
         default:
             return "ATHLTH"
@@ -120,21 +118,14 @@ struct ATHLTHSideMenuDeepLinkView: View {
         case .trainTogether:
             TrainTogetherMarketplaceView()
 
+        case .challenges:
+            ChallengeHubView()
+
         case .arena:
             ATHLTHArenaV3HomeView()
 
         case .clubs:
             ATHLTHCommunityV5View(initialTab: .clubs)
-
-        case .exerciseProgress:
-            ScrollView {
-                ATHLTHSpecificProgressView()
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: 900)
-                    .frame(maxWidth: .infinity)
-            }
-            .scrollIndicators(.hidden)
 
         case .home, .search, .inbox, .notifications,
              .trainingLibrary, .myExercises, .myRoutes,
