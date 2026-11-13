@@ -60,4 +60,24 @@ final class ExploreVisibleRegionSearchTests: XCTestCase {
         )
         XCTAssertNil(RouteDiscoveryRegionBounds(region: invalid))
     }
+    func testAreaSearchUsesOnePillForIdleAndActiveRequest() {
+        XCTAssertTrue(ExploreVisibleRegionSearchPolicy.showsSearchControl(
+            hasVisibleRegion: true, needsSearch: true, isSearching: false
+        ))
+        // During the query the search button becomes the loading indicator;
+        // the legacy secondary status capsule must not be shown too.
+        XCTAssertTrue(ExploreVisibleRegionSearchPolicy.showsSearchControl(
+            hasVisibleRegion: true, needsSearch: true, isSearching: true
+        ))
+        XCTAssertTrue(ExploreVisibleRegionSearchPolicy.showsSearchControl(
+            hasVisibleRegion: true, needsSearch: false, isSearching: true
+        ))
+        XCTAssertFalse(ExploreVisibleRegionSearchPolicy.showsSearchControl(
+            hasVisibleRegion: true, needsSearch: false, isSearching: false
+        ))
+        XCTAssertFalse(ExploreVisibleRegionSearchPolicy.showsSearchControl(
+            hasVisibleRegion: false, needsSearch: true, isSearching: false
+        ))
+    }
+
 }

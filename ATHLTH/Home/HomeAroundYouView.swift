@@ -241,6 +241,16 @@ private struct AroundYouRouteItem: Identifiable {
 
 /// Panning and zooming mark a pending search without loading new data.
 enum ExploreVisibleRegionSearchPolicy {
+    /// Only one map-area search pill may be visible. Once tapped, it turns
+    /// into a progress indicator in the exact same place.
+    static func showsSearchControl(
+        hasVisibleRegion: Bool,
+        needsSearch: Bool,
+        isSearching: Bool
+    ) -> Bool {
+        hasVisibleRegion && (needsSearch || isSearching)
+    }
+
     static func needsSearch(
         current: MKCoordinateRegion,
         lastSearched: MKCoordinateRegion
@@ -1568,7 +1578,11 @@ struct AroundYouExploreView: View {
                 )
             }
 
-             if visibleRegion != nil && shouldSearchVisibleArea {
+            if ExploreVisibleRegionSearchPolicy.showsSearchControl(
+                hasVisibleRegion: visibleRegion != nil,
+                needsSearch: shouldSearchVisibleArea,
+                isSearching: isSearchingVisibleArea
+            ) {
                 Button {
                     Task {
                         await searchVisibleArea()
@@ -1586,7 +1600,10 @@ struct AroundYouExploreView: View {
                         }
 
                         Text(ATHLTHLocalization.choose(
-                            english: "Search this area", norwegian: "Søk i dette området"
+                            english: isSearchingVisibleArea
+                                ? "Searching visible map area…" : "Search this area",
+                            norwegian: isSearchingVisibleArea
+                                ? "Søker i kartutsnittet…" : "Søk i dette området"
                         ))
                     }
                     .font(.caption.weight(.medium))
@@ -1731,7 +1748,13 @@ struct AroundYouExploreView: View {
     @ViewBuilder
     private var exploreTrailStatusOverlay:
         some View {
-        if isSearchingVisibleArea ||
+        // The main search button already shows this loading state in place.
+        // Never stack a second "Searching visible map area" pill beneath it.
+        if !ExploreVisibleRegionSearchPolicy.showsSearchControl(
+            hasVisibleRegion: visibleRegion != nil,
+            needsSearch: shouldSearchVisibleArea,
+            isSearching: isSearchingVisibleArea
+        ) &&
             ((publicTrailDiscovery.isLoading ||
               publicTrailDiscovery.isWarmingCache) &&
              publicTrailDiscovery.trails.isEmpty) {
@@ -1740,16 +1763,10 @@ struct AroundYouExploreView: View {
                     .controlSize(.small)
 
                 Text(ATHLTHLocalization.choose(
-                    english: isSearchingVisibleArea
-                        ? "Searching visible map area…"
-                        : publicTrailDiscovery.isWarmingCache
-                            ? "Finding public trails…"
-                            : "Loading public trails…",
-                    norwegian: isSearchingVisibleArea
-                        ? "Søker i kartutsnittet…"
-                        : publicTrailDiscovery.isWarmingCache
-                            ? "Finner turstier…"
-                            : "Henter turstier…"
+                    english: publicTrailDiscovery.isWarmingCache
+                        ? "Finding public trails…" : "Loading public trails…",
+                    norwegian: publicTrailDiscovery.isWarmingCache
+                        ? "Finner turstier…" : "Henter turstier…"
                 ))
                 .font(.caption)
                 .foregroundStyle(
