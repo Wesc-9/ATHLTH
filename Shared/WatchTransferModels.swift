@@ -311,6 +311,33 @@ struct WatchRouteTransfer: Identifiable, Codable, Hashable {
     var updatedAt: Date
 }
 
+/// A single HealthKit workout runs from the user's start until the user's
+/// explicit finish. Internal set timers, strength rests, exercise switches and
+/// recovery intervals must never be translated to a workout-session pause.
+/// Global pause remains a deliberate action; automatic pause is limited to
+/// outdoor running/walking when the athlete enables it.
+enum ATHLTHWorkoutHealthKitContinuityPolicy {
+    static func supportsAutomaticPause(_ kind: WatchWorkoutKind) -> Bool {
+        kind == .running || kind == .walking
+    }
+
+    /// Recover unexpected HealthKit/system pauses on strength. The user's
+    /// explicit "Pause whole workout" action remains authoritative.
+    static func shouldResumeUnexpectedPause(
+        kind: WatchWorkoutKind,
+        userPausedWholeWorkout: Bool,
+        finishing: Bool
+    ) -> Bool {
+        kind == .strength && !userPausedWholeWorkout && !finishing
+    }
+
+    static func pausesWorkoutForInternalRecoveryOrRest(
+        kind: WatchWorkoutKind
+    ) -> Bool {
+        false
+    }
+}
+
 enum WatchWorkoutKind: String, Codable, CaseIterable, Hashable {
     case running
     case walking
