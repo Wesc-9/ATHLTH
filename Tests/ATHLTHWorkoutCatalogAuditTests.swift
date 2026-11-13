@@ -49,6 +49,43 @@ final class ATHLTHWorkoutCatalogAuditTests: XCTestCase {
         }
     }
 
+    func testAll240ZonedWorkoutPrescriptionsKeepSourceMetadataInPersonalCopies() {
+        // A complete audit, not a test of only the sample one-minute workout.
+        let published = ATHLTHZonedPlanLibrary.workoutCatalogEntries
+        XCTAssertEqual(published.count, 240)
+        for recipe in published {
+            let original = recipe.plannedSession().resolvedWorkoutBlocks
+            let copied = ATHLTHWorkoutLibraryPersonalization.blankTargets(original)
+            XCTAssertEqual(copied.count, original.count, recipe.slug)
+            for (index, source) in original.enumerated() {
+                let target = copied[index]
+                XCTAssertEqual(target.kind, source.kind, "\(recipe.slug) #\(index)")
+                XCTAssertEqual(target.title, source.title, "\(recipe.slug) #\(index)")
+                XCTAssertEqual(target.resolvedPhase, source.resolvedPhase)
+                XCTAssertEqual(target.durationSeconds, source.durationSeconds)
+                XCTAssertEqual(target.distanceMeters, source.distanceMeters)
+                XCTAssertEqual(target.repetitions, source.repetitions)
+                XCTAssertEqual(target.setCount, source.setCount)
+                XCTAssertEqual(target.restBetweenSetsSeconds, source.restBetweenSetsSeconds)
+                XCTAssertEqual(target.groupRounds, source.groupRounds)
+                XCTAssertEqual(target.targetHeartRateZone, source.targetHeartRateZone)
+                XCTAssertEqual(target.sourceIntensityZoneLabel,
+                               source.sourceIntensityZoneLabel)
+                XCTAssertEqual(target.targetHeartRatePercentMin,
+                               source.targetHeartRatePercentMin)
+                XCTAssertEqual(target.targetHeartRatePercentMax,
+                               source.targetHeartRatePercentMax)
+                XCTAssertEqual(target.notes, source.notes)
+                if source.sourceIntensityZoneLabel != nil {
+                    XCTAssertNotNil(target.targetHeartRatePercentMin,
+                                    "\(recipe.slug): source zone without numeric lower bound")
+                    XCTAssertNotNil(target.targetHeartRatePercentMax,
+                                    "\(recipe.slug): source zone without numeric upper bound")
+                }
+            }
+        }
+    }
+
     func testAllActiveZonedWorkoutsImportWithoutLosingWorkoutParts() {
         let workouts = ATHLTHZonedPlanLibrary.workouts
             .filter { $0.discipline != "swimming" }
