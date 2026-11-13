@@ -361,7 +361,14 @@ enum ATHLTHZonedPlanLibrary {
             // distances. Do not make the athlete tap through an invented
             // extra run block just to read "Transition without stopping".
             let originalText = (step.descriptionEn ?? "").lowercased()
-            if step.durationSec == nil, step.distanceM == nil,
+            // MIX-001 describes a 30/30 interval explicitly, but the source
+            // JSON omitted durationSec for its 30-second effort. Recover only
+            // that documented effort duration; do not guess missing targets
+            // for hills, shuttles or open-ended fitness tests.
+            let effectiveDuration = step.durationSec ??
+                (originalText == "30/30 vo2max intervals" && sport != "cycling"
+                    ? 30.0 : nil)
+            if effectiveDuration == nil, step.distanceM == nil,
                step.distanceKm == nil,
                originalText == "transition without stopping" {
                 if let index = result.indices.last {
@@ -381,12 +388,15 @@ enum ATHLTHZonedPlanLibrary {
             // A double-threshold rest period, pace-adjustment reminder and
             // plyometric circuit are GUIDANCE, not GPS running intervals.
             // Keep them visible, never assign a made-up time or distance.
-            let instructionOnly = step.durationSec == nil &&
+            let instructionOnly = effectiveDuration == nil &&
                 step.distanceM == nil && step.distanceKm == nil &&
                 (originalText.contains("6-8h rest") ||
                  originalText == "adjust pace based on readings" ||
                  originalText.contains("single-leg hops per side"))
-            let recovery = step.role == "recovery"
+            // The source marks this explicitly named resting period as
+            // "effort". Respect its semantics; resting is not GPS running.
+            let preStartRest = originalText == "5min rest before simulated start"
+            let recovery = step.role == "recovery" || preStartRest
             let blockPhase: WorkoutPhaseKind = recovery ? .recovery : phase
             let isCycling = sport == "cycling"
             let description = (step.descriptionEn ?? "").lowercased()
@@ -398,7 +408,7 @@ enum ATHLTHZonedPlanLibrary {
             let passiveRest = blockPhase == .recovery && !isActiveRecovery
             let copy = ATHLTHZonedLocalization.stepCopy(
                 sourceEnglish: step.descriptionEn ?? (recovery ? "Recovery" : "Effort"),
-                durationSeconds: step.durationSec,
+                durationSeconds: effectiveDuration,
                 isRunning: !isCycling
             )
             let notes: [String] = [
@@ -418,7 +428,7 @@ enum ATHLTHZonedPlanLibrary {
                 exerciseSlug: nil,
                 distanceMeters: step.distanceM ?? step.distanceKm.map { $0 * 1_000 },
                 repetitions: nil,
-                durationSeconds: step.durationSec,
+                durationSeconds: effectiveDuration,
                 targetWeightKilograms: nil,
                 loadNote: nil,
                 notes: notes.isEmpty ? nil : notes.joined(separator: " · "),
