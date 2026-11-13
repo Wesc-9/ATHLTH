@@ -151,127 +151,16 @@ struct ATHLTHiPadLiveTimelinePanel: View {
 struct ATHLTHiPadLiveGhostDuelPanel: View {
     let snapshot: ATHLTHCrossDeviceWorkoutSnapshot
 
-    private func tr(_ en: String, _ no: String) -> String {
-        ATHLTHLocalization.choose(english: en, norwegian: no)
-    }
-
     var body: some View {
         if let ghost = snapshot.ghostRaceTitle, !ghost.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
-                    Image(systemName: "figure.run.circle")
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    Text(tr("YOU VS GHOST", "DU MOT GHOST"))
-                        .font(.caption.weight(.bold))
-                        .tracking(1)
-                    Spacer(minLength: 4)
-                    Text(ghost)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                HStack(alignment: .center, spacing: 14) {
-                    runnerBadge(title: tr("You", "Du"), symbol: "figure.run",
-                                highlighted: true)
-                    Spacer()
-                    Image(systemName: "arrow.left.arrow.right")
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    Spacer()
-                    runnerBadge(title: "Ghost", symbol: "figure.run",
-                                highlighted: false)
-                }
-
-                if let signedMeters = snapshot.ghostDistanceDeltaMeters,
-                   signedMeters.isFinite {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(gapText(signedMeters))
-                            .font(.system(size: 26, weight: .semibold,
-                                          design: .rounded))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            .monospacedDigit()
-                        Text(tr("Distance difference", "Distanseforskjell"))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                    if let length = snapshot.routeDistanceMeters,
-                       length > 0,
-                       let distance = snapshot.distanceMeters,
-                       distance.isFinite {
-                        let you = min(1, max(0, distance / length))
-                        let rival = min(1, max(0, (distance - signedMeters) / length))
-                        runnerProgress(tr("You", "Du"), progress: you)
-                        runnerProgress("Ghost", progress: rival)
-                    }
-                } else {
-                    Text(tr(
-                        "Waiting for the source device's Ghost comparison.",
-                        "Venter på Ghost-sammenligning fra treningsenheten."
-                    ))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
-
-                if let seconds = snapshot.ghostTimeDeltaSeconds,
-                   seconds.isFinite {
-                    HStack {
-                        Label(tr("Time difference", "Tidsforskjell"),
-                              systemImage: "timer")
-                        Spacer()
-                        Text(String(format: "%+.0f s", seconds))
-                            .monospacedDigit()
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                }
-            }
-            .padding(21)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(ATHLTHPlanDesign.surface,
-                        in: RoundedRectangle(cornerRadius: 24))
+            ATHLTHGhostLiveComparisonTable(
+                name: ghost,
+                distanceMeters: snapshot.distanceMeters,
+                signedLeadMeters: snapshot.ghostDistanceDeltaMeters,
+                timeGapSeconds: snapshot.ghostTimeDeltaSeconds
+            )
             .accessibilityIdentifier("athlth-ipad-live-ghost-duel")
         }
-    }
-
-    private func runnerBadge(
-        title: String, symbol: String, highlighted: Bool
-    ) -> some View {
-        VStack(spacing: 7) {
-            Image(systemName: symbol)
-                .font(.title2.weight(.medium))
-                .foregroundStyle(highlighted ? Color.white :
-                    ATHLTHPlanDesign.accentInk)
-                .frame(width: 47, height: 47)
-                .background(highlighted ? ATHLTHPlanDesign.accentInk :
-                    ATHLTHPlanDesign.selectedSurface, in: Circle())
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-        }
-    }
-
-    private func runnerProgress(_ title: String, progress: Double) -> some View {
-        VStack(spacing: 5) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text("\(Int((progress * 100).rounded())) %")
-                    .monospacedDigit()
-            }
-            .font(.caption)
-            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            ProgressView(value: progress)
-                .tint(ATHLTHPlanDesign.accentInk)
-        }
-    }
-
-    private func gapText(_ gap: Double) -> String {
-        let meters = Int(abs(gap).rounded())
-        if meters < 8 { return tr("Neck and neck", "Jevnt løp") }
-        return gap > 0
-            ? tr("\(meters) m ahead", "\(meters) m foran")
-            : tr("\(meters) m behind", "\(meters) m bak")
     }
 }
 
