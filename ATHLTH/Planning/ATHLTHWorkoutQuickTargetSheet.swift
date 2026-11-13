@@ -5,6 +5,7 @@ import SwiftUI
 enum ATHLTHWorkoutQuickTarget: Equatable {
     case none
     case pace(secondsPerKilometer: Int)
+    case pacePlan(ATHLTHWorkoutPacePlan)
     case heartRateZone(Int)
 }
 
@@ -21,21 +22,26 @@ enum ATHLTHWorkoutQuickGoalApplier {
         _ goal: ATHLTHWorkoutQuickTarget,
         to blocks: [WorkoutTemplateBlock]
     ) -> [WorkoutTemplateBlock] {
-        blocks.map { source in
+        blocks.enumerated().map { index, source in
             var block = source
-            guard block.kind == .run,
-                  block.resolvedPhase == .main else { return block }
+            guard block.kind == .run else { return block }
             switch goal {
             case .none:
                 break
             case .pace(let seconds):
-                guard (120...959).contains(seconds) else { return block }
+                guard block.resolvedPhase == .main,
+                      !block.isActiveRecovery,
+                      (120...959).contains(seconds) else { return block }
                 block.targetPaceSecondsPerKilometer = Double(seconds)
-                block.targetHeartRateZone = nil
-                block.sourceIntensityZoneLabel = nil
-                block.targetHeartRatePercentMin = nil
-                block.targetHeartRatePercentMax = nil
+                // Source training-zone guidance stays visible alongside pace.
+            case .pacePlan(let plan):
+                guard let seconds = plan.pace(for: block, at: index) else {
+                    return block
+                }
+                block.targetPaceSecondsPerKilometer = Double(seconds)
+                // Personal pace must not erase the source's HR prescription.
             case .heartRateZone(let zone):
+                guard block.resolvedPhase == .main else { return block }
                 guard (1...5).contains(zone) else { return block }
                 block.targetHeartRateZone = zone
                 block.targetPaceSecondsPerKilometer = nil
@@ -88,6 +94,10 @@ enum ATHLTHWorkoutQuickGoalApplier {
             step.intensity.paceMinSecondsPerKilometer = Double(seconds)
             step.intensity.paceMaxSecondsPerKilometer = Double(seconds)
             step.intensity.heartRateZone = nil
+        case .pacePlan:
+            // Selective pacing uses the unified expanded workout timeline,
+            // not this compressed legacy repetition-level representation.
+            return
         case .heartRateZone(let zone):
             guard (1...5).contains(zone) else { return }
             step.intensity.kind = .heartRateZone
