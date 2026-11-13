@@ -3000,6 +3000,7 @@ struct HomePersonalActivityHistoryView:
 
 private struct HomePersonalHistoryCard:
     View {
+    @EnvironmentObject private var session: AppSessionStore
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
@@ -3022,6 +3023,26 @@ private struct HomePersonalHistoryCard:
                 alignment: .leading,
                 spacing: 10
             ) {
+                HStack(spacing: 9) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 23, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 30, height: 30)
+                    Text(
+                        session.profile.displayName.isEmpty
+                            ? ATHLTHLocalization.choose(
+                                english: "My profile", norwegian: "Min profil"
+                            )
+                            : session.profile.displayName
+                    )
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                }
+                .accessibilityIdentifier("athlth-history-activity-username")
+
                 HStack(
                     alignment:
                         .firstTextBaseline
