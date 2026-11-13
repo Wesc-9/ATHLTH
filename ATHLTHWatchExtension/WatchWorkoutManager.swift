@@ -4905,9 +4905,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 settings.preferredHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
                 settings.maximumHeartRateBPM,
+            stepPercentMin: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRatePercentMin,
+            stepPercentMax: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRatePercentMax,
             suppressHeartRateForUnzonedStep:
                 structuredRunningWorkout != nil &&
-                currentStructuredRunningStep?.targetHeartRateZone == nil
+                currentStructuredRunningStep?.targetHeartRateZone == nil &&
+                (currentStructuredRunningStep?.targetHeartRatePercentMin == nil ||
+                 currentStructuredRunningStep?.targetHeartRatePercentMax == nil)
         )
         if let message = adaptiveCoachState.nextCue(
             settings: settings,
@@ -6973,9 +6979,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 audioCoachConfiguration.smartPrompts?.preferredHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
                 resolvedMaximumBPM,
+            stepPercentMin: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRatePercentMin,
+            stepPercentMax: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRatePercentMax,
             suppressHeartRateForUnzonedStep:
                 structuredRunningWorkout != nil &&
-                currentStructuredRunningStep?.targetHeartRateZone == nil
+                currentStructuredRunningStep?.targetHeartRateZone == nil &&
+                (currentStructuredRunningStep?.targetHeartRatePercentMin == nil ||
+                 currentStructuredRunningStep?.targetHeartRatePercentMax == nil)
         )
         let explicitPeriodicZone = audioCoachConfiguration.smartPrompts?
             .measuredZoneAnnouncementIntervalSeconds != nil
@@ -7024,9 +7036,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 audioCoachConfiguration.smartPrompts?.preferredHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
                 audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM,
+            stepPercentMin: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRatePercentMin,
+            stepPercentMax: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRatePercentMax,
             suppressHeartRateForUnzonedStep:
                 structuredRunningWorkout != nil &&
-                currentStructuredRunningStep?.targetHeartRateZone == nil
+                currentStructuredRunningStep?.targetHeartRateZone == nil &&
+                (currentStructuredRunningStep?.targetHeartRatePercentMin == nil ||
+                 currentStructuredRunningStep?.targetHeartRatePercentMax == nil)
         )
         guard state == .running,
               !awaitingMainStart,
@@ -8396,10 +8414,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             configured: targetAlertConfiguration,
             stepZone: awaitingMainStart ? nil :
                 currentRunningStep?.targetHeartRateZone,
-            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM,
+            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
+                audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM,
+            stepPercentMin: awaitingMainStart ? nil :
+                currentRunningStep?.targetHeartRatePercentMin,
+            stepPercentMax: awaitingMainStart ? nil :
+                currentRunningStep?.targetHeartRatePercentMax,
             suppressHeartRateForUnzonedStep:
                 structuredRunningWorkout != nil &&
-                currentRunningStep?.targetHeartRateZone == nil
+                currentRunningStep?.targetHeartRateZone == nil &&
+                (currentRunningStep?.targetHeartRatePercentMin == nil ||
+                 currentRunningStep?.targetHeartRatePercentMax == nil)
         )
         let intervalPosition = structuredRunningWorkout.flatMap {
             ATHLTHRunningIntervalPosition.resolve(
