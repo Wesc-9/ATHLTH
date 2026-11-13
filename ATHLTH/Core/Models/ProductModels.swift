@@ -1129,6 +1129,9 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     // true starts spotifyPlaylist when one is selected.
     var spotifyPlaylist: SpotifyPlaylistReference? = nil
     var spotifyAutoplayOnStart: Bool? = nil
+    // Explicitly chosen interval music. Nil keeps all existing workouts
+    // and ordinary Spotify playlists unchanged.
+    var spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack? = nil
 
     // Optional per-workout live target alerts.
     var targetAlertConfiguration:
