@@ -97,3 +97,68 @@ struct ATHLTHStudioHomeCommunitySummary: View {
         .buttonStyle(.plain)
     }
 }
+
+
+/// A single focused social entry point beside the upcoming workout on iPad.
+/// Counts come from the signed-in user's real mutual-follow relationships.
+struct ATHLTHStudioHomeSocialHighlight: View {
+    @EnvironmentObject private var social: SocialStore
+    @State private var showingCommunity = false
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        Button { showingCommunity = true } label: {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.2")
+                        .font(.title3)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 46, height: 46)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                    Spacer(minLength: 6)
+                    Image(systemName: "arrow.up.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+
+                Text(tr("Train together", "Tren sammen"))
+                    .font(.system(size: 23, weight: .medium, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                Text(social.mutualFollows.isEmpty
+                    ? tr("Find people to train with and make every workout more social.",
+                         "Finn treningsvenner og gjør øktene mer sosiale.")
+                    : tr("\(social.mutualFollows.count) training friends in your network",
+                         "\(social.mutualFollows.count) treningsvenner i nettverket ditt"))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+
+                Label(tr("Explore community", "Utforsk fellesskapet"),
+                      systemImage: "arrow.up.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, minHeight: 246, alignment: .topLeading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 20))
+            .contentShape(RoundedRectangle(cornerRadius: 20))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-ipad-home-social-highlight")
+        .sheet(isPresented: $showingCommunity) {
+            ATHLTHCommunityV5View(initialTab: .overview)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+}
