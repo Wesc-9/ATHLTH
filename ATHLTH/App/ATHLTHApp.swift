@@ -1357,7 +1357,9 @@ struct AppRootView: View {
             isPresented: Binding(
                 get: {
                     !ATHLTHDeviceRole.isIPad &&
-                    crossDeviceWorkout.incomingRequest != nil
+                    crossDeviceWorkout.incomingRequest != nil &&
+                    // The full-screen Watch UI presents its own visible banner.
+                    !workoutMirroring.liveViewIsVisible
                 },
                 set: { _ in }
             )
