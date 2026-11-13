@@ -32,6 +32,12 @@ enum ATHLTHZonedLocalization {
         english: String,
         workoutID: String? = nil
     ) -> String {
+        if workoutID == "THR-016" {
+            return ATHLTHLocalization.choose(
+                english: "Two separate threshold sessions on the same day, with 6–8 hours between. Record and save each as its OWN Apple Health workout; do not keep one workout active throughout the break.",
+                norwegian: "To separate terskeløkter samme dag, med 6–8 timer mellom. Registrer og lagre hver for seg i Apple Helse. Ikke la én økt stå aktiv i hele pausen."
+            )
+        }
         if workoutID == "ASS-009" {
             return ATHLTHLocalization.choose(
                 english: "A 3-minute maximum-effort test on a track. Record the total distance and pace in the final 30 seconds to assess critical speed.",
@@ -88,6 +94,72 @@ enum ATHLTHZonedLocalization {
         isRunning: Bool
     ) -> StepCopy {
         let input = sourceEnglish.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch input.lowercased() {
+        case "--- 6-8h rest ---":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "6–8 hours between sessions",
+                    norwegian: "6–8 timer mellom øktene"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "This plan contains TWO separate threshold workouts: finish and save the morning workout in Apple Health. Start a NEW workout in the evening, after 6–8 hours. Do not leave one workout recording running between sessions.",
+                    norwegian: "Planen inneholder TO separate terskeløkter: Avslutt og lagre morgenøkten i Apple Helse. Start en NY økt på kvelden etter 6–8 timer. Ikke la én treningsregistrering gå mellom øktene."
+                )
+            )
+        case "adjust pace based on readings":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Adjust pace after measurement",
+                    norwegian: "Juster farten etter måling"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Use the recorded lactate readings to adjust the following effort. This instruction has no fixed duration.",
+                    norwegian: "Bruk laktatmålingene til å tilpasse neste drag. Dette er en instruksjon uten egen varighet."
+                )
+            )
+        case "10 single-leg hops per side + 10 bounding strides + 8 drop jumps + 10 a-skips per side":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Plyometric circuit",
+                    norwegian: "Spenstsirkel"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "10 single-leg hops per side, 10 bounding strides, 8 drop jumps and 10 A-skips per side. Complete the exercises and move on manually; no duration was provided by the source.",
+                    norwegian: "10 hink per bein, 10 spensthopp, 8 fallhopp og 10 A-skips per side. Gjennomfør øvelsene og gå videre manuelt. Kilden oppgir ingen varighet."
+                )
+            )
+        case "jog down":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Jog downhill", norwegian: "Jogg ned bakken"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Easy jog back downhill. Move to the next interval when you are ready; no fixed time was supplied.",
+                    norwegian: "Jogg rolig ned bakken. Gå til neste drag når du er klar. Det er ikke oppgitt noen fast tid."
+                )
+            )
+        case "walk back":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Walk back", norwegian: "Gå tilbake"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Walk back to the starting point and continue manually when ready.",
+                    norwegian: "Gå tilbake til startpunktet og fortsett manuelt når du er klar."
+                )
+            )
+        case "partner's time":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Partner recovery", norwegian: "Partnerpause"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Recover while your partner completes their interval. Continue manually when the partner finishes.",
+                    norwegian: "Hvil mens partneren gjennomfører sitt drag. Fortsett manuelt når partneren er ferdig."
+                )
+            )
+        default: break
+        }
         if isRunning && isThreeMinuteAllOut(input) {
             return StepCopy(
                 title: ATHLTHLocalization.choose(
