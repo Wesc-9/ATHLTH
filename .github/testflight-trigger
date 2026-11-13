@@ -236,3 +236,5 @@ ATHLTH 2.1.8 build 126 — user-authorized retry 2026-11-12; upload only after s
 ATHLTH 2.1.9 build 127 – authorized TestFlight release, 2026-11-13, full iPad live workout and one-session consent
 
 ATHLTH 2.1.9 build 127 – retry after fixing immutable live snapshot XCTest fixture, 2026-11-13
+
+ATHLTH 2.1.9 build 127 – TestFlight retry: fixed racy watchOS Info.plist build script – 2026-11-13
