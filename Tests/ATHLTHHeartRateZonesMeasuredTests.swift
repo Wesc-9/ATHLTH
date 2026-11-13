@@ -69,7 +69,7 @@ final class ATHLTHHeartRateZonesMeasuredTests: XCTestCase {
         )
     }
 
-    func testSexSpecificAgeFallbackOnlyUsedWithoutConfiguredHRMax() {
+    func testSexSpecificAgeFallbackOnlyUsedWithoutConfiguredHRMax() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let birth = calendar.date(from: DateComponents(
@@ -85,14 +85,13 @@ final class ATHLTHHeartRateZonesMeasuredTests: XCTestCase {
             ),
             193
         )
-        XCTAssertEqual(
+        let female = try XCTUnwrap(
             ATHLTHHeartRateZones.resolvedMaximumBPM(
                 configured: nil, dateOfBirth: birth, now: date,
                 usesFemaleEstimate: true
-            ),
-            206 - 0.88 * 36,
-            accuracy: 0.0001
+            )
         )
+        XCTAssertEqual(female, 206 - 0.88 * 36, accuracy: 0.0001)
     }
 
     func testUnavailableOrInvalidPulseCannotAppearAsAMeasuredZone() {
