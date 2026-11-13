@@ -5028,7 +5028,10 @@ struct WorkoutTemplateBuilderView: View {
                     ATHLTHWorkoutSpotifyOptionsSheet(
                         playlist: $selectedSpotifyPlaylist,
                         autoplay: $spotifyAutoplayOnStart,
-                        intervalTrack: $spotifyIntervalTrack
+                        intervalTrack: $spotifyIntervalTrack,
+                        supportsIntervals: blocks.contains {
+                            $0.kind == .run && $0.cardioActivity != .walking
+                        }
                     )
                 case .heartRateAndPace:
                     ATHLTHWorkoutTargetsQuickSheet(blocks: $blocks)
