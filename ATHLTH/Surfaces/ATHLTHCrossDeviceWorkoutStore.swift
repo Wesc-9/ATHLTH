@@ -421,18 +421,27 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 ghostRaceTitle: watch.ghostRaceTitle,
                 ghostDistanceDeltaMeters: watch.ghostDistanceDeltaMeters,
                 ghostTimeDeltaSeconds: watch.ghostTimeDeltaSeconds,
+                runningSteps: watch.runningStageSummaries?.map {
+                    ATHLTHLiveWorkoutStage(
+                        index: $0.index,
+                        title: $0.title,
+                        phase: $0.phase ?? "unspecified",
+                        durationSeconds: $0.durationSeconds,
+                        distanceMeters: $0.distanceMeters
+                    )
+                },
                 runningStepIndex: watch.runningStepIndex,
                 runningStepCount: watch.runningStepCount,
                 runningStepRemainingMeters: watch.runningStepRemainingMeters,
                 routeProgressPercent: watch.routeProgressPercent,
                 routeRemainingMeters: watch.routeRemainingMeters,
                 routeDistanceMeters: watch.routeDistanceMeters,
-                strengthSetNumber: watch.strengthSetIndex.map { $0 + 1 },
+                strengthSetNumber: watch.strengthSetIndex,
                 strengthSetTotal: watch.strengthSetCount,
                 strengthReps: watch.strengthReps,
                 strengthWeightKilograms: watch.strengthWeightKilograms,
                 strengthRestEndsAt: watch.strengthRestEndsAt,
-                audioCoachEnabled: watch.watchOwnedAudioCoach
+                audioCoachEnabled: watch.watchAudioCoachEnabled
             )
         }
         return nil
