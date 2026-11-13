@@ -103,6 +103,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     private var lastSourceSessionID: UUID?
     private var approvedSourceSessionID: UUID?
+    private var nextWorkoutSharingExpiresAt: Date?
     private var outgoingRequestID: UUID?
 
     /// Only this phone's live, locally confirmed session authorizes publishing.
@@ -119,6 +120,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     func prepareOneWorkoutSharing(_ enabled: Bool) {
         guard !ATHLTHDeviceRole.isIPad else { return }
         shareNextWorkout = enabled
+        nextWorkoutSharingExpiresAt = enabled
+            ? Date().addingTimeInterval(600) : nil
     }
 
     private func reconcileSession(_ currentID: UUID?, title: String?) {
@@ -127,9 +130,14 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         incomingRequest = nil
         lastSourceSessionID = currentID
         sourceWorkoutTitle = title
-        if let currentID, shareNextWorkout {
+        if let currentID, shareNextWorkout,
+           let expiry = nextWorkoutSharingExpiresAt, expiry > .now {
             approvedSourceSessionID = currentID
+        }
+        if currentID != nil {
+            // Even an expired preflight selection is consumed by this launch.
             shareNextWorkout = false
+            nextWorkoutSharingExpiresAt = nil
         }
     }
 
@@ -161,6 +169,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         remote = nil
         lastPublishedID = nil
         shareNextWorkout = false
+        nextWorkoutSharingExpiresAt = nil
         incomingRequest = nil
         outgoingRequestID = nil
         outgoingRequestState = .idle
@@ -559,6 +568,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     func revokeLiveSharing() {
         approvedSourceSessionID = nil
         shareNextWorkout = false
+        nextWorkoutSharingExpiresAt = nil
     }
 
     private func pollOutgoingRequest(accountID: UUID) async {
