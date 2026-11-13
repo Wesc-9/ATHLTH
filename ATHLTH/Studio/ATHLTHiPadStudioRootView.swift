@@ -290,12 +290,8 @@ struct ATHLTHiPadStudioRootView: View {
             .id(detailNavigationIdentity)
         }
         .navigationSplitViewStyle(.balanced)
-        // Visible across every Studio tab while an iPhone-owned workout
-        // is active; users can collapse and re-open without losing their place.
-        .overlay(alignment: .top) {
-            ATHLTHStudioRemoteWorkoutOverlay()
-                .zIndex(100)
-        }
+        // A single root-level, read-only full-screen spectator handles both
+        // running and strength. Do not display a second legacy floating card.
         // iPhone/iPad share the workout engine; only Studio navigation and
         // adaptive side-by-side presentation differ on iPad.
         .environment(\.athlthStudioFullscreenEditing, true)
