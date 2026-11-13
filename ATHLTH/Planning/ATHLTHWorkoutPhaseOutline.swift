@@ -6,7 +6,7 @@ enum ATHLTHWorkoutPhaseOutline {
     struct Section: Identifiable, Equatable {
         let id: Int
         let phase: WorkoutPhaseKind
-        let indices: [Int]
+        var indices: [Int]
     }
 
     static func sections(for blocks: [WorkoutTemplateBlock]) -> [Section] {
@@ -22,12 +22,7 @@ enum ATHLTHWorkoutPhaseOutline {
                 activePhase = original
             }
             if let last = result.indices.last, result[last].phase == phase {
-                let previous = result[last]
-                result[last] = Section(
-                    id: previous.id,
-                    phase: phase,
-                    indices: previous.indices + [index]
-                )
+                result[last].indices.append(index)
             } else {
                 result.append(Section(id: index, phase: phase, indices: [index]))
             }
