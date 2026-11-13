@@ -977,6 +977,26 @@ enum WorkoutLaunchCoordinator {
                 plannedPlanID: plannedPlanID,
                 plannedSessionID: plannedSessionID
             )
+
+            // Only a deliberately chosen track, and only for iPhone-owned
+            // workouts. Apple Watch retains independent Spotify playback.
+            let effortSong = configuration.advancedWorkout?.spotifyIntervalTrack
+                ?? configuration.workout?.spotifyIntervalTrack
+                ?? plannedRunningWorkout?.spotifyIntervalTrack
+            spotify.prepareIntervalTrack(
+                effortSong,
+                workoutID: phoneWorkout.active?.id
+            )
+            if let recording = phoneWorkout.active,
+               let firstStep = recording.structuredRunningWorkout?.steps.first,
+               ATHLTHSpotifyIntervalCuePolicy.isEffort(firstStep.phase) {
+                Task { @MainActor in
+                    await spotify.playIntervalTrack(
+                        workoutID: recording.id, stepIndex: 0
+                    )
+                }
+            }
+
             watchConnection
                 .updateLocalWorkoutActivity(
                     isActive: true,
