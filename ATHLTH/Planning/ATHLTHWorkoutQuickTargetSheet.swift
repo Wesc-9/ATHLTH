@@ -115,6 +115,8 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
     let isRunning: Bool
     let durationMinutes: Int?
     let partCount: Int
+    /// The actual ordered recipe, including individual work and recovery steps.
+    var workoutSteps: [WorkoutTemplateBlock] = []
     let savingToLibrary: Bool
     let onDecision: (ATHLTHWorkoutGoalSheetDecision) -> Void
 
@@ -122,6 +124,18 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
     @State private var paceMinutes = 5
     @State private var paceSeconds = 0
     @State private var heartRateZone = 3
+    @State private var paceScope: ATHLTHWorkoutPacePlan.Scope = .allWork
+    @State private var selectedPaceIndices: Set<Int> = []
+    @State private var individualPaces: [Int: Int] = [:]
+    @State private var initializedPaceSegments = false
+    @EnvironmentObject private var session: AppSessionStore
+
+    private var maximumHeartRateBPM: Double? {
+        ATHLTHHeartRateZones.resolvedMaximumBPM(
+            configured: session.onboardingProfile?.maximumHeartRateBPM,
+            dateOfBirth: session.onboardingProfile?.dateOfBirth
+        )
+    }
 
     private enum GoalKind: String, CaseIterable, Identifiable {
         case none, pace, heartRateZone
@@ -133,7 +147,16 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
         switch selectedKind {
         case .none: return .none
         case .pace:
-            return .pace(secondsPerKilometer: paceMinutes * 60 + paceSeconds)
+            let seconds = paceMinutes * 60 + paceSeconds
+            guard !workoutSteps.isEmpty else {
+                return .pace(secondsPerKilometer: seconds)
+            }
+            return .pacePlan(ATHLTHWorkoutPacePlan(
+                scope: paceScope,
+                sharedPaceSecondsPerKilometer: seconds,
+                selectedIndices: Array(selectedPaceIndices).sorted(),
+                individualPaces: individualPaces
+            ))
         case .heartRateZone: return .heartRateZone(heartRateZone)
         }
     }
@@ -189,6 +212,16 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
 
                             if selectedKind == .pace {
                                 paceControls
+                                if !workoutSteps.isEmpty {
+                                    ATHLTHWorkoutPaceTargetPicker(
+                                        steps: workoutSteps,
+                                        commonSeconds: paceMinutes * 60 + paceSeconds,
+                                        maximumBPM: maximumHeartRateBPM,
+                                        scope: $paceScope,
+                                        selectedIndices: $selectedPaceIndices,
+                                        individualPaces: $individualPaces
+                                    )
+                                }
                             } else if selectedKind == .heartRateZone {
                                 zoneControls
                             }
@@ -235,6 +268,13 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .accessibilityIdentifier("athlth-quick-goal-sheet")
+        .onAppear {
+            guard !initializedPaceSegments else { return }
+            initializedPaceSegments = true
+            selectedPaceIndices = Set(
+                ATHLTHWorkoutPacePlan.suggestedWorkIndices(in: workoutSteps)
+            )
+        }
     }
 
     /// A persistent action rail keeps the optional "no target" path visible
@@ -259,6 +299,14 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(tint)
+            .disabled(
+                selectedKind == .pace &&
+                    paceScope != .allWork &&
+                    !workoutSteps.isEmpty &&
+                    selectedPaceIndices.intersection(
+                        Set(ATHLTHWorkoutPacePlan.eligibleIndices(in: workoutSteps))
+                    ).isEmpty
+            )
             .accessibilityIdentifier("athlth-quick-goal-continue")
 
             Button {
@@ -421,9 +469,20 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                 }
             }
             .pickerStyle(.segmented)
+            if let range = ATHLTHHeartRateZones.range(
+                for: heartRateZone,
+                maximumBPM: maximumHeartRateBPM
+            ) {
+                Text(tr(
+                    "Estimated target: ~\(range.lowerBound)–\(range.upperBound) bpm",
+                    "Estimert pulsmål: ca. \(range.lowerBound)–\(range.upperBound) slag/min"
+                ))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tint)
+            }
             Text(tr(
-                "Zone follows your ATHLTH heart-rate settings.",
-                "Pulssonen bruker pulsinnstillingene dine i ATHLTH."
+                "The target is estimated from your ATHLTH HRmax. Your heart rate rises gradually, so it may not reach the zone at the start.",
+                "Målområdet beregnes ut fra makspulsen i ATHLTH. Pulsen øker gradvis og er ikke nødvendigvis i sonen fra første sekund."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
