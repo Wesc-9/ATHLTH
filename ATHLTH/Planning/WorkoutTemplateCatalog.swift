@@ -3865,9 +3865,6 @@ struct WorkoutTemplateBuilderView: View {
     @State private var pendingDraftCheckpoint: Task<Void, Never>?
     @State private var showingBlockPicker = false
     @State private var showingSavedWorkoutPicker = false
-    @State private var showingWorkoutFileImporter = false
-    @State private var importedWorkoutPreview: ATHLTHWorkoutFileImport.Preview?
-    @State private var workoutFileImportError: String?
     @State private var showingStudioRoutePicker = false
     @State private var showingStudioRouteBuilder = false
     @State private var studioStepEditorSelection: ATHLTHWorkoutStudioStepEditorSelection?
@@ -5152,7 +5149,14 @@ struct WorkoutTemplateBuilderView: View {
                 if isPlannedWorkout {
                     WorkoutTemplateLibraryView(
                         onSelectPlanned: { workout in
+                            let wasBlank = blocks.isEmpty
                             appendSavedWorkout(workout)
+                            if wasBlank && !blocks.isEmpty {
+                                title = workout.title
+                                // The selected prescription is always editable
+                                // in the existing shared workout engine.
+                                studioBasicRunMode = .structured
+                            }
                             if !studioAdvanced && initialActivity == .running {
                                 studioBasicWorkoutTitle = workout.title
                             }
@@ -5317,39 +5321,6 @@ struct WorkoutTemplateBuilderView: View {
             }
             .sheet(isPresented: $showingCopyPicker) {
                 copyPickerSheet
-            }
-            .fileImporter(
-                isPresented: $showingWorkoutFileImporter,
-                allowedContentTypes: [.item],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    guard let url = urls.first else { return }
-                    do {
-                        importedWorkoutPreview = try ATHLTHWorkoutFileImport.load(
-                            url: url, selectedActivity: initialActivity
-                        )
-                    } catch {
-                        workoutFileImportError = error.localizedDescription
-                    }
-                case .failure(let error):
-                    workoutFileImportError = error.localizedDescription
-                }
-            }
-            .sheet(item: $importedWorkoutPreview) { preview in
-                importedWorkoutReview(preview)
-            }
-            .alert(
-                tr("Could not import workout", "Kunne ikke importere økten"),
-                isPresented: Binding(
-                    get: { workoutFileImportError != nil },
-                    set: { if !$0 { workoutFileImportError = nil } }
-                )
-            ) {
-                Button(tr("OK", "OK")) { workoutFileImportError = nil }
-            } message: {
-                Text(workoutFileImportError ?? "")
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 saveBar
@@ -5703,8 +5674,10 @@ struct WorkoutTemplateBuilderView: View {
                 studioVisiblePhases.insert(phase)
                 showingSavedWorkoutPicker = true
             },
-            onImportWorkout: {
-                showingWorkoutFileImporter = true
+            onChooseLibraryWorkout: {
+                // Reuse the existing ATHLTH / Mine workout selection, not a
+                // file picker or a second workout engine.
+                showingSavedWorkoutPicker = true
             },
             onSelectRoute: { phase in
                 selectedPhase = phase
@@ -7258,168 +7231,6 @@ struct WorkoutTemplateBuilderView: View {
         )
         block.activityTag = "cycling"
         insertBlock(block, toGroup: nil)
-    }
-
-    /// Import stays a draft until the athlete explicitly saves the workout.
-    /// The review prevents an accidental replacement of a partly built session.
-    private func importedWorkoutReview(
-        _ preview: ATHLTHWorkoutFileImport.Preview
-    ) -> some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Label(
-                        tr("Workout ready to import", "Treningsøkt klar for import"),
-                        systemImage: "checkmark.circle"
-                    )
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(studioInk)
-
-                    Text(preview.title)
-                        .font(.system(size: 28, weight: .semibold, design: .serif))
-                    Text(preview.sourceName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    HStack(spacing: 10) {
-                        Label("\(preview.blocks.count) " +
-                              tr("steps", "deløkter"),
-                              systemImage: "square.stack.3d.up")
-                        if let seconds = preview.durationSeconds {
-                            Label(
-                                ATHLTHWorkoutDurationEstimator.conciseDuration(seconds),
-                                systemImage: "clock"
-                            )
-                        }
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-
-                    ForEach(Array(preview.blocks.prefix(12).enumerated()), id: \.offset) {
-                        index, step in
-                        HStack {
-                            Text("\(index + 1).")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26, alignment: .leading)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(step.title).font(.subheadline.weight(.medium))
-                                if let detail = step.targetText {
-                                    Text(detail)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer(minLength: 5)
-                            Text(step.resolvedPhase.title)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 5)
-                    }
-                    if preview.blocks.count > 12 {
-                        Text(tr("\(preview.blocks.count - 12) more steps",
-                                "\(preview.blocks.count - 12) flere deler"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if !blocks.isEmpty {
-                        Text(tr(
-                            "You already have content in this workout. Choose whether to add the imported steps or replace the current content.",
-                            "Du har allerede innhold i denne økten. Velg om du vil legge til delene eller erstatte innholdet."
-                        ))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Button {
-                        applyImportedWorkout(preview, replace: blocks.isEmpty)
-                    } label: {
-                        Label(
-                            blocks.isEmpty
-                                ? tr("Use this workout", "Bruk denne treningsøkten")
-                                : tr("Add to current workout", "Legg til i denne økten"),
-                            systemImage: "checkmark"
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHPlanDesign.accentInk)
-
-                    if !blocks.isEmpty {
-                        Button(role: .destructive) {
-                            applyImportedWorkout(preview, replace: true)
-                        } label: {
-                            Label(tr("Replace current content", "Erstatt nåværende innhold"),
-                                  systemImage: "arrow.triangle.2.circlepath")
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("Import workout", "Importer treningsøkt"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Cancel", "Avbryt")) {
-                        importedWorkoutPreview = nil
-                    }
-                }
-            }
-        }
-        .presentationDetents([.large])
-        .accessibilityIdentifier("athlth-workout-file-import-preview")
-    }
-
-    private func applyImportedWorkout(
-        _ preview: ATHLTHWorkoutFileImport.Preview, replace: Bool
-    ) {
-        var groupMapping: [UUID: UUID] = [:]
-        let copied = preview.blocks.map { source -> WorkoutTemplateBlock in
-            var copy = source
-            copy.editorDragID = UUID()
-            if let original = copy.groupID {
-                if groupMapping[original] == nil { groupMapping[original] = UUID() }
-                copy.groupID = groupMapping[original]
-            }
-            return copy
-        }
-        // Recovery steps belong with their efforts by default. Creating an
-        // explicit Recovery category would split 1 min / 1 min into two
-        // unrelated categories and misrepresent the execution timeline.
-        let visibleImportedPhases = Set(
-            copied.map(\.resolvedPhase).filter { $0 != .recovery }
-        )
-        if replace {
-            blocks = copied
-            studioVisiblePhases = visibleImportedPhases.isEmpty
-                ? [.main] : visibleImportedPhases
-            selectedRouteID = nil
-            title = preview.title
-        } else {
-            blocks.append(contentsOf: copied)
-            studioVisiblePhases.formUnion(visibleImportedPhases)
-            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                title = preview.title
-            }
-        }
-        if isPlannedWorkout && initialActivity == .running {
-            studioBasicRunMode = .structured
-            studioBasicOwnedBlockIDs.removeAll()
-        }
-        resequence()
-        savedToMyWorkouts = false
-        persistWorkoutDraft()
-        importedWorkoutPreview = nil
-        actionNotice = tr(
-            "Workout imported · review and save when ready",
-            "Treningsøkten er importert · se over og lagre når du er klar"
-        )
     }
 
     private func appendSavedWorkout(_ workout: PlannedSession) {
