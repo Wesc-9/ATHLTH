@@ -13,6 +13,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
     let onEditRule: (UUID) -> Void
     let onEditOption: (ATHLTHAudioCoachOption) -> Void
     let onShowProfiles: () -> Void
+    let onUseStandard: () -> Void
     let onAddMessage: () -> Void
     let onShowAdvanced: () -> Void
 
@@ -92,6 +93,12 @@ struct ATHLTHAudioCoachCircleOverview: View {
                         }
                     }
                     Divider()
+                    Button {
+                        onUseStandard()
+                    } label: {
+                        Label(tr("Use standard Coach", "Bruk standard-coach"),
+                              systemImage: "checkmark.circle")
+                    }
                     Button {
                         onShowProfiles()
                     } label: {
@@ -190,9 +197,11 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                 Text(tr("Target", "Mål"))
                                     .font(.subheadline)
                                 Spacer()
-                                Text(draft.smartPrompts.preferredHeartRateZone.map {
-                                    "Z\($0)"
-                                } ?? tr("From workout", "Fra treningsøkten"))
+                                Text(showStructuredOptions
+                                    ? tr("From workout", "Fra treningsøkten")
+                                    : draft.smartPrompts.preferredHeartRateZone.map {
+                                        "Z\($0)"
+                                    } ?? tr("From workout", "Fra treningsøkten"))
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(gold)
                             }
