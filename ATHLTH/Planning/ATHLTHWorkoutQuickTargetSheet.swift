@@ -201,41 +201,7 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
-                    VStack(spacing: 10) {
-                        Button {
-                            onDecision(.continueWith(currentGoal))
-                        } label: {
-                            Label(
-                                selectedKind == .none
-                                    ? (savingToLibrary
-                                        ? tr("Save without target", "Lagre uten mål")
-                                        : tr("Continue without target", "Fortsett uten mål"))
-                                    : (savingToLibrary
-                                        ? tr("Save with target", "Lagre med mål")
-                                        : tr("Add with target", "Legg til med mål")),
-                                systemImage: "checkmark"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 50)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(tint)
-                        .accessibilityIdentifier("athlth-quick-goal-continue")
 
-                        Button {
-                            onDecision(.advanced)
-                        } label: {
-                            Label(
-                                tr("Customize in Advanced", "Tilpass i Avansert"),
-                                systemImage: "slider.horizontal.3"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(tint)
-                        .accessibilityIdentifier("athlth-quick-goal-advanced")
-                    }
                 }
                 .padding(.horizontal, 19)
                 .padding(.vertical, 20)
@@ -243,6 +209,9 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                 .frame(maxWidth: .infinity)
             }
             .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                actionBar
+            }
             .navigationTitle(tr("Make it yours", "Tilpass økten"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -256,6 +225,51 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .accessibilityIdentifier("athlth-quick-goal-sheet")
+    }
+
+    /// A persistent action rail keeps the optional "no target" path visible
+    /// even in the medium detent and with larger accessibility text.
+    private var actionBar: some View {
+        VStack(spacing: 9) {
+            Button {
+                onDecision(.continueWith(currentGoal))
+            } label: {
+                Label(
+                    selectedKind == .none
+                        ? (savingToLibrary
+                            ? tr("Save without target", "Lagre uten mål")
+                            : tr("Continue without target", "Fortsett uten mål"))
+                        : (savingToLibrary
+                            ? tr("Save with target", "Lagre med mål")
+                            : tr("Add with target", "Legg til med mål")),
+                    systemImage: "checkmark"
+                )
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 49)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(tint)
+            .accessibilityIdentifier("athlth-quick-goal-continue")
+
+            Button {
+                onDecision(.advanced)
+            } label: {
+                Label(
+                    tr("Customize in Advanced", "Tilpass i Avansert"),
+                    systemImage: "slider.horizontal.3"
+                )
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 46)
+            }
+            .buttonStyle(.bordered)
+            .tint(tint)
+            .accessibilityIdentifier("athlth-quick-goal-advanced")
+        }
+        .padding(.horizontal, 19)
+        .padding(.vertical, 11)
+        .frame(maxWidth: 540)
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial)
     }
 
     private var identity: some View {
