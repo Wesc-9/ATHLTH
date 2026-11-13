@@ -5584,6 +5584,8 @@ struct SessionEditorView: View {
 
     @State private var selectedSpotifyPlaylist:
         SpotifyPlaylistReference? = nil
+    @State private var selectedSpotifyIntervalTrack:
+        ATHLTHSpotifyIntervalTrack? = nil
     @State private var spotifyAutoplayOnStart:
         Bool? = nil
     @State private var showingSpotifyPlaylistPicker = false
@@ -5804,6 +5806,9 @@ struct SessionEditorView: View {
         )
         _selectedSpotifyPlaylist = State(
             initialValue: workout.spotifyPlaylist
+        )
+        _selectedSpotifyIntervalTrack = State(
+            initialValue: workout.spotifyIntervalTrack
         )
         _spotifyAutoplayOnStart = State(
             initialValue: workout.spotifyAutoplayOnStart
@@ -6405,7 +6410,7 @@ struct SessionEditorView: View {
         extras.gearIDs = source.gearIDs
         extras.spotifyPlaylist = source.spotifyPlaylist
         extras.spotifyAutoplayOnStart = source.spotifyAutoplayOnStart
-        extras.spotifyIntervalTrack = source.spotifyIntervalTrack
+        extras.spotifyIntervalTrack = selectedSpotifyIntervalTrack
         extras.audioCoachConfiguration = source.audioCoachConfiguration
         extras.routeAlertConfiguration = source.routeAlertConfiguration
         extras.ghostTargetDurationSeconds = source.ghostTargetDurationSeconds
@@ -6426,6 +6431,7 @@ struct SessionEditorView: View {
         selectedRouteID = updated.routeID
         title = updated.title
         selectedSpotifyPlaylist = updated.spotifyPlaylist
+        selectedSpotifyIntervalTrack = updated.spotifyIntervalTrack
         spotifyAutoplayOnStart = updated.spotifyAutoplayOnStart
         audioCoachOverride = updated.audioCoachConfiguration
         selectedGearIDs = Set(updated.gearIDs ?? [])
@@ -10425,6 +10431,8 @@ struct SessionEditorView: View {
             )
         selectedSpotifyPlaylist =
             workout.spotifyPlaylist
+        selectedSpotifyIntervalTrack =
+            workout.spotifyIntervalTrack
         spotifyAutoplayOnStart =
             workout.spotifyAutoplayOnStart
         workoutTemplateID =
@@ -10462,7 +10470,7 @@ struct SessionEditorView: View {
         let cleanNotes = notes
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        return PlannedSession(
+        var prepared = PlannedSession(
             id: existingWorkout?.id ??
                 (preserveSourceID ? initialSourceWorkout?.id ?? UUID() : UUID()),
             title: resolvedWorkoutTitle,
@@ -10557,7 +10565,8 @@ struct SessionEditorView: View {
                 ? initialSourceWorkout?.allowInviteeExercises
                 : selectedPartnerID == nil ? nil : allowInviteeExercises
         )
-
+        prepared.spotifyIntervalTrack = selectedSpotifyIntervalTrack
+        return prepared
     }
 
     private func saveSession() {
