@@ -2775,6 +2775,7 @@ struct WorkoutTemplateDetailView: View {
     @State private var showingWorkout = false
     @State private var showingEditor = false
     @State private var askingForPersonalTargets = false
+    @State private var detailQuickGoalDecision: ATHLTHWorkoutGoalSheetDecision?
     @State private var editingPersonalTargets = false
     @State private var personalBlocks: [WorkoutTemplateBlock]?
     @State private var originalCompletions: [StructuredWorkoutCompletion] = []
@@ -2832,6 +2833,24 @@ struct WorkoutTemplateDetailView: View {
         } else {
             savePersonalWorkout(blocks:
                 ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks))
+        }
+    }
+
+    /// The library detail uses the same quick goal behavior as Plan and Train.
+    private func finishDetailGoalSelection() {
+        let decision = detailQuickGoalDecision
+        detailQuickGoalDecision = nil
+        switch decision {
+        case .continueWith(let goal):
+            let clean = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+            savePersonalWorkout(
+                blocks: ATHLTHWorkoutQuickGoalApplier.apply(goal, to: clean)
+            )
+        case .advanced:
+            personalBlocks = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+            editingPersonalTargets = true
+        case .cancel, .none:
+            break
         }
     }
 
@@ -2955,26 +2974,20 @@ struct WorkoutTemplateDetailView: View {
             .padding(.vertical, 11)
             .background(.regularMaterial)
         }
-        .confirmationDialog(
-            tr("Add personal workout targets?", "Vil du legge inn personlige øktmål?"),
+        .sheet(
             isPresented: $askingForPersonalTargets,
-            titleVisibility: .visible
+            onDismiss: finishDetailGoalSelection
         ) {
-            Button(tr("Personalize workout", "Tilpass økten")) {
-                personalBlocks = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
-                editingPersonalTargets = true
+            ATHLTHWorkoutQuickTargetSheet(
+                workoutName: entry.title,
+                isRunning: entry.plannedSession().kind == .running,
+                durationMinutes: entry.estimatedDurationMinutes,
+                partCount: entry.blocks.count,
+                savingToLibrary: true
+            ) { decision in
+                detailQuickGoalDecision = decision
+                askingForPersonalTargets = false
             }
-            Button(tr("Save without personal targets", "Lagre uten personlige mål")) {
-                savePersonalWorkout(
-                    blocks: ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
-                )
-            }
-            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
-        } message: {
-            Text(tr(
-                "You can personalize weight, sets, reps, rest, pace, heart-rate zone and other targets now, or later. The original workout stays unchanged.",
-                "Du kan tilpasse vekt, sett, repetisjoner, pauser, tempo, pulssone og andre mål nå eller senere. Originaløkten endres ikke."
-            ))
         }
         .sheet(isPresented: $editingPersonalTargets) {
             NavigationStack {
