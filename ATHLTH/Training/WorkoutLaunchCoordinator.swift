@@ -1013,7 +1013,12 @@ enum WorkoutLaunchCoordinator {
                         )
                     }
                     await spotify.playIntervalTrack(
-                        workoutID: recording.id, stepIndex: 0
+                        workoutID: recording.id, stepIndex: 0,
+                        effortIndex: 0,
+                        targetDurationSeconds: recording.structuredRunningWorkout?
+                            .steps.first?.durationSeconds,
+                        intensityText: recording.structuredRunningWorkout?
+                            .steps.first?.intensityText
                     )
                 }
             } else {
