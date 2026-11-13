@@ -286,6 +286,26 @@ jobs:
             xcrun simctl terminate "$UDID" com.wesc9.athlth || true
           done
 
+          # Profile previously crashed with SwiftUI EnvironmentObject.error()
+          # when selected from the real iPad sidebar. Verify it stays alive.
+          PROFILE_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth \
+            --athlth-compatibility-preview \
+            "--athlth-compatibility-sidebar=profile" 2>&1)
+          echo "$PROFILE_OUTPUT"
+          PROFILE_PID=$(echo "$PROFILE_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+          sleep 5
+          if [ -z "$PROFILE_PID" ] || ! kill -0 "$PROFILE_PID" 2>/dev/null; then
+            echo "::error::ATHLTH iPad sidebar Profile crashed during presentation."
+            xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH"' || true
+            exit 1
+          fi
+          validate_screen "sidebar-profile"
+          if ! kill -0 "$PROFILE_PID" 2>/dev/null; then
+            echo "::error::ATHLTH iPad sidebar Profile crashed after rendering."
+            exit 1
+          fi
+          xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+
           # Check the actual first logged-in Studio frame on a larger iPad,
           # in addition to the 11-inch device tested above. Keep the PNG for
           # visual inspection; entropy alone cannot prove layout quality.

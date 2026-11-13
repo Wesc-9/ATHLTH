@@ -189,8 +189,18 @@ struct ATHLTHiPadStudioRootView: View {
                 )
             )
         }
+        // Exercise the real Profile destination in iPad crash regression smoke.
+        let sidebarArgument = ProcessInfo.processInfo.arguments.first {
+            $0.hasPrefix("--athlth-compatibility-sidebar=")
+        }
+        let sidebarPreview = sidebarArgument.flatMap {
+            ATHLTHSideMenuDestination(rawValue: String(
+                $0.dropFirst("--athlth-compatibility-sidebar=".count)
+            ))
+        }
         _selection = State(initialValue: initial)
         _libraryPage = State(initialValue: libraryPreview)
+        _sidebarPage = State(initialValue: sidebarPreview)
         // Plan Studio starts with its sidebar fully hidden; library pages
         // keep their sidebar visible in both preview and normal navigation.
         _sidebarVisibility = State(initialValue:
@@ -327,7 +337,8 @@ struct ATHLTHiPadStudioRootView: View {
             let compatibilityLaunch = ProcessInfo.processInfo.arguments
                 .contains {
                     $0.hasPrefix("--athlth-compatibility-tab=") ||
-                        $0.hasPrefix("--athlth-compatibility-library=")
+                        $0.hasPrefix("--athlth-compatibility-library=") ||
+                        $0.hasPrefix("--athlth-compatibility-sidebar=")
                 }
             if !compatibilityLaunch,
                let restored = ATHLTHStudioDestination(rawValue: savedDestination) {
