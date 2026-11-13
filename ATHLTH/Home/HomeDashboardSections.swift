@@ -4475,10 +4475,7 @@ private struct HomeWeeklyProgressDaySheet: View {
         // Both the workout created in ATHLTH and its HealthKit record may
         // carry the same HealthKit UUID. Prefer the ATHLTH strength log
         // so sets, exercises, weights and personal records are available.
-        let strengthLog = strength.workoutHistory.first {
-            $0.id == summary.id ||
-            $0.healthMetrics.healthKitWorkoutUUID == summary.id
-        }
+        let strengthLog = completedStrengthLog(for: summary)
         let workout = strengthLog.map {
             SocialPublishableWorkout(strengthWorkout: $0)
         } ?? SocialPublishableWorkout(summary: summary)
@@ -4545,10 +4542,22 @@ private struct HomeWeeklyProgressDaySheet: View {
             : parts.joined(separator: " · ")
     }
 
+    private func completedStrengthLog(for workout: WorkoutSummary) -> StrengthWorkoutLog? {
+        guard workout.activity == .strength else { return nil }
+        return strength.workoutHistory.first {
+            $0.isFinished &&
+            ($0.id == workout.id ||
+             $0.healthMetrics.healthKitWorkoutUUID == workout.id)
+        }
+    }
+
     private func actualRow(
         _ workout: WorkoutSummary
     ) -> some View {
-        let metrics = HomeCompletedWorkoutPresentation.metrics(for: workout)
+        let strengthLog = completedStrengthLog(for: workout)
+        let metrics = HomeCompletedWorkoutPresentation.metrics(
+            for: workout, strengthLog: strengthLog
+        )
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 9) {
@@ -4586,7 +4595,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .lineLimit(1)
 
                     Text(HomeCompletedWorkoutPresentation.timeAndLocation(
-                        for: workout
+                        for: workout,
+                        strengthLog: strengthLog
                     ))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -4613,10 +4623,10 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
 
             LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 7),
-                    GridItem(.flexible(), spacing: 7)
-                ],
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: 7),
+                    count: workout.activity == .strength ? 3 : 2
+                ),
                 alignment: .leading,
                 spacing: 7
             ) {
@@ -4701,19 +4711,22 @@ enum HomeCompletedWorkoutPresentation {
 
     static func timeAndLocation(
         for workout: WorkoutSummary,
+        strengthLog: StrengthWorkoutLog? = nil,
         norwegian: Bool = ATHLTHLocalization.isNorwegian
     ) -> String {
-        let start = workout.startDate.formatted(
+        let startDate = strengthLog?.startedAt ?? workout.startDate
+        let endDate = strengthLog?.endedAt ?? workout.endDate
+        let start = startDate.formatted(
             date: .omitted, time: .shortened
         )
-        let end = workout.endDate.formatted(
+        let end = endDate.formatted(
             date: .omitted, time: .shortened
         )
-        let range = workout.endDate > workout.startDate
+        let range = endDate > startDate
             ? "\(start)–\(end)" : start
 
         let location: String?
-        switch workout.isIndoor {
+        switch strengthLog == nil ? workout.isIndoor : true {
         case .some(true):
             location = norwegian ? "Inne" : "Indoor"
         case .some(false):
@@ -4726,10 +4739,14 @@ enum HomeCompletedWorkoutPresentation {
 
     static func metrics(
         for workout: WorkoutSummary,
+        strengthLog: StrengthWorkoutLog? = nil,
         norwegian: Bool = ATHLTHLocalization.isNorwegian
     ) -> [HomeCompletedWorkoutMetric] {
         var items: [HomeCompletedWorkoutMetric] = []
-        let seconds = workout.duration
+        let strengthPresentation = strengthLog.map {
+            SocialPublishableWorkout(strengthWorkout: $0)
+        }
+        let seconds = strengthPresentation?.duration ?? workout.duration
         if seconds.isFinite && seconds >= 0 {
             let minutes = max(Int((seconds / 60).rounded()), 0)
             let duration: String
@@ -4746,6 +4763,18 @@ enum HomeCompletedWorkoutPresentation {
                 id: "duration",
                 icon: "clock",
                 text: duration
+            ))
+        }
+
+        if let count = strengthPresentation?.strengthExerciseCount, count > 0 {
+            items.append(.init(
+                id: "exercises",
+                icon: "dumbbell.fill",
+                text: ATHLTHLocalization.format(
+                    english: "%d exercises",
+                    norwegian: "%d øvelser",
+                    count
+                )
             ))
         }
 
@@ -4803,7 +4832,8 @@ enum HomeCompletedWorkoutPresentation {
             }
         }
 
-        if let energy = workout.activeEnergyKilocalories,
+        if let energy = workout.activeEnergyKilocalories
+            ?? strengthPresentation?.activeEnergyKilocalories,
            energy.isFinite, energy > 0 {
             items.append(.init(
                 id: "energy",
