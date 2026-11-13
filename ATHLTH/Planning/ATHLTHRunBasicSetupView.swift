@@ -108,6 +108,27 @@ struct ATHLTHRunBasicSetupView: View {
                 .accessibilityIdentifier("athlth-quick-run-map-preview")
             }
 
+            if !scheduleEditable, let onEditWorkout {
+                Button(action: onEditWorkout) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "slider.horizontal.3")
+                            .frame(width: 26)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Edit workout", norwegian: "Rediger økten"
+                        ))
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(bronze)
+                    .frame(minHeight: 46)
+                    .padding(.horizontal, 14)
+                    .athlthTrainPaper()
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-basic-run-edit-workout")
+            }
+
             if let audioCoachEnabled {
                 DisclosureGroup(isExpanded: $showsBasicCoachSettings) {
                     Toggle(isOn: audioCoachEnabled) {

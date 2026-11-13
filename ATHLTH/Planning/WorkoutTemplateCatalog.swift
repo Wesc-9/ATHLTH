@@ -4874,21 +4874,23 @@ struct WorkoutTemplateBuilderView: View {
     // All block operations, validation, draft recovery and save closures
     // remain in WorkoutTemplateBuilderView on both platforms.
     private var studioPlanHeader: some View {
-        ATHLTHPlannedWorkoutStudioHeader(
-            workoutName: $title,
-            activity: initialActivity,
-            blocks: blocks,
-            durationMinutes: resolvedDurationMinutes,
-            route: activeRoute,
-            plannedDate: plannedDate,
-            onDateChanged: onScheduledTimeChanged,
-            runningEnvironment: initialActivity == .running
-                ? $studioBasicRunEnvironment : nil
-        )
-        .overlay(alignment: .topTrailing) {
-            workoutExtrasMenu
-                .padding(.top, 18)
-                .padding(.trailing, 18)
+        VStack(alignment: .leading, spacing: 10) {
+            ATHLTHPlannedWorkoutStudioHeader(
+                workoutName: $title,
+                activity: initialActivity,
+                blocks: blocks,
+                durationMinutes: resolvedDurationMinutes,
+                route: activeRoute,
+                scheduledAt: plannedDate != nil ? $studioBasicDate : nil,
+                runningEnvironment: initialActivity == .running
+                    ? $studioBasicRunEnvironment : nil
+            )
+            // Do not overlay integration controls on the shared card's
+            // planned timestamp; they remain available in both modes.
+            HStack {
+                Spacer(minLength: 0)
+                workoutExtrasMenu
+            }
         }
     }
 
@@ -4938,13 +4940,16 @@ struct WorkoutTemplateBuilderView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if isPlannedWorkout {
                         if !studioAdvanced && initialActivity == .running {
+                            studioPlanHeader
                             ATHLTHRunBasicSetupView(
                                 workoutName: $title,
                                 mode: $studioBasicRunMode,
                                 environment: $studioBasicRunEnvironment,
                                 date: $studioBasicDate,
-                                scheduleEditable: true,
-                                workoutStepCount: blocks.count,
+                                // Details, date and running environment now
+                                // live in the same card as Quick Run. Do not
+                                // render the old scheduling summary behind it.
+                                scheduleEditable: false,
                                 onEditWorkout: { studioAdvanced = true },
                                 selectedRouteTitle: session.savedRoutes.first {
                                     $0.id == selectedRouteID
@@ -4994,9 +4999,6 @@ struct WorkoutTemplateBuilderView: View {
                                 isGoalSelected: studioBasicGoalSelected,
                                 isGhostSelected: studioBasicGhostSelected
                             )
-                            // A labeled, native dropdown replaces the isolated
-                            // gear icon at the top of Basic running.
-                            workoutExtrasMenu
                             if studioBasicGoalSelected {
                                 studioBasicGoalEditor
                             }
@@ -5047,7 +5049,10 @@ struct WorkoutTemplateBuilderView: View {
             }
             .background(studioBackground.ignoresSafeArea())
             .onChange(of: studioBasicDate) { _, value in
-                if !studioAdvanced && initialActivity == .running {
+                // Date/time in the shared details card is authoritative for
+                // both Basic and Advanced, and the scheduled session is
+                // updated through the existing parent callback.
+                if isPlannedWorkout, plannedDate != nil {
                     onScheduledTimeChanged?(value)
                 }
             }

@@ -8,6 +8,8 @@ struct ATHLTHWorkoutDetailsCard<Details: View>: View {
     let symbol: String
     var name: Binding<String>? = nil
     var scheduledAt: Binding<Date>? = nil
+    var namePlaceholder: String? = nil
+    var showsTimingLabel = true
     let details: Details
 
     init(
@@ -15,12 +17,16 @@ struct ATHLTHWorkoutDetailsCard<Details: View>: View {
         symbol: String,
         name: Binding<String>? = nil,
         scheduledAt: Binding<Date>? = nil,
+        namePlaceholder: String? = nil,
+        showsTimingLabel: Bool = true,
         @ViewBuilder details: () -> Details
     ) {
         self.activityTitle = activityTitle
         self.symbol = symbol
         self.name = name
         self.scheduledAt = scheduledAt
+        self.namePlaceholder = namePlaceholder
+        self.showsTimingLabel = showsTimingLabel
         self.details = details()
     }
 
@@ -48,32 +54,34 @@ struct ATHLTHWorkoutDetailsCard<Details: View>: View {
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                 }
                 Spacer(minLength: 4)
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(
-                        english: scheduledAt == nil ? "NOW" : "PLANNED",
-                        norwegian: scheduledAt == nil ? "NÅ" : "PLANLAGT"
-                    ))
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(0.8)
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    if let scheduledAt {
-                        Text(scheduledAt.wrappedValue,
-                             format: .dateTime.day().month(.abbreviated).hour().minute())
-                            .font(.caption.weight(.semibold))
-                    } else {
-                        Text(Date.now, format: .dateTime.hour().minute())
-                            .font(.caption.weight(.semibold))
+                if showsTimingLabel {
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: scheduledAt == nil ? "NOW" : "PLANNED",
+                            norwegian: scheduledAt == nil ? "NÅ" : "PLANLAGT"
+                        ))
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.8)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        if let scheduledAt {
+                            Text(scheduledAt.wrappedValue,
+                                 format: .dateTime.day().month(.abbreviated).hour().minute())
+                                .font(.caption.weight(.semibold))
+                        } else {
+                            Text(Date.now, format: .dateTime.hour().minute())
+                                .font(.caption.weight(.semibold))
+                        }
                     }
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 }
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
             }
 
             if let name {
                 TextField(
                     "", text: name,
-                    prompt: Text(ATHLTHLocalization.choose(
+                    prompt: Text(namePlaceholder ?? ATHLTHLocalization.choose(
                         english: "Workout name (optional)",
                         norwegian: "Øktnavn (valgfritt)"
                     ))

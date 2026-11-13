@@ -9,13 +9,10 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     let blocks: [WorkoutTemplateBlock]
     let durationMinutes: Int?
     let route: TrainingRoute?
-    let plannedDate: Date?
-    let onDateChanged: ((Date) -> Void)?
+    let scheduledAt: Binding<Date>?
     /// Only supplied for running workouts. Other activities never expose
     /// the running environment selector.
     let runningEnvironment: Binding<RunEnvironment>?
-
-    @State private var selectedDate: Date
 
     init(
         workoutName: Binding<String>,
@@ -23,8 +20,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         blocks: [WorkoutTemplateBlock],
         durationMinutes: Int?,
         route: TrainingRoute?,
-        plannedDate: Date?,
-        onDateChanged: ((Date) -> Void)?,
+        scheduledAt: Binding<Date>?,
         runningEnvironment: Binding<RunEnvironment>? = nil
     ) {
         _workoutName = workoutName
@@ -32,10 +28,8 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         self.blocks = blocks
         self.durationMinutes = durationMinutes
         self.route = route
-        self.plannedDate = plannedDate
-        self.onDateChanged = onDateChanged
+        self.scheduledAt = scheduledAt
         self.runningEnvironment = runningEnvironment
-        _selectedDate = State(initialValue: plannedDate ?? Date())
     }
 
     private let ink = ATHLTHTrainDesign.ink
@@ -129,122 +123,96 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(spacing: 12) {
-                Image(systemName: activity?.symbol ?? "figure.run")
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(bronze)
-                    .frame(width: 52, height: 52)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 16))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "WORKOUT DETAILS", norwegian: "ØKTDETALJER"
-                    ))
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.8)
-                    .foregroundStyle(bronze)
-                    Text(activity?.title ?? ATHLTHLocalization.choose(
-                        english: "Your workout", norwegian: "Din økt"
-                    ))
-                    .font(.system(size: 23, weight: .semibold, design: .serif))
-                    .foregroundStyle(ink)
-                }
-                Spacer(minLength: 0)
-            }
-            TextField(
-                "", text: $workoutName,
-                prompt: Text(ATHLTHWorkoutNameSuggestion.suggested(
-                    activity: activity, blocks: blocks,
-                    durationMinutes: durationMinutes, routeTitle: route?.title
-                ))
-                .foregroundStyle(.secondary.opacity(0.55))
-            )
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(ink)
-            .tint(bronze)
-            .textInputAutocapitalization(.sentences)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Workout name (optional)", norwegian: "Øktnavn (valgfritt)"
-            ))
-            .frame(minHeight: 43, alignment: .leading)
-            .padding(.horizontal, 13)
-            .background(ATHLTHPlanDesign.canvas,
-                        in: RoundedRectangle(cornerRadius: 12))
-
-            if let runningLocationText {
-                HStack(spacing: 6) {
-                    Image(systemName: runningLocationSymbol)
-                        .accessibilityHidden(true)
-                    Text(runningLocationText)
-                    // Show both representations of the same pace target
-                    // for running outdoors, indoors and on treadmills.
-                    if let treadmillSpeedText {
-                        Text("·")
-                        Text(treadmillSpeedText)
-                        Text("·")
-                        Text(paceText + " min/km")
-                    } else if ATHLTHPlannedWorkoutMetrics.hasVariablePace(
-                        for: blocks
-                    ) {
-                        Text("·")
-                        Text(ATHLTHLocalization.choose(
-                            english: "Variable pace", norwegian: "Varierende tempo"
-                        ))
-                    } else if runningLocation == .outdoor && route != nil {
-                        Text("·")
-                        Text(ATHLTHLocalization.choose(
-                            english: "Route", norwegian: "Rute"
-                        ))
+        // Planlegg økt and Quick Run now render the same shared
+        // workout-details card. The planned date is editable, whereas
+        // Quick Run continues to show a read-only start-now timestamp.
+        ATHLTHWorkoutDetailsCard(
+            activityTitle: activity?.title ?? ATHLTHLocalization.choose(
+                english: "Your workout", norwegian: "Din økt"
+            ),
+            symbol: activity?.symbol ?? "figure.run",
+            name: $workoutName,
+            scheduledAt: scheduledAt,
+            namePlaceholder: ATHLTHWorkoutNameSuggestion.suggested(
+                activity: activity,
+                blocks: blocks,
+                durationMinutes: durationMinutes,
+                routeTitle: route?.title
+            ),
+            showsTimingLabel: scheduledAt != nil
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                if let runningLocationText {
+                    HStack(spacing: 6) {
+                        Image(systemName: runningLocationSymbol)
+                            .accessibilityHidden(true)
+                        Text(runningLocationText)
+                        if let treadmillSpeedText {
+                            Text("·")
+                            Text(treadmillSpeedText)
+                            Text("·")
+                            Text(paceText + " min/km")
+                        } else if ATHLTHPlannedWorkoutMetrics.hasVariablePace(
+                            for: blocks
+                        ) {
+                            Text("·")
+                            Text(ATHLTHLocalization.choose(
+                                english: "Variable pace", norwegian: "Varierende tempo"
+                            ))
+                        } else if runningLocation == .outdoor && route != nil {
+                            Text("·")
+                            Text(ATHLTHLocalization.choose(
+                                english: "Route", norwegian: "Rute"
+                            ))
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(bronze)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .accessibilityElement(children: .combine)
                 }
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(bronze)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                .accessibilityElement(children: .combine)
-            }
 
-            HStack(spacing: 0) {
-                metric("clock", ATHLTHLocalization.choose(
-                    english: "Duration", norwegian: "Varighet"
-                ), plannedDurationText)
-                metric("point.topleft.down.to.point.bottomright.curvepath",
-                       ATHLTHLocalization.choose(
-                            english: "Distance", norwegian: "Distanse"
-                       ), distanceText)
-                metric("heart", ATHLTHLocalization.choose(
-                    english: "Zone", norwegian: "Sone"
-                ), zoneText)
-                if runningLocation == .treadmill || blocks.contains(where: {
-                    $0.kind == .run && $0.treadmillInclinePercent != nil
-                }) {
-                    metric("mountain.2", ATHLTHLocalization.choose(
-                        english: "Incline", norwegian: "Stigning"
-                    ), inclineText)
-                } else if runningLocation != nil {
-                    metric("speedometer", ATHLTHLocalization.choose(
-                        english: "Pace (min/km)", norwegian: "Tempo (min/km)"
-                    ), paceText)
-                } else {
-                    metric("mountain.2", ATHLTHLocalization.choose(
-                        english: "Incline", norwegian: "Stigning"
-                    ), inclineText)
+                HStack(spacing: 0) {
+                    metric("clock", ATHLTHLocalization.choose(
+                        english: "Duration", norwegian: "Varighet"
+                    ), plannedDurationText)
+                    metric("point.topleft.down.to.point.bottomright.curvepath",
+                           ATHLTHLocalization.choose(
+                               english: "Distance", norwegian: "Distanse"
+                           ), distanceText)
+                    metric("heart", ATHLTHLocalization.choose(
+                        english: "Zone", norwegian: "Sone"
+                    ), zoneText)
+                    if runningLocation == .treadmill || blocks.contains(where: {
+                        $0.kind == .run && $0.treadmillInclinePercent != nil
+                    }) {
+                        metric("mountain.2", ATHLTHLocalization.choose(
+                            english: "Incline", norwegian: "Stigning"
+                        ), inclineText)
+                    } else if runningLocation != nil {
+                        metric("speedometer", ATHLTHLocalization.choose(
+                            english: "Pace (min/km)", norwegian: "Tempo (min/km)"
+                        ), paceText)
+                    } else {
+                        metric("mountain.2", ATHLTHLocalization.choose(
+                            english: "Incline", norwegian: "Stigning"
+                        ), inclineText)
+                    }
                 }
-            }
 
-            if activity == .running, let runningEnvironment {
-                ATHLTHRunEnvironmentDetailRow(environment: runningEnvironment)
-            }
+                if activity == .running, let runningEnvironment {
+                    ATHLTHRunEnvironmentDetailRow(environment: runningEnvironment)
+                }
 
-            if plannedDate != nil {
-                HStack(spacing: 8) {
-                    if onDateChanged != nil {
+                if let scheduledAt {
+                    HStack(spacing: 8) {
                         DatePicker(
                             ATHLTHLocalization.choose(
                                 english: "Date", norwegian: "Dato"
-                            ), selection: $selectedDate,
+                            ),
+                            selection: scheduledAt,
                             displayedComponents: .date
                         )
                         .font(.caption)
@@ -252,28 +220,18 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                         DatePicker(
                             ATHLTHLocalization.choose(
                                 english: "Time", norwegian: "Tid"
-                            ), selection: $selectedDate,
+                            ),
+                            selection: scheduledAt,
                             displayedComponents: .hourAndMinute
                         )
                         .font(.caption)
                         .frame(maxWidth: .infinity)
-                    } else {
-                        Label(selectedDate.formatted(date: .abbreviated, time: .omitted),
-                              systemImage: "calendar")
-                        Spacer()
-                        Label(selectedDate.formatted(date: .omitted, time: .shortened),
-                              systemImage: "clock")
                     }
-                }
-                .font(.caption)
-                .foregroundStyle(ink)
-                .onChange(of: selectedDate) { _, newValue in
-                    onDateChanged?(newValue)
+                    .foregroundStyle(ink)
                 }
             }
         }
-        .padding(16)
-        .athlthPlanCard(radius: 22, warm: true)
+        .accessibilityIdentifier("athlth-planned-shared-workout-details")
     }
 
     private func metric(
