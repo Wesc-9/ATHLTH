@@ -152,6 +152,7 @@ struct WatchActiveWorkoutView: View {
     @State private var selectedNonRunningPage = 0
     @State private var showingStrengthSetOptions = false
     @State private var showingStrengthSkipConfirmation = false
+    @State private var showingStrengthWholeWorkoutPauseConfirmation = false
 
     var body: some View {
         Group {
@@ -271,6 +272,26 @@ struct WatchActiveWorkoutView: View {
                 $showingStrengthSetOptions
         ) {
             strengthSetOptionsSheet
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Pause the entire workout?",
+                norwegian: "Pause hele treningsøkten?"
+            ),
+            isPresented: $showingStrengthWholeWorkoutPauseConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Pause whole workout",
+                norwegian: "Pause hele økten"
+            )) {
+                workoutManager.pause()
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Apple Health recording will pause. Rest between sets does not require pausing the workout.",
+                norwegian: "Registreringen i Apple Health pauses. Hvile mellom sett krever ikke at økten pauses."
+            ))
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -1570,6 +1591,10 @@ struct WatchActiveWorkoutView: View {
             Button {
                 if workoutManager.state == .paused {
                     workoutManager.resume()
+                } else if workoutManager.kind == .strength {
+                    // Rest timers never pause HealthKit. A pause of the
+                    // entire strength recording needs explicit confirmation.
+                    showingStrengthWholeWorkoutPauseConfirmation = true
                 } else {
                     workoutManager.pause()
                 }
@@ -1607,6 +1632,10 @@ struct WatchActiveWorkoutView: View {
                 workoutManager.state ==
                     .ending
             )
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Pauses the entire Apple Health workout, not rest between sets",
+                norwegian: "Pauser hele Apple Health-økten, ikke hvile mellom sett"
+            ))
 
             if workoutManager.audioCoachConfigured,
                workoutManager.audioCoachConfiguration.enabled {
