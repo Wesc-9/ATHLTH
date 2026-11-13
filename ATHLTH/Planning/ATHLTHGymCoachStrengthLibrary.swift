@@ -210,10 +210,7 @@ enum ATHLTHGymCoachStrengthLibrary {
                 (ATHLTHLocalization.isNorwegian
                     ? ATHLTHExerciseNameLocalization.norwegianName(for: exercise.name)
                     : exercise.name)
-            let loadDescription = ATHLTHLocalization.choose(
-                english: "\(exercise.targetRepsMin)–\(exercise.targetRepsMax) reps · \(exercise.targetRIR) reps in reserve",
-                norwegian: "\(exercise.targetRepsMin)–\(exercise.targetRepsMax) repetisjoner · \(exercise.targetRIR) i reserve"
-            )
+
             var block = WorkoutTemplateBlock(
                 sequence: blocks.count + 1, kind: .exercise,
                 title: title,
@@ -223,12 +220,16 @@ enum ATHLTHGymCoachStrengthLibrary {
                 durationSeconds: nil,
                 targetWeightKilograms: nil,
                 loadNote: nil,
-                notes: loadDescription,
+                notes: exercise.notes,
                 phase: .main,
                 targetEffortRPE: 10 - exercise.targetRIR,
                 setCount: exercise.targetSets,
                 restBetweenSetsSeconds: Double(exercise.restSec)
             )
+            block.targetRepetitionsMaximum = exercise.targetRepsMax
+            block.targetRepsInReserve = exercise.targetRIR
+            block.targetMovementTempo = exercise.tempo
+            block.sourceSupersetGroupIndex = exercise.supersetGroup
             block.exerciseSnapshot = ExerciseSnapshot(
                 name: exercise.name, instructions: [],
                 primaryMuscles: [exercise.muscleGroup.lowercased()],
