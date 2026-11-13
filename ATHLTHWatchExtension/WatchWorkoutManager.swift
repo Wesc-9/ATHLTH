@@ -7040,6 +7040,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 norwegian: String
             )?
         var hasEvaluableTarget = false
+        var hasHeartRateViolation = false
 
         let missingHeartRateSample =
             configuration.heartRateEnabled &&
@@ -7073,11 +7074,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             hasEvaluableTarget = true
 
             if heartRate < minimum {
+                hasHeartRateViolation = true
                 violation = ATHLTHHeartRateZoneCoachTarget.alertPhrase(
                     zone: configuration.heartRateZone,
                     below: true
                 )
             } else if heartRate > maximum {
+                hasHeartRateViolation = true
                 violation = ATHLTHHeartRateZoneCoachTarget.alertPhrase(
                     zone: configuration.heartRateZone,
                     below: false
@@ -7264,9 +7267,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             targetViolationStartedAt = now
         }
 
+        // Only HR-zone speech uses these athlete-selected tolerances.
+        // Pace-target warnings retain their existing independent thresholds.
+        let stableOffTargetSeconds = hasHeartRateViolation
+            ? (audioCoachConfiguration.smartPrompts?.resolvedTargetZoneGrace ??
+               configuration.graceSeconds)
+            : configuration.graceSeconds
+        let repeatAfterSeconds = hasHeartRateViolation
+            ? (audioCoachConfiguration.smartPrompts?.resolvedTargetZoneRepeat ??
+               configuration.repeatSeconds)
+            : configuration.repeatSeconds
         guard now.timeIntervalSince(
             targetViolationStartedAt ?? now
-        ) >= configuration.graceSeconds
+        ) >= stableOffTargetSeconds
         else {
             return
         }
@@ -7274,7 +7287,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if let lastTargetAlertAt,
            now.timeIntervalSince(
                 lastTargetAlertAt
-           ) < configuration.repeatSeconds {
+           ) < repeatAfterSeconds {
             return
         }
 
