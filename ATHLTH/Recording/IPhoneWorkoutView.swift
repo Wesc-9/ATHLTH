@@ -1460,6 +1460,7 @@ struct IPhoneWorkoutView: View {
     @StateObject private var socialCompanion =
         SocialWorkoutCompanionStore()
     @State private var confirmFinish = false
+    @State private var showingSpotifyControls = false
     @State private var followMe = true
     @State private var showingTreadmillInclineEditor = false
     @State private var showingLiveAudioCoach = false
@@ -1517,88 +1518,17 @@ struct IPhoneWorkoutView: View {
                         .hidden
                     )
 
-                    if let ghostTitle =
-                            workout.ghostRaceTitle {
-                        Section("Ghost") {
-                            HStack(
-                                alignment:
-                                    .firstTextBaseline
-                            ) {
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 3
-                                ) {
-                                    Text(ghostTitle)
-                                        .font(.headline)
-
-                                    Text(
-                                        "Live comparison"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
-
-                                    if realtime
-                                        .selectedLiveGhostSessionID != nil {
-                                        liveGhostConnectionLabel
-                                    }
-                                }
-
-                                Spacer()
-
-                                if let distanceDelta =
-                                        workout.ghostDistanceDeltaMeters,
-                                   distanceDelta.isFinite {
-                                    Text(liveGhostText(distanceDelta))
-                                        .font(.title3.weight(.bold))
-                                        .monospacedDigit()
-                                        .foregroundStyle(
-                                            abs(distanceDelta) < 8
-                                                ? .secondary
-                                                : distanceDelta >= 0
-                                                    ? ATHLTHTheme.vitality : .orange
-                                        )
-                                } else if realtime.selectedLiveGhostSessionID != nil {
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "Waiting for fresh GPS",
-                                        norwegian: "Venter på fersk GPS"
-                                    ))
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.orange)
-                                    .multilineTextAlignment(.trailing)
-                                } else {
-                                    Text("—")
-                                        .foregroundStyle(.secondary)
-                                }
+                    if let ghostTitle = workout.ghostRaceTitle {
+                        Section {
+                            ATHLTHGhostLiveComparisonTable(
+                                name: ghostTitle,
+                                distanceMeters: workout.distanceMeters,
+                                signedLeadMeters: workout.ghostDistanceDeltaMeters,
+                                timeGapSeconds: workout.ghostTimeDeltaSeconds
+                            )
+                            if realtime.selectedLiveGhostSessionID != nil {
+                                liveGhostConnectionLabel
                             }
-
-                            if let timeDelta =
-                                    workout
-                                        .ghostTimeDeltaSeconds {
-                                LabeledContent(
-                                    "Estimated gap",
-                                    value:
-                                        ghostTimeText(
-                                            timeDelta
-                                        )
-                                )
-                            }
-
-                            if workout
-                                .ghostAudioConfiguration?
-                                .enabled == true {
-                                Label(
-                                    "Ghost Updates active",
-                                    systemImage:
-                                        "waveform"
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    .secondary
-                                )
-                            }
-
                             Button {
                                 recorder.disableGhostDuringWorkout()
                             } label: {
@@ -1606,12 +1536,13 @@ struct IPhoneWorkoutView: View {
                                     ATHLTHLocalization.choose(
                                         english: "Turn off Ghost Race",
                                         norwegian: "Slå av Ghost Race"
-                                    ),
-                                    systemImage: "eye.slash"
+                                    ), systemImage: "eye.slash"
                                 )
                                 .font(.subheadline.weight(.semibold))
                             }
                             .buttonStyle(.bordered)
+                        } header: {
+                            Text("Ghost")
                         }
                     }
 
@@ -1847,8 +1778,7 @@ struct IPhoneWorkoutView: View {
                     }
 
                     if workout.runEnvironment == .outdoor &&
-                       ghostRace.reference == nil &&
-                       (workout.plannedRouteCoordinates?.count ?? 0) >= 2 {
+                       ghostRace.reference == nil {
                         premiumWorkoutMap(
                             workout
                         )
@@ -2152,6 +2082,62 @@ struct IPhoneWorkoutView: View {
                 )
             }
             .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let workout = recorder.active {
+                    VStack(spacing: 6) {
+                        ATHLTHLiveWorkoutTopStrip(
+                            title: workout.walking
+                                ? ATHLTHLocalization.choose(english: "Walking", norwegian: "Gåing")
+                                : ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"),
+                            subtitle: workout.title,
+                            spotifyExpanded: showingSpotifyControls,
+                            addEnabled: !workout.walking,
+                            finishDisabled: recorder.saving,
+                            onMinimize: {
+                                recorder.minimizeWorkout()
+                                dismiss()
+                            },
+                            onSpotify: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showingSpotifyControls.toggle()
+                                }
+                            },
+                            onAdd: { showingAddRunningWorkout = true },
+                            onFinish: { confirmFinish = true }
+                        )
+                        if showingSpotifyControls {
+                            ATHLTHLiveSpotifyExpandedBar()
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                        if workout.audioCoachConfiguration?.enabled == true {
+                            HStack {
+                                ATHLTHWorkoutAudioDock(
+                                    showSpotifyLauncher: false,
+                                    inlinePopovers: true,
+                                    compactAlignment: .leading,
+                                    coachVisible: true,
+                                    coachEnabled: true,
+                                    coachPaused: recorder.coachSpeechPaused,
+                                    coachManagedOnWatch: false,
+                                    canReplayCoach: recorder.canReplayLastCoachMessage,
+                                    onCoachStatus: { recorder.announceCoachStatusNow() },
+                                    onCoachTogglePause: {
+                                        recorder.setCoachSpeechPaused(!recorder.coachSpeechPaused)
+                                    },
+                                    onCoachReplay: { recorder.replayLastCoachMessage() },
+                                    onCoachSettings: { showingLiveAudioCoach = true }
+                                )
+                                Spacer(minLength: 0)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
+                    .background(ATHLTHTheme.canvasTop)
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let workout = recorder.active {
                     VStack(spacing: 0) {
@@ -2525,33 +2511,34 @@ struct IPhoneWorkoutView: View {
             alignment: .leading,
             spacing: 10
         ) {
-            HStack {
-                ATHLTHLiveWorkoutControlButton(kind: .minimize) {
-                    recorder.minimizeWorkout()
-                    dismiss()
+            Button {
+                if workout.runEnvironment == .treadmill &&
+                   workout.indoorVenue != .indoorRunning {
+                    treadmillInclineEditingWorkoutID = nil
+                    treadmillInclineDraft = workout.treadmillInclinePercent ?? 0
+                    showingTreadmillInclineEditor = true
+                } else {
+                    showingManualEnvironmentChoice = true
                 }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: workout.runEnvironment == .treadmill
+                          ? "figure.run.treadmill" : "location.fill")
+                    Text(workout.runEnvironment == .treadmill
+                         ? ATHLTHLocalization.choose(english: "Indoor", norwegian: "Inne")
+                         : "GPS")
+                    Image(systemName: "chevron.down").font(.caption2)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .padding(.horizontal, 13)
+                .frame(height: 36)
+                .background(Color.white.opacity(0.88), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-run-environment-menu")
 
-                ATHLTHWorkoutAudioDock(
-                inlinePopovers: true,
-                compactAlignment: .leading,
-                coachVisible: workout.audioCoachConfiguration?.enabled == true,
-                coachEnabled: workout.audioCoachConfiguration?.enabled == true,
-                coachPaused: recorder.coachSpeechPaused,
-                coachManagedOnWatch: false,
-                canReplayCoach: recorder.canReplayLastCoachMessage,
-                onCoachStatus: { recorder.announceCoachStatusNow() },
-                onCoachTogglePause: {
-                    recorder.setCoachSpeechPaused(!recorder.coachSpeechPaused)
-                },
-                onCoachReplay: { recorder.replayLastCoachMessage() },
-                onCoachSettings: { showingLiveAudioCoach = true }
-            )
-                .fixedSize(horizontal: true, vertical: true)
-
-                Spacer(minLength: 4)
-
-                Button {
-                    if workout.runEnvironment == .treadmill &&
+            if workout.runEnvironment == .treadmill &&
                        workout.indoorVenue != .indoorRunning {
                         treadmillInclineEditingWorkoutID = nil
                         treadmillInclineDraft = workout.treadmillInclinePercent ?? 0
@@ -2853,8 +2840,8 @@ struct IPhoneWorkoutView: View {
                     )
                 }
 
-                if let last =
-                    workout.points.last {
+                if let last = workout.points.last,
+                   (-5...30).contains(Date().timeIntervalSince(last.timestamp)) {
                     Annotation(
                         "",
                         coordinate:
@@ -2894,6 +2881,10 @@ struct IPhoneWorkoutView: View {
                                 }
                         }
                     }
+                } else {
+                    // Immediately shows the operating system's live blue dot
+                    // before the route recorder has accepted its first point.
+                    UserAnnotation()
                 }
             }
             .frame(height: 265)
@@ -2917,14 +2908,12 @@ struct IPhoneWorkoutView: View {
             }
             .mapControls {
                 MapCompass()
+                MapUserLocationButton()
             }
             .onAppear {
-                routeCamera =
-                    .region(
-                        workoutMapRegion(
-                            for: workout
-                        )
-                    )
+                routeCamera = followMe
+                    ? .userLocation(fallback: .region(workoutMapRegion(for: workout)))
+                    : .region(workoutMapRegion(for: workout))
             }
             .onChange(
                 of:
