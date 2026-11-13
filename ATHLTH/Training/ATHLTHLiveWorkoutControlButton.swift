@@ -77,52 +77,34 @@ struct ATHLTHLiveWorkoutTopStrip: View {
     let spotifyExpanded: Bool
     var addEnabled = true
     var finishDisabled = false
+    var onOverview: (() -> Void)? = nil
     let onMinimize: () -> Void
     let onSpotify: () -> Void
     let onAdd: () -> Void
     let onFinish: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 3) {
-                Button(action: onMinimize) {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Minimize workout", norwegian: "Legg ned økten"
-                ))
+        HStack(spacing: 9) {
+            HStack(spacing: 2) {
+                stripButton("chevron.down",
+                            hint: ATHLTHLocalization.choose(
+                                english: "Minimize workout", norwegian: "Legg ned økten"
+                            ), action: onMinimize)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    Text(subtitle)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .monospacedDigit()
+                if let onOverview {
+                    stripButton("list.bullet",
+                                hint: ATHLTHLocalization.choose(
+                                    english: "Workout overview", norwegian: "Øktoversikt"
+                                ), action: onOverview)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
 
                 Button(action: onSpotify) {
                     ATHLTHSpotifyGlyph()
-                        .frame(width: 27, height: 27)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            spotifyExpanded
-                                ? ATHLTHTheme.premiumGoldSoft
-                                : Color.clear,
-                            in: Capsule()
-                        )
+                        .frame(width: 28, height: 28)
+                        .frame(width: 43, height: 44)
+                        .background(spotifyExpanded
+                            ? ATHLTHTheme.premiumGoldSoft : Color.clear,
+                            in: Circle())
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -132,11 +114,9 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                 ))
                 .accessibilityValue(spotifyExpanded
                     ? ATHLTHLocalization.choose(english: "Expanded", norwegian: "Åpen")
-                    : ATHLTHLocalization.choose(english: "Collapsed", norwegian: "Lukket")
-                )
+                    : ATHLTHLocalization.choose(english: "Collapsed", norwegian: "Lukket"))
             }
             .padding(.horizontal, 4)
-            .frame(maxWidth: .infinity, minHeight: 52)
             .background(ATHLTHTrainDesign.paper, in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
@@ -144,12 +124,29 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                 )
             }
 
+            VStack(alignment: .center, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+            }
+            .frame(maxWidth: .infinity, minWidth: 36)
+            .accessibilityElement(children: .combine)
+
             HStack(spacing: 0) {
                 Button(action: onAdd) {
                     Image(systemName: "plus")
-                        .font(.system(size: 17, weight: .medium))
+                        .font(.system(size: 19, weight: .medium))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
-                        .frame(width: 44, height: 48)
+                        .frame(width: 43, height: 48)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -158,20 +155,17 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                 .accessibilityLabel(ATHLTHLocalization.choose(
                     english: "Add to workout", norwegian: "Legg til i økten"
                 ))
-
                 Button(action: onFinish) {
                     Text(ATHLTHLocalization.choose(
                         english: "Finish", norwegian: "Avslutt"
                     ))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(finishDisabled
-                        ? ATHLTHTrainDesign.secondary
-                        : ATHLTHTrainDesign.ink
-                    )
+                        ? ATHLTHTrainDesign.secondary : ATHLTHTrainDesign.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(minWidth: 57, minHeight: 48)
-                    .padding(.trailing, 8)
+                    .minimumScaleFactor(0.72)
+                    .frame(minWidth: 52, minHeight: 48)
+                    .padding(.trailing, 6)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -180,9 +174,6 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                     english: "Finish workout", norwegian: "Avslutt økten"
                 ))
             }
-            .padding(.leading, 2)
-            .fixedSize(horizontal: true, vertical: false)
-            .frame(minHeight: 52)
             .background(ATHLTHTrainDesign.paper, in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
@@ -190,7 +181,22 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                 )
             }
         }
+        .frame(minHeight: 52)
         .accessibilityIdentifier("athlth-live-workout-top-strip")
+    }
+
+    private func stripButton(
+        _ symbol: String, hint: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 43, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(hint)
     }
 }
 
