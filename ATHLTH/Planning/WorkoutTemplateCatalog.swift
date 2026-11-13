@@ -197,6 +197,19 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var sourceIntensityZoneLabel: String? = nil
     var targetHeartRatePercentMin: Double? = nil
     var targetHeartRatePercentMax: Double? = nil
+    // Explicit author-prescribed targets, never inferred from guidance prose.
+    // Optional coding keys keep personal workouts from older builds readable.
+    var targetVMAPercent: Double? = nil
+    var targetIntensityType: String? = nil
+    var targetElevationGainMeters: Double? = nil
+    /// Outdoor hill grade; distinct from indoor treadmill inclination.
+    var targetGradientPercent: Double? = nil
+    var targetTerrainType: String? = nil
+    /// Strength source may prescribe a range and reps-in-reserve, rather than
+    /// only the minimum repetitions and a generic free-text instruction.
+    var targetRepetitionsMaximum: Int? = nil
+    var targetRepsInReserve: Int? = nil
+    var targetMovementTempo: String? = nil
     /// Athlete-selected perceived intensity (RPE 1...10). Never a measured
     /// physiological reading; optional so historic templates still decode.
     var targetEffortRPE: Int? = nil
@@ -257,6 +270,14 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.sourceIntensityZoneLabel == rhs.sourceIntensityZoneLabel &&
         lhs.targetHeartRatePercentMin == rhs.targetHeartRatePercentMin &&
         lhs.targetHeartRatePercentMax == rhs.targetHeartRatePercentMax &&
+        lhs.targetVMAPercent == rhs.targetVMAPercent &&
+        lhs.targetIntensityType == rhs.targetIntensityType &&
+        lhs.targetElevationGainMeters == rhs.targetElevationGainMeters &&
+        lhs.targetGradientPercent == rhs.targetGradientPercent &&
+        lhs.targetTerrainType == rhs.targetTerrainType &&
+        lhs.targetRepetitionsMaximum == rhs.targetRepetitionsMaximum &&
+        lhs.targetRepsInReserve == rhs.targetRepsInReserve &&
+        lhs.targetMovementTempo == rhs.targetMovementTempo &&
         lhs.targetEffortRPE == rhs.targetEffortRPE &&
         lhs.treadmillInclinePercent == rhs.treadmillInclinePercent &&
         lhs.setCount == rhs.setCount &&
@@ -298,6 +319,14 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(sourceIntensityZoneLabel)
         hasher.combine(targetHeartRatePercentMin)
         hasher.combine(targetHeartRatePercentMax)
+        hasher.combine(targetVMAPercent)
+        hasher.combine(targetIntensityType)
+        hasher.combine(targetElevationGainMeters)
+        hasher.combine(targetGradientPercent)
+        hasher.combine(targetTerrainType)
+        hasher.combine(targetRepetitionsMaximum)
+        hasher.combine(targetRepsInReserve)
+        hasher.combine(targetMovementTempo)
         hasher.combine(targetEffortRPE)
         hasher.combine(treadmillInclinePercent)
         hasher.combine(setCount)
@@ -347,6 +376,14 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case sourceIntensityZoneLabel = "source_intensity_zone"
         case targetHeartRatePercentMin = "target_hr_percent_min"
         case targetHeartRatePercentMax = "target_hr_percent_max"
+        case targetVMAPercent = "target_vma_percent"
+        case targetIntensityType = "target_intensity_type"
+        case targetElevationGainMeters = "target_elevation_gain_m"
+        case targetGradientPercent = "target_gradient_percent"
+        case targetTerrainType = "target_terrain_type"
+        case targetRepetitionsMaximum = "target_repetitions_max"
+        case targetRepsInReserve = "target_reps_in_reserve"
+        case targetMovementTempo = "target_movement_tempo"
         case targetEffortRPE = "target_effort_rpe"
         case treadmillInclinePercent = "treadmill_incline_percent"
         case setCount = "set_count"
@@ -444,6 +481,19 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         if let targetEffortRPE, (1...10).contains(targetEffortRPE) {
             parts.append("RPE \(targetEffortRPE)/10")
         }
+        if let targetRepetitionsMaximum, let repetitions,
+           targetRepetitionsMaximum > repetitions {
+            parts.append("\(repetitions)–\(targetRepetitionsMaximum) reps")
+        }
+        if let targetRepsInReserve, (0...10).contains(targetRepsInReserve) {
+            parts.append("RIR \(targetRepsInReserve)")
+        }
+        if let targetVMAPercent, targetVMAPercent.isFinite {
+            parts.append("\(Int(targetVMAPercent.rounded())) % VMA")
+        }
+        if let targetGradientPercent, targetGradientPercent.isFinite {
+            parts.append(String(format: "%.1f %% outdoor gradient", targetGradientPercent))
+        }
         if isIndoor == true, let treadmillInclinePercent,
            treadmillInclinePercent.isFinite,
            (0...20).contains(treadmillInclinePercent) {
@@ -509,6 +559,14 @@ extension Array where Element == WorkoutTemplateBlock {
             item.sourceIntensityZoneLabel = source.sourceIntensityZoneLabel
             item.targetHeartRatePercentMin = source.targetHeartRatePercentMin
             item.targetHeartRatePercentMax = source.targetHeartRatePercentMax
+            item.targetVMAPercent = source.targetVMAPercent
+            item.targetIntensityType = source.targetIntensityType
+            item.targetElevationGainMeters = source.targetElevationGainMeters
+            item.targetGradientPercent = source.targetGradientPercent
+            item.targetTerrainType = source.targetTerrainType
+            item.targetRepetitionsMaximum = source.targetRepetitionsMaximum
+            item.targetRepsInReserve = source.targetRepsInReserve
+            item.targetMovementTempo = source.targetMovementTempo
             if let origin {
                 item.executionGroupKind = origin.groupKind
                 item.executionGroupID = origin.groupID
