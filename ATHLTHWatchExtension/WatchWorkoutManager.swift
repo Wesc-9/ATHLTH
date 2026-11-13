@@ -8570,6 +8570,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             structuredRunningWorkout?.intervalCoachCueEverySeconds
         snapshot.runningIntervalCoachCountdownSeconds =
             structuredRunningWorkout?.intervalCoachCountdownSeconds
+        snapshot.runningStageSummaries = structuredRunningWorkout?.steps
+            .enumerated().map { index, step in
+                ATHLTHWatchRunningStageSummary(
+                    index: index,
+                    title: step.title,
+                    phase: step.phase,
+                    durationSeconds: step.durationSeconds,
+                    distanceMeters: step.distanceMeters
+                )
+            }
+        snapshot.watchAudioCoachEnabled = audioCoachConfiguration.enabled
 
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
 
