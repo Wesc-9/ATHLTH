@@ -986,14 +986,13 @@ enum WorkoutLaunchCoordinator {
                 effortSong,
                 workoutID: phoneWorkout.active?.id
             )
-            if let recording = phoneWorkout.active,
-               let firstStep = recording.structuredRunningWorkout?.steps.first,
-               ATHLTHSpotifyIntervalCuePolicy.isEffort(firstStep.phase) {
-                Task { @MainActor in
-                    await spotify.playIntervalTrack(
-                        workoutID: recording.id, stepIndex: 0
-                    )
-                }
+            let initialEffortWorkout = phoneWorkout.active.flatMap { recording
+                -> PhoneWorkout? in
+                guard effortSong != nil,
+                      let first = recording.structuredRunningWorkout?.steps.first,
+                      ATHLTHSpotifyIntervalCuePolicy.isEffort(first.phase)
+                else { return nil }
+                return recording
             }
 
             watchConnection
@@ -1001,14 +1000,30 @@ enum WorkoutLaunchCoordinator {
                     isActive: true,
                     title: plannedRunningWorkout?.title ?? configuration.title
                 )
-            startQuickSpotifyIfNeeded(
-                playlist:
-                    configuration.spotifyPlaylist,
-                autoplay:
-                    configuration.spotifyAutoplay,
-                settings: settings,
-                spotify: spotify
-            )
+
+            if let recording = initialEffortWorkout {
+                // A workout starting directly with a work interval must not
+                // race playlist autoplay: the selected song is requested last.
+                Task { @MainActor in
+                    if configuration.spotifyAutoplay,
+                       let playlist = configuration.spotifyPlaylist {
+                        await spotify.startLinkedPlaylist(
+                            playlist, settings: settings,
+                            respectGlobalAutoplay: false
+                        )
+                    }
+                    await spotify.playIntervalTrack(
+                        workoutID: recording.id, stepIndex: 0
+                    )
+                }
+            } else {
+                startQuickSpotifyIfNeeded(
+                    playlist: configuration.spotifyPlaylist,
+                    autoplay: configuration.spotifyAutoplay,
+                    settings: settings,
+                    spotify: spotify
+                )
+            }
             return
         }
 
