@@ -72,9 +72,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
                                     ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
                                 }
                                 ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
-                                if isCardio && (snapshot.routeTitle != nil ||
-                                    (snapshot.liveLatitude != nil &&
-                                     snapshot.liveLongitude != nil)) {
+                                if snapshot.kind == "running" || snapshot.kind == "walking" {
                                     ATHLTHiPadLiveGPSMap(snapshot: snapshot)
                                 }
                                 ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
@@ -98,9 +96,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
                             ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
                         }
                         ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
-                        if isCardio && (snapshot.routeTitle != nil ||
-                                    (snapshot.liveLatitude != nil &&
-                                     snapshot.liveLongitude != nil)) {
+                        if snapshot.kind == "running" || snapshot.kind == "walking" {
                             ATHLTHiPadLiveGPSMap(snapshot: snapshot)
                         }
                         ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
