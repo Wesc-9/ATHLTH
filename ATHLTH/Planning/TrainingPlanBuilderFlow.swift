@@ -1229,6 +1229,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     gearIDs: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.gearIDs,
                     spotifyPlaylist: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyPlaylist,
                     spotifyAutoplayOnStart: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyAutoplayOnStart,
+                    spotifyIntervalTrack: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyIntervalTrack,
                     audioCoachConfiguration: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.audioCoachConfiguration,
                     routeAlertConfiguration: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeAlertConfiguration,
                     ghostTargetDurationSeconds: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.ghostTargetDurationSeconds,
@@ -1260,6 +1261,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     proposed.gearIDs = extras.gearIDs
                     proposed.spotifyPlaylist = extras.spotifyPlaylist
                     proposed.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
+                    proposed.spotifyIntervalTrack = extras.spotifyIntervalTrack
         proposed.audioCoachConfiguration = extras.audioCoachConfiguration
         proposed.routeAlertConfiguration = extras.routeAlertConfiguration
         proposed.ghostTargetDurationSeconds = extras.ghostTargetDurationSeconds
@@ -4512,6 +4514,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         proposed.gearIDs = extras.gearIDs
         proposed.spotifyPlaylist = extras.spotifyPlaylist
         proposed.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
+        proposed.spotifyIntervalTrack = extras.spotifyIntervalTrack
         proposed.audioCoachConfiguration = extras.audioCoachConfiguration
         proposed.routeAlertConfiguration = extras.routeAlertConfiguration
         proposed.ghostTargetDurationSeconds = extras.ghostTargetDurationSeconds
