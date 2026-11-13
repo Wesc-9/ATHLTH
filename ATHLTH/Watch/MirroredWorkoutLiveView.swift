@@ -18,6 +18,7 @@ struct MirroredWorkoutLiveView: View {
     @State private var showingAddRunningWorkout = false
     @State private var showingSpotifyControls = false
     @State private var showingTargetPaceEditor = false
+    @State private var showingStrengthWholeWorkoutPauseConfirmation = false
     @State private var targetPaceDraftSeconds = 330.0
     @State private var enteredTargetPaceSeconds: Double?
     @State private var paceSamples: [(elapsed: Double, distance: Double)] = []
@@ -494,6 +495,25 @@ struct MirroredWorkoutLiveView: View {
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Pause the entire workout?",
+                norwegian: "Pause hele treningsøkten?"
+            ),
+            isPresented: $showingStrengthWholeWorkoutPauseConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Pause whole workout", norwegian: "Pause hele økten"
+            )) {
+                _ = mirroring.sendCommand(.pause)
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Apple Health stops counting workout time while paused. Rest between sets does not need this.",
+                norwegian: "Apple Health stopper registreringen av økttid mens den er pauset. Hvile mellom sett krever ikke dette."
+            ))
         }
         .sheet(isPresented: $showingAddRunningWorkout) {
             ActiveHybridWorkoutPicker(runningOnly: true) { session, startNow in
@@ -2095,12 +2115,22 @@ struct MirroredWorkoutLiveView: View {
         } else {
             HStack(spacing: 12) {
                 Button {
-                    mirroring.sendCommand(
-                        snapshot.state == .paused ? .resume : .pause
-                    )
+                    if snapshot.state == .paused {
+                        _ = mirroring.sendCommand(.resume)
+                    } else if snapshot.kind == .strength {
+                        showingStrengthWholeWorkoutPauseConfirmation = true
+                    } else {
+                        _ = mirroring.sendCommand(.pause)
+                    }
                 } label: {
                     Label(
-                        snapshot.state == .paused ? "Resume" : "Pause",
+                        snapshot.state == .paused
+                            ? ATHLTHLocalization.choose(
+                                english: "Resume workout", norwegian: "Fortsett økten"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Pause workout", norwegian: "Pause økten"
+                            ),
                         systemImage: snapshot.state == .paused
                             ? "play.fill"
                             : "pause.fill"
