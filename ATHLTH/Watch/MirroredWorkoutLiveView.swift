@@ -9,6 +9,7 @@ struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingTreadmillInclineEditor = false
@@ -16,6 +17,11 @@ struct MirroredWorkoutLiveView: View {
     @State private var coachOutputName: String?
     @State private var showingAIConversation = false
     @State private var showingAddRunningWorkout = false
+    @State private var showingAddStrengthWorkout = false
+    @State private var showingStrengthExerciseLibrary = false
+    @State private var pendingStrengthExercise: ExerciseLibraryEntry?
+    @State private var showingAddActions = false
+    @State private var showingFinishConfirmation = false
     @State private var showingSpotifyControls = false
     @State private var showingTargetPaceEditor = false
     @State private var showingStrengthWholeWorkoutPauseConfirmation = false
@@ -29,8 +35,6 @@ struct MirroredWorkoutLiveView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    header
-
                     TrainTogetherStatusStrip()
 
                     if let snapshot = mirroring.snapshot {
@@ -325,15 +329,40 @@ struct MirroredWorkoutLiveView: View {
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle(
-                ATHLTHLocalization.choose(
-                    english: "Live Workout",
-                    norwegian: "Live økt"
-                )
-            )
-            .navigationBarTitleDisplayMode(
-                .inline
-            )
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let snapshot = mirroring.snapshot,
+                   mirroring.hasActiveMirroredWorkout {
+                    VStack(spacing: 7) {
+                        ATHLTHLiveWorkoutTopStrip(
+                            title: snapshot.kind.title,
+                            subtitle: mirroredTopSummary(snapshot),
+                            spotifyExpanded: showingSpotifyControls,
+                            addEnabled: supportsMirroredAdd(snapshot),
+                            finishDisabled: snapshot.state == .preparing ||
+                                snapshot.state == .ending,
+                            onMinimize: { mirroring.minimizeWorkout() },
+                            onSpotify: {
+                                withAnimation(.easeInOut(duration: 0.22)) {
+                                    showingSpotifyControls.toggle()
+                                }
+                            },
+                            onAdd: { showingAddActions = true },
+                            onFinish: { showingFinishConfirmation = true }
+                        )
+
+                        if showingSpotifyControls {
+                            mirroredSpotifyBar
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 7)
+                    .padding(.bottom, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(ATHLTHTheme.canvasTop)
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let snapshot = mirroring.snapshot {
                     controls(snapshot)
@@ -344,157 +373,7 @@ struct MirroredWorkoutLiveView: View {
                         .background(.regularMaterial)
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if showingSpotifyControls && spotify.isConnected {
-                    HStack {
-                        Spacer(minLength: 0)
-                        mirroredSpotifyBar
-                            .padding(.trailing, 13)
-                    }
-                    .padding(.vertical, 4)
-                    .background(.regularMaterial)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .toolbar {
-                if mirroring
-                    .hasActiveMirroredWorkout {
-                    ToolbarItem(
-                        placement:
-                            .topBarLeading
-                    ) {
-                        Button {
-                            mirroring
-                                .minimizeWorkout()
-                        } label: {
-                            Image(
-                                systemName:
-                                    "chevron.down"
-                            )
-                            .font(
-                                .system(
-                                    size: 16,
-                                    weight:
-                                        .semibold
-                                )
-                            )
-                        }
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Minimize workout",
-                                norwegian:
-                                    "Legg ned økten"
-                            )
-                        )
-                    }
-                }
 
-                if spotify.isConnected && mirroring.hasActiveMirroredWorkout {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.22)) {
-                                showingSpotifyControls.toggle()
-                            }
-                        } label: {
-                            ATHLTHSpotifyGlyph()
-                                .frame(width: 24, height: 24)
-                        }
-                        .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Show or hide Spotify controls",
-                            norwegian: "Vis eller skjul Spotify-kontroller"
-                        ))
-                    }
-                }
-
-                // Use the run's top-right + for real, supported in-session
-                // actions. The Watch owns this recording; do not offer an
-                // unimplemented second workout recorder from this screen.
-                if let snapshot = mirroring.snapshot,
-                   mirroring.hasActiveMirroredWorkout,
-                   snapshot.kind == .running {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button {
-                                showingAddRunningWorkout = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Add interval workout",
-                                        norwegian: "Legg til intervalløkt"
-                                    ),
-                                    systemImage: "rectangle.stack.badge.plus"
-                                )
-                            }
-
-                            if let incline = snapshot.treadmillInclinePercent {
-                                Button {
-                                    treadmillInclineDraft = incline
-                                    showingTreadmillInclineEditor = true
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english: "Adjust treadmill incline",
-                                            norwegian: "Juster stigning på mølle"
-                                        ),
-                                        systemImage: "figure.run"
-                                    )
-                                }
-                            }
-
-                            if snapshot.routeCanReturnToStart == true {
-                                Button {
-                                    _ = mirroring.requestRunBackToStart()
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english: "Run back to start",
-                                            norwegian: "Løp tilbake til start"
-                                        ),
-                                        systemImage: "arrow.uturn.backward"
-                                    )
-                                }
-                            }
-
-                            Button {
-                                showingAIConversation = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Talk to AI Coach",
-                                        norwegian: "Snakk med AI Coach"
-                                    ),
-                                    systemImage: "waveform"
-                                )
-                            }
-
-                            if mirroring.canReplayMirroredCoachMessage {
-                                Button {
-                                    mirroring.replayMirroredCoachMessage()
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english: "Replay last coach message",
-                                            norwegian: "Hør siste coachbeskjed"
-                                        ),
-                                        systemImage: "arrow.counterclockwise"
-                                    )
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "More live workout actions",
-                            norwegian: "Flere valg under økten"
-                        ))
-                    }
-                }
-            }
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -514,6 +393,110 @@ struct MirroredWorkoutLiveView: View {
                 english: "Apple Health stops counting workout time while paused. Rest between sets does not need this.",
                 norwegian: "Apple Health stopper registreringen av økttid mens den er pauset. Hvile mellom sett krever ikke dette."
             ))
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Add to workout", norwegian: "Legg til i økten"
+            ),
+            isPresented: $showingAddActions,
+            titleVisibility: .visible
+        ) {
+            if let snapshot = mirroring.snapshot, snapshot.kind == .running {
+                Button(ATHLTHLocalization.choose(
+                    english: "Add interval workout", norwegian: "Legg til intervalløkt"
+                )) {
+                    showingAddRunningWorkout = true
+                }
+                if let incline = snapshot.treadmillInclinePercent {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Adjust treadmill incline", norwegian: "Juster stigning på mølle"
+                    )) {
+                        treadmillInclineDraft = incline
+                        showingTreadmillInclineEditor = true
+                    }
+                }
+                if snapshot.routeCanReturnToStart == true {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Run back to start", norwegian: "Løp tilbake til start"
+                    )) {
+                        _ = mirroring.requestRunBackToStart()
+                    }
+                }
+            }
+            if mirroring.snapshot?.kind == .strength,
+               strength.activeWorkout != nil {
+                Button(ATHLTHLocalization.choose(
+                    english: "Add exercise", norwegian: "Legg til øvelse"
+                )) {
+                    showingStrengthExerciseLibrary = true
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Add workout", norwegian: "Legg til treningsøkt"
+                )) {
+                    showingAddStrengthWorkout = true
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Talk to AI Coach", norwegian: "Snakk med AI Coach"
+            )) {
+                showingAIConversation = true
+            }
+            if mirroring.canReplayMirroredCoachMessage {
+                Button(ATHLTHLocalization.choose(
+                    english: "Replay last coach message", norwegian: "Hør siste coachbeskjed"
+                )) {
+                    mirroring.replayMirroredCoachMessage()
+                }
+            }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Finish workout?", norwegian: "Avslutte treningsøkten?"
+            ),
+            isPresented: $showingFinishConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Finish workout", norwegian: "Avslutt økten"
+            ), role: .destructive) {
+                _ = mirroring.sendCommand(.end)
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Apple Watch will save the recorded workout to Apple Health.",
+                norwegian: "Apple Watch lagrer den registrerte økten i Apple Health."
+            ))
+        }
+        .sheet(isPresented: $showingStrengthExerciseLibrary) {
+            NavigationStack {
+                ExerciseLibraryView(
+                    selectionTitle: ATHLTHLocalization.choose(
+                        english: "Add to active workout", norwegian: "Legg til i økten"
+                    ),
+                    selectedExerciseCounts: [:],
+                    allowsEquipmentScan: true
+                ) { entry in
+                    pendingStrengthExercise = entry
+                    showingStrengthExerciseLibrary = false
+                }
+            }
+        }
+        .sheet(item: $pendingStrengthExercise) { entry in
+            FreestyleExercisePrescriptionView(entry: entry) {
+                strength.appendExercise(
+                    entry.exercise,
+                    sets: $0, reps: $1, targetKind: $2,
+                    targetDurationSeconds: $3, loadKind: $4,
+                    targetWeightKilograms: $5, targetResistanceLevel: $6,
+                    restSeconds: $7, warmUpSets: $8, openEndedTime: $9
+                )
+                pendingStrengthExercise = nil
+            }
+        }
+        .sheet(isPresented: $showingAddStrengthWorkout) {
+            ActiveHybridWorkoutPicker { session, startNow in
+                strength.appendWorkoutDuringSession(session, startNow: startNow)
+            }
         }
         .sheet(isPresented: $showingAddRunningWorkout) {
             ActiveHybridWorkoutPicker(runningOnly: true) { session, startNow in
@@ -1155,6 +1138,49 @@ struct MirroredWorkoutLiveView: View {
         return seconds < 5
             ? "Now"
             : "\(seconds)s ago"
+    }
+
+    private func supportsMirroredAdd(_ snapshot: WatchWorkoutLiveSnapshot) -> Bool {
+        snapshot.kind == .running ||
+            (snapshot.kind == .strength && strength.activeWorkout != nil)
+    }
+
+    private func mirroredTopSummary(_ snapshot: WatchWorkoutLiveSnapshot) -> String {
+        if snapshot.kind == .strength {
+            if let workout = strength.activeWorkout {
+                let exercises = workout.exercises.count
+                let sets = workout.totalCompletedSets
+                return ATHLTHLocalization.choose(
+                    english: "\(exercises) exercises · \(sets) sets",
+                    norwegian: "\(exercises) øvelser · \(sets) sett"
+                )
+            }
+            if let name = snapshot.strengthExerciseName, !name.isEmpty {
+                return name
+            }
+        }
+        if snapshot.kind == .running,
+           let index = snapshot.runningIntervalOrdinal,
+           let count = snapshot.runningIntervalTotal,
+           count > 0 {
+            return ATHLTHLocalization.choose(
+                english: "Interval \(index) of \(count)",
+                norwegian: "Drag \(index) av \(count)"
+            )
+        }
+        let elapsed = max(0, Int(snapshot.elapsedTime))
+        let clock = elapsed >= 3600
+            ? String(format: "%d:%02d:%02d",
+                     elapsed / 3600, (elapsed % 3600) / 60, elapsed % 60)
+            : String(format: "%02d:%02d", elapsed / 60, elapsed % 60)
+        if snapshot.kind == .running || snapshot.kind == .walking {
+            let kilometers = max(snapshot.distanceMeters, 0) / 1_000
+            let distance = String(format: "%.2f", kilometers)
+                .replacingOccurrences(of: ".", with:
+                    ATHLTHLocalization.isNorwegian ? "," : ".")
+            return "\(clock) · \(distance) km"
+        }
+        return clock
     }
 
     @ViewBuilder
