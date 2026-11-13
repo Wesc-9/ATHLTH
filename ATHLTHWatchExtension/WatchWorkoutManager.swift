@@ -4123,12 +4123,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         automaticPauseCount = 0
         manualPauseActive = false
         resetIndoorProbeForNewWorkout()
-        autoPauseDetector.reset(
-            enabled:
-                (kind == .running ||
-                 kind == .walking) &&
-                automaticPauseEnabled
-        )
+        automaticPauseEnabled =
+            ATHLTHWorkoutHealthKitContinuityPolicy.supportsAutomaticPause(kind) &&
+            automaticPauseEnabled
+        autoPauseDetector.reset(enabled: automaticPauseEnabled)
         capturedRouteLocations = []
         lastRenderedRouteLocation = nil
         gpsFallbackDistanceMeters = 0
@@ -8772,7 +8770,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func triggerAutomaticPause() {
-        guard automaticPauseEnabled,
+        guard ATHLTHWorkoutHealthKitContinuityPolicy.supportsAutomaticPause(kind),
+              automaticPauseEnabled,
               !manualPauseActive,
               !automaticPauseActive,
               state == .running
@@ -8788,7 +8787,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func triggerAutomaticResume() {
-        guard automaticPauseEnabled,
+        guard ATHLTHWorkoutHealthKitContinuityPolicy.supportsAutomaticPause(kind),
+              automaticPauseEnabled,
               !manualPauseActive,
               automaticPauseActive
         else {
@@ -8882,7 +8882,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
 
         case .paused:
-            // Cover pauses originating outside our own pause button.
+            // Strength set recovery/rest never pauses the HealthKit workout.
+            // If watchOS or a stale system event unexpectedly pauses the
+            // full strength session, resume recording unless the athlete
+            // explicitly chose "Pause whole workout".
+            if ATHLTHWorkoutHealthKitContinuityPolicy.shouldResumeUnexpectedPause(
+                kind: kind,
+                userPausedWholeWorkout: manualPauseActive,
+                finishing: finishing
+            ) {
+                workoutSession?.resume()
+                return
+            }
+
+            // Cover intentional pauses originating outside our own button.
             if previousState == .running,
                strengthSession?.isEmbeddedRunningInterval == true,
                strengthSession?.timedSetCountdown?.isRunning == true {
