@@ -11,6 +11,17 @@ struct ATHLTHiPadLiveWorkoutView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("athlth_ipad_live_keep_awake") private var keepAwake = false
     @State private var previousIdleTimerDisabled = false
+    @EnvironmentObject private var session: AppSessionStore
+
+    private var measuredZone: Int? {
+        ATHLTHHeartRateZones.measuredZone(
+            heartRateBPM: snapshot.heartRateBPM,
+            maximumBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
+                configured: session.onboardingProfile?.maximumHeartRateBPM,
+                dateOfBirth: session.onboardingProfile?.dateOfBirth
+            )
+        )
+    }
 
     private let ink = ATHLTHPlanDesign.ink
     private let secondary = ATHLTHPlanDesign.secondaryInk
@@ -61,6 +72,9 @@ struct ATHLTHiPadLiveWorkoutView: View {
                                     ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
                                 }
                                 ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
+                                if isCardio && snapshot.routeTitle != nil {
+                                    ATHLTHiPadLiveGPSMap(snapshot: snapshot)
+                                }
                                 ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
                                 ATHLTHiPadLiveWorkoutExtrasPanel(snapshot: snapshot)
                                 additionalDetails
@@ -82,6 +96,9 @@ struct ATHLTHiPadLiveWorkoutView: View {
                             ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
                         }
                         ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
+                        if isCardio && snapshot.routeTitle != nil {
+                            ATHLTHiPadLiveGPSMap(snapshot: snapshot)
+                        }
                         ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
                         ATHLTHiPadLiveWorkoutExtrasPanel(snapshot: snapshot)
                         additionalDetails
@@ -302,6 +319,30 @@ struct ATHLTHiPadLiveWorkoutView: View {
             )
 
             if isCardio {
+                if let zone = measuredZone {
+                    metric(
+                        tr("Heart rate zone now", "Pulssone nå"),
+                        value: tr("Zone", "Sone") + " \(zone)",
+                        symbol: "heart.text.square",
+                        detail: tr("From measured pulse", "Fra målt puls")
+                    )
+                } else if let target = snapshot.targetHeartRateZone,
+                          (1...5).contains(target) {
+                    metric(
+                        tr("Target heart rate zone", "Målpulssone"),
+                        value: tr("Zone", "Sone") + " \(target)",
+                        symbol: "heart.text.square",
+                        detail: tr("Planned, not measured", "Planlagt, ikke målt")
+                    )
+                } else {
+                    metric(
+                        tr("Heart rate zone", "Pulssone"),
+                        value: "—",
+                        symbol: "heart.text.square",
+                        detail: tr("Awaiting pulse and HRmax",
+                                   "Venter på puls og makspuls")
+                    )
+                }
                 metric(
                     tr("Average pace", "Snittempo"),
                     value: ATHLTHiPadLiveMetrics.averagePace(snapshot),
