@@ -588,217 +588,393 @@ struct ATHLTHWorkoutReplayCard: View {
             }
             return "—"
         }
-        guard let meters = workout.distanceMeters,
-              meters > 0 && workout.duration > 0 else { return "—" }
-        return paceText(workout.duration / (meters / 1_000))
+        guard let pace = validOverallPace else { return "—" }
+        return paceText(pace)
     }
 
     private var replayMoments: [ReplayMoment] {
+        guard !requiresDataReview else { return [] }
+        let available = isStrength ? strengthMoments : enduranceMoments
+        let ranked = available.sorted {
+            $0.priority == $1.priority
+                ? $0.category < $1.category
+                : $0.priority > $1.priority
+        }
+        var seenCategories = Set<String>()
+        let distinct = ranked.filter { seenCategories.insert($0.category).inserted }
+        if distinct.isEmpty {
+            return [ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Recording saved", norwegian: "Økten er registrert"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "More verified measurements are needed for performance highlights.",
+                    norwegian: "Vi trenger flere pålitelige målinger for prestasjonshøydepunkter."
+                ),
+                icon: "checkmark.circle", tint: ATHLTHTrainDesign.bronze,
+                priority: 1, category: "recording"
+            )]
+        }
+        return Array(distinct.prefix(3))
+    }
+
+    /// Short factual Coach copy; never generates speculative health claims.
+    private var coachSummary: String {
+        if requiresDataReview {
+            return ATHLTHLocalization.choose(
+                english: "This recording has unusually little movement for its duration. Pace and performance conclusions have been hidden; check the workout data before sharing.",
+                norwegian: "Økten har uvanlig lite bevegelse i forhold til varigheten. Tempo- og prestasjonskonklusjoner er skjult. Kontroller målingene før du deler."
+            )
+        }
+
         if isStrength {
-            return strengthMoments
-        }
-
-        return enduranceMoments
-    }
-
-    private var strengthMoments: [ReplayMoment] {
-        var moments: [ReplayMoment] = []
-
-        if let groups = workout.strengthMuscleGroups,
-           !groups.isEmpty {
-            let names = groups.prefix(3).joined(separator: ", ")
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(english: "Training focus", norwegian: "Treningsfokus"),
-                    detail: names,
-                    icon: "figure.strengthtraining.traditional",
-                    tint: ATHLTHTheme.vitality
+            if let focus = workout.strengthMuscleGroups?.prefix(2),
+               !focus.isEmpty {
+                return ATHLTHLocalization.choose(
+                    english: "Your logged work focused on \(focus.joined(separator: " and ")). The insights below use completed exercises and recorded loads, not assumed exertion.",
+                    norwegian: "Den registrerte økten prioriterte \(focus.joined(separator: " og ")). Høydepunktene bygger på utførte øvelser og registrert belastning, ikke antatt anstrengelse."
                 )
-            )
-        }
-
-        if let volume = workout.strengthTotalVolumeKilograms,
-           volume > 0 {
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(english: "Total volume", norwegian: "Totalt volum"),
-                    detail: formatWeight(volume),
-                    icon: "sum",
-                    tint: ATHLTHTheme.accent
+            }
+            if let reps = workout.strengthTotalReps, reps > 0 {
+                return ATHLTHLocalization.choose(
+                    english: "\(reps) repetitions were logged. Compare completed work with your previous sessions below when comparable data exists.",
+                    norwegian: "\(reps) repetisjoner er registrert. Vi sammenligner med tidligere lignende økter når sammenlignbare data finnes."
                 )
-            )
-        }
-
-        if let heaviest = workout.strengthHeaviestWeightKilograms,
-           heaviest > 0 {
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(english: "Heaviest load", norwegian: "Tyngste løft"),
-                    detail: formatWeight(heaviest),
-                    icon: "dumbbell.fill",
-                    tint: ATHLTHTheme.premiumGold
-                )
-            )
-        }
-
-        if let reps = workout.strengthTotalReps,
-           reps > 0,
-           moments.count < 3 {
-            moments.append(
-                ReplayMoment(
-                    title: "Work completed",
-                    detail: ATHLTHLocalization.choose(english: "\(reps) total reps", norwegian: "\(reps) repetisjoner totalt"),
-                    icon: "repeat",
-                    tint: .blue
-                )
-            )
-        }
-
-        if moments.isEmpty {
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(english: "Session complete", norwegian: "Økt fullført"),
-                    detail: durationText(workout.duration),
-                    icon: "checkmark.circle.fill",
-                    tint: ATHLTHTheme.vitality
-                )
-            )
-        }
-
-        return Array(moments.prefix(3))
-    }
-
-    private var enduranceMoments: [ReplayMoment] {
-        var moments: [ReplayMoment] = []
-
-        if let fastest = usableSegments
-            .filter({ ($0.paceSecondsPerKilometer ?? 0) > 0 })
-            .min(by: {
-                ($0.paceSecondsPerKilometer ?? .greatestFiniteMagnitude) <
-                ($1.paceSecondsPerKilometer ?? .greatestFiniteMagnitude)
-            }),
-           let pace = fastest.paceSecondsPerKilometer {
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(
-                        english: "Fastest phase · \(fastest.label)",
-                        norwegian: "Raskeste fase · \(fastest.label)"
-                    ),
-                    detail: ATHLTHLocalization.choose(
-                        english: "\(paceText(pace)) average pace",
-                        norwegian: "\(paceText(pace)) snittempo"
-                    ),
-                    icon: "speedometer",
-                    tint: ATHLTHTheme.vitality
-                )
-            )
-        }
-
-        if let peak = usableSegments
-            .filter({ $0.maxHeartRateBPM != nil })
-            .max(by: {
-                ($0.maxHeartRateBPM ?? 0) <
-                ($1.maxHeartRateBPM ?? 0)
-            }),
-           let maxHR = peak.maxHeartRateBPM {
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(
-                        english: "Highest effort · \(peak.label)",
-                        norwegian: "Høyeste belastning · \(peak.label)"
-                    ),
-                    detail: ATHLTHLocalization.choose(
-                        english: "Heart rate reached \(Int(maxHR.rounded())) bpm",
-                        norwegian: "Pulsen nådde \(Int(maxHR.rounded())) slag/min"
-                    ),
-                    icon: "heart.fill",
-                    tint: .red
-                )
-            )
-        }
-
-        if let opening = usableSegments.first?.paceSecondsPerKilometer,
-           let finish = usableSegments.last?.paceSecondsPerKilometer,
-           opening > 0,
-           finish > 0 {
-            let percent =
-                ((opening - finish) / opening) * 100
-
-            if abs(percent) >= 2 {
-                moments.append(
-                    ReplayMoment(
-                        title:
-                            percent > 0
-                                ? ATHLTHLocalization.choose(english: "You finished stronger", norwegian: "Du avsluttet sterkere")
-                                : ATHLTHLocalization.choose(english: "The finish got tougher", norwegian: "Avslutningen ble tyngre"),
-                        detail:
-                            percent > 0
-                                ? ATHLTHLocalization.choose(
-                                    english: "Final-phase pace was about \(Int(abs(percent).rounded()))% faster than the opening phase.",
-                                    norwegian: "Tempoet mot slutten var omtrent \(Int(abs(percent).rounded())) % raskere enn i starten."
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Final-phase pace was about \(Int(abs(percent).rounded()))% slower than the opening phase.",
-                                    norwegian: "Tempoet mot slutten var omtrent \(Int(abs(percent).rounded())) % saktere enn i starten."
-                                ),
-                        icon:
-                            percent > 0
-                                ? "arrow.up.forward.circle.fill"
-                                : "arrow.down.forward.circle.fill",
-                        tint:
-                            percent > 0
-                                ? ATHLTHTheme.accent
-                                : .orange
-                    )
+            }
+        } else if let similar = previousComparableEndurance,
+                  let currentPace = validOverallPace,
+                  let previousPace = ATHLTHReplayDataQuality.usablePace(
+                    duration: similar.duration,
+                    distanceMeters: similar.distanceMeters,
+                    activity: workout.activity,
+                    requiresReview: false
+                  ) {
+            let diff = currentPace - previousPace
+            if abs(diff) >= 3 && abs(diff) / previousPace < 0.3 {
+                return ATHLTHLocalization.choose(
+                    english: "At a similar distance, the recorded average pace was \(Int(abs(diff).rounded())) sec/km \(diff < 0 ? "quicker" : "slower") than your previous comparable workout. Route and conditions may differ.",
+                    norwegian: "På en lignende distanse var registrert snittempo \(Int(abs(diff).rounded())) sek/km \(diff < 0 ? "raskere" : "roligere") enn i forrige sammenlignbare økt. Rute og forhold kan være ulike."
                 )
             }
         }
 
-        if moments.count < 3,
-           let distance = workout.distanceMeters,
-           distance > 0 {
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(english: "Distance covered", norwegian: "Tilbakelagt distanse"),
-                    detail: String(
-                        format: "%.2f km in %@",
-                        distance / 1_000,
-                        durationText(workout.duration)
-                    ),
-                    icon: activitySystemImage,
-                    tint: ATHLTHTheme.accentDeep
-                )
+        if let first = replayMoments.first,
+           first.category != "recording" {
+            return ATHLTHLocalization.choose(
+                english: "This session's clearest verified insight: \(first.detail) Only measurements available from this workout are used.",
+                norwegian: "Det tydeligste registrerte funnet i denne økten: \(first.detail) Vi bygger oppsummeringen på målinger som faktisk finnes."
             )
         }
+        return ATHLTHLocalization.choose(
+            english: "The session has been recorded, but there is not enough reliable data yet to describe progress or training intensity.",
+            norwegian: "Økten er registrert, men vi har foreløpig ikke nok pålitelige data til å vurdere fremgang eller treningsintensitet."
+        )
+    }
 
-        if moments.count < 3,
-           let calories = workout.activeEnergyKilocalories,
-           calories > 0 {
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(english: "Energy", norwegian: "Energi"),
+    private var previousComparableEndurance: WorkoutSummary? {
+        guard let current = workout.distanceMeters,
+              validOverallPace != nil else { return nil }
+        return health.workouts
+            .filter {
+                $0.id != workout.id &&
+                $0.activity == workout.activity &&
+                $0.startDate < workout.startDate &&
+                $0.isIndoor == workout.isIndoor &&
+                $0.startDate >= workout.startDate.addingTimeInterval(-180 * 86_400) &&
+                ATHLTHReplayDataQuality.isComparableDistance(
+                    current: current,
+                    previous: $0.distanceMeters ?? 0
+                ) &&
+                ATHLTHReplayDataQuality.usablePace(
+                    duration: $0.duration,
+                    distanceMeters: $0.distanceMeters,
+                    activity: workout.activity,
+                    requiresReview: false
+                ) != nil
+            }
+            .max(by: { $0.startDate < $1.startDate })
+    }
+
+    private var matchingStrengthLog: StrengthWorkoutLog? {
+        strengthStore.workoutHistory.first {
+            $0.id == workout.id ||
+                $0.healthMetrics.healthKitWorkoutUUID == workout.id
+        }
+    }
+
+    private var comparablePreviousStrengthLog: StrengthWorkoutLog? {
+        guard let current = matchingStrengthLog, current.isFinished else { return nil }
+        let names = Set(current.exercises.map(\.exercise.displayName))
+        guard !names.isEmpty else { return nil }
+        return strengthStore.workoutHistory
+            .filter {
+                $0.isFinished && $0.id != current.id &&
+                $0.startedAt < current.startedAt &&
+                $0.startedAt >= current.startedAt.addingTimeInterval(-180 * 86_400) &&
+                (current.plannedSessionID != nil &&
+                 current.plannedSessionID == $0.plannedSessionID ||
+                 {
+                     let compared = Set($0.exercises.map(\.exercise.displayName))
+                     return compared.count >= 2 &&
+                         names.intersection(compared).count >=
+                             max(2, Int(ceil(Double(names.count) * 0.75)))
+                 }())
+            }
+            .max(by: { $0.startedAt < $1.startedAt })
+    }
+
+    private var strengthMoments: [ReplayMoment] {
+        var choices: [ReplayMoment] = []
+        if let volume = workout.strengthTotalVolumeKilograms,
+           volume.isFinite, volume > 0,
+           let previous = comparablePreviousStrengthLog {
+            let previousVolume = SocialPublishableWorkout(
+                strengthWorkout: previous
+            ).strengthTotalVolumeKilograms ?? 0
+            if previousVolume > 0 {
+                let ratio = (volume - previousVolume) / previousVolume
+                if abs(ratio) >= 0.05 && abs(ratio) <= 2.0 {
+                    choices.append(ReplayMoment(
+                        title: ATHLTHLocalization.choose(
+                            english: "Versus a comparable workout",
+                            norwegian: "Mot en sammenlignbar økt"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Logged strength volume was \(Int(abs(ratio * 100).rounded()))% \(ratio > 0 ? "higher" : "lower") than the previous similar session. Different sets may affect the result.",
+                            norwegian: "Registrert styrkevolum var \(Int(abs(ratio * 100).rounded())) % \(ratio > 0 ? "høyere" : "lavere") enn forrige lignende økt. Ulike sett kan påvirke sammenligningen."
+                        ),
+                        icon: "arrow.left.arrow.right",
+                        tint: ATHLTHTrainDesign.bronze,
+                        priority: 100, category: "history"
+                    ))
+                }
+            }
+        }
+        if let groups = workout.strengthMuscleGroups, !groups.isEmpty {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Muscle focus", norwegian: "Muskelprioritet"
+                ),
+                detail: groups.prefix(3).joined(separator: " · "),
+                icon: "figure.strengthtraining.traditional",
+                tint: ATHLTHTheme.vitality,
+                priority: 70, category: "focus"
+            ))
+        }
+        if let volume = workout.strengthTotalVolumeKilograms,
+           volume.isFinite, volume > 0 {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Strength volume logged", norwegian: "Registrert styrkevolum"
+                ),
+                detail: formatWeight(volume),
+                icon: "sum", tint: ATHLTHTheme.accent,
+                priority: 62, category: "volume"
+            ))
+        }
+        if let heaviest = workout.strengthHeaviestWeightKilograms,
+           heaviest.isFinite, heaviest > 0 {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Heaviest logged weight", norwegian: "Tyngste registrerte vekt"
+                ),
+                detail: formatWeight(heaviest),
+                icon: "dumbbell.fill", tint: ATHLTHTheme.premiumGold,
+                priority: 58, category: "weight"
+            ))
+        }
+        if let reps = workout.strengthTotalReps, reps > 0 {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Completed repetitions", norwegian: "Gjennomførte repetisjoner"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "\(reps) logged repetitions",
+                    norwegian: "\(reps) registrerte repetisjoner"
+                ),
+                icon: "repeat", tint: ATHLTHTrainDesign.bronze,
+                priority: 55, category: "repetitions"
+            ))
+        }
+        if let log = matchingStrengthLog {
+            let rest = log.totalActualRestSeconds
+            if rest.isFinite, rest >= 60 {
+                choices.append(ReplayMoment(
+                    title: ATHLTHLocalization.choose(
+                        english: "Recorded set recovery", norwegian: "Registrerte settpauser"
+                    ),
                     detail: ATHLTHLocalization.choose(
-                        english: "\(Int(calories.rounded())) active kcal",
-                        norwegian: "\(Int(calories.rounded())) aktive kcal"
+                        english: "\(durationText(rest)) of set recovery was recorded; this is not a pause of the whole Apple Health workout.",
+                        norwegian: "\(durationText(rest)) med settpauser er registrert. Dette er ikke en pause av hele Apple Health-økten."
                     ),
-                    icon: "flame.fill",
-                    tint: .orange
-                )
-            )
+                    icon: "timer", tint: ATHLTHTrainDesign.bronze,
+                    priority: 57, category: "recovery"
+                ))
+            }
+        }
+        if let seconds = workout.strengthCardioDurationSeconds, seconds > 0 {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Cardio within strength", norwegian: "Kondisjon i styrkeøkten"
+                ),
+                detail: durationText(Double(seconds)),
+                icon: "figure.run", tint: ATHLTHTheme.accentDeep,
+                priority: 65, category: "cardio"
+            ))
+        }
+        return choices
+    }
+
+    private var enduranceMoments: [ReplayMoment] {
+        guard validOverallPace != nil || workout.activity == .swimming ||
+                workout.activity == .rowing || workout.activity == .hiit ||
+                workout.activity == .elliptical ||
+                workout.activity == .stairClimbing ||
+                workout.activity == .yoga ||
+                workout.activity == .coreTraining ||
+                workout.activity == .other
+        else { return [] }
+
+        var choices: [ReplayMoment] = []
+        if let previous = previousComparableEndurance,
+           let currentPace = validOverallPace,
+           let oldPace = ATHLTHReplayDataQuality.usablePace(
+                duration: previous.duration,
+                distanceMeters: previous.distanceMeters,
+                activity: workout.activity,
+                requiresReview: false
+           ) {
+            let difference = currentPace - oldPace
+            if abs(difference) >= 3, abs(difference) / oldPace < 0.3 {
+                choices.append(ReplayMoment(
+                    title: ATHLTHLocalization.choose(
+                        english: "Since a similar workout",
+                        norwegian: "Siden forrige lignende økt"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "\(Int(abs(difference).rounded())) sec/km \(difference < 0 ? "quicker" : "slower") on a comparable distance.",
+                        norwegian: "\(Int(abs(difference).rounded())) sek/km \(difference < 0 ? "raskere" : "roligere") på sammenlignbar distanse."
+                    ),
+                    icon: "clock.arrow.circlepath",
+                    tint: ATHLTHTrainDesign.bronze,
+                    priority: 100, category: "history"
+                ))
+            }
         }
 
-        if moments.isEmpty {
-            moments.append(
-                ReplayMoment(
-                    title: ATHLTHLocalization.choose(english: "Workout complete", norwegian: "Økt fullført"),
-                    detail: durationText(workout.duration),
-                    icon: "checkmark.circle.fill",
-                    tint: ATHLTHTheme.vitality
-                )
-            )
+        if let elevation = context?.elevationGainMeters,
+           elevation.isFinite && elevation >= 25 {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Climbing recorded", norwegian: "Stigning registrert"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "\(Int(elevation.rounded())) metres of elevation gain",
+                    norwegian: "\(Int(elevation.rounded())) høydemeter"
+                ),
+                icon: "mountain.2", tint: ATHLTHTheme.accentDeep,
+                priority: 77, category: "elevation"
+            ))
         }
 
-        return Array(moments.prefix(3))
+        let paces = usableSegments.compactMap(\.paceSecondsPerKilometer)
+        if paces.count >= 3 {
+            let mean = paces.reduce(0, +) / Double(paces.count)
+            let spread = ((paces.max() ?? mean) - (paces.min() ?? mean)) / mean
+            if spread <= 0.06 {
+                choices.append(ReplayMoment(
+                    title: ATHLTHLocalization.choose(
+                        english: "Steady pacing", norwegian: "Jevnt tempo"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "The measured sections stayed within about \(Int((spread * 100).rounded()))% pace variation.",
+                        norwegian: "De målte delene holdt seg innenfor omtrent \(Int((spread * 100).rounded())) % tempovariasjon."
+                    ),
+                    icon: "equal.circle", tint: ATHLTHTheme.vitality,
+                    priority: 85, category: "consistency"
+                ))
+            }
+        }
+
+        if usableSegments.count >= 2,
+           let fastest = usableSegments.min(by: {
+               ($0.paceSecondsPerKilometer ?? .greatestFiniteMagnitude) <
+                   ($1.paceSecondsPerKilometer ?? .greatestFiniteMagnitude)
+           }),
+           let pace = fastest.paceSecondsPerKilometer {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Fastest measured section", norwegian: "Raskeste målte del"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "An average of \(paceText(pace)) in that section",
+                    norwegian: "\(paceText(pace)) i snitt på denne delen"
+                ),
+                icon: "speedometer", tint: ATHLTHTheme.vitality,
+                priority: 72, category: "fastest"
+            ))
+        }
+
+        if usableSegments.count >= 2,
+           let start = usableSegments.first?.paceSecondsPerKilometer,
+           let finish = usableSegments.last?.paceSecondsPerKilometer {
+            let percent = (start - finish) / start * 100
+            if abs(percent) >= 4 && abs(percent) <= 30 {
+                choices.append(ReplayMoment(
+                    title: ATHLTHLocalization.choose(
+                        english: "How the pace changed", norwegian: "Tempo gjennom økten"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "The final measured section was \(Int(abs(percent).rounded()))% \(percent > 0 ? "quicker" : "slower") than the first. This is a pace comparison, not a judgement of effort.",
+                        norwegian: "Siste målte del var \(Int(abs(percent).rounded())) % \(percent > 0 ? "raskere" : "roligere") enn første. Det er en temposammenligning, ikke en vurdering av anstrengelse."
+                    ),
+                    icon: "arrow.up.forward.circle", tint: ATHLTHTrainDesign.bronze,
+                    priority: 63, category: "pacing"
+                ))
+            }
+        }
+        if let maxHeartRate = context?.maxHeartRateBPM,
+           maxHeartRate.isFinite, maxHeartRate >= 60,
+           maxHeartRate <= 240 {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Highest recorded heart rate",
+                    norwegian: "Høyeste registrerte puls"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "\(Int(maxHeartRate.rounded())) bpm recorded; not a measure of effort on its own.",
+                    norwegian: "\(Int(maxHeartRate.rounded())) slag/min. Pulsen alene sier ikke hvor hard økten var."
+                ),
+                icon: "heart", tint: ATHLTHTheme.accent,
+                priority: 49, category: "heart"
+            ))
+        }
+        if let calories = workout.activeEnergyKilocalories,
+           calories.isFinite, calories >= 30 {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Recorded active energy", norwegian: "Registrert aktiv energi"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "\(Int(calories.rounded())) active kcal",
+                    norwegian: "\(Int(calories.rounded())) aktive kcal"
+                ),
+                icon: "flame", tint: ATHLTHTheme.accentDeep,
+                priority: 40, category: "energy"
+            ))
+        }
+        if let meters = workout.distanceMeters,
+           meters.isFinite, meters >= 1_000, validOverallPace != nil {
+            choices.append(ReplayMoment(
+                title: ATHLTHLocalization.choose(
+                    english: "Distance logged", norwegian: "Registrert distanse"
+                ),
+                detail: String(format: "%.1f km", meters / 1_000),
+                icon: activitySystemImage, tint: ATHLTHTrainDesign.bronze,
+                priority: 25, category: "distance"
+            ))
+        }
+        return choices
     }
 
     private var activitySystemImage: String {
@@ -900,6 +1076,24 @@ private struct ReplayMoment {
     let detail: String
     let icon: String
     let tint: Color
+    let priority: Int
+    let category: String
+
+    init(
+        title: String,
+        detail: String,
+        icon: String,
+        tint: Color,
+        priority: Int = 0,
+        category: String = "general"
+    ) {
+        self.title = title
+        self.detail = detail
+        self.icon = icon
+        self.tint = tint
+        self.priority = priority
+        self.category = category
+    }
 }
 
 
