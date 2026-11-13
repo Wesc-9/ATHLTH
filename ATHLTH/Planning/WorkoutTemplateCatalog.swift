@@ -4949,7 +4949,11 @@ struct WorkoutTemplateBuilderView: View {
                                 selectedRouteTitle: session.savedRoutes.first {
                                     $0.id == selectedRouteID
                                 }?.title,
-                                selectedRoute: activeRoute,
+                                // A route may be selected before its block
+                                // has been reconciled. Never hide its map.
+                                selectedRoute: activeRoute ?? session.savedRoutes.first {
+                                    $0.id == selectedRouteID
+                                },
                                 structuredSteps: blocks,
                                 selectedWorkoutTitle: studioBasicWorkoutTitle,
                                 onChooseRoute: {

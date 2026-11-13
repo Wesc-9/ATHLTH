@@ -1593,6 +1593,8 @@ struct RunQuickStartSheet: View {
                             date: $quickDisplayDate,
                             selectedRouteTitle: selectedRoute?.title,
                             selectedRoute: selectedRoute,
+                            structuredSteps: advancedWorkout?.resolvedWorkoutBlocks ??
+                                selectedWorkout?.plannedSession().resolvedWorkoutBlocks ?? [],
                             selectedWorkoutTitle: selectedWorkout?.title,
                             onChooseRoute: { showingRoutes = true },
                             onChooseWorkout: { showingRunningLibrary = true },

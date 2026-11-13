@@ -92,12 +92,20 @@ struct ATHLTHRunBasicSetupView: View {
                 ATHLTHRunEnvironmentDetailRow(environment: $environment)
                     .padding(12)
                     .athlthTrainPaper()
-            } else if mode == .route, environment == .outdoor,
-                      let selectedRoute {
-                // Quick Train reuses the same route image instead of a
-                // second MapKit renderer.
-                RouteMapSnapshotThumbnail(route: selectedRoute, height: 145)
-                    .accessibilityIdentifier("athlth-quick-run-route-map")
+            } else {
+                // The same small map and workout outline used in planning.
+                ATHLTHRunModePreviewView(
+                    mode: mode,
+                    environment: environment,
+                    route: selectedRoute,
+                    workoutTitle: selectedWorkoutTitle,
+                    steps: structuredSteps,
+                    isGoalSelected: isGoalSelected,
+                    isGhostSelected: isGhostSelected
+                )
+                .padding(12)
+                .athlthTrainPaper()
+                .accessibilityIdentifier("athlth-quick-run-map-preview")
             }
 
             if let audioCoachEnabled {
