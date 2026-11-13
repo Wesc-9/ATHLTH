@@ -110,7 +110,10 @@ enum ATHLTHQuickRunTimelineAdapter {
                      (!distance.isFinite || distance <= 0) { return false }
                   if let seconds = block.durationSeconds,
                      (!seconds.isFinite || seconds <= 0) { return false }
-                  return block.kind != .rest || block.durationSeconds != nil
+                  // WatchRunningStepMeasure.open intentionally requires the
+                  // athlete to press Next. Hills, partner recovery and test
+                  // phases must not receive invented pause lengths.
+                  return true
               }) else {
             return ATHLTHLocalization.choose(
                 english: "Check the distance and duration of each phase.",
