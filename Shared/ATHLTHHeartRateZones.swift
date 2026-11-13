@@ -50,8 +50,9 @@ enum ATHLTHHeartRateZones {
         else { return nil }
         let low = 0.50 + 0.10 * Double(firstZone - 1)
         let high = 0.50 + 0.10 * Double(lastZone)
-        return Int((low * maximumBPM).rounded())...
-               Int((min(1, high) * maximumBPM).rounded())
+        let lowerBPM = Int((low * maximumBPM).rounded())
+        let upperBPM = Int((min(1, high) * maximumBPM).rounded())
+        return lowerBPM...upperBPM
     }
 
     static func range(
@@ -66,8 +67,9 @@ enum ATHLTHHeartRateZones {
               let maximumBPM, maximumBPM.isFinite,
               (100...240).contains(maximumBPM)
         else { return nil }
-        return Int((maximumBPM * lower / 100).rounded())...
-               Int((maximumBPM * upper / 100).rounded())
+        let lowerBPM = Int((maximumBPM * lower / 100).rounded())
+        let upperBPM = Int((maximumBPM * upper / 100).rounded())
+        return lowerBPM...upperBPM
     }
 
     static func matchingZones(
