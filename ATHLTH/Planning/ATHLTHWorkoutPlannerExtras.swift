@@ -6,6 +6,7 @@ struct ATHLTHWorkoutPlannerExtras: Codable, Hashable {
     var gearIDs: [UUID]? = nil
     var spotifyPlaylist: SpotifyPlaylistReference? = nil
     var spotifyAutoplayOnStart: Bool? = nil
+    var spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack? = nil
 
     // Optional workout-specific guidance values. Older saved plan drafts
     // remain decodable without these fields.
