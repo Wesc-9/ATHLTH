@@ -3,6 +3,8 @@ import AVFoundation
 
 struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var mirroring: WorkoutMirroringStore
+    @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
+    @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -34,6 +36,12 @@ struct MirroredWorkoutLiveView: View {
 
     var body: some View {
         workoutNavigation
+        // The mirrored Watch workout is full-screen; an alert attached to
+        // the underlying app root is not reliably visible above this cover.
+        // Keep the approval actions on the screen the athlete is using.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            liveViewingApprovalBanner
+        }
         .confirmationDialog(
             pendingLiveAction == .finish
                 ? ATHLTHLocalization.choose(
@@ -293,6 +301,65 @@ struct MirroredWorkoutLiveView: View {
             of: scenePhase
         ) { _, _ in
             updateScreenAwakeState()
+        }
+    }
+
+    @ViewBuilder
+    private var liveViewingApprovalBanner: some View {
+        if let request = liveSharing.incomingRequest, request.isPending {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Show this workout on iPad?",
+                        norwegian: "Vise denne økten på iPad?"
+                    ),
+                    systemImage: "ipad.and.iphone"
+                )
+                .font(.subheadline.weight(.semibold))
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Only this workout will be shared. iPad cannot control recording.",
+                    norwegian: "Kun denne økten deles. iPad kan ikke styre registreringen."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Allow this workout",
+                        norwegian: "Tillat denne økten"
+                    )) {
+                        Task {
+                            await liveSharing.respondToRequest(
+                                approve: true,
+                                accountID: appSession.profile.userID
+                            )
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    .accessibilityIdentifier("athlth-watch-live-approve-ipad")
+
+                    Button(ATHLTHLocalization.choose(
+                        english: "Decline", norwegian: "Avslå"
+                    )) {
+                        Task {
+                            await liveSharing.respondToRequest(
+                                approve: false,
+                                accountID: appSession.profile.userID
+                            )
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("athlth-watch-live-decline-ipad")
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .accessibilityIdentifier("athlth-watch-live-ipad-approval-banner")
         }
     }
 
