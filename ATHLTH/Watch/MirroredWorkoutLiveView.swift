@@ -2117,7 +2117,8 @@ struct MirroredWorkoutLiveView: View {
                 Button {
                     if snapshot.state == .paused {
                         _ = mirroring.sendCommand(.resume)
-                    } else if snapshot.kind == .strength {
+                    } else if snapshot.kind != .running &&
+                                snapshot.kind != .walking {
                         showingStrengthWholeWorkoutPauseConfirmation = true
                     } else {
                         _ = mirroring.sendCommand(.pause)
