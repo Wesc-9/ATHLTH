@@ -1476,7 +1476,7 @@ struct WorkoutTemplateLibraryView: View {
         let visibleRunningTemplates = filteredRunningTemplates
         let visibleSavedWorkouts = filteredSavedWorkouts
         let visibleScheduledWorkouts = filteredScheduledWorkouts
-        return ScrollViewReader { proxy in
+        ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 // Run library filters are enough context; keep hero cards elsewhere.
