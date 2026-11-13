@@ -57,6 +57,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
     @State private var showingSpotifyControls = false
+    @State private var showingLiveAddActions = false
     @State private var showingStrengthAudioCoachSettings = false
     @State private var showingNextExerciseDetails = false
     @State private var showingOmitRemainingSetsConfirmation = false
@@ -72,7 +73,6 @@ struct ActiveStrengthWorkoutView: View {
                     } else if workout.exercises.isEmpty {
                         ScrollView {
                             VStack(spacing: 18) {
-                                workoutHeader(workout)
                                 TrainTogetherStatusStrip()
                                 addExerciseCard(workout)
                                 simpleTrackingContent(
@@ -145,107 +145,31 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 }
             }
-            .navigationTitle(
+            .toolbar(.hidden, for: .navigationBar)
+            .confirmationDialog(
                 ATHLTHLocalization.choose(
-                    english: "Strength",
-                    norwegian: "Styrke"
-                )
-            )
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
-                    if strength.activeWorkout != nil {
-                        ATHLTHLiveWorkoutControlButton(kind: .minimize) {
-                            // Recording and timers continue after minimization.
-                            strength.checkpoint()
-                            dismiss()
-                        }
-                        .accessibilityHint(ATHLTHLocalization.choose(
-                            english: "Keep tracking your workout and return to ATHLTH",
-                            norwegian: "Fortsett å registrere økten og gå tilbake til ATHLTH"
-                        ))
-                    }
-
-                    if let workout = strength.activeWorkout {
-                        ATHLTHWorkoutAudioDock(
-                            inlinePopovers: true,
-                            compactAlignment: .leading,
-                            coachVisible: true,
-                            coachEnabled:
-                                workout.advancedConfiguration?.audioCoach.enabled == true,
-                            coachPaused: strengthCoach.speechPaused,
-                            coachManagedOnWatch: workout.captureDevice == .appleWatch,
-                            canReplayCoach: strengthCoach.canReplayLastMessage,
-                            onCoachStatus: { announceStrengthCoachStatusNow() },
-                            onCoachTogglePause: {
-                                strengthCoach.setSpeechPaused(!strengthCoach.speechPaused)
-                            },
-                            onCoachReplay: { strengthCoach.replayLastMessage() },
-                            onCoachSettings: workout.captureDevice == .iPhone
-                                ? { showingStrengthAudioCoachSettings = true }
-                                : nil
-                        )
-                        .fixedSize(horizontal: true, vertical: true)
-                    }
-
+                    english: "Add to workout", norwegian: "Legg til i økten"
+                ),
+                isPresented: $showingLiveAddActions,
+                titleVisibility: .visible
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Add exercise", norwegian: "Legg til øvelse"
+                )) {
+                    showingExerciseLibrary = true
                 }
 
-                ToolbarItemGroup(
-                    placement:
-                        .topBarTrailing
-                ) {
-                    if strength.activeWorkout != nil {
-                        Menu {
-                            Button {
-                                showingExerciseQueue = true
-                            } label: {
-                                Label(ATHLTHLocalization.choose(
-                                    english: "Exercises and order",
-                                    norwegian: "Øvelser og rekkefølge"
-                                ), systemImage: "list.bullet")
-                            }
-                            Button {
-                                showingExerciseLibrary = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Exercise", norwegian: "Øvelse"
-                                    ),
-                                    systemImage: "dumbbell"
-                                )
-                            }
+                Button(ATHLTHLocalization.choose(
+                    english: "Add workout", norwegian: "Legg til treningsøkt"
+                )) {
+                    showingAppendWorkout = true
+                }
 
-                            Button {
-                                showingAppendWorkout = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Entire workout",
-                                        norwegian: "Hel treningsøkt"
-                                    ),
-                                    systemImage: "rectangle.stack.badge.plus"
-                                )
-                            }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                                .frame(width: 43, height: 43)
-                                .background(.white.opacity(0.90),
-                                            in: RoundedRectangle(cornerRadius: 14))
-                        }
-                        .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Add exercise or workout",
-                            norwegian: "Legg til øvelse eller treningsøkt"
-                        ))
-                    }
-
-                    ATHLTHLiveWorkoutControlButton(
-                        kind: .finish,
-                        disabled: strength.activeWorkout == nil || finishInProgress
-                    ) {
-                        showingFinishConfirmation = true
-                    }
+                Button(ATHLTHLocalization.choose(
+                    english: "Exercises and order",
+                    norwegian: "Øvelser og rekkefølge"
+                )) {
+                    showingExerciseQueue = true
                 }
             }
             .sheet(isPresented: $showingStrengthAudioCoachSettings) {
@@ -756,6 +680,66 @@ struct ActiveStrengthWorkoutView: View {
         }
         // The current set is a stable bottom surface. Scrolling exercise
         // media/instructions never scrolls away load, reps or the main action.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let workout = strength.activeWorkout {
+                VStack(spacing: 6) {
+                    ATHLTHLiveWorkoutTopStrip(
+                        title: ATHLTHLocalization.choose(
+                            english: "Strength", norwegian: "Styrke"
+                        ),
+                        subtitle: strengthLiveTopSummary(workout),
+                        spotifyExpanded: showingSpotifyControls,
+                        finishDisabled: finishInProgress,
+                        onMinimize: {
+                            strength.checkpoint()
+                            dismiss()
+                        },
+                        onSpotify: {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                showingSpotifyControls.toggle()
+                            }
+                        },
+                        onAdd: { showingLiveAddActions = true },
+                        onFinish: { showingFinishConfirmation = true }
+                    )
+
+                    if showingSpotifyControls {
+                        ATHLTHLiveSpotifyExpandedBar()
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    if workout.advancedConfiguration?.audioCoach.enabled == true {
+                        HStack {
+                            ATHLTHWorkoutAudioDock(
+                                showSpotifyLauncher: false,
+                                inlinePopovers: true,
+                                compactAlignment: .leading,
+                                coachVisible: true,
+                                coachEnabled: true,
+                                coachPaused: strengthCoach.speechPaused,
+                                coachManagedOnWatch: workout.captureDevice == .appleWatch,
+                                canReplayCoach: strengthCoach.canReplayLastMessage,
+                                onCoachStatus: { announceStrengthCoachStatusNow() },
+                                onCoachTogglePause: {
+                                    strengthCoach.setSpeechPaused(!strengthCoach.speechPaused)
+                                },
+                                onCoachReplay: { strengthCoach.replayLastMessage() },
+                                onCoachSettings: workout.captureDevice == .iPhone
+                                    ? { showingStrengthAudioCoachSettings = true }
+                                    : nil
+                            )
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 7)
+                .padding(.bottom, 8)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+                .background(ATHLTHTheme.canvasTop)
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let workout = strength.activeWorkout,
                let exercise = strength.currentExercise,
@@ -1962,111 +1946,10 @@ struct ActiveStrengthWorkoutView: View {
         appSession.endTrainingStatus()
     }
 
-    /// Confirming is a save action, not a destructive delete.
-    /// The active workout remains untouched until the primary action is tapped.
-    @ViewBuilder
-    /// A single thin line tucked under the Spotify toolbar button.
-    /// Reuses the playback commands without opening a modal sheet.
-    private var inlineSpotifyBar: some View {
-        HStack(spacing: 7) {
-            ATHLTHSpotifyGlyph()
-                .frame(width: 17, height: 17)
-                .accessibilityHidden(true)
-            Text("Spotify")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-            Spacer(minLength: 0)
-            Button {
-                Task {
-                    await spotify.handleIPhoneAudioDockCommand(
-                        spotify.isPlaying ? .pause : .resume
-                    )
-                }
-            } label: {
-                Image(systemName: spotify.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 31, height: 38)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(spotify.isPlaying
-                ? ATHLTHLocalization.choose(
-                    english: "Pause Spotify", norwegian: "Pause Spotify"
-                  )
-                : ATHLTHLocalization.choose(
-                    english: "Play Spotify", norwegian: "Spill Spotify"
-                  ))
-            Button {
-                Task {
-                    await spotify.handleIPhoneAudioDockCommand(.next)
-                }
-            } label: {
-                Image(systemName: "forward.end.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 31, height: 38)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Next Spotify track", norwegian: "Neste Spotify-låt"
-            ))
-            Rectangle()
-                .fill(ATHLTHTrainDesign.rule)
-                .frame(width: 1, height: 20)
-                .padding(.horizontal, 1)
-            spotifyWorkoutShortcut(1, playlist: settings.spotifyQuickPlaylistOne)
-            spotifyWorkoutShortcut(2, playlist: settings.spotifyQuickPlaylistTwo)
-        }
-        .foregroundStyle(ATHLTHTrainDesign.ink)
-        .padding(.horizontal, 11)
-        .frame(maxWidth: .infinity, minHeight: 42, maxHeight: 42)
-        .background(ATHLTHTrainDesign.paper, in: Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.7)
-                .allowsHitTesting(false)
-        }
-        .shadow(color: ATHLTHTrainDesign.ink.opacity(0.05),
-                radius: 6, x: 0, y: 2)
-    }
-
-    private func spotifyWorkoutShortcut(
-        _ index: Int, playlist: SpotifyPlaylistReference?
-    ) -> some View {
-        Button {
-            guard let playlist else { return }
-            // Explicit tap authorizes playback even if automatic workout
-            // playlist starting was disabled in Settings.
-            Task {
-                await spotify.startLinkedPlaylist(
-                    playlist,
-                    settings: settings,
-                    respectGlobalAutoplay: false
-                )
-            }
-        } label: {
-            Text(playlist?.name ?? "\(index)")
-                .font(.system(size: 10, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(maxWidth: .infinity, minHeight: 34)
-                .padding(.horizontal, 4)
-                .background(
-                    playlist == nil
-                        ? ATHLTHTrainDesign.rule.opacity(0.28)
-                        : ATHLTHPlanDesign.accent.opacity(0.10),
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(playlist == nil)
-        .opacity(playlist == nil ? 0.52 : 1)
-        .accessibilityLabel(
-            playlist.map { ATHLTHLocalization.choose(
-                english: "Play playlist \($0.name)",
-                norwegian: "Spill spillelisten \($0.name)"
-            ) } ?? ATHLTHLocalization.choose(
-                english: "Configure playlist shortcut \(index) in Settings",
-                norwegian: "Velg spillelistesnarvei \(index) i Innstillinger"
-            )
+    private func strengthLiveTopSummary(_ workout: StrengthWorkoutLog) -> String {
+        ATHLTHLocalization.choose(
+            english: "\(workout.exercises.count) exercises · \(workout.totalCompletedSets) sets",
+            norwegian: "\(workout.exercises.count) øvelser · \(workout.totalCompletedSets) sett"
         )
     }
 
