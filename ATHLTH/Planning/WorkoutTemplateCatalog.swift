@@ -6492,7 +6492,9 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func localizedBlockTitle(_ block: WorkoutTemplateBlock) -> String {
-        guard block.kind == .exercise else { return block.title }
+        guard block.kind == .exercise else {
+            return ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block).title
+        }
         if let match = ATHLTHExerciseReferenceResolver.resolve(
             block, in: exerciseLibrary.allExercises
         ) {
