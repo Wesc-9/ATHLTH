@@ -167,14 +167,22 @@ enum ATHLTHSimpleWorkoutOutline {
                 ATHLTHWorkoutStepCopy.duration($0)
             } ?? recovery?.block.targetText
 
+            // Compact previews must show executable targets, not only the
+            // prose title. Zoned's 1-minute efforts therefore read as
+            // "1 min · Z5 arbeid · 1 min · Z1 pause".
+            let workZone = ATHLTHWorkoutStepTargetSummary
+                .zoneLabel(for: work.block).map { " · \($0)" } ?? ""
+            let recoveryZone = recovery.flatMap {
+                ATHLTHWorkoutStepTargetSummary.zoneLabel(for: $0.block)
+            }.map { " · \($0)" } ?? ""
             let detail: String
             if let recoveryText {
                 detail = ATHLTHLocalization.choose(
-                    english: "\(workText) work · \(recoveryText) recovery",
-                    norwegian: "\(workText) arbeid · \(recoveryText) pause"
+                    english: "\(workText)\(workZone) work · \(recoveryText)\(recoveryZone) recovery",
+                    norwegian: "\(workText)\(workZone) arbeid · \(recoveryText)\(recoveryZone) pause"
                 )
             } else {
-                detail = workText
+                detail = workText + workZone
             }
             let itemTitle = conciseTitle(
                 ATHLTHZonedLocalization.normalizeLegacyAllOutStep(work.block).title
