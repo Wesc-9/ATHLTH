@@ -339,6 +339,23 @@ final class APNsPushManager: ObservableObject {
                 .rpc("register_notification_device", params: params)
                 .execute()
 
+            // The existing registration RPC intentionally keeps platform
+            // as "ios". Label the device separately so same-account workout
+            // approval requests can notify the iPhone, not the waiting iPad.
+            // Failure here must not disable ordinary notification delivery.
+            do {
+                try await client.from("notification_devices")
+                    .update([
+                        "device_family": UIDevice.current.userInterfaceIdiom == .pad
+                            ? "ipad" : "iphone"
+                    ])
+                    .eq("user_id", value: userID)
+                    .eq("device_id", value: Self.deviceIdentifier)
+                    .execute()
+            } catch {
+                // The access request still works through in-app polling.
+            }
+
             isRegisteredWithBackend = true
             isSystemRegistered =
                 UIApplication.shared
