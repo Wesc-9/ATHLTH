@@ -234,3 +234,5 @@ ATHLTH 2.1.8 build 126 — explicitly authorized TestFlight launch 2026-11-12 02
 ATHLTH 2.1.8 build 126 — user-authorized retry 2026-11-12; upload only after same-commit Build ATHLTH and backend regressions succeed, signed archive validated; no new distribution certificates; verify App Store Connect acceptance before reporting success.
 
 ATHLTH 2.1.9 build 127 – authorized TestFlight release, 2026-11-13, full iPad live workout and one-session consent
+
+ATHLTH 2.1.9 build 127 – retry after fixing immutable live snapshot XCTest fixture, 2026-11-13
