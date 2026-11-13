@@ -187,6 +187,14 @@ struct ATHLTHAudioCoachActiveListView: View {
                         onShowProfiles: {
                             showingProfiles = true
                         },
+                        onUseStandard: {
+                            if hasAdvancedConfiguration {
+                                confirmReplaceWithStandard = true
+                            } else {
+                                draft.applySimpleAudioCoach()
+                                selectedProfileName = nil
+                            }
+                        },
                         onAddMessage: {
                             showingCatalogue = true
                         },
