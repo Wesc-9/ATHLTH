@@ -13,13 +13,30 @@ struct ATHLTHiPadLiveWorkoutView: View {
     @State private var previousIdleTimerDisabled = false
     @EnvironmentObject private var session: AppSessionStore
 
+    private var liveMaximumBPM: Double? {
+        snapshot.maximumHeartRateBPM ??
+            ATHLTHHeartRateZones.resolvedMaximumBPM(
+                configured: session.onboardingProfile?.maximumHeartRateBPM,
+                dateOfBirth: session.onboardingProfile?.dateOfBirth,
+                usesFemaleEstimate: session.onboardingProfile?.healthSex == .female
+            )
+    }
+
     private var measuredZone: Int? {
         ATHLTHHeartRateZones.measuredZone(
+            heartRateBPM: snapshot.heartRateBPM, maximumBPM: liveMaximumBPM
+        )
+    }
+
+    private var runningPulseZones: some View {
+        ATHLTHRunningPulseZoneGauge(
             heartRateBPM: snapshot.heartRateBPM,
-            maximumBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
-                configured: session.onboardingProfile?.maximumHeartRateBPM,
-                dateOfBirth: session.onboardingProfile?.dateOfBirth
-            )
+            maximumHeartRateBPM: liveMaximumBPM,
+            targetHeartRateZone: snapshot.targetHeartRateZone,
+            targetMinimumBPM: snapshot.targetHeartRateMinimumBPM,
+            targetMaximumBPM: snapshot.targetHeartRateMaximumBPM,
+            targetPercentMin: snapshot.targetHeartRatePercentMin,
+            targetPercentMax: snapshot.targetHeartRatePercentMax
         )
     }
 
@@ -56,6 +73,10 @@ struct ATHLTHiPadLiveWorkoutView: View {
                             VStack(spacing: 20) {
                                 elapsedHero
                                 metrics
+                                if snapshot.kind == "running" ||
+                                   snapshot.kind == "walking" {
+                                    runningPulseZones
+                                }
                             }
                             .frame(maxWidth: .infinity, alignment: .topLeading)
 
@@ -84,6 +105,10 @@ struct ATHLTHiPadLiveWorkoutView: View {
                     } else {
                         elapsedHero
                         metrics
+                        if snapshot.kind == "running" ||
+                           snapshot.kind == "walking" {
+                            runningPulseZones
+                        }
                         activeStepCard
                         if isStrength {
                             strengthProgress
