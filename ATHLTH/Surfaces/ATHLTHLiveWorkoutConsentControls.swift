@@ -39,95 +39,159 @@ struct ATHLTHLiveWorkoutPrestartToggle: View {
     }
 }
 
-/// An unobtrusive home hint: no live data is revealed just by being signed in.
-/// The athlete must accept for the current workout on iPhone.
-struct ATHLTHiPadLiveWorkoutAccessTip: View {
+/// The iPad shows that a workout is underway without leaking its title,
+/// pulse, pace, GPS, exercises or other consent-protected details. The user
+/// opens this card to request access for only the current session.
+struct ATHLTHiPadLiveWorkoutStatusCard: View {
     @EnvironmentObject private var live: ATHLTHCrossDeviceWorkoutStore
     @EnvironmentObject private var account: AppSessionStore
+    @State private var showingAccess = false
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
+    private var sourceName: String {
+        let source = live.remote?.sourceDevice ?? live.remotePresence?.sourceDevice
+        return source == "watch" ? "Apple Watch" : "iPhone"
+    }
+
     var body: some View {
-        if ATHLTHDeviceRole.isIPad && live.remote == nil {
-            HStack(alignment: .center, spacing: 14) {
-                Image(systemName: "ipad.and.iphone")
-                    .font(.title3)
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .frame(width: 48, height: 48)
-                    .background(
-                        ATHLTHPlanDesign.selectedSurface,
-                        in: RoundedRectangle(cornerRadius: 14)
-                    )
-                    .accessibilityHidden(true)
+        if ATHLTHDeviceRole.isIPad &&
+           (live.remote != nil || live.remotePresence != nil) {
+            Button {
+                if live.remote != nil {
+                    live.setExpanded(true)
+                } else {
+                    showingAccess = true
+                }
+            } label: {
+                HStack(spacing: 15) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.title3)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 48, height: 48)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                        .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(tr("Workout on iPhone or Apple Watch?",
-                            "Trener du på iPhone eller Apple Watch?"))
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 7) {
+                            Circle()
+                                .fill(Color(red: 0.18, green: 0.62, blue: 0.38))
+                                .frame(width: 7, height: 7)
+                                .accessibilityHidden(true)
+                            Text(tr("WORKOUT IN PROGRESS", "ØKT PÅGÅR"))
+                                .font(.caption2.weight(.semibold))
+                                .tracking(1.3)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+
+                        Text(live.remote?.title ??
+                             tr("Active workout", "Aktiv treningsøkt"))
+                            .font(.system(.title3, design: .serif, weight: .medium))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .lineLimit(2)
+
+                        Text(live.remote != nil
+                             ? tr("Live details available · Open the workout",
+                                  "Liveinformasjon tilgjengelig · Åpne økten")
+                             : tr("On \(sourceName) · Tap to request access",
+                                  "På \(sourceName) · Trykk for å be om tilgang"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 5)
+                    Image(systemName: "chevron.right")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                    Text(tr(
-                        "You can follow one live workout here. iPhone must approve each request.",
-                        "Du kan følge én liveøkt her. iPhone må godkjenne hver forespørsel."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                    if live.outgoingRequestState == .pending ||
-                       live.outgoingRequestState == .sending {
-                        Label(tr("Waiting for iPhone approval. You can resend the request.",
-                                 "Venter på godkjenning på iPhone. Du kan sende forespørselen på nytt."),
-                              systemImage: "clock")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    } else if live.outgoingRequestState == .denied {
-                        Text(tr("Request declined on iPhone.",
-                                "Forespørselen ble avslått på iPhone."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if live.outgoingRequestState == .expired {
-                        Text(tr("Request expired. You can send another.",
-                                "Forespørselen utløp. Du kan prøve igjen."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if let error = live.requestError {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
-
-                Spacer(minLength: 8)
-
-                Button {
-                    Task {
-                        await live.requestAccess(accountID: account.profile.userID)
-                    }
-                } label: {
-                    Label(
-                        live.outgoingRequestState == .pending
-                            ? tr("Resend request", "Send på nytt")
-                            : tr("Request access", "Be om tilgang"),
-                        systemImage: "lock.open"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .frame(minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHPlanDesign.accentInk)
-                // Pending requests may be replaced: never strand the user.
-                .disabled(live.outgoingRequestState == .sending)
-                .accessibilityIdentifier("athlth-ipad-request-live-access")
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.white, in: RoundedRectangle(cornerRadius: 19))
+                .contentShape(RoundedRectangle(cornerRadius: 19))
             }
-            .padding(16)
-            .background(
-                ATHLTHPlanDesign.surface,
-                in: RoundedRectangle(cornerRadius: 19)
-            )
-            .accessibilityIdentifier("athlth-ipad-live-access-tip")
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-ipad-active-workout-status")
+            .sheet(isPresented: $showingAccess) {
+                NavigationStack {
+                    VStack(alignment: .leading, spacing: 18) {
+                        Label(
+                            tr("Workout in progress on \(sourceName)",
+                               "Økt pågår på \(sourceName)"),
+                            systemImage: "ipad.and.iphone"
+                        )
+                        .font(.title3.weight(.semibold))
+
+                        Text(tr(
+                            "You can see that a workout is active, but its details are private. Request permission on the recording iPhone to follow this session live.",
+                            "Du kan se at en økt pågår, men treningsdata er private. Be om tillatelse på iPhone for å følge akkurat denne økten direkte."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                        if live.outgoingRequestState == .pending ||
+                           live.outgoingRequestState == .sending {
+                            Label(
+                                tr("Waiting for iPhone approval",
+                                   "Venter på godkjenning på iPhone"),
+                                systemImage: "clock"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        } else if live.outgoingRequestState == .denied {
+                            Text(tr("Request declined", "Forespørselen ble avslått"))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        } else if live.outgoingRequestState == .expired {
+                            Text(tr("Request expired · Try again",
+                                    "Forespørselen utløp · Prøv igjen"))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        } else if let error = live.requestError {
+                            Text(error)
+                                .font(.subheadline)
+                                .foregroundStyle(.orange)
+                        }
+
+                        Button {
+                            Task {
+                                await live.requestAccess(accountID: account.profile.userID)
+                            }
+                        } label: {
+                            Label(
+                                live.outgoingRequestState == .pending
+                                    ? tr("Resend request", "Send på nytt")
+                                    : tr("Request live access", "Be om tilgang"),
+                                systemImage: "lock.open"
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHPlanDesign.accentInk)
+                        .disabled(live.outgoingRequestState == .sending)
+                        .accessibilityIdentifier("athlth-ipad-request-live-access")
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .topLeading)
+                    .navigationTitle(tr("Live workout", "Liveøkt"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(tr("Close", "Lukk")) { showingAccess = false }
+                        }
+                    }
+                }
+                .presentationDetents([.medium, .large])
+            }
+            .onChange(of: live.remote?.id) { _, newID in
+                if newID != nil { showingAccess = false }
+            }
         }
     }
 }
