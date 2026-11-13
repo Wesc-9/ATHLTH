@@ -321,6 +321,13 @@ enum ATHLTHWorkoutHealthKitContinuityPolicy {
         kind == .running || kind == .walking
     }
 
+    static func mayAutoPause(
+        kind: WatchWorkoutKind,
+        hasStructuredIntervals: Bool
+    ) -> Bool {
+        supportsAutomaticPause(kind) && !hasStructuredIntervals
+    }
+
     /// Recover unexpected HealthKit/system pauses on strength. The user's
     /// explicit "Pause whole workout" action remains authoritative.
     static func shouldResumeUnexpectedPause(
