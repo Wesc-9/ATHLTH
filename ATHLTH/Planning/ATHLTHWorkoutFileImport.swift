@@ -262,6 +262,9 @@ enum ATHLTHWorkoutFileImport {
               let workout = root.child("workout") else {
             throw ImportFailure.noPlannedWorkout
         }
+        let sportName = root.child("sportType")?.value.lowercased() ?? "bike"
+        let activity: ATHLTHPlannedWorkoutType =
+            ["run", "running", "treadmill"].contains(sportName) ? .running : .cycling
         var parsed: [WorkoutTemplateBlock] = []
 
         func append(
@@ -273,14 +276,21 @@ enum ATHLTHWorkoutFileImport {
                 throw ImportFailure.invalidFile
             }
             var block = WorkoutTemplateBlock(
-                sequence: parsed.count + 1, kind: .note,
+                sequence: parsed.count + 1,
+                kind: activity == .running ? (phase == .recovery ? .rest : .run) : .note,
                 title: name, exerciseSlug: nil, distanceMeters: nil,
                 repetitions: nil, durationSeconds: seconds,
                 targetWeightKilograms: nil, loadNote: nil,
-                notes: ftpPower.map { "Zwift: \(Int(($0 * 100).rounded()))% FTP" },
+                notes: ftpPower.map {
+                    let percent = Int(($0 * 100).rounded())
+                    return activity == .cycling
+                        ? "Zwift: \(percent)% FTP"
+                        : "Zwift: \(percent)% prescribed intensity"
+                },
                 phase: phase
             )
-            block.activityTag = "cycling"
+            if activity == .cycling { block.activityTag = "cycling" }
+            if activity == .running { block.cardioActivity = .running }
             parsed.append(block)
         }
 
@@ -316,9 +326,9 @@ enum ATHLTHWorkoutFileImport {
             try append(label, seconds: time, phase: phase, ftpPower: power)
         }
         guard !parsed.isEmpty else { throw ImportFailure.noPlannedWorkout }
-        // FTP-based Zwift targets are deliberately kept as notes, not
-        // transformed into HR zones or running pace.
-        return (root.child("name")?.value ?? "Imported Zwift workout", .cycling, parsed)
+        // Imported power/intensity targets remain notes, not invented
+        // heart-rate zones or running paces, for either Zwift sport.
+        return (root.child("name")?.value ?? "Imported Zwift workout", activity, parsed)
     }
 
     private static func xml(_ data: Data) throws -> XMLNode {
