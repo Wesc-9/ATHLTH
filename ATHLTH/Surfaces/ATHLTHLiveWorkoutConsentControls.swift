@@ -78,8 +78,8 @@ struct ATHLTHiPadLiveWorkoutAccessTip: View {
 
                     if live.outgoingRequestState == .pending ||
                        live.outgoingRequestState == .sending {
-                        Label(tr("Waiting for iPhone approval",
-                                 "Venter på godkjenning på iPhone"),
+                        Label(tr("Waiting for iPhone approval. You can resend the request.",
+                                 "Venter på godkjenning på iPhone. Du kan sende forespørselen på nytt."),
                               systemImage: "clock")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -108,7 +108,9 @@ struct ATHLTHiPadLiveWorkoutAccessTip: View {
                     }
                 } label: {
                     Label(
-                        tr("Request access", "Be om tilgang"),
+                        live.outgoingRequestState == .pending
+                            ? tr("Resend request", "Send på nytt")
+                            : tr("Request access", "Be om tilgang"),
                         systemImage: "lock.open"
                     )
                     .font(.subheadline.weight(.semibold))
@@ -116,10 +118,8 @@ struct ATHLTHiPadLiveWorkoutAccessTip: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(ATHLTHPlanDesign.accentInk)
-                .disabled(
-                    live.outgoingRequestState == .pending ||
-                    live.outgoingRequestState == .sending
-                )
+                // Pending requests may be replaced: never strand the user.
+                .disabled(live.outgoingRequestState == .sending)
                 .accessibilityIdentifier("athlth-ipad-request-live-access")
             }
             .padding(16)
