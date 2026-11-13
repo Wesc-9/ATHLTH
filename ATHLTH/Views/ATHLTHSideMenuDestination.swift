@@ -14,9 +14,9 @@ enum ATHLTHSideMenuDestination: String, Identifiable {
     case myWorkouts
     case trainTogether
     case ghostRace
+    case challenges
     case arena
     case clubs
-    case exerciseProgress
     case profile
     case settings
 
