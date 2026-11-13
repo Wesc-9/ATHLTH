@@ -55,7 +55,7 @@ enum ATHLTHWorkoutQuickGoalApplier {
         guard goal != .none else { return result }
         result.blocks = workout.blocks.map { source in
             var block = source
-            guard block.kind == .work else { return block }
+            guard block.kind == .work || block.kind == .steady else { return block }
 
             var work = block.work
             configure(&work, goal: goal)
@@ -206,9 +206,13 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                             onDecision(.continueWith(currentGoal))
                         } label: {
                             Label(
-                                savingToLibrary
-                                    ? tr("Save workout", "Lagre økt")
-                                    : tr("Add workout", "Legg til økt"),
+                                selectedKind == .none
+                                    ? (savingToLibrary
+                                        ? tr("Save without target", "Lagre uten mål")
+                                        : tr("Continue without target", "Fortsett uten mål"))
+                                    : (savingToLibrary
+                                        ? tr("Save with target", "Lagre med mål")
+                                        : tr("Add with target", "Legg til med mål")),
                                 systemImage: "checkmark"
                             )
                             .font(.subheadline.weight(.semibold))
