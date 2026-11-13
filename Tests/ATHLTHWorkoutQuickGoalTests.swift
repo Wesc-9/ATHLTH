@@ -82,6 +82,25 @@ final class ATHLTHWorkoutQuickGoalTests: XCTestCase {
         XCTAssertEqual(target.blocks[1].work.durationSeconds, 240)
     }
 
+    func testQuickTargetAlsoWorksForSteadyRuns() {
+        let source = RunningWorkoutTemplate(
+            id: UUID(), title: "Easy 30", type: .easy,
+            summary: "Steady running", blocks: [
+                RunningWorkoutBlock(kind: .steady, title: "Easy running",
+                                    work: .time(1800))
+            ],
+            routeID: nil, isBuiltIn: false,
+            createdAt: Date(), updatedAt: Date()
+        )
+        let result = ATHLTHWorkoutQuickGoalApplier.apply(
+            .pace(secondsPerKilometer: 360), to: source
+        )
+        XCTAssertEqual(result.blocks[0].work.intensity.kind, .pace)
+        XCTAssertEqual(result.blocks[0].work.intensity.paceMinSecondsPerKilometer, 360)
+        XCTAssertEqual(result.blocks[0].work.durationSeconds, 1800)
+        XCTAssertNil(source.blocks[0].work.intensity.paceMinSecondsPerKilometer)
+    }
+
     func testNoTargetKeepsRunningPrescriptionUnchanged() {
         let source = RunningWorkoutTemplate(
             id: UUID(), title: "Recovery", type: .easy,
