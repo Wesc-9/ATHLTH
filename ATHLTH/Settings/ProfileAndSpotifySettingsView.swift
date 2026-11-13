@@ -3594,234 +3594,256 @@ struct SpotifySettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "music.note")
                         .font(.title2)
-                        .foregroundStyle(ATHLTHTheme.accent)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                         .frame(width: 44, height: 44)
                         .background(
                             ATHLTHTheme.accentSoft,
                             in: RoundedRectangle(cornerRadius: 14)
                         )
+                        .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Spotify")
                             .font(.headline)
                         Text(spotify.connectionState.title)
-                            .font(.caption)
-                            .foregroundStyle(
-                                spotify.isConnected
-                                    ? ATHLTHTheme.accentDeep
-                                    : .secondary
-                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
 
-                    Spacer()
+                    Spacer(minLength: 8)
 
                     if spotify.connectionState == .connecting ||
                         spotify.isRefreshingPlaylists {
                         ProgressView()
                             .controlSize(.small)
+                    } else if spotify.isConnected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .accessibilityLabel(localized(
+                                english: "Connected",
+                                norwegian: "Tilkoblet"
+                            ))
                     }
                 }
             }
 
             if !spotify.isConfigured {
-                Section("Developer Setup") {
+                Section(localized(
+                    english: "Developer setup",
+                    norwegian: "Utvikleroppsett"
+                )) {
                     Label(
-                        "Spotify client ID is not configured for this build.",
+                        localized(
+                            english: "Spotify is not configured in this build.",
+                            norwegian: "Spotify er ikke konfigurert i denne versjonen."
+                        ),
                         systemImage: "wrench.and.screwdriver"
                     )
-                    .font(.subheadline)
-
-                    Text(
-                        spotify.setupMessage
-                            ?? "Configure Spotify before connecting an account."
-                    )
+                    Text(spotify.setupMessage ?? localized(
+                        english: "Configure Spotify before connecting an account.",
+                        norwegian: "Konfigurer Spotify før du kobler til en konto."
+                    ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                    Text(
-                        "Redirect URI: \(spotify.redirectURIForDiagnostics)"
-                    )
-                    .font(.caption.monospaced())
-                    .textSelection(.enabled)
+                    Text("Redirect URI: \(spotify.redirectURIForDiagnostics)")
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
                 }
             } else if spotify.isConnected {
-                Section("Workout Playback") {
-                    Toggle(
-                        "Start linked playlist with workout",
-                        isOn: $settings.spotifyAutoplayLinkedPlaylists
-                    )
+                Section(localized(
+                    english: "Playback during workouts",
+                    norwegian: "Avspilling under trening"
+                )) {
+                    Toggle(isOn: $settings.spotifyAutoplayLinkedPlaylists) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(localized(
+                                english: "Start music automatically",
+                                norwegian: "Start musikk automatisk"
+                            ))
+                            Text(localized(
+                                english: "Play the linked playlist when a workout starts.",
+                                norwegian: "Spill av den valgte spillelisten når økten starter."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(ATHLTHTheme.accentDeep)
 
                     Button {
                         showingPlaylistPicker = true
                     } label: {
-                        HStack {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Default workout playlist",
-                                    norwegian: "Standardspilleliste for økter"
-                                ),
-                                systemImage: "music.note.list"
-                            )
-                            Spacer()
-                            Text(
-                                settings
-                                    .spotifyDefaultPlaylist?
-                                    .name ??
-                                ATHLTHLocalization.choose(
-                                    english: "None",
-                                    norwegian: "Ingen"
-                                )
-                            )
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        }
-                    }
+                        HStack(spacing: 12) {
+                            playlistArtwork(settings.spotifyDefaultPlaylist)
 
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Choose a default playlist for new quick workouts. Planned workouts and programs can still use their own playlist or turn Spotify off.",
-                            norwegian: "Velg en standardspilleliste for nye quick-økter. Planlagte økter og programmer kan fortsatt velge en egen spilleliste eller slå av Spotify."
-                        )
-                    )
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(localized(
+                                    english: "Default playlist",
+                                    norwegian: "Standardspilleliste"
+                                ))
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+
+                                Text(
+                                    settings.spotifyDefaultPlaylist?.name ??
+                                    localized(
+                                        english: "No playlist selected",
+                                        norwegian: "Ingen spilleliste valgt"
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                        .frame(minHeight: 48)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Text(localized(
+                        english: "Used for new Quick Train sessions. Planned workouts and training plans can choose their own playlist or keep music off.",
+                        norwegian: "Brukes for nye Quick Train-økter. Planlagte økter og treningsplaner kan velge egen spilleliste eller slå av musikk."
+                    ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                    if settings.spotifyDefaultPlaylist == nil &&
+                        settings.spotifyAutoplayLinkedPlaylists {
+                        Label(
+                            localized(
+                                english: "Quick workouts need a default playlist to start music automatically.",
+                                norwegian: "Velg en standardspilleliste for at Quick Train skal starte musikk automatisk."
+                            ),
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                 }
 
-                Section(ATHLTHLocalization.choose(
-                    english: "Workout music shortcuts",
+                Section(localized(
+                    english: "Music shortcuts during workouts",
                     norwegian: "Musikksnarveier under trening"
                 )) {
-                    Button { showingQuickPlaylistOne = true } label: {
-                        HStack {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Playlist 1",
-                                    norwegian: "Spilleliste 1"
-                                ), systemImage: "1.circle"
-                            )
-                            Spacer()
-                            Text(settings.spotifyQuickPlaylistOne?.name ??
-                                 ATHLTHLocalization.choose(english: "Choose", norwegian: "Velg"))
-                                .lineLimit(1)
-                                .foregroundStyle(.secondary)
-                        }
+                    Button {
+                        showingQuickPlaylistOne = true
+                    } label: {
+                        shortcutRow(
+                            number: 1,
+                            playlist: settings.spotifyQuickPlaylistOne
+                        )
                     }
-                    Button { showingQuickPlaylistTwo = true } label: {
-                        HStack {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Playlist 2",
-                                    norwegian: "Spilleliste 2"
-                                ), systemImage: "2.circle"
-                            )
-                            Spacer()
-                            Text(settings.spotifyQuickPlaylistTwo?.name ??
-                                 ATHLTHLocalization.choose(english: "Choose", norwegian: "Velg"))
-                                .lineLimit(1)
-                                .foregroundStyle(.secondary)
-                        }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        showingQuickPlaylistTwo = true
+                    } label: {
+                        shortcutRow(
+                            number: 2,
+                            playlist: settings.spotifyQuickPlaylistTwo
+                        )
                     }
-                    Text(ATHLTHLocalization.choose(
-                        english: "Tap a shortcut during training to switch playlists. A shortcut only starts music when you tap it.",
-                        norwegian: "Trykk på en snarvei under trening for å bytte spilleliste. Musikk starter bare når du trykker."
+                    .buttonStyle(.plain)
+
+                    Text(localized(
+                        english: "Tap a shortcut during a workout to switch playlists. Music only starts when you choose it.",
+                        norwegian: "Trykk på en snarvei under trening for å bytte spilleliste. Musikken starter bare når du velger snarveien."
                     ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
 
                 Section {
-                    Button {
-                        Task {
-                            await spotify.refreshPlaylists()
-                        }
-                    } label: {
-                        Label(
-                            "Refresh Playlists",
-                            systemImage: "arrow.clockwise"
-                        )
+                    DisclosureGroup(localized(
+                        english: "Spotify and Apple Watch",
+                        norwegian: "Spotify og Apple Watch"
+                    )) {
+                        Text(localized(
+                            english: "Watch-only workouts remain independent of Spotify on iPhone. Spotify never prevents a workout from starting, even if playback is unavailable.",
+                            norwegian: "Trening som startes kun på Apple Watch, fungerer uavhengig av Spotify på iPhone. Du kan alltid starte en treningsøkt selv om Spotify er utilgjengelig."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
+                }
 
+                Section {
                     Button(role: .destructive) {
                         spotify.disconnect()
                         settings.spotifyConnected = false
                     } label: {
                         Label(
-                            "Disconnect Spotify",
+                            localized(
+                                english: "Disconnect Spotify",
+                                norwegian: "Koble fra Spotify"
+                            ),
                             systemImage: "link.badge.minus"
                         )
                     }
                 }
             } else {
-                Section("Connect") {
+                Section {
                     Button {
                         spotify.connect()
                     } label: {
                         Label(
-                            "Connect Spotify",
+                            localized(
+                                english: "Connect Spotify",
+                                norwegian: "Koble til Spotify"
+                            ),
                             systemImage: "link"
                         )
                     }
                     .disabled(spotify.connectionState == .connecting)
 
-                    Text(
-                        "ATHLTH signs in with Spotify using Authorization Code + PKCE, then keeps the refresh token securely in Keychain. App Remote is used only when playback control is needed."
-                    )
+                    Text(localized(
+                        english: "Connect securely to select playlists and control music during workouts. You can disconnect at any time.",
+                        norwegian: "Koble til sikkert for å velge spillelister og styre musikk under trening. Du kan koble fra når som helst."
+                    ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
             }
 
-            if let error = spotify.lastErrorMessage,
-               !error.isEmpty {
-                Section("Status") {
-                    Label(
-                        error,
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+            if let error = spotify.lastErrorMessage, !error.isEmpty {
+                Section(localized(
+                    english: "Spotify connection issue",
+                    norwegian: "Problem med Spotify-tilkoblingen"
+                )) {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.orange)
 
-                    VStack(
-                        alignment: .leading,
-                        spacing: 4
-                    ) {
-                        Text(
-                            "Spotify redirect URI"
-                        )
-                        .font(
-                            .caption2.weight(
-                                .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
+                    DisclosureGroup(localized(
+                        english: "Technical details",
+                        norwegian: "Tekniske detaljer"
+                    )) {
+                        Text("Spotify redirect URI")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
 
-                        Text(
-                            spotify
-                                .redirectURIForDiagnostics
-                        )
-                        .font(
-                            .caption
-                                .monospaced()
-                        )
-                        .textSelection(.enabled)
+                        Text(spotify.redirectURIForDiagnostics)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+
+                        Text(localized(
+                            english: "If Spotify reports an authorization error, this must match the Redirect URI in the Spotify Developer Dashboard.",
+                            norwegian: "Ved en autorisasjonsfeil må adressen være lik Redirect URI i Spotify Developer Dashboard."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
-
-                    Text(
-                        "If Spotify reports a redirect or authorization error, this value must match the Redirect URI in Spotify Developer Dashboard exactly."
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                 }
-            }
-
-            Section("Apple Watch") {
-                Text(
-                    "Watch-only training stays independent. ATHLTH will not show an “open Spotify first” prompt and will never block Start Workout because Spotify is unavailable."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
         .athlthBrandedForm()
@@ -3829,18 +3851,16 @@ struct SpotifySettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingPlaylistPicker) {
             SpotifyPlaylistPickerView(
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Default Spotify Playlist",
-                        norwegian: "Standardspilleliste"
-                    ),
-                selection:
-                    $settings.spotifyDefaultPlaylist
+                title: localized(
+                    english: "Default Spotify playlist",
+                    norwegian: "Standardspilleliste"
+                ),
+                selection: $settings.spotifyDefaultPlaylist
             )
         }
         .sheet(isPresented: $showingQuickPlaylistOne) {
             SpotifyPlaylistPickerView(
-                title: ATHLTHLocalization.choose(
+                title: localized(
                     english: "Playlist shortcut 1",
                     norwegian: "Spillelistesnarvei 1"
                 ),
@@ -3849,7 +3869,7 @@ struct SpotifySettingsView: View {
         }
         .sheet(isPresented: $showingQuickPlaylistTwo) {
             SpotifyPlaylistPickerView(
-                title: ATHLTHLocalization.choose(
+                title: localized(
                     english: "Playlist shortcut 2",
                     norwegian: "Spillelistesnarvei 2"
                 ),
@@ -3859,13 +3879,85 @@ struct SpotifySettingsView: View {
         .task {
             settings.spotifyConnected = spotify.isConnected
 
-            if spotify.isConnected &&
-                spotify.playlists.isEmpty {
+            if spotify.isConnected && spotify.playlists.isEmpty {
                 await spotify.refreshPlaylists()
             }
         }
         .onChange(of: spotify.connectionState) { _, _ in
             settings.spotifyConnected = spotify.isConnected
         }
+    }
+
+    private func shortcutRow(
+        number: Int,
+        playlist: SpotifyPlaylistReference?
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "\(number).circle")
+                .font(.title2)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 40, height: 44)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(localized(
+                    english: "Playlist \(number)",
+                    norwegian: "Spilleliste \(number)"
+                ))
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+
+                Text(playlist?.name ?? localized(
+                    english: "No playlist selected",
+                    norwegian: "Ingen spilleliste valgt"
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 48)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func playlistArtwork(_ playlist: SpotifyPlaylistReference?) -> some View {
+        if let artworkURL = playlist?.artworkURL {
+            ATHLTHStorageImage(url: artworkURL) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFill()
+                } else {
+                    artworkPlaceholder
+                }
+            }
+            .frame(width: 48, height: 48)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .accessibilityHidden(true)
+        } else {
+            artworkPlaceholder
+                .frame(width: 48, height: 48)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var artworkPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(ATHLTHTheme.accentSoft)
+            .overlay {
+                Image(systemName: "music.note.list")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+    }
+
+    private func localized(english: String, norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 }
