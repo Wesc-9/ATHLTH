@@ -2418,38 +2418,69 @@ struct WorkoutTemplateLibraryView: View {
         }
     }
 
+    /// Compact tile shared by saved, running and curated workouts.
+    /// Detailed exercises and targets belong to the preview, not the grid.
     private func workoutGridCard(
         title: String, subtitle: String, symbol: String,
         workout: PlannedSession, estimatedMinutes: Int? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: symbol)
-                .font(.system(size: 20, weight: .light))
+                .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 .frame(width: 44, height: 44)
-                .background(ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 13))
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+                .accessibilityHidden(true)
+
             Text(ATHLTHLibraryName.workoutCard(title, grid: true))
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(2)
                 .truncationMode(.tail)
-                .accessibilityLabel(title)
                 .multilineTextAlignment(.leading)
                 .foregroundStyle(ATHLTHPlanDesign.ink)
+                .accessibilityLabel(title)
+
             Text(subtitle)
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .lineLimit(1)
-            ATHLTHWorkoutGridDetails(
-                workout: workout,
-                estimatedMinutes: estimatedMinutes
-            )
-            .padding(.top, 3)
+
             Spacer(minLength: 0)
+
+            HStack(spacing: 9) {
+                if let minutes = estimatedMinutes ?? workout.durationMinutes,
+                   minutes > 0 {
+                    Label("~\(minutes) min", systemImage: "clock")
+                }
+                let blockCount = workout.resolvedWorkoutBlocks.count
+                if blockCount > 0 {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "\(blockCount) parts",
+                            norwegian: "\(blockCount) deler"
+                        ),
+                        systemImage: "square.stack"
+                    )
+                }
+            }
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
         .padding(13)
-        .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+        .frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(cornerRadius: 20)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(Color.white.opacity(0.96), lineWidth: 0.8)
+        }
     }
 
     private func workoutCard(
@@ -2511,7 +2542,7 @@ struct WorkoutTemplateLibraryView: View {
                 )
                 .padding(.top, 2)
 
-                if initialCategory != nil {
+                if initialCategory != .running {
                     ATHLTHWorkoutContentsPreview(
                         workout: entry.plannedSession()
                     )
@@ -2590,7 +2621,7 @@ struct WorkoutTemplateLibraryView: View {
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .padding(.top, 2)
 
-                if initialCategory != nil {
+                if initialCategory != .running {
                     ATHLTHWorkoutContentsPreview(
                         workout: workout.plannedSession()
                     )
