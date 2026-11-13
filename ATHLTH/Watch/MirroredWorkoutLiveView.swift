@@ -33,6 +33,280 @@ struct MirroredWorkoutLiveView: View {
     @State private var paceWorkoutStart: Date?
 
     var body: some View {
+        workoutNavigation
+        .confirmationDialog(
+            pendingLiveAction == .finish
+                ? ATHLTHLocalization.choose(
+                    english: "Finish workout?", norwegian: "Avslutte treningsøkten?"
+                )
+                : pendingLiveAction == .pauseWholeWorkout
+                    ? ATHLTHLocalization.choose(
+                        english: "Pause the entire workout?",
+                        norwegian: "Pause hele treningsøkten?"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Add to workout", norwegian: "Legg til i økten"
+                    ),
+            isPresented: Binding(
+                get: { pendingLiveAction != nil },
+                set: { if !$0 { pendingLiveAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if pendingLiveAction == .finish {
+                Button(ATHLTHLocalization.choose(
+                    english: "Finish workout", norwegian: "Avslutt økten"
+                ), role: .destructive) {
+                    _ = mirroring.sendCommand(.end)
+                }
+            } else if pendingLiveAction == .pauseWholeWorkout {
+                Button(ATHLTHLocalization.choose(
+                    english: "Pause whole workout", norwegian: "Pause hele økten"
+                )) {
+                    _ = mirroring.sendCommand(.pause)
+                }
+            } else if pendingLiveAction == .add {
+                if let snapshot = mirroring.snapshot, snapshot.kind == .running {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Add interval workout", norwegian: "Legg til intervalløkt"
+                    )) {
+                        showingAddRunningWorkout = true
+                    }
+                    if let incline = snapshot.treadmillInclinePercent {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Adjust treadmill incline",
+                            norwegian: "Juster stigning på mølle"
+                        )) {
+                            treadmillInclineDraft = incline
+                            showingTreadmillInclineEditor = true
+                        }
+                    }
+                    if snapshot.routeCanReturnToStart == true {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Run back to start", norwegian: "Løp tilbake til start"
+                        )) {
+                            _ = mirroring.requestRunBackToStart()
+                        }
+                    }
+                }
+                if mirroring.snapshot?.kind == .strength,
+                   strength.activeWorkout != nil {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Add exercise", norwegian: "Legg til øvelse"
+                    )) {
+                        showingStrengthExerciseLibrary = true
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Add workout", norwegian: "Legg til treningsøkt"
+                    )) {
+                        showingAddStrengthWorkout = true
+                    }
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Talk to AI Coach", norwegian: "Snakk med AI Coach"
+                )) {
+                    showingAIConversation = true
+                }
+                if mirroring.canReplayMirroredCoachMessage {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Replay last coach message",
+                        norwegian: "Hør siste coachbeskjed"
+                    )) {
+                        mirroring.replayMirroredCoachMessage()
+                    }
+                }
+            }
+        } message: {
+            if pendingLiveAction == .finish {
+                Text(ATHLTHLocalization.choose(
+                    english: "Apple Watch will save the recording to Apple Health.",
+                    norwegian: "Apple Watch lagrer økten i Apple Health."
+                ))
+            } else if pendingLiveAction == .pauseWholeWorkout {
+                Text(ATHLTHLocalization.choose(
+                    english: "Apple Health stops counting workout time while paused. Rest between sets does not require this.",
+                    norwegian: "Apple Health stopper registreringen av økttid mens den er pauset. Hvile mellom sett krever ikke dette."
+                ))
+            }
+        }
+        .sheet(isPresented: $showingStrengthExerciseLibrary) {
+            NavigationStack {
+                ExerciseLibraryView(
+                    selectionTitle: ATHLTHLocalization.choose(
+                        english: "Add to active workout", norwegian: "Legg til i økten"
+                    ),
+                    selectedExerciseCounts: [:],
+                    allowsEquipmentScan: true
+                ) { entry in
+                    pendingStrengthExercise = entry
+                    showingStrengthExerciseLibrary = false
+                }
+            }
+        }
+        .sheet(item: $pendingStrengthExercise) { entry in
+            FreestyleExercisePrescriptionView(entry: entry) {
+                strength.appendExercise(
+                    entry.exercise,
+                    sets: $0, reps: $1, targetKind: $2,
+                    targetDurationSeconds: $3, loadKind: $4,
+                    targetWeightKilograms: $5, targetResistanceLevel: $6,
+                    restSeconds: $7, warmUpSets: $8, openEndedTime: $9
+                )
+                pendingStrengthExercise = nil
+            }
+        }
+        .sheet(isPresented: $showingAddStrengthWorkout) {
+            ActiveHybridWorkoutPicker { session, startNow in
+                strength.appendWorkoutDuringSession(session, startNow: startNow)
+            }
+        }
+        .sheet(isPresented: $showingAddRunningWorkout) {
+            ActiveHybridWorkoutPicker(runningOnly: true) { session, startNow in
+                guard let template = session.runningWorkout else {
+                    return false
+                }
+                return mirroring.appendRunningWorkout(
+                    template, startNow: startNow
+                )
+            }
+            .environmentObject(runningLibrary)
+        }
+        .sheet(isPresented: $showingAIConversation) {
+            ATHLTHGroqVoiceCoachView(source: .mirroredWatchWorkout)
+                .environmentObject(settings)
+                .environmentObject(mirroring)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(
+            isPresented:
+                $showingTreadmillInclineEditor
+        ) {
+            TreadmillInclineEditorView(
+                initialValue:
+                    treadmillInclineDraft
+            ) { value in
+                _ = mirroring
+                    .sendTreadmillInclinePercent(
+                        value
+                    )
+                treadmillInclineDraft =
+                    value
+            }
+        }
+        .sheet(isPresented: $showingTargetPaceEditor) {
+            NavigationStack {
+                Form {
+                    Section {
+                        Stepper(
+                            targetPaceEditorLabel,
+                            value: $targetPaceDraftSeconds,
+                            in: 120...1200, step: 5
+                        )
+                        Slider(value: $targetPaceDraftSeconds,
+                               in: 120...1200, step: 5)
+                    } footer: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "A manually chosen target. Actual pace comes from Apple Watch and is not overwritten.",
+                            norwegian: "Et manuelt mål. Faktisk tempo måles av Apple Watch og endres ikke."
+                        ))
+                    }
+                }
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Target pace", norwegian: "Måltempo"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        )) { showingTargetPaceEditor = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Save", norwegian: "Lagre"
+                        )) {
+                            if mirroring.sendTreadmillTargetPaceSecondsPerKilometer(
+                                targetPaceDraftSeconds
+                            ) {
+                                enteredTargetPaceSeconds = targetPaceDraftSeconds
+                                showingTargetPaceEditor = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .onChange(of: mirroring.snapshot?.capturedAt) { _, _ in
+            guard let snap = mirroring.snapshot else { return }
+            updateRollingPace(with: snap)
+        }
+        .interactiveDismissDisabled(mirroring.hasActiveMirroredWorkout)
+        .task(
+            id: mirroring.snapshot?
+                .capturedAt
+        ) {
+            await syncLivePosition()
+        }
+        .onChange(of: mirroring.ghostDisableRequestGeneration) { _, _ in
+            if ghostRace.reference != nil {
+                ghostRace.cancel()
+            }
+        }
+        .onAppear {
+            mirroring.liveViewDidAppear()
+            coachOutputName = AVAudioSession.sharedInstance()
+                .currentRoute.outputs.first?.portName
+            updateScreenAwakeState()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: AVAudioSession.routeChangeNotification
+            )
+        ) { _ in
+            coachOutputName = AVAudioSession.sharedInstance()
+                .currentRoute.outputs.first?.portName
+        }
+        .onDisappear {
+            mirroring.liveViewDidDisappear()
+            ATHLTHWorkoutScreenAwake.set(
+                false,
+                reason: "watch-mirrored-workout"
+            )
+        }
+        .onChange(of: watchConnection.latestAIConversationRequestID) { _, request in
+            if request != nil &&
+               mirroring.hasActiveMirroredWorkout &&
+               scenePhase == .active {
+                // A Watch request opens a choice, never microphone capture.
+                showingAIConversation = true
+            }
+        }
+        .onChange(
+            of:
+                mirroring
+                    .hasActiveMirroredWorkout
+        ) { _, isActive in
+            if !isActive { showingAIConversation = false }
+            updateScreenAwakeState()
+        }
+        .onChange(
+            of: scenePhase
+        ) { _, _ in
+            updateScreenAwakeState()
+        }
+    }
+
+    private var targetPaceEditorLabel: String {
+        let value = targetPaceDraftSeconds
+        return String(
+            format: "%.1f km/t · %d:%02d/km",
+            3_600 / value, Int(value) / 60, Int(value) % 60
+        )
+    }
+
+    /// Split the navigation tree from the sheet/dialog modifiers so SwiftUI
+    /// does not have to infer the entire live screen in one expression.
+    private var workoutNavigation: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
@@ -376,270 +650,8 @@ struct MirroredWorkoutLiveView: View {
             }
 
         }
-        .confirmationDialog(
-            pendingLiveAction == .finish
-                ? ATHLTHLocalization.choose(
-                    english: "Finish workout?", norwegian: "Avslutte treningsøkten?"
-                )
-                : pendingLiveAction == .pauseWholeWorkout
-                    ? ATHLTHLocalization.choose(
-                        english: "Pause the entire workout?",
-                        norwegian: "Pause hele treningsøkten?"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "Add to workout", norwegian: "Legg til i økten"
-                    ),
-            isPresented: Binding(
-                get: { pendingLiveAction != nil },
-                set: { if !$0 { pendingLiveAction = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            if pendingLiveAction == .finish {
-                Button(ATHLTHLocalization.choose(
-                    english: "Finish workout", norwegian: "Avslutt økten"
-                ), role: .destructive) {
-                    _ = mirroring.sendCommand(.end)
-                }
-            } else if pendingLiveAction == .pauseWholeWorkout {
-                Button(ATHLTHLocalization.choose(
-                    english: "Pause whole workout", norwegian: "Pause hele økten"
-                )) {
-                    _ = mirroring.sendCommand(.pause)
-                }
-            } else if pendingLiveAction == .add {
-                if let snapshot = mirroring.snapshot, snapshot.kind == .running {
-                    Button(ATHLTHLocalization.choose(
-                        english: "Add interval workout", norwegian: "Legg til intervalløkt"
-                    )) {
-                        showingAddRunningWorkout = true
-                    }
-                    if let incline = snapshot.treadmillInclinePercent {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Adjust treadmill incline",
-                            norwegian: "Juster stigning på mølle"
-                        )) {
-                            treadmillInclineDraft = incline
-                            showingTreadmillInclineEditor = true
-                        }
-                    }
-                    if snapshot.routeCanReturnToStart == true {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Run back to start", norwegian: "Løp tilbake til start"
-                        )) {
-                            _ = mirroring.requestRunBackToStart()
-                        }
-                    }
-                }
-                if mirroring.snapshot?.kind == .strength,
-                   strength.activeWorkout != nil {
-                    Button(ATHLTHLocalization.choose(
-                        english: "Add exercise", norwegian: "Legg til øvelse"
-                    )) {
-                        showingStrengthExerciseLibrary = true
-                    }
-                    Button(ATHLTHLocalization.choose(
-                        english: "Add workout", norwegian: "Legg til treningsøkt"
-                    )) {
-                        showingAddStrengthWorkout = true
-                    }
-                }
-                Button(ATHLTHLocalization.choose(
-                    english: "Talk to AI Coach", norwegian: "Snakk med AI Coach"
-                )) {
-                    showingAIConversation = true
-                }
-                if mirroring.canReplayMirroredCoachMessage {
-                    Button(ATHLTHLocalization.choose(
-                        english: "Replay last coach message",
-                        norwegian: "Hør siste coachbeskjed"
-                    )) {
-                        mirroring.replayMirroredCoachMessage()
-                    }
-                }
-            }
-        } message: {
-            if pendingLiveAction == .finish {
-                Text(ATHLTHLocalization.choose(
-                    english: "Apple Watch will save the recording to Apple Health.",
-                    norwegian: "Apple Watch lagrer økten i Apple Health."
-                ))
-            } else if pendingLiveAction == .pauseWholeWorkout {
-                Text(ATHLTHLocalization.choose(
-                    english: "Apple Health stops counting workout time while paused. Rest between sets does not require this.",
-                    norwegian: "Apple Health stopper registreringen av økttid mens den er pauset. Hvile mellom sett krever ikke dette."
-                ))
-            }
-        }
-        .sheet(isPresented: $showingStrengthExerciseLibrary) {
-            NavigationStack {
-                ExerciseLibraryView(
-                    selectionTitle: ATHLTHLocalization.choose(
-                        english: "Add to active workout", norwegian: "Legg til i økten"
-                    ),
-                    selectedExerciseCounts: [:],
-                    allowsEquipmentScan: true
-                ) { entry in
-                    pendingStrengthExercise = entry
-                    showingStrengthExerciseLibrary = false
-                }
-            }
-        }
-        .sheet(item: $pendingStrengthExercise) { entry in
-            FreestyleExercisePrescriptionView(entry: entry) {
-                strength.appendExercise(
-                    entry.exercise,
-                    sets: $0, reps: $1, targetKind: $2,
-                    targetDurationSeconds: $3, loadKind: $4,
-                    targetWeightKilograms: $5, targetResistanceLevel: $6,
-                    restSeconds: $7, warmUpSets: $8, openEndedTime: $9
-                )
-                pendingStrengthExercise = nil
-            }
-        }
-        .sheet(isPresented: $showingAddStrengthWorkout) {
-            ActiveHybridWorkoutPicker { session, startNow in
-                strength.appendWorkoutDuringSession(session, startNow: startNow)
-            }
-        }
-        .sheet(isPresented: $showingAddRunningWorkout) {
-            ActiveHybridWorkoutPicker(runningOnly: true) { session, startNow in
-                guard let template = session.runningWorkout else {
-                    return false
-                }
-                return mirroring.appendRunningWorkout(
-                    template, startNow: startNow
-                )
-            }
-            .environmentObject(runningLibrary)
-        }
-        .sheet(isPresented: $showingAIConversation) {
-            ATHLTHGroqVoiceCoachView(source: .mirroredWatchWorkout)
-                .environmentObject(settings)
-                .environmentObject(mirroring)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(
-            isPresented:
-                $showingTreadmillInclineEditor
-        ) {
-            TreadmillInclineEditorView(
-                initialValue:
-                    treadmillInclineDraft
-            ) { value in
-                _ = mirroring
-                    .sendTreadmillInclinePercent(
-                        value
-                    )
-                treadmillInclineDraft =
-                    value
-            }
-        }
-        .sheet(isPresented: $showingTargetPaceEditor) {
-            NavigationStack {
-                Form {
-                    Section {
-                        Stepper(
-                            String(format: "%.1f km/t · %d:%02d/km",
-                                3_600 / targetPaceDraftSeconds,
-                                Int(targetPaceDraftSeconds) / 60,
-                                Int(targetPaceDraftSeconds) % 60),
-                            value: $targetPaceDraftSeconds,
-                            in: 120...1200, step: 5
-                        )
-                        Slider(value: $targetPaceDraftSeconds,
-                               in: 120...1200, step: 5)
-                    } footer: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "A manually chosen target. Actual pace comes from Apple Watch and is not overwritten.",
-                            norwegian: "Et manuelt mål. Faktisk tempo måles av Apple Watch og endres ikke."
-                        ))
-                    }
-                }
-                .navigationTitle(ATHLTHLocalization.choose(
-                    english: "Target pace", norwegian: "Måltempo"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Cancel", norwegian: "Avbryt"
-                        )) { showingTargetPaceEditor = false }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Save", norwegian: "Lagre"
-                        )) {
-                            if mirroring.sendTreadmillTargetPaceSecondsPerKilometer(
-                                targetPaceDraftSeconds
-                            ) {
-                                enteredTargetPaceSeconds = targetPaceDraftSeconds
-                                showingTargetPaceEditor = false
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .onChange(of: mirroring.snapshot?.capturedAt) { _, _ in
-            guard let snap = mirroring.snapshot else { return }
-            updateRollingPace(with: snap)
-        }
-        .interactiveDismissDisabled(mirroring.hasActiveMirroredWorkout)
-        .task(
-            id: mirroring.snapshot?
-                .capturedAt
-        ) {
-            await syncLivePosition()
-        }
-        .onChange(of: mirroring.ghostDisableRequestGeneration) { _, _ in
-            if ghostRace.reference != nil {
-                ghostRace.cancel()
-            }
-        }
-        .onAppear {
-            mirroring.liveViewDidAppear()
-            coachOutputName = AVAudioSession.sharedInstance()
-                .currentRoute.outputs.first?.portName
-            updateScreenAwakeState()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: AVAudioSession.routeChangeNotification
-            )
-        ) { _ in
-            coachOutputName = AVAudioSession.sharedInstance()
-                .currentRoute.outputs.first?.portName
-        }
-        .onDisappear {
-            mirroring.liveViewDidDisappear()
-            ATHLTHWorkoutScreenAwake.set(
-                false,
-                reason: "watch-mirrored-workout"
-            )
-        }
-        .onChange(of: watchConnection.latestAIConversationRequestID) { _, request in
-            if request != nil &&
-               mirroring.hasActiveMirroredWorkout &&
-               scenePhase == .active {
-                // A Watch request opens a choice, never microphone capture.
-                showingAIConversation = true
-            }
-        }
-        .onChange(
-            of:
-                mirroring
-                    .hasActiveMirroredWorkout
-        ) { _, isActive in
-            if !isActive { showingAIConversation = false }
-            updateScreenAwakeState()
-        }
-        .onChange(
-            of: scenePhase
-        ) { _, _ in
-            updateScreenAwakeState()
-        }
     }
+
 
     private var mirroredAudioCoachCard: some View {
         ATHLTHUnifiedCard {
