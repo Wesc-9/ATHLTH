@@ -162,12 +162,10 @@ final class ATHLTHWorkoutCatalogAuditTests: XCTestCase {
             $0.isActiveRecovery && $0.durationSeconds == 30
         }
         XCTAssertEqual(between.count, 9)
-        XCTAssertEqual(
-            try XCTUnwrap(
-                ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline)
-            ),
-            3_570, accuracy: 0.01
+        let estimatedSeconds = try XCTUnwrap(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline)
         )
+        XCTAssertEqual(estimatedSeconds, 3_570, accuracy: 0.01)
         XCTAssertEqual(timeline.first?.resolvedPhase, .warmup)
         XCTAssertEqual(timeline.last?.resolvedPhase, .cooldown)
     }
