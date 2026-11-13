@@ -100,6 +100,13 @@ struct ATHLTHRunningPulseZoneGauge: View {
         return tr("Within target", "Innenfor målsonen")
     }
 
+    private var feedbackSymbol: String {
+        guard let measured else { return "waveform.path.ecg" }
+        guard let band else { return "info.circle" }
+        return band.contains(Int(measured.rounded()))
+            ? "checkmark.circle.fill" : "arrow.up.right.circle"
+    }
+
     private var positionFraction: CGFloat? {
         guard let measured, let maximum else { return nil }
         return CGFloat(min(max((measured / maximum - 0.5) / 0.5, 0), 1))
@@ -209,11 +216,7 @@ struct ATHLTHRunningPulseZoneGauge: View {
             }
 
             HStack(spacing: 6) {
-                Image(systemName: measured == nil ? "waveform.path.ecg" :
-                        band == nil ? "info.circle" :
-                        (Double(band!.lowerBound)...Double(band!.upperBound))
-                            .contains(measured!) ? "checkmark.circle.fill"
-                            : "arrow.up.right.circle")
+                Image(systemName: feedbackSymbol)
                 Text(feedback)
                 Spacer(minLength: 0)
                 if let maximum {
