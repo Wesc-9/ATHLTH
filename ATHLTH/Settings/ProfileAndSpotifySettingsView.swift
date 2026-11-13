@@ -2409,6 +2409,56 @@ struct PersonalHealthProfileView: View {
                                 step: 1
                             )
 
+                            VStack(alignment: .leading, spacing: 10) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Your Z1–Z5 pulse ranges",
+                                        norwegian: "Dine pulsområder Z1–Z5"
+                                    ),
+                                    systemImage: "heart.text.square"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                                ForEach(1...5, id: \.self) { zone in
+                                    if let range = ATHLTHHeartRateZones.range(
+                                        for: zone,
+                                        maximumBPM: Double(maximumHeartRateBPM)
+                                    ) {
+                                        HStack {
+                                            Text("Z\(zone)")
+                                                .font(.subheadline.weight(.semibold))
+                                            Spacer()
+                                            Text("\(range.lowerBound)–\(range.upperBound) bpm")
+                                                .font(.subheadline.monospacedDigit())
+                                        }
+                                    }
+                                }
+                                if let combined = ATHLTHHeartRateZones.range(
+                                    from: 1, through: 2,
+                                    maximumBPM: Double(maximumHeartRateBPM)
+                                ) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Example Z1–Z2: \(combined.lowerBound)–\(combined.upperBound) bpm.",
+                                        norwegian: "Eksempel Z1–Z2: \(combined.lowerBound)–\(combined.upperBound) slag/min."
+                                    ))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Preview calculated from the value above. Saved HRmax drives targets on iPhone, Watch and iPad. Age-based values are only estimates.",
+                                    norwegian: "Forhåndsvisning beregnet fra tallet over. Lagret makspuls brukes som grunnlag for øktmål på iPhone, Watch og iPad. Aldersberegninger er kun estimater."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            .padding(14)
+                            .background(
+                                ATHLTHTheme.accentSoft.opacity(0.4),
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
+                            .accessibilityIdentifier("athlth-profile-hrmax-zone-preview")
+
                             if let estimate = maximumHeartRateEstimate {
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack {
