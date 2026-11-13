@@ -136,7 +136,7 @@ final class SupabaseWorkoutPlaceCheckInService {
         workoutID: UUID,
         applePlaceID: String,
         placeKind: String,
-        distanceMeters: Double
+        distanceMeters: Double?
     ) async throws {
         let payload =
             WorkoutPlaceCheckInWrite(
@@ -145,14 +145,10 @@ final class SupabaseWorkoutPlaceCheckInService {
                 applePlaceID: applePlaceID,
                 placeKind: placeKind,
                 checkedInAt: Date(),
-                distanceMeters:
-                    max(
-                        0,
-                        min(
-                            distanceMeters,
-                            150
-                        )
-                    ),
+                // Manual venue choice is not a location-verified check-in.
+                // NULL complies with the existing owner's RLS policy without
+                // forging a proximity measurement.
+                distanceMeters: distanceMeters,
                 source: "apple_maps"
             )
 
@@ -266,19 +262,8 @@ final class WorkoutPlaceCheckInStore:
         userID: UUID,
         place: WorkoutPlacePresentation
     ) async -> Bool {
-        guard let distance =
-                place.distanceMeters,
-              distance.isFinite,
-              distance >= 0,
-              distance <= 150
-        else {
-            errorMessage =
-                ATHLTHLocalization.choose(
-                    english: "You must be within 150 m of the training venue to check in.",
-                    norwegian: "Du må være innenfor 150 meter fra treningsstedet for å sjekke inn."
-                )
-            return false
-        }
+        // Venue selection never asserts that the athlete was physically
+        // present. True proximity-verified check-in remains a separate action.
 
         do {
             try await service.upsert(
@@ -286,7 +271,7 @@ final class WorkoutPlaceCheckInStore:
                 workoutID: workoutID,
                 applePlaceID: place.id,
                 placeKind: place.placeKind,
-                distanceMeters: distance
+                distanceMeters: nil
             )
 
             resolvedPlaces[place.id] =
@@ -427,6 +412,45 @@ final class WorkoutPlaceCheckInStore:
         }
     }
 
+    /// Apple Maps search supports choosing a venue anywhere, even when
+    /// precise location permissions are denied or the venue is far away.
+    func searchTrainingPlaces(
+        query: String,
+        near location: CLLocation?
+    ) async throws -> [WorkoutPlacePresentation] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard term.count >= 2 else { return [] }
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = term
+        request.resultTypes = .pointOfInterest
+        // Do not constrain the search to a proximity radius. Users can
+        // specify any city in the query.
+        let response = try await MKLocalSearch(request: request).start()
+        let results: [WorkoutPlacePresentation] = response.mapItems.compactMap { item in
+            guard let id = item.identifier,
+                  let name = item.name?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !name.isEmpty else { return nil }
+            let coordinate = item.placemark.coordinate
+            let distance = location.map {
+                $0.distance(from: CLLocation(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                ))
+            }
+            let category = item.pointOfInterestCategory
+            return WorkoutPlacePresentation(
+                id: id.rawValue,
+                name: name,
+                coordinate: coordinate,
+                distanceMeters: distance,
+                placeKind: category == .hotel ? "hotel" :
+                    category == .stadium ? "stadium" : "fitness_center"
+            )
+        }
+        for result in results { resolvedPlaces[result.id] = result }
+        return Array(results.prefix(30))
+    }
+
     func nearbyFitnessCenters(
         near location: CLLocation
     ) async throws ->
@@ -454,7 +478,7 @@ final class WorkoutPlaceCheckInStore:
             MKLocalPointsOfInterestRequest(
                 center:
                     location.coordinate,
-                radius: 400
+                radius: 2_000
             )
 
         request.pointOfInterestFilter =
@@ -510,7 +534,7 @@ final class WorkoutPlaceCheckInStore:
                         )
 
                     guard distance.isFinite,
-                          distance <= 400
+                          distance <= 2_000
                     else {
                         return nil
                     }
@@ -571,7 +595,7 @@ final class WorkoutPlaceCheckInStore:
             )
             guard distance.isFinite,
                   distance >= 0,
-                  distance <= 150 else {
+                  distance <= 2_000 else {
                 return nil
             }
 
