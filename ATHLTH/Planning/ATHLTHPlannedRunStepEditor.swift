@@ -5,6 +5,7 @@ import SwiftUI
 struct ATHLTHPlannedRunStepEditor: View {
     @Binding var block: WorkoutTemplateBlock
     var routeDistanceMeters: Double? = nil
+    @State private var showSourceTargets = false
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -169,6 +170,55 @@ struct ATHLTHPlannedRunStepEditor: View {
             .padding(13)
             .background(ATHLTHPlanDesign.selectedSurface.opacity(0.55),
                         in: RoundedRectangle(cornerRadius: 16))
+
+            DisclosureGroup(
+                tr("Additional workout targets", "Flere mål fra treningsøkten"),
+                isExpanded: $showSourceTargets
+            ) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(tr("VMA (% of VMA)", "VMA (% av VMA)"))
+                        Spacer()
+                        TextField("—", value: $block.targetVMAPercent, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text(tr("Elevation (m)", "Høydemeter (m)"))
+                        Spacer()
+                        TextField("—", value: $block.targetElevationGainMeters, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text(tr("Outdoor gradient (%)", "Stigning ute (%)"))
+                        Spacer()
+                        TextField("—", value: $block.targetGradientPercent, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    TextField(
+                        tr("Source intensity", "Intensitetstype"),
+                        text: Binding(
+                            get: { block.targetIntensityType ?? "" },
+                            set: { block.targetIntensityType = $0.isEmpty ? nil : $0 }
+                        )
+                    )
+                    TextField(
+                        tr("Terrain", "Terreng"),
+                        text: Binding(
+                            get: { block.targetTerrainType ?? "" },
+                            set: { block.targetTerrainType = $0.isEmpty ? nil : $0 }
+                        )
+                    )
+                }
+                .font(.subheadline)
+                .padding(.top, 11)
+            }
+            .padding(13)
+            .background(ATHLTHPlanDesign.canvas,
+                        in: RoundedRectangle(cornerRadius: 16))
+            .accessibilityIdentifier("athlth-running-step-structured-source-targets")
         }
     }
 }
