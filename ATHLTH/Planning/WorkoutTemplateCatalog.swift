@@ -2873,9 +2873,10 @@ enum ATHLTHWorkoutLibraryPersonalization {
             // Retain structured targetHeartRateZone and percent bounds even
             // for catalogues that do not use sourceIntensityZoneLabel.
             // These are relative intensity prescriptions, not personal BPM.
-            block.targetEffortRPE = nil
+            // Author-prescribed intensity/RIR and source load advice are
+            // protocol data, not individual measurements. Removing them
+            // would reproduce the text-only library bug on personal copies.
             block.targetWeightKilograms = nil
-            block.loadNote = nil
             return block
         }
     }
