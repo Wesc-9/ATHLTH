@@ -1364,36 +1364,56 @@ struct AppRootView: View {
                 crossDeviceWorkout.didBackground()
             }
         }
+        // The iPad keeps a small return pill only after the spectator has
+        // explicitly minimized its full-screen workout dashboard.
         .overlay(alignment: .top) {
             if ATHLTHDeviceRole.isIPad,
                appSession.signedIn,
                let remote = crossDeviceWorkout.remote,
                strengthWorkout.activeWorkout == nil,
-               phoneWorkout.active == nil {
-                if crossDeviceWorkout.isExpanded {
-                    ATHLTHCrossDeviceLiveCard(snapshot: remote) {
-                        crossDeviceWorkout.setExpanded(false)
-                    }
-                    .padding(.top, 12)
-                    .padding(.horizontal, 18)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(70)
-                } else {
-                    ATHLTHMinimizedWorkoutReturnPill(
-                        title: ATHLTHLocalization.choose(
+               phoneWorkout.active == nil,
+               !crossDeviceWorkout.isExpanded {
+                ATHLTHMinimizedWorkoutReturnPill(
+                    title: remote.sourceDevice == "watch"
+                        ? ATHLTHLocalization.choose(
+                            english: "Live workout on Apple Watch",
+                            norwegian: "Live økt på Apple Watch"
+                        )
+                        : ATHLTHLocalization.choose(
                             english: "Live workout on iPhone",
                             norwegian: "Live økt på iPhone"
                         ),
-                        systemImage: remote.symbol,
-                        detail: remote.title
-                    ) {
-                        crossDeviceWorkout.setExpanded(true)
-                    }
-                    .padding(.top, 12)
-                    .padding(.horizontal, 18)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(70)
+                    systemImage: remote.symbol,
+                    detail: remote.title
+                ) {
+                    crossDeviceWorkout.setExpanded(true)
                 }
+                .padding(.top, 12)
+                .padding(.horizontal, 18)
+                .transition(.opacity)
+                .zIndex(70)
+            }
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: {
+                    ATHLTHDeviceRole.isIPad &&
+                    appSession.signedIn &&
+                    crossDeviceWorkout.isExpanded &&
+                    crossDeviceWorkout.remote != nil &&
+                    strengthWorkout.activeWorkout == nil &&
+                    phoneWorkout.active == nil
+                },
+                set: { expanded in
+                    crossDeviceWorkout.setExpanded(expanded)
+                }
+            )
+        ) {
+            if let remote = crossDeviceWorkout.remote {
+                ATHLTHiPadLiveWorkoutView(snapshot: remote) {
+                    crossDeviceWorkout.setExpanded(false)
+                }
+                .id(remote.id)
             }
         }
         .overlay(alignment: .top) {
