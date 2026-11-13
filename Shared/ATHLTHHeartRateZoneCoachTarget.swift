@@ -8,6 +8,8 @@ enum ATHLTHHeartRateZoneCoachTarget {
         configured: WatchWorkoutTargetAlertConfiguration?,
         stepZone: Int?,
         maximumBPM: Double?,
+        stepPercentMin: Double? = nil,
+        stepPercentMax: Double? = nil,
         suppressHeartRateForUnzonedStep: Bool = false
     ) -> WatchWorkoutTargetAlertConfiguration? {
         // A planned 1-minute recovery without Z5 is NOT another Z5 effort.
@@ -19,6 +21,42 @@ enum ATHLTHHeartRateZoneCoachTarget {
             restConfiguration?.heartRateMinimumBPM = nil
             restConfiguration?.heartRateMaximumBPM = nil
             return restConfiguration
+        }
+        if let lower = stepPercentMin, let upper = stepPercentMax {
+            // A multiple-zone target like Z1–Z2 carries exact percent
+            // boundaries, not an invented single zone. Prefer the source
+            // prescription over any global Audio Coach pulse target.
+            guard lower.isFinite, upper.isFinite,
+                  (30...100).contains(lower), (30...100).contains(upper),
+                  lower <= upper,
+                  let maximumBPM, maximumBPM.isFinite,
+                  (100...240).contains(maximumBPM) else {
+                var unavailable = configured
+                unavailable?.heartRateEnabled = false
+                unavailable?.heartRateZone = nil
+                unavailable?.heartRateMinimumBPM = nil
+                unavailable?.heartRateMaximumBPM = nil
+                return unavailable
+            }
+            let minimum = Double(Int((maximumBPM * lower / 100).rounded()))
+            let maximum = Double(Int((maximumBPM * upper / 100).rounded()))
+            var result = configured ?? WatchWorkoutTargetAlertConfiguration(
+                heartRateEnabled: true,
+                heartRateZone: stepZone,
+                heartRateMinimumBPM: minimum,
+                heartRateMaximumBPM: maximum,
+                paceAlertsEnabled: false,
+                paceToleranceSecondsPerKilometer: 15,
+                graceSeconds: 10,
+                repeatSeconds: 120,
+                delivery: .both,
+                announceBackInTarget: true
+            )
+            result.heartRateEnabled = true
+            result.heartRateZone = stepZone
+            result.heartRateMinimumBPM = minimum
+            result.heartRateMaximumBPM = maximum
+            return result
         }
         guard let stepZone else { return configured }
         guard let interval = ATHLTHHeartRateZones.range(
