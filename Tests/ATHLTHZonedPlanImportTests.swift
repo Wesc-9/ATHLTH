@@ -159,6 +159,30 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
     }
 
     @MainActor
+    func testGenericLibraryCopyKeepsAuthoredHeartRateTargets() {
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "VO2max effort",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 60,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        block.targetHeartRateZone = 5
+        block.targetPaceSecondsPerKilometer = 260
+        block.targetHeartRatePercentMin = 90
+        block.targetHeartRatePercentMax = 100
+        // Other curated sources may not use a separate source-zone label.
+        XCTAssertNil(block.sourceIntensityZoneLabel)
+
+        let personalized = ATHLTHWorkoutLibraryPersonalization.blankTargets([block])
+        XCTAssertEqual(personalized[0].targetHeartRateZone, 5)
+        XCTAssertEqual(personalized[0].targetHeartRatePercentMin, 90)
+        XCTAssertEqual(personalized[0].targetHeartRatePercentMax, 100)
+        XCTAssertNil(personalized[0].targetPaceSecondsPerKilometer)
+        XCTAssertEqual(personalized[0].durationSeconds, 60)
+    }
+
+    @MainActor
     func testRaceDaysAndCyclingRecipesAreNotDiscarded() throws {
         let plan = try XCTUnwrap(ATHLTHZonedPlanLibrary.plans.first { $0.id == "5k-debutant" })
         let week = try XCTUnwrap(plan.weeks.last)
