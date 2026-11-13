@@ -52,6 +52,8 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     var strengthExercises: [ATHLTHLiveStrengthExercise]? = nil
     var paceIsTreadmillTarget: Bool? = nil
     var spotifyPlaying: Bool? = nil
+    var audioCoachEnabled: Bool? = nil
+    var recentSplits: [ATHLTHLiveWorkoutSplit]? = nil
 
     var id: UUID { sessionID }
     var symbol: String {
@@ -181,7 +183,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         accountID: UUID,
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore,
-        mirroredWatch: WorkoutMirroringStore
+        mirroredWatch: WorkoutMirroringStore,
+        spotify: SpotifyPlaybackStore
     ) async {
         guard signedIn else {
             clearLocalState()
@@ -199,7 +202,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 } else {
                     await publishLocal(
                         accountID: accountID, phone: phone,
-                        strength: strength, mirroredWatch: mirroredWatch
+                        strength: strength, mirroredWatch: mirroredWatch,
+                        spotify: spotify
                     )
                     await pollIncomingRequests(accountID: accountID)
                 }
@@ -219,7 +223,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private func liveSnapshot(
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore,
-        mirroredWatch: WorkoutMirroringStore
+        mirroredWatch: WorkoutMirroringStore,
+        spotify: SpotifyPlaybackStore
     ) -> ATHLTHCrossDeviceWorkoutSnapshot? {
         if let log = strength.activeWorkout {
             let exercise = strength.currentExerciseIndex
@@ -254,7 +259,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         completedSets: entry.sets.filter(\.isCompleted).count,
                         totalSets: entry.sets.count
                     )
-                }
+                },
+                spotifyPlaying: log.captureDevice == .appleWatch
+                    ? nil : spotify.isPlaying
             )
         }
         if let run = phone.active {
@@ -345,7 +352,16 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 routeRemainingMeters: run.routeRemainingMeters,
                 routeDistanceMeters:
                     run.plannedRouteDistanceKilometers.map { $0 * 1_000 },
-                paceIsTreadmillTarget: run.runEnvironment == .treadmill
+                paceIsTreadmillTarget: run.runEnvironment == .treadmill,
+                spotifyPlaying: spotify.isPlaying,
+                audioCoachEnabled: run.audioCoachConfiguration?.enabled,
+                recentSplits: run.recordedRunningSteps?.suffix(6).map {
+                    ATHLTHLiveWorkoutSplit(
+                        index: $0.index, title: $0.title,
+                        activeSeconds: $0.activeSeconds,
+                        distanceMeters: $0.distanceMeters
+                    )
+                }
             )
         }
         if let watch = mirroredWatch.snapshot,
@@ -406,7 +422,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 strengthSetTotal: watch.strengthSetCount,
                 strengthReps: watch.strengthReps,
                 strengthWeightKilograms: watch.strengthWeightKilograms,
-                strengthRestEndsAt: watch.strengthRestEndsAt
+                strengthRestEndsAt: watch.strengthRestEndsAt,
+                audioCoachEnabled: watch.watchOwnedAudioCoach
             )
         }
         return nil
@@ -416,10 +433,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         accountID: UUID,
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore,
-        mirroredWatch: WorkoutMirroringStore
+        mirroredWatch: WorkoutMirroringStore,
+        spotify: SpotifyPlaybackStore
     ) async {
         let active = liveSnapshot(
-            phone: phone, strength: strength, mirroredWatch: mirroredWatch
+            phone: phone, strength: strength, mirroredWatch: mirroredWatch,
+            spotify: spotify
         )
         reconcileSession(active?.id, title: active?.title)
         if let active, isApprovedForSession(active.id) {
