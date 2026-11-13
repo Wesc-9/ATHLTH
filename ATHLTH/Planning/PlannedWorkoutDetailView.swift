@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 struct PlannedWorkoutDetailView: View {
+    @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var session: AppSessionStore
@@ -18,6 +19,7 @@ struct PlannedWorkoutDetailView: View {
     // Reuses the owning Train tab launch flow for unstructured sessions.
     var onStartWorkout: ((UUID, PlannedSession) -> Void)? = nil
 
+    @State private var shareThisWorkoutOnIPad = false
     @State private var showingEditor = false
     @State private var showingTrainingPlacePicker = false
     @State private var showingStructuredWorkout = false
@@ -120,6 +122,11 @@ struct PlannedWorkoutDetailView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     header
+                    if !isCompleted && !currentWorkout.isExplicitRestDay {
+                        ATHLTHLiveWorkoutPrestartToggle(
+                            isOn: $shareThisWorkoutOnIPad
+                        )
+                    }
                     if simplePresentation {
                         simpleInstructions
                         if !currentWorkout.isStructuredWorkout,
@@ -154,6 +161,9 @@ struct PlannedWorkoutDetailView: View {
                                         strengthHistory: strength.workoutHistory
                                     )
                                 else { return }
+                                liveSharing.prepareOneWorkoutSharing(
+                                    shareThisWorkoutOnIPad
+                                )
                                 onStartWorkout(planID, persisted)
                             } label: {
                                 Label(
@@ -1216,6 +1226,7 @@ struct PlannedWorkoutDetailView: View {
                     strengthHistory: strength.workoutHistory
                 )
             else { return }
+            liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
             if let onStartWorkout {
                 onStartWorkout(planID, persisted)
             } else {
