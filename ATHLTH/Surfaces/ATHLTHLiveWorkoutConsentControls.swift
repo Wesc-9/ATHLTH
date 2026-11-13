@@ -3,16 +3,11 @@ import SwiftUI
 /// Same visual setting in Quick Train, planned workouts and the preflight
 /// surfaces. It arms only the *next* workout and is OFF by default.
 struct ATHLTHLiveWorkoutPrestartToggle: View {
-    @EnvironmentObject private var live: ATHLTHCrossDeviceWorkoutStore
+    @Binding var isOn: Bool
 
     var body: some View {
         if !ATHLTHDeviceRole.isIPad {
-            Toggle(
-                isOn: Binding(
-                    get: { live.shareNextWorkout },
-                    set: { live.prepareOneWorkoutSharing($0) }
-                )
-            ) {
+            Toggle(isOn: $isOn) {
                 HStack(spacing: 10) {
                     Image(systemName: "ipad.and.iphone")
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
