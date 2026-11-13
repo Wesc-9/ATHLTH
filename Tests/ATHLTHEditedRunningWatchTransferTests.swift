@@ -133,6 +133,41 @@ final class ATHLTHEditedRunningWatchTransferTests: XCTestCase {
         }.count, 12)
     }
 
+    func testZonedWarmupZ1ToZ2TransfersExactPercentBoundsToWatch() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workoutCatalogEntries.first {
+            $0.slug == "zoned-vma-006"
+        })
+        let workout = planned(source.blocks)
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: workout, routeAlerts: .standard
+        )
+        let warmup = try XCTUnwrap(transfer.steps.first {
+            $0.phase == "warmup" && $0.targetHeartRateZone == nil &&
+            $0.targetHeartRatePercentMin == 50 &&
+            $0.targetHeartRatePercentMax == 70
+        })
+        let serialized = try JSONDecoder().decode(
+            WatchRunningWorkoutTransfer.self,
+            from: JSONEncoder().encode(transfer)
+        )
+        let restored = try XCTUnwrap(serialized.steps.first {
+            $0.id == warmup.id
+        })
+        XCTAssertNil(restored.targetHeartRateZone)
+        XCTAssertEqual(restored.targetHeartRatePercentMin, 50)
+        XCTAssertEqual(restored.targetHeartRatePercentMax, 70)
+        let config = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: nil,
+            stepZone: restored.targetHeartRateZone,
+            maximumBPM: 190,
+            stepPercentMin: restored.targetHeartRatePercentMin,
+            stepPercentMax: restored.targetHeartRatePercentMax
+        )
+        XCTAssertEqual(config?.heartRateMinimumBPM, 95)
+        XCTAssertEqual(config?.heartRateMaximumBPM, 133)
+        XCTAssertTrue(config?.heartRateEnabled == true)
+    }
+
     func testLegacyRunningTemplateStillUsesItsExistingWatchBuilder() throws {
         var workout = planned([], title: "Legacy")
         workout.runningWorkout = try XCTUnwrap(
