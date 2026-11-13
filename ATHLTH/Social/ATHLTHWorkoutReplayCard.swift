@@ -152,7 +152,7 @@ struct ATHLTHWorkoutReplayCard: View {
                             endPoint: .bottom
                         )
 
-                        Image(systemName: showingMoments ? "pause.circle" : "play.circle")
+                        Image(systemName: showingMoments ? "sparkles.rectangle.stack.fill" : "sparkles")
                             .font(.system(size: 41, weight: .ultraLight))
                             .foregroundStyle(.white)
 
@@ -177,7 +177,7 @@ struct ATHLTHWorkoutReplayCard: View {
                                 .minimumScaleFactor(0.82)
                             Spacer(minLength: 2)
                             Text(ATHLTHLocalization.choose(
-                                english: "REPLAY", norwegian: "TILBAKEBLIKK"
+                                english: "HIGHLIGHTS", norwegian: "HØYDEPUNKTER"
                             ))
                             .font(.system(size: 8, weight: .bold))
                             .tracking(0.6)
@@ -186,15 +186,7 @@ struct ATHLTHWorkoutReplayCard: View {
                             .background(Color.black.opacity(0.05), in: Capsule())
                             .foregroundStyle(ATHLTHTheme.mutedText)
                         }
-                        Text(isStrength
-                             ? ATHLTHLocalization.choose(
-                                 english: "Highlights from your strength session.",
-                                 norwegian: "Høydepunktene fra styrkeøkten."
-                             )
-                             : ATHLTHLocalization.choose(
-                                 english: "A quick look at how your session unfolded.",
-                                 norwegian: "Et raskt tilbakeblikk på hvordan økten utviklet seg."
-                             ))
+                        Text(replayHeadline)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
@@ -242,9 +234,64 @@ struct ATHLTHWorkoutReplayCard: View {
                     : "Vis øktens tilbakeblikk"
             ))
 
+            if requiresDataReview {
+                Button { showingDataReview = true } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: userConfirmedUnusual
+                              ? "checkmark.shield" : "exclamationmark.triangle")
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        Text(ATHLTHLocalization.choose(
+                            english: userConfirmedUnusual
+                                ? "Reviewed · performance claims remain hidden"
+                                : "Unusual duration and movement · review",
+                            norwegian: userConfirmedUnusual
+                                ? "Gjennomgått · usikre prestasjonstall er fortsatt skjult"
+                                : "Uvanlig varighet og bevegelse · gjennomgå"
+                        ))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .padding(.horizontal, 11)
+                    .frame(minHeight: 42)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 10)
+                .accessibilityIdentifier("athlth-replay-review-unusual-data")
+            }
+
             if showingMoments {
                 Divider()
                     .padding(.top, 12)
+
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ATHLTH Coach")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(coachSummary)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(11)
+                .background(
+                    ATHLTHTheme.premiumGoldSoft.opacity(0.55),
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+                .padding(.top, 10)
+                .accessibilityIdentifier("athlth-replay-coach-summary")
                 if isStrength,
                    let seconds = workout.strengthCardioDurationSeconds,
                    seconds > 0 {
@@ -324,7 +371,10 @@ struct ATHLTHWorkoutReplayCard: View {
                         ))
                         .font(.headline)
                         .foregroundStyle(ATHLTHPlanDesign.ink)
-                        ForEach(Array(performed.enumerated()), id: \.offset) { index, detail in
+                        ForEach(Array((showingAllStrengthExercises
+                            ? performed
+                            : Array(performed.prefix(3))).enumerated()), id: \.offset) {
+                            index, detail in
                             HStack(alignment: .top, spacing: 10) {
                                 Text("\(index + 1)")
                                     .font(.caption.weight(.bold))
@@ -339,6 +389,27 @@ struct ATHLTHWorkoutReplayCard: View {
                                     .foregroundStyle(ATHLTHPlanDesign.ink)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
+                        }
+                        if performed.count > 3 {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showingAllStrengthExercises.toggle()
+                                }
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: showingAllStrengthExercises
+                                            ? "Show fewer exercises" : "See all \(performed.count) exercises",
+                                        norwegian: showingAllStrengthExercises
+                                            ? "Vis færre øvelser" : "Se alle \(performed.count) øvelser"
+                                    ),
+                                    systemImage: showingAllStrengthExercises
+                                        ? "chevron.up" : "chevron.down"
+                                )
+                                .font(.caption.weight(.semibold))
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -376,7 +447,7 @@ struct ATHLTHWorkoutReplayCard: View {
                     }
                 }
 
-                if !isStrength && usableSegments.isEmpty {
+                if !isStrength && usableSegments.isEmpty && !requiresDataReview {
                     Label(
                         ATHLTHLocalization.choose(
                             english: "More replay detail appears with route or heart-rate samples.",
@@ -397,7 +468,66 @@ struct ATHLTHWorkoutReplayCard: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.white.opacity(0.95), lineWidth: 0.9)
         }
+        .sheet(isPresented: $showingDataReview) {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: 16) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Check the workout recording",
+                            norwegian: "Kontroller øktregistreringen"
+                        ),
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.title3.weight(.semibold))
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "The workout lasted \(durationText(workout.duration)), but very little movement was registered. This can happen if the session was left running or the distance data is missing. ATHLTH cannot tell which happened.",
+                        norwegian: "Økten varte \(durationText(workout.duration)), men svært lite bevegelse ble registrert. Økten kan ha blitt stående på, eller distansedata kan mangle. ATHLTH vet ikke hva som skjedde."
+                    ))
+                    .font(.subheadline)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "We omit unreliable pace, effort rankings and finishing claims. Review the workout in Apple Health if its times or distance are incorrect. Confirming here does not modify Apple Health.",
+                        norwegian: "Vi skjuler upålitelige tempo- og prestasjonspåstander. Kontroller treningsøkten i Apple Helse hvis tid eller distanse er feil. Bekreftelse her endrer ikke Apple Helse."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Button {
+                        userConfirmedUnusual = true
+                        UserDefaults.standard.set(true, forKey: confirmedReviewKey)
+                        showingDataReview = false
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "The recording is correct",
+                            norwegian: "Registreringen stemmer"
+                        ), systemImage: "checkmark.circle")
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTrainDesign.bronze)
+
+                    Spacer(minLength: 0)
+                }
+                .padding(22)
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Workout data", norwegian: "Øktdata"
+                ))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Done", norwegian: "Ferdig"
+                        )) { showingDataReview = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .onAppear {
+            userConfirmedUnusual = UserDefaults.standard.bool(
+                forKey: confirmedReviewKey
+            )
             // After a strength workout, the actual completed exercise list
             // should be immediately visible rather than hidden behind Replay.
             if isStrength, !(workout.strengthPerformedExerciseSummaries ?? []).isEmpty {
