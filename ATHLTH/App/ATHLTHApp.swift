@@ -212,6 +212,9 @@ private struct ATHLTHSceneRootView: View {
                 .environmentObject(subscriptionBackend)
                 .environmentObject(accountService)
                 .environmentObject(deviceRelay)
+                // Also inject into the iPad compatibility and smoke-test
+                // roots, not only the signed-in AppRoot lifecycle.
+                .environmentObject(ATHLTHCrossDeviceWorkoutStore.shared)
                 .environment(
                     \.locale,
                     settings.interfaceLocale
