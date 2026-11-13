@@ -15,6 +15,85 @@ struct WatchRunHeartRateDetailPage: View {
             ? workout.targetAlertConfiguration : nil
     }
 
+    private var liveZone: Int? {
+        ATHLTHHeartRateZones.measuredZone(
+            heartRateBPM: workout.hasFreshHeartRate ? workout.heartRate : nil,
+            maximumBPM: workout.liveZoneMaximumHeartRateBPM
+        )
+    }
+
+    private var targetBand: ClosedRange<Int>? {
+        guard let target,
+              let lower = target.heartRateMinimumBPM,
+              let upper = target.heartRateMaximumBPM,
+              lower.isFinite, upper.isFinite,
+              lower <= upper
+        else { return nil }
+        return Int(lower.rounded())...Int(upper.rounded())
+    }
+
+    private var highlightedZones: Set<Int> {
+        ATHLTHHeartRateZones.matchingZones(
+            for: targetBand,
+            maximumBPM: workout.liveZoneMaximumHeartRateBPM
+        )
+    }
+
+    private var fiveZoneGuide: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "YOUR ZONE", norwegian: "DIN SONE"
+                ))
+                .font(.system(size: 10, weight: .bold))
+                Spacer()
+                Text(liveZone.map { "Z\($0)" } ?? "—")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+            }
+            HStack(spacing: 3) {
+                ForEach(1...5, id: \.self) { zone in
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(highlightedZones.contains(zone)
+                                  ? WatchTheme.premiumGold
+                                  : WatchTheme.planSelected)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .stroke(liveZone == zone
+                                            ? WatchTheme.textPrimary : .clear,
+                                            lineWidth: 2)
+                            }
+                            .frame(height: 12)
+                        Text("Z\(zone)")
+                            .font(.system(size: 9,
+                                          weight: liveZone == zone ? .heavy : .medium))
+                            .foregroundStyle(liveZone == zone
+                                             ? WatchTheme.textPrimary
+                                             : WatchTheme.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            if let max = workout.liveZoneMaximumHeartRateBPM {
+                Text(ATHLTHLocalization.choose(
+                    english: "Based on HRmax", norwegian: "Fra makspuls"
+                ) + " \(Int(max.rounded())) bpm")
+                    .font(.system(size: 10))
+                    .foregroundStyle(WatchTheme.textSecondary)
+            } else {
+                Text(ATHLTHLocalization.choose(
+                    english: "Set HRmax in your profile for the Z1–Z5 pointer.",
+                    norwegian: "Sett makspuls i profilen for Z1–Z5-markøren."
+                ))
+                    .font(.system(size: 10))
+                    .foregroundStyle(WatchTheme.textSecondary)
+            }
+        }
+        .padding(10)
+        .watchSurface(radius: 17)
+        .accessibilityIdentifier("athlth-watch-five-zone-live-pulse")
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
@@ -67,6 +146,8 @@ struct WatchRunHeartRateDetailPage: View {
                         norwegian: spokenNorwegian
                     )
                 )
+
+                fiveZoneGuide
 
                 HStack(spacing: 7) {
                     readout(
