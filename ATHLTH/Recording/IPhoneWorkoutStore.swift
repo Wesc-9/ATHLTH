@@ -2421,6 +2421,16 @@ final class IPhoneWorkoutStore:
             active = workout
             persistActiveCheckpoint(force: true)
             syncLiveActivity()
+            if let index = workout.structuredStepIndex,
+               let steps = workout.structuredRunningWorkout?.steps,
+               steps.indices.contains(index),
+               ATHLTHSpotifyIntervalCuePolicy.isEffort(steps[index].phase) {
+                NotificationCenter.default.post(
+                    name: Notification.Name("athlth.spotifyRunEffortBegan"),
+                    object: nil,
+                    userInfo: ["workoutID": workout.id, "stepIndex": index]
+                )
+            }
             announceStructuredStepIfNeeded(prefix: "Starting")
             return
         }
@@ -4271,6 +4281,15 @@ final class IPhoneWorkoutStore:
                 )
             }
             return
+        }
+        // The running engine is the single source of interval boundaries.
+        // Spotify only receives this best-effort cue; no recording awaits it.
+        if ATHLTHSpotifyIntervalCuePolicy.isEffort(plan.steps[nextIndex].phase) {
+            NotificationCenter.default.post(
+                name: Notification.Name("athlth.spotifyRunEffortBegan"),
+                object: nil,
+                userInfo: ["workoutID": workout.id, "stepIndex": nextIndex]
+            )
         }
         let scoped = step.measure == .time
             ? ATHLTHCoachBoundaryCountdown.forRunningStep(
