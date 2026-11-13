@@ -120,11 +120,11 @@ enum ATHLTHPremiumStrengthSessions {
                 (ATHLTHLocalization.isNorwegian
                  ? ATHLTHExerciseNameLocalization.norwegianName(for: move.name)
                  : move.name)
-            let repTarget = move.durationSeconds.map { "\($0) s" } ??
-                "\(move.repsMin ?? 0)–\(move.repsMax ?? 0)"
+            // Repetition bounds, duration and RIR are independent
+            // prescribed fields; only the coaching advice remains prose.
             let instruction = ATHLTHLocalization.choose(
-                english: "\(repTarget) per set · \(move.rir) reps in reserve (RIR). You choose the weight and may change it before or between sets.",
-                norwegian: "\(repTarget) per sett · \(move.rir) repetisjoner i reserve (RIR). Du velger vekten og kan endre den før eller mellom settene."
+                english: "You choose the weight and may change it before or between sets.",
+                norwegian: "Du velger vekten og kan endre den før eller mellom settene."
             )
             var block = WorkoutTemplateBlock(
                 sequence: result.count + 1,
@@ -142,6 +142,9 @@ enum ATHLTHPremiumStrengthSessions {
                 restBetweenSetsSeconds: TimeInterval(move.restSeconds)
             )
             block.targetEffortRPE = 10 - move.rir
+            block.targetRepetitionsMaximum = move.durationSeconds == nil
+                ? move.repsMax : nil
+            block.targetRepsInReserve = move.rir
             result.append(block)
         }
         return result
