@@ -196,7 +196,7 @@ enum ATHLTHSimpleWorkoutOutline {
               last.contains("/"),
               last.split(separator: "/").count == 2,
               last.split(separator: "/").allSatisfy({
-                  Int($0.trimmingCharacters(in: .whitespaces)) != nil
+                  Int(String($0).trimmingCharacters(in: .whitespaces)) != nil
               })
         else { return value }
         return parts.dropLast().joined(separator: " · ")
