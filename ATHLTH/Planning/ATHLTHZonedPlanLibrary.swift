@@ -355,6 +355,37 @@ enum ATHLTHZonedPlanLibrary {
                 continue
             }
             guard step.kind == "segment" else { continue }
+
+            // A source instruction is not a timed/distance workout step.
+            // In particular Marathon Cutdown explicitly has NO stop between
+            // distances. Do not make the athlete tap through an invented
+            // extra run block just to read "Transition without stopping".
+            let originalText = (step.descriptionEn ?? "").lowercased()
+            if step.durationSec == nil, step.distanceM == nil,
+               step.distanceKm == nil,
+               originalText == "transition without stopping" {
+                if let index = result.indices.last {
+                    let guidance = ATHLTHLocalization.choose(
+                        english: "Continue directly into the next distance without stopping.",
+                        norwegian: "Gå rett over i neste distanse uten stopp."
+                    )
+                    let existing = result[index].notes ?? ""
+                    if !existing.contains(guidance) {
+                        result[index].notes = existing.isEmpty
+                            ? guidance : existing + "\n" + guidance
+                    }
+                }
+                continue
+            }
+
+            // A double-threshold rest period, pace-adjustment reminder and
+            // plyometric circuit are GUIDANCE, not GPS running intervals.
+            // Keep them visible, never assign a made-up time or distance.
+            let instructionOnly = step.durationSec == nil &&
+                step.distanceM == nil && step.distanceKm == nil &&
+                (originalText.contains("6-8h rest") ||
+                 originalText == "adjust pace based on readings" ||
+                 originalText.contains("single-leg hops per side"))
             let recovery = step.role == "recovery"
             let blockPhase: WorkoutPhaseKind = recovery ? .recovery : phase
             let isCycling = sport == "cycling"
@@ -381,7 +412,8 @@ enum ATHLTHZonedPlanLibrary {
             let zone = step.zone.flatMap(zonePrescription)
             var block = WorkoutTemplateBlock(
                 sequence: result.count + 1,
-                kind: passiveRest ? .rest : (isCycling ? .note : .run),
+                kind: instructionOnly ? .note :
+                    (passiveRest ? .rest : (isCycling ? .note : .run)),
                 title: copy.title,
                 exerciseSlug: nil,
                 distanceMeters: step.distanceM ?? step.distanceKm.map { $0 * 1_000 },
@@ -395,7 +427,8 @@ enum ATHLTHZonedPlanLibrary {
                 cardioActivity: isCycling ? nil : .running
             )
             block.activityTag = isCycling ? "cycling" :
-                (recovery && isActiveRecovery ? "active_recovery" : nil)
+                (instructionOnly ? nil :
+                    (recovery && isActiveRecovery ? "active_recovery" : nil))
             block.sourceIntensityZoneLabel = zone?.label
             block.targetHeartRatePercentMin = zone?.minimum
             block.targetHeartRatePercentMax = zone?.maximum
