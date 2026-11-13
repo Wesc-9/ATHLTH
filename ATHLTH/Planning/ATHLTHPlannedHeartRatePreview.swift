@@ -13,8 +13,9 @@ enum ATHLTHPlannedHeartRatePreview {
            let upper = block.targetHeartRatePercentMax,
            (30...100).contains(lower), (30...100).contains(upper),
            lower <= upper {
-            return Int((maximumBPM * lower / 100).rounded())...
-                Int((maximumBPM * upper / 100).rounded())
+            let minimumBPM = Int((maximumBPM * lower / 100).rounded())
+            let maximumBPMValue = Int((maximumBPM * upper / 100).rounded())
+            return minimumBPM...maximumBPMValue
         }
         if let zone = block.targetHeartRateZone {
             return ATHLTHHeartRateZones.range(for: zone, maximumBPM: maximumBPM)
