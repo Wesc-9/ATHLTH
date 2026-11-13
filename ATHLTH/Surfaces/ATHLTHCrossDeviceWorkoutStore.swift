@@ -175,6 +175,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private let client = SupabaseEnvironment.client
     private var lastPublishedID: UUID?
     private var lastPresencePublished = false
+    private var lastSpotifySpectatorRefreshAt: Date?
     private var lastPresenceCleanupAt: Date?
     private var lastPresenceExpiry: Date?
     private var lastUnauthorisedCleanupAt: Date?
@@ -206,6 +207,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         lastPresenceExpiry = nil
         lastPresencePublished = false
         lastPresenceCleanupAt = nil
+        lastSpotifySpectatorRefreshAt = nil
         lastPublishedID = nil
         lastUnauthorisedCleanupAt = nil
         shareNextWorkout = false
@@ -250,6 +252,19 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     await readRemote(accountID: accountID)
                     await pollOutgoingRequest(accountID: accountID)
                 } else {
+                    // The Web API may report an active Spotify Connect player
+                    // on Watch even when the iPhone App Remote is not attached.
+                    // Read-only refreshes are throttled and never start music.
+                    if mirroredWatch.hasActiveMirroredWorkout,
+                       spotify.isConnected {
+                        let now = Date()
+                        if lastSpotifySpectatorRefreshAt.map({
+                            now.timeIntervalSince($0) >= 20
+                        }) ?? true {
+                            lastSpotifySpectatorRefreshAt = now
+                            await spotify.refreshPlaybackForLiveSpectator()
+                        }
+                    }
                     await publishLocal(
                         accountID: accountID, phone: phone,
                         strength: strength, mirroredWatch: mirroredWatch,
@@ -526,9 +541,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 strengthWeightKilograms: watch.strengthWeightKilograms,
                 strengthRestEndsAt: watch.strengthRestEndsAt,
                 audioCoachEnabled: watch.watchAudioCoachEnabled,
-                // Watch workout + Spotify playback on the iPhone are separate
-                // sources. Relay verified iPhone playback only; never claim
-                // to know which track the Watch is playing independently.
+                // Only Spotify's verified account playback is relayed.
+                // Online Watch Spotify Connect playback may be available;
+                // independent offline music remains deliberately unknown.
                 spotifyPlaying: spotify.isPlaying,
                 spotifyTrackTitle: spotify.isPlaying
                     ? spotify.watchTrackTitle : nil,
