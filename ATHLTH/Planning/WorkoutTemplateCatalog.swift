@@ -436,7 +436,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         } else if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
             parts.append(ATHLTHLocalization.choose(
                 english: "HR zone Z\(targetHeartRateZone)",
-                norwegian: "Pulssone S\(targetHeartRateZone)"
+                norwegian: "Pulssone Z\(targetHeartRateZone)"
             ))
         }
         // Include the athlete's planned perceived effort in the timeline.
