@@ -419,8 +419,53 @@ struct ATHLTHWorkoutReplayCard: View {
                         in: RoundedRectangle(cornerRadius: 14)
                     )
                 }
+                if let feature = replayMoments.first,
+                   feature.category != "recording" {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: feature.icon)
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .frame(width: 38, height: 38)
+                            .background(ATHLTHTheme.premiumGoldSoft, in: Circle())
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "TODAY'S HIGHLIGHT",
+                                norwegian: "ØKTENS HØYDEPUNKT"
+                            ))
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.9)
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+
+                            Text(feature.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(feature.detail)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        ATHLTHTheme.cardWarm.opacity(0.7),
+                        in: RoundedRectangle(cornerRadius: 15)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15)
+                            .strokeBorder(
+                                ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.7
+                            )
+                    }
+                    .padding(.top, 10)
+                    .accessibilityIdentifier("athlth-replay-featured-insight")
+                }
+
                 VStack(spacing: 0) {
-                    ForEach(Array(replayMoments.enumerated()), id: \.offset) { index, moment in
+                    ForEach(Array(replayMoments.dropFirst().enumerated()), id: \.offset) { index, moment in
                         HStack(alignment: .top, spacing: 11) {
                             Image(systemName: moment.icon)
                                 .font(.system(size: 15, weight: .semibold))
@@ -441,10 +486,22 @@ struct ATHLTHWorkoutReplayCard: View {
                         }
                         .padding(.vertical, 10)
 
-                        if index < replayMoments.count - 1 {
+                        if index < replayMoments.dropFirst().count - 1 {
                             Divider().padding(.leading, 43)
                         }
                     }
+                }
+
+                if replayMoments.first?.category == "recording" && !requiresDataReview {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Not enough comparable measurements for performance insights.",
+                            norwegian: "For få sammenlignbare målinger til å vise prestasjonshøydepunkter."
+                        ),
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
                 if !isStrength && usableSegments.isEmpty && !requiresDataReview {
