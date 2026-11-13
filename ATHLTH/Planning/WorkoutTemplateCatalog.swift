@@ -2770,24 +2770,20 @@ enum ATHLTHWorkoutFirstUsePolicy {
     }
 }
 
-/// A library workout describes the structure, not the athlete's personal targets.
-/// Leave time, prescribed repetitions and exercise names alone. Targets are
-/// intentionally empty until the athlete saves them to My Workouts.
+/// Personalize a catalogue workout without discarding its prescription.
+/// Time, repetitions and AUTHOR-PRESCRIBED heart-rate zones are workout
+/// structure. Athlete-specific pace, weights and RPE should be selected
+/// separately. Previously, unlabelled authored Z1–Z5 targets were silently
+/// erased when added from the library, leaving the copied workout text-only.
 enum ATHLTHWorkoutLibraryPersonalization {
     static func blankTargets(_ blocks: [WorkoutTemplateBlock]) -> [WorkoutTemplateBlock] {
         blocks.map { original in
             var block = original
             block.targetPaceSecondsPerKilometer = nil
             block.treadmillInclinePercent = nil
-            // A Zoned source-zone is part of the prescribed session,
-            // not an athlete-specific target. Keep S5 on an all-out test
-            // and source Z1–Z2 recovery bands, while clearing unsourced
-            // personal zone overrides.
-            if block.sourceIntensityZoneLabel == nil {
-                block.targetHeartRateZone = nil
-                block.targetHeartRatePercentMin = nil
-                block.targetHeartRatePercentMax = nil
-            }
+            // Retain structured targetHeartRateZone and percent bounds even
+            // for catalogues that do not use sourceIntensityZoneLabel.
+            // These are relative intensity prescriptions, not personal BPM.
             block.targetEffortRPE = nil
             block.targetWeightKilograms = nil
             block.loadNote = nil
