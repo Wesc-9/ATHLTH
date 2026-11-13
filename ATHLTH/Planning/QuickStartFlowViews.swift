@@ -2594,6 +2594,8 @@ struct RunQuickStartSheet: View {
                 .font(.caption)
                 .padding(.horizontal, 12)
             }
+            ATHLTHLiveWorkoutPrestartToggle()
+                .padding(.horizontal, 12)
             ATHLTHQuickRunStartFooter(
                 watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
                 canStart: canSubmitQuickRun(captureDevice: .iPhone),
@@ -3730,6 +3732,8 @@ struct WalkQuickStartSheet: View {
                         .font(.caption)
                         .padding(.horizontal, 18)
                     }
+                    ATHLTHLiveWorkoutPrestartToggle()
+                        .padding(.horizontal, 14)
                     ATHLTHQuickStartDeviceLaunchBar(
                     watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
                     onIPhone: { startWalk(using: .iPhone) },
@@ -3927,6 +3931,8 @@ struct StrengthQuickStartSheet: View {
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                     }
+
+                    ATHLTHLiveWorkoutPrestartToggle()
 
                     ATHLTHBasicActivityHero(
                         title: ATHLTHLocalization.choose(
