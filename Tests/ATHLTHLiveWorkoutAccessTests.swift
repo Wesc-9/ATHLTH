@@ -54,6 +54,32 @@ final class ATHLTHLiveWorkoutAccessTests: XCTestCase {
         XCTAssertFalse(declined.isPending)
     }
 
+    func testPrivatePresenceBeaconNeverContainsWorkoutDetails() throws {
+        let row = ATHLTHCrossDevicePresenceRow(
+            userID: UUID(), sourceDevice: "watch",
+            updatedAt: Date(timeIntervalSince1970: 1_000),
+            expiresAt: Date(timeIntervalSince1970: 1_030)
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(row)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        XCTAssertEqual(Set(object.keys), Set([
+            "user_id", "source_device", "updated_at", "expires_at"
+        ]))
+        XCTAssertNil(object["snapshot"])
+        XCTAssertNil(object["heartRateBPM"])
+        XCTAssertNil(object["liveLatitude"])
+        XCTAssertNil(object["title"])
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(ATHLTHCrossDevicePresenceRow.self, from: data)
+        XCTAssertEqual(decoded, row)
+    }
+
     func testRichSessionPayloadStillUsesOnlyOptionalSensorEvidence() throws {
         var snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
             sessionID: UUID(), kind: "running", title: "4 × 4",
