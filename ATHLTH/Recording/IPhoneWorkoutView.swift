@@ -1449,6 +1449,7 @@ private struct IPhoneStructuredStepCard: View {
 struct IPhoneWorkoutView: View {
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -1476,6 +1477,44 @@ struct IPhoneWorkoutView: View {
     @State private var routeCamera:
         MapCameraPosition = .automatic
 
+    private func runningPulseZones(
+        for workout: PhoneWorkout, at now: Date
+    ) -> some View {
+        let activeStep: WatchRunningWorkoutStep? = {
+            guard let plan = workout.structuredRunningWorkout,
+                  let index = workout.structuredStepIndex,
+                  plan.steps.indices.contains(index)
+            else { return nil }
+            return plan.steps[index]
+        }()
+        // History cache is not live telemetry. Show an actual heart rate only
+        // when HealthKit has a suitably recent sensor sample.
+        let freshPulse: Double? = {
+            guard let sample = health.heart.latestHeartRate,
+                  let time = health.heart.latestHeartRateDate,
+                  now.timeIntervalSince(time) >= -2,
+                  now.timeIntervalSince(time) <= 15
+            else { return nil }
+            return sample
+        }()
+        let maximum = workout.structuredRunningWorkout?.heartRateZoneMaximumBPM ??
+            ATHLTHHeartRateZones.resolvedMaximumBPM(
+                configured: session.onboardingProfile?.maximumHeartRateBPM,
+                dateOfBirth: session.onboardingProfile?.dateOfBirth,
+                now: now,
+                usesFemaleEstimate: session.onboardingProfile?.healthSex == .female
+            )
+        return ATHLTHRunningPulseZoneGauge(
+            heartRateBPM: freshPulse,
+            maximumHeartRateBPM: maximum,
+            targetHeartRateZone: activeStep?.targetHeartRateZone,
+            targetMinimumBPM: nil,
+            targetMaximumBPM: nil,
+            targetPercentMin: activeStep?.targetHeartRatePercentMin,
+            targetPercentMax: activeStep?.targetHeartRatePercentMax
+        )
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -1495,6 +1534,14 @@ struct IPhoneWorkoutView: View {
                         )
                         .frame(maxWidth: 720)
                         .frame(maxWidth: .infinity)
+
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            runningPulseZones(
+                                for: workout, at: context.date
+                            )
+                            .frame(maxWidth: 720)
+                            .frame(maxWidth: .infinity)
+                        }
 
                         if let message =
                             recorder.message,
