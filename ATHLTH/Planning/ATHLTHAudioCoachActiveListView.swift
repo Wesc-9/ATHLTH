@@ -15,6 +15,11 @@ struct ATHLTHAudioCoachActiveListView: View {
     // actual Coach settings and profiles remain unchanged.
     @State private var editorMode = "basic"
     @State private var showingCatalogue = false
+    @State private var showingQuickMessage = false
+    @State private var openAdvancedAfterQuickMessage = false
+    @State private var quickTrigger: ATHLTHAudioCoachRule.Trigger = .time
+    @State private var quickMetric: ATHLTHAudioCoachRule.Metric = .heartRate
+    @State private var quickInterval = 60
     @State private var showingVoice = false
     @State private var showingProfiles = false
     @State private var editingOption: ATHLTHAudioCoachOption?
@@ -196,7 +201,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                             }
                         },
                         onAddMessage: {
-                            showingCatalogue = true
+                            showingQuickMessage = true
                         },
                         onShowAdvanced: {
                             editorMode = "advanced"
@@ -226,6 +231,14 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .padding(.horizontal, 4)
         }
         .tint(bronze)
+        .sheet(isPresented: $showingQuickMessage, onDismiss: {
+            if openAdvancedAfterQuickMessage {
+                openAdvancedAfterQuickMessage = false
+                showingCatalogue = true
+            }
+        }) {
+            quickMessageSheet
+        }
         .sheet(isPresented: $showingCatalogue, onDismiss: {
             if let nextEditor {
                 editingOption = nextEditor
@@ -704,6 +717,135 @@ struct ATHLTHAudioCoachActiveListView: View {
             .accessibilityLabel(tr("Remove", "Fjern") + " " + option.title)
         }
         .padding(.vertical, 4)
+    }
+
+    /// The everyday flow asks only when to speak and what to read.
+    /// Advanced editing still uses the SAME underlying custom-rule model.
+    private var quickMessageSheet: some View {
+        NavigationStack {
+            Form {
+                if showStructuredOptions {
+                    Section {
+                        Button {
+                            draft.smartPrompts.targetZoneVoiceAlertsEnabled = true
+                            draft.smartPrompts.preferredHeartRateZone = nil
+                            showingQuickMessage = false
+                        } label: {
+                            Label(
+                                tr("Notify me when outside my planned pulse zone",
+                                   "Si fra når jeg er utenfor planlagt pulssone"),
+                                systemImage: "heart.text.square"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(bronze)
+                            .frame(minHeight: 44, alignment: .leading)
+                        }
+                    } header: {
+                        Text(tr("Recommended for intervals", "Anbefalt for intervaller"))
+                    } footer: {
+                        Text(tr("Uses Z1–Z5 from each programmed effort. No separate message per interval.",
+                                "Bruker Z1–Z5 fra hvert planlagte drag. Ingen egen beskjed per intervall."))
+                    }
+                }
+
+                Section {
+                    Picker(tr("When should Coach speak?", "Når skal Coach snakke?"),
+                           selection: $quickTrigger) {
+                        Text(tr("After time", "Etter tid"))
+                            .tag(ATHLTHAudioCoachRule.Trigger.time)
+                        Text(tr("After distance", "Etter distanse"))
+                            .tag(ATHLTHAudioCoachRule.Trigger.distance)
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: quickTrigger) { _, next in
+                        quickInterval = next == .time ? 60 : 1_000
+                    }
+
+                    Stepper(
+                        value: $quickInterval,
+                        in: quickTrigger == .time ? 15...7_200 : 100...42_000,
+                        step: quickTrigger == .time ? 15 : 100
+                    ) {
+                        HStack {
+                            Text(tr("Every", "Hvert"))
+                            Spacer()
+                            Text(quickTrigger == .time
+                                 ? tr("\(quickInterval) seconds", "\(quickInterval) sekunder")
+                                 : "\(quickInterval) m")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(bronze)
+                        }
+                    }
+                } header: {
+                    Text(tr("1 · When?", "1 · Når?"))
+                }
+
+                Section {
+                    Picker(tr("What should Coach say?", "Hva skal Coach si?"),
+                           selection: $quickMetric) {
+                        ForEach([
+                            ATHLTHAudioCoachRule.Metric.heartRate,
+                            .elapsedTime,
+                            .distance,
+                            .pace,
+                            .motivation
+                        ], id: \.self) { metric in
+                            Text(metric.title).tag(metric)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                } header: {
+                    Text(tr("2 · What?", "2 · Hva?"))
+                }
+
+                Section {
+                    Button {
+                        guard draft.customRules.count < 20 else { return }
+                        draft.customRules.append(ATHLTHAudioCoachRule(
+                            trigger: quickTrigger,
+                            metric: quickMetric,
+                            interval: quickInterval,
+                            scope: .workout
+                        ))
+                        showingQuickMessage = false
+                    } label: {
+                        Label(tr("Add Coach message", "Legg til Coach-beskjed"),
+                              systemImage: "checkmark")
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(bronze)
+                    .disabled(draft.customRules.count >= 20)
+                    .accessibilityIdentifier("athlth-coach-quick-add-save")
+
+                    Button {
+                        openAdvancedAfterQuickMessage = true
+                        showingQuickMessage = false
+                    } label: {
+                        Label(tr("More message types", "Flere beskjedtyper"),
+                              systemImage: "slider.horizontal.3")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(bronze)
+                } footer: {
+                    Text(tr(
+                        "Your message belongs only to this workout. All advanced metrics and rules are still available.",
+                        "Beskjeden gjelder denne økten. Alle avanserte målinger og regler er fortsatt tilgjengelige."
+                    ))
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("New Coach message", "Ny Coach-beskjed"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Close", "Lukk")) { showingQuickMessage = false }
+                }
+            }
+        }
+        .presentationDetents([.large])
     }
 
     private var catalogueSheet: some View {
