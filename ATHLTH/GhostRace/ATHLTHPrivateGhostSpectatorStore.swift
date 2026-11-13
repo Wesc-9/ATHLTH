@@ -165,7 +165,8 @@ enum ATHLTHPrivateGhostSpectatorStore {
     ) async {
         guard !ATHLTHDeviceRole.isIPad,
               client.auth.currentUser?.id == userID,
-              isEnabled(for: userID)
+              isEnabled(for: userID),
+              ATHLTHCrossDeviceWorkoutStore.shared.isSharingActiveSession
         else { return }
 
         let now = Date()
@@ -203,7 +204,8 @@ enum ATHLTHPrivateGhostSpectatorStore {
             // An in-flight network write cannot silently undo opt-out
             // or a finish event that cleared the spectator session.
             if generationAtSend != mutationGeneration ||
-               !isEnabled(for: userID) {
+               !isEnabled(for: userID) ||
+               !ATHLTHCrossDeviceWorkoutStore.shared.isSharingActiveSession {
                 await clear(for: userID)
             }
         } catch {
