@@ -29,10 +29,31 @@ struct ATHLTHiPadLiveWorkoutExtrasPanel: View {
                         .font(.subheadline)
                 }
 
-                if let playing = snapshot.spotifyPlaying {
+                if snapshot.spotifyPlaying == true,
+                   let track = snapshot.spotifyTrackTitle,
+                   !track.isEmpty {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "music.note")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(tr("NOW PLAYING", "SPILLES NÅ"))
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            Text(track)
+                                .font(.subheadline.weight(.semibold))
+                            if let artist = snapshot.spotifyArtistName,
+                               !artist.isEmpty {
+                                Text(artist)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("athlth-ipad-now-playing-track")
+                } else if let playing = snapshot.spotifyPlaying {
                     Label(playing
-                        ? tr("Spotify playing on iPhone",
-                             "Spotify spiller på iPhone")
+                        ? tr("Spotify playing · track not available",
+                             "Spotify spiller · sang ikke tilgjengelig")
                         : tr("Spotify not playing on iPhone",
                              "Spotify spiller ikke på iPhone"),
                           systemImage: "music.note")
