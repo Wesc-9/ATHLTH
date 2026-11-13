@@ -168,6 +168,40 @@ final class ATHLTHEditedRunningWatchTransferTests: XCTestCase {
         XCTAssertTrue(config?.heartRateEnabled == true)
     }
 
+    func testEveryPureRunningZonedRecipeKeepsTargetsInWatchTransfer() {
+        let candidates = ATHLTHZonedPlanLibrary.workoutCatalogEntries.filter {
+            $0.category == "running" && !$0.blocks.isEmpty &&
+            $0.blocks.allSatisfy { $0.kind == .run || $0.kind == .rest }
+        }
+        XCTAssertFalse(candidates.isEmpty)
+        for source in candidates {
+            let blocks = source.blocks
+            let expected = blocks.expandedForExecution()
+            let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+                from: planned(blocks, title: source.title),
+                routeAlerts: .standard
+            )
+            XCTAssertEqual(transfer.steps.count, expected.count, source.slug)
+            for (index, step) in transfer.steps.enumerated() {
+                guard expected.indices.contains(index) else { break }
+                let block = expected[index]
+                XCTAssertEqual(step.targetHeartRateZone,
+                               block.targetHeartRateZone,
+                               "\(source.slug) step \(index)")
+                XCTAssertEqual(step.targetHeartRatePercentMin,
+                               block.targetHeartRatePercentMin,
+                               "\(source.slug) step \(index)")
+                XCTAssertEqual(step.targetHeartRatePercentMax,
+                               block.targetHeartRatePercentMax,
+                               "\(source.slug) step \(index)")
+                XCTAssertEqual(step.durationSeconds, block.durationSeconds,
+                               "\(source.slug) step \(index)")
+                XCTAssertEqual(step.distanceMeters, block.distanceMeters,
+                               "\(source.slug) step \(index)")
+            }
+        }
+    }
+
     func testLegacyRunningTemplateStillUsesItsExistingWatchBuilder() throws {
         var workout = planned([], title: "Legacy")
         workout.runningWorkout = try XCTUnwrap(
