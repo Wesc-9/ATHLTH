@@ -166,7 +166,7 @@ enum ATHLTHZonedPlanLibrary {
                 title: ATHLTHZonedLocalization.text(workout.nameEn),
                 summary: ATHLTHZonedLocalization.workoutSummary(workout.category, english: workout.descriptionEn),
                 category: activity,
-                difficulty: workout.difficulty,
+                difficulty: ATHLTHZonedLocalization.text(workout.difficulty),
                 estimatedDurationMinutes: workout.typicalDuration.map { ($0.min + $0.max) / 2 },
                 tags: ["zoned", workout.category, workout.sessionType, workout.targetSystem ?? ""].filter { !$0.isEmpty },
                 sourceLabel: "Zoned · MIT",
@@ -359,7 +359,13 @@ enum ATHLTHZonedPlanLibrary {
                 (step.distanceM ?? 0) > 0 ||
                 (step.distanceKm ?? 0) > 0
             let passiveRest = blockPhase == .recovery && !isActiveRecovery
+            let copy = ATHLTHZonedLocalization.stepCopy(
+                sourceEnglish: step.descriptionEn ?? (recovery ? "Recovery" : "Effort"),
+                durationSeconds: step.durationSec,
+                isRunning: !isCycling
+            )
             let notes: [String] = [
+                copy.instructions,
                 step.vmaPercent.map { ATHLTHLocalization.choose(english: "VMA target: \($0) %", norwegian: "VMA-mål: \($0) %") },
                 step.intensityType.map { ATHLTHLocalization.choose(english: "Pace intensity: \($0)", norwegian: "Fartsintensitet: \($0)") },
                 step.elevationGainM.map { ATHLTHLocalization.choose(english: "Elevation gain: \($0) m", norwegian: "Høydemeter: \($0) m") },
@@ -370,7 +376,7 @@ enum ATHLTHZonedPlanLibrary {
             var block = WorkoutTemplateBlock(
                 sequence: result.count + 1,
                 kind: passiveRest ? .rest : (isCycling ? .note : .run),
-                title: ATHLTHZonedLocalization.text(step.descriptionEn ?? (recovery ? "Recovery" : "Effort")),
+                title: copy.title,
                 exerciseSlug: nil,
                 distanceMeters: step.distanceM ?? step.distanceKm.map { $0 * 1_000 },
                 repetitions: nil,
