@@ -90,8 +90,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     func didBackground() {
         foregroundedSinceLastPoll = false
-        suppressAutoOpenOnNextPoll = true
-        isExpanded = false
+        // Keep a deliberately opened spectator visible when returning to
+        // iPad. Respect a manually minimized spectator across app switching.
+        suppressAutoOpenOnNextPoll = !isExpanded
     }
 
     func didForeground() {
