@@ -555,12 +555,21 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         // A profile can only choose among the athlete's saved favorites.
         // No profile, missing intensity, or invalid track keeps the explicit
         // single-song selection from the previous version unchanged.
-        let track = ATHLTHSpotifySmartMusicPolicy.select(
+        let matched = ATHLTHSpotifySmartMusicPolicy.select(
             from: chosen.smartProfile,
             effortIndex: effortIndex ?? stepIndex,
             targetDurationSeconds: targetDurationSeconds,
             intensityText: intensityText
-        ) ?? chosen
+        )
+        // A profile with no suitable intensity should stay silent, not play
+        // the first unrelated song. A separately chosen single song may still
+        // be used as an explicit fallback.
+        let explicitFallback = chosen.smartProfile?.favorites.contains(
+            where: { $0.id == chosen.id }
+        ) == true ? nil : chosen
+        guard let track = matched ??
+            (chosen.smartProfile == nil ? chosen : explicitFallback)
+        else { return }
 
         // iPhone-only App Remote. Do not use Spotify Connect as fallback:
         // that could switch playback to an old speaker or another person's device.
