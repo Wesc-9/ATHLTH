@@ -600,14 +600,27 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func resolveIntervalTrackLink(_ link: String) async throws -> ATHLTHSpotifyIntervalTrack {
-        guard let id = ATHLTHSpotifyIntervalCuePolicy.validSpotifyTrackID(link),
-              let token = await accessTokenForRequest(),
-              let url = URL(string: "https://api.spotify.com/v1/tracks/\(id)")
-        else { throw SpotifyPlaybackError.invalidResponse }
-        let track: SpotifyIntervalTrackSearchResponse.Track = try await requestSpotifyJSON(
-            url: url, token: token
+        guard let id = ATHLTHSpotifyIntervalCuePolicy.validSpotifyTrackID(link) else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+        if let token = await accessTokenForRequest(),
+           let url = URL(string: "https://api.spotify.com/v1/tracks/\(id)") {
+            // Spotify may restrict track metadata in Development Mode.
+            // An explicitly pasted Spotify URI remains valid for App Remote
+            // even when the optional title lookup is unavailable.
+            if let track: SpotifyIntervalTrackSearchResponse.Track =
+                try? await requestSpotifyJSON(url: url, token: token) {
+                return track.asIntervalTrack
+            }
+        }
+        return ATHLTHSpotifyIntervalTrack(
+            id: id,
+            title: ATHLTHLocalization.choose(
+                english: "Selected Spotify song", norwegian: "Valgt Spotify-sang"
+            ),
+            artist: "",
+            durationMilliseconds: 0
         )
-        return track.asIntervalTrack
     }
 
     private func requestSpotifyJSON<T: Decodable>(
