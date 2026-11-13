@@ -340,45 +340,15 @@ struct ATHLTHWorkoutRecipePreview: View {
         .sheet(item: $inspectedCardioStep) { item in
             NavigationStack {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Label(item.block.resolvedPhase.title,
-                              systemImage: item.block.resolvedPhase.symbol)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        Text(localizedTitle(item.block, compact: false))
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                        if let target = item.block.targetText {
-                            Text(target)
-                                .font(.subheadline)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        if let suggestion = ATHLTHWorkoutStepCopy.suggestedZone(
+                    ATHLTHWorkoutStepDetails(
+                        block: ATHLTHZonedLocalization
+                            .normalizeLegacyAllOutStep(item.block),
+                        displayTitle: localizedTitle(item.block, compact: false),
+                        maximumHeartRateBPM: maximumHeartRateBPM,
+                        suggestion: ATHLTHWorkoutStepCopy.suggestedZone(
                             for: item.block, workoutTitle: title
-                        ) {
-                            Label(suggestion, systemImage: "heart")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        }
-                        if let incline = item.block.treadmillInclinePercent,
-                           incline.isFinite, (0...20).contains(incline) {
-                            Label(
-                                tr("Incline", "Stigning") +
-                                    String(format: " %.1f %%", incline),
-                                systemImage: "mountain.2"
-                            )
-                            .font(.subheadline)
-                        }
-                        if let notes = ATHLTHZonedLocalization
-                            .normalizeLegacyAllOutStep(item.block).notes,
-                            !notes.isEmpty {
-                            Text(notes)
-                                .font(.subheadline)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                        )
+                    )
                 }
                 .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
                 .navigationTitle(tr("Step details", "Detaljer for øktdel"))
