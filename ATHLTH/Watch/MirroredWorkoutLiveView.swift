@@ -453,36 +453,6 @@ struct MirroredWorkoutLiveView: View {
                             mirroredAudioCoachCard
                         }
 
-                        if mirroring.hasActiveMirroredWorkout {
-                            Button {
-                                showingAIConversation = true
-                            } label: {
-                                ATHLTHUnifiedCard {
-                                    HStack(spacing: 10) {
-                                        Image(systemName: "mic.circle.fill")
-                                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                                            .font(.title2)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(ATHLTHLocalization.choose(
-                                                english: "Talk to AI Coach",
-                                                norwegian: "Snakk med AI Coach"
-                                            ))
-                                            .font(.subheadline.weight(.semibold))
-                                            Text(ATHLTHLocalization.choose(
-                                                english: "Optional · confirm microphone on iPhone",
-                                                norwegian: "Valgfritt · godkjenn mikrofon på iPhone"
-                                            ))
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-
                         if let liveSession =
                             realtime.currentSession,
                            realtime.isSharingLiveLocation {
