@@ -55,6 +55,25 @@ final class ATHLTHWorkoutFileImportTests: XCTestCase {
         XCTAssertEqual(result.blocks[2].resolvedPhase, .recovery)
     }
 
+    func testZwiftRunningFileUsesRunningStepsAndNeverInventsPace() throws {
+        let zwo = """
+        <workout_file><sportType>run</sportType><name>Run workout</name>
+        <workout><IntervalsT Repeat="2" OnDuration="60" OffDuration="60"
+                 OnPower="1.20" OffPower="0.50"/></workout></workout_file>
+        """
+        let result = try ATHLTHWorkoutFileImport.parse(
+            data: Data(zwo.utf8), filename: "run.zwo",
+            selectedActivity: .running
+        )
+        XCTAssertEqual(result.activity, .running)
+        XCTAssertEqual(result.blocks.count, 4)
+        XCTAssertEqual(result.blocks[0].kind, .run)
+        XCTAssertEqual(result.blocks[1].kind, .rest)
+        XCTAssertEqual(result.blocks[0].notes, "Zwift: 120% prescribed intensity")
+        XCTAssertNil(result.blocks[0].targetPaceSecondsPerKilometer)
+        XCTAssertNil(result.blocks[0].targetHeartRateZone)
+    }
+
     func testJSONEditableBlocksImportWithoutExternalRouteIdentity() throws {
         let block = WorkoutTemplateBlock(
             sequence: 1, kind: .run, title: "Interval Z4",
