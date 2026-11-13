@@ -1722,6 +1722,15 @@ struct HomeWeeklyProgressStrip:
     @Environment(\.scenePhase) private var scenePhase
     @SceneStorage("athlth.home.weeklyProgress.openDay")
     private var persistedOpenDay: Double = 0
+    // Scene-level editor intent survives a temporarily dismissed UIKit sheet.
+    @SceneStorage("athlth.home.composerActive")
+    private var composerActive = false
+    @SceneStorage("athlth.home.composerAccount")
+    private var composerAccount = ""
+    @SceneStorage("athlth.home.composerDay")
+    private var composerDay: Double = 0
+    @State private var showingStandaloneSessionEditor = false
+    @State private var pendingComposerPresentation = false
 
     let plan: TrainingPlan?
     let workouts: [WorkoutSummary]
@@ -1867,13 +1876,30 @@ struct HomeWeeklyProgressStrip:
             )
         }
         .onAppear {
-            restoreDaySheetIfNeeded()
+            if composerActive {
+                restoreWorkoutComposerIfNeeded()
+            } else {
+                restoreDaySheetIfNeeded()
+            }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { restoreDaySheetIfNeeded() }
+            guard phase == .active else { return }
+            if composerActive {
+                restoreWorkoutComposerIfNeeded()
+            } else {
+                restoreDaySheetIfNeeded()
+            }
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            if composerActive { restoreWorkoutComposerIfNeeded() }
         }
         .sheet(item: $selectedDay, onDismiss: {
-            if scenePhase == .active { persistedOpenDay = 0 }
+            if pendingComposerPresentation {
+                pendingComposerPresentation = false
+                restoreWorkoutComposerIfNeeded()
+            } else if scenePhase == .active && !composerActive {
+                persistedOpenDay = 0
+            }
         }) {
             selection in
             HomeWeeklyProgressDaySheet(
@@ -1888,6 +1914,9 @@ struct HomeWeeklyProgressStrip:
                 },
                 onOpenWorkout: {
                     daySheetDetent = .large
+                },
+                onPlanWorkout: { date in
+                    openWorkoutComposer(on: date)
                 }
             )
             .presentationDetents(
@@ -1900,6 +1929,55 @@ struct HomeWeeklyProgressStrip:
             .presentationCornerRadius(
                 28
             )
+        }
+        .fullScreenCover(
+            isPresented: $showingStandaloneSessionEditor,
+            onDismiss: { restoreWorkoutComposerIfNeeded() }
+        ) {
+            SessionEditorView(
+                standaloneDate: Date(timeIntervalSinceReferenceDate: composerDay),
+                onExit: closeWorkoutComposer
+            )
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .interactiveDismissDisabled(composerActive)
+        }
+    }
+
+    private func openWorkoutComposer(on date: Date) {
+        composerAccount = session.profile.userID.uuidString
+        composerDay = Calendar.current.startOfDay(for: date)
+            .timeIntervalSinceReferenceDate
+        composerActive = true
+        // Dismiss the day card before showing the actual editor. No sheet stack.
+        persistedOpenDay = 0
+        pendingComposerPresentation = true
+        selectedDay = nil
+    }
+
+    private func closeWorkoutComposer() {
+        composerActive = false
+        composerAccount = ""
+        composerDay = 0
+        pendingComposerPresentation = false
+    }
+
+    private func restoreWorkoutComposerIfNeeded() {
+        guard composerActive else { return }
+        guard ATHLTHHomeWorkoutComposerRecoveryPolicy.canRestore(
+            account: composerAccount,
+            currentAccountID: session.profile.userID,
+            day: composerDay
+        ) else {
+            closeWorkoutComposer()
+            return
+        }
+        guard scenePhase == .active, selectedDay == nil,
+              !showingStandaloneSessionEditor else { return }
+        Task { @MainActor in
+            await Task.yield()
+            guard composerActive, scenePhase == .active, selectedDay == nil,
+                  !showingStandaloneSessionEditor else { return }
+            showingStandaloneSessionEditor = true
         }
     }
 
@@ -1922,7 +2000,7 @@ struct HomeWeeklyProgressStrip:
     }
 
     private func restoreDaySheetIfNeeded() {
-        guard selectedDay == nil, persistedOpenDay > 0 else { return }
+        guard !composerActive, selectedDay == nil, persistedOpenDay > 0 else { return }
         selectedDay = makeDaySelection(
             for: Date(timeIntervalSince1970: persistedOpenDay)
         )
@@ -2973,49 +3051,6 @@ private struct HomeWeeklyProgressDaySheet: View {
     @SceneStorage("athlth.home.daySheet.completedWorkoutID")
     private var persistedCompletedWorkoutID = ""
     @State private var completedWorkoutPath: [UUID] = []
-    @State private var suspendedEditor = false
-    @State private var suspendedAt: Date?
-    // Scene-local navigation intent survives a UIKit sheet being torn down
-    // when the app is suspended. Workout data remains in the shared draft.
-    @SceneStorage("athlth.home.composerActive")
-    private var composerActive = false
-    @SceneStorage("athlth.home.composerAccount")
-    private var composerAccount = ""
-    @SceneStorage("athlth.home.composerDay")
-    private var composerDay: Double = 0
-
-    private func openWorkoutComposer() {
-        composerAccount = session.profile.userID.uuidString
-        composerDay = Calendar.current.startOfDay(for: selection.date)
-            .timeIntervalSinceReferenceDate
-        composerActive = true
-        showingStandaloneSessionEditor = true
-    }
-
-    private func closeWorkoutComposer() {
-        composerActive = false
-        composerAccount = ""
-        composerDay = 0
-    }
-
-    private func restoreWorkoutComposerIfNeeded() {
-        guard composerActive else { return }
-        let day = Calendar.current.startOfDay(for: selection.date)
-            .timeIntervalSinceReferenceDate
-        guard composerAccount == session.profile.userID.uuidString,
-              abs(composerDay - day) < 1 else {
-            // Never reopen another athlete's or another day's draft.
-            closeWorkoutComposer()
-            return
-        }
-        guard !showingStandaloneSessionEditor else { return }
-        Task { @MainActor in
-            await Task.yield()
-            guard composerActive, scenePhase == .active,
-                  !showingStandaloneSessionEditor else { return }
-            showingStandaloneSessionEditor = true
-        }
-    }
 
     private var hasWorkoutDraft: Bool {
         let key = "athlth.sessionEditor.draft.v1.\(session.profile.userID.uuidString).standalone"
@@ -3034,12 +3069,12 @@ private struct HomeWeeklyProgressDaySheet: View {
     var onStartStandaloneWorkout:
         ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
     let onOpenWorkout: () -> Void
+    let onPlanWorkout: (Date) -> Void
 
     // Build the sizable offline workout catalog only after the day sheet
     // becomes visible. It is not needed to render the chosen day's schedule.
     @State private var suggestionCatalogEntries: [WorkoutTemplateCatalogEntry] = []
     @State private var suggestionsReady = false
-    @State private var showingStandaloneSessionEditor = false
     @State private var showingWorkoutPicker = false
     @State private var showingInspiration = false
     @State private var pendingInspiration: PlannedSession?
@@ -3329,7 +3364,6 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             .onAppear {
                 restoreCompletedWorkoutIfNeeded()
-                restoreWorkoutComposerIfNeeded()
             }
             .onChange(of: completedWorkoutPath) { _, next in
                 if scenePhase == .active {
@@ -3438,32 +3472,9 @@ private struct HomeWeeklyProgressDaySheet: View {
                     if let id = completedWorkoutPath.last {
                         persistedCompletedWorkoutID = id.uuidString
                     }
-                    if suspendedAt == nil {
-                        suspendedAt = Date()
-                        suspendedEditor = showingStandaloneSessionEditor
-                    }
                 } else {
                     restoreCompletedWorkoutIfNeeded()
-                    if suspendedAt.map({ Date().timeIntervalSince($0) < 300 }) == true,
-                       suspendedEditor, composerActive {
-                        showingStandaloneSessionEditor = true
-                    }
-                    restoreWorkoutComposerIfNeeded()
-                    suspendedAt = nil
-                    suspendedEditor = false
                 }
-            }
-            .sheet(isPresented: $showingStandaloneSessionEditor, onDismiss: {
-                // An unexpected system dismissal is not an explicit Cancel.
-                // The presentation intent is cleared only by the editor.
-                restoreWorkoutComposerIfNeeded()
-            }) {
-                SessionEditorView(
-                    standaloneDate: selection.date,
-                    onExit: closeWorkoutComposer
-                )
-                .presentationDetents([.large])
-                .interactiveDismissDisabled(composerActive)
             }
             .sheet(isPresented: $showingInspiration, onDismiss: {
                 if let picked = pendingInspiration {
@@ -3600,7 +3611,7 @@ private struct HomeWeeklyProgressDaySheet: View {
             Spacer(minLength: 6)
 
             if canPlanWorkout {
-                Button(action: openWorkoutComposer) {
+                Button { onPlanWorkout(selection.date) } label: {
                     Label(
                         ATHLTHLocalization.choose(
                             english: hasWorkoutDraft ? "Continue draft" : "Plan new",
