@@ -213,6 +213,15 @@ struct ATHLTHWorkoutStepDetails: View {
                     targetTile(tr("Source superset", "Supersettgruppe"),
                                "\(index)", symbol: "square.stack")
                 }
+                if let choices = block.sourceLoadAlternativesKilograms,
+                   !choices.isEmpty {
+                    targetTile(
+                        tr("Race load options", "Vektalternativer"),
+                        choices.map { String(format: "%g kg", $0) }
+                            .joined(separator: " / "),
+                        symbol: "dumbbell"
+                    )
+                }
                 if let load = block.targetWeightKilograms, load >= 0 {
                     targetTile(tr("Planned weight", "Planlagt vekt"),
                                String(format: "%.1f kg", load),
