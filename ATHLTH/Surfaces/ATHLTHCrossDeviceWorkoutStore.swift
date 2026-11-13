@@ -521,6 +521,14 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 strengthWeightKilograms: watch.strengthWeightKilograms,
                 strengthRestEndsAt: watch.strengthRestEndsAt,
                 audioCoachEnabled: watch.watchAudioCoachEnabled,
+                // Watch workout + Spotify playback on the iPhone are separate
+                // sources. Relay verified iPhone playback only; never claim
+                // to know which track the Watch is playing independently.
+                spotifyPlaying: spotify.isPlaying,
+                spotifyTrackTitle: spotify.isPlaying
+                    ? spotify.watchTrackTitle : nil,
+                spotifyArtistName: spotify.isPlaying
+                    ? spotify.watchArtistName : nil,
                 liveLatitude: {
                     guard let lat = watch.currentLatitude,
                           let lon = watch.currentLongitude,
