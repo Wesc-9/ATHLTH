@@ -150,10 +150,19 @@ struct ATHLTHiPadLiveWorkoutStatusCard: View {
                                     "Forespørselen utløp · Prøv igjen"))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
-                        } else if let error = live.requestError {
+                        }
+                        if let error = live.requestError {
                             Text(error)
                                 .font(.subheadline)
                                 .foregroundStyle(.orange)
+                        }
+                        if live.outgoingRequestState == .pending {
+                            Text(tr(
+                                "If your iPhone is locked, tap the ATHLTH notification or open the app to approve. Nothing is shared until you allow it.",
+                                "Er iPhone låst, trykk på ATHLTH-varselet eller åpne appen for å godkjenne. Ingen treningsdata deles før du tillater det."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
 
                         Button {
