@@ -143,6 +143,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     private let client = SupabaseEnvironment.client
     private var lastPublishedID: UUID?
+    private var lastUnauthorisedCleanupAt: Date?
     private var mirroredStartedAt: Date?
     private var mirroredSessionID: UUID?
     private var lastRemoteExpiry: Date?
@@ -168,6 +169,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     func clearLocalState() {
         remote = nil
         lastPublishedID = nil
+        lastUnauthorisedCleanupAt = nil
         shareNextWorkout = false
         nextWorkoutSharingExpiresAt = nil
         incomingRequest = nil
@@ -471,19 +473,32 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 try await client.from("private_active_workout_status")
                     .upsert(row, onConflict: "user_id")
                     .execute()
+                lastUnauthorisedCleanupAt = nil
                 lastPublishedID = active.id
             } catch {
                 // Never interrupt a locally recorded workout for spectator sync.
             }
-        } else if lastPublishedID != nil {
-            do {
-                try await client.from("private_active_workout_status")
-                    .delete()
-                    .eq("user_id", value: accountID)
-                    .execute()
-                lastPublishedID = nil
-            } catch {
-                // TTL clears an abandoned session when the network returns.
+        } else {
+            // A restarted iPhone may have lost its in-memory consent while
+            // an old network row is still inside its TTL. Clear it even if
+            // lastPublishedID was reset by the restart.
+            let now = Date()
+            let needsCleanup = lastPublishedID != nil ||
+                lastUnauthorisedCleanupAt.map {
+                    now.timeIntervalSince($0) >= 20
+                } ?? true
+            if needsCleanup {
+                lastUnauthorisedCleanupAt = now
+                do {
+                    try await client.from("private_active_workout_status")
+                        .delete()
+                        .eq("user_id", value: accountID)
+                        .execute()
+                    lastPublishedID = nil
+                } catch {
+                    // No fallback ever starts a recording or enables viewing.
+                    // The previous row expires naturally as a final guard.
+                }
             }
         }
     }
