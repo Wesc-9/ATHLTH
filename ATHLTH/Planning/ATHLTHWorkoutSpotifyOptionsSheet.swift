@@ -66,8 +66,14 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
                                         "Choose a song", "Velg en sang"
                                     ))
                                         .foregroundStyle(.primary)
-                                    if let intervalTrack {
-                                        Text("\(intervalTrack.artist) · \(intervalTrack.durationLabel)")
+                                    if let intervalTrack,
+                                       !intervalTrack.artist.isEmpty ||
+                                       intervalTrack.durationMilliseconds > 0 {
+                                        Text([
+                                            intervalTrack.artist,
+                                            intervalTrack.durationMilliseconds > 0
+                                                ? intervalTrack.durationLabel : ""
+                                        ].filter { !$0.isEmpty }.joined(separator: " · "))
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
