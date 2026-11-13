@@ -1026,6 +1026,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var tournamentCalendar: ATHLTHTournamentCalendarStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
@@ -1037,6 +1038,7 @@ struct ATHLTHHomeView: View {
     @State private var lastHomeInitialLoadAt: Date?
     @State private var homeInitialLoadAccountID: UUID?
     @State private var showingHomeTodayCalendarAll = false
+    @State private var showingHomeSocialInbox = false
     @State private var showingHomeCalendarWorkoutPicker = false
     @State private var homeCalendarPendingKind: WorkoutKind?
     @State private var homeCalendarPendingCustom = false
@@ -1180,6 +1182,8 @@ struct ATHLTHHomeView: View {
                             startHomeStandaloneWorkout(workout, device: device)
                         }
                     )
+
+                    homeSocialStatusStrip
 
                     homeDailyRecommendationAndCalendarRow
 
@@ -1481,6 +1485,8 @@ struct ATHLTHHomeView: View {
                     social.refreshHomeFeed(force: true)
                 async let friendsRefresh: Void =
                     social.refreshHomeFriends(force: true)
+                async let socialStatusRefresh: Void =
+                    social.refreshHomeSocialStatus(challengeStore: challenges, force: true)
 
                 if !health.shouldDeferAutomaticHealthWork {
                     _ = await health.refreshWorkoutImportInbox()
@@ -1509,8 +1515,12 @@ struct ATHLTHHomeView: View {
                     communityRefresh,
                     groupRefresh,
                     activityRefresh,
-                    friendsRefresh
+                    friendsRefresh,
+                    socialStatusRefresh
                 )
+            }
+            .sheet(isPresented: $showingHomeSocialInbox) {
+                ATHLTHSideMenuUtilitiesView(destination: .inbox)
             }
             .sheet(item: $selectedHomeRecommendationInfo) { information in
                 HomeDailyRecommendationInfoSheet(info: information)
@@ -1677,6 +1687,8 @@ struct ATHLTHHomeView: View {
                     refreshHomeGroupCalendar()
                 async let activityRefresh: Void = social.refreshHomeFeed()
                 async let friendsRefresh: Void = social.refreshHomeFriends()
+                async let socialStatusRefresh: Void =
+                    social.refreshHomeSocialStatus(challengeStore: challenges)
 
                 guard !health.shouldDeferAutomaticHealthWork else {
                     await loadHomeStreak()
@@ -1684,7 +1696,8 @@ struct ATHLTHHomeView: View {
                         communityRefresh,
                         groupRefresh,
                         activityRefresh,
-                        friendsRefresh
+                        friendsRefresh,
+                        socialStatusRefresh
                     )
                     return
                 }
@@ -1713,7 +1726,8 @@ struct ATHLTHHomeView: View {
                     communityRefresh,
                     groupRefresh,
                     activityRefresh,
-                    friendsRefresh
+                    friendsRefresh,
+                    socialStatusRefresh
                 )
                 guard !Task.isCancelled else { return }
                 homeInitialLoadAccountID = session.profile.userID
@@ -2335,9 +2349,153 @@ struct ATHLTHHomeView: View {
         }
     }
 
-    // Preserve both the recommendation logic and friend data sources.
-    // The recommendation now appears as quiet copy inside the calendar,
-    // while Friends occupies the former recommendation tile.
+    private var homeChallengeInvitationCount: Int {
+        challenges.incomingInvitations(for: session.profile.userID).count
+    }
+
+    private var homeWorkoutInvitationCount: Int {
+        social.workoutInvites.filter { $0.participant.state == .invited }.count
+    }
+
+    private var homeActiveChallenges: [ATHLTHChallenge] {
+        challenges.trainingChallenges(for: session.profile.userID)
+            .filter { $0.status == .active }
+    }
+
+    /// At most one slim status row, so Recent Activity remains the focal feed.
+    private var homeSocialStatusStrip: some View {
+        let invitations = homeChallengeInvitationCount + homeWorkoutInvitationCount
+        let active = homeActiveChallenges
+
+        return Group {
+            if invitations > 0 || !active.isEmpty {
+                HStack(spacing: 0) {
+                    if invitations > 0 {
+                        Button {
+                            showingHomeSocialInbox = true
+                        } label: {
+                            homeSocialStatusCell(
+                                icon: "envelope.badge",
+                                title: ATHLTHLocalization.choose(
+                                    english: invitations == 1 ? "1 invitation" : "\(invitations) invitations",
+                                    norwegian: invitations == 1 ? "1 invitasjon" : "\(invitations) invitasjoner"
+                                ),
+                                detail: homeSocialInvitationKinds
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-home-social-invitations")
+                    }
+
+                    if invitations > 0 && !active.isEmpty {
+                        Rectangle()
+                            .fill(ATHLTHTrainDesign.rule.opacity(0.4))
+                            .frame(width: 1, height: 33)
+                    }
+
+                    if let first = active.first {
+                        NavigationLink {
+                            if active.count == 1 {
+                                ChallengeDetailView(challengeID: first.id)
+                            } else {
+                                ChallengeHubView()
+                            }
+                        } label: {
+                            homeSocialStatusCell(
+                                icon: "trophy",
+                                title: ATHLTHLocalization.choose(
+                                    english: active.count == 1 ? "Active challenge" : "\(active.count) active challenges",
+                                    norwegian: active.count == 1 ? "Aktiv challenge" : "\(active.count) aktive challenges"
+                                ),
+                                detail: active.count == 1
+                                    ? first.title
+                                    : ATHLTHLocalization.choose(
+                                        english: "View all challenges",
+                                        norwegian: "Se alle utfordringene"
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-home-social-active-challenge")
+                    }
+                }
+                .padding(.horizontal, 5)
+                .frame(minHeight: 48)
+                .background(
+                    ATHLTHTrainDesign.paper,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.34), lineWidth: 0.8)
+                }
+                .accessibilityIdentifier("athlth-home-social-status")
+            }
+        }
+    }
+
+    private var homeSocialInvitationKinds: String {
+        let challengeCount = homeChallengeInvitationCount
+        let workoutCount = homeWorkoutInvitationCount
+        if challengeCount > 0 && workoutCount > 0 {
+            return ATHLTHLocalization.choose(
+                english: "Challenge · Train Together",
+                norwegian: "Challenge · Tren sammen"
+            )
+        }
+        return challengeCount > 0
+            ? "Challenge"
+            : ATHLTHLocalization.choose(english: "Train Together", norwegian: "Tren sammen")
+    }
+
+    private func homeSocialStatusCell(
+        icon: String,
+        title: String,
+        detail: String
+    ) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.system(size: 9))
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 7)
+        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private var homeShowsDailyRecommendation: Bool {
+        HomeCalendarRecommendationDisplayPolicy.showsRecommendation(
+            plannedWorkoutCount: HomeTodayCalendarSchedule.workouts(
+                plan: session.activePlan,
+                standalone: session.standalonePlannedSessions
+            ).count,
+            personalEventCount: homeTodayCommunityEvents.count,
+            clubEventCount: homeTodayGroupEvents.count,
+            tournamentCount: tournamentCalendar.events(on: Date()).count
+        )
+    }
+
+    // Keep Friends and Calendar compact to protect Recent Activity space.
+    // The existing recommendation is now a small, tappable Friends footer.
     private var homeDailyRecommendationAndCalendarRow: some View {
         Group {
             if homeDynamicTypeSize.isAccessibilitySize {
@@ -2381,10 +2539,40 @@ struct ATHLTHHomeView: View {
                 }
                 .padding(.top, 7)
             }
+            if homeShowsDailyRecommendation {
+                let advice = homeDailyRecommendation
+                Button {
+                    showHomeDailyRecommendationDetails(advice)
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Today's recommendation",
+                            norwegian: "Dagens anbefaling"
+                        ))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+
+                        Text(advice.shortDescription)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.top, 7)
+                    .overlay(alignment: .top) {
+                        Rectangle()
+                            .fill(ATHLTHTrainDesign.rule.opacity(0.30))
+                            .frame(height: 0.7)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-home-friends-recommendation")
+            }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 158, alignment: .topLeading)
-        .padding(11)
+        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+        .padding(10)
         .background(
             ATHLTHTrainDesign.paper,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -2408,17 +2596,7 @@ struct ATHLTHHomeView: View {
         let clubEvents =
             homeTodayGroupEvents
         let tournamentItems = tournamentCalendar.events(on: Date())
-        // Keep the compact tile the same height while reserving an Arena
-        // slot whenever the athlete has a scheduled competition exercise.
-        // Hide the suggestion when multiple activities are already
-        // scheduled; do not change the underlying coaching recommendation.
-        let showCalendarRecommendation =
-            HomeCalendarRecommendationDisplayPolicy.showsRecommendation(
-                plannedWorkoutCount: todayWorkouts.count,
-                personalEventCount: personalEvents.count,
-                clubEventCount: clubEvents.count,
-                tournamentCount: tournamentItems.count
-            )
+        // Coaching text is now below Friends, never duplicated here.
 
         let visibleWorkoutCount = tournamentItems.isEmpty
             ? min(todayWorkouts.count, 2)
@@ -2638,41 +2816,12 @@ struct ATHLTHHomeView: View {
                 )
             }
 
-            if showCalendarRecommendation {
-                let advice = homeDailyRecommendation
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Today's recommendation",
-                        norwegian: "Dagens anbefaling"
-                    ))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
 
-                    Button {
-                        showHomeDailyRecommendationDetails(advice)
-                    } label: {
-                        Text(advice.shortDescription)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(ATHLTHTrainDesign.secondary)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("athlth-home-calendar-recommendation")
-                }
-                .padding(.top, 8)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(ATHLTHTrainDesign.rule.opacity(0.30))
-                        .frame(height: 0.7)
-                }
-            }
         }
-        .padding(11)
+        .padding(10)
         .frame(
             maxWidth: .infinity,
-            minHeight: 158,
+            minHeight: 148,
             maxHeight: .infinity,
             alignment: .topLeading
         )
