@@ -680,7 +680,7 @@ final class AppSessionStore: ObservableObject {
             GoalStore.removeAccountImagesAfterDeletion(deletedID)
             defaults.removeObject(forKey: AccountLocalStorage.key("training", userID: deletedID))
             defaults.removeObject(forKey: AccountLocalStorage.key("coach", userID: deletedID))
-            for name in ["arenaDrafts", "goals", "goalAccountSyncAcknowledgement", "personalTrainingProfile", "profileRecordDisplayCache", "featuredProfileRecords", "featuredProfileRecordsPending", "strengthHistory", "strengthHistoryBeforeTimedFixV1", "strengthBarDefaultMassV1", "strengthBarExerciseMassV1", "strengthActive", "phoneHistory", "phoneActive", "workoutCompletionImpacts", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt"] {
+            for name in ["arenaDrafts", "goals", "goalAccountSyncAcknowledgement", "personalTrainingProfile", "profileRecordDisplayCache", "featuredProfileRecords", "featuredProfileRecordsPending", "strengthHistory", "strengthHistoryBeforeTimedFixV1", "strengthBarDefaultMassV1", "strengthBarExerciseMassV1", "strengthActive", "phoneHistory", "phoneActive", "workoutCompletionImpacts", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt", "spotifyMusicPresets"] {
                 defaults.removeObject(forKey: AccountLocalStorage.key(name, userID: deletedID))
             }
             AccountLocalStorage.write([RunningWorkoutTemplate](), name: "runningLibrary", userID: deletedID, defaults: defaults)
