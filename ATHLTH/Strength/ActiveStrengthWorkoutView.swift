@@ -9887,7 +9887,7 @@ struct ActiveStrengthWorkoutView: View {
     }
 }
 
-private struct FreestyleExercisePrescriptionView: View {
+struct FreestyleExercisePrescriptionView: View {
     @Environment(\.dismiss) private var dismiss
 
     let entry: ExerciseLibraryEntry
