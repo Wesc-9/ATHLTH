@@ -308,8 +308,12 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
                             weekCard(week, width: width)
 
-                            ATHLTHStudioGhostHomeStatusView().id(session.profile.userID)
-                            ATHLTHStudioStrengthHomeStatusView().id(session.profile.userID)
+                            ATHLTHiPadLiveWorkoutAccessTip()
+                            // Legacy strength/ghost cards were opt-out by
+                            // default and bypassed per-session permission.
+                            // The new read-only full screen is the only
+                            // authorized remote workout surface.
+                            
                             ATHLTHStudioHomeCommunitySummary()
                             progressCard(wide: split, recorded: workouts, week: week)
                         }
