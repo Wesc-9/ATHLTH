@@ -6,7 +6,10 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var playlist: SpotifyPlaylistReference?
     @Binding var autoplay: Bool?
+    @Binding var intervalTrack: ATHLTHSpotifyIntervalTrack?
     @State private var showingPlaylistPicker = false
+    @State private var showingIntervalTrackPicker = false
+    @State private var intervalOptionsExpanded = false
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -43,7 +46,71 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
                     )
                     .disabled(playlist == nil)
                     .tint(ATHLTHTrainDesign.bronze)
-                } footer: {
+                }
+
+                // Collapsed by default. Most users need nothing beyond their
+                // normal linked playlist and will never see another prompt.
+                Section {
+                    DisclosureGroup(
+                        isExpanded: $intervalOptionsExpanded
+                    ) {
+                        Button {
+                            showingIntervalTrackPicker = true
+                        } label: {
+                            HStack(spacing: 9) {
+                                Image(systemName: "music.note")
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(intervalTrack?.title ?? tr(
+                                        "Choose a song", "Velg en sang"
+                                    ))
+                                        .foregroundStyle(.primary)
+                                    if let intervalTrack {
+                                        Text("\(intervalTrack.artist) · \(intervalTrack.durationLabel)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        if intervalTrack != nil {
+                            Button(tr("Remove interval song", "Fjern intervallsang")) {
+                                intervalTrack = nil
+                            }
+                            .font(.subheadline)
+                        }
+                        Text(tr(
+                            "Optional: start your favorite song from 0:00 for each work interval on iPhone. Spotify may start slightly late. Watch playback is unchanged.",
+                            "Valgfritt: start favorittsangen fra 0:00 på hvert arbeidsdrag på iPhone. Spotify kan starte litt forsinket. Avspilling på Apple Watch endres ikke."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    } label: {
+                        HStack {
+                            Label(
+                                tr("Song for intervals", "Sang på drag"),
+                                systemImage: "waveform"
+                            )
+                            Spacer()
+                            if !intervalOptionsExpanded {
+                                Text(intervalTrack == nil
+                                     ? tr("Off", "Av")
+                                     : tr("Selected", "Valgt"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text(tr("Optional", "Valgfritt"))
+                }
+
+                Section {
                     VStack(alignment: .leading, spacing: 7) {
                         Text(tr(
                             "Your playlist is saved with this workout. On iPhone it can play when the workout starts.",
@@ -70,6 +137,9 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
                     title: tr("Workout playlist", "Spilleliste for økten"),
                     selection: $playlist
                 )
+            }
+            .sheet(isPresented: $showingIntervalTrackPicker) {
+                ATHLTHSpotifyIntervalTrackPicker(selection: $intervalTrack)
             }
             .onChange(of: playlist?.id) { oldID, newID in
                 if newID == nil && oldID != nil { autoplay = false }
