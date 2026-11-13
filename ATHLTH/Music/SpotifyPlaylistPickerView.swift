@@ -148,7 +148,13 @@ struct SpotifyPlaylistPickerView: View {
                                 await spotify.refreshPlaylists()
                             }
                         } label: {
-                            Image(systemName: "arrow.clockwise")
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Refresh playlists",
+                                    norwegian: "Oppdater spillelister"
+                                ),
+                                systemImage: "arrow.clockwise"
+                            )
                         }
                         .disabled(spotify.isRefreshingPlaylists)
                     }
