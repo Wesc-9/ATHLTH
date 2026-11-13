@@ -2943,6 +2943,9 @@ private struct HomeWeeklyProgressDaySheet: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @Environment(\.scenePhase) private var scenePhase
+    @SceneStorage("athlth.home.daySheet.completedWorkoutID")
+    private var persistedCompletedWorkoutID = ""
+    @State private var completedWorkoutPath: [UUID] = []
     @State private var suspendedEditor = false
     @State private var suspendedAt: Date?
 
@@ -3200,7 +3203,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $completedWorkoutPath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 13) {
                     Text(selection.date.formatted(
@@ -3249,6 +3252,21 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             .background(dayCanvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: UUID.self) { workoutID in
+                if let workout = selection.actual.first(where: { $0.id == workoutID }) {
+                    completedWorkoutDestination(workout)
+                        .onAppear(perform: onOpenWorkout)
+                }
+            }
+            .onAppear {
+                restoreCompletedWorkoutIfNeeded()
+            }
+            .onChange(of: completedWorkoutPath) { _, next in
+                if scenePhase == .active {
+                    persistedCompletedWorkoutID = next.last?.uuidString ?? ""
+                }
+            }
+
             .sheet(isPresented: $showingRemoveConfirmation, onDismiss: {
                 workoutPendingRemoval = nil
             }) {
@@ -3347,11 +3365,15 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
+                    if let id = completedWorkoutPath.last {
+                        persistedCompletedWorkoutID = id.uuidString
+                    }
                     if suspendedAt == nil {
                         suspendedAt = Date()
                         suspendedEditor = showingStandaloneSessionEditor
                     }
                 } else {
+                    restoreCompletedWorkoutIfNeeded()
                     if suspendedAt.map({ Date().timeIntervalSince($0) < 300 }) == true,
                        suspendedEditor {
                         showingStandaloneSessionEditor = true
@@ -3470,6 +3492,15 @@ private struct HomeWeeklyProgressDaySheet: View {
                 session.syncApprovedSharedWorkouts(from: messaging.recentMessages)
             }
         }
+    }
+
+    private func restoreCompletedWorkoutIfNeeded() {
+        guard completedWorkoutPath.isEmpty,
+              let id = UUID(uuidString: persistedCompletedWorkoutID),
+              selection.actual.contains(where: { $0.id == id })
+        else { return }
+        completedWorkoutPath = [id]
+        onOpenWorkout()
     }
 
     /// Today's plan is a fixed section, not a mode. A single explicit
@@ -3829,10 +3860,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     english: "Completed workouts", norwegian: "Utførte økter"
                 ))
                 ForEach(selection.actual) { workout in
-                    NavigationLink {
-                        completedWorkoutDestination(workout)
-                            .onAppear(perform: onOpenWorkout)
-                    } label: {
+                    NavigationLink(value: workout.id) {
                         actualRow(workout)
                     }
                     .buttonStyle(.plain)
