@@ -1467,6 +1467,7 @@ private struct ATHLTHRunQuickStartPlanPreview: View {
 }
 
 struct RunQuickStartSheet: View {
+    @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
@@ -1483,6 +1484,7 @@ struct RunQuickStartSheet: View {
     let onStart: (RunQuickStartConfiguration) async -> String?
     @State private var launchInProgress = false
     @State private var launchFailure: String?
+    @State private var shareThisWorkoutOnIPad = false
 
     @State private var mode: RunQuickStartMode
     @State private var routeWarmup = ATHLTHRouteWarmupConfiguration.disabled
@@ -2594,7 +2596,7 @@ struct RunQuickStartSheet: View {
                 .font(.caption)
                 .padding(.horizontal, 12)
             }
-            ATHLTHLiveWorkoutPrestartToggle()
+            ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
                 .padding(.horizontal, 12)
             ATHLTHQuickRunStartFooter(
                 watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
@@ -2949,11 +2951,13 @@ struct RunQuickStartSheet: View {
             } : nil
         configuration.routeWarmup = mode == .route ? routeWarmup : .disabled
         configuration.ghostPacingStrategy = ghostDraft.pacingStrategy
+        liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
         launchInProgress = true
         Task { @MainActor in
             let failure = await onStart(configuration)
             launchInProgress = false
             if let failure {
+                liveSharing.prepareOneWorkoutSharing(false)
                 launchFailure = failure
             } else {
                 dismiss()
@@ -3463,6 +3467,7 @@ struct RunQuickStartSheet: View {
 }
 
 struct WalkQuickStartSheet: View {
+    @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
@@ -3475,6 +3480,7 @@ struct WalkQuickStartSheet: View {
     let watchConnected: Bool
     var plannedSession: PlannedSession? = nil
     let onStart: (WalkQuickStartConfiguration) async -> String?
+    @State private var shareThisWorkoutOnIPad = false
     @State private var launchInProgress = false
     @State private var launchFailure: String?
 
@@ -3732,7 +3738,7 @@ struct WalkQuickStartSheet: View {
                         .font(.caption)
                         .padding(.horizontal, 18)
                     }
-                    ATHLTHLiveWorkoutPrestartToggle()
+                    ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
                         .padding(.horizontal, 14)
                     ATHLTHQuickStartDeviceLaunchBar(
                     watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
@@ -3845,11 +3851,13 @@ struct WalkQuickStartSheet: View {
                 gearIDs: selectedGearIDs
             )
         configuration.petIDs = selectedPetIDs
+        liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
         launchInProgress = true
         Task { @MainActor in
             let failure = await onStart(configuration)
             launchInProgress = false
             if let failure {
+                liveSharing.prepareOneWorkoutSharing(false)
                 launchFailure = failure
             } else {
                 dismiss()
@@ -3900,11 +3908,13 @@ private struct ATHLTHQuickWatchLaunchNotice: View {
 }
 
 struct StrengthQuickStartSheet: View {
+    @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
 
     let onChoose: (PlannedSession) -> Void
     @State private var draftID = UUID()
+    @State private var shareThisWorkoutOnIPad = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 10),
@@ -3932,7 +3942,7 @@ struct StrengthQuickStartSheet: View {
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                     }
 
-                    ATHLTHLiveWorkoutPrestartToggle()
+                    ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
 
                     ATHLTHBasicActivityHero(
                         title: ATHLTHLocalization.choose(
@@ -4089,6 +4099,7 @@ struct StrengthQuickStartSheet: View {
     }
 
     private func beginWorkout(_ workout: PlannedSession) {
+        liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
         social.prepareQuickTrainFriendsForLaunch()
         onChoose(workout)
         dismiss()
