@@ -61,6 +61,55 @@ final class ATHLTHSideMenuLayoutPolicyTests: XCTestCase {
             )
         )
     }
+
+    func testInteractiveCloseTracksOnlyHorizontalLeftSwipes() {
+        XCTAssertEqual(
+            ATHLTHSideMenuLayoutPolicy.interactiveOffset(
+                for: CGSize(width: -55, height: 6)
+            ),
+            -55
+        )
+        XCTAssertEqual(
+            ATHLTHSideMenuLayoutPolicy.interactiveOffset(
+                for: CGSize(width: -55, height: 80)
+            ),
+            0
+        )
+        XCTAssertEqual(
+            ATHLTHSideMenuLayoutPolicy.interactiveOffset(
+                for: CGSize(width: 85, height: 0)
+            ),
+            0
+        )
+    }
+
+    func testBadgePolicyDeduplicatesImportedChallengeInvites() {
+        let counts = ATHLTHSideMenuBadgePolicy.counts(
+            messageUnread: 3,
+            messageRequests: 1,
+            backendChallengeInvites: 2,
+            importedChallengeInvites: 1,
+            notificationUnread: 4,
+            pendingWorkoutImports: 2
+        )
+        XCTAssertEqual(counts.inbox, 5)
+        XCTAssertEqual(counts.notifications, 6)
+        XCTAssertEqual(counts.total, 11)
+    }
+
+    func testBadgePolicyNeverProducesNegativeCounts() {
+        let counts = ATHLTHSideMenuBadgePolicy.counts(
+            messageUnread: 0,
+            messageRequests: 0,
+            backendChallengeInvites: 1,
+            importedChallengeInvites: 3,
+            notificationUnread: 0,
+            pendingWorkoutImports: 0
+        )
+        XCTAssertEqual(counts.inbox, 0)
+        XCTAssertEqual(counts.notifications, 0)
+        XCTAssertEqual(counts.total, 0)
+    }
 }
 
 final class ATHLTHStudioInboxPanelGesturePolicyTests: XCTestCase {
