@@ -10,6 +10,7 @@ struct ATHLTHSpotifyIntervalTrack: Identifiable, Codable, Hashable {
 
     var uri: String { "spotify:track:\(id)" }
     var durationLabel: String {
+        guard durationMilliseconds > 0 else { return "—" }
         let seconds = max(0, durationMilliseconds / 1_000)
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
