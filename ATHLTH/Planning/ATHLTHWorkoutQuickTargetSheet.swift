@@ -265,7 +265,9 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        // The pace-by-step editor must open at a stable readable height.
+        // Avoid an intermediate half-sheet layout for long interval recipes.
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .accessibilityIdentifier("athlth-quick-goal-sheet")
         .onAppear {
