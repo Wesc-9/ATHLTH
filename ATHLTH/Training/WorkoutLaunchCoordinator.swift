@@ -324,6 +324,8 @@ struct PlannedWorkoutWatchBuilder {
                 targetPaceMinSecondsPerKilometer: pace,
                 targetPaceMaxSecondsPerKilometer: pace,
                 phase: phase, targetHeartRateZone: block.targetHeartRateZone,
+                targetHeartRatePercentMin: block.targetHeartRatePercentMin,
+                targetHeartRatePercentMax: block.targetHeartRatePercentMax,
                 targetTreadmillInclinePercent:
                     block.isIndoor == true ? block.treadmillInclinePercent : nil,
                 coachBrief: phase == "work" ? block.notes : nil,
