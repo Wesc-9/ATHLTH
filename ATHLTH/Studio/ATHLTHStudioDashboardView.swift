@@ -170,7 +170,7 @@ struct ATHLTHStudioDashboardView: View {
                     }
 
                     weekCard(currentWeek, width: geometry.size.width)
-                    ATHLTHiPadLiveWorkoutAccessTip()
+                    ATHLTHiPadLiveWorkoutStatusCard()
 
                     if wide {
                         HStack(alignment: .top, spacing: 15) {
