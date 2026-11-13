@@ -1370,18 +1370,29 @@ struct HomePersonalRecentActivitySection:
                     NavigationLink {
                         ATHLTHProfileView()
                     } label: {
-                        Label(
-                            session.profile.displayName.isEmpty
-                                ? ATHLTHLocalization.choose(
-                                    english: "My activity", norwegian: "Min aktivitet"
-                                  )
-                                : session.profile.displayName,
-                            systemImage: "person.crop.circle"
-                        )
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(
+                                session.profile.username.isEmpty
+                                    ? (session.profile.displayName.isEmpty
+                                        ? ATHLTHLocalization.choose(
+                                            english: "My activity",
+                                            norwegian: "Min aktivitet"
+                                        )
+                                        : session.profile.displayName)
+                                    : "@\(session.profile.username)",
+                                systemImage: "person.crop.circle"
+                            )
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            if !session.profile.username.isEmpty &&
+                                !session.profile.displayName.isEmpty {
+                                Text(session.profile.displayName)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
 
@@ -1464,11 +1475,21 @@ struct HomePersonalRecentActivitySection:
                     } label: {
                         HStack(spacing: 9) {
                             SocialAvatar(profile: feedItem.actor, size: 32)
-                            Text(feedItem.actor.resolvedName)
-                                .font(.system(size: 17, weight: .bold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(feedItem.actor.usernameLabel.isEmpty
+                                     ? feedItem.actor.resolvedName
+                                     : feedItem.actor.usernameLabel)
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                if !feedItem.actor.usernameLabel.isEmpty {
+                                    Text(feedItem.actor.resolvedName)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .lineLimit(1)
+                                }
+                            }
                             Spacer(minLength: 0)
                         }
                     }
