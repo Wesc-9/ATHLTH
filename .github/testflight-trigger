@@ -238,3 +238,5 @@ ATHLTH 2.1.9 build 127 – authorized TestFlight release, 2026-11-13, full iPad 
 ATHLTH 2.1.9 build 127 – retry after fixing immutable live snapshot XCTest fixture, 2026-11-13
 
 ATHLTH 2.1.9 build 127 – TestFlight retry: fixed racy watchOS Info.plist build script – 2026-11-13
+
+ATHLTH 2.1.9 build 127 – retry: fixed optional Bool XCTest assertion in Quick Run timeline adapter – 2026-11-13
