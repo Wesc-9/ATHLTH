@@ -114,6 +114,9 @@ struct ProductRootTabView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var selectedTab: Int
+    @SceneStorage("athlth.root.openTab") private var persistedSelectedTab = 0
+    @SceneStorage("athlth.root.openTabAccount") private var persistedTabAccount = ""
+    @State private var hasRestoredSelectedTab = false
     @State private var trainNavigationRequest:
         ATHLTHTrainNavigationRequest?
     @State private var showingDailyCheckInFromNotification = false
@@ -351,6 +354,19 @@ struct ProductRootTabView: View {
         )) { notification in
             handleFriendQuickShareSuccess(notification)
         }
+        .onAppear {
+            guard !hasRestoredSelectedTab else { return }
+            hasRestoredSelectedTab = true
+            let isCompatibilityPreview = ProcessInfo.processInfo.arguments.contains {
+                $0.hasPrefix("--athlth-compatibility-tab=")
+            }
+            if !isCompatibilityPreview,
+               session.signedIn,
+               persistedTabAccount == session.profile.userID.uuidString,
+               (0...4).contains(persistedSelectedTab) {
+                selectedTab = persistedSelectedTab
+            }
+        }
         .task {
             updateDailyCheckInReminder()
             updateBodyGoalCheckInReminders()
@@ -363,6 +379,10 @@ struct ProductRootTabView: View {
             openPendingDailyCheckInIfNeeded()
         }
         .onChange(of: selectedTab) { previous, next in
+            if session.signedIn {
+                persistedSelectedTab = next
+                persistedTabAccount = session.profile.userID.uuidString
+            }
             // Instruments signposts let us correlate a perceived tab stall
             // with HealthKit, MapKit and Community refreshes on a real device.
             switch next {
