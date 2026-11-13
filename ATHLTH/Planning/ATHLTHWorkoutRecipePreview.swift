@@ -60,6 +60,172 @@ enum ATHLTHWorkoutStepCopy {
     }
 }
 
+/// Presentation-only grouping over the canonical WorkoutTemplateBlock timeline.
+/// Used by both Quick Train/library previews and the shared plan/quick editor.
+/// Never edits, expands, reorders or rewrites a user's saved training prescription.
+enum ATHLTHSimpleWorkoutOutline {
+    struct Item: Identifiable {
+        let id: Int
+        let title: String
+        let detail: String
+        let symbol: String
+        let repetitions: Int
+        let representedSteps: Int
+    }
+
+    struct Stage: Identifiable {
+        let id: Int
+        let phase: WorkoutPhaseKind
+        let sourceStepCount: Int
+        let plannedSeconds: TimeInterval?
+        let items: [Item]
+    }
+
+    private struct IndexedBlock {
+        let index: Int
+        let block: WorkoutTemplateBlock
+    }
+
+    /// Recovery belongs to the preceding main exercise for display only.
+    /// The source retains its actual recovery phase and execution sequence.
+    static func stages(for blocks: [WorkoutTemplateBlock]) -> [Stage] {
+        var groups: [(phase: WorkoutPhaseKind, steps: [IndexedBlock])] = []
+        var lastWorkPhase: WorkoutPhaseKind = .main
+        for (index, block) in blocks.enumerated() {
+            let phase: WorkoutPhaseKind
+            if block.resolvedPhase == .recovery {
+                phase = lastWorkPhase
+            } else {
+                phase = block.resolvedPhase
+                lastWorkPhase = phase
+            }
+            if let last = groups.indices.last, groups[last].phase == phase {
+                groups[last].steps.append(.init(index: index, block: block))
+            } else {
+                groups.append((phase: phase, steps: [.init(index: index, block: block)]))
+            }
+        }
+        return groups.map { group in
+            let times = group.steps.map { $0.block.durationSeconds }
+            let sum = times.compactMap { $0 }.filter { $0 > 0 }.reduce(0, +)
+            return Stage(
+                id: group.steps[0].index,
+                phase: group.phase,
+                sourceStepCount: group.steps.count,
+                plannedSeconds: sum > 0 ? sum : nil,
+                items: compactItems(group.steps)
+            )
+        }
+    }
+
+    private static func compactItems(_ steps: [IndexedBlock]) -> [Item] {
+        var result: [Item] = []
+        var cursor = 0
+        while cursor < steps.count {
+            let work = steps[cursor]
+            let recovery = cursor + 1 < steps.count &&
+                isRecovery(steps[cursor + 1].block)
+                ? steps[cursor + 1] : nil
+            let pairSize = recovery == nil ? 1 : 2
+            var count = 1
+            var consumed = pairSize
+
+            // Collapse repeated *identical* work/recovery pairs. Different
+            // targets, durations or individual variations remain distinct.
+            if !isRecovery(work.block) {
+                while cursor + consumed < steps.count {
+                    let next = steps[cursor + consumed].block
+                    guard samePrescription(work.block, next) else { break }
+                    if let recovery {
+                        let nextRest = cursor + consumed + 1
+                        if nextRest < steps.count &&
+                            samePrescription(recovery.block, steps[nextRest].block) {
+                            consumed += 2
+                        } else if nextRest == steps.count {
+                            // Final effort may intentionally omit its recovery.
+                            consumed += 1
+                        } else {
+                            break
+                        }
+                    } else {
+                        consumed += 1
+                    }
+                    count += 1
+                }
+            }
+
+            let workText = work.block.durationSeconds.map {
+                ATHLTHWorkoutStepCopy.duration($0)
+            } ?? work.block.targetText ?? ""
+            let recoveryText = recovery?.block.durationSeconds.map {
+                ATHLTHWorkoutStepCopy.duration($0)
+            } ?? recovery?.block.targetText
+
+            let detail: String
+            if let recoveryText {
+                detail = ATHLTHLocalization.choose(
+                    english: "\(workText) work · \(recoveryText) recovery",
+                    norwegian: "\(workText) arbeid · \(recoveryText) pause"
+                )
+            } else {
+                detail = workText
+            }
+            let itemTitle = conciseTitle(work.block.title)
+            let displayTitle = count > 1 ? "\(count) × \(itemTitle)" : itemTitle
+            result.append(Item(
+                id: work.index,
+                title: displayTitle,
+                detail: detail,
+                symbol: work.block.kind.systemImage,
+                repetitions: count,
+                representedSteps: consumed
+            ))
+            cursor += consumed
+        }
+        return result
+    }
+
+    private static func isRecovery(_ block: WorkoutTemplateBlock) -> Bool {
+        block.kind == .rest || block.resolvedPhase == .recovery
+    }
+
+    /// Drop only sequence numbers appended by imported interval previews.
+    private static func conciseTitle(_ value: String) -> String {
+        let parts = value.components(separatedBy: " · ")
+        guard let last = parts.last,
+              last.contains("/"),
+              last.split(separator: "/").count == 2,
+              last.split(separator: "/").allSatisfy({
+                  Int($0.trimmingCharacters(in: .whitespaces)) != nil
+              })
+        else { return value }
+        return parts.dropLast().joined(separator: " · ")
+    }
+
+    private static func samePrescription(
+        _ a: WorkoutTemplateBlock,
+        _ b: WorkoutTemplateBlock
+    ) -> Bool {
+        conciseTitle(a.title) == conciseTitle(b.title) &&
+            a.kind == b.kind &&
+            a.resolvedPhase == b.resolvedPhase &&
+            a.durationSeconds == b.durationSeconds &&
+            a.distanceMeters == b.distanceMeters &&
+            a.repetitions == b.repetitions &&
+            a.setCount == b.setCount &&
+            a.targetPaceSecondsPerKilometer == b.targetPaceSecondsPerKilometer &&
+            a.targetHeartRateZone == b.targetHeartRateZone &&
+            a.targetWeightKilograms == b.targetWeightKilograms &&
+            a.treadmillInclinePercent == b.treadmillInclinePercent &&
+            a.targetEffortRPE == b.targetEffortRPE &&
+            a.notes == b.notes &&
+            a.groupID == b.groupID &&
+            a.groupKind == b.groupKind &&
+            a.cardioActivity == b.cardioActivity &&
+            a.isIndoor == b.isIndoor
+    }
+}
+
 /// Read-only workout presentation shared by running, strength and hybrid
 /// recipes. It uses the same light plan tokens and phase-oriented timeline as
 /// WorkoutTemplateBuilderView, without exposing editing controls by accident.
@@ -129,7 +295,11 @@ struct ATHLTHWorkoutRecipePreview: View {
                 ))
             }
             modeControl
-            expandableOutline
+            if advanced {
+                expandableOutline
+            } else {
+                simpleOutline
+            }
         }
         .sheet(item: $editingStep) { item in
             ATHLTHWorkoutStepEditor(block: item.block) { updated in
@@ -297,6 +467,84 @@ struct ATHLTHWorkoutRecipePreview: View {
                 "Velg en enkel oversikt eller alle treningsdetaljene."
             ))
         }
+    }
+
+    /// A quick understanding of WHAT to do, not 26 individual settings.
+    /// Changing to Advanced shows the unchanged original step-by-step recipe.
+    private var simpleOutline: some View {
+        let stages = ATHLTHSimpleWorkoutOutline.stages(for: blocks)
+        return VStack(alignment: .leading, spacing: 11) {
+            if !stages.isEmpty {
+                Text(tr("This is your workout", "Dette skal du gjøre"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+            }
+
+            ForEach(stages) { stage in
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 9) {
+                        Image(systemName: stage.phase.symbol)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(recipeTint)
+                            .frame(width: 34, height: 34)
+                            .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                        Text(stage.phase.title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Spacer(minLength: 4)
+                        if let seconds = stage.plannedSeconds {
+                            Text(ATHLTHWorkoutDurationEstimator.conciseDuration(seconds))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .monospacedDigit()
+                        }
+                    }
+
+                    ForEach(Array(stage.items.prefix(3))) { item in
+                        HStack(spacing: 9) {
+                            Image(systemName: item.symbol)
+                                .font(.system(size: 14))
+                                .foregroundStyle(recipeTint)
+                                .frame(width: 22)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                if !item.detail.isEmpty {
+                                    Text(item.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .combine)
+                    }
+
+                    if stage.items.count > 3 {
+                        Text(tr(
+                            "\(stage.items.count - 3) more variations in Advanced",
+                            "\(stage.items.count - 3) flere varianter i Avansert"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(recipeTint)
+                    }
+                }
+                .padding(15)
+                .athlthPlanCard(radius: 19)
+            }
+
+            if onUpdateBlock != nil && !stages.isEmpty {
+                Text(tr(
+                    "Need to change pace, rests or individual steps? Choose Advanced above.",
+                    "Vil du endre tempo, pauser eller enkeltdrag? Velg Avansert over."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
+        .accessibilityIdentifier("athlth-simple-workout-outline")
     }
 
     /// Existing library recipes stay in their original warm-up/main/cool-down
