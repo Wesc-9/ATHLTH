@@ -180,6 +180,11 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     private var hasRequestedOnDemandRemoteControls = false
     private var connectingForRemoteControl = false
     private var workoutAutoplayGate = SpotifyWorkoutAutoplayGate()
+    private var intervalTrack: ATHLTHSpotifyIntervalTrack?
+    private var intervalTrackWorkoutID: UUID?
+    private var intervalTrackPlayedStepIndexes = Set<Int>()
+    private var intervalTrackGeneration = UUID()
+    private var intervalCueObserver: NSObjectProtocol?
     private var pkceSession: SpotifyPKCESession?
     private var webAuthenticationSession: ASWebAuthenticationSession?
     private var pkceCodeVerifier: String?
@@ -310,6 +315,21 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     override init() {
         super.init()
 
+        // The iPhone recorder emits a cue only when its authoritative
+        // running engine moves into an actual work step. No music timer.
+        intervalCueObserver = NotificationCenter.default.addObserver(
+            forName: Notification.Name("athlth.spotifyRunEffortBegan"),
+            object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let workoutID = notification.userInfo?["workoutID"] as? UUID,
+                  let stepIndex = notification.userInfo?["stepIndex"] as? Int
+            else { return }
+            Task { @MainActor [weak self] in
+                await self?.playIntervalTrack(workoutID: workoutID,
+                                              stepIndex: stepIndex)
+            }
+        }
+
         guard isConfigured else {
             connectionState = .unavailable
             return
@@ -368,6 +388,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func disconnect() {
+        prepareIntervalTrack(nil, workoutID: nil)
         hasRequestedOnDemandRemoteControls = false
         connectingForRemoteControl = false
         workoutAutoplayGate.end()
@@ -494,6 +515,111 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         }
     }
 
+    /// One optional track, repeated from the beginning for each work step.
+    /// Never writes a configuration back into the running engine.
+    func prepareIntervalTrack(
+        _ track: ATHLTHSpotifyIntervalTrack?, workoutID: UUID?
+    ) {
+        intervalTrack = track
+        intervalTrackWorkoutID = track == nil ? nil : workoutID
+        intervalTrackPlayedStepIndexes.removeAll()
+        intervalTrackGeneration = UUID()
+    }
+
+    func playIntervalTrack(workoutID: UUID, stepIndex: Int) async {
+        guard intervalTrackWorkoutID == workoutID,
+              let track = intervalTrack,
+              ATHLTHSpotifyIntervalCuePolicy.shouldPlay(
+                phase: "work", stepIndex: stepIndex,
+                previouslyPlayed: intervalTrackPlayedStepIndexes,
+                manuallyPaused: workoutAutoplayGate.wasManuallyPaused
+              ) else { return }
+        let generation = intervalTrackGeneration
+
+        // iPhone-only App Remote. Do not use Spotify Connect as fallback:
+        // that could switch playback to an old speaker or another person's device.
+        guard await connectAppRemoteForControls(),
+              let playerAPI = appRemote?.playerAPI,
+              intervalTrackWorkoutID == workoutID,
+              generation == intervalTrackGeneration,
+              !workoutAutoplayGate.wasManuallyPaused
+        else { return }
+
+        // Mark before the asynchronous callback so one drag is never
+        // restarted by duplicated GPS/timer state changes or foregrounding.
+        intervalTrackPlayedStepIndexes.insert(stepIndex)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            playerAPI.play(track.uri) { [weak self] _, error in
+                Task { @MainActor in
+                    if let self,
+                       self.intervalTrackWorkoutID == workoutID,
+                       self.intervalTrackGeneration == generation {
+                        if let error {
+                            self.lastErrorMessage = error.localizedDescription
+                        } else {
+                            self.lastErrorMessage = nil
+                            self.isPlaying = true
+                            self.watchTrackTitle = track.title
+                            self.watchArtistName = track.artist
+                            self.lastStartedAt = Date()
+                        }
+                    }
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    /// Search is explicitly opened from the Spotify sheet; no background
+    /// suggestions, automatic prompts, or extra OAuth permissions.
+    func searchIntervalTracks(_ query: String) async throws -> [ATHLTHSpotifyIntervalTrack] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else { return [] }
+        guard let token = await accessTokenForRequest() else {
+            throw SpotifyPlaybackError.authorizationExpired
+        }
+        var components = URLComponents(string: "https://api.spotify.com/v1/search")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: trimmed),
+            URLQueryItem(name: "type", value: "track"),
+            URLQueryItem(name: "limit", value: "12")
+        ]
+        guard let url = components?.url else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+        let page: SpotifyIntervalTrackSearchResponse = try await requestSpotifyJSON(
+            url: url, token: token
+        )
+        return page.tracks.items.map { $0.asIntervalTrack }
+    }
+
+    func resolveIntervalTrackLink(_ link: String) async throws -> ATHLTHSpotifyIntervalTrack {
+        guard let id = ATHLTHSpotifyIntervalCuePolicy.validSpotifyTrackID(link),
+              let token = await accessTokenForRequest(),
+              let url = URL(string: "https://api.spotify.com/v1/tracks/\(id)")
+        else { throw SpotifyPlaybackError.invalidResponse }
+        let track: SpotifyIntervalTrackSearchResponse.Track = try await requestSpotifyJSON(
+            url: url, token: token
+        )
+        return track.asIntervalTrack
+    }
+
+    private func requestSpotifyJSON<T: Decodable>(
+        url: URL, token: String
+    ) async throws -> T {
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+        if http.statusCode == 401 { throw SpotifyPlaybackError.authorizationExpired }
+        guard (200..<300).contains(http.statusCode) else {
+            throw SpotifyPlaybackError.httpStatus(http.statusCode)
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
     func startLinkedPlaylist(
         _ playlist: SpotifyPlaylistReference,
         settings: AppSettingsStore,
@@ -588,6 +714,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func endLinkedWorkoutPlaybackSession() {
+        prepareIntervalTrack(nil, workoutID: nil)
         // End the request and stop automatic reconnects. Leave the music
         // untouched: the athlete may want it to continue after training.
         workoutAutoplayGate.end()
@@ -1740,6 +1867,32 @@ extension SpotifyPlaybackStore: SPTAppRemoteDelegate {
             }
         }
     }
+}
+
+private struct SpotifyIntervalTrackSearchResponse: Decodable {
+    struct Track: Decodable {
+        struct Artist: Decodable { let name: String }
+
+        let id: String
+        let name: String
+        let durationMilliseconds: Int
+        let artists: [Artist]
+
+        enum CodingKeys: String, CodingKey {
+            case id, name, artists
+            case durationMilliseconds = "duration_ms"
+        }
+
+        var asIntervalTrack: ATHLTHSpotifyIntervalTrack {
+            ATHLTHSpotifyIntervalTrack(
+                id: id, title: name,
+                artist: artists.map(\.name).joined(separator: ", "),
+                durationMilliseconds: durationMilliseconds
+            )
+        }
+    }
+    struct Tracks: Decodable { let items: [Track] }
+    let tracks: Tracks
 }
 
 private struct SpotifyPlaylistPage: Decodable {
