@@ -383,7 +383,16 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             // iPhone only relays a private summary to the signed-in iPad.
             let startedAt = watch.startedAt ??
                 watch.capturedAt.addingTimeInterval(-watch.confirmedActiveDuration)
-            if mirroredStartedAt != startedAt || mirroredSessionID == nil {
+            // A Watch snapshot without startedAt may yield a slightly
+            // different inferred start every poll. That is not a new
+            // workout; rotating the ID would accidentally revoke this
+            // session's one-time iPad approval.
+            let isNewWatchSession: Bool = {
+                guard let previous = mirroredStartedAt else { return true }
+                if watch.startedAt != nil { return previous != startedAt }
+                return abs(previous.timeIntervalSince(startedAt)) > 5
+            }()
+            if isNewWatchSession || mirroredSessionID == nil {
                 mirroredStartedAt = startedAt
                 mirroredSessionID = UUID()
             }
