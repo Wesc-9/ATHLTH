@@ -918,6 +918,7 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     @State private var showingPersonalizationQuestion = false
+    @State private var pendingQuickGoalDecision: ATHLTHWorkoutGoalSheetDecision?
     @State private var showingCatalogPersonalization = false
     @State private var showingRunningPersonalization = false
     @State private var catalogPersonalBlocks: [WorkoutTemplateBlock] = []
@@ -1033,6 +1034,53 @@ struct WorkoutTemplateLibraryView: View {
         }
         pendingCatalogAddition = nil
         pendingRunningAddition = nil
+    }
+
+    /// A first-use selection may provide one small target or explicitly none.
+    /// Apply it to a private copy, never to the original catalogue model.
+    private func addFirstWorkout(with goal: ATHLTHWorkoutQuickTarget) {
+        guard goal != .none else {
+            saveFirstAdditionWithoutTargets()
+            return
+        }
+
+        if let entry = pendingCatalogAddition {
+            let clean = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+            addCatalogToPlan(
+                entry,
+                blocks: ATHLTHWorkoutQuickGoalApplier.apply(goal, to: clean)
+            )
+        } else if let source = pendingRunningAddition {
+            // duplicate(...) creates the account-scoped, unpersonalized copy.
+            let copy = runningLibrary.duplicate(source)
+            let customized = ATHLTHWorkoutQuickGoalApplier.apply(goal, to: copy)
+            runningLibrary.save(customized)
+            onSelectPlanned?(customized.plannedSession())
+        }
+        pendingCatalogAddition = nil
+        pendingRunningAddition = nil
+    }
+
+    /// Avoid showing a second sheet while the goal sheet is still closing.
+    private func finishQuickGoalSelectionAfterDismissal() {
+        let decision = pendingQuickGoalDecision
+        pendingQuickGoalDecision = nil
+
+        switch decision {
+        case .continueWith(let goal):
+            addFirstWorkout(with: goal)
+        case .advanced:
+            if let entry = pendingCatalogAddition {
+                catalogPersonalBlocks =
+                    ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+                showingCatalogPersonalization = true
+            } else if pendingRunningAddition != nil {
+                showingRunningPersonalization = true
+            }
+        case .cancel, .none:
+            pendingCatalogAddition = nil
+            pendingRunningAddition = nil
+        }
     }
 
     private let strengthFocuses = [
@@ -2010,42 +2058,35 @@ struct WorkoutTemplateLibraryView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Set personal workout targets now?",
-                norwegian: "Vil du legge inn personlige øktmål nå?"
-            ),
+        .sheet(
             isPresented: $showingPersonalizationQuestion,
-            titleVisibility: .visible
+            onDismiss: finishQuickGoalSelectionAfterDismissal
         ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Customize in Advanced", norwegian: "Tilpass i Avansert"
-            )) {
-                if let entry = pendingCatalogAddition {
-                    catalogPersonalBlocks =
-                        ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
-                    showingCatalogPersonalization = true
-                } else if pendingRunningAddition != nil {
-                    showingRunningPersonalization = true
+            if let entry = pendingCatalogAddition {
+                ATHLTHWorkoutQuickTargetSheet(
+                    workoutName: entry.title,
+                    isRunning: entry.plannedSession().kind == .running,
+                    durationMinutes: entry.estimatedDurationMinutes,
+                    partCount: entry.blocks.count,
+                    savingToLibrary: false
+                ) { decision in
+                    pendingQuickGoalDecision = decision
+                    showingPersonalizationQuestion = false
+                }
+            } else if let source = pendingRunningAddition {
+                ATHLTHWorkoutQuickTargetSheet(
+                    workoutName: source.title,
+                    isRunning: true,
+                    durationMinutes: source.estimatedDurationSeconds.map {
+                        Int(($0 / 60).rounded(.up))
+                    },
+                    partCount: source.blocks.count,
+                    savingToLibrary: false
+                ) { decision in
+                    pendingQuickGoalDecision = decision
+                    showingPersonalizationQuestion = false
                 }
             }
-            Button(ATHLTHLocalization.choose(
-                english: "Add without personal targets",
-                norwegian: "Legg til uten personlige mål"
-            )) {
-                saveFirstAdditionWithoutTargets()
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Cancel", norwegian: "Avbryt"
-            ), role: .cancel) {
-                pendingCatalogAddition = nil
-                pendingRunningAddition = nil
-            }
-        } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "Set your own weight, sets, repetitions, rest, pace and other optional targets. The original library workout stays unchanged.",
-                norwegian: "Tilpass målvekt, sett, repetisjoner, pauser, fart og andre valgfrie mål. Originaløkten i biblioteket endres ikke."
-            ))
         }
         .sheet(isPresented: $showingCatalogPersonalization, onDismiss: {
             pendingCatalogAddition = nil
