@@ -42,7 +42,9 @@ final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
         XCTAssertEqual(result[0].notes, original.notes)
         XCTAssertNil(result[0].targetPaceSecondsPerKilometer)
         XCTAssertNil(result[0].treadmillInclinePercent)
-        XCTAssertNil(result[0].targetHeartRateZone)
+        // An authored HR zone is part of the prescription, not a
+        // personal pace estimate to discard when the workout is copied.
+        XCTAssertEqual(result[0].targetHeartRateZone, 4)
         XCTAssertNil(result[0].targetWeightKilograms)
         XCTAssertNil(result[0].targetEffortRPE)
         XCTAssertNil(result[0].loadNote)
@@ -94,6 +96,26 @@ final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
         XCTAssertEqual(result.blocks[0].work.intensity.kind, .none)
         XCTAssertEqual(original.blocks[0].work.intensity.kind, .pace)
         XCTAssertEqual(original.blocks[0].work.treadmillInclinePercent, 4)
+    }
+
+    func testBuiltInRunningCopyRetainsExplicitZoneButClearsPersonalPace() throws {
+        var original = try XCTUnwrap(
+            RunningWorkoutLibraryStore.builtInTemplates.first {
+                ATHLTHWorkoutSearch.normalized($0.title) == "4x4 intervaller"
+            }
+        )
+        original.blocks[0].work.intensity = RunningIntensityTarget(
+            kind: .heartRateZone,
+            paceMinSecondsPerKilometer: 285,
+            paceMaxSecondsPerKilometer: 310,
+            heartRateZone: 5,
+            rpe: nil
+        )
+        let result = ATHLTHRunningLibraryDefaults.unpersonalized(original)
+        XCTAssertEqual(result.blocks[0].work.intensity.kind, .heartRateZone)
+        XCTAssertEqual(result.blocks[0].work.intensity.heartRateZone, 5)
+        XCTAssertNil(result.blocks[0].work.intensity.paceMinSecondsPerKilometer)
+        XCTAssertNil(result.blocks[0].work.intensity.paceMaxSecondsPerKilometer)
     }
 
     func testSavedPersonalRunningCopyUsesOriginalLibraryIdentity() throws {
