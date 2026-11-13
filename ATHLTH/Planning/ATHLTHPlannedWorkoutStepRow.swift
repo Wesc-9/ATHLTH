@@ -177,7 +177,9 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                 ? ATHLTHLocalization.choose(
                                     english: "Recovery", norwegian: "Pause"
                                 )
-                                : ATHLTHWorkoutNameSuggestion.displayStepTitle(block))
+                                : ATHLTHWorkoutNameSuggestion.displayStepTitle(
+                                    ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+                                ))
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(ATHLTHTrainDesign.ink)
                                 .lineLimit(1)
