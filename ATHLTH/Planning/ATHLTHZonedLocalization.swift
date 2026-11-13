@@ -58,10 +58,95 @@ enum ATHLTHZonedLocalization {
         }
     }
 
+    /// Split source *instructions* from the short name shown in a timeline.
+    /// This is editorial presentation; the prescribed duration and intensity
+    /// continue to come exclusively from the canonical Zoned step model.
+    struct StepCopy {
+        let title: String
+        let instructions: String?
+    }
+
+    private static func isThreeMinuteAllOut(_ value: String) -> Bool {
+        let lower = value.lowercased()
+        return lower.contains("sustained maximal effort") &&
+            (lower.contains("last 30") || lower.contains("30 sekunder"))
+    }
+
+    static func stepCopy(
+        sourceEnglish: String,
+        durationSeconds: Double?,
+        isRunning: Bool
+    ) -> StepCopy {
+        let input = sourceEnglish.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isRunning && isThreeMinuteAllOut(input) {
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "3-minute all-out test",
+                    norwegian: "3 min maksimaltest"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Run at maximum sustainable effort on a track for 3 minutes. Record total distance and the pace of the final 30 seconds.",
+                    norwegian: "Løp med maksimal innsats på bane i 3 minutter. Noter totaldistanse og tempo de siste 30 sekundene."
+                )
+            )
+        }
+
+        // Full sentences belong in Notes, not the button or exercise name.
+        // Preserve source text verbatim for non-curated instructions; this
+        // prevents losing test guidance in any of the 240 bundled workouts.
+        let firstSentence = input.components(separatedBy: ". ").first ?? input
+        if input.count > 74 {
+            let title: String
+            if firstSentence.count <= 55 && firstSentence != input {
+                title = text(firstSentence)
+            } else if let durationSeconds, durationSeconds > 0 {
+                title = ATHLTHWorkoutStepCopy.duration(durationSeconds) + " · " +
+                    ATHLTHLocalization.choose(
+                        english: isRunning ? "Running" : "Training",
+                        norwegian: isRunning ? "Løping" : "Trening"
+                    )
+            } else {
+                title = ATHLTHLocalization.choose(
+                    english: isRunning ? "Running segment" : "Workout segment",
+                    norwegian: isRunning ? "Løpsdel" : "Øktdel"
+                )
+            }
+            return StepCopy(title: title, instructions: text(input))
+        }
+        return StepCopy(title: text(input), instructions: nil)
+    }
+
+    /// Historical saved/personalized imports can contain the old mixed-language
+    /// sentence as their title. Correct only this known catalog instruction,
+    /// never replace names the athlete wrote themselves by a generic heuristic.
+    static func normalizeLegacyAllOutStep(
+        _ block: WorkoutTemplateBlock
+    ) -> WorkoutTemplateBlock {
+        guard block.kind == .run, isThreeMinuteAllOut(block.title),
+              (block.durationSeconds ?? 0) == 180 else { return block }
+        var clean = block
+        let copy = stepCopy(
+            sourceEnglish: block.title, durationSeconds: block.durationSeconds,
+            isRunning: true
+        )
+        clean.title = copy.title
+        if let instructions = copy.instructions {
+            let existing = (clean.notes ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            clean.notes = existing.isEmpty ? instructions :
+                (existing.contains(instructions) ? existing : instructions + "\n" + existing)
+        }
+        return clean
+    }
+
     /// Athletic microcopy, not machine translation of medical instructions.
     /// Preserve percentages, distances, repetitions and numbers.
     static func text(_ english: String) -> String {
         guard ATHLTHLocalization.isNorwegian else { return english }
+        if english == "3-Minute All-Out Test" ||
+           english == "3-Minutt All-Out Test" {
+            return "3-minutters maksimaltest"
+        }
         var localized = english
         for (from, to) in substitutions {
             localized = localized.replacingOccurrences(
