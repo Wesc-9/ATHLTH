@@ -183,6 +183,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     private var intervalTrack: ATHLTHSpotifyIntervalTrack?
     private var intervalTrackWorkoutID: UUID?
     private var intervalTrackPlayedStepIndexes = Set<Int>()
+    private var intervalTrackLatestRequestedStepIndex = -1
     private var intervalTrackGeneration = UUID()
     private var intervalCueObserver: NSObjectProtocol?
     private var pkceSession: SpotifyPKCESession?
@@ -523,6 +524,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         intervalTrack = track
         intervalTrackWorkoutID = track == nil ? nil : workoutID
         intervalTrackPlayedStepIndexes.removeAll()
+        intervalTrackLatestRequestedStepIndex = -1
         intervalTrackGeneration = UUID()
     }
 
@@ -533,7 +535,10 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                 phase: "work", stepIndex: stepIndex,
                 previouslyPlayed: intervalTrackPlayedStepIndexes,
                 manuallyPaused: workoutAutoplayGate.wasManuallyPaused
-              ) else { return }
+              ),
+              stepIndex >= intervalTrackLatestRequestedStepIndex
+        else { return }
+        intervalTrackLatestRequestedStepIndex = stepIndex
         let generation = intervalTrackGeneration
 
         // iPhone-only App Remote. Do not use Spotify Connect as fallback:
@@ -542,6 +547,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
               let playerAPI = appRemote?.playerAPI,
               intervalTrackWorkoutID == workoutID,
               generation == intervalTrackGeneration,
+              intervalTrackLatestRequestedStepIndex == stepIndex,
               !workoutAutoplayGate.wasManuallyPaused
         else { return }
 
