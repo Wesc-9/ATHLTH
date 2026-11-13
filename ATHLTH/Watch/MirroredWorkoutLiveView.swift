@@ -1601,25 +1601,25 @@ struct MirroredWorkoutLiveView: View {
                 }
             }
 
-            if let zone = snapshot.runningStepTargetHeartRateZone,
-               (1...5).contains(zone) {
-                HStack(spacing: 7) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "TARGET HEART RATE", norwegian: "PULSMÅL"
-                    ) + " · " + ATHLTHLocalization.choose(
-                        english: "Zone", norwegian: "Sone"
-                    ) + " \(zone)")
-                        .font(.caption.weight(.semibold))
-                    Spacer()
-                    ForEach(1...5, id: \.self) { number in
-                        Capsule()
-                            .fill(number == zone
-                                  ? ATHLTHTheme.accent : ATHLTHTheme.divider)
-                            .frame(width: 15, height: 7)
-                    }
-                }
-                .foregroundStyle(ATHLTHTheme.mutedText)
-            }
+            ATHLTHRunningPulseZoneGauge(
+                heartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
+                    snapshot.heartRate,
+                    sampledAt: snapshot.coachHeartRateSampleAt
+                ) ? snapshot.heartRate : nil,
+                maximumHeartRateBPM:
+                    snapshot.coachResolvedMaximumHeartRateBPM ??
+                    ATHLTHHeartRateZones.resolvedMaximumBPM(
+                        configured: appSession.onboardingProfile?.maximumHeartRateBPM,
+                        dateOfBirth: appSession.onboardingProfile?.dateOfBirth,
+                        usesFemaleEstimate: appSession.onboardingProfile?.healthSex == .female
+                    ),
+                targetHeartRateZone: snapshot.runningStepTargetHeartRateZone ??
+                    snapshot.heartRateTargetZone,
+                targetMinimumBPM: snapshot.heartRateTargetMinimumBPM,
+                targetMaximumBPM: snapshot.heartRateTargetMaximumBPM,
+                compact: true
+            )
+            .accessibilityIdentifier("athlth-watch-mirrored-running-pulse-zone")
 
             if snapshot.runningManualAdvanceRequired == true,
                snapshot.state == .running,
