@@ -887,12 +887,39 @@ private struct ATHLTHWorkoutStepEditor: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    HStack {
-                        Text(ATHLTHLocalization.choose(english: "Heart-rate zone (Z1–Z5)", norwegian: "Pulssone (S1–S5)"))
-                        Spacer()
-                        TextField(ATHLTHLocalization.choose(english: "Z1–Z5", norwegian: "S1–S5"), value: $draft.targetHeartRateZone, format: .number)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Target HR zone", norwegian: "Målpulssone"
+                        ),
+                        selection: Binding<Int?>(
+                            get: { draft.targetHeartRateZone },
+                            set: { selected in
+                                draft.targetHeartRateZone = selected
+                                // A personal override must not retain the
+                                // source's older percentage interval/label.
+                                // Otherwise the UI and Watch may disagree.
+                                draft.sourceIntensityZoneLabel = nil
+                                draft.targetHeartRatePercentMin = nil
+                                draft.targetHeartRatePercentMax = nil
+                            }
+                        )
+                    ) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "No target", norwegian: "Ingen målsone"
+                        ))
+                        .tag(nil as Int?)
+                        ForEach(1...5, id: \.self) { zone in
+                            Text("Z\(zone)").tag(zone as Int?)
+                        }
+                    }
+                    if let originalZone = ATHLTHWorkoutStepTargetSummary
+                        .zoneLabel(for: draft),
+                       draft.sourceIntensityZoneLabel != nil {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Original prescription: ", norwegian: "Planlagt fra biblioteket: "
+                        ) + originalZone)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                     if draft.kind == .run && draft.isIndoor == true {
                         HStack {
