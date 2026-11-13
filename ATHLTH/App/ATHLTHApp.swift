@@ -1341,6 +1341,56 @@ struct AppRootView: View {
     private var lifecycleChromeContent: AnyView {
         AnyView(
             lifecycleWorkoutContent
+        // Shared by the single iPad spectator, pre-start toggles and dashboard.
+        .environmentObject(crossDeviceWorkout)
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Allow this workout on iPad?",
+                norwegian: "Tillate visning av denne økten på iPad?"
+            ),
+            isPresented: Binding(
+                get: {
+                    !ATHLTHDeviceRole.isIPad &&
+                    crossDeviceWorkout.incomingRequest != nil
+                },
+                set: { _ in }
+            )
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Allow this workout",
+                norwegian: "Tillat denne økten"
+            )) {
+                Task {
+                    await crossDeviceWorkout.respondToRequest(
+                        approve: true,
+                        accountID: appSession.profile.userID
+                    )
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Decline",
+                norwegian: "Avslå"
+            ), role: .cancel) {
+                Task {
+                    await crossDeviceWorkout.respondToRequest(
+                        approve: false,
+                        accountID: appSession.profile.userID
+                    )
+                }
+            }
+        } message: {
+            Text(
+                (crossDeviceWorkout.sourceWorkoutTitle ??
+                    ATHLTHLocalization.choose(
+                        english: "Current workout",
+                        norwegian: "Aktiv økt"
+                    )) +
+                ATHLTHLocalization.choose(
+                    english: "\nOnly the current workout can be viewed. Access ends automatically with this session. No workout controls are transferred.",
+                    norwegian: "\nKun denne økten kan vises. Tilgangen avsluttes automatisk når økten er ferdig. Ingen treningskontroller overføres."
+                )
+            )
+        }
         .task(id: appSession.signedIn ? appSession.profile.userID : nil) {
             if scenePhase == .active {
                 crossDeviceWorkout.didForeground()
