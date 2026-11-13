@@ -769,7 +769,7 @@ struct WorkoutTemplateCatalogEntry: Identifiable, Codable, Hashable {
         )
 
         result.workoutTemplateID = id
-        result.workoutBlocks = blocks
+        result.workoutBlocks = blocks.recoveringLegacyStructuredTargets()
         result.workoutCategory = category
         return result
     }
