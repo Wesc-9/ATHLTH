@@ -204,6 +204,93 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
     }
 
     @MainActor
+    func testThreeMinuteAllOutHasReadableNameInstructionsAndPrescribedDuration() throws {
+        let previous = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+
+        let source = try XCTUnwrap(
+            ATHLTHZonedPlanLibrary.workouts.first { $0.id == "ASS-009" }
+        )
+        let original = ATHLTHZonedPlanLibrary.blocks(for: source)
+        XCTAssertEqual(original.count, 4)
+        let effort = try XCTUnwrap(original.first { $0.resolvedPhase == .main })
+        XCTAssertEqual(effort.kind, .run)
+        XCTAssertEqual(effort.durationSeconds, 180)
+        XCTAssertEqual(effort.title, "3 min maksimaltest")
+        XCTAssertTrue(effort.notes?.contains("30 sekundene") == true)
+        XCTAssertFalse(effort.title.contains("Record"))
+        XCTAssertEqual(effort.targetHeartRateZone, 5)
+        XCTAssertEqual(effort.sourceIntensityZoneLabel, "Z5")
+
+        let personalCopy = ATHLTHWorkoutLibraryPersonalization.blankTargets(original)
+        let personalized = try XCTUnwrap(
+            personalCopy.first { $0.resolvedPhase == .main }
+        )
+        XCTAssertEqual(personalized.title, "3 min maksimaltest")
+        XCTAssertEqual(personalized.durationSeconds, 180)
+        XCTAssertEqual(personalized.targetHeartRateZone, 5)
+        XCTAssertEqual(personalized.sourceIntensityZoneLabel, "Z5")
+        XCTAssertTrue(personalized.notes?.contains("totaldistanse") == true)
+        XCTAssertNil(personalized.targetPaceSecondsPerKilometer)
+
+        let summary = ATHLTHZonedLocalization.workoutSummary(
+            source.category, english: source.descriptionEn, workoutID: source.id
+        )
+        XCTAssertTrue(summary.contains("Tre minutters"))
+    }
+
+    @MainActor
+    func testOlderMixedLanguageAllOutCopyIsCorrectedWithoutChangingPrescription() throws {
+        let previous = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+        let source = try XCTUnwrap(
+            ATHLTHZonedPlanLibrary.workouts.first { $0.id == "ASS-009" }
+        )
+        var old = try XCTUnwrap(
+            ATHLTHZonedPlanLibrary.blocks(for: source).first {
+                $0.resolvedPhase == .main
+            }
+        )
+        old.title = "3 Minutter of sustained maximal effort på Bane. Record total distance og Fart of the last 30 Sekunder"
+        old.notes = "Egen merknad"
+        let fixed = ATHLTHZonedLocalization.normalizeLegacyAllOutStep(old)
+        XCTAssertEqual(fixed.title, "3 min maksimaltest")
+        XCTAssertEqual(fixed.durationSeconds, 180)
+        XCTAssertEqual(fixed.targetHeartRateZone, old.targetHeartRateZone)
+        XCTAssertTrue(fixed.notes?.contains("totaldistanse") == true)
+        XCTAssertTrue(fixed.notes?.contains("Egen merknad") == true)
+        XCTAssertEqual(ATHLTHZonedLocalization.normalizeLegacyAllOutStep(fixed), fixed)
+        XCTAssertEqual(ATHLTHWorkoutStepCopy.title(
+            for: old, workoutTitle: source.nameEn, compact: true
+        ), "3 min maksimaltest")
+    }
+
+    @MainActor
+    func testLengthySourceDescriptionUsesShortTitleAndPreservesInstructions() {
+        let text = "Run steadily at a relaxed pace across the first long section. Record the exact elapsed time for your next test."
+        let copy = ATHLTHZonedLocalization.stepCopy(
+            sourceEnglish: text, durationSeconds: 600, isRunning: true
+        )
+        XCTAssertLessThan(copy.title.count, 60)
+        XCTAssertNotNil(copy.instructions)
+        XCTAssertTrue(copy.instructions?.contains("Record") == true)
+    }
+
+    @MainActor
     func testImportedWorkoutsNeverExposeSourceZoneSix() {
         for workout in ATHLTHZonedPlanLibrary.workouts where workout.discipline != "swimming" {
             for block in ATHLTHZonedPlanLibrary.blocks(for: workout) {
