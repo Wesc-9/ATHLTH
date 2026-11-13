@@ -1959,6 +1959,8 @@ struct HomeWeeklyProgressStrip:
         composerAccount = ""
         composerDay = 0
         pendingComposerPresentation = false
+        // Also close the visible editor if the account changes or the user exits.
+        showingStandaloneSessionEditor = false
     }
 
     private func restoreWorkoutComposerIfNeeded() {
