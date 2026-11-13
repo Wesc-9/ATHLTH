@@ -672,13 +672,6 @@ struct ATHLTHiPadStudioRootView: View {
                                 english: "Workout history", norwegian: "Treningshistorikk"
                             ), systemImage: "clock.arrow.circlepath")
                         }
-                        Button {
-                            openSidebarPage(.exerciseProgress)
-                        } label: {
-                            Label(ATHLTHLocalization.choose(
-                                english: "Exercise progression", norwegian: "Øvelsesfremdrift"
-                            ), systemImage: "chart.bar")
-                        }
                     }
 
                     sidebarAction("ATHLTH Coach", symbol: "sparkles",
