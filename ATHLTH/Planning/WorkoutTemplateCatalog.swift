@@ -4057,6 +4057,18 @@ struct WorkoutTemplateBuilderView: View {
         let ghostTargetDurationSeconds: TimeInterval?
         let ghostUpdates: WatchGhostRaceAudioConfiguration?
         let runningEnvironment: RunEnvironment?
+        // Restore the Basic screen's actual selection, not merely its blocks.
+        // Optional fields keep drafts saved by earlier releases compatible.
+        let basicRunMode: String?
+        let basicGoalSelected: Bool?
+        let basicGhostSelected: Bool?
+        let basicGoalKind: String?
+        let basicGoalDistance: Int?
+        let basicGoalMinutes: Int?
+        let basicGoalPace: Int?
+        let basicGoalZone: Int?
+        let basicGhostMinutes: Int?
+        let basicWorkoutTitle: String?
     }
 
     private var draftStorageKey: String {
@@ -4127,6 +4139,22 @@ struct WorkoutTemplateBuilderView: View {
         studioAdvanced = stored.studioAdvanced ?? studioAdvanced
         studioBasicDate = stored.studioDate ?? studioBasicDate
         if initialActivity == .running {
+            studioBasicRunMode = stored.basicRunMode
+                .flatMap(RunQuickStartMode.init(rawValue:)) ??
+                (stored.routeID != nil ? .route :
+                    stored.blocks.isEmpty ? .free : .structured)
+            studioBasicGoalSelected = stored.basicGoalSelected ?? false
+            studioBasicGhostSelected = stored.basicGhostSelected ?? false
+            studioBasicGoalKind = stored.basicGoalKind
+                .flatMap(ATHLTHBasicRunGoalKind.init(rawValue:)) ?? .distance
+            studioBasicGoalDistance = stored.basicGoalDistance ?? studioBasicGoalDistance
+            studioBasicGoalMinutes = stored.basicGoalMinutes ?? studioBasicGoalMinutes
+            studioBasicGoalPace = stored.basicGoalPace ?? studioBasicGoalPace
+            studioBasicGoalZone = stored.basicGoalZone ?? studioBasicGoalZone
+            studioBasicGhostMinutes = stored.basicGhostMinutes ?? studioBasicGhostMinutes
+            studioBasicWorkoutTitle = stored.basicWorkoutTitle
+        }
+        if initialActivity == .running {
             studioBasicRunEnvironment = stored.runningEnvironment ??
                 stored.blocks.first(where: { $0.kind == .run }).map { block in
                     block.isIndoor == true
@@ -4194,7 +4222,17 @@ struct WorkoutTemplateBuilderView: View {
                     fallback: settings.ghostRaceAudioConfiguration
                   ) : nil,
             runningEnvironment: initialActivity == .running
-                ? studioBasicRunEnvironment : nil
+                ? studioBasicRunEnvironment : nil,
+            basicRunMode: initialActivity == .running ? studioBasicRunMode.rawValue : nil,
+            basicGoalSelected: initialActivity == .running ? studioBasicGoalSelected : nil,
+            basicGhostSelected: initialActivity == .running ? studioBasicGhostSelected : nil,
+            basicGoalKind: initialActivity == .running ? studioBasicGoalKind.rawValue : nil,
+            basicGoalDistance: initialActivity == .running ? studioBasicGoalDistance : nil,
+            basicGoalMinutes: initialActivity == .running ? studioBasicGoalMinutes : nil,
+            basicGoalPace: initialActivity == .running ? studioBasicGoalPace : nil,
+            basicGoalZone: initialActivity == .running ? studioBasicGoalZone : nil,
+            basicGhostMinutes: initialActivity == .running ? studioBasicGhostMinutes : nil,
+            basicWorkoutTitle: initialActivity == .running ? studioBasicWorkoutTitle : nil
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: draftStorageKey)
@@ -4760,6 +4798,16 @@ struct WorkoutTemplateBuilderView: View {
             .onChange(of: studioVisiblePhases) { _, _ in persistWorkoutDraft() }
             .onChange(of: selectedPhase) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioAdvanced) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicRunMode) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicGoalSelected) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicGhostSelected) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicGoalKind) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicGoalDistance) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicGoalMinutes) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicGoalPace) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicGoalZone) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicGhostMinutes) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicWorkoutTitle) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicDate) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicRunEnvironment) { _, _ in
                 persistWorkoutDraft()

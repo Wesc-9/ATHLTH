@@ -5498,6 +5498,9 @@ struct SessionEditorView: View {
     let onPreparedWorkout: ((PlannedSession) -> Void)?
     let initialSourceWorkout: PlannedSession?
     let preserveSourceID: Bool
+    // Only the presenting day owns this navigation intent. Shared editors
+    // without a day-sheet host use the existing dismissal behavior.
+    var onExit: (() -> Void)? = nil
 
     @State private var hasSelectedWorkoutSource = false
     @State private var hasStoredStandaloneDraft = false
@@ -5635,7 +5638,8 @@ struct SessionEditorView: View {
         standaloneDate: Date,
         initialSourceWorkout: PlannedSession? = nil,
         preserveSourceID: Bool = false,
-        onPreparedWorkout: ((PlannedSession) -> Void)? = nil
+        onPreparedWorkout: ((PlannedSession) -> Void)? = nil,
+        onExit: (() -> Void)? = nil
     ) {
         self.dayID = nil
         self.planID = nil
@@ -5644,6 +5648,7 @@ struct SessionEditorView: View {
         self.onPreparedWorkout = onPreparedWorkout
         self.initialSourceWorkout = initialSourceWorkout
         self.preserveSourceID = preserveSourceID
+        self.onExit = onExit
 
         let calendar =
             Calendar.current
@@ -6362,6 +6367,7 @@ struct SessionEditorView: View {
             )
         }
         finishDraft()
+        onExit?()
         dismiss()
     }
 
@@ -6803,6 +6809,7 @@ struct SessionEditorView: View {
                     )
                 ) {
                     finishDraft()
+                    onExit?()
                     dismiss()
                 }
             }
@@ -6864,15 +6871,17 @@ struct SessionEditorView: View {
                     includesRestDay: false
                 ) {
                     finishDraft()
+                    onExit?()
                     dismiss()
                 }
                 .presentationDetents([.large])
             }
-            .sheet(
+            .fullScreenCover(
                 isPresented: $showingUnifiedWorkoutComposer,
                 onDismiss: {
                     if closeAfterScratchSave {
                         closeAfterScratchSave = false
+                        onExit?()
                         scratchBuilderClosedIntentionally = false
                         restoreScratchComposerOnWake = false
                         // First dismiss the child, then the obsolete host.
@@ -6964,10 +6973,10 @@ struct SessionEditorView: View {
                     },
                     onCloseRequested: {
                         scratchBuilderClosedIntentionally = true
+                        onExit?()
                     }
                 )
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
+                .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
                 .interactiveDismissDisabled(
                     isStandalone && selectedScratchWorkoutType != nil
                 )
@@ -10665,12 +10674,14 @@ struct SessionEditorView: View {
         if let onPreparedWorkout {
             onPreparedWorkout(workout)
             finishDraft()
+            onExit?()
             dismiss()
             return
         }
 
         persistSession(workout)
         finishDraft()
+        onExit?()
         dismiss()
     }
 

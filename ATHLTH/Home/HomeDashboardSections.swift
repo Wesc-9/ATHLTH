@@ -2975,10 +2975,52 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var completedWorkoutPath: [UUID] = []
     @State private var suspendedEditor = false
     @State private var suspendedAt: Date?
+    // Scene-local navigation intent survives a UIKit sheet being torn down
+    // when the app is suspended. Workout data remains in the shared draft.
+    @SceneStorage("athlth.home.composerActive")
+    private var composerActive = false
+    @SceneStorage("athlth.home.composerAccount")
+    private var composerAccount = ""
+    @SceneStorage("athlth.home.composerDay")
+    private var composerDay: Double = 0
+
+    private func openWorkoutComposer() {
+        composerAccount = session.profile.userID.uuidString
+        composerDay = Calendar.current.startOfDay(for: selection.date)
+            .timeIntervalSinceReferenceDate
+        composerActive = true
+        showingStandaloneSessionEditor = true
+    }
+
+    private func closeWorkoutComposer() {
+        composerActive = false
+        composerAccount = ""
+        composerDay = 0
+    }
+
+    private func restoreWorkoutComposerIfNeeded() {
+        guard composerActive else { return }
+        let day = Calendar.current.startOfDay(for: selection.date)
+            .timeIntervalSinceReferenceDate
+        guard composerAccount == session.profile.userID.uuidString,
+              abs(composerDay - day) < 1 else {
+            // Never reopen another athlete's or another day's draft.
+            closeWorkoutComposer()
+            return
+        }
+        guard !showingStandaloneSessionEditor else { return }
+        Task { @MainActor in
+            await Task.yield()
+            guard composerActive, scenePhase == .active,
+                  !showingStandaloneSessionEditor else { return }
+            showingStandaloneSessionEditor = true
+        }
+    }
 
     private var hasWorkoutDraft: Bool {
         let key = "athlth.sessionEditor.draft.v1.\(session.profile.userID.uuidString).standalone"
-        return UserDefaults.standard.data(forKey: key) != nil
+        return UserDefaults.standard.data(forKey: key) != nil ||
+            UserDefaults.standard.data(forKey: key + ".scratchComposer") != nil
     }
 
     @EnvironmentObject private var session: AppSessionStore
@@ -3287,6 +3329,7 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             .onAppear {
                 restoreCompletedWorkoutIfNeeded()
+                restoreWorkoutComposerIfNeeded()
             }
             .onChange(of: completedWorkoutPath) { _, next in
                 if scenePhase == .active {
@@ -3402,16 +3445,25 @@ private struct HomeWeeklyProgressDaySheet: View {
                 } else {
                     restoreCompletedWorkoutIfNeeded()
                     if suspendedAt.map({ Date().timeIntervalSince($0) < 300 }) == true,
-                       suspendedEditor {
+                       suspendedEditor, composerActive {
                         showingStandaloneSessionEditor = true
                     }
+                    restoreWorkoutComposerIfNeeded()
                     suspendedAt = nil
                     suspendedEditor = false
                 }
             }
-            .sheet(isPresented: $showingStandaloneSessionEditor) {
-                SessionEditorView(standaloneDate: selection.date)
-                    .presentationDetents([.large])
+            .sheet(isPresented: $showingStandaloneSessionEditor, onDismiss: {
+                // An unexpected system dismissal is not an explicit Cancel.
+                // The presentation intent is cleared only by the editor.
+                restoreWorkoutComposerIfNeeded()
+            }) {
+                SessionEditorView(
+                    standaloneDate: selection.date,
+                    onExit: closeWorkoutComposer
+                )
+                .presentationDetents([.large])
+                .interactiveDismissDisabled(composerActive)
             }
             .sheet(isPresented: $showingInspiration, onDismiss: {
                 if let picked = pendingInspiration {
@@ -3548,9 +3600,7 @@ private struct HomeWeeklyProgressDaySheet: View {
             Spacer(minLength: 6)
 
             if canPlanWorkout {
-                Button {
-                    showingStandaloneSessionEditor = true
-                } label: {
+                Button(action: openWorkoutComposer) {
                     Label(
                         ATHLTHLocalization.choose(
                             english: hasWorkoutDraft ? "Continue draft" : "Plan new",
