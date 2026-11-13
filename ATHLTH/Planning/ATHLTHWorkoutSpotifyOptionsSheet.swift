@@ -7,6 +7,7 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
     @Binding var playlist: SpotifyPlaylistReference?
     @Binding var autoplay: Bool?
     @Binding var intervalTrack: ATHLTHSpotifyIntervalTrack?
+    let supportsIntervals: Bool
     @State private var showingPlaylistPicker = false
     @State private var showingIntervalTrackPicker = false
     @State private var intervalOptionsExpanded = false
@@ -48,8 +49,9 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
                     .tint(ATHLTHTrainDesign.bronze)
                 }
 
-                // Collapsed by default. Most users need nothing beyond their
-                // normal linked playlist and will never see another prompt.
+                // Hidden for non-running workouts and collapsed otherwise.
+                // Spotify is never a mandatory step in training setup.
+                if supportsIntervals {
                 Section {
                     DisclosureGroup(
                         isExpanded: $intervalOptionsExpanded
@@ -108,6 +110,7 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
                     }
                 } header: {
                     Text(tr("Optional", "Valgfritt"))
+                }
                 }
 
                 Section {
