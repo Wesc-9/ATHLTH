@@ -1195,7 +1195,9 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     }
 
     var resolvedWorkoutBlocks: [WorkoutTemplateBlock] {
-        workoutBlocks ?? []
+        // Read-time, lossless restoration of known legacy catalogue targets.
+        // Persisted user records are never rewritten without an explicit save.
+        (workoutBlocks ?? []).recoveringLegacyStructuredTargets()
     }
 
     var isStructuredWorkout: Bool {
