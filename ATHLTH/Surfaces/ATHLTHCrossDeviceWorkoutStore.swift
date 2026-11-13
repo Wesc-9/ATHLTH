@@ -94,6 +94,22 @@ private struct ATHLTHCrossDeviceWorkoutRow: Codable {
     }
 }
 
+/// Minimal active-session presence, separate from approved live details.
+/// It is private to the same account and contains no health measurements.
+struct ATHLTHCrossDevicePresenceRow: Codable, Equatable {
+    let userID: UUID
+    let sourceDevice: String
+    let updatedAt: Date
+    let expiresAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case sourceDevice = "source_device"
+        case updatedAt = "updated_at"
+        case expiresAt = "expires_at"
+    }
+}
+
 /// Polling deliberately shares only a compact spectator state; no second
 /// HKWorkoutSession, no mirrored GPS track, no public/social presence.
 /// Server-side RLS additionally enforces user_id = auth.uid().
@@ -101,6 +117,8 @@ private struct ATHLTHCrossDeviceWorkoutRow: Codable {
 final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     static let shared = ATHLTHCrossDeviceWorkoutStore()
     @Published private(set) var remote: ATHLTHCrossDeviceWorkoutSnapshot?
+    /// Only a same-account active flag; never treated as viewing consent.
+    @Published private(set) var remotePresence: ATHLTHCrossDevicePresenceRow?
     @Published private(set) var isExpanded = false
     /// Explicit opt-in only for the next workout, never a saved preference.
     @Published var shareNextWorkout = false
@@ -151,6 +169,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     private let client = SupabaseEnvironment.client
     private var lastPublishedID: UUID?
+    private var lastPresencePublished = false
+    private var lastPresenceCleanupAt: Date?
+    private var lastPresenceExpiry: Date?
     private var lastUnauthorisedCleanupAt: Date?
     private var mirroredStartedAt: Date?
     private var mirroredSessionID: UUID?
@@ -176,6 +197,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     func clearLocalState() {
         remote = nil
+        remotePresence = nil
+        lastPresenceExpiry = nil
+        lastPresencePublished = false
+        lastPresenceCleanupAt = nil
         lastPublishedID = nil
         lastUnauthorisedCleanupAt = nil
         shareNextWorkout = false
@@ -216,6 +241,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             // also requires the active Supabase session to match that ID.
             if client.auth.currentUser?.id == accountID {
                 if isPad {
+                    await readPresence(accountID: accountID)
                     await readRemote(accountID: accountID)
                     await pollOutgoingRequest(accountID: accountID)
                 } else {
@@ -228,6 +254,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 }
             } else {
                 remote = nil
+                remotePresence = nil
                 ATHLTHSurfaceCoordinator.setRemoteWorkout(nil)
             }
 
@@ -561,6 +588,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             spotify: spotify
         )
         reconcileSession(active?.id, title: active?.title)
+        // Presence is intentionally independent from session-scoped approval.
+        // No metrics or workout names enter this table.
+        await publishPresence(accountID: accountID, snapshot: active)
         if let active, isApprovedForSession(active.id) {
             let now = Date()
             let row = ATHLTHCrossDeviceWorkoutRow(
@@ -599,6 +629,66 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     // No fallback ever starts a recording or enables viewing.
                     // The previous row expires naturally as a final guard.
                 }
+            }
+        }
+    }
+
+    private func publishPresence(
+        accountID: UUID,
+        snapshot: ATHLTHCrossDeviceWorkoutSnapshot?
+    ) async {
+        if let snapshot {
+            let now = Date()
+            let row = ATHLTHCrossDevicePresenceRow(
+                userID: accountID,
+                sourceDevice: snapshot.sourceDevice == "watch" ? "watch" : "iphone",
+                updatedAt: now,
+                expiresAt: now.addingTimeInterval(30)
+            )
+            do {
+                try await client.from("private_active_workout_presence")
+                    .upsert(row, onConflict: "user_id")
+                    .execute()
+                lastPresencePublished = true
+                lastPresenceCleanupAt = nil
+            } catch {
+                // A failed heartbeat never interrupts Watch or phone recording.
+            }
+        } else {
+            let now = Date()
+            let shouldDelete = lastPresencePublished ||
+                lastPresenceCleanupAt.map { now.timeIntervalSince($0) >= 20 } ?? true
+            if shouldDelete {
+                lastPresenceCleanupAt = now
+                do {
+                    try await client.from("private_active_workout_presence")
+                        .delete()
+                        .eq("user_id", value: accountID)
+                        .execute()
+                    lastPresencePublished = false
+                } catch {
+                    // Expiring the heartbeat is the offline safety fallback.
+                }
+            }
+        }
+    }
+
+    private func readPresence(accountID: UUID) async {
+        do {
+            let rows: [ATHLTHCrossDevicePresenceRow] = try await client
+                .from("private_active_workout_presence")
+                .select()
+                .eq("user_id", value: accountID)
+                .limit(1)
+                .execute()
+                .value
+            let valid = rows.first.flatMap { $0.expiresAt > .now ? $0 : nil }
+            remotePresence = valid
+            lastPresenceExpiry = valid?.expiresAt
+        } catch {
+            if lastPresenceExpiry.map({ $0 <= .now }) ?? true {
+                remotePresence = nil
+                lastPresenceExpiry = nil
             }
         }
     }
