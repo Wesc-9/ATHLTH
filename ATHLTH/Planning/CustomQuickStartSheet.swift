@@ -265,6 +265,7 @@ enum CustomQuickStartDestination {
 }
 
 struct CustomQuickStartSheet: View {
+    @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
@@ -275,6 +276,7 @@ struct CustomQuickStartSheet: View {
     let watchConnected: Bool
     let onStart: (CustomQuickWorkoutConfiguration, CustomQuickStartDestination) -> Void
 
+    @State private var shareThisWorkoutOnIPad = false
     @State private var activity: CustomQuickWorkoutActivity = .hiit
     @State private var showingOtherActivities = false
     @State private var method: CustomQuickWorkoutMethod = .open
@@ -424,15 +426,21 @@ struct CustomQuickStartSheet: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 5) {
-                    ATHLTHLiveWorkoutPrestartToggle()
+                    ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
                     ATHLTHQuickStartDeviceLaunchBar(
                         watchAvailable: canUseWatch,
                         onIPhone: {
+                            liveSharing.prepareOneWorkoutSharing(
+                                shareThisWorkoutOnIPad
+                            )
                             onStart(previewConfiguration, .phoneTimer)
                             dismiss()
                         },
                         onAppleWatch: {
                             guard canUseWatch else { return }
+                            liveSharing.prepareOneWorkoutSharing(
+                                shareThisWorkoutOnIPad
+                            )
                             onStart(previewConfiguration, .watch)
                             dismiss()
                         },
