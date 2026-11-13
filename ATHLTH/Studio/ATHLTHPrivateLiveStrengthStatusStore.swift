@@ -120,7 +120,11 @@ enum ATHLTHPrivateLiveStrengthStatusStore {
             return
         }
 
-        guard let snapshot else {
+        guard let snapshot,
+              ATHLTHCrossDeviceWorkoutStore.shared.isApprovedForSession(
+                snapshot.id
+              ) else {
+            // Legacy status must never bypass the new per-workout opt-in.
             await clear(for: userID)
             return
         }
