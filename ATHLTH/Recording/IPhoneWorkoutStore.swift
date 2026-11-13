@@ -2428,7 +2428,15 @@ final class IPhoneWorkoutStore:
                 NotificationCenter.default.post(
                     name: Notification.Name("athlth.spotifyRunEffortBegan"),
                     object: nil,
-                    userInfo: ["workoutID": workout.id, "stepIndex": index]
+                    userInfo: [
+                        "workoutID": workout.id,
+                        "stepIndex": index,
+                        "effortOrdinal": steps.prefix(index).filter {
+                            ATHLTHSpotifyIntervalCuePolicy.isEffort($0.phase)
+                        }.count,
+                        "targetDurationSeconds": steps[index].durationSeconds ?? 0,
+                        "intensityText": steps[index].intensityText ?? ""
+                    ]
                 )
             }
             announceStructuredStepIfNeeded(prefix: "Starting")
@@ -4288,7 +4296,17 @@ final class IPhoneWorkoutStore:
             NotificationCenter.default.post(
                 name: Notification.Name("athlth.spotifyRunEffortBegan"),
                 object: nil,
-                userInfo: ["workoutID": workout.id, "stepIndex": nextIndex]
+                userInfo: [
+                    "workoutID": workout.id,
+                    "stepIndex": nextIndex,
+                    "effortOrdinal": plan.steps.prefix(nextIndex).filter {
+                        ATHLTHSpotifyIntervalCuePolicy.isEffort($0.phase)
+                    }.count,
+                    "targetDurationSeconds":
+                        plan.steps[nextIndex].durationSeconds ?? 0,
+                    "intensityText":
+                        plan.steps[nextIndex].intensityText ?? ""
+                ]
             )
         }
         let scoped = step.measure == .time
