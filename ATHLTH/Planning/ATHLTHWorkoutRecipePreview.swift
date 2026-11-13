@@ -291,6 +291,9 @@ struct ATHLTHWorkoutRecipePreview: View {
         VStack(alignment: .leading, spacing: 17) {
             if !embeddedInDetails {
                 introduction
+            }
+            modeControl
+            if advanced && !embeddedInDetails {
                 statistics
             }
             if let meters = ATHLTHRunningEstimate.distanceMeters(for: blocks),
@@ -312,7 +315,6 @@ struct ATHLTHWorkoutRecipePreview: View {
                     "Beregnet fra planlagte hastigheter og distanser – ikke en registrert økt"
                 ))
             }
-            modeControl
             if advanced {
                 expandableOutline
             } else {
@@ -461,32 +463,38 @@ struct ATHLTHWorkoutRecipePreview: View {
         .athlthPlanCard(radius: 19)
     }
 
+    /// Mode is immediately below the identity card in every shared preview.
+    /// Simple remains a readable recipe; Advanced retains all target details.
     private var modeControl: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(embeddedInDetails
-                     ? tr("WORKOUT PROGRAM", "ØKTPROGRAM")
-                     : tr("SESSION DETAILS", "ØKTDETALJER"))
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                Spacer()
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(tr("View workout", "Vis økten"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer(minLength: 4)
                 Text(advanced
-                     ? tr("Targets and recovery", "Mål og pauser")
-                     : tr("Quick overview", "Enkel oversikt"))
+                    ? tr("All details", "Alle detaljer")
+                    : tr("At a glance", "Kort oversikt"))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
+
             Picker(tr("Detail level", "Detaljnivå"), selection: $advanced) {
                 Text(tr("Simple", "Enkel")).tag(false)
                 Text(tr("Advanced", "Avansert")).tag(true)
             }
             .pickerStyle(.segmented)
+            .accessibilityIdentifier("workout-recipe-detail-mode")
             .accessibilityHint(tr(
-                "Choose a quick overview or full training details.",
-                "Velg en enkel oversikt eller alle treningsdetaljene."
+                "Choose a quick overview or detailed targets and rests.",
+                "Velg kort oversikt eller detaljerte mål og pauser."
             ))
         }
+        .padding(13)
+        .background(
+            ATHLTHPlanDesign.selectedSurface.opacity(0.5),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
     }
 
     /// A quick understanding of WHAT to do, not 26 individual settings.
