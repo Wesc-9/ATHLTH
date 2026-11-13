@@ -1467,7 +1467,14 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
+        // The library can contain hundreds of imported interval recipes.
+        // Search/sort once per view update, not for every empty-state check,
+        // alphabet index and lazy-grid ForEach in the same render pass.
+        let visibleEntries = filteredEntries
+        let visibleRunningTemplates = filteredRunningTemplates
+        let visibleSavedWorkouts = filteredSavedWorkouts
+        let visibleScheduledWorkouts = filteredScheduledWorkouts
+        return ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 // Run library filters are enough context; keep hero cards elsewhere.
@@ -1708,14 +1715,14 @@ struct WorkoutTemplateLibraryView: View {
                     }
                 }
 
-                if onSelectPlanned != nil && !filteredScheduledWorkouts.isEmpty {
+                if onSelectPlanned != nil && !visibleScheduledWorkouts.isEmpty {
                     Text(ATHLTHLocalization.choose(
                         english: "From your plans",
                         norwegian: "Fra dine planer"
                     ))
                     .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
-                    ForEach(filteredScheduledWorkouts.prefix(50)) { workout in
+                    ForEach(visibleScheduledWorkouts.prefix(50)) { workout in
                         Group {
                         if initialCategory != nil && displayMode == .list {
                             ATHLTHWorkoutLibraryExpandableCard(
@@ -1778,11 +1785,11 @@ struct WorkoutTemplateLibraryView: View {
                     }
                 }
 
-                if onSelectPlanned != nil && !filteredSavedWorkouts.isEmpty {
+                if onSelectPlanned != nil && !visibleSavedWorkouts.isEmpty {
                     Text(ATHLTHLocalization.choose(english: "My workouts", norwegian: "Mine økter"))
                         .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
-                    ForEach(filteredSavedWorkouts) { workout in
+                    ForEach(visibleSavedWorkouts) { workout in
                         Group {
                         if initialCategory != nil && displayMode == .list {
                             ATHLTHWorkoutLibraryExpandableCard(
@@ -1833,8 +1840,8 @@ struct WorkoutTemplateLibraryView: View {
                     }
                     }
                 }
-                if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty &&
-                   filteredSavedWorkouts.isEmpty && filteredScheduledWorkouts.isEmpty {
+                if visibleEntries.isEmpty && visibleRunningTemplates.isEmpty &&
+                   visibleSavedWorkouts.isEmpty && visibleScheduledWorkouts.isEmpty {
                     VStack(spacing: 14) {
                         ContentUnavailableView(
                             ATHLTHLocalization.choose(
@@ -1867,7 +1874,7 @@ struct WorkoutTemplateLibraryView: View {
                     .padding(.top, 25)
                 } else {
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
-                    ForEach(filteredEntries) { entry in
+                    ForEach(visibleEntries) { entry in
                         Group {
                         if initialCategory != nil && displayMode == .list,
                            onSelectPlanned != nil {
@@ -1953,7 +1960,7 @@ struct WorkoutTemplateLibraryView: View {
                         .id(entry.id)
                     }
 
-                    ForEach(filteredRunningTemplates) { workout in
+                    ForEach(visibleRunningTemplates) { workout in
                         Group {
                         if initialCategory != nil && displayMode == .list,
                            onSelectPlanned != nil {
