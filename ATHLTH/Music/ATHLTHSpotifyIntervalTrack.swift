@@ -7,6 +7,8 @@ struct ATHLTHSpotifyIntervalTrack: Identifiable, Codable, Hashable {
     var title: String
     var artist: String
     var durationMilliseconds: Int
+    /// Absent in all existing workouts; never enables automation by default.
+    var smartProfile: ATHLTHSpotifyMusicProfile? = nil
 
     var uri: String { "spotify:track:\(id)" }
     var durationLabel: String {
