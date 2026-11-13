@@ -329,7 +329,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     ATHLTHLiveWorkoutStage(
                         index: index,
                         title: step.title,
-                        phase: step.phase,
+                        phase: step.phase ?? "unspecified",
                         durationSeconds: step.durationSeconds,
                         distanceMeters: step.distanceMeters
                     )
