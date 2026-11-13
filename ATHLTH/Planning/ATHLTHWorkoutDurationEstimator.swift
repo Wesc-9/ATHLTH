@@ -135,15 +135,21 @@ enum ATHLTHWorkoutDurationEstimator {
                       time.isFinite, time >= 0 else { return nil }
                 seconds += time
             case .note:
-                if block.wellnessKind != nil || block.activityTag == "cycling" {
-                    // Timed cycling/yoga/recovery are real parts of the plan,
-                    // not ignorable notes when duration is unspecified.
-                    guard let time = block.durationSeconds,
-                          time.isFinite, time > 0 else { return nil }
-                    hasActivity = true
+                // A note with an explicit duration is a REAL timed phase:
+                // curated/premium strength warm-ups are represented this way.
+                // Omitting it understated 51 bundled strength workouts.
+                // Untimed guidance (including between-session instructions)
+                // is non-executable and intentionally adds no duration.
+                if let time = block.durationSeconds {
+                    guard time.isFinite, time > 0 else { return nil }
                     seconds += time
+                    hasActivity = true
+                } else if block.wellnessKind != nil ||
+                            block.activityTag == "cycling" {
+                    // Timed cycling and wellness must never silently become
+                    // zero-duration workouts when the time target is missing.
+                    return nil
                 }
-                // Pure instructions are intentionally not assigned time.
             }
             guard seconds.isFinite, seconds >= 0 else { return nil }
         }
