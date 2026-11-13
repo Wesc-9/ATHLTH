@@ -44,6 +44,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var routeLegDistanceOffsetMeters: Double = 0
     @Published private(set) var routeAlertConfiguration:
         WatchRouteAlertConfiguration = .standard
+    /// Read-only HRmax used by all active Watch pulse-zone screens.
+    /// The planned transfer or explicit coach value takes precedence; no
+    /// arbitrary default BPM is fabricated on the watch.
+    var liveZoneMaximumHeartRateBPM: Double? {
+        let value = audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM ??
+            structuredRunningWorkout?.heartRateZoneMaximumBPM
+        guard let value, value.isFinite, (100...240).contains(value)
+        else { return nil }
+        return value
+    }
+
     @Published private(set) var targetAlertConfiguration:
         WatchWorkoutTargetAlertConfiguration?
     @Published private(set) var liveTargetStatus: String?
