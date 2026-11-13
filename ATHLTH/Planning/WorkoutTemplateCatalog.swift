@@ -3765,6 +3765,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var gearSelectionTouched = false
     @State private var selectedSpotifyPlaylist: SpotifyPlaylistReference?
     @State private var spotifyAutoplayOnStart: Bool?
+    @State private var spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack?
     @State private var studioRoutePhase: WorkoutPhaseKind = .main
     @State private var studioVisiblePhases: Set<WorkoutPhaseKind> = []
     @State private var studioAdvanced = true
@@ -3879,6 +3880,7 @@ struct WorkoutTemplateBuilderView: View {
         _gearSelectionTouched = State(initialValue: initialExtras.gearIDs != nil)
         _selectedSpotifyPlaylist = State(initialValue: initialExtras.spotifyPlaylist)
         _spotifyAutoplayOnStart = State(initialValue: initialExtras.spotifyAutoplayOnStart)
+        _spotifyIntervalTrack = State(initialValue: initialExtras.spotifyIntervalTrack)
         var initialCoachDraft = AudioCoachDraft()
         if let coach = initialExtras.audioCoachConfiguration {
             initialCoachDraft.load(configuration: coach)
@@ -3959,6 +3961,7 @@ struct WorkoutTemplateBuilderView: View {
         let gearIDs: [UUID]?
         let spotifyPlaylist: SpotifyPlaylistReference?
         let spotifyAutoplayOnStart: Bool?
+        let spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack?
         let pendingCopyDayIDs: [Int]?
         let updatedAt: Date
         // Optional additions keep previously saved drafts decodable.
@@ -4015,6 +4018,7 @@ struct WorkoutTemplateBuilderView: View {
         gearSelectionTouched = stored.gearIDs != nil
         selectedSpotifyPlaylist = stored.spotifyPlaylist
         spotifyAutoplayOnStart = stored.spotifyAutoplayOnStart
+        spotifyIntervalTrack = stored.spotifyIntervalTrack
         if let config = stored.audioCoachConfiguration {
             audioCoachDraft.load(configuration: config)
             coachIsCustomized = true
@@ -4090,6 +4094,7 @@ struct WorkoutTemplateBuilderView: View {
             gearIDs: gearSelectionTouched ? Array(selectedWorkoutGearIDs) : nil,
             spotifyPlaylist: selectedSpotifyPlaylist,
             spotifyAutoplayOnStart: spotifyAutoplayOnStart,
+            spotifyIntervalTrack: spotifyIntervalTrack,
             pendingCopyDayIDs: Array(pendingCopyDayIDs).sorted(),
             updatedAt: Date(),
             sourceTitle: initialSourceTitle,
@@ -4665,6 +4670,10 @@ struct WorkoutTemplateBuilderView: View {
                 savedToMyWorkouts = false
                 persistWorkoutDraft()
             }
+            .onChange(of: spotifyIntervalTrack) { _, _ in
+                savedToMyWorkouts = false
+                persistWorkoutDraft()
+            }
             .onChange(of: manualDurationMinutes) { _, _ in
                 savedToMyWorkouts = false
                 scheduleWorkoutDraftCheckpoint()
@@ -5018,7 +5027,8 @@ struct WorkoutTemplateBuilderView: View {
                 case .spotify:
                     ATHLTHWorkoutSpotifyOptionsSheet(
                         playlist: $selectedSpotifyPlaylist,
-                        autoplay: $spotifyAutoplayOnStart
+                        autoplay: $spotifyAutoplayOnStart,
+                        intervalTrack: $spotifyIntervalTrack
                     )
                 case .heartRateAndPace:
                     ATHLTHWorkoutTargetsQuickSheet(blocks: $blocks)
@@ -7601,6 +7611,7 @@ struct WorkoutTemplateBuilderView: View {
         }
         workout.spotifyPlaylist = selectedSpotifyPlaylist
         workout.spotifyAutoplayOnStart = spotifyAutoplayOnStart
+        workout.spotifyIntervalTrack = spotifyIntervalTrack
         workout.audioCoachConfiguration = currentAudioCoachConfiguration
         workout.routeAlertConfiguration = hasOutdoorCardio && routeIsCustomized &&
             activeRoute != nil ? routeGuardianDraft.configuration : nil
@@ -7635,6 +7646,7 @@ struct WorkoutTemplateBuilderView: View {
             gearIDs: workout.gearIDs,
             spotifyPlaylist: workout.spotifyPlaylist,
             spotifyAutoplayOnStart: workout.spotifyAutoplayOnStart,
+            spotifyIntervalTrack: workout.spotifyIntervalTrack,
             audioCoachConfiguration: workout.audioCoachConfiguration,
             routeAlertConfiguration: workout.routeAlertConfiguration,
             ghostTargetDurationSeconds: workout.ghostTargetDurationSeconds,
