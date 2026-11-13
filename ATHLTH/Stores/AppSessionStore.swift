@@ -3659,6 +3659,7 @@ final class AppSessionStore: ObservableObject {
             revision.gearIDs = existing.gearIDs
             revision.spotifyPlaylist = existing.spotifyPlaylist
             revision.spotifyAutoplayOnStart = existing.spotifyAutoplayOnStart
+            revision.spotifyIntervalTrack = existing.spotifyIntervalTrack
             guard revision != existing else { continue }
 
             standalonePlannedSessions[index] = revision
@@ -3722,6 +3723,7 @@ final class AppSessionStore: ObservableObject {
                 updated.gearIDs = existing.gearIDs
                 updated.spotifyPlaylist = existing.spotifyPlaylist
                 updated.spotifyAutoplayOnStart = existing.spotifyAutoplayOnStart
+                updated.spotifyIntervalTrack = existing.spotifyIntervalTrack
                 if updated != existing {
                     updateStandalonePlannedSession(updated)
                 }
@@ -3922,6 +3924,7 @@ final class AppSessionStore: ObservableObject {
             autoPauseEnabled: source.autoPauseEnabled,
             spotifyPlaylist: source.spotifyPlaylist,
             spotifyAutoplayOnStart: source.spotifyAutoplayOnStart,
+            spotifyIntervalTrack: source.spotifyIntervalTrack,
             targetAlertConfiguration: source.targetAlertConfiguration,
             routeAlertConfiguration: source.routeAlertConfiguration,
             ghostTargetDurationSeconds: source.ghostTargetDurationSeconds,
@@ -5176,6 +5179,7 @@ final class AppSessionStore: ObservableObject {
                 source.spotifyPlaylist,
             spotifyAutoplayOnStart:
                 source.spotifyAutoplayOnStart,
+            spotifyIntervalTrack: source.spotifyIntervalTrack,
             targetAlertConfiguration:
                 source.targetAlertConfiguration,
             routeAlertConfiguration:
