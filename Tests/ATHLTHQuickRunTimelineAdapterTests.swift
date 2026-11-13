@@ -118,7 +118,7 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
             }, id)
             XCTAssertEqual(transferred.steps.count,
                            recipe.expandedForExecution().count, id)
-            XCTAssertTrue(transferred.autoAdvanceTimedSteps)
+            XCTAssertEqual(transferred.autoAdvanceTimedSteps, true)
         }
     }
 
