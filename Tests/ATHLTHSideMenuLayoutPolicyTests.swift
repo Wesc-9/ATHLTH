@@ -6,37 +6,34 @@ final class ATHLTHSideMenuLayoutPolicyTests: XCTestCase {
     func testTypicalIPhoneWidthsLeaveVisibleHomeSpace() {
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 375),
-            187.5,
+            215.625,
             accuracy: 0.01
         )
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 393),
-            196.5,
+            225.975,
             accuracy: 0.01
         )
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 440),
-            220,
+            253,
             accuracy: 0.01
         )
     }
 
-    func testDrawerOccupiesExactlyHalfTheScreen() {
+    func testDrawerIsFifteenPercentWiderThanBefore() {
         for width: CGFloat in [280, 320, 375, 393, 440] {
             let drawerWidth = ATHLTHSideMenuLayoutPolicy.width(for: width)
-            XCTAssertEqual(drawerWidth, width * 0.5, accuracy: 0.01)
+            XCTAssertEqual(drawerWidth, width * 0.5 * 1.15, accuracy: 0.01)
         }
     }
 
     func testSmallScreensKeepSpaceForDismissTap() {
-        XCTAssertLessThanOrEqual(
-            ATHLTHSideMenuLayoutPolicy.width(for: 320),
-            160
-        )
-        XCTAssertLessThanOrEqual(
-            ATHLTHSideMenuLayoutPolicy.width(for: 280),
-            140
-        )
+        for width: CGFloat in [280, 320, 375, 393, 440] {
+            let drawerWidth = ATHLTHSideMenuLayoutPolicy.width(for: width)
+            XCTAssertGreaterThanOrEqual(width - drawerWidth, width * 0.425 - 0.01)
+            XCTAssertGreaterThanOrEqual(width - drawerWidth, 110)
+        }
     }
 
     func testLeftSwipeClosesWithoutCapturingVerticalScroll() {

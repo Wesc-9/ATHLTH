@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// iPhone drawer stays half screen for ordinary text sizes.
+/// The iPhone drawer is 15% wider than the previous half-screen layout.
+/// Its 42.5% uncovered area still supports tapping outside to dismiss.
 enum ATHLTHSideMenuLayoutPolicy {
     static func width(for viewportWidth: CGFloat) -> CGFloat {
-        max(0, viewportWidth * 0.5)
+        max(0, viewportWidth * 0.575)
     }
 
     static func shouldDismiss(translation: CGSize) -> Bool {
