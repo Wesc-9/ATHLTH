@@ -157,6 +157,67 @@ struct ATHLTHWorkoutStepDetails: View {
                         symbol: "mountain.2"
                     )
                 }
+                if let sets = block.setCount, sets > 0 {
+                    targetTile(tr("Sets", "Sett"), "\(sets)", symbol: "square.stack.3d.up")
+                }
+                if let repetitions = block.repetitions, repetitions > 0 {
+                    let maximum = block.targetRepetitionsMaximum
+                    let detail = maximum.map {
+                        $0 > repetitions ? "\(repetitions)–\($0)" : "\(repetitions)"
+                    } ?? "\(repetitions)"
+                    targetTile(tr("Repetitions", "Repetisjoner"), detail,
+                               symbol: "repeat")
+                }
+                if let rest = block.restBetweenSetsSeconds, rest > 0 {
+                    targetTile(tr("Set rest", "Settpause"),
+                               ATHLTHWorkoutStepCopy.duration(rest),
+                               symbol: "pause.circle")
+                }
+                if let rir = block.targetRepsInReserve, (0...10).contains(rir) {
+                    targetTile(tr("Reps in reserve", "Repetisjoner i reserve"),
+                               "\(rir) RIR", symbol: "gauge.medium")
+                }
+                if let movementTempo = block.targetMovementTempo,
+                   !movementTempo.isEmpty {
+                    targetTile(tr("Movement tempo", "Bevegelsestempo"),
+                               movementTempo, symbol: "timer")
+                }
+                if let power = block.targetVMAPercent, power.isFinite {
+                    targetTile(tr("VMA target", "VMA-mål"),
+                               String(format: "%.0f %%", power), symbol: "gauge")
+                }
+                if let intensity = block.targetIntensityType,
+                   !intensity.isEmpty {
+                    targetTile(tr("Intensity type", "Intensitetstype"),
+                               intensity, symbol: "flame")
+                }
+                if let metres = block.targetElevationGainMeters,
+                   metres.isFinite {
+                    targetTile(tr("Elevation gain", "Høydemeter"),
+                               String(format: "%.0f m", metres),
+                               symbol: "mountain")
+                }
+                if let gradient = block.targetGradientPercent,
+                   gradient.isFinite {
+                    targetTile(tr("Outdoor gradient", "Stigning ute"),
+                               String(format: "%.1f %%", gradient),
+                               symbol: "mountain.2")
+                }
+                if let terrain = block.targetTerrainType,
+                   !terrain.isEmpty {
+                    targetTile(tr("Terrain", "Terreng"),
+                               ATHLTHZonedLocalization.text(terrain),
+                               symbol: "map")
+                }
+                if let index = block.sourceSupersetGroupIndex {
+                    targetTile(tr("Source superset", "Supersettgruppe"),
+                               "\(index)", symbol: "square.stack")
+                }
+                if let load = block.targetWeightKilograms, load >= 0 {
+                    targetTile(tr("Planned weight", "Planlagt vekt"),
+                               String(format: "%.1f kg", load),
+                               symbol: "dumbbell")
+                }
                 if let rpe = block.targetEffortRPE, (1...10).contains(rpe) {
                     targetTile(
                         tr("Effort", "Anstrengelse"),
