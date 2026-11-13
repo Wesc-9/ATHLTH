@@ -193,3 +193,127 @@ struct ATHLTHLiveWorkoutTopStrip: View {
         .accessibilityIdentifier("athlth-live-workout-top-strip")
     }
 }
+
+
+/// Same expandable Spotify dock on local strength and mirrored Watch workouts.
+/// The player is only instantiated when the athlete opens Spotify in the top strip.
+struct ATHLTHLiveSpotifyExpandedBar: View {
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var settings: AppSettingsStore
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ATHLTHSpotifyGlyph()
+                .frame(width: 22, height: 22)
+                .accessibilityHidden(true)
+
+            Text("Spotify")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+
+            Button {
+                Task {
+                    await spotify.handleIPhoneAudioDockCommand(
+                        spotify.isPlaying ? .pause : .resume
+                    )
+                }
+            } label: {
+                Image(systemName: spotify.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 35, height: 42)
+                    .contentShape(Rectangle())
+            }
+            .disabled(!spotify.isConnected)
+            .accessibilityLabel(spotify.isPlaying
+                ? ATHLTHLocalization.choose(english: "Pause Spotify", norwegian: "Pause Spotify")
+                : ATHLTHLocalization.choose(english: "Play Spotify", norwegian: "Spill Spotify")
+            )
+
+            Button {
+                Task { await spotify.handleIPhoneAudioDockCommand(.next) }
+            } label: {
+                Image(systemName: "forward.end.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 35, height: 42)
+                    .contentShape(Rectangle())
+            }
+            .disabled(!spotify.isConnected)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Next track", norwegian: "Neste låt"
+            ))
+
+            Rectangle()
+                .fill(ATHLTHTrainDesign.rule)
+                .frame(width: 1, height: 22)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 5) {
+                    playlistButton(index: 1, playlist: settings.spotifyQuickPlaylistOne)
+                    playlistButton(index: 2, playlist: settings.spotifyQuickPlaylistTwo)
+                }
+                .frame(minWidth: 150)
+
+                playlistButton(index: 1, playlist: settings.spotifyQuickPlaylistOne)
+
+                Text(
+                    spotify.watchTrackTitle ??
+                        spotify.activePlaylist?.name ??
+                        ATHLTHLocalization.choose(
+                            english: "No active playlist", norwegian: "Ingen aktiv spilleliste"
+                        )
+                )
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(ATHLTHTrainDesign.ink)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(ATHLTHTrainDesign.paper, in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(
+                ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.8
+            )
+        }
+        .accessibilityIdentifier("athlth-live-expanded-spotify")
+    }
+
+    private func playlistButton(
+        index: Int,
+        playlist: SpotifyPlaylistReference?
+    ) -> some View {
+        Button {
+            guard let playlist else { return }
+            Task {
+                await spotify.startLinkedPlaylist(
+                    playlist, settings: settings,
+                    respectGlobalAutoplay: false
+                )
+            }
+        } label: {
+            Text(playlist?.name ?? "\(index)")
+                .font(.system(size: 10, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, 7)
+                .frame(maxWidth: .infinity, minHeight: 34)
+                .background(
+                    ATHLTHTheme.premiumGoldSoft,
+                    in: RoundedRectangle(cornerRadius: 10)
+                )
+        }
+        .disabled(playlist == nil || !spotify.isConnected)
+        .accessibilityLabel(playlist.map {
+            ATHLTHLocalization.choose(
+                english: "Play playlist \($0.name)",
+                norwegian: "Spill spillelisten \($0.name)"
+            )
+        } ?? ATHLTHLocalization.choose(
+            english: "Configure playlist \(index) in Settings",
+            norwegian: "Velg spilleliste \(index) i Innstillinger"
+        ))
+    }
+}
