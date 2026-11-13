@@ -1401,7 +1401,8 @@ struct AppRootView: View {
                     accountID: appSession.profile.userID,
                     phone: phoneWorkout,
                     strength: strengthWorkout,
-                    mirroredWatch: workoutMirroring
+                    mirroredWatch: workoutMirroring,
+                    spotify: spotifyPlayback
                 )
             } else {
                 crossDeviceWorkout.clearLocalState()
