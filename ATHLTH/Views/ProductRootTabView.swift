@@ -99,7 +99,7 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
-    @StateObject private var goalAccountSync = ATHLTHGoalAccountSyncStore()
+    @EnvironmentObject private var goalAccountSync: ATHLTHGoalAccountSyncStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore

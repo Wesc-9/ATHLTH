@@ -127,6 +127,8 @@ struct ATHLTHiPadStudioRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMessagePanelMotion
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var studioPlanSync: ATHLTHStudioPlanSyncStore
+    @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var goalAccountSync: ATHLTHGoalAccountSyncStore
     @SceneStorage("athlth.studio.selectedDestination")
     private var savedDestination = ATHLTHStudioDestination.overview.rawValue
     @State private var selection: ATHLTHStudioDestination = .overview
@@ -309,6 +311,16 @@ struct ATHLTHiPadStudioRootView: View {
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
         }
+        // Keep goal sync live while Studio is foregrounded, as on iPhone.
+        .task(id: "\(session.profile.userID.uuidString)|\(session.signedIn)|\(String(describing: scenePhase))") {
+            guard session.signedIn, scenePhase == .active else { return }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(20)) }
+                catch { return }
+                guard !Task.isCancelled, session.signedIn, scenePhase == .active else { return }
+                await goalAccountSync.sync(session: session, goals: goalStore)
+            }
+        }
         .onAppear {
             // Scene-local, not shared across windows: Stage Manager windows
             // can keep different destinations without fighting each other.
@@ -324,6 +336,10 @@ struct ATHLTHiPadStudioRootView: View {
             studioPlanSync.switchAccount(
                 session.signedIn ? session.profile.userID : nil
             )
+            goalAccountSync.switchAccount(
+                session.signedIn ? session.profile.userID : nil
+            )
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
             if studioPlanSync.enabled {
                 Task { await studioPlanSync.sync(session: session) }
             }
@@ -333,10 +349,35 @@ struct ATHLTHiPadStudioRootView: View {
             studioPlanSync.switchAccount(
                 session.signedIn ? session.profile.userID : nil
             )
+            goalAccountSync.switchAccount(
+                session.signedIn ? session.profile.userID : nil
+            )
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
         }
         .onChange(of: session.signedIn) { _, signedIn in
             if !signedIn { showingInspector = false }
             studioPlanSync.switchAccount(signedIn ? session.profile.userID : nil)
+            goalAccountSync.switchAccount(signedIn ? session.profile.userID : nil)
+            if signedIn {
+                goalAccountSync.scheduleSync(session: session, goals: goalStore)
+            }
+        }
+        .onChange(of: goalStore.goals) { _, _ in
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: Notification.Name("athlth.goalDocumentDidChange")
+        )) { notification in
+            guard let accountID = notification.userInfo?["accountID"] as? UUID,
+                  session.signedIn, accountID == session.profile.userID else { return }
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: Notification.Name("athlth.privateMeasurementsDidChange")
+        )) { notification in
+            guard let accountID = notification.userInfo?["accountID"] as? UUID,
+                  session.signedIn, accountID == session.profile.userID else { return }
+            goalAccountSync.scheduleSync(session: session, goals: goalStore)
         }
         .onChange(of: session.trainingPlans) { _, _ in
             // Saving the local plan remains immediate and independent of
@@ -344,8 +385,11 @@ struct ATHLTHiPadStudioRootView: View {
             studioPlanSync.scheduleSync(session: session)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active && studioPlanSync.enabled {
-                Task { await studioPlanSync.sync(session: session) }
+            if phase == .active {
+                goalAccountSync.scheduleSync(session: session, goals: goalStore)
+                if studioPlanSync.enabled {
+                    Task { await studioPlanSync.sync(session: session) }
+                }
             }
         }
         .onChange(of: selection) { _, destination in

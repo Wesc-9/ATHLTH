@@ -68,6 +68,8 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
     @StateObject private var goals = GoalStore()
+    // One account-scoped sync coordinator for iPhone and iPad profile goals.
+    @StateObject private var goalAccountSync = ATHLTHGoalAccountSyncStore()
     @StateObject private var trainingBackups = TrainingBackupStore()
     @StateObject private var studioPlanSync = ATHLTHStudioPlanSyncStore()
     @StateObject private var automaticOfflineLibrary = ATHLTHAutomaticOfflineLibraryStore()
@@ -180,6 +182,7 @@ private struct ATHLTHSceneRootView: View {
                 .environmentObject(settings)
                 .environmentObject(strengthWorkout)
                 .environmentObject(goals)
+                .environmentObject(goalAccountSync)
                 .environmentObject(trainingBackups)
                 .environmentObject(studioPlanSync)
                 .environmentObject(phoneWorkout)
