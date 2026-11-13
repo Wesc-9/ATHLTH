@@ -17,7 +17,7 @@ create index if not exists private_active_workout_presence_expires_idx
     on public.private_active_workout_presence(expires_at);
 
 alter table public.private_active_workout_presence enable row level security;
-revoke all on public.private_active_workout_presence from public, anon;
+revoke all on public.private_active_workout_presence from public, anon, authenticated;
 grant select, insert, update, delete
     on public.private_active_workout_presence to authenticated;
 
