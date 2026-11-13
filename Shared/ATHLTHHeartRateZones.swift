@@ -8,7 +8,8 @@ enum ATHLTHHeartRateZones {
     static func resolvedMaximumBPM(
         configured: Int?,
         dateOfBirth: Date?,
-        now: Date = Date()
+        now: Date = Date(),
+        usesFemaleEstimate: Bool = false
     ) -> Double? {
         if let configured, (100...240).contains(configured) {
             return Double(configured)
@@ -18,7 +19,9 @@ enum ATHLTHHeartRateZones {
             [.year], from: dateOfBirth, to: now
         ).year ?? 0
         guard (18...100).contains(age) else { return nil }
-        return max(100, 208 - 0.7 * Double(age))
+        return usesFemaleEstimate
+            ? max(100, 206 - 0.88 * Double(age))
+            : max(100, 208 - 0.7 * Double(age))
     }
 
     static func range(for zone: Int, maximumBPM: Double?) -> ClosedRange<Int>? {
@@ -31,6 +34,55 @@ enum ATHLTHHeartRateZones {
         let lowerBPM = Int((maximumBPM * lower).rounded())
         let upperBPM = Int((maximumBPM * upper).rounded())
         return lowerBPM...upperBPM
+    }
+
+    /// Multi-zone prescription, e.g. Z1–Z2 = 50–70% HRmax.
+    /// Values are rounded only after calculating the full continuous band.
+    static func range(
+        from firstZone: Int,
+        through lastZone: Int,
+        maximumBPM: Double?
+    ) -> ClosedRange<Int>? {
+        guard (1...5).contains(firstZone),
+              (1...5).contains(lastZone), firstZone <= lastZone,
+              let maximumBPM, maximumBPM.isFinite,
+              (100...240).contains(maximumBPM)
+        else { return nil }
+        let low = 0.50 + 0.10 * Double(firstZone - 1)
+        let high = 0.50 + 0.10 * Double(lastZone)
+        return Int((low * maximumBPM).rounded())...
+               Int((min(1, high) * maximumBPM).rounded())
+    }
+
+    static func range(
+        fromPercent lower: Double?,
+        toPercent upper: Double?,
+        maximumBPM: Double?
+    ) -> ClosedRange<Int>? {
+        guard let lower, let upper,
+              lower.isFinite, upper.isFinite,
+              (30...100).contains(lower),
+              (30...100).contains(upper), lower <= upper,
+              let maximumBPM, maximumBPM.isFinite,
+              (100...240).contains(maximumBPM)
+        else { return nil }
+        return Int((maximumBPM * lower / 100).rounded())...
+               Int((maximumBPM * upper / 100).rounded())
+    }
+
+    static func matchingZones(
+        for target: ClosedRange<Int>?,
+        maximumBPM: Double?
+    ) -> Set<Int> {
+        guard let target else { return [] }
+        return Set((1...5).filter { zone in
+            guard let range = range(for: zone, maximumBPM: maximumBPM) else {
+                return false
+            }
+            // A shared boundary (e.g. exactly 60%) is not sufficient.
+            return target.lowerBound < range.upperBound &&
+                   target.upperBound > range.lowerBound
+        })
     }
 
     /// Observed zone uses an actually measured heart rate and a valid
