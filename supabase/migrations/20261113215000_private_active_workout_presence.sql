@@ -21,19 +21,51 @@ revoke all on public.private_active_workout_presence from public, anon, authenti
 grant select, insert, update, delete
     on public.private_active_workout_presence to authenticated;
 
-create policy "Own workout presence read"
-    on public.private_active_workout_presence for select to authenticated
-    using (user_id = (select auth.uid()));
-create policy "Own workout presence insert"
-    on public.private_active_workout_presence for insert to authenticated
-    with check (user_id = (select auth.uid()));
-create policy "Own workout presence update"
-    on public.private_active_workout_presence for update to authenticated
-    using (user_id = (select auth.uid()))
-    with check (user_id = (select auth.uid()));
-create policy "Own workout presence delete"
-    on public.private_active_workout_presence for delete to authenticated
-    using (user_id = (select auth.uid()));
+-- Replays remain safe when Supabase's remote migration history was
+-- populated separately from this GitHub release branch.
+do $$
+begin
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'private_active_workout_presence'
+          and policyname = 'Own workout presence read'
+    ) then
+        create policy "Own workout presence read"
+            on public.private_active_workout_presence for select to authenticated
+            using (user_id = (select auth.uid()));
+    end if;
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'private_active_workout_presence'
+          and policyname = 'Own workout presence insert'
+    ) then
+        create policy "Own workout presence insert"
+            on public.private_active_workout_presence for insert to authenticated
+            with check (user_id = (select auth.uid()));
+    end if;
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'private_active_workout_presence'
+          and policyname = 'Own workout presence update'
+    ) then
+        create policy "Own workout presence update"
+            on public.private_active_workout_presence for update to authenticated
+            using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+    end if;
+    if not exists (
+        select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'private_active_workout_presence'
+          and policyname = 'Own workout presence delete'
+    ) then
+        create policy "Own workout presence delete"
+            on public.private_active_workout_presence for delete to authenticated
+            using (user_id = (select auth.uid()));
+    end if;
+end $$;
 
 comment on table public.private_active_workout_presence is
     'Short-lived private active-workout signal only. Not an approval and never contains live health metrics. User-visible iPad card may request session-scoped consent on iPhone.';
