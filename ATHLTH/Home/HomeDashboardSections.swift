@@ -1719,6 +1719,9 @@ struct HomeWeeklyProgressStrip:
         AppSessionStore
     @EnvironmentObject private var strength:
         StrengthWorkoutStore
+    @Environment(\.scenePhase) private var scenePhase
+    @SceneStorage("athlth.home.weeklyProgress.openDay")
+    private var persistedOpenDay: Double = 0
 
     let plan: TrainingPlan?
     let workouts: [WorkoutSummary]
@@ -1863,7 +1866,15 @@ struct HomeWeeklyProgressStrip:
                 lineWidth: 0.7
             )
         }
-        .sheet(item: $selectedDay) {
+        .onAppear {
+            restoreDaySheetIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { restoreDaySheetIfNeeded() }
+        }
+        .sheet(item: $selectedDay, onDismiss: {
+            if scenePhase == .active { persistedOpenDay = 0 }
+        }) {
             selection in
             HomeWeeklyProgressDaySheet(
                 selection: selection,
@@ -1872,6 +1883,7 @@ struct HomeWeeklyProgressStrip:
                 onStartStandaloneWorkout: { workout, device in
                     // Close the day sheet before the chosen recorder opens.
                     selectedDay = nil
+                    persistedOpenDay = 0
                     onStartStandaloneWorkout?(workout, device)
                 },
                 onOpenWorkout: {
@@ -1889,6 +1901,31 @@ struct HomeWeeklyProgressStrip:
                 28
             )
         }
+    }
+
+    private func makeDaySelection(for date: Date) -> HomeWeeklyProgressDaySelection {
+        let planned = plannedSessions(for: date)
+        let actual = workoutsForDay(date)
+        let events = communityEventsForDay(date)
+        return HomeWeeklyProgressDaySelection(
+            date: date,
+            planned: planned,
+            communityEvents: events,
+            actual: actual,
+            completedPlannedIDs: completedPlanSessionIDs(
+                date: date, planned: planned
+            ),
+            completedCommunityEventIDs: completedCommunityEventIDs(
+                date: date, events: events
+            )
+        )
+    }
+
+    private func restoreDaySheetIfNeeded() {
+        guard selectedDay == nil, persistedOpenDay > 0 else { return }
+        selectedDay = makeDaySelection(
+            for: Date(timeIntervalSince1970: persistedOpenDay)
+        )
     }
 
     @ViewBuilder
@@ -1921,18 +1958,8 @@ struct HomeWeeklyProgressStrip:
 
         Button {
             daySheetDetent = .fraction(0.78)
-            selectedDay =
-                HomeWeeklyProgressDaySelection(
-                    date: date,
-                    planned: planned,
-                    communityEvents:
-                        scheduledCommunityEvents,
-                    actual: actual,
-                    completedPlannedIDs:
-                        completedIDs,
-                    completedCommunityEventIDs:
-                        completedCommunityIDs
-                )
+            persistedOpenDay = date.timeIntervalSince1970
+            selectedDay = makeDaySelection(for: date)
         } label: {
             day(
                 date,
