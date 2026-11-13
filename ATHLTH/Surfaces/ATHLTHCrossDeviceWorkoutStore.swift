@@ -310,6 +310,17 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                           target > 0, let remaining else { return nil }
                     return min(1, max(0, 1 - remaining / target))
                 }(),
+                runningOverallProgress: {
+                    guard !steps.isEmpty, steps.indices.contains(index),
+                          let seconds = current?.durationSeconds,
+                          seconds > 0, let remaining else { return nil }
+                    return ATHLTHRunningStepEngine.overallProgress(
+                        steps: steps,
+                        index: index,
+                        currentStepProgress:
+                            min(1, max(0, 1 - remaining / seconds))
+                    )
+                }(),
                 routeTitle: run.plannedRouteTitle,
                 ghostRaceTitle: run.ghostRaceTitle,
                 ghostDistanceDeltaMeters: run.ghostDistanceDeltaMeters,
@@ -330,17 +341,6 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         (run.structuredStepStartDistanceMeters ??
                          run.distanceMeters)))
                 },
-                runningOverallProgress: {
-                    guard !steps.isEmpty, steps.indices.contains(index),
-                          let seconds = current?.durationSeconds,
-                          seconds > 0, let remaining else { return nil }
-                    return ATHLTHRunningStepEngine.overallProgress(
-                        steps: steps,
-                        index: index,
-                        currentStepProgress:
-                            min(1, max(0, 1 - remaining / seconds))
-                    )
-                }(),
                 routeProgressPercent: run.routeProgressPercent,
                 routeRemainingMeters: run.routeRemainingMeters,
                 routeDistanceMeters:
