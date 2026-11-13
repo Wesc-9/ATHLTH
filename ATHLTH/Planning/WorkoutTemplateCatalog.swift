@@ -889,6 +889,8 @@ struct WorkoutTemplateLibraryView: View {
     @AppStorage("athlth.workoutPreview.advanced.v1") private var advancedMode = false
     @State private var pendingCatalogAddition: WorkoutTemplateCatalogEntry?
     @State private var pendingRunningAddition: RunningWorkoutTemplate?
+    // Prepared once on selection, never rebuilt during sheet layout.
+    @State private var pendingTargetSteps: [WorkoutTemplateBlock] = []
     @State private var previewedWorkoutSource: SelectedWorkoutSource?
     @State private var workoutSourceAfterPreviewDismiss: SelectedWorkoutSource?
 
@@ -984,6 +986,12 @@ struct WorkoutTemplateLibraryView: View {
         ) {
             pendingCatalogAddition = entry
             pendingRunningAddition = nil
+            // Synchronously install the real 8+ steps before presentation.
+            // The advanced editor must never appear with a transient 0 steps.
+            pendingTargetSteps = entry.blocks
+            catalogPersonalBlocks = ATHLTHWorkoutLibraryPersonalization.blankTargets(
+                entry.blocks
+            )
             showingPersonalizationQuestion = true
         } else {
             addCatalogToPlan(entry, blocks:
@@ -1022,6 +1030,9 @@ struct WorkoutTemplateLibraryView: View {
         }
         pendingRunningAddition = source
         pendingCatalogAddition = nil
+        pendingTargetSteps = ATHLTHUnifiedWorkout.editorBlocks(
+            from: source.plannedSession()
+        )
         showingPersonalizationQuestion = true
     }
 
@@ -1051,14 +1062,30 @@ struct WorkoutTemplateLibraryView: View {
                 blocks: ATHLTHWorkoutQuickGoalApplier.apply(goal, to: clean)
             )
         } else if let source = pendingRunningAddition {
-            // duplicate(...) creates the account-scoped, unpersonalized copy.
-            let copy = runningLibrary.duplicate(source)
-            let customized = ATHLTHWorkoutQuickGoalApplier.apply(goal, to: copy)
-            runningLibrary.save(customized)
-            onSelectPlanned?(customized.plannedSession())
+            if case .pacePlan = goal {
+                // A legacy running template compresses repeated intervals.
+                // Preserve individual drag/recovery selection by storing its
+                // personal expanded timeline in the shared workout engine.
+                var personal = source.plannedSession()
+                personal.workoutBlocks = ATHLTHWorkoutQuickGoalApplier.apply(
+                    goal, to: pendingTargetSteps
+                )
+                let id = session.saveSharedWorkout(
+                    personal, sourceSessionID: source.id
+                )
+                onSelectPlanned?(session.savedWorkoutTemplates.first {
+                    $0.id == id
+                } ?? personal)
+            } else {
+                let copy = runningLibrary.duplicate(source)
+                let customized = ATHLTHWorkoutQuickGoalApplier.apply(goal, to: copy)
+                runningLibrary.save(customized)
+                onSelectPlanned?(customized.plannedSession())
+            }
         }
         pendingCatalogAddition = nil
         pendingRunningAddition = nil
+        pendingTargetSteps = []
     }
 
     /// Avoid showing a second sheet while the goal sheet is still closing.
@@ -1070,9 +1097,8 @@ struct WorkoutTemplateLibraryView: View {
         case .continueWith(let goal):
             addFirstWorkout(with: goal)
         case .advanced:
-            if let entry = pendingCatalogAddition {
-                catalogPersonalBlocks =
-                    ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+            if pendingCatalogAddition != nil {
+                // Already prepared before the first sheet appeared.
                 showingCatalogPersonalization = true
             } else if pendingRunningAddition != nil {
                 showingRunningPersonalization = true
@@ -1858,7 +1884,7 @@ struct WorkoutTemplateLibraryView: View {
                                     )
                                 },
                                 onUse: {
-                                    previewedWorkoutSource = .catalog(entry)
+                                    chooseCatalogForPlan(entry)
                                     recents.markUsed(
                                         .workout, itemID: entry.id.uuidString,
                                         title: entry.title, subtitle: entry.categoryTitle,
@@ -1879,11 +1905,10 @@ struct WorkoutTemplateLibraryView: View {
                             Group {
                                 if let onSelectPlanned {
                                 Button {
-                                    if initialCategory != nil {
-                                        previewedWorkoutSource = .catalog(entry)
-                                    } else {
-                                        chooseCatalogForPlan(entry)
-                                    }
+                                    // The card already previews this workout;
+                                    // open one personal-target sheet, not two
+                                    // stacked preview/target presentations.
+                                    chooseCatalogForPlan(entry)
                                 } label: {
                                     catalogTile(entry)
                                 }
@@ -1945,7 +1970,7 @@ struct WorkoutTemplateLibraryView: View {
                                     )
                                 },
                                 onUse: {
-                                    previewedWorkoutSource = .running(workout)
+                                    chooseRunningForPlan(workout)
                                     recents.markUsed(
                                         .workout, itemID: workout.id.uuidString,
                                         title: workout.title, subtitle: workout.type.title,
@@ -1966,11 +1991,7 @@ struct WorkoutTemplateLibraryView: View {
                             Group {
                                 if let onSelectPlanned {
                                 Button {
-                                    if initialCategory != nil {
-                                        previewedWorkoutSource = .running(workout)
-                                    } else {
-                                        chooseRunningForPlan(workout)
-                                    }
+                                    chooseRunningForPlan(workout)
                                 } label: {
                                     runningTile(workout)
                                 }
@@ -2068,6 +2089,7 @@ struct WorkoutTemplateLibraryView: View {
                     isRunning: entry.plannedSession().kind == .running,
                     durationMinutes: entry.estimatedDurationMinutes,
                     partCount: entry.blocks.count,
+                    workoutSteps: pendingTargetSteps,
                     savingToLibrary: false
                 ) { decision in
                     pendingQuickGoalDecision = decision
@@ -2080,7 +2102,8 @@ struct WorkoutTemplateLibraryView: View {
                     durationMinutes: source.estimatedDurationSeconds.map {
                         Int(($0 / 60).rounded(.up))
                     },
-                    partCount: source.blocks.count,
+                    partCount: pendingTargetSteps.count,
+                    workoutSteps: pendingTargetSteps,
                     savingToLibrary: false
                 ) { decision in
                     pendingQuickGoalDecision = decision
@@ -2101,7 +2124,10 @@ struct WorkoutTemplateLibraryView: View {
                             symbol: entry.systemImage,
                             difficulty: entry.difficulty,
                             durationMinutes: entry.estimatedDurationMinutes,
-                            blocks: catalogPersonalBlocks,
+                            blocks: catalogPersonalBlocks.isEmpty
+                                ? ATHLTHWorkoutLibraryPersonalization.blankTargets(
+                                    entry.blocks
+                                ) : catalogPersonalBlocks,
                             onUpdateBlock: { index, updated in
                                 guard catalogPersonalBlocks.indices.contains(index) else {
                                     return
@@ -2983,6 +3009,7 @@ struct WorkoutTemplateDetailView: View {
                 isRunning: entry.plannedSession().kind == .running,
                 durationMinutes: entry.estimatedDurationMinutes,
                 partCount: entry.blocks.count,
+                workoutSteps: entry.blocks,
                 savingToLibrary: true
             ) { decision in
                 detailQuickGoalDecision = decision
