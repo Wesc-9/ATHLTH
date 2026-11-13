@@ -111,6 +111,7 @@ struct ProductRootTabView: View {
         HealthKitManager
     @Environment(\.scenePhase)
     private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var selectedTab: Int
     @State private var trainNavigationRequest:
@@ -216,46 +217,12 @@ struct ProductRootTabView: View {
     }
 
     private var visibleAppBadgeCount: Int {
-        let inboxCount =
-            messaging.unreadCount +
-            messaging.messageRequestCount
-
-        let bellCount =
-            notifications
-                .notificationCenterUnreadCount +
-            health.pendingWorkoutImportCount
-
-        // A challenge invite can arrive in SocialStore slightly before the
-        // notification center imports the same backend row. Count only the
-        // uncovered invites so one event never becomes two app-icon badges.
-        let backendChallengeInvites =
-            social.inboxEvents.reduce(into: 0) { count, event in
-                if event.kind == "challenge_invite" && event.readAt == nil {
-                    count += 1
-                }
-            }
-
-        let importedChallengeInvites =
-            notifications.notificationCenterItems.reduce(into: 0) { count, item in
-                if item.isUnread &&
-                    item.socialEventKind?.lowercased() == "challenge_invite" {
-                    count += 1
-                }
-            }
-
-        let uncoveredChallengeInvites =
-            max(
-                backendChallengeInvites -
-                    importedChallengeInvites,
-                0
-            )
-
-        return max(
-            inboxCount +
-            bellCount +
-            uncoveredChallengeInvites,
-            0
-        )
+        ATHLTHSideMenuBadgePolicy.counts(
+            messaging: messaging,
+            social: social,
+            notificationStore: notifications,
+            health: health
+        ).total
     }
 
     init() {
@@ -299,8 +266,7 @@ struct ProductRootTabView: View {
                     selectedTab = 1
                 },
                 onOpenSideMenu: {
-                    // Instant overlay: no drawer spring, slide or fade.
-                    showingSideMenu = true
+                    openSideMenu()
                 },
                 sideMenuUnreadCount: visibleAppBadgeCount,
                 isActive: selectedTab == 0
@@ -737,16 +703,38 @@ struct ProductRootTabView: View {
             }
         }
         .overlay {
-            if showingSideMenu {
-                ATHLTHSideMenuView(
-                    selectedTab: selectedTab,
-                    onSelect: selectFromSideMenu,
-                    onDismiss: {
+            ZStack(alignment: .leading) {
+                if showingSideMenu {
+                    Button {
                         showingSideMenu = false
+                    } label: {
+                        Color.black.opacity(0.28)
+                            .ignoresSafeArea()
+                            .contentShape(Rectangle())
                     }
-                )
-                .zIndex(100)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Close navigation menu",
+                        norwegian: "Lukk sidemenyen"
+                    ))
+                    .transition(.opacity)
+                    .zIndex(99)
+
+                    ATHLTHSideMenuView(
+                        selectedTab: selectedTab,
+                        onSelect: selectFromSideMenu,
+                        onDismiss: { showingSideMenu = false }
+                    )
+                    .transition(
+                        reduceMotion ? .opacity : .move(edge: .leading)
+                    )
+                    .zIndex(100)
+                }
             }
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.86),
+                value: showingSideMenu
+            )
         }
         .sheet(item: $sideMenuModalDestination) { _ in
             NavigationStack {
@@ -772,6 +760,10 @@ struct ProductRootTabView: View {
             ATHLTHSideMenuDeepLinkView(destination: destination)
         }
         .environmentObject(goalAccountSync)
+    }
+
+    private func openSideMenu() {
+        showingSideMenu = true
     }
 
     private func selectFromSideMenu(_ destination: ATHLTHSideMenuDestination) {
@@ -808,7 +800,7 @@ struct ProductRootTabView: View {
             trainNavigationRequest = .ghost
             selectedTab = 1
 
-        case .profile, .trainTogether, .arena, .clubs, .exerciseProgress:
+        case .profile, .trainTogether, .challenges, .arena, .clubs:
             sideMenuFullScreenDestination = destination
 
         case .settings:
