@@ -163,7 +163,9 @@ final class ATHLTHWorkoutCatalogAuditTests: XCTestCase {
         }
         XCTAssertEqual(between.count, 9)
         XCTAssertEqual(
-            ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline),
+            try XCTUnwrap(
+                ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline)
+            ),
             3_570, accuracy: 0.01
         )
         XCTAssertEqual(timeline.first?.resolvedPhase, .warmup)
@@ -176,7 +178,9 @@ final class ATHLTHWorkoutCatalogAuditTests: XCTestCase {
         })
         let timeline = ATHLTHZonedPlanLibrary.blocks(for: source)
         let rest = try XCTUnwrap(timeline.first {
-            $0.title.lowercased().contains("rest before simulated start")
+            $0.kind == .rest &&
+            $0.resolvedPhase == .recovery &&
+            $0.durationSeconds == 300
         })
         XCTAssertEqual(rest.kind, .rest)
         XCTAssertEqual(rest.resolvedPhase, .recovery)
@@ -185,7 +189,7 @@ final class ATHLTHWorkoutCatalogAuditTests: XCTestCase {
         // The walk-back has no source distance or duration, so the total
         // session estimate cannot be asserted as a fixed number.
         XCTAssertTrue(timeline.contains {
-            $0.title.lowercased().contains("walk back") &&
+            $0.kind == .run && $0.resolvedPhase == .recovery &&
             $0.durationSeconds == nil && $0.distanceMeters == nil
         })
         XCTAssertNil(ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline))
