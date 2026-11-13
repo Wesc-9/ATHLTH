@@ -2866,7 +2866,9 @@ enum ATHLTHWorkoutFirstUsePolicy {
 /// erased when added from the library, leaving the copied workout text-only.
 enum ATHLTHWorkoutLibraryPersonalization {
     static func blankTargets(_ blocks: [WorkoutTemplateBlock]) -> [WorkoutTemplateBlock] {
-        blocks.map { original in
+        // Every ATHLTH/Mine/Quick Train library addition receives the same
+        // deterministic recovery, including copies predating the new schema.
+        blocks.recoveringLegacyStructuredTargets().map { original in
             var block = original
             block.targetPaceSecondsPerKilometer = nil
             block.treadmillInclinePercent = nil
