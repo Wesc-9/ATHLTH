@@ -67,6 +67,24 @@ final class ATHLTHHeartRateZoneCoachTargetTests: XCTestCase {
         XCTAssertEqual(target, oldConfiguration)
     }
 
+    func testUnzonedRecoveryNeverInheritsPreviousZ5Target() {
+        let previous = oldConfiguration
+        let recovery = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: previous,
+            stepZone: nil,
+            maximumBPM: 190,
+            suppressHeartRateForUnzonedStep: true
+        )
+        XCTAssertFalse(recovery?.heartRateEnabled ?? true)
+        XCTAssertNil(recovery?.heartRateZone)
+        XCTAssertNil(recovery?.heartRateMinimumBPM)
+        XCTAssertNil(recovery?.heartRateMaximumBPM)
+        XCTAssertTrue(recovery?.paceAlertsEnabled == true)
+        XCTAssertEqual(recovery?.repeatSeconds, previous.repeatSeconds)
+        // Never mutate the original workout-wide setting.
+        XCTAssertTrue(previous.heartRateEnabled)
+    }
+
     func testHapticAlertsGainVoiceOnlyWhenAudioCoachEnabled() {
         XCTAssertEqual(ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
             .haptic, coachEnabled: true), .both)
