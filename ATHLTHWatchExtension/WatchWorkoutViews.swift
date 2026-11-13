@@ -1591,12 +1591,10 @@ struct WatchActiveWorkoutView: View {
             Button {
                 if workoutManager.state == .paused {
                     workoutManager.resume()
-                } else if workoutManager.kind == .strength {
-                    // Rest timers never pause HealthKit. A pause of the
-                    // entire strength recording needs explicit confirmation.
-                    showingStrengthWholeWorkoutPauseConfirmation = true
                 } else {
-                    workoutManager.pause()
+                    // The entire HealthKit workout is different from
+                    // interval recovery and strength-set rest timers.
+                    showingStrengthWholeWorkoutPauseConfirmation = true
                 }
             } label: {
                 Label(
