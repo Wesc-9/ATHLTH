@@ -325,9 +325,16 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             guard let workoutID = notification.userInfo?["workoutID"] as? UUID,
                   let stepIndex = notification.userInfo?["stepIndex"] as? Int
             else { return }
+            let duration = notification.userInfo?["targetDurationSeconds"] as? TimeInterval
+            let intensityText = notification.userInfo?["intensityText"] as? String
+            let effortIndex = notification.userInfo?["effortOrdinal"] as? Int ?? stepIndex
             Task { @MainActor [weak self] in
-                await self?.playIntervalTrack(workoutID: workoutID,
-                                              stepIndex: stepIndex)
+                await self?.playIntervalTrack(
+                    workoutID: workoutID, stepIndex: stepIndex,
+                    effortIndex: effortIndex,
+                    targetDurationSeconds: duration,
+                    intensityText: intensityText
+                )
             }
         }
 
@@ -528,9 +535,14 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         intervalTrackGeneration = UUID()
     }
 
-    func playIntervalTrack(workoutID: UUID, stepIndex: Int) async {
+    func playIntervalTrack(
+        workoutID: UUID, stepIndex: Int,
+        effortIndex: Int? = nil,
+        targetDurationSeconds: TimeInterval? = nil,
+        intensityText: String? = nil
+    ) async {
         guard intervalTrackWorkoutID == workoutID,
-              let track = intervalTrack,
+              let chosen = intervalTrack,
               ATHLTHSpotifyIntervalCuePolicy.shouldPlay(
                 phase: "work", stepIndex: stepIndex,
                 previouslyPlayed: intervalTrackPlayedStepIndexes,
@@ -540,6 +552,15 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         else { return }
         intervalTrackLatestRequestedStepIndex = stepIndex
         let generation = intervalTrackGeneration
+        // A profile can only choose among the athlete's saved favorites.
+        // No profile, missing intensity, or invalid track keeps the explicit
+        // single-song selection from the previous version unchanged.
+        let track = ATHLTHSpotifySmartMusicPolicy.select(
+            from: chosen.smartProfile,
+            effortIndex: effortIndex ?? stepIndex,
+            targetDurationSeconds: targetDurationSeconds,
+            intensityText: intensityText
+        ) ?? chosen
 
         // iPhone-only App Remote. Do not use Spotify Connect as fallback:
         // that could switch playback to an old speaker or another person's device.
