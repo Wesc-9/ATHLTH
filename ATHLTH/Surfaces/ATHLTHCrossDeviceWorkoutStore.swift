@@ -72,6 +72,7 @@ private struct ATHLTHCrossDeviceWorkoutRow: Codable {
 /// Server-side RLS additionally enforces user_id = auth.uid().
 @MainActor
 final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
+    static let shared = ATHLTHCrossDeviceWorkoutStore()
     @Published private(set) var remote: ATHLTHCrossDeviceWorkoutSnapshot?
     @Published private(set) var isExpanded = false
     /// Explicit opt-in only for the next workout, never a saved preference.
