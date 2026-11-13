@@ -282,38 +282,45 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 let width = geometry.size.width
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        // The mountain hero belongs to the full detail canvas,
-                        // including the area behind the iPad top navigation.
-                        // Only the hero escapes the normal content margins.
-                        mountainPlanHero
-                            .frame(maxWidth: .infinity)
-                            .frame(height: split ? 344 : 308)
+                // Keep the mountain hero fixed while the cards scroll in
+                // their own content area. The existing plan button stays live.
+                VStack(spacing: 0) {
+                    mountainPlanHero
+                        .frame(maxWidth: .infinity)
+                        .frame(height: split ? 344 : 308)
 
+                    ScrollView {
                         VStack(alignment: .leading, spacing: split ? 20 : 16) {
-                            // Preserve all existing dashboard cards, actions,
-                            // content, and their own styling below the new hero.
-                            if split {
+                            let upcoming = nextWorkout(from: windows.upcoming)
+
+                            if split && width >= 1080 {
                                 HStack(alignment: .top, spacing: 18) {
-                                    activePlanSummary
+                                    nextWorkoutCard(upcoming)
+                                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                                    compactReadinessCard
+                                        .frame(width: min(390, max(310, width * 0.30)))
+                                    ATHLTHStudioHomeSocialHighlight()
+                                        .frame(width: min(285, max(230, width * 0.235)))
+                                }
+                            } else if split {
+                                HStack(alignment: .top, spacing: 18) {
+                                    nextWorkoutCard(upcoming)
                                         .frame(maxWidth: .infinity, alignment: .topLeading)
                                     compactReadinessCard
                                         .frame(width: min(390, max(310, width * 0.30)))
                                 }
+                                ATHLTHStudioHomeSocialHighlight()
                             } else {
-                                activePlanSummary
+                                nextWorkoutCard(upcoming)
                                 compactReadinessCard
+                                ATHLTHStudioHomeSocialHighlight()
                             }
 
-                            weekCard(week, width: width)
+                            // Only the existence of an active session is visible
+                            // without permission. Opening the card requests it.
+                            ATHLTHiPadLiveWorkoutStatusCard()
 
-                            ATHLTHiPadLiveWorkoutAccessTip()
-                            // Legacy strength/ghost cards were opt-out by
-                            // default and bypassed per-session permission.
-                            // The new read-only full screen is the only
-                            // authorized remote workout surface.
-                            
+                            weekCard(week, width: width)
                             ATHLTHStudioHomeCommunitySummary()
                             progressCard(wide: split, recorded: workouts, week: week)
                         }
@@ -322,10 +329,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         .frame(maxWidth: 1500)
                         .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
+                    .scrollIndicators(.hidden)
+                    .background(cream)
                 }
                 .ignoresSafeArea(.container, edges: .top)
-                .scrollIndicators(.hidden)
             }
         }
         .background(cream.ignoresSafeArea())
