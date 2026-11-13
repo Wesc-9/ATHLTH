@@ -54,6 +54,14 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     var spotifyPlaying: Bool? = nil
     var audioCoachEnabled: Bool? = nil
     var recentSplits: [ATHLTHLiveWorkoutSplit]? = nil
+    // Private one-session spectator metadata: never a full GPS trail.
+    // Only a fresh valid position from the source is shared after approval.
+    var liveLatitude: Double? = nil
+    var liveLongitude: Double? = nil
+    var livePositionAt: Date? = nil
+    // Only iPhone's observed Spotify track; Watch playback is not inferred.
+    var spotifyTrackTitle: String? = nil
+    var spotifyArtistName: String? = nil
 
     var id: UUID { sessionID }
     var symbol: String {
@@ -272,7 +280,11 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     )
                 },
                 spotifyPlaying: log.captureDevice == .appleWatch
-                    ? nil : spotify.isPlaying
+                    ? nil : spotify.isPlaying,
+                spotifyTrackTitle: log.captureDevice == .iPhone &&
+                    spotify.isPlaying ? spotify.watchTrackTitle : nil,
+                spotifyArtistName: log.captureDevice == .iPhone &&
+                    spotify.isPlaying ? spotify.watchArtistName : nil
             )
         }
         if let run = phone.active {
@@ -372,7 +384,36 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         activeSeconds: $0.activeSeconds,
                         distanceMeters: $0.distanceMeters
                     )
-                }
+                },
+                liveLatitude: {
+                    guard run.runEnvironment == .outdoor,
+                          let point = run.points.last,
+                          Self.isFreshPosition(
+                              latitude: point.latitude, longitude: point.longitude,
+                              sampledAt: point.timestamp, accuracy: point.accuracy
+                          ) else { return nil }
+                    return point.latitude
+                }(),
+                liveLongitude: {
+                    guard run.runEnvironment == .outdoor,
+                          let point = run.points.last,
+                          Self.isFreshPosition(
+                              latitude: point.latitude, longitude: point.longitude,
+                              sampledAt: point.timestamp, accuracy: point.accuracy
+                          ) else { return nil }
+                    return point.longitude
+                }(),
+                livePositionAt: {
+                    guard run.runEnvironment == .outdoor,
+                          let point = run.points.last,
+                          Self.isFreshPosition(
+                              latitude: point.latitude, longitude: point.longitude,
+                              sampledAt: point.timestamp, accuracy: point.accuracy
+                          ) else { return nil }
+                    return point.timestamp
+                }(),
+                spotifyTrackTitle: spotify.isPlaying ? spotify.watchTrackTitle : nil,
+                spotifyArtistName: spotify.isPlaying ? spotify.watchArtistName : nil
             )
         }
         if let watch = mirroredWatch.snapshot,
@@ -452,10 +493,60 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 strengthReps: watch.strengthReps,
                 strengthWeightKilograms: watch.strengthWeightKilograms,
                 strengthRestEndsAt: watch.strengthRestEndsAt,
-                audioCoachEnabled: watch.watchAudioCoachEnabled
+                audioCoachEnabled: watch.watchAudioCoachEnabled,
+                liveLatitude: {
+                    guard let lat = watch.currentLatitude,
+                          let lon = watch.currentLongitude,
+                          let sampled = watch.currentLocationSampledAt,
+                          Self.isFreshPosition(
+                              latitude: lat, longitude: lon, sampledAt: sampled
+                          ) else { return nil }
+                    return lat
+                }(),
+                liveLongitude: {
+                    guard let lat = watch.currentLatitude,
+                          let lon = watch.currentLongitude,
+                          let sampled = watch.currentLocationSampledAt,
+                          Self.isFreshPosition(
+                              latitude: lat, longitude: lon, sampledAt: sampled
+                          ) else { return nil }
+                    return lon
+                }(),
+                livePositionAt: {
+                    guard let lat = watch.currentLatitude,
+                          let lon = watch.currentLongitude,
+                          let sampled = watch.currentLocationSampledAt,
+                          Self.isFreshPosition(
+                              latitude: lat, longitude: lon, sampledAt: sampled
+                          ) else { return nil }
+                    return sampled
+                }()
             )
         }
         return nil
+    }
+
+    // Only source-provided coordinates are eligible. No location tracking is
+    // started by the spectator, and stale coordinates cannot be called live.
+    private static func isFreshPosition(
+        latitude: Double,
+        longitude: Double,
+        sampledAt: Date,
+        accuracy: Double? = nil,
+        now: Date = .now
+    ) -> Bool {
+        guard latitude.isFinite, longitude.isFinite,
+              (-90...90).contains(latitude),
+              (-180...180).contains(longitude),
+              abs(latitude) > 0.00001 || abs(longitude) > 0.00001,
+              (-5...30).contains(now.timeIntervalSince(sampledAt))
+        else { return false }
+        if let accuracy {
+            guard accuracy.isFinite, (0...100).contains(accuracy) else {
+                return false
+            }
+        }
+        return true
     }
 
     private func publishLocal(
