@@ -7,8 +7,19 @@ enum ATHLTHHeartRateZoneCoachTarget {
     static func configuration(
         configured: WatchWorkoutTargetAlertConfiguration?,
         stepZone: Int?,
-        maximumBPM: Double?
+        maximumBPM: Double?,
+        suppressHeartRateForUnzonedStep: Bool = false
     ) -> WatchWorkoutTargetAlertConfiguration? {
+        // A planned 1-minute recovery without Z5 is NOT another Z5 effort.
+        // Keep any independent pace alert, but remove its inherited HR zone.
+        if suppressHeartRateForUnzonedStep {
+            var restConfiguration = configured
+            restConfiguration?.heartRateEnabled = false
+            restConfiguration?.heartRateZone = nil
+            restConfiguration?.heartRateMinimumBPM = nil
+            restConfiguration?.heartRateMaximumBPM = nil
+            return restConfiguration
+        }
         guard let stepZone else { return configured }
         guard let interval = ATHLTHHeartRateZones.range(
             for: stepZone,
