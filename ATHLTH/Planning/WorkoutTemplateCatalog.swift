@@ -2898,6 +2898,14 @@ struct WorkoutTemplateDetailView: View {
                     blocks: libraryDisplayBlocks
                 )
 
+                // All bundled Zoned sessions include genuine coaching notes
+                // beyond the numeric workout steps. Keep this optional and
+                // collapsed so the training timeline remains primary.
+                if let original = ATHLTHZonedPlanLibrary
+                    .workout(forCatalogSlug: entry.slug) {
+                    ATHLTHZonedWorkoutGuidanceCard(workout: original)
+                }
+
                 ATHLTHLastWorkoutHistoryCard(summary:
                     ATHLTHLibraryWorkoutHistory.catalogOriginal(
                         id: entry.id, completions: originalCompletions
