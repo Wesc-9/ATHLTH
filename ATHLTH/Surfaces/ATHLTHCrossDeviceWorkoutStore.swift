@@ -23,6 +23,19 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     var runningStepRemainingSeconds: TimeInterval? = nil
     var capturedAt: Date? = nil
 
+    // Optional live data; older cross-device snapshots remain decodable.
+    // Only the source device can publish these values. iPad never measures.
+    var sourceDevice: String? = nil
+    var heartRateBPM: Double? = nil
+    var activeCalories: Double? = nil
+    var currentPaceSecondsPerKilometer: Double? = nil
+    var targetPaceSecondsPerKilometer: Double? = nil
+    var targetHeartRateZone: Int? = nil
+    var runningStepProgress: Double? = nil
+    var runningOverallProgress: Double? = nil
+    var routeTitle: String? = nil
+    var ghostRaceTitle: String? = nil
+
     var id: UUID { sessionID }
     var symbol: String {
         switch kind {
@@ -156,7 +169,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 currentStep: activeName,
                 nextStep: nil,
                 completedSets: log.totalCompletedSets,
-                totalSets: log.exercises.reduce(0) { $0 + $1.sets.count }
+                totalSets: log.exercises.reduce(0) { $0 + $1.sets.count },
+                capturedAt: .now,
+                sourceDevice: "iphone"
             )
         }
         if let run = phone.active {
@@ -192,7 +207,20 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 runningInRecovery: interval?.isRecovery,
                 runningStepRemainingSeconds: current?.measure == .time
                     ? remaining : nil,
-                capturedAt: .now
+                capturedAt: .now,
+                sourceDevice: "iphone",
+                currentPaceSecondsPerKilometer:
+                    run.currentPaceSecondsPerKilometer,
+                targetPaceSecondsPerKilometer:
+                    current?.targetPaceMinSecondsPerKilometer,
+                targetHeartRateZone: current?.targetHeartRateZone,
+                runningStepProgress: {
+                    guard let target = current?.durationSeconds,
+                          target > 0, let remaining else { return nil }
+                    return min(1, max(0, 1 - remaining / target))
+                }(),
+                routeTitle: run.plannedRouteTitle,
+                ghostRaceTitle: run.ghostRaceTitle
             )
         }
         if let watch = mirroredWatch.snapshot,
@@ -226,7 +254,21 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 runningIntervalTotal: watch.runningIntervalTotal,
                 runningInRecovery: watch.runningInRecovery,
                 runningStepRemainingSeconds: watch.runningStepRemainingSeconds,
-                capturedAt: watch.capturedAt
+                capturedAt: watch.capturedAt,
+                sourceDevice: "watch",
+                heartRateBPM: watch.heartRate > 0
+                    ? Double(watch.heartRate) : nil,
+                activeCalories: watch.activeCalories > 0
+                    ? Double(watch.activeCalories) : nil,
+                currentPaceSecondsPerKilometer:
+                    watch.currentPaceSecondsPerKilometer,
+                targetPaceSecondsPerKilometer:
+                    watch.runningStepTargetPaceSecondsPerKilometer,
+                targetHeartRateZone: watch.runningStepTargetHeartRateZone,
+                runningStepProgress: watch.runningStepProgress,
+                runningOverallProgress: watch.runningOverallProgress,
+                routeTitle: watch.routeTitle,
+                ghostRaceTitle: watch.ghostRaceTitle
             )
         }
         return nil
@@ -285,7 +327,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             }
             let previous = remote?.id
             if previous != next?.id {
-                if hasLoadedRemote && foregroundedSinceLastPoll &&
+                if foregroundedSinceLastPoll &&
                    !suppressAutoOpenOnNextPoll && next != nil {
                     isExpanded = true
                 } else {
