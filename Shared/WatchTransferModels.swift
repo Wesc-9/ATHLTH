@@ -1036,6 +1036,11 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
     /// Work, recovery, warmup, or cooldown. Optional for older transfers.
     var phase: String? = nil
     var targetHeartRateZone: Int? = nil
+    /// Optional authored interval spanning more than one of the five zones.
+    /// For example 50–70% HRmax is Z1–Z2; a single zone integer cannot
+    /// represent this prescription. Optional for older Watch transfers.
+    var targetHeartRatePercentMin: Double? = nil
+    var targetHeartRatePercentMax: Double? = nil
     /// Planned belt incline; not a measured workout metric.
     var targetTreadmillInclinePercent: Double? = nil
     var ghostPaceSecondsPerKilometer: Double? = nil
