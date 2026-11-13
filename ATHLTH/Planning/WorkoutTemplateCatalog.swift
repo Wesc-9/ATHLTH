@@ -2679,10 +2679,15 @@ enum ATHLTHWorkoutLibraryPersonalization {
             var block = original
             block.targetPaceSecondsPerKilometer = nil
             block.treadmillInclinePercent = nil
-            block.targetHeartRateZone = nil
-            block.targetHeartRatePercentMin = nil
-            block.targetHeartRatePercentMax = nil
-            block.sourceIntensityZoneLabel = nil
+            // A Zoned source-zone is part of the prescribed session,
+            // not an athlete-specific target. Keep S5 on an all-out test
+            // and source Z1–Z2 recovery bands, while clearing unsourced
+            // personal zone overrides.
+            if block.sourceIntensityZoneLabel == nil {
+                block.targetHeartRateZone = nil
+                block.targetHeartRatePercentMin = nil
+                block.targetHeartRatePercentMax = nil
+            }
             block.targetEffortRPE = nil
             block.targetWeightKilograms = nil
             block.loadNote = nil
