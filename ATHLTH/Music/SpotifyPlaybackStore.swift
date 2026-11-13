@@ -1024,6 +1024,22 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         }
     }
 
+    /// Read the athlete's active Spotify Connect playback without
+    /// controlling or starting music. Unlike App Remote, this can also
+    /// report a Watch's active online Spotify playback on the same account.
+    /// Offline Watch music and playback hidden by Spotify remain unknown.
+    func refreshPlaybackForLiveSpectator() async {
+        guard isConfigured,
+              let token = await accessTokenForRequest()
+        else { return }
+        do {
+            try await refreshWatchPlaybackState(accessToken: token)
+        } catch {
+            // A failed read must never stop the recording or music.
+            // The caller retains the last known playback state.
+        }
+    }
+
     private func refreshWatchPlaybackState(
         accessToken: String
     ) async throws {
