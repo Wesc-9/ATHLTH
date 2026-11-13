@@ -6397,6 +6397,22 @@ struct SessionEditorView: View {
         selectedScratchWorkoutType?.scratchQuickAdd
     }
 
+    /// Pass the full current integration snapshot into the same editor.
+    /// A layout-only edit must never silently lose music, coach or gear.
+    private var currentWorkoutPlannerExtras: ATHLTHWorkoutPlannerExtras {
+        let source = composeSession()
+        var extras = ATHLTHWorkoutPlannerExtras()
+        extras.gearIDs = source.gearIDs
+        extras.spotifyPlaylist = source.spotifyPlaylist
+        extras.spotifyAutoplayOnStart = source.spotifyAutoplayOnStart
+        extras.spotifyIntervalTrack = source.spotifyIntervalTrack
+        extras.audioCoachConfiguration = source.audioCoachConfiguration
+        extras.routeAlertConfiguration = source.routeAlertConfiguration
+        extras.ghostTargetDurationSeconds = source.ghostTargetDurationSeconds
+        extras.ghostUpdates = source.ghostUpdates
+        return extras
+    }
+
     /// The timeline builder returns the same PlannedSession recipe the editor
     /// already saves and transfers to the Watch. It does not schedule the
     /// session itself: the athlete confirms date and time in this editor.
@@ -6409,6 +6425,20 @@ struct SessionEditorView: View {
         workoutCategory = updated.workoutCategory
         selectedRouteID = updated.routeID
         title = updated.title
+        selectedSpotifyPlaylist = updated.spotifyPlaylist
+        spotifyAutoplayOnStart = updated.spotifyAutoplayOnStart
+        audioCoachOverride = updated.audioCoachConfiguration
+        selectedGearIDs = Set(updated.gearIDs ?? [])
+        gearSelectionTouched = updated.gearIDs != nil
+        if let navigation = updated.routeAlertConfiguration {
+            routeGuardianDraft.load(configuration: navigation)
+        }
+        ghostDraft.load(
+            targetDuration: updated.ghostTargetDurationSeconds,
+            updates: updated.ghostUpdates,
+            route: selectedRoute,
+            settings: settings
+        )
         if let minutes = updated.durationMinutes {
             durationMinutes = minutes
             durationWasAdjustedManually = false
@@ -6892,6 +6922,7 @@ struct SessionEditorView: View {
                     initialTitle: title,
                     initialBlocks: workoutPlanningPreviewBlocks,
                     initialRouteID: selectedRouteID,
+                    initialExtras: currentWorkoutPlannerExtras,
                     initialQuickAdd: workoutBlocks.isEmpty &&
                         plannedExercises.isEmpty &&
                         selectedRunningWorkouts.isEmpty
