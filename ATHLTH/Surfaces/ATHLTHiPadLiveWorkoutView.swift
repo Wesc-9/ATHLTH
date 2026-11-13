@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// iPad's full-screen, read-only companion for an iPhone/Apple Watch workout.
 /// Uses exactly the same private snapshot as the small Home return pill.
@@ -8,6 +9,8 @@ struct ATHLTHiPadLiveWorkoutView: View {
     let onMinimize: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("athlth_ipad_live_keep_awake") private var keepAwake = false
+    @State private var previousIdleTimerDisabled = false
 
     private let ink = ATHLTHPlanDesign.ink
     private let secondary = ATHLTHPlanDesign.secondaryInk
@@ -52,6 +55,13 @@ struct ATHLTHiPadLiveWorkoutView: View {
                                 } else {
                                     workoutProgress
                                 }
+                                if isStrength {
+                                    ATHLTHiPadLiveStrengthDetailsPanel(snapshot: snapshot)
+                                } else {
+                                    ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
+                                }
+                                ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
+                                ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
                                 additionalDetails
                             }
                             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -65,6 +75,13 @@ struct ATHLTHiPadLiveWorkoutView: View {
                         } else {
                             workoutProgress
                         }
+                        if isStrength {
+                            ATHLTHiPadLiveStrengthDetailsPanel(snapshot: snapshot)
+                        } else {
+                            ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
+                        }
+                        ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
+                        ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
                         additionalDetails
                     }
 
@@ -90,6 +107,17 @@ struct ATHLTHiPadLiveWorkoutView: View {
             .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         }
         .accessibilityIdentifier("athlth-ipad-live-workout-fullscreen")
+        .onAppear {
+            previousIdleTimerDisabled = UIApplication.shared.isIdleTimerDisabled
+            if keepAwake { UIApplication.shared.isIdleTimerDisabled = true }
+        }
+        .onChange(of: keepAwake) { _, enabled in
+            UIApplication.shared.isIdleTimerDisabled =
+                enabled || previousIdleTimerDisabled
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = previousIdleTimerDisabled
+        }
     }
 
     private var topBar: some View {
@@ -123,6 +151,16 @@ struct ATHLTHiPadLiveWorkoutView: View {
                 .foregroundStyle(secondary)
                 .lineLimit(1)
             }
+
+            Toggle(isOn: $keepAwake) {
+                Label(tr("Keep screen awake", "Hold skjermen på"),
+                      systemImage: "sun.max")
+                    .font(.caption)
+            }
+            .toggleStyle(.switch)
+            .tint(bronze)
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityIdentifier("athlth-ipad-live-keep-awake")
 
             Button(action: onMinimize) {
                 Label(tr("Minimize", "Minimer"), systemImage: "arrow.down.right.and.arrow.up.left")
@@ -246,7 +284,9 @@ struct ATHLTHiPadLiveWorkoutView: View {
                         snapshot.currentPaceSecondsPerKilometer
                     ),
                     symbol: "speedometer",
-                    detail: tr("min/km", "min/km")
+                    detail: snapshot.paceIsTreadmillTarget == true
+                        ? tr("Belt speed", "Møllehastighet") :
+                        tr("min/km", "min/km")
                 )
             }
 
@@ -376,6 +416,21 @@ struct ATHLTHiPadLiveWorkoutView: View {
                 }
             }
 
+            if snapshot.runningStepRemainingSeconds == nil,
+               let remaining = snapshot.runningStepRemainingMeters,
+               remaining.isFinite, remaining >= 0 {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("DISTANCE REMAINING", "GJENSTÅENDE DISTANSE"))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(secondary)
+                    Text(String(format: "%.0f m", remaining))
+                        .font(.system(size: 43, weight: .bold,
+                                      design: .rounded))
+                        .foregroundStyle(ink)
+                        .monospacedDigit()
+                }
+            }
+
             if let progress = ATHLTHiPadLiveMetrics.normalized(
                 snapshot.runningStepProgress
             ) {
@@ -489,10 +544,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
     private var additionalDetails: some View {
         let hasTargets = snapshot.targetPaceSecondsPerKilometer != nil ||
             snapshot.targetHeartRateZone != nil
-        let hasRoute = snapshot.routeTitle?.isEmpty == false
-        let hasGhost = snapshot.ghostRaceTitle?.isEmpty == false
-
-        if hasTargets || hasRoute || hasGhost {
+        if hasTargets {
             VStack(alignment: .leading, spacing: 14) {
                 Text(tr("WORKOUT DETAILS", "ØKTDETALJER"))
                     .font(.caption.weight(.semibold))
@@ -512,20 +564,6 @@ struct ATHLTHiPadLiveWorkoutView: View {
                         tr("Target zone", "Målsone"),
                         value: tr("Zone", "Sone") + " \(zone)",
                         symbol: "heart.text.square"
-                    )
-                }
-                if let route = snapshot.routeTitle, !route.isEmpty {
-                    detailLine(
-                        tr("Route", "Rute"),
-                        value: route,
-                        symbol: "map"
-                    )
-                }
-                if let ghost = snapshot.ghostRaceTitle, !ghost.isEmpty {
-                    detailLine(
-                        "Ghost Race",
-                        value: ghost,
-                        symbol: "figure.run.circle"
                     )
                 }
             }
