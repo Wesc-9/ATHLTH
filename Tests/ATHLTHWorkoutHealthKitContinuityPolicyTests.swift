@@ -70,13 +70,22 @@ final class ATHLTHWorkoutHealthKitContinuityPolicyTests: XCTestCase {
         )
     }
 
-    func testOtherSportsKeepTheirUserSelectedGlobalPause() {
-        for kind in WatchWorkoutKind.allCases where kind != .strength {
+    func testOtherNonAutoPauseSportsRecoverUnexpectedPause() {
+        for kind in WatchWorkoutKind.allCases {
+            let shouldRecover =
+                !ATHLTHWorkoutHealthKitContinuityPolicy.supportsAutomaticPause(kind)
+            XCTAssertEqual(
+                ATHLTHWorkoutHealthKitContinuityPolicy.shouldResumeUnexpectedPause(
+                    kind: kind, userPausedWholeWorkout: false, finishing: false
+                ),
+                shouldRecover,
+                "Unexpected pause recovery in \(kind.rawValue)"
+            )
             XCTAssertFalse(
                 ATHLTHWorkoutHealthKitContinuityPolicy.shouldResumeUnexpectedPause(
-                    kind: kind, userPausedWholeWorkout: false,
-                    finishing: false
-                )
+                    kind: kind, userPausedWholeWorkout: true, finishing: false
+                ),
+                "An intentional pause must never auto-resume"
             )
         }
     }
