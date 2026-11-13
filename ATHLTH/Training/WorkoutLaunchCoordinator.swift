@@ -981,7 +981,6 @@ enum WorkoutLaunchCoordinator {
             // Only a deliberately chosen track, and only for iPhone-owned
             // workouts. Apple Watch retains independent Spotify playback.
             let effortSong = configuration.advancedWorkout?.spotifyIntervalTrack
-                ?? configuration.workout?.spotifyIntervalTrack
                 ?? plannedRunningWorkout?.spotifyIntervalTrack
             spotify.prepareIntervalTrack(
                 effortSong,
