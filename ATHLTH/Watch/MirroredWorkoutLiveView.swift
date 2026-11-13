@@ -1184,40 +1184,6 @@ struct MirroredWorkoutLiveView: View {
     }
 
     @ViewBuilder
-    private var header: some View {
-        if let snapshot = mirroring.snapshot {
-            ATHLTHUnifiedCard {
-                HStack(spacing: 14) {
-                    Image(systemName: snapshot.kind.systemImage)
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 50, height: 50)
-                        .background(ATHLTHTheme.accent.opacity(0.10), in: Circle())
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(snapshot.kind.title)
-                            .font(.title2.weight(.bold))
-
-                        Text(ATHLTHLocalization.choose(english: "Live from Apple Watch", norwegian: "Direkte fra Apple Watch"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Circle()
-                        .fill(
-                            mirroring.hasActiveMirroredWorkout
-                                ? ATHLTHTheme.accent
-                                : Color.secondary
-                        )
-                        .frame(width: 10, height: 10)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
     private func runningDashboard(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> some View {
@@ -2003,37 +1969,7 @@ struct MirroredWorkoutLiveView: View {
     }
 
     private var mirroredSpotifyBar: some View {
-        HStack(spacing: 7) {
-            ATHLTHSpotifyGlyph()
-                .frame(width: 17, height: 17)
-            Text("Spotify")
-                .font(.system(size: 12, weight: .semibold))
-            Spacer(minLength: 0)
-            Button {
-                Task {
-                    await spotify.handleIPhoneAudioDockCommand(
-                        spotify.isPlaying ? .pause : .resume)
-                }
-            } label: {
-                Image(systemName: spotify.isPlaying ? "pause.fill" : "play.fill")
-                    .frame(width: 32, height: 34)
-            }
-            .buttonStyle(.plain)
-            Button {
-                Task { await spotify.handleIPhoneAudioDockCommand(.next) }
-            } label: {
-                Image(systemName: "forward.end.fill")
-                    .frame(width: 32, height: 34)
-            }
-            .buttonStyle(.plain)
-        }
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(ATHLTHTrainDesign.ink)
-        .padding(.horizontal, 10)
-        .frame(width: 210, height: 40)
-        .background(ATHLTHTrainDesign.paper, in: Capsule())
-        .overlay(Capsule().strokeBorder(
-            ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.7))
+        ATHLTHLiveSpotifyExpandedBar()
     }
 
     private func averageRunningPaceText(
@@ -2131,59 +2067,55 @@ struct MirroredWorkoutLiveView: View {
                     ghostRace.dismissResult()
                 }
             } label: {
-                Label("Done", systemImage: "checkmark")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+                Label(
+                    ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig"),
+                    systemImage: "checkmark"
+                )
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 54)
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.large)
             .tint(ATHLTHTheme.accent)
         } else {
-            HStack(spacing: 12) {
-                Button {
-                    if snapshot.state == .paused {
-                        _ = mirroring.sendCommand(.resume)
-                    } else if snapshot.kind != .running &&
-                                snapshot.kind != .walking {
-                        showingStrengthWholeWorkoutPauseConfirmation = true
-                    } else {
-                        _ = mirroring.sendCommand(.pause)
-                    }
-                } label: {
-                    Label(
-                        snapshot.state == .paused
-                            ? ATHLTHLocalization.choose(
-                                english: "Resume workout", norwegian: "Fortsett økten"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Pause workout", norwegian: "Pause økten"
-                            ),
-                        systemImage: snapshot.state == .paused
-                            ? "play.fill"
-                            : "pause.fill"
-                    )
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+            Button {
+                if snapshot.state == .paused {
+                    _ = mirroring.sendCommand(.resume)
+                } else if snapshot.kind != .running &&
+                            snapshot.kind != .walking {
+                    showingStrengthWholeWorkoutPauseConfirmation = true
+                } else {
+                    _ = mirroring.sendCommand(.pause)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .disabled(
-                    snapshot.state == .preparing ||
-                    snapshot.state == .ending
+            } label: {
+                Label(
+                    snapshot.state == .paused
+                        ? ATHLTHLocalization.choose(
+                            english: "Resume entire workout",
+                            norwegian: "Fortsett hele økten"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Pause entire workout",
+                            norwegian: "Pause hele økten"
+                        ),
+                    systemImage: snapshot.state == .paused
+                        ? "play.fill" : "pause.fill"
                 )
-
-                Button(role: .destructive) {
-                    mirroring.sendCommand(.end)
-                } label: {
-                    Label("Finish", systemImage: "stop.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(.red)
-                .disabled(snapshot.state == .ending)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(maxWidth: .infinity, minHeight: 54)
+                .background(
+                    ATHLTHTheme.premiumGoldSoft,
+                    in: Capsule()
+                )
+                .contentShape(Capsule())
             }
+            .buttonStyle(.plain)
+            .disabled(snapshot.state == .preparing || snapshot.state == .ending)
+            .accessibilityIdentifier("athlth-mirrored-full-width-pause")
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "This pauses Apple Health, not rest between sets or intervals.",
+                norwegian: "Pauser Apple Health-økten, ikke hvile mellom sett eller intervaller."
+            ))
         }
     }
 
