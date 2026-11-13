@@ -210,6 +210,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var targetRepetitionsMaximum: Int? = nil
     var targetRepsInReserve: Int? = nil
     var targetMovementTempo: String? = nil
+    /// Original GymCoach superset association. The engine does not yet
+    /// guarantee set-by-set cycling for arbitrary source superset indices.
+    var sourceSupersetGroupIndex: Int? = nil
     /// Athlete-selected perceived intensity (RPE 1...10). Never a measured
     /// physiological reading; optional so historic templates still decode.
     var targetEffortRPE: Int? = nil
@@ -278,6 +281,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.targetRepetitionsMaximum == rhs.targetRepetitionsMaximum &&
         lhs.targetRepsInReserve == rhs.targetRepsInReserve &&
         lhs.targetMovementTempo == rhs.targetMovementTempo &&
+        lhs.sourceSupersetGroupIndex == rhs.sourceSupersetGroupIndex &&
         lhs.targetEffortRPE == rhs.targetEffortRPE &&
         lhs.treadmillInclinePercent == rhs.treadmillInclinePercent &&
         lhs.setCount == rhs.setCount &&
@@ -327,6 +331,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(targetRepetitionsMaximum)
         hasher.combine(targetRepsInReserve)
         hasher.combine(targetMovementTempo)
+        hasher.combine(sourceSupersetGroupIndex)
         hasher.combine(targetEffortRPE)
         hasher.combine(treadmillInclinePercent)
         hasher.combine(setCount)
@@ -384,6 +389,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case targetRepetitionsMaximum = "target_repetitions_max"
         case targetRepsInReserve = "target_reps_in_reserve"
         case targetMovementTempo = "target_movement_tempo"
+        case sourceSupersetGroupIndex = "source_superset_group_index"
         case targetEffortRPE = "target_effort_rpe"
         case treadmillInclinePercent = "treadmill_incline_percent"
         case setCount = "set_count"
@@ -429,7 +435,11 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
             parts.append("\(setCount) sett")
         }
         if let repetitions, repetitions > 0 {
-            parts.append("\(repetitions) reps")
+            if let upper = targetRepetitionsMaximum, upper > repetitions {
+                parts.append("\(repetitions)–\(upper) reps")
+            } else {
+                parts.append("\(repetitions) reps")
+            }
         }
 
         if let durationSeconds, durationSeconds > 0 {
@@ -480,10 +490,6 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         // It is stored independently of the HR target and is not measured data.
         if let targetEffortRPE, (1...10).contains(targetEffortRPE) {
             parts.append("RPE \(targetEffortRPE)/10")
-        }
-        if let targetRepetitionsMaximum, let repetitions,
-           targetRepetitionsMaximum > repetitions {
-            parts.append("\(repetitions)–\(targetRepetitionsMaximum) reps")
         }
         if let targetRepsInReserve, (0...10).contains(targetRepsInReserve) {
             parts.append("RIR \(targetRepsInReserve)")
@@ -567,6 +573,7 @@ extension Array where Element == WorkoutTemplateBlock {
             item.targetRepetitionsMaximum = source.targetRepetitionsMaximum
             item.targetRepsInReserve = source.targetRepsInReserve
             item.targetMovementTempo = source.targetMovementTempo
+            item.sourceSupersetGroupIndex = source.sourceSupersetGroupIndex
             if let origin {
                 item.executionGroupKind = origin.groupKind
                 item.executionGroupID = origin.groupID
