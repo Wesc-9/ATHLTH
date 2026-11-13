@@ -191,6 +191,25 @@ final class ATHLTHWorkoutStructuredDataAuditTests: XCTestCase {
         XCTAssertEqual(premium.notes, "Velg vekt selv.")
     }
 
+    func testHYROXLoadChoicesRemainAlternativesRatherThanPersonalWeights() {
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Wall Balls",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: 60,
+            durationSeconds: nil, targetWeightKilograms: nil,
+            loadNote: "6 kg / 4 kg as specified by the HYROX PFT",
+            notes: nil, phase: .main
+        )
+        let normalized = ATHLTHWorkoutStructuredDataMigration.normalize(block)
+        XCTAssertEqual(normalized.sourceLoadAlternativesKilograms, [6, 4])
+        XCTAssertNil(normalized.targetWeightKilograms)
+        XCTAssertEqual(normalized.loadNote, block.loadNote)
+
+        block.loadNote = "Use your division race load"
+        let unassigned = ATHLTHWorkoutStructuredDataMigration.normalize(block)
+        XCTAssertNil(unassigned.sourceLoadAlternativesKilograms)
+        XCTAssertNil(unassigned.targetWeightKilograms)
+    }
+
     func testExtendedTargetsSurviveCodingAndExecutionExpansion() throws {
         var block = WorkoutTemplateBlock(
             sequence: 1, kind: .run, title: "Hill repetitions",
@@ -207,6 +226,7 @@ final class ATHLTHWorkoutStructuredDataAuditTests: XCTestCase {
         block.targetRepsInReserve = 1
         block.targetMovementTempo = "3-1-1-0"
         block.sourceSupersetGroupIndex = 2
+        block.sourceLoadAlternativesKilograms = [6, 4]
 
         let decoded = try JSONDecoder().decode(
             WorkoutTemplateBlock.self, from: JSONEncoder().encode(block)
@@ -221,5 +241,6 @@ final class ATHLTHWorkoutStructuredDataAuditTests: XCTestCase {
         XCTAssertEqual(result.targetTerrainType, "hill")
         XCTAssertEqual(result.targetMovementTempo, "3-1-1-0")
         XCTAssertEqual(result.sourceSupersetGroupIndex, 2)
+        XCTAssertEqual(result.sourceLoadAlternativesKilograms, [6, 4])
     }
 }
