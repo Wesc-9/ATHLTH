@@ -1812,6 +1812,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepTitle: String? = nil
     var runningStepIndex: Int? = nil
     var runningStepCount: Int? = nil
+    /// Small full phase list for read-only iPad workouts.
+    var runningStageSummaries: [ATHLTHWatchRunningStageSummary]? = nil
     /// Efforts only (not warm-up/recovery). Optional for older snapshots.
     var runningIntervalOrdinal: Int? = nil
     var runningIntervalTotal: Int? = nil
@@ -1878,6 +1880,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     /// A phone mirror must never request a voice lease while this is true.
     /// Optional for mixed-version watch/phone compatibility.
     var watchOwnedAudioCoach: Bool? = nil
+    /// Actual enabled status, independent of who owns the speech lease.
+    var watchAudioCoachEnabled: Bool? = nil
 
     // Sample ages travel separately from the current displayed values.
     // Older Watch builds omit these markers; coaching then avoids claiming
