@@ -76,10 +76,6 @@ struct ATHLTHiPadSidebarPageView: View {
             return ATHLTHLocalization.choose(
                 english: "Clubs", norwegian: "Klubber"
             )
-        case .exerciseProgress:
-            return ATHLTHLocalization.choose(
-                english: "Exercise progression", norwegian: "Øvelsesfremdrift"
-            )
         default:
             return "ATHLTH"
         }
@@ -94,7 +90,6 @@ struct ATHLTHiPadSidebarPageView: View {
         case .ghostRace: "flag.checkered"
         case .profile: "person.crop.circle"
         case .clubs: "person.3"
-        case .exerciseProgress: "chart.bar"
         default: "square.grid.2x2"
         }
     }
@@ -116,15 +111,6 @@ struct ATHLTHiPadSidebarPageView: View {
             ATHLTHProfileView()
         case .clubs:
             ATHLTHCommunityV5View(initialTab: .clubs)
-        case .exerciseProgress:
-            ScrollView {
-                ATHLTHSpecificProgressView()
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 22)
-                    .frame(maxWidth: 1050)
-                    .frame(maxWidth: .infinity)
-            }
-            .scrollIndicators(.hidden)
         default:
             ContentUnavailableView(
                 ATHLTHLocalization.choose(
