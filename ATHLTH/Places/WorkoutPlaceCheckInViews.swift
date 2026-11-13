@@ -540,6 +540,7 @@ private struct WorkoutPlacePickerView:
                 ) {
                     Button {
                         forceNextSearch = true
+                        location.start()
                         location.refresh()
                     } label: {
                         Image(
@@ -548,12 +549,13 @@ private struct WorkoutPlacePickerView:
                         )
                     }
                     .accessibilityLabel(
-                        placeTR("Refresh location", "Oppdater posisjon")
+                        placeTR("Find venues near me", "Finn steder i nærheten")
                     )
                 }
             }
             .onAppear {
-                location.start()
+                // Searching Apple Maps by name must work without GPS permission.
+                // Only the explicit location action starts a location request.
                 Task {
                     frequent = await places.resolvedFrequentPlaces(near: nil)
                 }
