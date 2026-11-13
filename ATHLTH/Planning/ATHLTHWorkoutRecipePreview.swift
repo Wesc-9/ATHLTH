@@ -840,6 +840,7 @@ private struct ATHLTHWorkoutStepEditor: View {
     let block: WorkoutTemplateBlock
     let onSave: (WorkoutTemplateBlock) -> Void
     @State private var draft: WorkoutTemplateBlock
+    @State private var showAdditionalTargets = false
 
     init(block: WorkoutTemplateBlock, onSave: @escaping (WorkoutTemplateBlock) -> Void) {
         self.block = block
@@ -1011,6 +1012,93 @@ private struct ATHLTHWorkoutStepEditor: View {
                                 .multilineTextAlignment(.trailing)
                         }
                     }
+                    DisclosureGroup(
+                        ATHLTHLocalization.choose(
+                            english: "More structured targets",
+                            norwegian: "Flere egne datafelt"
+                        ),
+                        isExpanded: $showAdditionalTargets
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if draft.kind == .exercise {
+                                HStack {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Maximum repetitions",
+                                        norwegian: "Maks repetisjoner"))
+                                    Spacer()
+                                    TextField("—", value: $draft.targetRepetitionsMaximum,
+                                              format: .number)
+                                        .keyboardType(.numberPad)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                                HStack {
+                                    Text("RIR")
+                                    Spacer()
+                                    TextField("—", value: $draft.targetRepsInReserve,
+                                              format: .number)
+                                        .keyboardType(.numberPad)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                                TextField(
+                                    ATHLTHLocalization.choose(
+                                        english: "Movement tempo", norwegian: "Bevegelsestempo"),
+                                    text: Binding(
+                                        get: { draft.targetMovementTempo ?? "" },
+                                        set: { draft.targetMovementTempo = $0.isEmpty ? nil : $0 }
+                                    )
+                                )
+                            }
+                            if draft.kind == .run || draft.kind == .note {
+                                HStack {
+                                    Text("VMA (%)")
+                                    Spacer()
+                                    TextField("—", value: $draft.targetVMAPercent,
+                                              format: .number)
+                                        .keyboardType(.decimalPad)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                                HStack {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Elevation gain (m)",
+                                        norwegian: "Høydemeter (m)"))
+                                    Spacer()
+                                    TextField("—", value: $draft.targetElevationGainMeters,
+                                              format: .number)
+                                        .keyboardType(.decimalPad)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                                HStack {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Outdoor gradient (%)",
+                                        norwegian: "Stigning ute (%)"))
+                                    Spacer()
+                                    TextField("—", value: $draft.targetGradientPercent,
+                                              format: .number)
+                                        .keyboardType(.decimalPad)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                                TextField(
+                                    ATHLTHLocalization.choose(
+                                        english: "Intensity type", norwegian: "Intensitetstype"),
+                                    text: Binding(
+                                        get: { draft.targetIntensityType ?? "" },
+                                        set: { draft.targetIntensityType = $0.isEmpty ? nil : $0 }
+                                    )
+                                )
+                                TextField(
+                                    ATHLTHLocalization.choose(
+                                        english: "Terrain type", norwegian: "Terrengtype"),
+                                    text: Binding(
+                                        get: { draft.targetTerrainType ?? "" },
+                                        set: { draft.targetTerrainType = $0.isEmpty ? nil : $0 }
+                                    )
+                                )
+                            }
+                        }
+                        .font(.subheadline)
+                    }
+                    .accessibilityIdentifier("athlth-step-structured-advanced-targets")
+
                     HStack {
                         Text(ATHLTHLocalization.choose(english: "Rest (sec)", norwegian: "Pause (sek)"))
                         Spacer()
