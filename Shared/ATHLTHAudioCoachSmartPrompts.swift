@@ -158,6 +158,12 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     /// Applies to free runs; an interval's programmed zone takes precedence.
     var preferredHeartRateZone: Int? = nil
     var confirmWhenBackInZone: Bool? = nil
+    /// Stable off-target pulse required before spoken feedback. Defaults to
+    /// the existing 10-second debounce for older saved profiles and transfers.
+    var targetZoneGraceSeconds: Int? = nil
+    /// The earliest repeat while remaining outside the SAME active interval.
+    /// The Watch already resets its cooldown at every interval boundary.
+    var targetZoneRepeatSeconds: Int? = nil
     var coachingMode: ATHLTHCoachMotivationControlMode? = nil
     var strongStartDurationSeconds: Int? = nil
     var pushWhenBelowTargetZone: Bool? = nil
@@ -178,6 +184,13 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     var intervalAfterCountdownFromRecovery: ATHLTHCoachCountdownAfter? = nil
     // User-authored countdowns at step, section, group and planned-workout boundaries.
     var boundaryCountdownRules: [ATHLTHCoachBoundaryCountdownRule]? = nil
+
+    var resolvedTargetZoneGrace: TimeInterval {
+        TimeInterval(min(max(targetZoneGraceSeconds ?? 10, 5), 30))
+    }
+    var resolvedTargetZoneRepeat: TimeInterval {
+        TimeInterval(min(max(targetZoneRepeatSeconds ?? 120, 30), 600))
+    }
 
     var resolvedBelowZoneRepeat: TimeInterval {
         TimeInterval(min(max(belowZoneRepeatSeconds ?? 180, 60), 900))
