@@ -92,6 +92,51 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
         XCTAssertEqual(transfer?.steps[2].measure, .time)
     }
 
+    func testOpenEndedRecoveryTransfersAsManualNextWithoutInventedTime() throws {
+        for id in ["HIL-005", "HIL-006", "VMA-019", "RP-016"] {
+            let source = try XCTUnwrap(
+                ATHLTHZonedPlanLibrary.workouts.first { $0.id == id }
+            )
+            let recipe = ATHLTHZonedPlanLibrary.blocks(for: source)
+            let session = workout(recipe)
+            XCTAssertNil(
+                ATHLTHQuickRunTimelineAdapter.validationError(for: session),
+                "An open recovery is valid, \(id)"
+            )
+            let transferred = try XCTUnwrap(
+                ATHLTHQuickRunTimelineAdapter.transfer(
+                    from: session, title: source.nameEn,
+                    routeAlerts: .standard, autoPauseEnabled: false
+                )
+            )
+            let openRecovery = transferred.steps.filter {
+                $0.phase == "recovery" && $0.measure == .open
+            }
+            XCTAssertFalse(openRecovery.isEmpty, id)
+            XCTAssertTrue(openRecovery.allSatisfy {
+                $0.durationSeconds == nil && $0.distanceMeters == nil
+            }, id)
+            XCTAssertEqual(transferred.steps.count,
+                           recipe.expandedForExecution().count, id)
+            XCTAssertTrue(transferred.autoAdvanceTimedSteps)
+        }
+    }
+
+    func testInvalidTargetsStillFailValidationWithoutInventingDurations() {
+        var rest = block("Untimed jog downhill", kind: .rest,
+                         phase: .recovery, seconds: 60)
+        rest.durationSeconds = nil
+        let work = block("Hill effort", phase: .main, seconds: 180)
+        XCTAssertNil(ATHLTHQuickRunTimelineAdapter.validationError(
+            for: workout([work, rest])
+        ))
+
+        rest.durationSeconds = -10
+        XCTAssertNotNil(ATHLTHQuickRunTimelineAdapter.validationError(
+            for: workout([work, rest])
+        ))
+    }
+
     func testPlannedIndoorRunRemainsIndoorAfterQuickStart() {
         var run = block("Indoor", phase: .main, seconds: 1_200)
         run.isIndoor = true
