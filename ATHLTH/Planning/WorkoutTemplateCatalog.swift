@@ -712,9 +712,11 @@ struct WorkoutTemplateCatalogEntry: Identifiable, Codable, Hashable {
 
 extension WorkoutTemplateCatalogEntry {
     /// A single offline baseline used everywhere, even without connectivity.
-    static var bundledCatalog: [WorkoutTemplateCatalogEntry] {
-        fallbackCatalog + ATHLTHCuratedStrengthWorkouts.entries + ATHLTHPremiumStrengthSessions.entries + ATHLTHZonedPlanLibrary.workoutCatalogEntries + ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries
-    }
+    static let bundledCatalog: [WorkoutTemplateCatalogEntry] =
+        fallbackCatalog + ATHLTHCuratedStrengthWorkouts.entries +
+        ATHLTHPremiumStrengthSessions.entries +
+        ATHLTHZonedPlanLibrary.workoutCatalogEntries +
+        ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries
 }
 
 @MainActor

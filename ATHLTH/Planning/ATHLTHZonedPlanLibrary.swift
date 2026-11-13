@@ -154,10 +154,13 @@ enum ATHLTHZonedPlanLibrary {
         }
     }
 
-    static var workoutCatalogEntries: [WorkoutTemplateCatalogEntry] {
-        workouts.enumerated().compactMap { index, workout in
+    // Parse and translate this fixed, licensed offline catalogue once.
+    // Building 240 interval prescriptions on every library reconstruction
+    // was expensive, especially while presenting the first target sheet.
+    static let workoutCatalogEntries: [WorkoutTemplateCatalogEntry] = {
+        ATHLTHZonedPlanLibrary.workouts.enumerated().compactMap { index, workout in
             guard workout.discipline != "swimming" else { return nil }
-            let blocks = blocks(for: workout)
+            let blocks = ATHLTHZonedPlanLibrary.blocks(for: workout)
             guard !blocks.isEmpty else { return nil }
             let activity = workout.discipline ?? "running"
             return WorkoutTemplateCatalogEntry(
@@ -178,7 +181,7 @@ enum ATHLTHZonedPlanLibrary {
                 sortOrder: 500 + index
             )
         }
-    }
+    }()
 
     static func weekday(_ source: Int) -> Int {
         // Zoned uses JavaScript weekdays (Sunday=0). ATHLTH uses Monday=1..Sunday=7.
