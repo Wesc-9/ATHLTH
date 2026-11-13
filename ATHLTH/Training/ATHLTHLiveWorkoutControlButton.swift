@@ -89,7 +89,7 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .frame(width: 36, height: 44)
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -116,7 +116,7 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                 Button(action: onSpotify) {
                     ATHLTHSpotifyGlyph()
                         .frame(width: 27, height: 27)
-                        .frame(width: 38, height: 44)
+                        .frame(width: 44, height: 44)
                         .background(
                             spotifyExpanded
                                 ? ATHLTHTheme.premiumGoldSoft
@@ -149,7 +149,7 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                     Image(systemName: "plus")
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
-                        .frame(width: 39, height: 48)
+                        .frame(width: 44, height: 48)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -279,6 +279,15 @@ struct ATHLTHLiveSpotifyExpandedBar: View {
             )
         }
         .accessibilityIdentifier("athlth-live-expanded-spotify")
+        .task {
+            // Ask the existing App Remote for fresh playback state only when
+            // the expanded player is visible. This never starts music.
+            guard spotify.isConnected else { return }
+            await spotify.handleIPhoneAudioDockCommand(.requestState)
+            if spotify.playlists.isEmpty {
+                await spotify.refreshPlaylists()
+            }
+        }
     }
 
     private func playlistButton(
