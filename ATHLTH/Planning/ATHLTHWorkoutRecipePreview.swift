@@ -218,9 +218,19 @@ enum ATHLTHSimpleWorkoutOutline {
             a.targetWeightKilograms == b.targetWeightKilograms &&
             a.treadmillInclinePercent == b.treadmillInclinePercent &&
             a.targetEffortRPE == b.targetEffortRPE &&
+            a.targetHeartRatePercentMin == b.targetHeartRatePercentMin &&
+            a.targetHeartRatePercentMax == b.targetHeartRatePercentMax &&
+            a.sourceIntensityZoneLabel == b.sourceIntensityZoneLabel &&
+            a.individualSetTargets == b.individualSetTargets &&
+            a.restBetweenSetsSeconds == b.restBetweenSetsSeconds &&
+            a.loadNote == b.loadNote &&
+            a.exerciseID == b.exerciseID &&
+            a.exerciseSnapshot == b.exerciseSnapshot &&
             a.notes == b.notes &&
             a.groupID == b.groupID &&
             a.groupKind == b.groupKind &&
+            a.executionGroupID == b.executionGroupID &&
+            a.executionGroupKind == b.executionGroupKind &&
             a.cardioActivity == b.cardioActivity &&
             a.isIndoor == b.isIndoor
     }
