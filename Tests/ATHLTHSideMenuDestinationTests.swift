@@ -19,7 +19,7 @@ final class ATHLTHSideMenuDestinationTests: XCTestCase {
             .trainingLibrary,
             .trainTogether,
             .ghostRace,
-            .exerciseProgress,
+            .challenges,
             .arena,
             .clubs
         ]
@@ -30,6 +30,10 @@ final class ATHLTHSideMenuDestinationTests: XCTestCase {
         ] {
             XCTAssertNil(ATHLTHSideMenuDestination(rawValue: duplicatedTab))
         }
+    }
+
+    func testExerciseProgressIsNotASideMenuDestination() {
+        XCTAssertNil(ATHLTHSideMenuDestination(rawValue: "exerciseProgress"))
     }
 
     func testProfileAndSettingsStayAvailable() {
