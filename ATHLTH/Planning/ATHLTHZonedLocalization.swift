@@ -27,7 +27,17 @@ enum ATHLTHZonedLocalization {
         return plans[id]?.summary ?? text(english)
     }
 
-    static func workoutSummary(_ category: String, english: String) -> String {
+    static func workoutSummary(
+        _ category: String,
+        english: String,
+        workoutID: String? = nil
+    ) -> String {
+        if workoutID == "ASS-009" {
+            return ATHLTHLocalization.choose(
+                english: "A 3-minute maximum-effort test on a track. Record the total distance and pace in the final 30 seconds to assess critical speed.",
+                norwegian: "Tre minutters maksimaltest på løpebane. Noter totaldistanse og tempo de siste 30 sekundene for å vurdere kritisk fart."
+            )
+        }
         guard ATHLTHLocalization.isNorwegian else { return english }
         let summary: [String: String] = [
             "assessment": "Testøkt for å vurdere form og utvikling. Tilpass belastningen til eget nivå.",
