@@ -668,7 +668,7 @@ struct AppRootView: View {
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var trainingBackups: TrainingBackupStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
-    @StateObject private var crossDeviceWorkout = ATHLTHCrossDeviceWorkoutStore()
+    @StateObject private var crossDeviceWorkout = ATHLTHCrossDeviceWorkoutStore.shared
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
