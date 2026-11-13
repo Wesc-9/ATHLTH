@@ -79,6 +79,86 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
     }
 
     @MainActor
+    func testOneMinuteIntervalsCarryRealZ5AndZ1ThroughLibraryAndExecution() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "VMA-006"
+        })
+        let sourceBlocks = ATHLTHZonedPlanLibrary.blocks(for: source)
+        let efforts = sourceBlocks.filter {
+            $0.resolvedPhase == .main && $0.durationSeconds == 60
+        }
+        let recoveries = sourceBlocks.filter {
+            $0.resolvedPhase == .recovery && $0.durationSeconds == 60
+        }
+
+        XCTAssertEqual(efforts.count, 12)
+        XCTAssertEqual(recoveries.count, 11)
+        XCTAssertTrue(efforts.allSatisfy {
+            $0.kind == .run && $0.targetHeartRateZone == 5 &&
+            $0.sourceIntensityZoneLabel == "Z5" &&
+            $0.targetHeartRatePercentMin == 90 &&
+            $0.targetHeartRatePercentMax == 100
+        })
+        XCTAssertTrue(recoveries.allSatisfy {
+            $0.targetHeartRateZone == 1 &&
+            $0.sourceIntensityZoneLabel == "Z1" &&
+            $0.targetHeartRatePercentMin == 50 &&
+            $0.targetHeartRatePercentMax == 60
+        })
+
+        let workout = try XCTUnwrap(
+            ATHLTHZonedPlanLibrary.workoutCatalogEntries.first {
+                $0.slug == "zoned-vma-006"
+            }
+        )
+        let saved = ATHLTHWorkoutLibraryPersonalization.blankTargets(
+            workout.plannedSession().resolvedWorkoutBlocks
+        )
+        XCTAssertEqual(saved.count, sourceBlocks.count)
+        let executed = saved.expandedForExecution()
+        XCTAssertEqual(executed.filter {
+            $0.resolvedPhase == .main && $0.targetHeartRateZone == 5
+        }.count, 12)
+        XCTAssertEqual(executed.filter {
+            $0.resolvedPhase == .recovery && $0.targetHeartRateZone == 1
+        }.count, 11)
+        XCTAssertEqual(
+            ATHLTHWorkoutStepTargetSummary.zoneLabel(for: efforts[0]),
+            "Z5"
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutStepTargetSummary.percentRange(for: efforts[0]),
+            90...100
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutStepTargetSummary.highlightedZones(for: recoveries[0]),
+            Set([1])
+        )
+    }
+
+    @MainActor
+    func testMultiZoneSourceRangesRemainStructuredAndVisible() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "VMA-006"
+        })
+        let warmup = try XCTUnwrap(ATHLTHZonedPlanLibrary.blocks(for: source)
+            .first { $0.sourceIntensityZoneLabel == "Z1-Z2" })
+        XCTAssertNil(warmup.targetHeartRateZone)
+        XCTAssertEqual(
+            ATHLTHWorkoutStepTargetSummary.zoneLabel(for: warmup),
+            "Z1–Z2"
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutStepTargetSummary.percentRange(for: warmup),
+            50...70
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutStepTargetSummary.highlightedZones(for: warmup),
+            Set([1, 2])
+        )
+    }
+
+    @MainActor
     func testRaceDaysAndCyclingRecipesAreNotDiscarded() throws {
         let plan = try XCTUnwrap(ATHLTHZonedPlanLibrary.plans.first { $0.id == "5k-debutant" })
         let week = try XCTUnwrap(plan.weeks.last)
