@@ -17,6 +17,9 @@ struct MirroredWorkoutLiveView: View {
     @State private var showingTreadmillInclineEditor = false
     @State private var treadmillInclineDraft = 0.0
     @State private var coachOutputName: String?
+    // Watch may explicitly request AI conversation; the live card no longer
+    // advertises an AI-chat button.
+    @State private var showingAIConversation = false
     @State private var showingAddRunningWorkout = false
     @State private var showingAddStrengthWorkout = false
     @State private var showingStrengthExerciseLibrary = false
@@ -130,6 +133,13 @@ struct MirroredWorkoutLiveView: View {
                     norwegian: "Apple Health stopper registreringen av økttid mens den er pauset. Hvile mellom sett krever ikke dette."
                 ))
             }
+        }
+        .sheet(isPresented: $showingAIConversation) {
+            ATHLTHGroqVoiceCoachView(source: .mirroredWatchWorkout)
+                .environmentObject(settings)
+                .environmentObject(mirroring)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingStrengthExerciseLibrary) {
             NavigationStack {
