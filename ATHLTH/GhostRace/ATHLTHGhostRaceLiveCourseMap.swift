@@ -130,6 +130,10 @@ struct ATHLTHGhostRaceLiveCourseMap: View {
                         ) {
                             ghostMarker
                         }
+                    } else {
+                        // While race progress waits for an accepted GPS match,
+                        // still show the local iPhone's live location.
+                        UserAnnotation()
                     }
                 }
                 .mapStyle(.standard(elevation: .flat))
