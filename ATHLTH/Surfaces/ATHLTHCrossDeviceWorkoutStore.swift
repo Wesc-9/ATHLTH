@@ -43,6 +43,7 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     var runningStepRemainingMeters: Double? = nil
     var routeProgressPercent: Double? = nil
     var routeRemainingMeters: Double? = nil
+    var routeDistanceMeters: Double? = nil
     var strengthSetNumber: Int? = nil
     var strengthSetTotal: Int? = nil
     var strengthReps: Int? = nil
@@ -342,6 +343,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 }(),
                 routeProgressPercent: run.routeProgressPercent,
                 routeRemainingMeters: run.routeRemainingMeters,
+                routeDistanceMeters:
+                    run.plannedRouteDistanceKilometers.map { $0 * 1_000 },
                 paceIsTreadmillTarget: run.runEnvironment == .treadmill
             )
         }
@@ -398,6 +401,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 runningStepRemainingMeters: watch.runningStepRemainingMeters,
                 routeProgressPercent: watch.routeProgressPercent,
                 routeRemainingMeters: watch.routeRemainingMeters,
+                routeDistanceMeters: watch.routeDistanceMeters,
                 strengthSetNumber: watch.strengthSetIndex.map { $0 + 1 },
                 strengthSetTotal: watch.strengthSetCount,
                 strengthReps: watch.strengthReps,
