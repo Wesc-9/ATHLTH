@@ -85,6 +85,47 @@ final class ATHLTHHeartRateZoneCoachTargetTests: XCTestCase {
         XCTAssertTrue(previous.heartRateEnabled)
     }
 
+    func testMultiZoneHeartRateTargetKeepsFullPercentBand() {
+        let target = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: oldConfiguration,
+            stepZone: nil,
+            maximumBPM: 190,
+            stepPercentMin: 50,
+            stepPercentMax: 70
+        )
+        XCTAssertTrue(target?.heartRateEnabled == true)
+        XCTAssertNil(target?.heartRateZone)
+        XCTAssertEqual(target?.heartRateMinimumBPM, 95)
+        XCTAssertEqual(target?.heartRateMaximumBPM, 133)
+        XCTAssertTrue(target?.paceAlertsEnabled == true)
+        XCTAssertEqual(target?.graceSeconds, 15)
+        XCTAssertEqual(target?.repeatSeconds, 180)
+    }
+
+    func testMultiZoneTargetWithoutMaximumNeverInheritsGlobalZone() {
+        let target = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: oldConfiguration,
+            stepZone: nil, maximumBPM: nil,
+            stepPercentMin: 50, stepPercentMax: 70
+        )
+        XCTAssertEqual(target?.heartRateEnabled, false)
+        XCTAssertNil(target?.heartRateZone)
+        XCTAssertNil(target?.heartRateMinimumBPM)
+        XCTAssertNil(target?.heartRateMaximumBPM)
+        XCTAssertTrue(target?.paceAlertsEnabled == true)
+    }
+
+    func testSingleZoneSourcePercentOverridesOlderConfiguredZone() {
+        let target = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: oldConfiguration,
+            stepZone: 5, maximumBPM: 190,
+            stepPercentMin: 90, stepPercentMax: 100
+        )
+        XCTAssertEqual(target?.heartRateZone, 5)
+        XCTAssertEqual(target?.heartRateMinimumBPM, 171)
+        XCTAssertEqual(target?.heartRateMaximumBPM, 190)
+    }
+
     func testHapticAlertsGainVoiceOnlyWhenAudioCoachEnabled() {
         XCTAssertEqual(ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
             .haptic, coachEnabled: true), .both)
