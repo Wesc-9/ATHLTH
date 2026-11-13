@@ -115,6 +115,13 @@ enum ATHLTHZonedPlanLibrary {
     private static let workoutsByID: [String: Workout] =
         Dictionary(uniqueKeysWithValues: workouts.map { ($0.id, $0) })
 
+    /// Read source coaching notes without inventing them from a preview title.
+    /// This lookup stays offline and is shared by iPhone and iPad.
+    static func workout(forCatalogSlug slug: String) -> Workout? {
+        guard slug.hasPrefix("zoned-") else { return nil }
+        return workoutsByID[String(slug.dropFirst("zoned-".count)).uppercased()]
+    }
+
     static func plan(for catalogSlug: String) -> Plan? {
         guard catalogSlug.hasPrefix("zoned-") else { return nil }
         let sourceID = String(catalogSlug.dropFirst("zoned-".count))
