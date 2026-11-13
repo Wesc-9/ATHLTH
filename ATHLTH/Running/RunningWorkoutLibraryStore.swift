@@ -1,7 +1,8 @@
 import Foundation
 
-/// Keeps published running intervals intact while leaving personal pace,
-/// heart-rate targets and incline empty until the athlete enters them.
+/// Keeps the built-in running prescription, including author-provided
+/// heart-rate zones, while clearing only athlete-specific pace, ghost, and
+/// treadmill choices. A preset Z5 interval must remain Z5 when copied.
 enum ATHLTHRunningLibraryDefaults {
     static func unpersonalized(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
         var result = source
@@ -32,8 +33,11 @@ enum ATHLTHRunningLibraryDefaults {
         var target = source
         target.intensity.paceMinSecondsPerKilometer = nil
         target.intensity.paceMaxSecondsPerKilometer = nil
-        target.intensity.heartRateZone = nil
-        if target.intensity.kind == .pace || target.intensity.kind == .heartRateZone {
+        // An authored zone is part of the training protocol, not a
+        // measurement or an athlete-specific BPM value.
+        if target.intensity.kind == .pace ||
+           (target.intensity.kind == .heartRateZone &&
+            target.intensity.heartRateZone == nil) {
             target.intensity.kind = .none
         }
         target.treadmillInclinePercent = nil
