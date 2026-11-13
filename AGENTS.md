@@ -1,10 +1,15 @@
-# Shared iPhone / iPad product rule (2.1.8)
+# Shared iPhone / iPad product rule (2.2.0)
 
 Use the existing shared plan, goal and workout engines and the same persisted data on iPhone and iPad. iPad may add previews, inspectors and editing controls to use its larger screen, with adaptive narrow-window fallbacks. Day and week planning are views of the same draft. Never reset or erase entered plan/workout/goal data on Back, layout changes, resizing or backgrounding. Keep recoverable drafts local and account-scoped; replacing an active plan requires one explicit acknowledged choice. Use warm gold for plan actions.
 
 # ATHLTH development baseline
 
-- **CURRENT ACTIVE VERSION: 2.1.8 (build 126)** on `release/v2.1.8`. Created 2026-11-11 directly from the exact successfully validated and TestFlight-uploaded 2.1.7 commit `3d42ccf38c62a919bb420bdc0f5699538db1dc5a`. Develop and test all new changes only on `release/v2.1.8`. **Do not upload 2.1.8 to TestFlight until the user explicitly requests it.**
+- **CURRENT ACTIVE VERSION: 2.2.0 (build 128)** on `release/v2.2.0`, created 2026-11-13 from the exact verified 2.1.9 release commit `8b05eadc5aa728b471df50867995878127481268`. Develop and test all new features, fixes and UI changes only on `release/v2.2.0`. **Do not upload 2.2.0 to TestFlight without a new explicit user request.**
+- **VERSION 2.1.9 (build 127) IS FROZEN** at `8b05eadc5aa728b471df50867995878127481268`. Preservation refs: `locked/v2.1.9` and `backup/v2.1.9-locked-before-v2.2.0-20261113`. Same-commit GitHub Actions: iOS Build ATHLTH `43464390980`, backend regressions `43464390913`, TestFlight upload `43464391402` all succeeded on 2026-11-13. This confirms GitHub's upload step; it does not independently confirm subsequent Apple processing or tester availability. Never modify `release/v2.1.9` or either preservation ref.
+- **Release transition:** This 2.2.0 section supersedes historical active-version guidance below. Preserve the shared iPhone/iPad training engine, plan editor, Watch sync, offline data and 2.1.9's privacy-first, opt-in iPad live-workout consent behavior.
+- **Freeze enforcement:** Frozen branches are preserved by separate Git refs and project policy, not GitHub branch protection. Admin-enforced protection requires separate administrative access.
+
+- **HISTORICAL VERSION: 2.1.8 (build 126)** on `release/v2.1.8`. Superseded by the 2.2.0 active-development baseline above.
 - **VERSION 2.1.7 (build 125) IS FROZEN** at commit `3d42ccf38c62a919bb420bdc0f5699538db1dc5a`. Preservation refs: `locked/v2.1.7` and `backup/v2.1.7-locked-before-v2.1.8-20261111`. Same-commit iOS Build ATHLTH workflow `42913510211`, backend regressions `42913510531` and TestFlight upload `42913511036` all succeeded on 2026-11-11 (Europe/Oslo); GitHub confirmed App Store Connect upload, not subsequent Apple processing. Never modify `release/v2.1.7`, its locked branch, or its backup. Freezing is by preserved refs and developer policy, not enforced GitHub branch protection.
 - **Release transition rule:** This 2.1.8 section supersedes historical active-version instructions below, including references to 2.1.6 and 2.1.3. Continue using the existing shared iPhone/iPad plan and workout engines rather than duplicating them. The new iPad Plan Studio visual produced in chat was a proposal, not implemented source in build 125; any UI work must be separately implemented and tested in 2.1.8.
 
