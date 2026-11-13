@@ -283,6 +283,10 @@ struct ATHLTHWorkoutRecipePreview: View {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 
+    private var normalizedBlocks: [WorkoutTemplateBlock] {
+        blocks.recoveringLegacyStructuredTargets()
+    }
+
     private var recipeTint: Color { ATHLTHPlanDesign.accentInk }
 
     private var maximumHeartRateBPM: Double? {
@@ -312,7 +316,7 @@ struct ATHLTHWorkoutRecipePreview: View {
             if advanced && !embeddedInDetails {
                 statistics
             }
-            if let meters = ATHLTHRunningEstimate.distanceMeters(for: blocks),
+            if let meters = ATHLTHRunningEstimate.distanceMeters(for: normalizedBlocks),
                category == "running" || category == "walking" {
                 Label(
                     tr("Estimated distance", "Estimert distanse") + " · " +
@@ -416,7 +420,7 @@ struct ATHLTHWorkoutRecipePreview: View {
             GridItem(.flexible(), spacing: 9)
         ], spacing: 9) {
             metric(
-                value: "\(blocks.count)",
+                value: "\(normalizedBlocks.count)",
                 label: tr("Steps", "Deler"), icon: "square.stack"
             )
             metric(
@@ -486,7 +490,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     /// A quick understanding of WHAT to do, not 26 individual settings.
     /// Changing to Advanced shows the unchanged original step-by-step recipe.
     private var simpleOutline: some View {
-        let stages = ATHLTHSimpleWorkoutOutline.stages(for: blocks)
+        let stages = ATHLTHSimpleWorkoutOutline.stages(for: normalizedBlocks)
         return VStack(alignment: .leading, spacing: 11) {
             if !stages.isEmpty {
                 Text(tr("This is your workout", "Dette skal du gjøre"))
@@ -565,13 +569,13 @@ struct ATHLTHWorkoutRecipePreview: View {
     /// phases. A phase opens to a compact exercise list, and each exercise can
     /// open again to reveal rests and the editing action.
     private var expandableOutline: some View {
-        let sections = ATHLTHWorkoutPhaseOutline.sections(for: blocks)
+        let sections = ATHLTHWorkoutPhaseOutline.sections(for: normalizedBlocks)
         return LazyVStack(alignment: .leading, spacing: 12) {
             ForEach(sections) { section in
                 phaseDisclosure(section.phase, count: section.indices.count)
                 if !collapsedPhases.contains(section.phase) {
                     ForEach(section.indices, id: \.self) { index in
-                        recipeStepCard(blocks[index], index: index)
+                        recipeStepCard(normalizedBlocks[index], index: index)
                             .padding(.leading, 9)
                     }
                 }
