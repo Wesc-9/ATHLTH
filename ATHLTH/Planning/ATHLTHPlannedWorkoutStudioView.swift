@@ -30,7 +30,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddRest: (WorkoutPhaseKind) -> Void
     let onAddActiveRest: (WorkoutPhaseKind) -> Void
     let onAddWorkout: (WorkoutPhaseKind) -> Void
-    let onImportWorkout: () -> Void
+    let onChooseLibraryWorkout: () -> Void
     let onSelectRoute: (WorkoutPhaseKind) -> Void
     let onBuildRoute: (WorkoutPhaseKind) -> Void
     let onEdit: (UUID) -> Void
@@ -109,21 +109,25 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 addSectionMenu
             }
 
-            Button(action: onImportWorkout) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Import a workout from a file",
-                        norwegian: "Importer treningsøkt fra fil"
-                    ),
-                    systemImage: "square.and.arrow.down"
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(bronze)
-                .frame(maxWidth: .infinity, minHeight: 46, alignment: .center)
+            // Library selection always uses the shared ATHLTH/Mine workout
+            // picker. Keep it discoverable after the first step was added.
+            if !phases.isEmpty {
+                Button(action: onChooseLibraryWorkout) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Choose workout from library",
+                            norwegian: "Velg treningsøkt fra biblioteket"
+                        ),
+                        systemImage: "books.vertical"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(bronze)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                }
+                .buttonStyle(.bordered)
+                .tint(bronze)
+                .accessibilityIdentifier("athlth-workout-choose-from-library")
             }
-            .buttonStyle(.bordered)
-            .tint(bronze)
-            .accessibilityIdentifier("athlth-import-planned-workout-file")
 
             if advanced && activity == .strength {
                 DisclosureGroup {
@@ -176,6 +180,20 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    Button(action: onChooseLibraryWorkout) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Choose a workout from the library",
+                                norwegian: "Velg en treningsøkt fra biblioteket"
+                            ),
+                            systemImage: "books.vertical"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(bronze)
+                    .accessibilityIdentifier("athlth-workout-choose-from-library")
                     HStack(spacing: 8) {
                         Button {
                             // Strength always enters the exercise library.
