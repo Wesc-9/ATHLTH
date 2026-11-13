@@ -157,7 +157,12 @@ enum ATHLTHSimpleWorkoutOutline {
 
             let workText = work.block.durationSeconds.map {
                 ATHLTHWorkoutStepCopy.duration($0)
-            } ?? work.block.targetText ?? ""
+            } ?? work.block.targetText ?? (
+                (work.block.kind == .run || work.block.kind == .rest)
+                    ? ATHLTHLocalization.choose(
+                        english: "Manual next", norwegian: "Fortsett manuelt"
+                    ) : ""
+            )
             let recoveryText = recovery?.block.durationSeconds.map {
                 ATHLTHWorkoutStepCopy.duration($0)
             } ?? recovery?.block.targetText
@@ -667,8 +672,15 @@ struct ATHLTHWorkoutRecipePreview: View {
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(expanded ? nil : 2)
                         } else {
-                            Text(tr("Open to see workout instructions",
-                                    "Åpne for å se øktdetaljer"))
+                            Text(
+                                (block.kind == .run || block.kind == .rest) &&
+                                block.durationSeconds == nil &&
+                                block.distanceMeters == nil
+                                    ? tr("Open-ended · continue manually",
+                                         "Åpen øktdel · fortsett manuelt")
+                                    : tr("Open to see workout instructions",
+                                         "Åpne for å se øktdetaljer")
+                            )
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
@@ -876,6 +888,19 @@ private struct ATHLTHWorkoutStepEditor: View {
                         )
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    }
+                    if draft.durationSeconds == nil &&
+                       draft.distanceMeters == nil &&
+                       (draft.kind == .run || draft.kind == .rest) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Open-ended: use Next to finish this step.",
+                                norwegian: "Åpen øktdel: bruk Neste for å avslutte delen."
+                            ),
+                            systemImage: "hand.tap"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                 }
                 Section(ATHLTHLocalization.choose(english: "Targets", norwegian: "Mål")) {
