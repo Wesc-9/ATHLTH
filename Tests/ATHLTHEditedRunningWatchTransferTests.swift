@@ -101,6 +101,38 @@ final class ATHLTHEditedRunningWatchTransferTests: XCTestCase {
         XCTAssertEqual(watch.steps[1].durationSeconds, 90)
     }
 
+    func testZonedOneMinuteIntervalsReachWatchWithActualZ5AndZ1Targets() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workoutCatalogEntries.first {
+            $0.slug == "zoned-vma-006"
+        })
+        let workout = planned(
+            ATHLTHWorkoutLibraryPersonalization.blankTargets(source.blocks),
+            title: source.title
+        )
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: workout, routeAlerts: .standard
+        )
+        let z5 = transfer.steps.filter {
+            $0.phase == "work" && $0.targetHeartRateZone == 5
+        }
+        let z1 = transfer.steps.filter {
+            $0.phase == "recovery" && $0.targetHeartRateZone == 1
+        }
+        XCTAssertEqual(z5.count, 12)
+        XCTAssertEqual(z1.count, 11)
+        XCTAssertTrue(z5.allSatisfy { $0.durationSeconds == 60 })
+        XCTAssertTrue(z1.allSatisfy { $0.durationSeconds == 60 })
+
+        // Encoding to Watch must not replace a target with display-only text.
+        let decoded = try JSONDecoder().decode(
+            WatchRunningWorkoutTransfer.self,
+            from: JSONEncoder().encode(transfer)
+        )
+        XCTAssertEqual(decoded.steps.filter {
+            $0.targetHeartRateZone == 5 && $0.durationSeconds == 60
+        }.count, 12)
+    }
+
     func testLegacyRunningTemplateStillUsesItsExistingWatchBuilder() throws {
         var workout = planned([], title: "Legacy")
         workout.runningWorkout = try XCTUnwrap(
