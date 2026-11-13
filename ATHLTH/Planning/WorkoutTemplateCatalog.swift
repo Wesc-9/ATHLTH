@@ -1450,9 +1450,13 @@ struct WorkoutTemplateLibraryView: View {
                 }
 
                 HStack(spacing: 9) {
-                    Text(ATHLTHLocalization.choose(english: "View", norwegian: "Visning"))
+                    if initialCategory != .running {
+                        Text(ATHLTHLocalization.choose(
+                            english: "View", norwegian: "Visning"
+                        ))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
                     if initialCategory == .running {
                         Button {
                             favoritesOnly.toggle()
@@ -1966,12 +1970,13 @@ struct WorkoutTemplateLibraryView: View {
                 }
             }
             .padding(.leading, 18)
-            .padding(.trailing, initialCategory == nil ? 18 : 42)
+            .padding(.trailing, initialCategory == nil || initialCategory == .running ? 18 : 42)
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity)
         }
         .overlay(alignment: .trailing) {
-            if initialCategory != nil && !workoutAlphabetTargets.isEmpty {
+            if initialCategory != nil && initialCategory != .running &&
+                !workoutAlphabetTargets.isEmpty {
                 ATHLTHExerciseAlphabetIndex(targets: workoutAlphabetTargets) { target in
                     withAnimation(.easeInOut(duration: 0.22)) {
                         proxy.scrollTo(target, anchor: .top)
@@ -2248,146 +2253,134 @@ struct WorkoutTemplateLibraryView: View {
         }
     }
 
+    /// Shared, one-row discovery controls for all workout entry points.
     @ViewBuilder
     private var activityDiscoveryFilters: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "FIND THE RIGHT WORKOUT",
-                        norwegian: "FINN RIKTIG ØKT"
-                    ))
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-
-                    Text(initialCategory == .strength
-                        ? ATHLTHLocalization.choose(
-                            english: "Which muscles?", norwegian: "Hvilke muskelgrupper?"
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 9) {
+                if isRunningScope {
+                    Menu {
+                        Button {
+                            selectedRunningType = nil
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "All types", norwegian: "Alle økttyper"
+                                ),
+                                systemImage: selectedRunningType == nil
+                                    ? "checkmark" : "figure.run"
+                            )
+                        }
+                        ForEach(RunningWorkoutType.allCases) { type in
+                            Button {
+                                selectedRunningType = type
+                            } label: {
+                                if selectedRunningType == type {
+                                    Label(type.title, systemImage: "checkmark")
+                                } else {
+                                    Label(type.title, systemImage: type.systemImage)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(
+                            selectedRunningType?.title ??
+                                ATHLTHLocalization.choose(
+                                    english: "Workout type", norwegian: "Økttype"
+                                ),
+                            systemImage: "figure.run"
                         )
-                        : initialCategory == .running
-                            ? ATHLTHLocalization.choose(
-                                english: "What kind of run?", norwegian: "Hva slags løpeøkt?"
-                              )
-                            : ATHLTHLocalization.choose(
-                                english: "Narrow your search", norwegian: "Finn økten du ønsker"
-                              ))
-                    .font(.title3.bold())
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .lineLimit(1)
+                        .frame(minHeight: 44)
+                    }
+                    .accessibilityIdentifier("workout-running-type-filter")
                 }
-                Spacer(minLength: 5)
+
+                Menu {
+                    ForEach(ATHLTHWorkoutDiscoveryFilter.Duration.allCases) { duration in
+                        Button {
+                            selectedWorkoutDuration = duration
+                        } label: {
+                            if duration == selectedWorkoutDuration {
+                                Label(duration.title, systemImage: "checkmark")
+                            } else {
+                                Text(duration.title)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(
+                        selectedWorkoutDuration == .any
+                            ? ATHLTHLocalization.choose(
+                                english: "Duration", norwegian: "Varighet"
+                            )
+                            : selectedWorkoutDuration.title,
+                        systemImage: "clock"
+                    )
+                    .lineLimit(1)
+                    .frame(minHeight: 44)
+                }
+                .accessibilityIdentifier("workout-duration-filter")
+
+                Menu {
+                    ForEach(DiscoverySort.allCases) { sort in
+                        Button {
+                            selectedDiscoverySort = sort
+                        } label: {
+                            if sort == selectedDiscoverySort {
+                                Label(sort.title, systemImage: "checkmark")
+                            } else {
+                                Text(sort.title)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(
+                        selectedDiscoverySort == .alphabetical
+                            ? ATHLTHLocalization.choose(
+                                english: "Sort", norwegian: "Sorter"
+                            )
+                            : selectedDiscoverySort.title,
+                        systemImage: "arrow.up.arrow.down"
+                    )
+                    .lineLimit(1)
+                    .frame(minHeight: 44)
+                }
+                .accessibilityIdentifier("workout-sort-filter")
+
                 if hasDiscoveryFilters {
-                    Button(ATHLTHLocalization.choose(
-                        english: "Clear filters", norwegian: "Nullstill"
-                    )) {
+                    Button {
                         selectedStrengthMuscles = []
                         selectedRunningType = nil
                         selectedWorkoutDuration = .any
                         selectedWorkoutLevel = "all"
                         selectedExerciseName = nil
                         selectedDiscoverySort = .alphabetical
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Reset", norwegian: "Nullstill"
+                            ),
+                            systemImage: "arrow.counterclockwise"
+                        )
+                        .frame(minHeight: 44)
                     }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
             }
-
-            if isRunningScope {
-                Text(ATHLTHLocalization.choose(
-                    english: "Workout type", norwegian: "Økttype"
-                ))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        Button { selectedRunningType = nil } label: {
-                            filterChip(
-                                ATHLTHLocalization.choose(
-                                    english: "All", norwegian: "Alle"
-                                ),
-                                systemImage: "figure.run",
-                                selected: selectedRunningType == nil
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        ForEach(RunningWorkoutType.allCases) { type in
-                            Button { selectedRunningType = type } label: {
-                                filterChip(
-                                    type.title, systemImage: type.systemImage,
-                                    selected: selectedRunningType == type
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.trailing, 15)
-                }
-                // Extend the actual scroll viewport to the filter card edge.
-                // The final chip retains an inset so it is never cut in half.
-                .padding(.trailing, -15)
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Duration", norwegian: "Varighet"
-                ))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 7) {
-                        ForEach(ATHLTHWorkoutDiscoveryFilter.Duration.allCases) {
-                            duration in
-                            Button {
-                                selectedWorkoutDuration = duration
-                            } label: {
-                                filterChip(
-                                    duration.title, systemImage: "clock",
-                                    selected: selectedWorkoutDuration == duration
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.trailing, 15)
-                }
-                .padding(.trailing, -15)
-                if selectedWorkoutDuration != .any {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Only workouts with a recorded duration can match a time filter.",
-                        norwegian: "Kun økter med registrert varighet kan vises med tidsfilter."
-                    ))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                }
-            }
-
-            HStack {
-                Text(ATHLTHLocalization.choose(
-                    english: "Sort workouts", norwegian: "Sorter økter"
-                ))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                Spacer()
-                Picker(ATHLTHLocalization.choose(
-                    english: "Sort", norwegian: "Sorter"
-                ), selection: $selectedDiscoverySort) {
-                    ForEach(DiscoverySort.allCases) { sort in
-                        Text(sort.title).tag(sort)
-                    }
-                }
-                .tint(ATHLTHPlanDesign.accentInk)
-            }
+            .font(.subheadline.weight(.medium))
+            .buttonStyle(.bordered)
+            .tint(ATHLTHPlanDesign.accentInk)
+            .padding(.vertical, 2)
+            .padding(.horizontal, 1)
         }
-        .padding(15)
-        .background(
-            ATHLTHTheme.accentSoft.opacity(0.3),
-            in: RoundedRectangle(cornerRadius: 21)
-        )
+        .accessibilityIdentifier("workout-compact-filters")
     }
 
     private var libraryColumns: [GridItem] {
         ATHLTHLibraryResponsiveLayout.columns(
             mode: displayMode,
             width: libraryViewWidth,
-            reservedHorizontalSpace: initialCategory == nil ? 36 : 60,
+            reservedHorizontalSpace: initialCategory == nil || initialCategory == .running ? 36 : 60,
             accessibilityText: dynamicTypeSize.isAccessibilitySize,
             preferredMinimumCardWidth: 145
         )
