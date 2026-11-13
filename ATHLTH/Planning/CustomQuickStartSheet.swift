@@ -424,6 +424,7 @@ struct CustomQuickStartSheet: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 5) {
+                    ATHLTHLiveWorkoutPrestartToggle()
                     ATHLTHQuickStartDeviceLaunchBar(
                         watchAvailable: canUseWatch,
                         onIPhone: {
