@@ -219,6 +219,54 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                     .tint(gold)
                             }
 
+                            if zoneVoiceAlerts.wrappedValue {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack {
+                                        Text(tr("Wait before alert", "Vent før varsel"))
+                                            .font(.subheadline)
+                                        Spacer(minLength: 8)
+                                        Picker(tr("Wait before alert", "Vent før varsel"),
+                                               selection: Binding(
+                                                get: { draft.smartPrompts.targetZoneGraceSeconds ?? 10 },
+                                                set: { draft.smartPrompts.targetZoneGraceSeconds = $0 }
+                                               )) {
+                                            ForEach([5, 10, 15, 20, 30], id: \.self) { seconds in
+                                                Text("\(seconds) s").tag(seconds)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .pickerStyle(.menu)
+                                    }
+                                    HStack {
+                                        Text(tr("Repeat if still outside",
+                                                "Gjenta hvis fortsatt utenfor"))
+                                            .font(.subheadline)
+                                        Spacer(minLength: 8)
+                                        Picker(tr("Repeat if still outside",
+                                                  "Gjenta hvis fortsatt utenfor"),
+                                               selection: Binding(
+                                                get: { draft.smartPrompts.targetZoneRepeatSeconds ?? 120 },
+                                                set: { draft.smartPrompts.targetZoneRepeatSeconds = $0 }
+                                               )) {
+                                            ForEach([30, 45, 60, 90, 120, 180, 300], id: \.self) { seconds in
+                                                Text(seconds.isMultiple(of: 60)
+                                                    ? "\(seconds / 60) min" : "\(seconds) s")
+                                                    .tag(seconds)
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .pickerStyle(.menu)
+                                    }
+                                    Text(tr(
+                                        "Alerts restart for each new interval. No warning is sent for a pause without a target zone.",
+                                        "Varslingen starter på nytt for hvert drag. Pauser uten pulsmål gir ingen varsler."
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(dim)
+                                }
+                                .accessibilityIdentifier("athlth-coach-zone-timing")
+                            }
+
                             Button {
                                 onEditOption(.targetZoneCoach)
                             } label: {
