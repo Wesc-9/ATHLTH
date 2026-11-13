@@ -6,8 +6,14 @@ import Foundation
 /// untouched, and a pre-existing typed value always takes precedence.
 enum ATHLTHWorkoutStructuredDataMigration {
     static func normalize(_ source: WorkoutTemplateBlock) -> WorkoutTemplateBlock {
-        guard let notes = source.notes, !notes.isEmpty else { return source }
         var block = source
+        if block.sourceLoadAlternativesKilograms == nil,
+           let loadNote = block.loadNote,
+           loadNote == "6 kg / 4 kg as specified by the HYROX PFT" {
+            // Two race specifications, not a personal target weight.
+            block.sourceLoadAlternativesKilograms = [6, 4]
+        }
+        guard let notes = source.notes, !notes.isEmpty else { return block }
         let segments = notes.components(separatedBy: " · ")
         var instructions: [String] = []
 
