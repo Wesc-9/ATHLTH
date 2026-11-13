@@ -164,7 +164,10 @@ enum ATHLTHZonedPlanLibrary {
                 id: UUID(uuidString: String(format: "B4000000-0000-0000-0000-%012d", index + 1))!,
                 slug: "zoned-\(workout.id.lowercased())",
                 title: ATHLTHZonedLocalization.text(workout.nameEn),
-                summary: ATHLTHZonedLocalization.workoutSummary(workout.category, english: workout.descriptionEn),
+                summary: ATHLTHZonedLocalization.workoutSummary(
+                    workout.category, english: workout.descriptionEn,
+                    workoutID: workout.id
+                ),
                 category: activity,
                 difficulty: ATHLTHZonedLocalization.text(workout.difficulty),
                 estimatedDurationMinutes: workout.typicalDuration.map { ($0.min + $0.max) / 2 },
@@ -219,7 +222,10 @@ enum ATHLTHZonedPlanLibrary {
         let optionalStrength = week.sessions.filter { $0.isSuggestion == true }
             .map(\.workoutId).joined(separator: ", ")
         var detail: [String] = [
-            ATHLTHZonedLocalization.workoutSummary(workout.category, english: workout.descriptionEn),
+            ATHLTHZonedLocalization.workoutSummary(
+                    workout.category, english: workout.descriptionEn,
+                    workoutID: workout.id
+                ),
             ATHLTHLocalization.choose(
                 english: "Zoned · \(sourcePlan.nameEn) · week \(week.weekNumber) (\(week.phase))",
                 norwegian: "Zoned · \(ATHLTHZonedLocalization.planTitle(sourcePlan.id, english: sourcePlan.nameEn)) · uke \(week.weekNumber) (\(ATHLTHZonedLocalization.phase(week.phase)))"
