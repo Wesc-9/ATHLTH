@@ -110,6 +110,11 @@ struct ATHLTHCrossDevicePresenceRow: Codable, Equatable {
     }
 }
 
+private struct ATHLTHLiveAccessPushResult: Decodable {
+    let queued: Bool
+    let reason: String?
+}
+
 /// Polling deliberately shares only a compact spectator state; no second
 /// HKWorkoutSession, no mirrored GPS track, no public/social presence.
 /// Server-side RLS additionally enforces user_id = auth.uid().
@@ -726,11 +731,42 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .execute()
             outgoingRequestID = request.id
             outgoingRequestState = .pending
+            // Best effort APNs only. Sending the request is independent from
+            // notification permissions and never grants spectator access.
+            Task { await notifyIPhoneAboutRequest(id: request.id, accountID: accountID) }
         } catch {
             outgoingRequestState = .failed
             requestError = ATHLTHLocalization.choose(
                 english: "Unable to send the viewing request. Try again.",
                 norwegian: "Kunne ikke sende forespørselen. Prøv igjen."
+            )
+        }
+    }
+
+    private func notifyIPhoneAboutRequest(id: UUID, accountID: UUID) async {
+        guard ATHLTHDeviceRole.isIPad,
+              outgoingRequestID == id,
+              client.auth.currentUser?.id == accountID else { return }
+        do {
+            let reply: ATHLTHLiveAccessPushResult = try await client.functions.invoke(
+                "notify-live-workout-request",
+                options: FunctionInvokeOptions(
+                    body: ["request_id": id.uuidString]
+                )
+            )
+            guard outgoingRequestID == id else { return }
+            if !reply.queued,
+               reply.reason != "already_notified" {
+                requestError = ATHLTHLocalization.choose(
+                    english: "Open ATHLTH on your iPhone to approve. A phone notification could not be delivered.",
+                    norwegian: "Åpne ATHLTH på iPhone for å godkjenne. Varsel til telefonen kunne ikke leveres."
+                )
+            }
+        } catch {
+            guard outgoingRequestID == id else { return }
+            requestError = ATHLTHLocalization.choose(
+                english: "Open ATHLTH on your iPhone to approve. The request is still waiting.",
+                norwegian: "Åpne ATHLTH på iPhone for å godkjenne. Forespørselen venter fortsatt."
             )
         }
     }
