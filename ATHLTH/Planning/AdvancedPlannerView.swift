@@ -6457,6 +6457,27 @@ struct SessionEditorView: View {
                     }
                 }
 
+                // Imported structured recipes use the same canonical
+                // timeline builder as Quick Train and Plan Studio.
+                if editorMode == .advanced &&
+                    !workoutBlocks.isEmpty &&
+                    selectedScratchWorkoutType == nil {
+                    Button {
+                        showingUnifiedWorkoutComposer = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Edit workout timeline",
+                                norwegian: "Rediger øktstruktur"
+                            ),
+                            systemImage: "slider.horizontal.3"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(minHeight: 44)
+                    }
+                }
+
                 if editorMode == .basic {
                     ForEach(Array(previewBlocks.prefix(4))) { block in
                         HStack(spacing: 12) {
@@ -6644,7 +6665,10 @@ struct SessionEditorView: View {
                 basicWorkoutChoiceSection
             } else {
                 if kind == .running {
-                    runningBuilder
+                    if !selectedRunningWorkouts.isEmpty ||
+                        workoutPlanningPreviewBlocks.isEmpty {
+                        runningBuilder
+                    }
                     plannedRunGuidanceSection
                 }
                 workoutSourcesSection
@@ -6878,7 +6902,8 @@ struct SessionEditorView: View {
                     initialActivity: selectedScratchWorkoutType,
                     onScheduledTimeChanged: { scheduledTime = $0 },
                     onAddStandalone: { updated in
-                        if ATHLTHScratchComposerPresentationPolicy.savesDirectly(
+                        if selectedScratchWorkoutType != nil &&
+                            ATHLTHScratchComposerPresentationPolicy.savesDirectly(
                             isStandalone: isStandalone,
                             preparesForSharing: onPreparedWorkout != nil,
                             hasPartner: selectedPartnerID != nil,
