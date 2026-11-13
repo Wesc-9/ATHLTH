@@ -564,11 +564,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.liveTargetStatus = nil
         }
 
+        // A recovery step belongs to the same HealthKit recording.
+        // Optional auto-pause only applies to unstructured run/walk sessions.
         autoPauseDetector.reset(
-            enabled:
-                workout.autoPauseEnabled ?? false
+            enabled: ATHLTHWorkoutHealthKitContinuityPolicy.mayAutoPause(
+                kind: .running,
+                hasStructuredIntervals: !workout.steps.isEmpty
+            ) && (workout.autoPauseEnabled ?? false)
         )
-        manualPauseActive = false
+        if !isActive { manualPauseActive = false }
+        if !workout.steps.isEmpty && automaticPauseActive && !manualPauseActive {
+            automaticPauseActive = false
+            workoutSession?.resume()
+        }
         structuredStepStartElapsedTime = elapsedTime
         structuredStepStartDistanceMeters = distanceMeters
         structuredWorkoutComplete = false
@@ -4126,7 +4134,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         automaticPauseEnabled =
             ATHLTHWorkoutHealthKitContinuityPolicy.supportsAutomaticPause(kind) &&
             automaticPauseEnabled
-        autoPauseDetector.reset(enabled: automaticPauseEnabled)
+        autoPauseDetector.reset(
+            enabled: automaticPauseEnabled &&
+                ATHLTHWorkoutHealthKitContinuityPolicy.mayAutoPause(
+                    kind: kind,
+                    hasStructuredIntervals: structuredRunningWorkout != nil
+                )
+        )
         capturedRouteLocations = []
         lastRenderedRouteLocation = nil
         gpsFallbackDistanceMeters = 0
@@ -8770,7 +8784,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func triggerAutomaticPause() {
-        guard ATHLTHWorkoutHealthKitContinuityPolicy.supportsAutomaticPause(kind),
+        guard ATHLTHWorkoutHealthKitContinuityPolicy.mayAutoPause(
+                  kind: kind,
+                  hasStructuredIntervals: structuredRunningWorkout != nil
+              ),
               automaticPauseEnabled,
               !manualPauseActive,
               !automaticPauseActive,
@@ -9402,8 +9419,10 @@ private extension WatchWorkoutManager {
         }
 
         if automaticPauseEnabled &&
-            (kind == .running ||
-             kind == .walking) {
+            ATHLTHWorkoutHealthKitContinuityPolicy.mayAutoPause(
+                kind: kind,
+                hasStructuredIntervals: structuredRunningWorkout != nil
+            ) {
             for location in orderedLocations {
                 if let action =
                         autoPauseDetector.evaluate(
