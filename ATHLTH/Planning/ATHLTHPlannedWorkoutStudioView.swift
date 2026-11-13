@@ -108,7 +108,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 addSectionMenu
             }
 
-            if activity == .strength {
+            if advanced && activity == .strength {
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 12) {
                         strengthHelp("Superset", "Supersett", "Two or more exercises in sequence before resting.", "To eller flere øvelser etter hverandre før pause.")
@@ -191,8 +191,12 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             }
 
             if routeAsWholeWorkout == nil {
-                ForEach(phases) { phase in
-                    phaseCard(phase)
+                if advanced {
+                    ForEach(phases) { phase in
+                        phaseCard(phase)
+                    }
+                } else {
+                    simpleBuilderOutline
                 }
             }
         }
@@ -300,6 +304,160 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 .accessibilityHidden(true)
                 .zIndex(100)
             }
+        }
+    }
+
+    /// One shared compact presentation of the SAME canonical recipe used by
+    /// Quick Train and planned workouts; no separate easy-mode editor model.
+    /// Advanced still owns per-step edits, targets, reordering and all groups.
+    private var simpleBuilderOutline: some View {
+        let outlines = ATHLTHSimpleWorkoutOutline.stages(
+            for: blocks.expandedForExecution()
+        )
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(ATHLTHLocalization.choose(
+                english: "Your workout at a glance",
+                norwegian: "Økten din – kort fortalt"
+            ))
+            .font(.headline)
+            .foregroundStyle(ink)
+
+            ForEach(phases) { phase in
+                let stageRows = outlines.filter { $0.phase == phase }
+                let items = stageRows.flatMap(\.items)
+                let plannedSeconds = stageRows.compactMap(\.plannedSeconds)
+                    .reduce(0, +)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Image(systemName: phase.symbol)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(bronze)
+                            .frame(width: 36, height: 36)
+                            .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                        Text(phase.title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(ink)
+                        Spacer(minLength: 4)
+                        if plannedSeconds > 0 {
+                            Text(ATHLTHWorkoutDurationEstimator.conciseDuration(
+                                plannedSeconds
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+
+                    if items.isEmpty {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Nothing added yet", norwegian: "Ingen deler lagt til"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    } else {
+                        ForEach(Array(items.prefix(3))) { item in
+                            HStack(spacing: 9) {
+                                Image(systemName: item.symbol)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(bronze)
+                                    .frame(width: 20)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(ink)
+                                    if !item.detail.isEmpty {
+                                        Text(item.detail)
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+
+                        if items.count > 3 {
+                            Text(ATHLTHLocalization.choose(
+                                english: "\(items.count - 3) more variations · see Advanced",
+                                norwegian: "\(items.count - 3) flere varianter · se Avansert"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(bronze)
+                        }
+                    }
+
+                    simplePhaseAddMenu(phase)
+                }
+                .padding(14)
+                .athlthPlanCard(radius: 19)
+            }
+
+            if !blocks.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Need different pace, rest, targets or individual steps? Switch to Advanced. Your workout stays the same.",
+                    norwegian: "Vil du endre tempo, pauser, mål eller enkeltdrag? Bytt til Avansert. Økten beholdes som den er."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .padding(.horizontal, 5)
+            }
+        }
+        .accessibilityIdentifier("athlth-simple-workout-builder-outline")
+    }
+
+    private func simplePhaseAddMenu(_ phase: WorkoutPhaseKind) -> some View {
+        Menu {
+            if activity == .strength {
+                Button {
+                    onAddExercise(phase)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Exercise", norwegian: "Øvelse"
+                    ), systemImage: "dumbbell")
+                }
+                Button {
+                    onAddFreeStrength(phase)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Free strength", norwegian: "Fri styrke"
+                    ), systemImage: "figure.strengthtraining.traditional")
+                }
+            } else {
+                Button {
+                    onAddRun(phase)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Activity", norwegian: "Aktivitet"
+                    ), systemImage: "figure.run")
+                }
+                if activity == .running || activity == .walking {
+                    Button {
+                        onAddIntervals(phase)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Intervals", norwegian: "Intervaller"
+                        ), systemImage: "timer")
+                    }
+                }
+            }
+            Button {
+                onAddRest(phase)
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Recovery", norwegian: "Pause"
+                ), systemImage: "pause")
+            }
+        } label: {
+            Label(ATHLTHLocalization.choose(
+                english: "Add to section", norwegian: "Legg til i øktdelen"
+            ), systemImage: "plus")
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(bronze)
+            .frame(maxWidth: .infinity, minHeight: 43)
+            .background(
+                ATHLTHPlanDesign.selectedSurface,
+                in: RoundedRectangle(cornerRadius: 12)
+            )
         }
     }
 
