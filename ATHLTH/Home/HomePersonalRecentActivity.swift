@@ -1092,6 +1092,21 @@ struct HomePersonalRecentActivitySection:
 
     @State private var myWorkouts:
         [SocialPublishableWorkout] = []
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var availableFeedWidth: CGFloat = 0
+
+    private var isWideRecentLayout: Bool {
+        ATHLTHRecentActivityLayoutPolicy.isHorizontal(
+            availableWidth: availableFeedWidth,
+            accessibilityText: dynamicTypeSize.isAccessibilitySize
+        )
+    }
+
+    private var recentArtworkHeight: CGFloat {
+        ATHLTHRecentActivityLayoutPolicy.artworkHeight(
+            horizontal: isWideRecentLayout
+        )
+    }
 
     private var recentRevision:
         HomeRecentActivityRevision {
@@ -1183,10 +1198,15 @@ struct HomePersonalRecentActivitySection:
             } else {
                 // Vertical feed uses the existing order, workout evidence,
                 // friend identities and engagement stores unchanged.
-                LazyVStack(spacing: 11) {
+                LazyVStack(spacing: 12) {
                     ForEach(visibleItems) { item in
                         verticalItem(item)
                     }
+                }
+                .onGeometryChange(for: CGFloat.self) { geometry in
+                    geometry.size.width
+                } action: { width in
+                    availableFeedWidth = width
                 }
                 .accessibilityIdentifier("athlth-home-recent-vertical-feed")
             }
@@ -1322,9 +1342,11 @@ struct HomePersonalRecentActivitySection:
 
     @ViewBuilder
     private func verticalItem(_ item: HomeActivityStreamItem) -> some View {
-        HStack(alignment: .center, spacing: 0) {
-            switch item.source {
-            case .mine(let workout):
+        switch item.source {
+        case .mine(let workout):
+            ATHLTHRecentActivityCardLayout(
+                availableWidth: availableFeedWidth
+            ) {
                 NavigationLink {
                     HomePersonalActivityDestination(
                         workout: workout,
@@ -1336,15 +1358,15 @@ struct HomePersonalRecentActivitySection:
                         workout: workout,
                         strengthWorkout: strengthWorkout(for: workout),
                         phoneWorkout: localPhoneWorkout(for: workout),
-                        height: 158,
+                        height: recentArtworkHeight,
                         recentActivityStrip: true
                     )
-                    .frame(width: 148, height: 158)
+                    .frame(maxWidth: .infinity)
                     .clipped()
                 }
                 .buttonStyle(.plain)
-
-                VStack(alignment: .leading, spacing: 7) {
+            } details: {
+                VStack(alignment: .leading, spacing: 8) {
                     NavigationLink {
                         ATHLTHProfileView()
                     } label: {
@@ -1356,9 +1378,10 @@ struct HomePersonalRecentActivitySection:
                                 : session.profile.displayName,
                             systemImage: "person.crop.circle"
                         )
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                     }
                     .buttonStyle(.plain)
 
@@ -1414,32 +1437,40 @@ struct HomePersonalRecentActivitySection:
                         item: socialFeedItem(for: workout)
                     )
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityIdentifier("athlth-home-recent-own-card")
 
-            case .following(let feedItem):
+        case .following(let feedItem):
+            ATHLTHRecentActivityCardLayout(
+                availableWidth: availableFeedWidth
+            ) {
                 NavigationLink {
                     HomeFollowingWorkoutDetailView(item: feedItem)
                 } label: {
                     HomeFollowingWorkoutArtwork(
                         item: feedItem,
                         activity: HomeFollowingWorkoutPresentation.activity(for: feedItem),
-                        height: 158
+                        height: recentArtworkHeight
                     )
-                    .frame(width: 148, height: 158)
+                    .frame(maxWidth: .infinity)
                     .clipped()
                 }
                 .buttonStyle(.plain)
-
-                VStack(alignment: .leading, spacing: 7) {
+            } details: {
+                VStack(alignment: .leading, spacing: 8) {
                     NavigationLink {
                         FriendProfileView(userID: feedItem.actor.userID)
                     } label: {
-                        Text(feedItem.actor.resolvedName)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                            .lineLimit(1)
+                        HStack(spacing: 9) {
+                            SocialAvatar(profile: feedItem.actor, size: 32)
+                            Text(feedItem.actor.resolvedName)
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                        }
                     }
                     .buttonStyle(.plain)
 
@@ -1493,21 +1524,9 @@ struct HomePersonalRecentActivitySection:
                     Spacer(minLength: 0)
                     HomeCompactActivityEngagementRow(item: feedItem)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        .frame(height: 158)
-        .background(
-            Color.white.opacity(0.98),
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(ATHLTHTrainDesign.rule.opacity(0.35), lineWidth: 0.8)
-                .allowsHitTesting(false)
+            .accessibilityIdentifier("athlth-home-recent-following-card")
         }
     }
 
