@@ -210,6 +210,9 @@ struct ATHLTHiPadStudioRootView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $sidebarVisibility) {
             sidebar
+                // Suppress the system button in the left sidebar. The
+                // existing single hamburger in the detail toolbar remains.
+                .toolbar(removing: .sidebarToggle)
                 .navigationSplitViewColumnWidth(min: 210, ideal: 244, max: 280)
         } detail: {
             NavigationStack(path: $detailNavigationPath) {
@@ -302,6 +305,7 @@ struct ATHLTHiPadStudioRootView: View {
             .id(detailNavigationIdentity)
         }
         .navigationSplitViewStyle(.balanced)
+        .toolbar(removing: .sidebarToggle)
         // A single root-level, read-only full-screen spectator handles both
         // running and strength. Do not display a second legacy floating card.
         // iPhone/iPad share the workout engine; only Studio navigation and
