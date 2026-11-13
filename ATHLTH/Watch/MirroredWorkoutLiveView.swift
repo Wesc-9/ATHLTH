@@ -20,11 +20,12 @@ struct MirroredWorkoutLiveView: View {
     @State private var showingAddStrengthWorkout = false
     @State private var showingStrengthExerciseLibrary = false
     @State private var pendingStrengthExercise: ExerciseLibraryEntry?
-    @State private var showingAddActions = false
-    @State private var showingFinishConfirmation = false
+    private enum LiveAction: Equatable {
+        case add, finish, pauseWholeWorkout
+    }
+    @State private var pendingLiveAction: LiveAction?
     @State private var showingSpotifyControls = false
     @State private var showingTargetPaceEditor = false
-    @State private var showingStrengthWholeWorkoutPauseConfirmation = false
     @State private var targetPaceDraftSeconds = 330.0
     @State private var enteredTargetPaceSeconds: Double?
     @State private var paceSamples: [(elapsed: Double, distance: Double)] = []
@@ -347,8 +348,8 @@ struct MirroredWorkoutLiveView: View {
                                     showingSpotifyControls.toggle()
                                 }
                             },
-                            onAdd: { showingAddActions = true },
-                            onFinish: { showingFinishConfirmation = true }
+                            onAdd: { pendingLiveAction = .add },
+                            onFinish: { pendingLiveAction = .finish }
                         )
 
                         if showingSpotifyControls {
@@ -376,96 +377,99 @@ struct MirroredWorkoutLiveView: View {
 
         }
         .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Pause the entire workout?",
-                norwegian: "Pause hele treningsøkten?"
+            pendingLiveAction == .finish
+                ? ATHLTHLocalization.choose(
+                    english: "Finish workout?", norwegian: "Avslutte treningsøkten?"
+                )
+                : pendingLiveAction == .pauseWholeWorkout
+                    ? ATHLTHLocalization.choose(
+                        english: "Pause the entire workout?",
+                        norwegian: "Pause hele treningsøkten?"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Add to workout", norwegian: "Legg til i økten"
+                    ),
+            isPresented: Binding(
+                get: { pendingLiveAction != nil },
+                set: { if !$0 { pendingLiveAction = nil } }
             ),
-            isPresented: $showingStrengthWholeWorkoutPauseConfirmation,
             titleVisibility: .visible
         ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Pause whole workout", norwegian: "Pause hele økten"
-            )) {
-                _ = mirroring.sendCommand(.pause)
-            }
-        } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "Apple Health stops counting workout time while paused. Rest between sets does not need this.",
-                norwegian: "Apple Health stopper registreringen av økttid mens den er pauset. Hvile mellom sett krever ikke dette."
-            ))
-        }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Add to workout", norwegian: "Legg til i økten"
-            ),
-            isPresented: $showingAddActions,
-            titleVisibility: .visible
-        ) {
-            if let snapshot = mirroring.snapshot, snapshot.kind == .running {
+            if pendingLiveAction == .finish {
                 Button(ATHLTHLocalization.choose(
-                    english: "Add interval workout", norwegian: "Legg til intervalløkt"
-                )) {
-                    showingAddRunningWorkout = true
+                    english: "Finish workout", norwegian: "Avslutt økten"
+                ), role: .destructive) {
+                    _ = mirroring.sendCommand(.end)
                 }
-                if let incline = snapshot.treadmillInclinePercent {
+            } else if pendingLiveAction == .pauseWholeWorkout {
+                Button(ATHLTHLocalization.choose(
+                    english: "Pause whole workout", norwegian: "Pause hele økten"
+                )) {
+                    _ = mirroring.sendCommand(.pause)
+                }
+            } else if pendingLiveAction == .add {
+                if let snapshot = mirroring.snapshot, snapshot.kind == .running {
                     Button(ATHLTHLocalization.choose(
-                        english: "Adjust treadmill incline", norwegian: "Juster stigning på mølle"
+                        english: "Add interval workout", norwegian: "Legg til intervalløkt"
                     )) {
-                        treadmillInclineDraft = incline
-                        showingTreadmillInclineEditor = true
+                        showingAddRunningWorkout = true
+                    }
+                    if let incline = snapshot.treadmillInclinePercent {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Adjust treadmill incline",
+                            norwegian: "Juster stigning på mølle"
+                        )) {
+                            treadmillInclineDraft = incline
+                            showingTreadmillInclineEditor = true
+                        }
+                    }
+                    if snapshot.routeCanReturnToStart == true {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Run back to start", norwegian: "Løp tilbake til start"
+                        )) {
+                            _ = mirroring.requestRunBackToStart()
+                        }
                     }
                 }
-                if snapshot.routeCanReturnToStart == true {
+                if mirroring.snapshot?.kind == .strength,
+                   strength.activeWorkout != nil {
                     Button(ATHLTHLocalization.choose(
-                        english: "Run back to start", norwegian: "Løp tilbake til start"
+                        english: "Add exercise", norwegian: "Legg til øvelse"
                     )) {
-                        _ = mirroring.requestRunBackToStart()
+                        showingStrengthExerciseLibrary = true
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Add workout", norwegian: "Legg til treningsøkt"
+                    )) {
+                        showingAddStrengthWorkout = true
+                    }
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Talk to AI Coach", norwegian: "Snakk med AI Coach"
+                )) {
+                    showingAIConversation = true
+                }
+                if mirroring.canReplayMirroredCoachMessage {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Replay last coach message",
+                        norwegian: "Hør siste coachbeskjed"
+                    )) {
+                        mirroring.replayMirroredCoachMessage()
                     }
                 }
             }
-            if mirroring.snapshot?.kind == .strength,
-               strength.activeWorkout != nil {
-                Button(ATHLTHLocalization.choose(
-                    english: "Add exercise", norwegian: "Legg til øvelse"
-                )) {
-                    showingStrengthExerciseLibrary = true
-                }
-                Button(ATHLTHLocalization.choose(
-                    english: "Add workout", norwegian: "Legg til treningsøkt"
-                )) {
-                    showingAddStrengthWorkout = true
-                }
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Talk to AI Coach", norwegian: "Snakk med AI Coach"
-            )) {
-                showingAIConversation = true
-            }
-            if mirroring.canReplayMirroredCoachMessage {
-                Button(ATHLTHLocalization.choose(
-                    english: "Replay last coach message", norwegian: "Hør siste coachbeskjed"
-                )) {
-                    mirroring.replayMirroredCoachMessage()
-                }
-            }
-        }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Finish workout?", norwegian: "Avslutte treningsøkten?"
-            ),
-            isPresented: $showingFinishConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Finish workout", norwegian: "Avslutt økten"
-            ), role: .destructive) {
-                _ = mirroring.sendCommand(.end)
-            }
         } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "Apple Watch will save the recorded workout to Apple Health.",
-                norwegian: "Apple Watch lagrer den registrerte økten i Apple Health."
-            ))
+            if pendingLiveAction == .finish {
+                Text(ATHLTHLocalization.choose(
+                    english: "Apple Watch will save the recording to Apple Health.",
+                    norwegian: "Apple Watch lagrer økten i Apple Health."
+                ))
+            } else if pendingLiveAction == .pauseWholeWorkout {
+                Text(ATHLTHLocalization.choose(
+                    english: "Apple Health stops counting workout time while paused. Rest between sets does not require this.",
+                    norwegian: "Apple Health stopper registreringen av økttid mens den er pauset. Hvile mellom sett krever ikke dette."
+                ))
+            }
         }
         .sheet(isPresented: $showingStrengthExerciseLibrary) {
             NavigationStack {
@@ -2082,7 +2086,7 @@ struct MirroredWorkoutLiveView: View {
                     _ = mirroring.sendCommand(.resume)
                 } else if snapshot.kind != .running &&
                             snapshot.kind != .walking {
-                    showingStrengthWholeWorkoutPauseConfirmation = true
+                    pendingLiveAction = .pauseWholeWorkout
                 } else {
                     _ = mirroring.sendCommand(.pause)
                 }
