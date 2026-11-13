@@ -31,6 +31,13 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     var currentPaceSecondsPerKilometer: Double? = nil
     var targetPaceSecondsPerKilometer: Double? = nil
     var targetHeartRateZone: Int? = nil
+    // Only shared once this specific session is explicitly approved on iPhone.
+    // Values describe the *current* programmed step, not recorded health data.
+    var maximumHeartRateBPM: Double? = nil
+    var targetHeartRateMinimumBPM: Double? = nil
+    var targetHeartRateMaximumBPM: Double? = nil
+    var targetHeartRatePercentMin: Double? = nil
+    var targetHeartRatePercentMax: Double? = nil
     var runningStepProgress: Double? = nil
     var runningOverallProgress: Double? = nil
     var routeTitle: String? = nil
@@ -382,6 +389,11 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 targetPaceSecondsPerKilometer:
                     current?.targetPaceMinSecondsPerKilometer,
                 targetHeartRateZone: current?.targetHeartRateZone,
+                maximumHeartRateBPM:
+                    run.structuredRunningWorkout?.heartRateZoneMaximumBPM ??
+                    run.audioCoachConfiguration?.smartPrompts?.maximumHeartRateBPM,
+                targetHeartRatePercentMin: current?.targetHeartRatePercentMin,
+                targetHeartRatePercentMax: current?.targetHeartRatePercentMax,
                 runningStepProgress: {
                     guard let target = current?.durationSeconds,
                           target > 0, let remaining else { return nil }
@@ -505,15 +517,21 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 runningStepRemainingSeconds: watch.runningStepRemainingSeconds,
                 capturedAt: watch.capturedAt,
                 sourceDevice: "watch",
-                heartRateBPM: watch.heartRate > 0
-                    ? Double(watch.heartRate) : nil,
+                heartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
+                    watch.heartRate, sampledAt: watch.coachHeartRateSampleAt
+                ) ? watch.heartRate : nil,
                 activeCalories: watch.activeCalories > 0
                     ? Double(watch.activeCalories) : nil,
                 currentPaceSecondsPerKilometer:
                     watch.currentPaceSecondsPerKilometer,
                 targetPaceSecondsPerKilometer:
                     watch.runningStepTargetPaceSecondsPerKilometer,
-                targetHeartRateZone: watch.runningStepTargetHeartRateZone,
+                targetHeartRateZone:
+                    watch.runningStepTargetHeartRateZone ??
+                    watch.heartRateTargetZone,
+                maximumHeartRateBPM: watch.coachResolvedMaximumHeartRateBPM,
+                targetHeartRateMinimumBPM: watch.heartRateTargetMinimumBPM,
+                targetHeartRateMaximumBPM: watch.heartRateTargetMaximumBPM,
                 runningStepProgress: watch.runningStepProgress,
                 runningOverallProgress: watch.runningOverallProgress,
                 routeTitle: watch.routeTitle,
