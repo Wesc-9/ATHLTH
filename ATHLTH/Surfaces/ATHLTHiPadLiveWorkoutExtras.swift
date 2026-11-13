@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Optional extras never displace the active workout or invent missing data.
-/// Music on Apple Watch cannot be inferred from iPhone Spotify Connect.
+/// Verified Spotify Connect playback may be available for iPhone or Watch.
+/// Offline Watch playback is not observable and is never guessed.
 struct ATHLTHiPadLiveWorkoutExtrasPanel: View {
     let snapshot: ATHLTHCrossDeviceWorkoutSnapshot
 
@@ -54,8 +55,8 @@ struct ATHLTHiPadLiveWorkoutExtrasPanel: View {
                     Label(playing
                         ? tr("Spotify playing · track not available",
                              "Spotify spiller · sang ikke tilgjengelig")
-                        : tr("Spotify not playing on iPhone",
-                             "Spotify spiller ikke på iPhone"),
+                        : tr("No active Spotify Connect playback",
+                             "Ingen aktiv Spotify Connect-avspilling"),
                           systemImage: "music.note")
                         .font(.subheadline)
                 }
