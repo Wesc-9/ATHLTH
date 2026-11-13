@@ -399,6 +399,10 @@ private struct WorkoutPlacePickerView:
 
     @State private var nearby:
         [WorkoutPlacePresentation] = []
+    @State private var searched:
+        [WorkoutPlacePresentation] = []
+    @State private var searchText = ""
+    @State private var searchIsLoading = false
     @State private var frequent:
         [WorkoutPlacePresentation] = []
     @State private var loading = false
@@ -419,6 +423,16 @@ private struct WorkoutPlacePickerView:
                 ) {
                     privacyBanner
 
+                    if searchIsLoading {
+                        ProgressView().controlSize(.small)
+                    }
+
+                    placeSection(
+                        title: placeTR("Search results", "Søkeresultater"),
+                        icon: "magnifyingglass",
+                        places: searched
+                    )
+
                     if loading ||
                         location.isUpdating {
                         HStack(spacing: 10) {
@@ -428,7 +442,7 @@ private struct WorkoutPlacePickerView:
                                 )
 
                             Text(
-                                placeTR("Finding nearby training venues within 150 m…", "Søker etter treningssteder innen 150 m…")
+                                placeTR("Finding training venues nearby…", "Finner treningssteder i nærheten…")
                             )
                             .font(.caption)
                             .foregroundStyle(
@@ -465,15 +479,17 @@ private struct WorkoutPlacePickerView:
 
                     if !loading,
                        !location.isUpdating,
-                       nearby.isEmpty {
+                       nearby.isEmpty,
+                       searched.isEmpty,
+                       searchText.isEmpty,
+                       frequent.isEmpty {
                         ContentUnavailableView(
-                            placeTR("No training venue within 150 m", "Ingen treningssteder innen 150 m"),
-                            systemImage:
-                                "figure.strengthtraining.traditional",
-                            description:
-                                Text(
-                                    placeTR("Move closer to the venue and refresh. ATHLTH only allows a check-in when you're physically nearby.", "Gå nærmere treningsstedet og oppdater. ATHLTH tillater bare innsjekking når du er i nærheten.")
-                                )
+                            placeTR("Find a training place", "Finn et treningssted"),
+                            systemImage: "magnifyingglass",
+                            description: Text(placeTR(
+                                "Search by venue and city. You can choose a place anywhere.",
+                                "Søk etter treningssted og by. Du kan velge steder hvor som helst."
+                            ))
                         )
                         .frame(
                             minHeight: 220
@@ -503,6 +519,10 @@ private struct WorkoutPlacePickerView:
             )
             .navigationBarTitleDisplayMode(
                 .inline
+            )
+            .searchable(
+                text: $searchText,
+                prompt: placeTR("Gym or location", "Treningssted eller by")
             )
             .toolbar {
                 ToolbarItem(
@@ -534,6 +554,9 @@ private struct WorkoutPlacePickerView:
             }
             .onAppear {
                 location.start()
+                Task {
+                    frequent = await places.resolvedFrequentPlaces(near: nil)
+                }
             }
             .onDisappear {
                 location.stop()
@@ -545,6 +568,9 @@ private struct WorkoutPlacePickerView:
                         .timestamp
             ) {
                 await loadPlaces()
+            }
+            .task(id: searchText) {
+                await loadSearchResults()
             }
         }
     }
@@ -568,7 +594,7 @@ private struct WorkoutPlacePickerView:
                 spacing: 3
             ) {
                 Text(
-                    placeTR("Private check-in", "Privat innsjekking")
+                    placeTR("Private training place", "Privat treningssted")
                 )
                 .font(
                     .caption.weight(
@@ -580,7 +606,7 @@ private struct WorkoutPlacePickerView:
                 )
 
                 Text(
-                    placeTR("This place is saved to your workout only. It is not added to your public activity automatically.", "Dette stedet lagres bare på økten din og deles ikke automatisk på aktiviteten din.")
+                    placeTR("Choosing a venue does not verify attendance and is not shared automatically.", "Valg av treningssted bekrefter ikke fysisk oppmøte og deles ikke automatisk.")
                 )
                 .font(.caption2)
                 .foregroundStyle(
@@ -655,18 +681,8 @@ private struct WorkoutPlacePickerView:
 
         let distance =
             place.distanceMeters
-        let canCheckIn =
-            distance.map {
-                $0.isFinite &&
-                $0 >= 0 &&
-                $0 <= 150
-            } ?? false
 
         return Button {
-            guard canCheckIn else {
-                return
-            }
-
             savingPlaceID =
                 place.id
             errorMessage = nil
@@ -701,22 +717,14 @@ private struct WorkoutPlacePickerView:
                     )
                 )
                 .foregroundStyle(
-                    canCheckIn
-                        ? ATHLTHTheme
-                            .vitality
-                        : ATHLTHTheme
-                            .mutedText
+                    ATHLTHTheme.vitality
                 )
                 .frame(
                     width: 38,
                     height: 38
                 )
                 .background(
-                    canCheckIn
-                        ? ATHLTHTheme
-                            .vitalitySoft
-                        : Color.primary
-                            .opacity(0.04),
+                    ATHLTHTheme.vitalitySoft,
                     in: RoundedRectangle(
                         cornerRadius: 12,
                         style: .continuous
@@ -778,26 +786,9 @@ private struct WorkoutPlacePickerView:
                         .controlSize(
                             .small
                         )
-                } else if canCheckIn {
-                    Image(
-                        systemName:
-                            "checkmark.circle"
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .accent
-                    )
                 } else {
-                    Text(placeTR("Too far", "For langt unna"))
-                        .font(
-                            .caption2.weight(
-                                .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
+                    Image(systemName: "checkmark.circle")
+                        .foregroundStyle(ATHLTHTheme.accent)
                 }
             }
             .padding(12)
@@ -822,10 +813,37 @@ private struct WorkoutPlacePickerView:
             }
         }
         .buttonStyle(.plain)
-        .disabled(
-            !canCheckIn ||
-            savingPlaceID != nil
-        )
+        .disabled(savingPlaceID != nil)
+    }
+
+    @MainActor
+    private func loadSearchResults() async {
+        let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard term.count >= 2 else {
+            searched = []
+            return
+        }
+        do {
+            try await Task.sleep(for: .milliseconds(300))
+        } catch {
+            return
+        }
+        guard !Task.isCancelled else { return }
+        searchIsLoading = true
+        defer { searchIsLoading = false }
+        do {
+            let results = try await places.searchTrainingPlaces(
+                query: term,
+                near: location.location
+            )
+            guard !Task.isCancelled, searchText == term else { return }
+            searched = results
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            errorMessage = error.localizedDescription
+        }
     }
 
     @MainActor
