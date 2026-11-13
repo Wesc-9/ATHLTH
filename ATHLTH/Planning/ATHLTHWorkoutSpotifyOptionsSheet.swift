@@ -10,6 +10,7 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
     let supportsIntervals: Bool
     @State private var showingPlaylistPicker = false
     @State private var showingIntervalTrackPicker = false
+    @State private var showingSmartMusicSetup = false
     @State private var intervalOptionsExpanded = false
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -86,15 +87,37 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        Button {
+                            showingSmartMusicSetup = true
+                        } label: {
+                            HStack(spacing: 9) {
+                                Image(systemName: "slider.horizontal.3")
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(tr("Smart music setup", "Smart musikkoppsett"))
+                                        .foregroundStyle(.primary)
+                                    if let name = intervalTrack?.smartProfile?.name {
+                                        Text(name)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer(minLength: 6)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
                         if intervalTrack != nil {
-                            Button(tr("Remove interval song", "Fjern intervallsang")) {
+                            Button(tr("Remove interval music", "Fjern intervallmusikk")) {
                                 intervalTrack = nil
                             }
                             .font(.subheadline)
                         }
                         Text(tr(
-                            "Optional: start your favorite song from 0:00 for each work interval on iPhone. Spotify may start slightly late. Watch playback is unchanged.",
-                            "Valgfritt: start favorittsangen fra 0:00 på hvert arbeidsdrag på iPhone. Spotify kan starte litt forsinket. Avspilling på Apple Watch endres ikke."
+                            "Optional: repeat one song or choose from your saved favorites by duration and intensity. iPhone playback is best-effort; Apple Watch is unchanged.",
+                            "Valgfritt: gjenta én sang, eller velg blant egne favoritter etter varighet og intensitet. Avspilling på iPhone kan bli forsinket. Apple Watch er uendret."
                         ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -149,6 +172,9 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
             }
             .sheet(isPresented: $showingIntervalTrackPicker) {
                 ATHLTHSpotifyIntervalTrackPicker(selection: $intervalTrack)
+            }
+            .sheet(isPresented: $showingSmartMusicSetup) {
+                ATHLTHSpotifySmartMusicSheet(selection: $intervalTrack)
             }
             .onChange(of: playlist?.id) { oldID, newID in
                 if newID == nil && oldID != nil { autoplay = false }
