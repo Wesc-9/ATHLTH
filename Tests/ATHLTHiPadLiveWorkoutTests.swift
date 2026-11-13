@@ -9,7 +9,9 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         paused: Bool? = false,
         elapsed: TimeInterval = 540,
         capturedAt: Date? = Date(timeIntervalSince1970: 1_000),
-        stepRemaining: TimeInterval? = 70
+        stepRemaining: TimeInterval? = 70,
+        completedSets: Int? = nil,
+        totalSets: Int? = nil
     ) -> ATHLTHCrossDeviceWorkoutSnapshot {
         ATHLTHCrossDeviceWorkoutSnapshot(
             sessionID: UUID(),
@@ -20,8 +22,8 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
             distanceMeters: 1_400,
             currentStep: "Effort 2",
             nextStep: "Recovery",
-            completedSets: nil,
-            totalSets: nil,
+            completedSets: completedSets,
+            totalSets: totalSets,
             paused: paused,
             runningIntervalOrdinal: 2,
             runningIntervalTotal: 4,
@@ -76,9 +78,7 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
     }
 
     func testStrengthSetsAreReadOnlyAndNeverExceedTotal() {
-        var workout = snapshot()
-        workout.completedSets = 12
-        workout.totalSets = 10
+        let workout = snapshot(completedSets: 12, totalSets: 10)
         XCTAssertEqual(ATHLTHiPadLiveMetrics.sets(workout), "10 / 10")
     }
 }
