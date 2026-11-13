@@ -62,6 +62,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
                                 }
                                 ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
                                 ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
+                                ATHLTHiPadLiveWorkoutExtrasPanel(snapshot: snapshot)
                                 additionalDetails
                             }
                             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -82,6 +83,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
                         }
                         ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
                         ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
+                        ATHLTHiPadLiveWorkoutExtrasPanel(snapshot: snapshot)
                         additionalDetails
                     }
 
