@@ -213,6 +213,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     /// Original GymCoach superset association. The engine does not yet
     /// guarantee set-by-set cycling for arbitrary source superset indices.
     var sourceSupersetGroupIndex: Int? = nil
+    /// Mutually exclusive source race-load choices (e.g. PFT 6 kg / 4 kg).
+    /// Never choose a single athlete's division or assign a personal weight.
+    var sourceLoadAlternativesKilograms: [Double]? = nil
     /// Athlete-selected perceived intensity (RPE 1...10). Never a measured
     /// physiological reading; optional so historic templates still decode.
     var targetEffortRPE: Int? = nil
@@ -282,6 +285,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.targetRepsInReserve == rhs.targetRepsInReserve &&
         lhs.targetMovementTempo == rhs.targetMovementTempo &&
         lhs.sourceSupersetGroupIndex == rhs.sourceSupersetGroupIndex &&
+        lhs.sourceLoadAlternativesKilograms == rhs.sourceLoadAlternativesKilograms &&
         lhs.targetEffortRPE == rhs.targetEffortRPE &&
         lhs.treadmillInclinePercent == rhs.treadmillInclinePercent &&
         lhs.setCount == rhs.setCount &&
@@ -332,6 +336,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(targetRepsInReserve)
         hasher.combine(targetMovementTempo)
         hasher.combine(sourceSupersetGroupIndex)
+        hasher.combine(sourceLoadAlternativesKilograms)
         hasher.combine(targetEffortRPE)
         hasher.combine(treadmillInclinePercent)
         hasher.combine(setCount)
@@ -390,6 +395,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case targetRepsInReserve = "target_reps_in_reserve"
         case targetMovementTempo = "target_movement_tempo"
         case sourceSupersetGroupIndex = "source_superset_group_index"
+        case sourceLoadAlternativesKilograms = "source_load_alternatives_kg"
         case targetEffortRPE = "target_effort_rpe"
         case treadmillInclinePercent = "treadmill_incline_percent"
         case setCount = "set_count"
@@ -500,6 +506,23 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         if let targetGradientPercent, targetGradientPercent.isFinite {
             parts.append(String(format: "%.1f %% outdoor gradient", targetGradientPercent))
         }
+        if let targetIntensityType, !targetIntensityType.isEmpty {
+            parts.append(targetIntensityType)
+        }
+        if let targetTerrainType, !targetTerrainType.isEmpty {
+            parts.append(ATHLTHZonedLocalization.text(targetTerrainType))
+        }
+        if let targetElevationGainMeters, targetElevationGainMeters.isFinite {
+            parts.append("\(Int(targetElevationGainMeters.rounded())) m elevation")
+        }
+        if let targetMovementTempo, !targetMovementTempo.isEmpty {
+            parts.append("Tempo \(targetMovementTempo)")
+        }
+        if let options = sourceLoadAlternativesKilograms, !options.isEmpty {
+            parts.append(options.map {
+                String(format: "%g kg", $0)
+            }.joined(separator: " / "))
+        }
         if isIndoor == true, let treadmillInclinePercent,
            treadmillInclinePercent.isFinite,
            (0...20).contains(treadmillInclinePercent) {
@@ -574,6 +597,7 @@ extension Array where Element == WorkoutTemplateBlock {
             item.targetRepsInReserve = source.targetRepsInReserve
             item.targetMovementTempo = source.targetMovementTempo
             item.sourceSupersetGroupIndex = source.sourceSupersetGroupIndex
+            item.sourceLoadAlternativesKilograms = source.sourceLoadAlternativesKilograms
             if let origin {
                 item.executionGroupKind = origin.groupKind
                 item.executionGroupID = origin.groupID
