@@ -1592,6 +1592,7 @@ struct RunQuickStartSheet: View {
                             environment: $environment,
                             date: $quickDisplayDate,
                             selectedRouteTitle: selectedRoute?.title,
+                            selectedRoute: selectedRoute,
                             selectedWorkoutTitle: selectedWorkout?.title,
                             onChooseRoute: { showingRoutes = true },
                             onChooseWorkout: { showingRunningLibrary = true },

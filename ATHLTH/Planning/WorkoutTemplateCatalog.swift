@@ -4938,6 +4938,8 @@ struct WorkoutTemplateBuilderView: View {
                                 selectedRouteTitle: session.savedRoutes.first {
                                     $0.id == selectedRouteID
                                 }?.title,
+                                selectedRoute: activeRoute,
+                                structuredSteps: blocks,
                                 selectedWorkoutTitle: studioBasicWorkoutTitle,
                                 onChooseRoute: {
                                     studioRoutePhase = .main

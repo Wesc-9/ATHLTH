@@ -14,6 +14,8 @@ struct ATHLTHRunBasicSetupView: View {
     var workoutStepCount = 0
     var onEditWorkout: (() -> Void)? = nil
     var selectedRouteTitle: String? = nil
+    var selectedRoute: TrainingRoute? = nil
+    var structuredSteps: [WorkoutTemplateBlock] = []
     var selectedWorkoutTitle: String? = nil
     var onChooseRoute: (() -> Void)? = nil
     var onChooseWorkout: (() -> Void)? = nil
@@ -90,6 +92,12 @@ struct ATHLTHRunBasicSetupView: View {
                 ATHLTHRunEnvironmentDetailRow(environment: $environment)
                     .padding(12)
                     .athlthTrainPaper()
+            } else if mode == .route, environment == .outdoor,
+                      let selectedRoute {
+                // Quick Train reuses the same route image instead of a
+                // second MapKit renderer.
+                RouteMapSnapshotThumbnail(route: selectedRoute, height: 145)
+                    .accessibilityIdentifier("athlth-quick-run-route-map")
             }
 
             if let audioCoachEnabled {
@@ -148,6 +156,19 @@ struct ATHLTHRunBasicSetupView: View {
                 .foregroundStyle(.secondary)
             }
             .frame(minHeight: 49)
+
+            Divider()
+
+            ATHLTHRunModePreviewView(
+                mode: mode,
+                environment: environment,
+                route: selectedRoute,
+                workoutTitle: selectedWorkoutTitle,
+                steps: structuredSteps,
+                isGoalSelected: isGoalSelected,
+                isGhostSelected: isGhostSelected
+            )
+            .padding(.vertical, 9)
 
             Divider()
 
