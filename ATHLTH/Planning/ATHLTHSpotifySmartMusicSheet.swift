@@ -194,6 +194,13 @@ struct ATHLTHSpotifySmartMusicSheet: View {
     }
 
     private func saveAndApply() {
+        guard session.signedIn else {
+            message = tr(
+                "Sign in to save this music setup.",
+                "Logg inn for å lagre dette musikkoppsettet."
+            )
+            return
+        }
         guard !draft.favorites.isEmpty else { return }
         draft.name = String(
             draft.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(64)
