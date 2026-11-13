@@ -1467,6 +1467,7 @@ struct IPhoneWorkoutView: View {
     @State private var showingAIConversation = false
     @State private var showingTreadmillSpeedEditor = false
     @State private var showingAddRunningWorkout = false
+    @State private var showingWorkoutOverview = false
     @State private var showingManualEnvironmentChoice = false
     @State private var showingAutomaticIndoorSuggestion = false
     @State private var treadmillInclineDraft = 0.0
@@ -2093,6 +2094,7 @@ struct IPhoneWorkoutView: View {
                             spotifyExpanded: showingSpotifyControls,
                             addEnabled: !workout.walking,
                             finishDisabled: recorder.saving,
+                            onOverview: { showingWorkoutOverview = true },
                             onMinimize: {
                                 recorder.minimizeWorkout()
                                 dismiss()
@@ -2210,6 +2212,71 @@ struct IPhoneWorkoutView: View {
                     .environmentObject(settings)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingWorkoutOverview) {
+                NavigationStack {
+                    List {
+                        if let workout = recorder.active {
+                            let steps = workout.structuredRunningWorkout?.steps ?? []
+                            if !steps.isEmpty {
+                                ForEach(steps.indices, id: \.self) { index in
+                                    let step = steps[index]
+                                    HStack(spacing: 11) {
+                                        Image(systemName: "list.number")
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("\(index + 1). " + step.title)
+                                                .font(.subheadline.weight(.semibold))
+                                            if let duration = step.durationSeconds, duration > 0 {
+                                                Text(ATHLTHWorkoutDurationEstimator.conciseDuration(duration))
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            } else if let meters = step.distanceMeters, meters > 0 {
+                                                Text(String(format: "%.0f m", meters))
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                        Spacer()
+                                        if index == (workout.structuredStepIndex ?? 0) {
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "Now", norwegian: "Nå"
+                                            ))
+                                            .font(.caption.weight(.bold))
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        }
+                                    }
+                                    .accessibilityElement(children: .combine)
+                                }
+                            } else {
+                                Label(
+                                    workout.walking
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Free walk", norwegian: "Fri gåtur"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Free run", norwegian: "Fri løping"
+                                        ),
+                                    systemImage: workout.walking
+                                        ? "figure.walk" : "figure.run"
+                                )
+                            }
+                        }
+                    }
+                    .navigationTitle(ATHLTHLocalization.choose(
+                        english: "Workout overview", norwegian: "Øktoversikt"
+                    ))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Done", norwegian: "Ferdig"
+                            )) { showingWorkoutOverview = false }
+                        }
+                    }
+                }
+                .presentationDetents([.medium, .large])
+                .accessibilityIdentifier("athlth-run-live-workout-overview")
             }
             .sheet(isPresented: $showingAddRunningWorkout) {
                 ActiveHybridWorkoutPicker(runningOnly: true) { session, startNow in

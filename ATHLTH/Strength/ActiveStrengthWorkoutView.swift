@@ -690,6 +690,7 @@ struct ActiveStrengthWorkoutView: View {
                         subtitle: strengthLiveTopSummary(workout),
                         spotifyExpanded: showingSpotifyControls,
                         finishDisabled: finishInProgress,
+                        onOverview: { showingExerciseQueue = true },
                         onMinimize: {
                             strength.checkpoint()
                             dismiss()
