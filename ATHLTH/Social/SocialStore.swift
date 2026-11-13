@@ -46,6 +46,9 @@ final class SocialStore: ObservableObject {
     private var lastHomeFeedRefreshAt: Date?
     private var lastHomeFriendsRefreshAt: Date?
     private var lastHomeFriendsAccountID: UUID?
+    private var lastHomeSocialStatusRefreshAt: Date?
+    private var lastHomeSocialStatusAccountID: UUID?
+    private var isHomeSocialStatusRefreshing = false
     private var lastFullRefreshAt: Date?
     private var profileCache: [UUID: SocialFriendProfile] = [:]
     private let activationDate: Date
@@ -406,6 +409,53 @@ final class SocialStore: ObservableObject {
             deliverSystemAlertsForImportedInbox:
                 deliverSystemAlertsForImportedInbox
         )
+    }
+
+    /// Home needs invitations and active challenges without loading the entire
+    /// Community hub. Keep these three backend requests separate from the
+    /// activity feed, and throttle quick tab switches.
+    func refreshHomeSocialStatus(
+        challengeStore: ChallengeStore,
+        force: Bool = false
+    ) async {
+        guard let userID = service.currentUserID else { return }
+        if !force,
+           lastHomeSocialStatusAccountID == userID,
+           let lastHomeSocialStatusRefreshAt,
+           Date().timeIntervalSince(lastHomeSocialStatusRefreshAt) < 120 {
+            return
+        }
+        guard !isHomeSocialStatusRefreshing else { return }
+        isHomeSocialStatusRefreshing = true
+        defer { isHomeSocialStatusRefreshing = false }
+
+        do {
+            async let challengesTask = service.loadRemoteChallenges()
+            async let sessionsTask = service.loadWorkoutSessions()
+            async let participantsTask = service.loadWorkoutParticipants()
+
+            let remoteChallenges = try await challengesTask
+            let sessions = try await sessionsTask
+            let participants = try await participantsTask
+
+            // Do not publish another account's response after a sign-out.
+            guard !Task.isCancelled, service.currentUserID == userID else {
+                return
+            }
+            challengeStore.replaceWithRemoteChallenges(remoteChallenges)
+            applyWorkoutSessions(
+                sessions: sessions,
+                participants: participants,
+                cards: visibleProfiles
+            )
+            lastHomeSocialStatusAccountID = userID
+            lastHomeSocialStatusRefreshAt = Date()
+        } catch is CancellationError {
+            return
+        } catch {
+            // Retain cached social status on temporary network failures.
+            // The next Home refresh may retry without disturbing the feed.
+        }
     }
 
     /// Launch/Home bootstrap that loads only the relationship state needed
@@ -3524,6 +3574,9 @@ final class SocialStore: ObservableObject {
         visibleProfiles = []
         lastHomeFriendsAccountID = nil
         lastHomeFriendsRefreshAt = nil
+        lastHomeSocialStatusAccountID = nil
+        lastHomeSocialStatusRefreshAt = nil
+        isHomeSocialStatusRefreshing = false
         isHomeFriendsRefreshing = false
         feed = []
         blockedUsers = []
