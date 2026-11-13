@@ -8,6 +8,7 @@ enum ATHLTHWorkoutStepCopy {
     }
 
     static func title(for block: WorkoutTemplateBlock, workoutTitle: String, compact: Bool) -> String {
+        let block = ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
         guard block.kind != .exercise else { return block.title }
         let source = ATHLTHWorkoutSearch.normalized(block.title)
         if block.kind == .run && block.resolvedPhase == .warmup &&
@@ -170,7 +171,9 @@ enum ATHLTHSimpleWorkoutOutline {
             } else {
                 detail = workText
             }
-            let itemTitle = conciseTitle(work.block.title)
+            let itemTitle = conciseTitle(
+                ATHLTHZonedLocalization.normalizeLegacyAllOutStep(work.block).title
+            )
             let displayTitle = count > 1 ? "\(count) × \(itemTitle)" : itemTitle
             result.append(Item(
                 id: work.index,
@@ -351,7 +354,9 @@ struct ATHLTHWorkoutRecipePreview: View {
                             )
                             .font(.subheadline)
                         }
-                        if let notes = item.block.notes, !notes.isEmpty {
+                        if let notes = ATHLTHZonedLocalization
+                            .normalizeLegacyAllOutStep(item.block).notes,
+                            !notes.isEmpty {
                             Text(notes)
                                 .font(.subheadline)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -662,7 +667,8 @@ struct ATHLTHWorkoutRecipePreview: View {
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(expanded ? nil : 2)
                         } else {
-                            Text(tr("Tap for goals and rest", "Trykk for mål og pauser"))
+                            Text(tr("Open to see workout instructions",
+                                    "Åpne for å se øktdetaljer"))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
@@ -709,10 +715,14 @@ struct ATHLTHWorkoutRecipePreview: View {
 
                 if onUpdateBlock != nil {
                     Button {
-                        editingStep = IndexedWorkoutStep(index: index, block: block)
+                        editingStep = IndexedWorkoutStep(
+                            index: index,
+                            block: ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+                        )
                     } label: {
-                        Label(tr("Edit sets, weight and targets",
-                                 "Rediger sett, vekt og mål"),
+                        Label(block.kind == .exercise
+                                ? tr("Edit sets, weight and targets", "Rediger sett, vekt og mål")
+                                : tr("Edit duration and targets", "Rediger varighet og mål"),
                               systemImage: "slider.horizontal.3")
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 40)
@@ -724,7 +734,10 @@ struct ATHLTHWorkoutRecipePreview: View {
                         if block.kind == .exercise {
                             selectedExercise = block
                         } else {
-                            inspectedCardioStep = IndexedWorkoutStep(index: index, block: block)
+                            inspectedCardioStep = IndexedWorkoutStep(
+                                index: index,
+                                block: ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+                            )
                         }
                     } label: {
                         Label(tr("View step details", "Se øktdetaljer"),
@@ -789,6 +802,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     private func advancedDetails(for block: WorkoutTemplateBlock) -> [String] {
+        let block = ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
         var result: [String] = []
         if let sets = block.setCount, sets > 0, block.kind == .exercise {
             result.append("\(sets) " + tr("sets", "sett"))
@@ -834,7 +848,9 @@ private struct ATHLTHWorkoutStepEditor: View {
     init(block: WorkoutTemplateBlock, onSave: @escaping (WorkoutTemplateBlock) -> Void) {
         self.block = block
         self.onSave = onSave
-        _draft = State(initialValue: block)
+        _draft = State(initialValue:
+            ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+        )
     }
 
     var body: some View {
@@ -846,16 +862,27 @@ private struct ATHLTHWorkoutStepEditor: View {
                     HStack {
                         Text(ATHLTHLocalization.choose(english: "Duration (sec)", norwegian: "Varighet (sek)"))
                         Spacer()
-                        TextField("0", value: $draft.durationSeconds, format: .number)
+                        TextField("—", value: $draft.durationSeconds, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
+                    }
+                    if let seconds = draft.durationSeconds, seconds > 0 {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Workout segment: ",
+                                norwegian: "Deløkt: "
+                            ) + ATHLTHWorkoutStepCopy.duration(seconds),
+                            systemImage: "timer"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
                     }
                 }
                 Section(ATHLTHLocalization.choose(english: "Targets", norwegian: "Mål")) {
                     HStack {
                         Text(ATHLTHLocalization.choose(english: "Pace (sec/km)", norwegian: "Tempo (sek/km)"))
                         Spacer()
-                        TextField("0", value: $draft.targetPaceSecondsPerKilometer, format: .number)
+                        TextField("—", value: $draft.targetPaceSecondsPerKilometer, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
@@ -866,7 +893,7 @@ private struct ATHLTHWorkoutStepEditor: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    if draft.kind == .run {
+                    if draft.kind == .run && draft.isIndoor == true {
                         HStack {
                             Text(ATHLTHLocalization.choose(
                                 english: "Speed (km/h)", norwegian: "Fart (km/t)"
@@ -956,10 +983,18 @@ private struct ATHLTHWorkoutStepEditor: View {
                             .multilineTextAlignment(.trailing)
                     }
                 }
-                Section(ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater")) {
-                    TextField(ATHLTHLocalization.choose(english: "Optional", norwegian: "Valgfritt"),
-                              text: Binding(get: { draft.notes ?? "" },
-                                            set: { draft.notes = $0.isEmpty ? nil : $0 }))
+                Section(ATHLTHLocalization.choose(
+                    english: "Workout instructions", norwegian: "Instruksjoner"
+                )) {
+                    TextEditor(text: Binding(
+                        get: { draft.notes ?? "" },
+                        set: { draft.notes = $0.isEmpty ? nil : $0 }
+                    ))
+                    .frame(minHeight: 88)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Instructions and notes",
+                        norwegian: "Instruksjoner og notater"
+                    ))
                 }
             }
             .navigationTitle(ATHLTHLocalization.choose(english: "Edit step", norwegian: "Rediger øktdel"))
