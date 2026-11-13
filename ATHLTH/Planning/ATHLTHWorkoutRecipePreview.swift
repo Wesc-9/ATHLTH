@@ -261,6 +261,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     var onUpdateBlock: ((Int, WorkoutTemplateBlock) -> Void)? = nil
 
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var session: AppSessionStore
     @AppStorage("athlth.workoutPreview.advanced.v1") private var advanced = false
     @State private var selectedExercise: WorkoutTemplateBlock?
     @State private var editingStep: IndexedWorkoutStep?
@@ -275,6 +276,13 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     private var recipeTint: Color { ATHLTHPlanDesign.accentInk }
+
+    private var maximumHeartRateBPM: Double? {
+        ATHLTHHeartRateZones.resolvedMaximumBPM(
+            configured: session.onboardingProfile?.maximumHeartRateBPM,
+            dateOfBirth: session.onboardingProfile?.dateOfBirth
+        )
+    }
 
     private var categoryTitle: String {
         switch category {
@@ -579,42 +587,24 @@ struct ATHLTHWorkoutRecipePreview: View {
     /// phases. A phase opens to a compact exercise list, and each exercise can
     /// open again to reveal rests and the editing action.
     private var expandableOutline: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                if beginsPhase(at: index) {
-                    phaseDisclosure(at: index)
-                }
-                if !collapsedPhases.contains(displayPhase(at: index)) {
-                    recipeStepCard(block, index: index)
-                        .padding(.leading, 9)
+        let sections = ATHLTHWorkoutPhaseOutline.sections(for: blocks)
+        return LazyVStack(alignment: .leading, spacing: 12) {
+            ForEach(sections) { section in
+                phaseDisclosure(section.phase, count: section.indices.count)
+                if !collapsedPhases.contains(section.phase) {
+                    ForEach(section.indices, id: \.self) { index in
+                        recipeStepCard(blocks[index], index: index)
+                            .padding(.leading, 9)
+                    }
                 }
             }
         }
     }
 
-    /// Recovery intervals belong visually to the preceding training block.
-    /// This does not change their underlying phase or execution order.
-    private func displayPhase(at index: Int) -> WorkoutPhaseKind {
-        let phase = blocks[index].resolvedPhase
-        guard phase == .recovery else { return phase }
-        return blocks.prefix(index).reversed()
-            .first(where: { $0.resolvedPhase != .recovery })?.resolvedPhase ?? .recovery
-    }
-
-    private func beginsPhase(at index: Int) -> Bool {
-        index == 0 || displayPhase(at: index) != displayPhase(at: index - 1)
-    }
-
-    private func phaseStepCount(at start: Int) -> Int {
-        let phase = displayPhase(at: start)
-        return (start..<blocks.count)
-            .prefix(while: { displayPhase(at: $0) == phase }).count
-    }
-
-    private func phaseDisclosure(at index: Int) -> some View {
-        let phase = displayPhase(at: index)
+    private func phaseDisclosure(
+        _ phase: WorkoutPhaseKind, count: Int
+    ) -> some View {
         let collapsed = collapsedPhases.contains(phase)
-        let count = phaseStepCount(at: index)
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) {
                 if collapsed {
@@ -650,7 +640,7 @@ struct ATHLTHWorkoutRecipePreview: View {
         .accessibilityValue(tr(collapsed ? "Collapsed" : "Expanded",
                                collapsed ? "Lukket" : "Utvidet"))
         .accessibilityHint(tr("Double tap to show or hide this workout section",
-                              "Dobbelttrykk for å vise eller skjule øktdelen"))
+                               "Dobbelttrykk for å vise eller skjule øktdelen"))
     }
 
     private func recipeStepCard(_ block: WorkoutTemplateBlock, index: Int) -> some View {
@@ -679,6 +669,14 @@ struct ATHLTHWorkoutRecipePreview: View {
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(expanded ? nil : 2)
+                            if let pulse = ATHLTHPlannedHeartRatePreview.rangeText(
+                                for: block, maximumBPM: maximumHeartRateBPM
+                            ) {
+                                Text(pulse)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(recipeTint)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         } else {
                             Text(
                                 (block.kind == .run || block.kind == .rest) &&
