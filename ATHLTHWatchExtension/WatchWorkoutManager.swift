@@ -4904,7 +4904,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentStructuredRunningStep?.targetHeartRateZone) ??
                 settings.preferredHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
-                settings.maximumHeartRateBPM
+                settings.maximumHeartRateBPM,
+            suppressHeartRateForUnzonedStep:
+                structuredRunningWorkout != nil &&
+                currentStructuredRunningStep?.targetHeartRateZone == nil
         )
         if let message = adaptiveCoachState.nextCue(
             settings: settings,
@@ -6969,7 +6972,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentStructuredRunningStep?.targetHeartRateZone) ??
                 audioCoachConfiguration.smartPrompts?.preferredHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
-                resolvedMaximumBPM
+                resolvedMaximumBPM,
+            suppressHeartRateForUnzonedStep:
+                structuredRunningWorkout != nil &&
+                currentStructuredRunningStep?.targetHeartRateZone == nil
         )
         let explicitPeriodicZone = audioCoachConfiguration.smartPrompts?
             .measuredZoneAnnouncementIntervalSeconds != nil
@@ -7017,7 +7023,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentStructuredRunningStep?.targetHeartRateZone) ??
                 audioCoachConfiguration.smartPrompts?.preferredHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
-                audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM
+                audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM,
+            suppressHeartRateForUnzonedStep:
+                structuredRunningWorkout != nil &&
+                currentStructuredRunningStep?.targetHeartRateZone == nil
         )
         guard state == .running,
               !awaitingMainStart,
@@ -8387,7 +8396,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             configured: targetAlertConfiguration,
             stepZone: awaitingMainStart ? nil :
                 currentRunningStep?.targetHeartRateZone,
-            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
+            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM,
+            suppressHeartRateForUnzonedStep:
+                structuredRunningWorkout != nil &&
+                currentRunningStep?.targetHeartRateZone == nil
         )
         let intervalPosition = structuredRunningWorkout.flatMap {
             ATHLTHRunningIntervalPosition.resolve(
