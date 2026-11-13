@@ -1,20 +1,134 @@
 import Foundation
 import SwiftUI
 
+/// Reject implausible speed and near-stationary outdoor sessions before
+/// presenting pace trends, comparisons or achievement claims. No inferred
+/// sleep, inactivity diagnoses, or automatic changes to Apple Health.
+enum ATHLTHReplayDataQuality {
+    static func needsReview(
+        activity: WorkoutActivity,
+        isIndoor: Bool?,
+        duration: TimeInterval,
+        distanceMeters: Double?
+    ) -> Bool {
+        guard isIndoor != true, duration.isFinite, duration >= 1_800,
+              [.running, .walking, .hiking, .cycling].contains(activity),
+              let distanceMeters, distanceMeters.isFinite,
+              distanceMeters >= 0
+        else { return false }
+
+        // A recorded 6h45 run with 20m of movement must be flagged.
+        return (duration >= 3_600 && distanceMeters < 150) ||
+            (duration >= 1_800 && distanceMeters / duration < 0.10)
+    }
+
+    static func plausiblePace(
+        _ secondsPerKilometer: Double,
+        activity: WorkoutActivity
+    ) -> Bool {
+        guard secondsPerKilometer.isFinite else { return false }
+        switch activity {
+        case .running: return (120...1_500).contains(secondsPerKilometer)
+        case .walking, .hiking: return (180...2_400).contains(secondsPerKilometer)
+        case .cycling: return (55...1_200).contains(secondsPerKilometer)
+        default: return false
+        }
+    }
+
+    static func usablePace(
+        duration: TimeInterval,
+        distanceMeters: Double?,
+        activity: WorkoutActivity,
+        requiresReview: Bool
+    ) -> Double? {
+        guard !requiresReview, duration.isFinite, duration > 0,
+              let distanceMeters, distanceMeters.isFinite,
+              distanceMeters >= 500 else { return nil }
+        let pace = duration / (distanceMeters / 1_000)
+        return plausiblePace(pace, activity: activity) ? pace : nil
+    }
+
+    static func reliableSegment(
+        distanceMeters: Double,
+        paceSecondsPerKilometer: Double?,
+        activity: WorkoutActivity
+    ) -> Bool {
+        guard distanceMeters.isFinite, distanceMeters >= 150,
+              let paceSecondsPerKilometer else { return false }
+        return plausiblePace(paceSecondsPerKilometer, activity: activity)
+    }
+
+    /// Distance matching keeps the comparison honest: a 1 km jog cannot
+    /// silently become the benchmark for a 10 km run.
+    static func isComparableDistance(
+        current: Double,
+        previous: Double
+    ) -> Bool {
+        guard current.isFinite, previous.isFinite,
+              current >= 750, previous >= 750 else { return false }
+        return abs(previous - current) / current <= 0.15
+    }
+}
+
 struct ATHLTHWorkoutReplayCard: View {
     let workout: SocialPublishableWorkout
     let context: WorkoutAIInsightContext?
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strengthStore: StrengthWorkoutStore
     @State private var showingMoments = false
+    @State private var showingDataReview = false
+    @State private var userConfirmedUnusual = false
+    @State private var showingAllStrengthExercises = false
 
     private var isStrength: Bool {
         workout.activity == .strength
     }
 
+    private var requiresDataReview: Bool {
+        ATHLTHReplayDataQuality.needsReview(
+            activity: workout.activity,
+            isIndoor: workout.isIndoor,
+            duration: workout.duration,
+            distanceMeters: workout.distanceMeters
+        )
+    }
+
+    private var validOverallPace: Double? {
+        ATHLTHReplayDataQuality.usablePace(
+            duration: workout.duration,
+            distanceMeters: workout.distanceMeters,
+            activity: workout.activity,
+            requiresReview: requiresDataReview
+        )
+    }
+
     private var usableSegments: [WorkoutRouteHealthSegment] {
-        context?.segments.filter {
-            $0.distanceMeters >= 50 ||
-            $0.averageHeartRateBPM != nil
+        guard !requiresDataReview else { return [] }
+        return context?.segments.filter {
+            ATHLTHReplayDataQuality.reliableSegment(
+                distanceMeters: $0.distanceMeters,
+                paceSecondsPerKilometer: $0.paceSecondsPerKilometer,
+                activity: workout.activity
+            )
         } ?? []
+    }
+
+    private var confirmedReviewKey: String {
+        "athlth.replay.reviewed.\(workout.id.uuidString)"
+    }
+
+    private var replayHeadline: String {
+        if requiresDataReview {
+            return ATHLTHLocalization.choose(
+                english: "Unusual workout data",
+                norwegian: "Uvanlige øktdata"
+            )
+        }
+        return replayMoments.first?.title ??
+            ATHLTHLocalization.choose(
+                english: "Your workout, in brief",
+                norwegian: "Økten din, kort fortalt"
+            )
     }
 
     var body: some View {
