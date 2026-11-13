@@ -30,6 +30,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddRest: (WorkoutPhaseKind) -> Void
     let onAddActiveRest: (WorkoutPhaseKind) -> Void
     let onAddWorkout: (WorkoutPhaseKind) -> Void
+    let onImportWorkout: () -> Void
     let onSelectRoute: (WorkoutPhaseKind) -> Void
     let onBuildRoute: (WorkoutPhaseKind) -> Void
     let onEdit: (UUID) -> Void
@@ -107,6 +108,22 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 Spacer(minLength: 2)
                 addSectionMenu
             }
+
+            Button(action: onImportWorkout) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Import a workout from a file",
+                        norwegian: "Importer treningsøkt fra fil"
+                    ),
+                    systemImage: "square.and.arrow.down"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(bronze)
+                .frame(maxWidth: .infinity, minHeight: 46, alignment: .center)
+            }
+            .buttonStyle(.bordered)
+            .tint(bronze)
+            .accessibilityIdentifier("athlth-import-planned-workout-file")
 
             if advanced && activity == .strength {
                 DisclosureGroup {
