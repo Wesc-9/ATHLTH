@@ -47,16 +47,16 @@ enum ATHLTHSpotifySmartMusicPolicy {
     static func intensity(for text: String?) -> ATHLTHSpotifyMusicIntensity {
         let input = (text ?? "").lowercased()
         if ["sone 1", "sone 2", "zone 1", "zone 2",
-            "rolig", "easy", "recovery", "lett"].contains(where: input.contains) {
+            "rolig", "easy", "recovery", "lett"].contains(where: { input.contains($0) }) {
             return .easy
         }
         if ["sone 5", "sone 4", "zone 5", "zone 4",
             "maks", "hard", "sprint", "anaerob", "high", "rask"]
-            .contains(where: input.contains) {
+            .contains(where: { input.contains($0) }) {
             return .hard
         }
         if ["sone 3", "zone 3", "tempo", "moderat", "steady", "threshold",
-            "terskel"].contains(where: input.contains) {
+            "terskel"].contains(where: { input.contains($0) }) {
             return .steady
         }
         // Work intervals with no explicit target are normally the hard portion.
