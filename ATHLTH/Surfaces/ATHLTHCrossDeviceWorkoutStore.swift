@@ -74,6 +74,44 @@ private struct ATHLTHCrossDeviceWorkoutRow: Codable {
 final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     @Published private(set) var remote: ATHLTHCrossDeviceWorkoutSnapshot?
     @Published private(set) var isExpanded = false
+    /// Explicit opt-in only for the next workout, never a saved preference.
+    @Published var shareNextWorkout = false
+    @Published private(set) var incomingRequest: ATHLTHLiveViewRequest?
+    @Published private(set) var outgoingRequestState: ATHLTHLiveViewRequestState = .idle
+    @Published private(set) var requestError: String?
+    @Published private(set) var sourceWorkoutTitle: String?
+
+    private var lastSourceSessionID: UUID?
+    private var approvedSourceSessionID: UUID?
+    private var outgoingRequestID: UUID?
+
+    /// Only this phone's live, locally confirmed session authorizes publishing.
+    func isApprovedForSession(_ sessionID: UUID) -> Bool {
+        !ATHLTHDeviceRole.isIPad && approvedSourceSessionID == sessionID
+    }
+
+    var isSharingActiveSession: Bool {
+        approvedSourceSessionID != nil &&
+        approvedSourceSessionID == lastSourceSessionID
+    }
+
+    /// A toggle is armed for one workout only. No account-wide auto-share.
+    func prepareOneWorkoutSharing(_ enabled: Bool) {
+        guard !ATHLTHDeviceRole.isIPad else { return }
+        shareNextWorkout = enabled
+    }
+
+    private func reconcileSession(_ currentID: UUID?, title: String?) {
+        guard lastSourceSessionID != currentID else { return }
+        approvedSourceSessionID = nil
+        incomingRequest = nil
+        lastSourceSessionID = currentID
+        sourceWorkoutTitle = title
+        if let currentID, shareNextWorkout {
+            approvedSourceSessionID = currentID
+            shareNextWorkout = false
+        }
+    }
 
     private let client = SupabaseEnvironment.client
     private var lastPublishedID: UUID?
@@ -102,6 +140,14 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     func clearLocalState() {
         remote = nil
         lastPublishedID = nil
+        shareNextWorkout = false
+        incomingRequest = nil
+        outgoingRequestID = nil
+        outgoingRequestState = .idle
+        requestError = nil
+        approvedSourceSessionID = nil
+        lastSourceSessionID = nil
+        sourceWorkoutTitle = nil
         mirroredStartedAt = nil
         mirroredSessionID = nil
         lastRemoteExpiry = nil
@@ -131,11 +177,13 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             if client.auth.currentUser?.id == accountID {
                 if isPad {
                     await readRemote(accountID: accountID)
+                    await pollOutgoingRequest(accountID: accountID)
                 } else {
                     await publishLocal(
                         accountID: accountID, phone: phone,
                         strength: strength, mirroredWatch: mirroredWatch
                     )
+                    await pollIncomingRequests(accountID: accountID)
                 }
             } else {
                 remote = nil
@@ -284,7 +332,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         let active = liveSnapshot(
             phone: phone, strength: strength, mirroredWatch: mirroredWatch
         )
-        if let active {
+        reconcileSession(active?.id, title: active?.title)
+        if let active, isApprovedForSession(active.id) {
             let now = Date()
             let row = ATHLTHCrossDeviceWorkoutRow(
                 userID: accountID,
@@ -310,6 +359,131 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             } catch {
                 // TTL clears an abandoned session when the network returns.
             }
+        }
+    }
+
+    /// iPad can request permission but can never grant it, even for the same
+    /// signed-in account. No live metrics are sent until iPhone agrees.
+    func requestAccess(accountID: UUID) async {
+        guard ATHLTHDeviceRole.isIPad,
+              client.auth.currentUser?.id == accountID,
+              outgoingRequestState != .sending else { return }
+
+        outgoingRequestState = .sending
+        requestError = nil
+        let now = Date()
+        let request = ATHLTHLiveViewRequest(
+            userID: accountID,
+            requestID: UUID(),
+            requestedAt: now,
+            expiresAt: now.addingTimeInterval(120),
+            status: "pending",
+            respondedAt: nil,
+            approvedSessionID: nil
+        )
+        do {
+            try await client.from("private_live_view_requests")
+                .upsert(request, onConflict: "user_id")
+                .execute()
+            outgoingRequestID = request.id
+            outgoingRequestState = .pending
+        } catch {
+            outgoingRequestState = .failed
+            requestError = ATHLTHLocalization.choose(
+                english: "Unable to send the viewing request. Try again.",
+                norwegian: "Kunne ikke sende forespørselen. Prøv igjen."
+            )
+        }
+    }
+
+    private func pollIncomingRequests(accountID: UUID) async {
+        guard !ATHLTHDeviceRole.isIPad,
+              lastSourceSessionID != nil,
+              !isSharingActiveSession else {
+            incomingRequest = nil
+            return
+        }
+        do {
+            let rows: [ATHLTHLiveViewRequest] = try await client
+                .from("private_live_view_requests")
+                .select()
+                .eq("user_id", value: accountID)
+                .limit(1)
+                .execute()
+                .value
+            let next = rows.first
+            incomingRequest = next?.isPending == true ? next : nil
+        } catch {
+            incomingRequest = nil
+        }
+    }
+
+    /// The iPhone alone commits the in-memory session grant. Neither an
+    /// iPad database update nor a request row can authorize publication.
+    func respondToRequest(approve: Bool, accountID: UUID) async {
+        guard !ATHLTHDeviceRole.isIPad,
+              let request = incomingRequest, request.isPending,
+              let exactSessionID = lastSourceSessionID,
+              client.auth.currentUser?.id == accountID else { return }
+
+        incomingRequest = nil
+        if approve {
+            approvedSourceSessionID = exactSessionID
+        }
+        let decision = ATHLTHLiveViewDecision(
+            status: approve ? "approved" : "denied",
+            respondedAt: .now,
+            approvedSessionID: approve ? exactSessionID : nil
+        )
+        do {
+            try await client.from("private_live_view_requests")
+                .update(decision)
+                .eq("user_id", value: accountID)
+                .eq("request_id", value: request.id)
+                .execute()
+        } catch {
+            // Local permission is decisive; a network error never turns a
+            // declined request into an approved session.
+        }
+    }
+
+    /// Revocation and end-of-workout remove the only live authorization.
+    func revokeLiveSharing() {
+        approvedSourceSessionID = nil
+        shareNextWorkout = false
+    }
+
+    private func pollOutgoingRequest(accountID: UUID) async {
+        guard ATHLTHDeviceRole.isIPad,
+              let requestID = outgoingRequestID,
+              client.auth.currentUser?.id == accountID else { return }
+        do {
+            let rows: [ATHLTHLiveViewRequest] = try await client
+                .from("private_live_view_requests")
+                .select()
+                .eq("user_id", value: accountID)
+                .limit(1)
+                .execute()
+                .value
+            guard let row = rows.first, row.id == requestID else {
+                outgoingRequestState = .expired
+                outgoingRequestID = nil
+                return
+            }
+            if row.expiresAt <= .now {
+                outgoingRequestState = .expired
+                outgoingRequestID = nil
+            } else if row.status == "denied" {
+                outgoingRequestState = .denied
+                outgoingRequestID = nil
+            } else if row.status == "approved" {
+                outgoingRequestState = .approved
+                outgoingRequestID = nil
+            } else {
+                outgoingRequestState = .pending
+            }
+        } catch {
+            // A transient network failure must never imply acceptance.
         }
     }
 
