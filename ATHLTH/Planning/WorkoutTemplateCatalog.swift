@@ -7389,14 +7389,21 @@ struct WorkoutTemplateBuilderView: View {
             }
             return copy
         }
+        // Recovery steps belong with their efforts by default. Creating an
+        // explicit Recovery category would split 1 min / 1 min into two
+        // unrelated categories and misrepresent the execution timeline.
+        let visibleImportedPhases = Set(
+            copied.map(\.resolvedPhase).filter { $0 != .recovery }
+        )
         if replace {
             blocks = copied
-            studioVisiblePhases = Set(copied.map(\.resolvedPhase))
+            studioVisiblePhases = visibleImportedPhases.isEmpty
+                ? [.main] : visibleImportedPhases
             selectedRouteID = nil
             title = preview.title
         } else {
             blocks.append(contentsOf: copied)
-            studioVisiblePhases.formUnion(copied.map(\.resolvedPhase))
+            studioVisiblePhases.formUnion(visibleImportedPhases)
             if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 title = preview.title
             }
