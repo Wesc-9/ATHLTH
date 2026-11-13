@@ -699,9 +699,18 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .font(.headline)
                     .foregroundStyle(ink)
                     .lineLimit(2)
-                Text(item.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 7) {
+                    Text(item.date.formatted(
+                        .dateTime.weekday(.abbreviated).day().month(.abbreviated)
+                    ))
+                    if let scheduled = item.workout.scheduledStart {
+                        Text("·")
+                        Text(scheduled.formatted(.dateTime.hour().minute()))
+                            .fontWeight(.semibold)
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     if let distance = item.workout.targetDistanceKilometers, distance > 0 {
                         Text(distance.formatted(.number.precision(.fractionLength(1))) + " km")
