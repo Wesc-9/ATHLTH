@@ -142,6 +142,89 @@ final class ATHLTHWorkoutCatalogAuditTests: XCTestCase {
         }.count, 3)
     }
 
+    func testThirtyThirtyTempoComboRestoresWorkTimeFromExplicitSourceText() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "MIX-001"
+        })
+        // The third source step says 30/30 but omitted durationSec.
+        // Keep its 30-second effort and nine 30-second inter-effort rests.
+        let sourceRepeat = try XCTUnwrap(source.mainSetStructure?.last)
+        XCTAssertEqual(sourceRepeat.count, 10)
+        XCTAssertNil(sourceRepeat.steps?.first?.durationSec)
+
+        let timeline = ATHLTHZonedPlanLibrary.blocks(for: source)
+        let efforts = timeline.filter {
+            $0.title.lowercased().contains("30/30") && $0.kind == .run
+        }
+        XCTAssertEqual(efforts.count, 10)
+        XCTAssertTrue(efforts.allSatisfy { $0.durationSeconds == 30 })
+        let between = timeline.filter {
+            $0.isActiveRecovery && $0.durationSeconds == 30
+        }
+        XCTAssertEqual(between.count, 9)
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline),
+            3_570, accuracy: 0.01
+        )
+        XCTAssertEqual(timeline.first?.resolvedPhase, .warmup)
+        XCTAssertEqual(timeline.last?.resolvedPhase, .cooldown)
+    }
+
+    func testPreRaceFiveMinuteRestIsNotCountedAsRunning() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "RP-016"
+        })
+        let timeline = ATHLTHZonedPlanLibrary.blocks(for: source)
+        let rest = try XCTUnwrap(timeline.first {
+            $0.title.lowercased().contains("rest before simulated start")
+        })
+        XCTAssertEqual(rest.kind, .rest)
+        XCTAssertEqual(rest.resolvedPhase, .recovery)
+        XCTAssertEqual(rest.durationSeconds, 300)
+        XCTAssertNil(rest.distanceMeters)
+        // The walk-back has no source distance or duration, so the total
+        // session estimate cannot be asserted as a fixed number.
+        XCTAssertTrue(timeline.contains {
+            $0.title.lowercased().contains("walk back") &&
+            $0.durationSeconds == nil && $0.distanceMeters == nil
+        })
+        XCTAssertNil(ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline))
+    }
+
+    func testOpenEndedAssessmentAndHillRecoveryStayManual() throws {
+        for id in ["ASS-004", "ASS-010", "MIX-002", "VMA-026"] {
+            let source = try XCTUnwrap(
+                ATHLTHZonedPlanLibrary.workouts.first { $0.id == id }
+            )
+            let timeline = ATHLTHZonedPlanLibrary.blocks(for: source)
+            XCTAssertTrue(timeline.contains {
+                $0.kind == .run &&
+                $0.durationSeconds == nil &&
+                $0.distanceMeters == nil
+            }, id)
+            XCTAssertNil(
+                ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline),
+                id
+            )
+        }
+
+        for id in ["HIL-005", "HIL-006", "VMA-019"] {
+            let source = try XCTUnwrap(
+                ATHLTHZonedPlanLibrary.workouts.first { $0.id == id }
+            )
+            let timeline = ATHLTHZonedPlanLibrary.blocks(for: source)
+            XCTAssertTrue(timeline.contains {
+                $0.resolvedPhase == .recovery &&
+                $0.durationSeconds == nil &&
+                $0.distanceMeters == nil
+            }, id)
+            XCTAssertNil(
+                ATHLTHWorkoutDurationEstimator.previewSeconds(for: timeline),
+                id
+            )
+        }
+    }
+
     func testUntimedRecoveryIsKeptManualNeverInventsSeconds() throws {
         let partner = try XCTUnwrap(
             ATHLTHZonedPlanLibrary.workouts.first { $0.id == "VMA-019" }
