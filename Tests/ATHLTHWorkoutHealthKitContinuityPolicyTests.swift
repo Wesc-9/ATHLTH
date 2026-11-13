@@ -26,6 +26,27 @@ final class ATHLTHWorkoutHealthKitContinuityPolicyTests: XCTestCase {
         }
     }
 
+    func testStructuredRunningAndWalkingNeverAutoPauseDuringIntervals() {
+        for kind in WatchWorkoutKind.allCases {
+            XCTAssertFalse(
+                ATHLTHWorkoutHealthKitContinuityPolicy.mayAutoPause(
+                    kind: kind, hasStructuredIntervals: true
+                ),
+                "A recovery phase must not truncate HealthKit duration"
+            )
+        }
+        XCTAssertTrue(
+            ATHLTHWorkoutHealthKitContinuityPolicy.mayAutoPause(
+                kind: .running, hasStructuredIntervals: false
+            )
+        )
+        XCTAssertTrue(
+            ATHLTHWorkoutHealthKitContinuityPolicy.mayAutoPause(
+                kind: .walking, hasStructuredIntervals: false
+            )
+        )
+    }
+
     func testUnexpectedStrengthPauseIsRecoveredWhenNotRequestedByAthlete() {
         XCTAssertTrue(
             ATHLTHWorkoutHealthKitContinuityPolicy.shouldResumeUnexpectedPause(
