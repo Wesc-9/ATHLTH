@@ -4069,6 +4069,8 @@ struct WorkoutTemplateBuilderView: View {
         let basicGoalZone: Int?
         let basicGhostMinutes: Int?
         let basicWorkoutTitle: String?
+        // Persist Basic-generated block positions, not ephemeral editor UUIDs.
+        let basicOwnedBlockIndices: [Int]?
     }
 
     private var draftStorageKey: String {
@@ -4153,6 +4155,11 @@ struct WorkoutTemplateBuilderView: View {
             studioBasicGoalZone = stored.basicGoalZone ?? studioBasicGoalZone
             studioBasicGhostMinutes = stored.basicGhostMinutes ?? studioBasicGhostMinutes
             studioBasicWorkoutTitle = stored.basicWorkoutTitle
+            if let positions = stored.basicOwnedBlockIndices {
+                studioBasicOwnedBlockIDs = Set(positions.compactMap { index in
+                    blocks.indices.contains(index) ? blocks[index].editorDragID : nil
+                })
+            }
         }
         if initialActivity == .running {
             studioBasicRunEnvironment = stored.runningEnvironment ??
@@ -4232,7 +4239,11 @@ struct WorkoutTemplateBuilderView: View {
             basicGoalPace: initialActivity == .running ? studioBasicGoalPace : nil,
             basicGoalZone: initialActivity == .running ? studioBasicGoalZone : nil,
             basicGhostMinutes: initialActivity == .running ? studioBasicGhostMinutes : nil,
-            basicWorkoutTitle: initialActivity == .running ? studioBasicWorkoutTitle : nil
+            basicWorkoutTitle: initialActivity == .running ? studioBasicWorkoutTitle : nil,
+            basicOwnedBlockIndices: initialActivity == .running
+                ? blocks.indices.filter {
+                    studioBasicOwnedBlockIDs.contains(blocks[$0].editorDragID)
+                  } : nil
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: draftStorageKey)
