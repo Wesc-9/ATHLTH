@@ -12,6 +12,7 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     var gearIDs: [UUID]? = nil
     var spotifyPlaylist: SpotifyPlaylistReference? = nil
     var spotifyAutoplayOnStart: Bool? = nil
+    var spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack? = nil
     var audioCoachConfiguration: WatchAudioCoachConfiguration? = nil
     var routeAlertConfiguration: WatchRouteAlertConfiguration? = nil
     var ghostTargetDurationSeconds: TimeInterval? = nil
@@ -104,6 +105,7 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
         workout.gearIDs = gearIDs
         workout.spotifyPlaylist = spotifyPlaylist
         workout.spotifyAutoplayOnStart = spotifyAutoplayOnStart
+        workout.spotifyIntervalTrack = spotifyIntervalTrack
         workout.audioCoachConfiguration = audioCoachConfiguration
         workout.routeAlertConfiguration = workout.routeID != nil
             ? routeAlertConfiguration : nil
