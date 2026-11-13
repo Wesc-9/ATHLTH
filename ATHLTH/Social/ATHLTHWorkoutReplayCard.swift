@@ -707,18 +707,18 @@ struct ATHLTHWorkoutReplayCard: View {
         let names = Set(current.exercises.map(\.exercise.displayName))
         guard !names.isEmpty else { return nil }
         return strengthStore.workoutHistory
-            .filter {
-                $0.isFinished && $0.id != current.id &&
-                $0.startedAt < current.startedAt &&
-                $0.startedAt >= current.startedAt.addingTimeInterval(-180 * 86_400) &&
-                (current.plannedSessionID != nil &&
-                 current.plannedSessionID == $0.plannedSessionID ||
-                 {
-                     let compared = Set($0.exercises.map(\.exercise.displayName))
-                     return compared.count >= 2 &&
-                         names.intersection(compared).count >=
-                             max(2, Int(ceil(Double(names.count) * 0.75)))
-                 }())
+            .filter { previous in
+                guard previous.isFinished,
+                      previous.id != current.id,
+                      previous.startedAt < current.startedAt,
+                      previous.startedAt >= current.startedAt.addingTimeInterval(-180 * 86_400)
+                else { return false }
+                if let plan = current.plannedSessionID,
+                   previous.plannedSessionID == plan { return true }
+                let compared = Set(previous.exercises.map(\.exercise.displayName))
+                return compared.count >= 2 &&
+                    names.intersection(compared).count >=
+                        max(2, Int(ceil(Double(names.count) * 0.75)))
             }
             .max(by: { $0.startedAt < $1.startedAt })
     }
@@ -826,7 +826,8 @@ struct ATHLTHWorkoutReplayCard: View {
     }
 
     private var enduranceMoments: [ReplayMoment] {
-        guard validOverallPace != nil || workout.activity == .swimming ||
+        guard validOverallPace != nil || !usableSegments.isEmpty ||
+                workout.activity == .swimming ||
                 workout.activity == .rowing || workout.activity == .hiit ||
                 workout.activity == .elliptical ||
                 workout.activity == .stairClimbing ||
