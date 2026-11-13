@@ -82,12 +82,10 @@ struct HomeActivityStrengthDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // One visual hero: the exercise-derived muscle atlas is
-                // composited into the photograph, never a second card.
+                // Keep the muscle atlas on the hero, but place the compact
+                // muscle-focus breakdown after the workout's headline stats.
                 workoutHeroCard
 
-                // Training results come directly after the hero; venue
-                // check-in is secondary and should never push stats down.
                 overviewCard
 
                 // Reuse the existing private location/check-in flow.
@@ -242,15 +240,60 @@ struct HomeActivityStrengthDetailView: View {
                         value: volumeText
                     ),
                     ATHLTHWorkoutDisplayMetric(
-                        icon: "pause.circle.fill",
+                        icon: "figure.strengthtraining.traditional",
                         label: ATHLTHLocalization.choose(
-                            english: "Total rest", norwegian: "Total pause"
+                            english: "Active training", norwegian: "Aktiv trening"
                         ),
-                        value: restSummaryText
+                        value: activeTrainingText
                     )
                 ],
                 columnCount: 3
             )
+
+            if hasMuscleHero {
+                Rectangle()
+                    .fill(ATHLTHTheme.divider)
+                    .frame(height: 1)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Muscle focus", norwegian: "Muskelfokus"
+                    ))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Spacer()
+                    Text("\(muscleSummary.totalSets) " + ATHLTHLocalization.choose(
+                        english: "sets", norwegian: "sett"
+                    ))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                VStack(spacing: 8) {
+                    ForEach(Array(muscleSummary.profile.topActivations.prefix(4))) {
+                        activation in
+                        workoutHeroMuscleRow(activation)
+                    }
+                }
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Estimated from completed sets, not measured muscle activity.",
+                    norwegian: "Estimert fra utførte sett, ikke målt muskelaktivitet."
+                ))
+                .font(.system(size: 10))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+
+            if totalRestSeconds > 0 || totalTransitionSeconds > 0 {
+                Text(ATHLTHLocalization.choose(
+                    english: "Active training is estimated by subtracting logged rests and transitions.",
+                    norwegian: "Aktiv trening er estimert ved å trekke fra registrerte pauser og øvelsesbytter."
+                ))
+                .font(.system(size: 10))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
         }
         .padding(16)
         .background(
@@ -315,72 +358,6 @@ struct HomeActivityStrengthDetailView: View {
             }
             .frame(height: workoutHeroHeight)
 
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .center, spacing: 10) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "MUSCLE FOCUS",
-                            norwegian: "MUSKELFOKUS"
-                        ),
-                        systemImage: "figure.strengthtraining.traditional"
-                    )
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.0)
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Spacer(minLength: 0)
-
-                    if muscleSummary.totalSets > 0 {
-                        Text(
-                            ATHLTHLocalization.format(
-                                english: "%d SETS",
-                                norwegian: "%d SETT",
-                                muscleSummary.totalSets
-                            )
-                        )
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 7)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: Capsule()
-                        )
-                    }
-                }
-
-                if hasMuscleHero {
-                    VStack(alignment: .leading, spacing: 13) {
-                        ForEach(
-                            Array(muscleSummary.profile.topActivations.prefix(5))
-                        ) { activation in
-                            workoutHeroMuscleRow(activation)
-                        }
-                    }
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Estimated from completed exercises and sets, not a direct measurement of muscle activity.",
-                            norwegian: "Anslått fra fullførte øvelser og sett, ikke en direkte måling av muskelaktivitet."
-                        )
-                    )
-                    .font(.system(size: 11))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Muscle focus appears when completed exercises have muscle information.",
-                            norwegian: "Muskelfokus vises når de fullførte øvelsene har muskelinformasjon."
-                        )
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(ATHLTHTheme.card)
         .clipShape(
@@ -404,7 +381,7 @@ struct HomeActivityStrengthDetailView: View {
         let tint = ATHLTHStrengthFocusTint.color(for: intensity)
         let percentage = Int((intensity * 100).rounded())
 
-        return VStack(alignment: .leading, spacing: 7) {
+        return HStack(alignment: .center, spacing: 9) {
             HStack(alignment: .firstTextBaseline) {
                 Text(activation.region.activityDisplayTitle)
                     .font(.system(size: 12, weight: .medium))
@@ -412,26 +389,23 @@ struct HomeActivityStrengthDetailView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
 
-                Spacer(minLength: 8)
-
-                Text("\(percentage) %")
-                    .font(.system(size: 11, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                Spacer(minLength: 2)
             }
+            .frame(width: 92, alignment: .leading)
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(ATHLTHTrainDesign.rule.opacity(0.38))
-                    Capsule()
-                        // Solid region tint: 100% stays entirely red;
-                        // medium-focus muscles are orange, lower-focus green.
-                        .fill(tint)
-                        .frame(width: geometry.size.width * intensity)
+                    Capsule().fill(ATHLTHTrainDesign.rule.opacity(0.38))
+                    Capsule().fill(tint).frame(width: geometry.size.width * intensity)
                 }
             }
-            .frame(height: 6)
+            .frame(height: 5)
+
+            Text("\(percentage) %")
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+            .frame(width: 44, alignment: .trailing)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(
                 ATHLTHLocalization.choose(
@@ -1738,6 +1712,15 @@ struct HomeActivityStrengthDetailView: View {
         return reps > 0
             ? "\(reps)"
             : "—"
+    }
+
+    /// This is a conservative estimate, never a stopwatch measurement of
+    /// exertion. Don't claim active minutes when no pause evidence exists.
+    private var activeTrainingText: String {
+        let recordedBreaks = totalRestSeconds + totalTransitionSeconds
+        guard recordedBreaks > 0 else { return "—" }
+        let seconds = max(0, workout.duration - recordedBreaks)
+        return compactStrengthDuration(seconds)
     }
 
     private var restSummaryText: String {
