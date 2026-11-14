@@ -4,7 +4,10 @@ import SwiftUI
 /// the recipe; the independent plus button opens the existing add-to-plan flow.
 /// Accessory controls such as Favorites remain tappable, without nested buttons.
 struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
-    let workout: PlannedSession
+    /// Catalog rows carry their small immutable entry until opened. They do
+    /// not construct a full PlannedSession during scrolling or search.
+    let workout: PlannedSession?
+    let entry: WorkoutTemplateCatalogEntry?
     var subtitle: String? = nil
     let expanded: Bool
     let onToggle: () -> Void
@@ -20,6 +23,7 @@ struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.workout = workout
+        self.entry = nil
         self.subtitle = subtitle
         self.expanded = expanded
         self.onToggle = onToggle
@@ -27,20 +31,43 @@ struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
         self.accessory = accessory()
     }
 
-    private var stepCount: Int { workout.resolvedWorkoutBlocks.count }
+    init(
+        entry: WorkoutTemplateCatalogEntry,
+        subtitle: String? = nil,
+        expanded: Bool,
+        onToggle: @escaping () -> Void,
+        onUse: @escaping () -> Void,
+        @ViewBuilder accessory: () -> Accessory
+    ) {
+        self.entry = entry
+        self.workout = nil
+        self.subtitle = subtitle
+        self.expanded = expanded
+        self.onToggle = onToggle
+        self.onUse = onUse
+        self.accessory = accessory()
+    }
+
+    private var workoutTitle: String { entry?.title ?? workout?.title ?? "" }
+    private var workoutIcon: String {
+        entry?.systemImage ?? workout?.kind.systemImage ?? "dumbbell"
+    }
+    private var stepCount: Int {
+        entry?.blocks.count ?? workout?.resolvedWorkoutBlocks.count ?? 0
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: expanded ? 12 : 0) {
             HStack(alignment: .top, spacing: 6) {
                 Button(action: onToggle) {
                     HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: workout.kind.systemImage)
+                        Image(systemName: workoutIcon)
                             .font(.system(size: 19, weight: .medium))
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
                             .frame(width: 30, height: 35)
 
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(ATHLTHLibraryName.workoutCard(workout.title, grid: false))
+                            Text(ATHLTHLibraryName.workoutCard(workoutTitle, grid: false))
                                 .font(.headline)
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .multilineTextAlignment(.leading)
@@ -53,8 +80,13 @@ struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
                                     .multilineTextAlignment(.leading)
                             }
                             if !expanded {
-                                ATHLTHWorkoutGridDetails(workout: workout)
-                                    .padding(.top, 3)
+                                if let entry {
+                                    ATHLTHWorkoutGridDetails(entry: entry)
+                                        .padding(.top, 3)
+                                } else if let workout {
+                                    ATHLTHWorkoutGridDetails(workout: workout)
+                                        .padding(.top, 3)
+                                }
                             }
                             HStack(spacing: 6) {
                                 Text(ATHLTHLocalization.choose(
@@ -73,7 +105,7 @@ struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(workout.title)
+                .accessibilityLabel(workoutTitle)
                 .accessibilityValue(ATHLTHLocalization.choose(
                     english: expanded ? "Expanded" : "Collapsed",
                     norwegian: expanded ? "Utvidet" : "Lukket"
@@ -100,11 +132,19 @@ struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
 
             if expanded {
                 Divider()
-                ATHLTHWorkoutContentsPreview(
-                    workout: workout,
-                    maximumVisibleBlocks: nil
-                )
-                .transition(.opacity)
+                if let entry {
+                    ATHLTHWorkoutContentsPreview(
+                        workout: entry.plannedSession(),
+                        maximumVisibleBlocks: nil
+                    )
+                    .transition(.opacity)
+                } else if let workout {
+                    ATHLTHWorkoutContentsPreview(
+                        workout: workout,
+                        maximumVisibleBlocks: nil
+                    )
+                    .transition(.opacity)
+                }
             }
         }
         .padding(15)
