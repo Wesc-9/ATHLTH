@@ -5312,7 +5312,15 @@ struct LibraryFavoritesView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     let onStartRunning: ((RunningWorkoutTemplate) -> Void)?
-    var initialKind: LibraryFavoriteKind? = nil
+    let initialKind: LibraryFavoriteKind?
+
+    init(
+        onStartRunning: ((RunningWorkoutTemplate) -> Void)? = nil,
+        initialKind: LibraryFavoriteKind? = nil
+    ) {
+        self.onStartRunning = onStartRunning
+        self.initialKind = initialKind
+    }
 
     @StateObject private var planLibrary = TrainingPlanLibraryStore()
     @StateObject private var workoutLibrary =
