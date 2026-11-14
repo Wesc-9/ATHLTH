@@ -13,6 +13,7 @@ struct RoutePerformanceAnalysis: Hashable {
     let maxDeviationMeters: Double
     let startDistanceMeters: Double
     let endDistanceMeters: Double
+    var direction: ATHLTHRouteAttemptDirection = .unknown
 
     var deviationPercent: Double {
         max(0, 100 - routeMatchPercent)
