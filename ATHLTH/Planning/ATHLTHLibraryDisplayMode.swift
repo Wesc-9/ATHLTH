@@ -293,6 +293,8 @@ enum ATHLTHLibraryName {
 /// Identical ATHLTH / Mine selector across exercises, workouts, plans and routes.
 struct ATHLTHLibrarySourcePicker: View {
     @Binding var selection: ATHLTHUnifiedLibraryScope
+    /// Route library uses “Public”; other libraries keep ATHLTH branding.
+    var athlthTitle: String? = nil
 
     var body: some View {
         HStack(spacing: 4) {
@@ -300,7 +302,7 @@ struct ATHLTHLibrarySourcePicker: View {
                 Button {
                     selection = source
                 } label: {
-                    Text(source.title)
+                    Text(source == .athlth ? (athlthTitle ?? source.title) : source.title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(selection == source ? Color.white : ATHLTHPlanDesign.ink)
                         .frame(maxWidth: .infinity, minHeight: 42)
