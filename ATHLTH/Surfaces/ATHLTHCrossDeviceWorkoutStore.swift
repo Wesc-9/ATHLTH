@@ -131,6 +131,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     @Published private(set) var remote: ATHLTHCrossDeviceWorkoutSnapshot?
     /// Only a same-account active flag; never treated as viewing consent.
     @Published private(set) var remotePresence: ATHLTHCrossDevicePresenceRow?
+    // Presence transport status is separate from consent-protected metrics.
+    // Avoid silently treating a failed request as "no workout".
+    @Published private(set) var presenceConnectionIssue = false
+    @Published private(set) var hasCheckedPresence = false
     @Published private(set) var isExpanded = false
     /// Explicit opt-in only for the next workout, never a saved preference.
     @Published var shareNextWorkout = false
@@ -140,6 +144,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     @Published private(set) var sourceWorkoutTitle: String?
 
     private var lastSourceSessionID: UUID?
+    private var trackingAccountID: UUID?
     private var approvedSourceSessionID: UUID?
     private var nextWorkoutSharingExpiresAt: Date?
     private var outgoingRequestID: UUID?
@@ -211,6 +216,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     func clearLocalState() {
         remote = nil
         remotePresence = nil
+        presenceConnectionIssue = false
+        hasCheckedPresence = false
+        trackingAccountID = nil
         lastPresenceExpiry = nil
         lastPresencePublished = false
         lastPresenceCleanupAt = nil
@@ -248,15 +256,27 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             clearLocalState()
             return
         }
+        // Shared Store survives scenes; never display another account's
+        // transient live status while a new account authenticates.
+        if trackingAccountID != accountID {
+            clearLocalState()
+            trackingAccountID = accountID
+        }
         hasLoadedRemote = false
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        while !Task.isCancelled {
+        let isPad = ATHLTHDeviceRole.isIPad
+        while !Task.isCancelled && trackingAccountID == accountID {
             // Do not trust local profile IDs as authorization: every request
             // also requires the active Supabase session to match that ID.
             if client.auth.currentUser?.id == accountID {
                 if isPad {
                     await readPresence(accountID: accountID)
+                    guard !Task.isCancelled, trackingAccountID == accountID else {
+                        break
+                    }
                     await readRemote(accountID: accountID)
+                    guard !Task.isCancelled, trackingAccountID == accountID else {
+                        break
+                    }
                     await pollOutgoingRequest(accountID: accountID)
                 } else {
                     // The Web API may report an active Spotify Connect player
@@ -279,9 +299,13 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     )
                     await pollIncomingRequests(accountID: accountID)
                 }
-            } else {
+            } else if isPad {
+                // Authentication may be refreshing after launch. This isn't
+                // proof that the iPhone is idle; show a reconnecting status.
                 remote = nil
                 remotePresence = nil
+                presenceConnectionIssue = true
+                hasCheckedPresence = true
                 ATHLTHSurfaceCoordinator.setRemoteWorkout(nil)
             }
 
@@ -704,6 +728,15 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         }
     }
 
+    func refreshPresenceNow(accountID: UUID) async {
+        guard ATHLTHDeviceRole.isIPad,
+              trackingAccountID == accountID,
+              client.auth.currentUser?.id == accountID else { return }
+        await readPresence(accountID: accountID)
+        guard trackingAccountID == accountID else { return }
+        await readRemote(accountID: accountID)
+    }
+
     private func readPresence(accountID: UUID) async {
         do {
             let rows: [ATHLTHCrossDevicePresenceRow] = try await client
@@ -713,10 +746,20 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
+            guard trackingAccountID == accountID, !Task.isCancelled else {
+                return
+            }
             let valid = rows.first.flatMap { $0.expiresAt > .now ? $0 : nil }
             remotePresence = valid
             lastPresenceExpiry = valid?.expiresAt
+            presenceConnectionIssue = false
+            hasCheckedPresence = true
         } catch {
+            guard trackingAccountID == accountID, !Task.isCancelled else {
+                return
+            }
+            hasCheckedPresence = true
+            presenceConnectionIssue = true
             if lastPresenceExpiry.map({ $0 <= .now }) ?? true {
                 remotePresence = nil
                 lastPresenceExpiry = nil
@@ -890,6 +933,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
+            guard trackingAccountID == accountID, !Task.isCancelled else {
+                return
+            }
             let row = rows.first
             let next = row.flatMap {
                 $0.expiresAt > Date() ? $0.snapshot : nil
@@ -928,6 +974,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 )
             })
         } catch {
+            guard trackingAccountID == accountID, !Task.isCancelled else {
+                return
+            }
+            presenceConnectionIssue = true
             // An offline spectator must not appear permanently live.
             if lastRemoteExpiry.map({ $0 <= Date() }) ?? true {
                 remote = nil
