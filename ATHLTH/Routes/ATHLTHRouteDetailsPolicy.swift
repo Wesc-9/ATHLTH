@@ -161,7 +161,11 @@ struct ATHLTHRouteMetadataForm: View {
                     .disabled(pendingTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 if !tags.isEmpty {
-                    FlowLayout(spacing: 8) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 100), spacing: 8)],
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
                         ForEach(tags, id: \.self) { tag in
                             Button {
                                 tags.removeAll { $0 == tag }
