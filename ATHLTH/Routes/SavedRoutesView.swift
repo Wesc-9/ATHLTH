@@ -353,7 +353,7 @@ struct SavedRoutesView: View {
     }
 
     private var searchAndFilters: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             Button { searchExpanded.toggle() } label: {
                 Label(tr("Search routes", "Søk i ruter"), systemImage: "magnifyingglass")
                     .font(.caption.weight(.semibold))
@@ -455,12 +455,7 @@ struct SavedRoutesView: View {
                 .accessibilityLabel(tr("Change estimated running pace", "Endre estimert løpetempo"))
             }
         }
-        .padding(13)
-        .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 19))
-        .overlay {
-            RoundedRectangle(cornerRadius: 19)
-                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.7), lineWidth: 0.8)
-        }
+        .padding(.vertical, 3)
     }
 
     private func filterControl(title: String, icon: String) -> some View {
