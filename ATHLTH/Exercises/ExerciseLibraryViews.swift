@@ -141,7 +141,8 @@ struct ExerciseLibraryView: View {
     @State private var selectedEquipment = "All"
     @State private var favoritesOnly = false
     @State private var searchExpanded = false
-    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
+    @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
     @State private var showingCreateExercise = false
     @State private var showingEquipmentCamera = false
@@ -379,7 +380,10 @@ struct ExerciseLibraryView: View {
                 .accessibilityLabel(ATHLTHLocalization.choose(
                     english: "Search exercises", norwegian: "Søk i øvelser"
                 ))
-                ATHLTHLibraryDisplayPicker(selection: $displayMode)
+                ATHLTHLibraryDisplayPicker(
+                    selection: $displayMode,
+                    columns: $preferredColumns
+                )
             }
             .padding(.horizontal, 16)
             .padding(.top, 7)
@@ -548,7 +552,8 @@ struct ExerciseLibraryView: View {
                                 mode: displayMode,
                                 width: libraryViewWidth,
                                 reservedHorizontalSpace: 50,
-                                accessibilityText: dynamicTypeSize.isAccessibilitySize
+                                accessibilityText: dynamicTypeSize.isAccessibilitySize,
+                                preferredColumns: preferredColumns
                             ),
                             spacing: 10
                         ) {
