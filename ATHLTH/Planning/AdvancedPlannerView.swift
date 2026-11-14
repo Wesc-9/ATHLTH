@@ -5524,6 +5524,8 @@ struct SessionEditorView: View {
     @State private var scratchTimelineDraftID = UUID()
     @State private var scratchResumingSavedComposer = false
     @State private var showingUnifiedWorkoutComposer = false
+    @State private var queuedNavigationStage:
+        ATHLTHStandaloneWorkoutDraftStore.NavigationStage?
     // Restore an involuntarily dismissed scratch builder after app suspension.
     @State private var restoreScratchComposerOnWake = false
     // Solo scratch sessions are saved directly from the shared builder,
@@ -6316,6 +6318,101 @@ struct SessionEditorView: View {
         .frame(maxWidth: .infinity, minHeight: 65)
         .background(background, in: RoundedRectangle(cornerRadius: 14))
         .contentShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    /// Home is the only owner of the automatic deep-link restoration.
+    /// Other editing and Train Together flows retain their explicit entry.
+    private var shouldTrackOpenNavigation: Bool {
+        isStandalone && existingWorkout == nil &&
+            onPreparedWorkout == nil && onExit != nil &&
+            directPartnerID == nil
+    }
+
+    private func persistOpenNavigationStage(
+        _ stage: ATHLTHStandaloneWorkoutDraftStore.NavigationStage
+    ) {
+        guard shouldTrackOpenNavigation else { return }
+        ATHLTHStandaloneWorkoutDraftStore.setNavigationStage(
+            stage, for: session.profile.userID
+        )
+    }
+
+    /// A nested sheet may not yet be attached on the editor's first frame.
+    /// Queue exactly one restoration; re-attempt it on scene activation.
+    private func queueNavigationPresentation(
+        _ stage: ATHLTHStandaloneWorkoutDraftStore.NavigationStage
+    ) {
+        queuedNavigationStage = stage
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(160))
+            presentQueuedNavigationIfNeeded()
+        }
+    }
+
+    private func presentQueuedNavigationIfNeeded() {
+        guard let queuedNavigationStage, scenePhase == .active,
+              !draftFinalized,
+              ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+                for: session.profile.userID
+              ) == queuedNavigationStage else { return }
+
+        switch queuedNavigationStage {
+        case .scratchBuilder:
+            guard selectedScratchWorkoutType != nil,
+                  !showingScratchTypePicker else { return }
+            showingUnifiedWorkoutComposer = true
+        case .scratchTypePicker:
+            showingScratchTypePicker = true
+        case .savedWorkoutPicker:
+            showingSavedWorkoutPicker = true
+        case .recoveryRestPlanner:
+            showingRecoveryRestPlanner = true
+        case .source, .legacyEditor:
+            break
+        }
+        self.queuedNavigationStage = nil
+    }
+
+    /// Recover the route only when the containing Home composer was still
+    /// open. A new visit always starts with the source card and keeps the
+    /// existing explicit "Continue saved draft" affordance.
+    private func restoreOpenNavigationStageIfNeeded() -> Bool {
+        guard shouldTrackOpenNavigation, !draftRestored,
+              let stage = ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+                for: session.profile.userID
+              ) else { return false }
+
+        switch stage {
+        case .source:
+            return false
+        case .scratchBuilder:
+            guard let saved = loadScratchComposerEntry() else {
+                persistOpenNavigationStage(.source)
+                return false
+            }
+            scratchTimelineDraftID = saved.id
+            selectedScratchWorkoutType = saved.type
+            scratchResumingSavedComposer = true
+            restoreDraftIfNeeded()
+            hasSelectedWorkoutSource = true
+            queueNavigationPresentation(.scratchBuilder)
+        case .scratchTypePicker, .savedWorkoutPicker, .recoveryRestPlanner:
+            draftRestored = true
+            hasSelectedWorkoutSource = false
+            hasStoredStandaloneDraft = ATHLTHStandaloneWorkoutDraftStore.hasDraft(
+                for: session.profile.userID
+            )
+            queueNavigationPresentation(stage)
+        case .legacyEditor:
+            guard UserDefaults.standard.data(forKey: draftStorageKey) != nil
+            else {
+                persistOpenNavigationStage(.source)
+                return false
+            }
+            restoreDraftIfNeeded()
+            hasSelectedWorkoutSource = true
+        }
+        return true
     }
 
     private var sourceChoiceCard: some View {
