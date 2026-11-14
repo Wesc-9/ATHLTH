@@ -68,6 +68,60 @@ final class PublicRouteBrowseRegressionTests: XCTestCase {
                        "03a07816-baf7-4da0-99d6-252bda4590b3")
     }
 
+    func testUnifiedPublicTrailsDecodeAsLightweightEntries() throws {
+        let json = """
+        {
+          "id": "B33A4A12-EB92-4122-9CD0-198D103A6235",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Havsteinrunden",
+          "distance_kilometers": 6.8,
+          "elevation_gain_meters": null,
+          "start_name": null,
+          "end_name": null,
+          "center_latitude": 63.41,
+          "center_longitude": 10.36,
+          "created_at": "2026-11-14T10:00:00Z",
+          "source_type": "public_trail",
+          "visibility": "public",
+          "source_label": "openstreetmap"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let entry = try decoder.decode(RouteLibraryEntry.self, from: Data(json.utf8))
+        XCTAssertTrue(entry.isPublicTrail)
+        XCTAssertFalse(entry.isFriendsOnly)
+        XCTAssertEqual(entry.distanceKilometers, 6.8, accuracy: 0.001)
+        XCTAssertEqual(entry.sourceType, "public_trail")
+        XCTAssertEqual(entry.sourceLabel, "openstreetmap")
+    }
+
+    func testFriendsOnlyRouteRequiresItsOwnVisibilityMarker() throws {
+        let json = """
+        {
+          "id": "9E7D4D84-2021-42EE-85C7-59BFB85320EA",
+          "owner_id": "03A07816-BAF7-4DA0-99D6-252BDA4590B3",
+          "title": "Venneløypa",
+          "distance_kilometers": 7.5,
+          "elevation_gain_meters": 110,
+          "start_name": "Start",
+          "end_name": "Mål",
+          "center_latitude": 67.25,
+          "center_longitude": 15.4,
+          "created_at": "2026-10-21T12:00:00Z",
+          "source_type": "community",
+          "visibility": "friends",
+          "source_label": null
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let entry = try decoder.decode(RouteLibraryEntry.self, from: Data(json.utf8))
+        XCTAssertTrue(entry.isFriendsOnly)
+        XCTAssertFalse(entry.isPublicTrail)
+        XCTAssertEqual(entry.visibility, "friends")
+    }
+
     func testCustomLengthRangeIsSentToServer() throws {
         let params = RouteCatalogSearchParameters(
             p_query: "",
