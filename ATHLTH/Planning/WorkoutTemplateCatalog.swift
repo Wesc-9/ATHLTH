@@ -2763,10 +2763,12 @@ struct WorkoutTemplateLibraryView: View {
     private func catalogTile(_ entry: WorkoutTemplateCatalogEntry) -> some View {
         ATHLTHWorkoutCatalogTile(
             entry: entry,
+            catalogRevision: catalog.contentRevision,
             compact: displayMode == .grid,
             includePreview: initialCategory != .running,
             history: catalogHistoryIndex[entry.id]
         )
+        .equatable()
     }
 
     @ViewBuilder
