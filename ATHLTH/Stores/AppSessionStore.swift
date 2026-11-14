@@ -4942,6 +4942,14 @@ final class AppSessionStore: ObservableObject {
             // same generic recipe across all weeks or lose their HR targets.
             for weekIndex in weeks.indices where weekIndex < zoned.weeks.count {
                 let sourceWeek = zoned.weeks[weekIndex]
+                // Preserve source week targets for calendar/plan progress.
+                // They are catalog prescriptions, not observed performance.
+                weeks[weekIndex].sourcePlanPhase = sourceWeek.phase
+                weeks[weekIndex].sourcePlanRecoveryWeek = sourceWeek.isRecoveryWeek
+                weeks[weekIndex].sourcePlanVolumePercent = sourceWeek.volumePercent
+                weeks[weekIndex].sourcePlanRunningKilometers = sourceWeek.targetKm
+                weeks[weekIndex].sourcePlanLongRunKilometers = sourceWeek.targetLongRunKm
+                weeks[weekIndex].sourcePlanWeeklyLoadScore = sourceWeek.weeklyLoadScore
                 let prescribed = ATHLTHZonedPlanLibrary.orderedRequiredSessions(in: sourceWeek)
                 for (slot, sourceSession) in prescribed.enumerated() {
                     let dayIndex = slot < targetDayIndexes.count
