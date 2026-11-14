@@ -1897,12 +1897,19 @@ struct TrainingPlanLibraryView: View {
         }
         .onAppear {
             displayMode = .load(userID: session.profile.userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(
+                userID: session.profile.userID
+            )
         }
         .onChange(of: session.profile.userID) { _, userID in
             displayMode = .load(userID: userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: userID)
         }
         .onChange(of: displayMode) { _, value in
             value.save(userID: session.profile.userID)
+        }
+        .onChange(of: preferredColumns) { _, value in
+            ATHLTHLibraryColumnPreference.save(value, userID: session.profile.userID)
         }
         .task {
             async let plans: Void = catalog.refresh()
