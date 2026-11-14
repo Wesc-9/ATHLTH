@@ -80,6 +80,40 @@ final class ATHLTHLiveWorkoutAccessTests: XCTestCase {
         XCTAssertEqual(decoded, row)
     }
 
+    func testLongIntervalWorkoutStillFitsPrivateLivePayloadLimit() throws {
+        var snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: UUID(), kind: "running", title: "Long intervals",
+            startedAt: .now, elapsedSeconds: 1800,
+            distanceMeters: nil, currentStep: "Current interval",
+            nextStep: "Recovery", completedSets: nil, totalSets: nil
+        )
+        snapshot.runningStepIndex = 58
+        snapshot.runningStepCount = 100
+        snapshot.runningSteps = (0..<100).map { index in
+            ATHLTHLiveWorkoutStage(
+                index: index, title: "Interval \(index) " + String(repeating: "A", count: 150),
+                phase: "main", durationSeconds: 120, distanceMeters: nil
+            )
+        }
+        let bounded = ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(
+            snapshot
+        )
+        XCTAssertEqual(bounded.id, snapshot.id)
+        XCTAssertEqual(bounded.runningStepIndex, 58)
+        XCTAssertEqual(bounded.kind, "running")
+        XCTAssertLessThan(try JSONEncoder().encode(bounded).count, 16_384)
+        XCTAssertLessThanOrEqual(bounded.runningSteps?.count ?? 0, 24)
+    }
+
+    func testUnapprovedWorkoutHasNoPrivateRemoteSnapshot() {
+        let state = ATHLTHCrossDeviceWorkoutStore()
+        XCTAssertNil(state.remote)
+        XCTAssertNil(state.remotePresence)
+        XCTAssertFalse(state.presenceConnectionIssue)
+        XCTAssertFalse(state.hasCheckedPresence)
+        XCTAssertFalse(state.isSharingActiveSession)
+    }
+
     func testRichSessionPayloadStillUsesOnlyOptionalSensorEvidence() throws {
         var snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
             sessionID: UUID(), kind: "running", title: "4 × 4",
