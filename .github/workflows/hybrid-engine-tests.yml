@@ -32,6 +32,14 @@ on:
       - Tests/ATHLTHIntervalRecipeEditingTests.swift
       - .github/workflows/hybrid-engine-tests.yml
       - ATHLTH/Routes/ATHLTHExploreRoutePolicy.swift
+      - ATHLTH/Routes/ATHLTHRouteDetailsPolicy.swift
+      - ATHLTH/Routes/RouteDetailView.swift
+      - ATHLTH/Routes/RunRouteBuilderView.swift
+      - ATHLTH/Routes/RouteDiscoveryStore.swift
+      - ATHLTH/Core/Models/ProductModels.swift
+      - ATHLTH/Stores/AppSessionStore.swift
+      - Tests/ATHLTHRouteDetailsPolicyTests.swift
+      - supabase/migrations/20261114120912_community_route_tags_surface_percentages.sql
       - ATHLTH/Planning/ATHLTHLibraryDisplayMode.swift
       - ATHLTH/Planning/TrainingLibraryHomeView.swift
       - ATHLTH/Planning/WorkoutTemplateCatalog.swift
@@ -181,6 +189,7 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/HybridTests.xcresult" \
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
             -only-testing:ATHLTHTests/ATHLTHExploreRoutePolicyTests \
+            -only-testing:ATHLTHTests/ATHLTHRouteDetailsPolicyTests \
             -only-testing:ATHLTHTests/ATHLTHLibraryDisplayModeTests \
             -only-testing:ATHLTHTests/ATHLTHLibraryResponsiveLayoutTests \
             -only-testing:ATHLTHTests/ATHLTHPublicTrailDiskCacheTests \
