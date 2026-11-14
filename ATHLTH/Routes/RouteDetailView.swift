@@ -735,49 +735,57 @@ struct RouteDetailView: View {
                     }
                 }
 
-                HStack(spacing: 0) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 146), spacing: 10)],
+                    spacing: 12
+                ) {
                     premiumRouteMetric(
                         value: String(
                             format: "%.1f km",
                             currentRoute.distanceKilometers
                         ),
-                        label: "Distance",
+                        label: ATHLTHLocalization.choose(
+                            english: "Distance", norwegian: "Distanse"
+                        ),
                         icon: "figure.run"
                     )
-
-                    premiumMetricDivider
-
                     premiumRouteMetric(
-                        value:
-                            resolvedElevationGain.map {
-                                "\(Int($0.rounded())) m"
-                            } ?? "—",
-                        label: "Ascent",
+                        value: resolvedElevationGain.map {
+                            "\(Int($0.rounded())) m"
+                        } ?? "—",
+                        label: ATHLTHLocalization.choose(
+                            english: "Ascent", norwegian: "Stigning"
+                        ),
                         icon: "mountain.2.fill"
                     )
-
-                    premiumMetricDivider
-
                     premiumRouteMetric(
-                        value:
-                            publicTrailMetadata?.routeShape ??
-                            "Route",
-                        label: "Type",
-                        icon: "point.topleft.down.to.point.bottomright.curvepath"
+                        value: routeTypeTitle,
+                        label: ATHLTHLocalization.choose(
+                            english: "Route type", norwegian: "Rutetype"
+                        ),
+                        icon: "arrow.triangle.branch"
                     )
-
-                    if let runSeconds =
-                        publicTrailMetadata?.estimatedRunSeconds {
-                        premiumMetricDivider
-
-                        premiumRouteMetric(
-                            value:
-                                compactDuration(runSeconds),
-                            label: "Est. run",
-                            icon: "clock.fill"
-                        )
-                    }
+                    premiumRouteMetric(
+                        value: resolvedWalkEstimate.map(compactDuration) ?? "—",
+                        label: ATHLTHLocalization.choose(
+                            english: "Est. walk", norwegian: "Est. gange"
+                        ),
+                        icon: "figure.walk"
+                    )
+                    premiumRouteMetric(
+                        value: resolvedRunEstimate.map(compactDuration) ?? "—",
+                        label: ATHLTHLocalization.choose(
+                            english: "Est. run", norwegian: "Est. løping"
+                        ),
+                        icon: "figure.run"
+                    )
                 }
+                Text(ATHLTHLocalization.choose(
+                    english: "Times are estimates, not a personalized pace guarantee.",
+                    norwegian: "Tidene er estimater, ikke en garanti for personlig tempo."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
 
                 let characteristics =
                     trailCharacteristics
@@ -838,7 +846,8 @@ struct RouteDetailView: View {
 
     private var resolvedElevationGain: Double? {
         publicTrailMetadata?.elevationGainMeters ??
-            currentRoute.elevationGainMeters
+            currentRoute.elevationGainMeters ??
+            ATHLTHRouteDetailsPolicy.ascentDescent(resolvedProfileSamples)?.ascent
     }
 
     private var trailCharacteristics: [String] {
