@@ -149,6 +149,9 @@ struct RouteLibraryListView: View {
     @State private var hydratedRoutes: [UUID: TrainingRoute] = [:]
     @State private var loadingDetails: Set<UUID> = []
     @State private var showingMapRoute: TrainingRoute?
+    @State private var preferredColumns = 0
+    @State private var libraryViewWidth: CGFloat = 390
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var viewMode: ATHLTHRouteBrowseMode {
         ATHLTHRouteBrowseMode(rawValue: savedViewMode) ?? .cards
@@ -306,7 +309,10 @@ struct RouteLibraryListView: View {
                 }
 
                 HStack(spacing: 10) {
-                    ATHLTHRouteBrowseModePicker(selection: viewModeBinding)
+                    ATHLTHRouteBrowseModePicker(
+                        selection: viewModeBinding,
+                        columns: $preferredColumns
+                    )
                     Spacer(minLength: 0)
                     Label(tr("Estimated times", "Estimerte tider"),
                           systemImage: "info.circle")
@@ -347,11 +353,22 @@ struct RouteLibraryListView: View {
                         databaseMap
                     }
 
-                    ForEach(entries) { entry in
-                        if viewMode == .cards {
-                            databasePremiumCard(entry)
-                        } else {
-                            databaseCompactRow(entry)
+                    LazyVGrid(
+                        columns: ATHLTHLibraryResponsiveLayout.columns(
+                            mode: viewMode == .list || viewMode == .map ? .list : .grid,
+                            width: libraryViewWidth,
+                            accessibilityText: dynamicTypeSize.isAccessibilitySize,
+                            preferredColumns: preferredColumns,
+                            preferredMinimumCardWidth: 104
+                        ),
+                        spacing: 10
+                    ) {
+                        ForEach(entries) { entry in
+                            if viewMode == .cards {
+                                databaseCompactTile(entry)
+                            } else {
+                                databaseCompactRow(entry)
+                            }
                         }
                     }
                 }
@@ -389,6 +406,20 @@ struct RouteLibraryListView: View {
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         .navigationTitle(tr("Routes", "Ruter"))
         .navigationBarTitleDisplayMode(.inline)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            libraryViewWidth = width
+        }
+        .onAppear {
+            preferredColumns = ATHLTHLibraryColumnPreference.load(
+                userID: session.profile.userID
+            )
+        }
+        .onChange(of: session.profile.userID) { _, userID in
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: userID)
+        }
+        .onChange(of: preferredColumns) { _, count in
+            ATHLTHLibraryColumnPreference.save(count, userID: session.profile.userID)
+        }
         .refreshable { await loadCatalog() }
         .task(id: catalogKey) {
             recents.refresh()
@@ -433,19 +464,9 @@ struct RouteLibraryListView: View {
 
     private var databaseHeader: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("ATHLTH · " + tr("EXPLORE ROUTES", "UTFORSK RUTER"))
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(tr("Discover routes", "Utforsk ruter"))
-                    .font(.system(size: 25, weight: .medium, design: .serif))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                Text(tr("Public routes from ATHLTH members",
-                        "Offentlige ruter fra ATHLTH-fellesskapet"))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
+            Text(tr("\(entries.count) routes", "\(entries.count) ruter"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
             Spacer(minLength: 4)
             NavigationLink {
                 RunRouteBuilderView(onRouteSaved: {
@@ -483,7 +504,7 @@ struct RouteLibraryListView: View {
     }
 
     private var databaseFilters: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             Button { searchExpanded.toggle() } label: {
                 Label(tr("Search routes", "Søk i ruter"), systemImage: "magnifyingglass")
                     .font(.caption.weight(.semibold))
@@ -600,12 +621,7 @@ struct RouteLibraryListView: View {
                                        "Endre estimert løpetempo"))
             }
         }
-        .padding(13)
-        .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 19))
-        .overlay {
-            RoundedRectangle(cornerRadius: 19)
-                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.7), lineWidth: 0.8)
-        }
+        .padding(.vertical, 3)
     }
 
     private func catalogFilterChip(_ title: String, icon: String) -> some View {
@@ -771,6 +787,67 @@ struct RouteLibraryListView: View {
         } catch {
             watchError = error.localizedDescription
         }
+    }
+
+    /// Compact image-first route tile for 2/3-column iPhone grids and
+    /// wider iPad collections. Full metrics and actions remain in Details.
+    private func databaseCompactTile(_ entry: RouteLibraryEntry) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            NavigationLink {
+                RouteLibraryDetailLoader(routeID: entry.id)
+            } label: {
+                VStack(alignment: .leading, spacing: 7) {
+                    Group {
+                        if let route = hydratedRoutes[entry.id] {
+                            RouteMapSnapshotThumbnail(route: route, height: 106)
+                        } else {
+                            RoundedRectangle(cornerRadius: 11)
+                                .fill(ATHLTHPlanDesign.selectedSurface)
+                                .overlay {
+                                    Image(systemName: "map")
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                }
+                                .frame(height: 106)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 11))
+
+                    Text(entry.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(String(format: "%.1f km", entry.distanceKilometers))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { markRecent(entry) })
+            HStack {
+                if let climb = entry.elevationGainMeters {
+                    Text("\(Int(climb.rounded())) hm")
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 0)
+                LibraryFavoriteButton(
+                    kind: .route,
+                    itemID: entry.id.uuidString,
+                    title: entry.title,
+                    subtitle: String(format: "%.1f km", entry.distanceKilometers),
+                    icon: "map.fill"
+                )
+            }
+        }
+        .padding(10)
+        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        .overlay {
+            RoundedRectangle(cornerRadius: 17)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.70), lineWidth: 0.8)
+        }
+        .task(id: entry.id) { await loadRouteDetail(entry.id) }
     }
 
     private func databasePremiumCard(_ entry: RouteLibraryEntry) -> some View {
