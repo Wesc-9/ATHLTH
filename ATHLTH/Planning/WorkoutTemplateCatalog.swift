@@ -1019,7 +1019,8 @@ struct WorkoutTemplateLibraryView: View {
     @State private var selectedExerciseName: String?
     @State private var showingExerciseFilter = false
     @State private var selectedDiscoverySort: DiscoverySort = .alphabetical
-    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
+    @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
 
     /// This cache is view-owned and never publishes changes on its own.
@@ -1714,63 +1715,11 @@ struct WorkoutTemplateLibraryView: View {
         ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
-                // Run library filters are enough context; keep hero cards elsewhere.
-                if initialCategory != .running {
-                LibraryPremiumIntro(
-                    eyebrow: initialCategory != nil
-                        ? "ATHLTH · PLAN" : "WORKOUT LIBRARY",
-                    title: initialCategory == .strength
-                        ? ATHLTHLocalization.choose(
-                            english: "Strength workouts", norwegian: "Styrkeøkter"
-                          )
-                        : initialCategory == .running
-                            ? ATHLTHLocalization.choose(
-                                english: "Running workouts", norwegian: "Løpeøkter"
-                              )
-                            : initialCategory?.title ?? "Complete workouts",
-                    subtitle: initialCategory == .strength
-                        ? ATHLTHLocalization.choose(
-                            english: "Choose muscle groups and preview the actual exercises before planning.",
-                            norwegian: "Velg muskelgrupper og se øvelsene før du planlegger."
-                          )
-                        : initialCategory == .running
-                            ? ATHLTHLocalization.choose(
-                                english: "Find intervals, easy runs or long runs. Filter and inspect each part.",
-                                norwegian: "Finn intervaller, rolige turer eller langtur. Filtrer og se alle øktdelene."
-                              )
-                            : initialCategory != nil
-                                ? ATHLTHLocalization.choose(
-                                    english: "Explore and adapt an existing workout.",
-                                    norwegian: "Finn og tilpass en eksisterende økt."
-                                  )
-                                : "A workout is the session you actually perform. It can combine running, exercises, rest, routes and targets in one structure.",
-                    icon: "rectangle.stack.fill",
-                    accent: ATHLTHPlanDesign.accentInk
-                ) {
-                    HStack(spacing: 8) {
-                        LibraryStatPill(
-                            value: "\(catalog.entries.count + builtInRunningTemplates.count)",
-                            label: "workouts",
-                            icon: "rectangle.stack.fill",
-                            tint: ATHLTHPlanDesign.accentInk
-                        )
-
-                        LibraryStatPill(
-                            value:
-                                "\(favorites.count(for: .workout))",
-                            label: "saved",
-                            icon: "star.fill",
-                            tint: ATHLTHTheme.premiumGold
-                        )
-                    }
-                }
-
-                }
-
                 HStack(spacing: 9) {
                     if initialCategory != .running {
                         Text(ATHLTHLocalization.choose(
-                            english: "View", norwegian: "Visning"
+                            english: "\(visibleEntries.count + visibleRunningTemplates.count) workouts",
+                            norwegian: "\(visibleEntries.count + visibleRunningTemplates.count) økter"
                         ))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -1793,7 +1742,10 @@ struct WorkoutTemplateLibraryView: View {
                         )
                     }
                     Spacer(minLength: 4)
-                    ATHLTHLibraryDisplayPicker(selection: $displayMode)
+                    ATHLTHLibraryDisplayPicker(
+                        selection: $displayMode,
+                        columns: $preferredColumns
+                    )
                 }
                 .frame(minHeight: 44)
 
@@ -2460,15 +2412,20 @@ struct WorkoutTemplateLibraryView: View {
             // Show the library immediately; workout-history disk reads can
             // follow after first layout rather than blocking the first frame.
             displayMode = .load(userID: session.profile.userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: session.profile.userID)
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
             libraryViewWidth = width
         }
         .onChange(of: session.profile.userID) { _, userID in
             displayMode = .load(userID: userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: userID)
         }
         .onChange(of: displayMode) { _, mode in
             mode.save(userID: session.profile.userID)
+        }
+        .onChange(of: preferredColumns) { _, value in
+            ATHLTHLibraryColumnPreference.save(value, userID: session.profile.userID)
         }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             // Account saves can emit several notifications during selection.
@@ -2757,7 +2714,8 @@ struct WorkoutTemplateLibraryView: View {
             width: libraryViewWidth,
             reservedHorizontalSpace: initialCategory == nil || initialCategory == .running ? 36 : 60,
             accessibilityText: dynamicTypeSize.isAccessibilitySize,
-            preferredMinimumCardWidth: 145
+            preferredMinimumCardWidth: preferredColumns == 3 ? 104 : 145,
+            preferredColumns: preferredColumns
         )
     }
 
