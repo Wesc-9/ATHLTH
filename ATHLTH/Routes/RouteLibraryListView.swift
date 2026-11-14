@@ -349,8 +349,8 @@ struct RouteLibraryListView: View {
                             mode: viewMode == .list || viewMode == .map ? .list : .grid,
                             width: libraryViewWidth,
                             accessibilityText: dynamicTypeSize.isAccessibilitySize,
-                            preferredColumns: preferredColumns,
-                            preferredMinimumCardWidth: 104
+                            preferredMinimumCardWidth: 104,
+                            preferredColumns: preferredColumns
                         ),
                         spacing: 10
                     ) {
@@ -413,11 +413,7 @@ struct RouteLibraryListView: View {
         }
         .refreshable { await loadCatalog() }
         .task(id: catalogKey) {
-            recents.refresh()
-            if sort == .nearest { locationStore.start() }
-            async let favoriteRefresh: Void = favorites.refresh()
-            await loadCatalog()
-            _ = await favoriteRefresh
+            await refreshCatalogOnAppear()
         }
         .onChange(of: sort) { _, value in
             if value == .nearest { locationStore.refresh() }
@@ -451,6 +447,14 @@ struct RouteLibraryListView: View {
         } message: {
             Text(watchError ?? watchMessage ?? "")
         }
+    }
+
+    private func refreshCatalogOnAppear() async {
+        recents.refresh()
+        if sort == .nearest { locationStore.start() }
+        async let favoriteRefresh: Void = favorites.refresh()
+        await loadCatalog()
+        _ = await favoriteRefresh
     }
 
     private var databaseHeader: some View {
