@@ -1538,24 +1538,29 @@ struct WorkoutTemplateLibraryView: View {
 
     /// First visible item for each letter, respecting active search and
     /// workout filters. IDs are the stable row IDs used by ScrollViewReader.
-    private var workoutAlphabetTargets: [String: UUID] {
+    private func workoutAlphabetTargets(
+        entries: [WorkoutTemplateCatalogEntry],
+        running: [RunningWorkoutTemplate],
+        saved: [PlannedSession],
+        scheduled: [PlannedSession]
+    ) -> [String: UUID] {
         var targets: [String: UUID] = [:]
         func register(_ title: String, id: UUID) {
             let letter = ATHLTHExerciseAlphabet.letter(for: title)
             if targets[letter] == nil { targets[letter] = id }
         }
         if onSelectPlanned != nil {
-            for workout in filteredScheduledWorkouts.prefix(50) {
+            for workout in scheduled.prefix(50) {
                 register(workout.title, id: workout.id)
             }
-            for workout in filteredSavedWorkouts {
+            for workout in saved {
                 register(workout.title, id: workout.id)
             }
         }
-        for entry in filteredEntries {
+        for entry in entries {
             register(entry.title, id: entry.id)
         }
-        for workout in filteredRunningTemplates {
+        for workout in running {
             register(workout.title, id: workout.id)
         }
         return targets
@@ -1569,6 +1574,14 @@ struct WorkoutTemplateLibraryView: View {
         let visibleRunningTemplates = filteredRunningTemplates
         let visibleSavedWorkouts = filteredSavedWorkouts
         let visibleScheduledWorkouts = filteredScheduledWorkouts
+        let alphabetTargets: [String: UUID] =
+            initialCategory != nil && initialCategory != .running
+            ? workoutAlphabetTargets(
+                entries: visibleEntries,
+                running: visibleRunningTemplates,
+                saved: visibleSavedWorkouts,
+                scheduled: visibleScheduledWorkouts
+            ) : [:]
         ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
@@ -2009,7 +2022,7 @@ struct WorkoutTemplateLibraryView: View {
                         if initialCategory != nil && displayMode == .list,
                            onSelectPlanned != nil {
                             ATHLTHWorkoutLibraryExpandableCard(
-                                workout: entry.plannedSession(),
+                                entry: entry,
                                 subtitle: entry.summary,
                                 expanded: expandedWorkoutCardID == "catalog-\(entry.id.uuidString)",
                                 onToggle: {
@@ -2182,8 +2195,8 @@ struct WorkoutTemplateLibraryView: View {
         }
         .overlay(alignment: .trailing) {
             if initialCategory != nil && initialCategory != .running &&
-                !workoutAlphabetTargets.isEmpty {
-                ATHLTHExerciseAlphabetIndex(targets: workoutAlphabetTargets) { target in
+                !alphabetTargets.isEmpty {
+                ATHLTHExerciseAlphabetIndex(targets: alphabetTargets) { target in
                     withAnimation(.easeInOut(duration: 0.22)) {
                         proxy.scrollTo(target, anchor: .top)
                     }
