@@ -105,6 +105,31 @@ final class ATHLTHLiveWorkoutAccessTests: XCTestCase {
         XCTAssertLessThanOrEqual(bounded.runningSteps?.count ?? 0, 24)
     }
 
+    func testInvalidSensorValuesCannotBreakPrivateSpectatorEncoding() throws {
+        var snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: UUID(), kind: "running", title: "Phone run",
+            startedAt: .now, elapsedSeconds: .infinity,
+            distanceMeters: .nan, currentStep: nil, nextStep: nil,
+            completedSets: nil, totalSets: nil
+        )
+        snapshot.currentPaceSecondsPerKilometer = .nan
+        snapshot.heartRateBPM = .infinity
+        snapshot.ghostTimeDeltaSeconds = -.infinity
+        snapshot.runningSteps = [
+            ATHLTHLiveWorkoutStage(
+                index: 0, title: "Interval", phase: "main",
+                durationSeconds: .nan, distanceMeters: nil
+            )
+        ]
+        let safe = ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(snapshot)
+        XCTAssertEqual(safe.elapsedSeconds, 0)
+        XCTAssertNil(safe.distanceMeters)
+        XCTAssertNil(safe.currentPaceSecondsPerKilometer)
+        XCTAssertNil(safe.heartRateBPM)
+        XCTAssertTrue(safe.runningSteps?.isEmpty == true)
+        XCTAssertNoThrow(try JSONEncoder().encode(safe))
+    }
+
     func testUnapprovedWorkoutHasNoPrivateRemoteSnapshot() {
         let state = ATHLTHCrossDeviceWorkoutStore()
         XCTAssertNil(state.remote)
