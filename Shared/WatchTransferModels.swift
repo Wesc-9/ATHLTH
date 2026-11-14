@@ -1735,6 +1735,10 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var routeComparisonID: UUID? = nil
     var routeTitle: String? = nil
 
+    // Exact calendar identity when the recording was started from the
+    // planned Watch Today / prepared card. Optional for older Watch builds.
+    var plannedCalendarSessionID: UUID? = nil
+
     // These fields are optional for legacy results. They are populated only
     // for structured sessions that actually reached their final step.
     var structuredWorkoutFullyCompleted: Bool? = nil
