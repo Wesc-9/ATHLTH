@@ -101,8 +101,28 @@ enum RouteMapSnapshotCache {
     // Coalesce identical thumbnails and limit simultaneous expensive
     // MapKit snapshots. Scroll cells can disappear without starting more
     // than two renders in parallel on the main actor.
-    private static var pending: [String: Task<UIImage?, Never>] = [:]
+    private struct PendingRender {
+        let token: UUID
+        let task: Task<UIImage?, Never>
+    }
+    private static var pending: [String: PendingRender] = [:]
     private static var activeRenders = 0
+    private static var scrollingOwners: Set<UUID> = []
+
+    static func setScrolling(_ scrolling: Bool, owner: UUID) {
+        if scrolling {
+            let wasIdle = scrollingOwners.isEmpty
+            scrollingOwners.insert(owner)
+            if wasIdle {
+                // MapKit snapshot tasks must not draw long routes on the
+                // main actor during an active scroll animation.
+                for render in pending.values { render.task.cancel() }
+                pending.removeAll()
+            }
+        } else {
+            scrollingOwners.remove(owner)
+        }
+    }
 
     private final class TraceBox: NSObject {
         let points: [CGPoint]
@@ -152,12 +172,16 @@ enum RouteMapSnapshotCache {
         requestID: String
     ) async -> UIImage? {
         if let cached = cachedImage(requestID: requestID) { return cached }
-        if let running = pending[requestID] { return await running.value }
+        guard scrollingOwners.isEmpty else { return nil }
+        if let running = pending[requestID] { return await running.task.value }
 
+        let token = UUID()
         let task = Task { await render(route: route, size: size, requestID: requestID) }
-        pending[requestID] = task
+        pending[requestID] = PendingRender(token: token, task: task)
         let result = await task.value
-        pending.removeValue(forKey: requestID)
+        if pending[requestID]?.token == token {
+            pending.removeValue(forKey: requestID)
+        }
         return result
     }
 
@@ -169,10 +193,10 @@ enum RouteMapSnapshotCache {
         // Avoid several MapKit instances allocating and compositing images
         // during a single scroll frame. Awaiting yields instead of blocking.
         while activeRenders >= 2 {
-            if Task.isCancelled { return nil }
+            if Task.isCancelled || !scrollingOwners.isEmpty { return nil }
             try? await Task.sleep(nanoseconds: 70_000_000)
         }
-        guard !Task.isCancelled else { return nil }
+        guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
         activeRenders += 1
         defer { activeRenders -= 1 }
 
@@ -194,7 +218,7 @@ enum RouteMapSnapshotCache {
 
         do {
             let snapshot = try await MKMapSnapshotter(options: options).start()
-            guard !Task.isCancelled else { return nil }
+            guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
             let rendered = drawRoute(coordinates, on: snapshot, size: size)
             if requestedGeneration == generation {
                 images.setObject(
