@@ -3532,7 +3532,8 @@ struct MyWorkoutTemplatesView: View {
 
     @State private var showingRunningBuilder = false
     @State private var showingHybridBuilder = false
-    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
+    @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
     @State private var query = ""
     @State private var searchExpanded = false
@@ -3557,7 +3558,8 @@ struct MyWorkoutTemplatesView: View {
             mode: displayMode,
             width: libraryViewWidth,
             reservedHorizontalSpace: 36,
-            accessibilityText: dynamicTypeSize.isAccessibilitySize
+            accessibilityText: dynamicTypeSize.isAccessibilitySize,
+            preferredColumns: preferredColumns
         )
     }
 
@@ -3577,7 +3579,10 @@ struct MyWorkoutTemplatesView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel(ATHLTHLocalization.choose(
                         english: "Search workouts", norwegian: "Søk i økter"))
-                    ATHLTHLibraryDisplayPicker(selection: $displayMode)
+                    ATHLTHLibraryDisplayPicker(
+                        selection: $displayMode,
+                        columns: $preferredColumns
+                    )
                 }
                 HStack(spacing: 10) {
                     Button { favoritesOnly.toggle() } label: {
@@ -3768,6 +3773,7 @@ struct MyWorkoutTemplatesView: View {
         .onAppear {
             refreshHistory()
             displayMode = .load(userID: session.profile.userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: session.profile.userID)
             Task { await favorites.refresh() }
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
@@ -3775,9 +3781,13 @@ struct MyWorkoutTemplatesView: View {
         }
         .onChange(of: session.profile.userID) { _, id in
             displayMode = .load(userID: id)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: id)
         }
         .onChange(of: displayMode) { _, mode in
             mode.save(userID: session.profile.userID)
+        }
+        .onChange(of: preferredColumns) { _, value in
+            ATHLTHLibraryColumnPreference.save(value, userID: session.profile.userID)
         }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             refreshHistory()
