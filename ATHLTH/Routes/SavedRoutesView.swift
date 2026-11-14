@@ -91,6 +91,7 @@ struct SavedRoutesView: View {
     @State private var watchError: String?
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
+    @State private var routeCardsScrolling = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(selectionTitle: String? = nil, onSelect: ((TrainingRoute) -> Void)? = nil) {
@@ -286,6 +287,9 @@ struct SavedRoutesView: View {
             .padding(.top, 14)
             .padding(.bottom, 80)
             .frame(maxWidth: .infinity)
+        }
+        .onScrollPhaseChange { _, phase in
+            routeCardsScrolling = phase.isScrolling
         }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top < -28
@@ -676,7 +680,11 @@ struct SavedRoutesView: View {
                 RouteDetailView(route: route)
             } label: {
                 VStack(alignment: .leading, spacing: 7) {
-                    RouteMapSnapshotThumbnail(route: route, height: 106)
+                    RouteMapSnapshotThumbnail(
+                        route: route,
+                        height: 106,
+                        allowsLiveSnapshot: !routeCardsScrolling
+                    )
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 11))
                     Text(route.title)
