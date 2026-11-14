@@ -19,32 +19,16 @@ struct ATHLTHWorkoutGridDetails: View {
         self.estimatedMinutes = entry.estimatedDurationMinutes
     }
 
-    private var preview: (titles: [String], remaining: Int) {
-        if let catalogBlocks {
-            return ATHLTHWorkoutLibraryExerciseIndex.preview(blocks: catalogBlocks)
-        }
-        if let workout {
-            return ATHLTHWorkoutLibraryExerciseIndex.preview(for: workout)
-        }
-        return ([], 0)
-    }
-
-    private var durationMinutes: Int? {
-        if let estimatedMinutes { return estimatedMinutes }
-        if let workout {
-            return workout.durationMinutes ??
-                ATHLTHWorkoutDurationEstimator.previewMinutes(
-                    for: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-                )
-        }
-        if let catalogBlocks {
-            return ATHLTHWorkoutDurationEstimator.previewMinutes(for: catalogBlocks)
-        }
-        return nil
-    }
-
     var body: some View {
-        let summary = preview
+        // Use the same one-time block projection for exercise names and
+        // duration. Catalog rows use their source blocks directly.
+        let resolvedBlocks = catalogBlocks ??
+            workout.map { ATHLTHUnifiedWorkout.editorBlocks(from: $0) } ?? []
+        let summary = ATHLTHWorkoutLibraryExerciseIndex.preview(
+            blocks: resolvedBlocks
+        )
+        let durationMinutes = estimatedMinutes ?? workout?.durationMinutes ??
+            ATHLTHWorkoutDurationEstimator.previewMinutes(for: resolvedBlocks)
         VStack(alignment: .leading, spacing: 4) {
             ForEach(summary.titles, id: \.self) { title in
                 Text(title)
