@@ -816,31 +816,48 @@ struct RouteLibraryListView: View {
 
     /// Compact image-first route tile for 2/3-column iPhone grids and
     /// wider iPad collections. Full metrics and actions remain in Details.
+    private func catalogSourceTitle(_ entry: RouteLibraryEntry) -> String {
+        if entry.isFriendsOnly {
+            return tr("Mutual friend", "Gjensidig venn")
+        }
+        if entry.isPublicTrail {
+            return tr("Public trail", "Offentlig turrute")
+        }
+        return tr("Public route", "Offentlig rute")
+    }
+
+    private func catalogSourceSymbol(_ entry: RouteLibraryEntry) -> String {
+        if entry.isFriendsOnly { return "person.2.fill" }
+        return entry.isPublicTrail ? "figure.hiking" : "point.topleft.down.to.point.bottomright.curvepath"
+    }
+
+    /// Fast, metadata-only route tile. No GPS, MapKit or network work can be
+    /// triggered when hundreds of catalogue items scroll past the viewport.
     private func databaseCompactTile(_ entry: RouteLibraryEntry) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             NavigationLink {
-                RouteLibraryDetailLoader(routeID: entry.id)
+                RouteLibraryDetailLoader(
+                    routeID: entry.id,
+                    sourceType: entry.sourceType ?? "community"
+                )
             } label: {
                 VStack(alignment: .leading, spacing: 7) {
-                    Group {
-                        if let route = hydratedRoutes[entry.id] {
-                            RouteMapSnapshotThumbnail(
-                                route: route,
-                                height: 106,
-                                allowsLiveSnapshot: !routeCardsScrolling
-                            )
-                        } else {
-                            RoundedRectangle(cornerRadius: 11)
-                                .fill(ATHLTHPlanDesign.selectedSurface)
-                                .overlay {
-                                    Image(systemName: "map")
-                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                }
-                                .frame(height: 106)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 11)
+                            .fill(ATHLTHPlanDesign.selectedSurface)
+                        VStack(spacing: 7) {
+                            Image(systemName: catalogSourceSymbol(entry))
+                                .font(.system(size: 25, weight: .medium))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            Text(catalogSourceTitle(entry))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
+                        .padding(7)
                     }
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 11))
+                    .frame(height: 100)
 
                     Text(entry.title)
                         .font(.subheadline.weight(.semibold))
@@ -854,6 +871,7 @@ struct RouteLibraryListView: View {
             }
             .buttonStyle(.plain)
             .simultaneousGesture(TapGesture().onEnded { markRecent(entry) })
+
             HStack {
                 if let climb = entry.elevationGainMeters {
                     Text("\(Int(climb.rounded())) hm")
@@ -875,10 +893,6 @@ struct RouteLibraryListView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 17)
                 .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.70), lineWidth: 0.8)
-        }
-        .task(id: entry.id.uuidString + (routeCardsScrolling ? "|scroll" : "|idle")) {
-            guard !routeCardsScrolling else { return }
-            await loadRouteDetail(entry.id)
         }
     }
 
@@ -927,7 +941,10 @@ struct RouteLibraryListView: View {
 
             HStack(alignment: .top, spacing: 10) {
                 NavigationLink {
-                    RouteLibraryDetailLoader(routeID: entry.id)
+                    RouteLibraryDetailLoader(
+                        routeID: entry.id,
+                        sourceType: entry.sourceType ?? "community"
+                    )
                 } label: {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(entry.title)
@@ -1017,7 +1034,10 @@ struct RouteLibraryListView: View {
 
             HStack(spacing: 12) {
                 NavigationLink {
-                    RouteLibraryDetailLoader(routeID: entry.id)
+                    RouteLibraryDetailLoader(
+                        routeID: entry.id,
+                        sourceType: entry.sourceType ?? "community"
+                    )
                 } label: {
                     Label(tr("Details", "Detaljer"), systemImage: "arrow.up.right")
                         .font(.subheadline.weight(.semibold))
@@ -1059,20 +1079,18 @@ struct RouteLibraryListView: View {
     private func databaseCompactRow(_ entry: RouteLibraryEntry) -> some View {
         HStack(spacing: 10) {
             NavigationLink {
-                RouteLibraryDetailLoader(routeID: entry.id)
+                RouteLibraryDetailLoader(
+                    routeID: entry.id,
+                    sourceType: entry.sourceType ?? "community"
+                )
             } label: {
                 HStack(spacing: 10) {
-                    if let route = hydratedRoutes[entry.id] {
-                        RouteMapSnapshotThumbnail(route: route, height: 80)
-                            .frame(width: 100, height: 80)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        Image(systemName: "map")
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            .frame(width: 100, height: 80)
-                            .background(ATHLTHPlanDesign.selectedSurface,
-                                        in: RoundedRectangle(cornerRadius: 12))
-                    }
+                    Image(systemName: catalogSourceSymbol(entry))
+                        .font(.system(size: 23, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 68, height: 68)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(entry.title)
                             .font(.subheadline.weight(.semibold))
@@ -1081,12 +1099,10 @@ struct RouteLibraryListView: View {
                         Text(String(format: "%.1f km", entry.distanceKilometers))
                             .font(.caption.weight(.medium))
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        if let start = entry.startName, !start.isEmpty {
-                            Text(start)
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .lineLimit(1)
-                        }
+                        Text(catalogSourceTitle(entry))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .lineLimit(1)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
@@ -1579,7 +1595,8 @@ struct RouteLibraryListView: View {
         HStack(spacing: 8) {
             NavigationLink {
                 RouteLibraryDetailLoader(
-                    routeID: entry.id
+                    routeID: entry.id,
+                    sourceType: entry.sourceType ?? "community"
                 )
             } label: {
                 VStack(
