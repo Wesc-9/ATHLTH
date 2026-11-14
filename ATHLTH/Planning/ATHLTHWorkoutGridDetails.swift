@@ -3,11 +3,48 @@ import SwiftUI
 /// Compact grid footer: actual main-part exercises first, then a short
 /// overflow count. Existing list cards can keep their full expandable recipe.
 struct ATHLTHWorkoutGridDetails: View {
-    let workout: PlannedSession
+    let workout: PlannedSession?
+    let catalogBlocks: [WorkoutTemplateBlock]?
     var estimatedMinutes: Int?
 
+    init(workout: PlannedSession, estimatedMinutes: Int? = nil) {
+        self.workout = workout
+        self.catalogBlocks = nil
+        self.estimatedMinutes = estimatedMinutes
+    }
+
+    init(entry: WorkoutTemplateCatalogEntry) {
+        self.workout = nil
+        self.catalogBlocks = entry.blocks
+        self.estimatedMinutes = entry.estimatedDurationMinutes
+    }
+
+    private var preview: (titles: [String], remaining: Int) {
+        if let catalogBlocks {
+            return ATHLTHWorkoutLibraryExerciseIndex.preview(blocks: catalogBlocks)
+        }
+        if let workout {
+            return ATHLTHWorkoutLibraryExerciseIndex.preview(for: workout)
+        }
+        return ([], 0)
+    }
+
+    private var durationMinutes: Int? {
+        if let estimatedMinutes { return estimatedMinutes }
+        if let workout {
+            return workout.durationMinutes ??
+                ATHLTHWorkoutDurationEstimator.previewMinutes(
+                    for: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+                )
+        }
+        if let catalogBlocks {
+            return ATHLTHWorkoutDurationEstimator.previewMinutes(for: catalogBlocks)
+        }
+        return nil
+    }
+
     var body: some View {
-        let summary = ATHLTHWorkoutLibraryExerciseIndex.preview(for: workout)
+        let summary = preview
         VStack(alignment: .leading, spacing: 4) {
             ForEach(summary.titles, id: \.self) { title in
                 Text(title)
@@ -23,11 +60,7 @@ struct ATHLTHWorkoutGridDetails: View {
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
             }
-            if let minutes = estimatedMinutes ?? workout.durationMinutes ??
-                ATHLTHWorkoutDurationEstimator.previewMinutes(
-                    for: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-                ),
-               minutes > 0 {
+            if let minutes = durationMinutes, minutes > 0 {
                 Label("~\(minutes) min", systemImage: "clock")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
