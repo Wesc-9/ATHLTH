@@ -2452,6 +2452,7 @@ struct TrainingPlanCatalogDetailView: View {
     // One session is open by default so users see actual exercises and
     // targets immediately, without rendering every session for 16 weeks.
     @State private var expandedSessionKeys: Set<String> = ["1:0"]
+    @State private var inspectedPlanStep: WorkoutTemplateBlock?
 
     var body: some View {
         ScrollView {
@@ -2727,6 +2728,36 @@ struct TrainingPlanCatalogDetailView: View {
                 createEditableCopy: createEditableCopy
             )
         }
+        .sheet(item: $inspectedPlanStep) { step in
+            NavigationStack {
+                ScrollView {
+                    ATHLTHWorkoutStepDetails(
+                        block: ATHLTHWorkoutStructuredDataMigration.normalize(step),
+                        displayTitle: step.title,
+                        maximumHeartRateBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
+                            configured: session.onboardingProfile?.maximumHeartRateBPM,
+                            dateOfBirth: session.onboardingProfile?.dateOfBirth,
+                            usesFemaleEstimate: session.onboardingProfile?.healthSex == .female
+                        ),
+                        suggestion: nil
+                    )
+                }
+                .background(ATHLTHPlanDesign.warmCanvas)
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Workout step", norwegian: "Øktdel"
+                ))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Close", norwegian: "Lukk"
+                        )) {
+                            inspectedPlanStep = nil
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -2860,16 +2891,36 @@ struct TrainingPlanCatalogDetailView: View {
 
             if let zonedWeek,
                let zonedPlan = ATHLTHZonedPlanLibrary.plan(for: entry.slug) {
-                HStack(spacing: 9) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 125), spacing: 8)],
+                    alignment: .leading,
+                    spacing: 8
+                ) {
                     if let km = zonedWeek.targetKm {
-                        Label("\(km.formatted()) km", systemImage: "figure.run")
+                        planTargetCell(
+                            ATHLTHLocalization.choose(english: "Weekly km", norwegian: "Ukesdistanse"),
+                            "\(km.formatted()) km"
+                        )
+                    }
+                    if let km = zonedWeek.targetLongRunKm {
+                        planTargetCell(
+                            ATHLTHLocalization.choose(english: "Long run", norwegian: "Langtur"),
+                            "\(km.formatted()) km"
+                        )
                     }
                     if let load = zonedWeek.weeklyLoadScore {
-                        Label("Zoned load \(load.formatted())", systemImage: "waveform.path.ecg")
+                        planTargetCell(
+                            ATHLTHLocalization.choose(english: "Load", norwegian: "Belastning"),
+                            load.formatted()
+                        )
+                    }
+                    if let volume = zonedWeek.volumePercent {
+                        planTargetCell(
+                            ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum"),
+                            "\(volume.formatted()) %"
+                        )
                     }
                 }
-                .font(.caption2)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
                 ForEach(
                     Array(ATHLTHZonedPlanLibrary.orderedRequiredSessions(in: zonedWeek).enumerated()),
@@ -3011,7 +3062,7 @@ struct TrainingPlanCatalogDetailView: View {
 
     @ViewBuilder
     private func previewSessionSteps(_ workout: PlannedSession) -> some View {
-        let blocks = (workout.workoutBlocks ?? []).filter { $0.kind != .note }
+        let blocks = workout.resolvedWorkoutBlocks.filter { $0.kind != .note }
         VStack(alignment: .leading, spacing: 0) {
             if blocks.isEmpty {
                 Text(ATHLTHLocalization.choose(
@@ -3030,38 +3081,109 @@ struct TrainingPlanCatalogDetailView: View {
     }
 
     private func previewWorkoutBlock(_ block: WorkoutTemplateBlock) -> some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: block.kind.systemImage)
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                .frame(width: 19)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(block.title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let target = block.targetText {
-                    Text(target)
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        Button {
+            inspectedPlanStep = block
+        } label: {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: block.kind.systemImage)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 19)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(block.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)
+                    previewBlockTargets(block)
                 }
-                if block.kind == .exercise,
-                   let rest = block.restBetweenSetsSeconds, rest > 0 {
-                    Text(ATHLTHLocalization.format(
-                        english: "%d sec rest between sets",
-                        norwegian: "%d sek pause mellom sett",
-                        Int(rest)
-                    ))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
+                Spacer(minLength: 2)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
             }
-            Spacer(minLength: 2)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 6)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 6)
+        .buttonStyle(.plain)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Open all structured step targets",
+            norwegian: "Åpne alle egne datafelt for øktdelen"
+        ))
+    }
+
+    @ViewBuilder
+    private func previewBlockTargets(_ block: WorkoutTemplateBlock) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 100), spacing: 6)],
+            alignment: .leading,
+            spacing: 6
+        ) {
+            if let zone = ATHLTHWorkoutStepTargetSummary.zoneLabel(for: block) {
+                planTargetCell(
+                    ATHLTHLocalization.choose(english: "HR zone", norwegian: "Pulssone"),
+                    zone
+                )
+            }
+            if let seconds = block.durationSeconds, seconds > 0 {
+                planTargetCell(
+                    ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"),
+                    ATHLTHWorkoutStepCopy.duration(seconds)
+                )
+            }
+            if let distance = block.distanceMeters, distance > 0 {
+                planTargetCell(
+                    ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
+                    distance >= 1_000
+                        ? String(format: "%.2f km", distance / 1_000)
+                        : "\(Int(distance.rounded())) m"
+                )
+            }
+            if let reps = block.repetitions, reps > 0 {
+                let label = block.targetRepetitionsMaximum.map {
+                    $0 > reps ? "\(reps)–\($0)" : "\(reps)"
+                } ?? "\(reps)"
+                planTargetCell(
+                    ATHLTHLocalization.choose(english: "Reps", norwegian: "Reps"),
+                    label
+                )
+            }
+            if let sets = block.setCount, sets > 0 {
+                planTargetCell(
+                    ATHLTHLocalization.choose(english: "Sets", norwegian: "Sett"),
+                    "\(sets)"
+                )
+            }
+            if let rest = block.restBetweenSetsSeconds, rest > 0 {
+                planTargetCell(
+                    ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"),
+                    ATHLTHWorkoutStepCopy.duration(rest)
+                )
+            }
+            if let rir = block.targetRepsInReserve {
+                planTargetCell("RIR", "\(rir)")
+            }
+        }
+    }
+
+    private func planTargetCell(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(1)
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(
+            ATHLTHPlanDesign.selectedSurface.opacity(0.65),
+            in: RoundedRectangle(cornerRadius: 9)
+        )
     }
 
     private func detailMetric(
