@@ -821,6 +821,29 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
     private let client: SupabaseClient
     private var loadedRemote = false
     private var lastRemoteRefreshAttemptAt: Date?
+    /// Normalize a recipe only for its first non-empty search. Reuse that
+    /// immutable index while typing; invalidate when published rows refresh.
+    private var searchIndex: [UUID: ATHLTHWorkoutSearch.Index] = [:]
+
+    func matchesSearch(
+        _ entry: WorkoutTemplateCatalogEntry, normalizedNeedle: String
+    ) -> Bool {
+        guard !normalizedNeedle.isEmpty else { return true }
+        let indexed: ATHLTHWorkoutSearch.Index
+        if let cached = searchIndex[entry.id] {
+            indexed = cached
+        } else {
+            let created = ATHLTHWorkoutSearch.makeIndex(texts: [
+                entry.title, entry.summary, entry.categoryTitle,
+                entry.tags.joined(separator: " ")
+            ])
+            searchIndex[entry.id] = created
+            indexed = created
+        }
+        return ATHLTHWorkoutSearch.matches(
+            normalizedNeedle: normalizedNeedle, index: indexed
+        )
+    }
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -864,6 +887,7 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
             let publishedSlugs = Set(remote.map(\.slug))
             let localOnly = offlineEntries
                 .filter { !publishedSlugs.contains($0.slug) }
+            searchIndex.removeAll(keepingCapacity: true)
             entries = (remote + localOnly).sorted {
                 $0.sortOrder == $1.sortOrder
                     ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
@@ -895,23 +919,41 @@ enum ATHLTHWorkoutSearch {
             .filter { !$0.isEmpty }.joined(separator: " ")
     }
 
-    static func matches(_ query: String, texts: [String]) -> Bool {
-        let needle = normalized(query)
-        guard !needle.isEmpty else { return true }
-        var candidates = texts
-        if texts.contains(where: { normalized($0).contains("4x4") }) {
-            candidates += [
+    struct Index: Sendable {
+        let texts: [String]
+        let compactTexts: [String]
+    }
+
+    static func makeIndex(texts: [String]) -> Index {
+        var normalizedTexts = texts.map(normalized)
+        if normalizedTexts.contains(where: { $0.contains("4x4") }) {
+            normalizedTexts += [
                 "4x4 intervals", "4x4 interval run", "4x4 intervaller",
                 "norwegian 4x4", "norwegian 4x4 intervals",
                 "4x4 training", "4x4 running"
             ]
         }
-        return candidates.contains {
-            let haystack = normalized($0)
-            return haystack.contains(needle) ||
-                haystack.replacingOccurrences(of: " ", with: "")
-                    .contains(needle.replacingOccurrences(of: " ", with: ""))
+        return Index(
+            texts: normalizedTexts,
+            compactTexts: normalizedTexts.map {
+                $0.replacingOccurrences(of: " ", with: "")
+            }
+        )
+    }
+
+    static func matches(normalizedNeedle: String, index: Index) -> Bool {
+        guard !normalizedNeedle.isEmpty else { return true }
+        if index.texts.contains(where: { $0.contains(normalizedNeedle) }) {
+            return true
         }
+        let compact = normalizedNeedle.replacingOccurrences(of: " ", with: "")
+        return index.compactTexts.contains { $0.contains(compact) }
+    }
+
+    static func matches(_ query: String, texts: [String]) -> Bool {
+        let needle = normalized(query)
+        guard !needle.isEmpty else { return true }
+        return matches(normalizedNeedle: needle, index: makeIndex(texts: texts))
     }
 }
 
