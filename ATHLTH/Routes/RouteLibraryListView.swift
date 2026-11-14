@@ -1766,6 +1766,7 @@ struct RouteLibraryListView: View {
 
 struct RouteLibraryDetailLoader: View {
     let routeID: UUID
+    var sourceType: String = "community"
     @State private var route: TrainingRoute?
     @State private var errorMessage: String?
 
@@ -1785,18 +1786,37 @@ struct RouteLibraryDetailLoader: View {
                 ProgressView("Loading route…")
             }
         }
-        .task(id: routeID) { await load() }
+        .task(id: routeID.uuidString + "|" + sourceType) { await load() }
     }
 
     @MainActor
     private func load() async {
         errorMessage = nil
+        route = nil
         do {
-            let record: CommunityRouteRecord = try await SupabaseEnvironment.client
-                .from("community_routes").select()
-                .eq("id", value: routeID).single().execute().value
-            try Task.checkCancellation()
-            route = record.trainingRoute
+            if sourceType == "public_trail" {
+                // Public trails have their own canonical table, source
+                // attribution and immutable GPS geometry.
+                let record = try await SupabasePublicTrailDiscoveryService()
+                    .fetch(id: routeID)
+                try Task.checkCancellation()
+                if let record {
+                    route = record.trainingRoute
+                } else {
+                    errorMessage = ATHLTHLocalization.choose(
+                        english: "This trail is no longer available.",
+                        norwegian: "Denne turruten er ikke lenger tilgjengelig."
+                    )
+                }
+            } else {
+                // PostgreSQL RLS is rechecked at the time of opening, so
+                // revoking a mutual follow immediately revokes friends access.
+                let record: CommunityRouteRecord = try await SupabaseEnvironment.client
+                    .from("community_routes").select()
+                    .eq("id", value: routeID).single().execute().value
+                try Task.checkCancellation()
+                route = record.trainingRoute
+            }
         } catch {
             if !Task.isCancelled { errorMessage = error.localizedDescription }
         }
