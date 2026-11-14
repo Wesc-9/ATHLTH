@@ -106,8 +106,7 @@ struct ATHLTHiPadLibraryWorkspaceView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            heading
-            categoryNavigation
+            compactNavigation
             Rectangle()
                 .fill(ATHLTHStudioStyle.outline.opacity(0.55))
                 .frame(height: 1)
@@ -126,66 +125,56 @@ struct ATHLTHiPadLibraryWorkspaceView: View {
         .accessibilityIdentifier("athlth-ipad-library-workspace")
     }
 
-    private var heading: some View {
-        HStack(alignment: .center, spacing: 14) {
+    /// One compact library switcher instead of a back header followed by a
+    /// second full-width category header. Keeps iPad content above the fold.
+    private var compactNavigation: some View {
+        HStack(spacing: 12) {
             Button(action: onBack) {
                 Label(
-                    ATHLTHLocalization.choose(
-                        english: "Back to Studio", norwegian: "Tilbake til Studio"
-                    ),
+                    ATHLTHLocalization.choose(english: "Studio", norwegian: "Studio"),
                     systemImage: "chevron.left"
                 )
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(ink)
                 .frame(minHeight: 44)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("athlth-ipad-library-back")
 
-            Spacer(minLength: 8)
+            Rectangle()
+                .fill(ATHLTHStudioStyle.outline.opacity(0.7))
+                .frame(width: 1, height: 27)
 
-            Text("ATHLTH LIBRARY")
-                .font(.caption2.weight(.semibold))
-                .tracking(2.1)
-                .foregroundStyle(gold)
-        }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 9)
-    }
-
-    private var categoryNavigation: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 9) {
-                ForEach(ATHLTHStudioLibraryPage.allCases) { destination in
-                    Button {
-                        guard destination != page else { return }
-                        onSelect(destination)
-                    } label: {
-                        Label(destination.title, systemImage: destination.symbol)
-                            .font(.subheadline.weight(
-                                destination == page ? .semibold : .medium
-                            ))
-                            .lineLimit(1)
-                            .foregroundStyle(destination == page ? .white : ink)
-                            .padding(.horizontal, 15)
-                            .frame(minHeight: 43)
-                            .background(
-                                destination == page ? ink : Color.white.opacity(0.88),
-                                in: Capsule()
-                            )
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(ATHLTHStudioLibraryPage.allCases) { destination in
+                        Button {
+                            if destination != page { onSelect(destination) }
+                        } label: {
+                            Label(destination.title, systemImage: destination.symbol)
+                                .font(.caption.weight(
+                                    destination == page ? .semibold : .medium
+                                ))
+                                .lineLimit(1)
+                                .foregroundStyle(destination == page ? Color.white : ink)
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 39)
+                                .background(
+                                    destination == page ? ink : Color.white.opacity(0.88),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(destination == page ? [.isSelected] : [])
+                        .accessibilityIdentifier(
+                            "athlth-ipad-library-nav-\(destination.rawValue)"
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(
-                        destination == page ? .isSelected : []
-                    )
-                    .accessibilityIdentifier(
-                        "athlth-ipad-library-nav-\(destination.rawValue)"
-                    )
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 12)
         }
+        .padding(.horizontal, 17)
+        .padding(.vertical, 7)
     }
 
     private var categoryCards: some View {
