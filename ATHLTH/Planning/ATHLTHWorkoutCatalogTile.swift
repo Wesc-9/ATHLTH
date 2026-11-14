@@ -4,11 +4,23 @@ import SwiftUI
 /// preview and selection changes no longer compile into the tile body.
 /// The source recipe remains immutable; personal workout creation happens
 /// only when the user selects a workout.
-struct ATHLTHWorkoutCatalogTile: View {
+struct ATHLTHWorkoutCatalogTile: View, Equatable {
     let entry: WorkoutTemplateCatalogEntry
+    /// Incremented on published catalog refresh to invalidate row content.
+    let catalogRevision: Int
     let compact: Bool
     let includePreview: Bool
     let history: ATHLTHLibraryWorkoutHistory.Summary?
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        // Avoid deep comparison of hundreds of workout blocks on every
+        // unrelated state update. The catalog store owns contentRevision.
+        lhs.entry.id == rhs.entry.id &&
+            lhs.catalogRevision == rhs.catalogRevision &&
+            lhs.compact == rhs.compact &&
+            lhs.includePreview == rhs.includePreview &&
+            lhs.history == rhs.history
+    }
 
     var body: some View {
         if compact {
