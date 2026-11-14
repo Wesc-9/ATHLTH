@@ -333,6 +333,7 @@ final class PublicTrailDiscoveryStore:
 
     private let service:
         SupabasePublicTrailDiscoveryService
+    private let diskCache = ATHLTHPublicTrailDiskCache.shared
 
     private var lastRefreshAt: Date?
     private var lastCenter: CLLocation?
@@ -363,6 +364,15 @@ final class PublicTrailDiscoveryStore:
         location.coordinate.longitude.isFinite
         else {
             return
+        }
+
+        // The previous city's public routes are never used as a cache hit.
+        // A saved snapshot is shown before a new network request completes.
+        if trails.isEmpty {
+            await restoreCached(
+                near: location,
+                radiusKilometers: min(max(radiusKilometers, 3), 20)
+            )
         }
 
         if !force,
@@ -456,6 +466,10 @@ final class PublicTrailDiscoveryStore:
                 response.isRefreshing &&
                 response.trails.isEmpty
             errorMessage = nil
+            rememberCurrentTrails(
+                near: location,
+                radiusKilometers: min(max(radiusKilometers, 3), 20)
+            )
         } catch is CancellationError {
             return
         } catch {
@@ -493,6 +507,9 @@ final class PublicTrailDiscoveryStore:
         if radius <= 19 {
             await refresh(near: center, radiusKilometers: max(3, radius + 1), force: force)
             return
+        }
+        if trails.isEmpty {
+            await restoreCached(near: center, radiusKilometers: radius)
         }
         // A Home request can still be finishing as Explore opens. Wait
         // for it, then fetch the *selected viewport* instead of dropping
@@ -583,6 +600,7 @@ final class PublicTrailDiscoveryStore:
         lastRefreshAt = Date()
         lastCenter = center
         isWarmingCache = trails.isEmpty && responses.contains(where: { $0.isRefreshing })
+        rememberCurrentTrails(near: center, radiusKilometers: radius)
     }
 
     func similar(
@@ -637,6 +655,50 @@ final class PublicTrailDiscoveryStore:
             return nil
         } catch {
             return nil
+        }
+    }
+
+    // Cache only public sources; account-specific shared/saved routes are not
+    // included. Disk operations are serialized off the main actor.
+    private func restoreCached(
+        near location: CLLocation,
+        radiusKilometers: Double
+    ) async {
+        guard trails.isEmpty else { return }
+        let cached = await diskCache.cached(
+            latitude: location.coordinate.latitude,
+            longitude: location.coordinate.longitude,
+            radiusKilometers: radiusKilometers
+        )
+        guard !Task.isCancelled, let cached,
+              let decoded = try? JSONDecoder().decode(
+                [PublicTrailRecord].self, from: cached.payload
+              ) else { return }
+        let usable = PublicTrailDeduplicator.unique(decoded.filter(\.isUsable))
+        guard !usable.isEmpty, trails.isEmpty else { return }
+        trails = usable
+        attribution = cached.attribution
+        lastCenter = location
+        lastRefreshAt = cached.savedAt
+    }
+
+    private func rememberCurrentTrails(
+        near location: CLLocation,
+        radiusKilometers: Double
+    ) {
+        guard !trails.isEmpty,
+              let payload = try? JSONEncoder().encode(trails) else { return }
+        let credit = attribution
+        let latitude = location.coordinate.latitude
+        let longitude = location.coordinate.longitude
+        Task(priority: .utility) {
+            await diskCache.store(
+                payload: payload,
+                attribution: credit,
+                latitude: latitude,
+                longitude: longitude,
+                radiusKilometers: radiusKilometers
+            )
         }
     }
 
