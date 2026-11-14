@@ -55,6 +55,60 @@ enum ATHLTHScratchComposerPresentationPolicy {
 /// checkpoint. Delete them as ONE account-scoped draft so Home cannot offer
 /// "Continue draft" after the athlete explicitly chose Delete.
 enum ATHLTHStandaloneWorkoutDraftStore {
+    // Navigation is deliberately separate from the workout recipe. The last
+    // visible card is restored automatically only for an *active* Home
+    // composer; an ordinary new visit still offers explicit draft selection.
+    enum NavigationStage: String, Codable {
+        case source
+        case scratchTypePicker
+        case scratchBuilder
+        case savedWorkoutPicker
+        case recoveryRestPlanner
+        case legacyEditor
+    }
+
+    private struct NavigationSnapshot: Codable {
+        let stage: NavigationStage
+        let savedAt: Date
+    }
+
+    private static func navigationKey(for userID: UUID) -> String {
+        "athlth.sessionEditor.navigation.v1.\(userID.uuidString)"
+    }
+
+    static func navigationStage(
+        for userID: UUID,
+        defaults: UserDefaults = .standard,
+        now: Date = Date()
+    ) -> NavigationStage? {
+        guard let data = defaults.data(forKey: navigationKey(for: userID)),
+              let snapshot = try? JSONDecoder().decode(
+                NavigationSnapshot.self, from: data
+              ),
+              snapshot.savedAt <= now.addingTimeInterval(300),
+              now.timeIntervalSince(snapshot.savedAt) < 14 * 86_400
+        else { return nil }
+        return snapshot.stage
+    }
+
+    static func setNavigationStage(
+        _ stage: NavigationStage,
+        for userID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        let snapshot = NavigationSnapshot(stage: stage, savedAt: Date())
+        if let data = try? JSONEncoder().encode(snapshot) {
+            defaults.set(data, forKey: navigationKey(for: userID))
+        }
+    }
+
+    static func clearNavigationStage(
+        for userID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.removeObject(forKey: navigationKey(for: userID))
+    }
+
     private struct ScratchReference: Decodable {
         let id: UUID
     }
