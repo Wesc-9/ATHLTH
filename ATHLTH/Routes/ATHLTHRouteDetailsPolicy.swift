@@ -28,7 +28,7 @@ enum ATHLTHRouteSurface: String, CaseIterable, Identifiable {
 }
 
 enum ATHLTHRouteDetailsPolicy {
-    enum Shape {
+    enum Shape: Equatable {
         case loop
         case outAndBack
         case pointToPoint
