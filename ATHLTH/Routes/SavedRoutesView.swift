@@ -89,6 +89,9 @@ struct SavedRoutesView: View {
     @State private var previewRoute: TrainingRoute?
     @State private var watchMessage: String?
     @State private var watchError: String?
+    @State private var preferredColumns = 0
+    @State private var libraryViewWidth: CGFloat = 390
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(selectionTitle: String? = nil, onSelect: ((TrainingRoute) -> Void)? = nil) {
         self.selectionTitle = selectionTitle
@@ -245,7 +248,7 @@ struct SavedRoutesView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 13) {
+            LazyVStack(spacing: 10) {
                 heroHeader
                 if !session.savedRoutes.isEmpty {
                     searchAndFilters
@@ -259,11 +262,22 @@ struct SavedRoutesView: View {
                 } else if visibleRoutes.isEmpty {
                     filteredEmptyState
                 } else {
-                    ForEach(visibleRoutes, id: \.route.id) { entry in
-                        if viewMode == .cards {
-                            routeCard(entry)
-                        } else {
-                            compactRouteRow(entry)
+                    LazyVGrid(
+                        columns: ATHLTHLibraryResponsiveLayout.columns(
+                            mode: viewMode == .list || viewMode == .map ? .list : .grid,
+                            width: libraryViewWidth,
+                            accessibilityText: dynamicTypeSize.isAccessibilitySize,
+                            preferredColumns: preferredColumns,
+                            preferredMinimumCardWidth: 104
+                        ),
+                        spacing: 10
+                    ) {
+                        ForEach(visibleRoutes, id: \.route.id) { entry in
+                            if viewMode == .cards {
+                                compactSavedRouteTile(entry)
+                            } else {
+                                compactRouteRow(entry)
+                            }
                         }
                     }
                 }
@@ -281,6 +295,20 @@ struct SavedRoutesView: View {
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         .navigationTitle(selectionTitle ?? tr("My routes", "Mine ruter"))
         .navigationBarTitleDisplayMode(.inline)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            libraryViewWidth = width
+        }
+        .onAppear {
+            preferredColumns = ATHLTHLibraryColumnPreference.load(
+                userID: session.profile.userID
+            )
+        }
+        .onChange(of: session.profile.userID) { _, userID in
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: userID)
+        }
+        .onChange(of: preferredColumns) { _, count in
+            ATHLTHLibraryColumnPreference.save(count, userID: session.profile.userID)
+        }
         .task {
             await favorites.refresh()
             if sort == .nearest { locationStore.start() }
@@ -305,18 +333,9 @@ struct SavedRoutesView: View {
 
     private var heroHeader: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("ATHLTH · " + tr("MY ROUTES", "MINE RUTER"))
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(selectionTitle == nil ? tr("My routes", "Mine ruter") : tr("Choose a route", "Velg en rute"))
-                    .font(.system(size: 25, weight: .medium, design: .serif))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                Text(tr("\(session.savedRoutes.count) saved routes", "\(session.savedRoutes.count) lagrede ruter"))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
+            Text(selectionTitle ?? tr("My routes", "Mine ruter"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
             Spacer(minLength: 4)
             NavigationLink {
                 RunRouteBuilderView()
@@ -495,18 +514,15 @@ struct SavedRoutesView: View {
     }
 
     private var resultsHeader: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(tr("\(visibleRoutes.count) routes", "\(visibleRoutes.count) ruter"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-
-            ATHLTHRouteBrowseModePicker(selection: viewModeBinding)
-            Label(
-                tr("Times are estimates", "Tidene er estimater"),
-                systemImage: "info.circle"
+        HStack(spacing: 8) {
+            ATHLTHRouteBrowseModePicker(
+                selection: viewModeBinding,
+                columns: $preferredColumns
             )
-            .font(.caption2)
-            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            Spacer(minLength: 4)
+            Text("\(visibleRoutes.count)")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 3)
@@ -654,6 +670,68 @@ struct SavedRoutesView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    /// Route snapshots are rendered only for visible lazy-grid cells.
+    /// Details, full map and existing workout selection remain available.
+    private func compactSavedRouteTile(_ entry: PositionedSavedRoute) -> some View {
+        let route = entry.route
+        return VStack(alignment: .leading, spacing: 7) {
+            NavigationLink {
+                RouteDetailView(route: route)
+            } label: {
+                VStack(alignment: .leading, spacing: 7) {
+                    RouteMapSnapshotThumbnail(route: route, height: 106)
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 11))
+                    Text(route.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(String(format: "%.1f km", route.distanceKilometers))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { markRecent(route) })
+
+            HStack {
+                if let onSelect {
+                    Button {
+                        markRecent(route)
+                        onSelect(route)
+                    } label: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 38, height: 35)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr("Use route", "Bruk rute"))
+                } else {
+                    LibraryFavoriteButton(
+                        kind: .route, itemID: route.id.uuidString,
+                        title: route.title,
+                        subtitle: String(format: "%.1f km", route.distanceKilometers),
+                        icon: "map.fill"
+                    )
+                }
+                Spacer(minLength: 0)
+                if let climb = route.elevationGainMeters {
+                    Text("\(Int(climb.rounded())) hm")
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(10)
+        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        .overlay {
+            RoundedRectangle(cornerRadius: 17)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.70), lineWidth: 0.8)
+        }
     }
 
     private func routeCard(_ entry: PositionedSavedRoute) -> some View {
