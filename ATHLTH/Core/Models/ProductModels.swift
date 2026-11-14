@@ -1091,6 +1091,14 @@ struct ATHLTHTrainingPlace: Identifiable, Codable, Hashable {
     var address: String
 }
 
+/// Source-only reference pacing; never a personalized workout pace target.
+struct ATHLTHPlanPaceExample: Codable, Hashable {
+    let zone: String
+    let paceMinimumMinutesPerKilometer: Double?
+    let paceMaximumMinutesPerKilometer: Double?
+    let description: String?
+}
+
 struct PlannedSession: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
@@ -1151,6 +1159,15 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var workoutTemplateID: UUID? = nil
     var workoutBlocks: [WorkoutTemplateBlock]? = nil
     var workoutCategory: String? = nil
+
+    // These source-plan prescriptions were previously only prose in notes.
+    // Optional and backward-compatible: do not treat source pace examples as
+    // individual pace targets or estimate HR from them.
+    var sourcePlanLoadScore: Double? = nil
+    var sourcePlanIsKeySession: Bool? = nil
+    var sourcePlanSessionType: String? = nil
+    var sourcePaceExamples: [ATHLTHPlanPaceExample]? = nil
+    var sourcePlanScaledRepetitions: Int? = nil
 
     // Optional to keep all historical saved sessions decodable.
     var meetingPoint: PlannedWorkoutMeetingPoint? = nil
@@ -1231,6 +1248,14 @@ struct TrainingPlanWeek: Identifiable, Codable, Hashable {
     var days: [TrainingPlanDay]
     // Optional to preserve decoding of all pre-periodization plans.
     var strengthPhase: TrainingWeekStrengthPhase? = nil
+    // Persist real week-level targets from authored catalog plans as data.
+    // Optional so every saved plan from prior releases still decodes.
+    var sourcePlanPhase: String? = nil
+    var sourcePlanRecoveryWeek: Bool? = nil
+    var sourcePlanVolumePercent: Double? = nil
+    var sourcePlanRunningKilometers: Double? = nil
+    var sourcePlanLongRunKilometers: Double? = nil
+    var sourcePlanWeeklyLoadScore: Double? = nil
 }
 
 enum TrainingPlanBuilderMode: String, Codable, Hashable, CaseIterable, Identifiable {
