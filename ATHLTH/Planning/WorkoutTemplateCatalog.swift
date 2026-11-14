@@ -1506,13 +1506,6 @@ struct WorkoutTemplateLibraryView: View {
                 uniquingKeysWith: { first, _ in first }
             ) : [:]
         let matching = session.savedWorkoutTemplates.filter { workout in
-            let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
-                workout.sharedSourceSessionID.flatMap { originals[$0] }
-            guard filter.matches(workout, catalogEntry: source),
-                  initialCategory != .strength ||
-                    selectedWorkoutLevel == "all" ||
-                    (source.map(levelMatches) ?? false)
-            else { return false }
             let matchesCategory = selectedCategory == "All" ||
                 (selectedCategory == "Hybrid" &&
                  ATHLTHPlannedWorkoutType.custom.matches(workout)) ||
@@ -1520,9 +1513,17 @@ struct WorkoutTemplateLibraryView: View {
                     rawValue: selectedCategory.lowercased()
                 )?.matches(workout) ??
                     (workout.kind.title == selectedCategory))
-            return (clean.isEmpty || ATHLTHWorkoutSearch.matches(
+            guard matchesCategory else { return false }
+            let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
+                workout.sharedSourceSessionID.flatMap { originals[$0] }
+            guard filter.matches(workout, catalogEntry: source),
+                  initialCategory != .strength ||
+                    selectedWorkoutLevel == "all" ||
+                    (source.map(levelMatches) ?? false)
+            else { return false }
+            return clean.isEmpty || ATHLTHWorkoutSearch.matches(
                 clean, texts: [workout.title, workout.notes ?? ""]
-            )) && matchesCategory
+            )
         }
         return discoverySorted(matching, title: { $0.title }) {
             $0.durationMinutes.map(Double.init)
@@ -1551,25 +1552,26 @@ struct WorkoutTemplateLibraryView: View {
                 uniquingKeysWith: { first, _ in first }
             ) : [:]
         let matching = stored.filter { workout in
+            guard seen.insert(workout.id).inserted else { return false }
+            let matchingType = ATHLTHPlannedWorkoutType(
+                rawValue: selectedCategory.lowercased()
+            )
+            let categoryMatches = selectedCategory == "All" ||
+                (selectedCategory == "Hybrid" &&
+                 ATHLTHPlannedWorkoutType.custom.matches(workout)) ||
+                (matchingType?.matches(workout) ??
+                 (workout.kind.title == selectedCategory))
+            guard categoryMatches else { return false }
             let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
                 workout.sharedSourceSessionID.flatMap { originals[$0] }
-            guard seen.insert(workout.id).inserted,
-                  filter.matches(workout, catalogEntry: source),
+            guard filter.matches(workout, catalogEntry: source),
                   initialCategory != .strength ||
                     selectedWorkoutLevel == "all" ||
                     (source.map(levelMatches) ?? false)
             else { return false }
-            let matchingType = ATHLTHPlannedWorkoutType(
-                rawValue: selectedCategory.lowercased()
+            return clean.isEmpty || ATHLTHWorkoutSearch.matches(
+                clean, texts: [workout.title, workout.notes ?? ""]
             )
-            return (selectedCategory == "All" ||
-                    (selectedCategory == "Hybrid" &&
-                     ATHLTHPlannedWorkoutType.custom.matches(workout)) ||
-                    (matchingType?.matches(workout) ??
-                     (workout.kind.title == selectedCategory))) &&
-                (clean.isEmpty || ATHLTHWorkoutSearch.matches(
-                    clean, texts: [workout.title, workout.notes ?? ""]
-                ))
         }
         .sorted {
             ($0.scheduledStart ?? .distantPast) >
