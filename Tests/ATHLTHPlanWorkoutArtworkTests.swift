@@ -48,6 +48,15 @@ final class ATHLTHPlanWorkoutArtworkTests: XCTestCase {
                        .strength)
         XCTAssertEqual(ATHLTHPlanWorkoutArtwork.scene(for: hybrid),
                        .hybrid)
+        let marathon = entry(
+            slug: "marathon-consistency", category: "running",
+            title: "Marathon preparation",
+            pattern: ["easy_run", "intervals", "long_run"]
+        )
+        // A mixed training week must not turn the entire plan cover into an
+        // interval photo merely because its recipe includes speed work.
+        XCTAssertEqual(ATHLTHPlanWorkoutArtwork.scene(for: marathon),
+                       .stadiumRace)
     }
 
     func testAllCuratedPlanCoversAreBundledAndWorkOffline() {
