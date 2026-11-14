@@ -469,6 +469,24 @@ struct RouteDetailView: View {
         )) / 1_000
     }
 
+    private var startDistanceLabel: String {
+        guard let distance = distanceToStartKilometers,
+              let location = routeLocation.location else {
+            return ATHLTHLocalization.choose(
+                english: "Location unavailable",
+                norwegian: "Posisjon utilgjengelig"
+            )
+        }
+        if location.horizontalAccuracy < 0 ||
+           location.horizontalAccuracy >= 500 {
+            return ATHLTHLocalization.choose(
+                english: String(format: "About %.0f km", distance),
+                norwegian: String(format: "Ca. %.0f km", distance)
+            )
+        }
+        return String(format: "%.1f km", distance)
+    }
+
     private var resolvedProfileSamples: [Double] {
         if let profile = publicTrailMetadata?.elevationProfile,
            profile.count >= 2 {
@@ -724,12 +742,7 @@ struct RouteDetailView: View {
                     Image(systemName: "location")
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(distanceToStartKilometers.map {
-                            String(format: "%.1f km", $0)
-                        } ?? ATHLTHLocalization.choose(
-                            english: "Location unavailable",
-                            norwegian: "Posisjon utilgjengelig"
-                        ))
+                        Text(startDistanceLabel)
                         .font(.subheadline.weight(.bold))
                         Text(ATHLTHLocalization.choose(
                             english: "Straight-line distance to route start",
@@ -758,7 +771,7 @@ struct RouteDetailView: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(.bordered)
-                .disabled(routeStartCoordinate == nil)
+                .disabled(routeStartCoordinate.map(CLLocationCoordinate2DIsValid) != true)
                 .accessibilityHint(ATHLTHLocalization.choose(
                     english: "Opens walking directions in Apple Maps",
                     norwegian: "Åpner gangveibeskrivelse i Apple Kart"
