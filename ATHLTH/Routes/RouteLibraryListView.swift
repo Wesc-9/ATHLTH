@@ -452,6 +452,13 @@ struct RouteLibraryListView: View {
               : "") {
             if viewMode == .map { await loadMapRouteGeometry() }
         }
+        .onChange(of: viewMode) { _, mode in
+            if mode != .map {
+                // Map geometry is for an explicit viewing session only.
+                hydratedRoutes.removeAll(keepingCapacity: false)
+                loadingDetails.removeAll()
+            }
+        }
         .onChange(of: publicFilter) { _, _ in
             // Favorites filter is local; server sorting and pagination persist.
             if viewMode == .map {
@@ -1146,55 +1153,77 @@ struct RouteLibraryListView: View {
 
     @MainActor
     private func loadRouteDetail(_ id: UUID) async {
-        guard hydratedRoutes[id] == nil, !loadingDetails.contains(id) else { return }
-        // Do not fire dozens of route-geometry requests while quickly
-        // swiping through a grid. The lazy cells request only when idle.
-        while loadingDetails.count >= 2 {
-            guard !Task.isCancelled, !routeCardsScrolling else { return }
-            try? await Task.sleep(nanoseconds: 90_000_000)
-        }
-        guard !Task.isCancelled, !routeCardsScrolling,
-              hydratedRoutes[id] == nil else { return }
+        guard viewMode == .map, hydratedRoutes[id] == nil,
+              !loadingDetails.contains(id),
+              let entry = entries.first(where: { $0.id == id })
+        else { return }
         loadingDetails.insert(id)
         defer { loadingDetails.remove(id) }
+
         do {
-            let record: CommunityRouteRecord = try await SupabaseEnvironment.client
-                .from("community_routes")
-                .select()
-                .eq("id", value: id)
-                .single()
-                .execute().value
-            guard !Task.isCancelled else { return }
-            hydratedRoutes[id] = record.trainingRoute
+            let resolved: TrainingRoute?
+            if entry.isPublicTrail {
+                resolved = try await SupabasePublicTrailDiscoveryService()
+                    .fetch(id: id)?.trainingRoute
+            } else {
+                let record: CommunityRouteRecord = try await SupabaseEnvironment.client
+                    .from("community_routes").select()
+                    .eq("id", value: id).single().execute().value
+                resolved = record.trainingRoute
+            }
+            guard !Task.isCancelled, viewMode == .map,
+                  entries.prefix(20).contains(where: { $0.id == id })
+            else { return }
+            if let resolved { hydratedRoutes[id] = resolved }
         } catch {
-            // A route may be removed or made private while the list is open.
-            // The metadata card remains usable via its normal details loader.
+            // A route may be removed, or its friends-only permission revoked.
         }
     }
 
     @MainActor
     private func loadMapRouteGeometry() async {
-        // One RLS-protected batch instead of twenty sequential round-trips.
-        // The catalogue RPC returns metadata only; detailed polylines are
-        // fetched on demand for the visible map and capped for MapKit memory.
+        // Map is explicit opt-in. Fetch at most 20 full routes, separated by
+        // canonical table; browse cards never download GPS or MapKit images.
         guard viewMode == .map, !Task.isCancelled else { return }
-        let ids = entries.prefix(20).map(\.id)
-            .filter { hydratedRoutes[$0] == nil }
-        guard !ids.isEmpty else { return }
-        do {
-            let records: [CommunityRouteRecord] = try await SupabaseEnvironment.client
-                .from("community_routes")
-                .select()
-                .in("id", values: ids.map(\.uuidString))
-                .execute().value
-            guard !Task.isCancelled, viewMode == .map else { return }
-            let requested = Set(ids)
-            for record in records where requested.contains(record.id) {
-                hydratedRoutes[record.id] = record.trainingRoute
+        let visible = Array(entries.prefix(20))
+        let ids = Set(visible.map(\.id))
+        // Release any previous map's geometry after filtering or sorting.
+        hydratedRoutes = hydratedRoutes.filter { ids.contains($0.key) }
+
+        let communityIDs = visible.filter {
+            !$0.isPublicTrail && hydratedRoutes[$0.id] == nil
+        }.map(\.id)
+        let trailIDs = visible.filter {
+            $0.isPublicTrail && hydratedRoutes[$0.id] == nil
+        }.map(\.id)
+
+        if !communityIDs.isEmpty {
+            do {
+                let records: [CommunityRouteRecord] = try await SupabaseEnvironment.client
+                    .from("community_routes").select()
+                    .in("id", values: communityIDs.map(\.uuidString))
+                    .execute().value
+                guard !Task.isCancelled, viewMode == .map else { return }
+                for record in records where ids.contains(record.id) {
+                    hydratedRoutes[record.id] = record.trainingRoute
+                }
+            } catch {
+                // Existing catalogue entries still navigate to a protected detail.
             }
-        } catch {
-            // Server permission or transient failure: all rows remain
-            // navigable through RouteLibraryDetailLoader.
+        }
+        if !trailIDs.isEmpty {
+            do {
+                let records: [PublicTrailRecord] = try await SupabaseEnvironment.client
+                    .from("public_trails").select()
+                    .in("id", values: trailIDs.map(\.uuidString))
+                    .execute().value
+                guard !Task.isCancelled, viewMode == .map else { return }
+                for record in records where ids.contains(record.id) && record.isUsable {
+                    hydratedRoutes[record.id] = record.trainingRoute
+                }
+            } catch {
+                // Indexed trails may have been removed or refreshed meanwhile.
+            }
         }
     }
 
