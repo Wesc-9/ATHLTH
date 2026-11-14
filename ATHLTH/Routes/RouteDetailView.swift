@@ -20,6 +20,7 @@ struct RouteDetailView: View {
     @StateObject private var publicTrailAttempts =
         PublicTrailAttemptStore()
     @StateObject private var discovery = RouteDiscoveryStore()
+    @StateObject private var routeLocation = HomeLocationStore()
 
     let route: TrainingRoute
 
@@ -36,6 +37,9 @@ struct RouteDetailView: View {
     @State private var loadingSimilarTrails = false
     @State private var showingSimilarTrails = false
     @State private var routeToStart: TrainingRoute?
+    @State private var showingMetadataEditor = false
+    @State private var draftTags: [String] = []
+    @State private var draftSurfaces: [String: Int] = [:]
 
     private var currentRoute: TrainingRoute {
         session.savedRoutes.first {
@@ -149,6 +153,9 @@ struct RouteDetailView: View {
             LazyVStack(spacing: 16) {
                 mapCard
                 overviewCard
+                startDirectionsCard
+                elevationCard
+                tagsAndSurfacesCard
 
                 if isPublicTrail {
                     trailIntelligenceCard
@@ -195,6 +202,18 @@ struct RouteDetailView: View {
                             )
                         }
 
+                        Button {
+                            beginMetadataEdit()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Edit tags and surface",
+                                    norwegian: "Rediger tags og underlag"
+                                ),
+                                systemImage: "tag"
+                            )
+                        }
+
                         NavigationLink {
                             ChallengeCreationView(
                                 preselectedRouteID: currentRoute.id
@@ -227,8 +246,10 @@ struct RouteDetailView: View {
     var body: some View {
         routePrimaryContent
         .task(id: currentRoute.id) {
+            routeLocation.start()
             await prepareRouteData()
         }
+        .onDisappear { routeLocation.stop() }
         .refreshable {
             await prepareRouteData(forceHealthSync: true)
         }
@@ -262,6 +283,32 @@ struct RouteDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Choose the name shown in Routes and challenges.")
+        }
+        .sheet(isPresented: $showingMetadataEditor) {
+            NavigationStack {
+                ScrollView {
+                    ATHLTHRouteMetadataForm(
+                        tags: $draftTags,
+                        surfacePercentages: $draftSurfaces
+                    )
+                }
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Route details", norwegian: "Rutedetaljer"
+                ))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        )) { showingMetadataEditor = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Save", norwegian: "Lagre"
+                        )) { saveRouteMetadata() }
+                    }
+                }
+            }
         }
         .sheet(
             isPresented:
