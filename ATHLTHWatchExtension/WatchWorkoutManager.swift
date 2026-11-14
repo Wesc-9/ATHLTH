@@ -125,6 +125,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var workoutLocationMetadataAttached = false
     private var timer: Timer?
     private var startedAt: Date?
+    // Set only by a named planned card, never guessed from a workout title.
+    private var plannedCalendarSessionID: UUID?
     /// Immutable within one HealthKit workout, even if iPhone changes user.
     private var workoutOwnerID: UUID?
     private var finishing = false
@@ -424,6 +426,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         Task { @MainActor in
             try? await workoutSession.sendToRemoteWorkoutSession(data: payload)
         }
+    }
+
+    func configureCalendarSessionID(_ workoutID: UUID?) {
+        guard !isActive else { return }
+        plannedCalendarSessionID = workoutID
     }
 
     func configurePlannedRoute(
@@ -3863,6 +3870,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func prepareForLocalWorkoutStart() {
+        plannedCalendarSessionID = nil
         ghostRaceConfiguration = nil
         returningToRouteStart = false
         routeLegDistanceOffsetMeters = 0
@@ -3966,6 +3974,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workoutLocation = nil
         workoutLocationMetadataAttached = false
         startedAt = nil
+        plannedCalendarSessionID = nil
         workoutOwnerID = nil
         resetIndoorProbeForNewWorkout()
         finishing = false
@@ -8116,6 +8125,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
 
         result.accountOwnerID = workoutOwnerID
+        result.plannedCalendarSessionID = plannedCalendarSessionID
         result.petSegments = WatchRouteStore.shared.completedPetSegments()
         if kind == .running || kind == .walking {
             result.recordedRunningMinutes = recordedStructuredRunMinutes
