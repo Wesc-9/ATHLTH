@@ -4143,6 +4143,9 @@ struct WorkoutTemplateBuilderView: View {
     @State private var pendingNewGroupKind: WorkoutBlockGroupKind?
     @State private var collapsedGroupIDs: Set<UUID> = []
     @State private var showingDiscardConfirmation = false
+    // Wait for the confirmation sheet to close before dismissing its editor.
+    // Dismissing both presentations in one update can strand the old host.
+    @State private var closeAfterDraftDecision = false
     @State private var manualDurationMinutes: Int?
     @State private var durationInputText = ""
     @State private var allRoundsExpandedIDs: Set<UUID> = []
@@ -5630,7 +5633,9 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Cancel", "Avbryt")) {
+                    Button(onCloseRequested == nil
+                           ? tr("Cancel", "Avbryt")
+                           : tr("Back", "Tilbake")) {
                         if ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
                             isScratchHost: onCloseRequested != nil,
                             hasEdits: !blocks.isEmpty || !title.isEmpty ||
@@ -5643,7 +5648,14 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingDiscardConfirmation) {
+            .sheet(
+                isPresented: $showingDiscardConfirmation,
+                onDismiss: {
+                    guard closeAfterDraftDecision else { return }
+                    closeAfterDraftDecision = false
+                    closeWorkoutEditor()
+                }
+            ) {
                 ATHLTHDiscardDraftSheet(
                     kind: onCloseRequested != nil ? .standaloneWorkoutDraft : .workout,
                     onKeepEditing: {
@@ -5653,8 +5665,8 @@ struct WorkoutTemplateBuilderView: View {
                         // The existing local checkpoint is the recoverable
                         // draft; do not silently create a scheduled workout.
                         persistWorkoutDraft()
+                        closeAfterDraftDecision = true
                         showingDiscardConfirmation = false
-                        closeWorkoutEditor()
                     },
                     onDiscard: {
                         // The onDisappear draft observer must not recreate
@@ -5664,8 +5676,8 @@ struct WorkoutTemplateBuilderView: View {
                         pendingDraftCheckpoint = nil
                         UserDefaults.standard.removeObject(forKey: draftStorageKey)
                         onDraftDiscarded?()
+                        closeAfterDraftDecision = true
                         showingDiscardConfirmation = false
-                        closeWorkoutEditor()
                     }
                 )
             }
