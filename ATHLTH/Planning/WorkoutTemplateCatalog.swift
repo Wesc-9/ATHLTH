@@ -1110,6 +1110,8 @@ struct WorkoutTemplateLibraryView: View {
     @State private var showingRunningPersonalization = false
     @State private var catalogPersonalBlocks: [WorkoutTemplateBlock] = []
     @State private var libraryCompletions: [StructuredWorkoutCompletion] = []
+    @State private var catalogHistoryIndex:
+        [UUID: ATHLTHLibraryWorkoutHistory.Summary] = [:]
     @State private var runningCompletions: [ATHLTHCompletedRunningPerformance] = []
     @State private var pendingHistoryRefresh: Task<Void, Never>?
 
@@ -1129,8 +1131,12 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     private func loadHistory() {
-        libraryCompletions = StructuredWorkoutCompletionStore.load(
+        let completions = StructuredWorkoutCompletionStore.load(
             userID: session.profile.userID
+        )
+        libraryCompletions = completions
+        catalogHistoryIndex = ATHLTHLibraryWorkoutHistory.catalogOriginalIndex(
+            completions: completions
         )
         runningCompletions = ATHLTHRunningPerformanceHistory.load(
             userID: session.profile.userID
@@ -2754,19 +2760,13 @@ struct WorkoutTemplateLibraryView: View {
         )
     }
 
-    @ViewBuilder
     private func catalogTile(_ entry: WorkoutTemplateCatalogEntry) -> some View {
-        if displayMode == .grid {
-            workoutGridCard(
-                title: entry.title,
-                subtitle: entry.categoryTitle,
-                symbol: entry.systemImage,
-                blockCount: entry.blocks.count,
-                estimatedMinutes: entry.estimatedDurationMinutes
-            )
-        } else {
-            workoutCard(entry)
-        }
+        ATHLTHWorkoutCatalogTile(
+            entry: entry,
+            compact: displayMode == .grid,
+            includePreview: initialCategory != .running,
+            history: catalogHistoryIndex[entry.id]
+        )
     }
 
     @ViewBuilder
@@ -2849,100 +2849,6 @@ struct WorkoutTemplateLibraryView: View {
         }
     }
 
-    private func workoutCard(
-        _ entry: WorkoutTemplateCatalogEntry
-    ) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: entry.systemImage)
-                .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(workoutTint(entry))
-                .frame(width: 50, height: 50)
-                .background(
-                    workoutTint(entry).opacity(0.10),
-                    in: RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-                )
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(entry.categoryTitle.uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundStyle(workoutTint(entry))
-
-                Text(ATHLTHLibraryName.workoutCard(entry.title, grid: false))
-                    .font(.headline)
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .accessibilityLabel(entry.title)
-                    .multilineTextAlignment(.leading)
-
-                Text(entry.summary)
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-
-                HStack(spacing: 9) {
-                    Label(
-                        "\(entry.blocks.count) blocks",
-                        systemImage:
-                            "list.number"
-                    )
-
-                    if let minutes =
-                        entry.estimatedDurationMinutes {
-                        Label(
-                            "~\(minutes) min",
-                            systemImage: "clock"
-                        )
-                    }
-                }
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .padding(.top, 2)
-
-                if initialCategory != .running {
-                    ATHLTHWorkoutContentsPreview(blocks: entry.blocks)
-                        .padding(.top, 7)
-                }
-
-                if let last = ATHLTHLibraryWorkoutHistory.catalogOriginal(
-                    id: entry.id, completions: libraryCompletions
-                ) {
-                    ATHLTHLastWorkoutHistoryLabel(summary: last)
-                        .padding(.top, 4)
-                }
-            }
-
-            Spacer(minLength: 34)
-        }
-        .padding(16)
-        .background(
-            Color.white.opacity(0.86),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.94),
-                lineWidth: 0.8
-            )
-        }
-    }
-
     private func runningWorkoutCard(_ workout: RunningWorkoutTemplate) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: workout.type.systemImage)
@@ -3010,14 +2916,6 @@ struct WorkoutTemplateLibraryView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.white.opacity(0.94), lineWidth: 0.8)
-        }
-    }
-
-    private func workoutTint(
-        _ entry: WorkoutTemplateCatalogEntry
-    ) -> Color {
-        switch entry.category {
-        default: return ATHLTHPlanDesign.accentInk
         }
     }
 
