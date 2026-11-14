@@ -12,7 +12,7 @@ struct ATHLTHWorkoutCatalogTile: View, Equatable {
     let includePreview: Bool
     let history: ATHLTHLibraryWorkoutHistory.Summary?
 
-    static func == (lhs: Self, rhs: Self) -> Bool {
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         // Avoid deep comparison of hundreds of workout blocks on every
         // unrelated state update. The catalog store owns contentRevision.
         lhs.entry.id == rhs.entry.id &&
