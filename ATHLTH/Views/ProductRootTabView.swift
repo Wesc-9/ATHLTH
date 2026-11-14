@@ -1183,7 +1183,8 @@ struct ATHLTHHomeView: View {
                         loadText:
                             homeLoadMetricText,
                         readinessText:
-                            homeReadinessMetricText
+                            homeReadinessMetricText,
+                        isActive: isActive
                     )
 
                     HomeWeeklyProgressStrip(
@@ -1662,6 +1663,20 @@ struct ATHLTHHomeView: View {
                     showingGettingStartedPopup = true
                 }
             }
+            // Trend cards receive their own update as soon as HealthKit
+            // reports a new snapshot. They must not wait for friends,
+            // import-inbox processing or other Home network work, and never
+            // require the user to pull to refresh.
+            .task(id: "\(isActive)|\(session.profile.userID.uuidString)|\(health.hasRequestedAuthorization)|\(health.lastSuccessfulRefreshAt?.timeIntervalSince1970 ?? 0)|\(health.sleep.sleepEnd?.timeIntervalSince1970 ?? 0)|\(health.heart.hrvMilliseconds ?? -1)|\(health.workouts.count)") {
+                guard isActive,
+                      !session.previewModeEnabled,
+                      health.hasRequestedAuthorization,
+                      !health.shouldDeferAutomaticHealthWork
+                else { return }
+                let trend = await health.recoveryTrendSnapshot(days: 14)
+                guard !Task.isCancelled, isActive else { return }
+                homeRecoveryTrendSnapshot = trend
+            }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)-arena") {
                 guard isActive, !session.previewModeEnabled else { return }
                 _ = await tournamentCalendar.refresh(for: session.profile.userID)
@@ -1714,16 +1729,14 @@ struct ATHLTHHomeView: View {
                     return
                 }
 
-                _ = await health.refreshWorkoutImportInbox()
-
+                // Give the four top Home cards their freshest HealthKit
+                // values first. Import inbox is secondary and cannot block
+                // the card refresh on a cold launch.
                 await health.refreshIfStale(
                     maxAge: 90
                 )
-
-                homeRecoveryTrendSnapshot =
-                    await health.recoveryTrendSnapshot(
-                        days: 14
-                    )
+                guard !Task.isCancelled else { return }
+                _ = await health.refreshWorkoutImportInbox()
 
                 async let streakRefresh: Void = loadHomeStreak()
                 async let goalsRefresh: Void =
