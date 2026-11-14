@@ -21,7 +21,7 @@ final class ATHLTHRecentActivityLayoutTests: XCTestCase {
                 ATHLTHRecentActivityLayoutPolicy.artworkHeight(
                     horizontal: false
                 ),
-                170
+                132
             )
         }
     }
@@ -37,7 +37,7 @@ final class ATHLTHRecentActivityLayoutTests: XCTestCase {
                 ATHLTHRecentActivityLayoutPolicy.artworkWidth(
                     for: width, horizontal: true
                 ),
-                width * 0.43,
+                width * 0.39,
                 accuracy: 0.01
             )
             XCTAssertGreaterThan(
@@ -47,6 +47,17 @@ final class ATHLTHRecentActivityLayoutTests: XCTestCase {
                 width * 0.5
             )
         }
+    }
+
+    func testWideIPadArtworkIsCompactWithoutRemovingItsSideBySideLayout() {
+        XCTAssertEqual(
+            ATHLTHRecentActivityLayoutPolicy.artworkHeight(horizontal: true),
+            158
+        )
+        XCTAssertLessThan(
+            ATHLTHRecentActivityLayoutPolicy.artworkHeight(horizontal: false),
+            ATHLTHRecentActivityLayoutPolicy.artworkHeight(horizontal: true)
+        )
     }
 
     func testStageManagerNarrowWindowAndAccessibilityKeepVerticalLayout() {
