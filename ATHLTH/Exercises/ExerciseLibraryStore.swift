@@ -760,8 +760,27 @@ final class ExerciseLibraryStore: ObservableObject {
                 throw ExerciseLibraryError.httpStatus(http.statusCode)
             }
 
-            let dataset = try JSONDecoder().decode(RepDBDataset.self, from: data)
-            let mapped = dataset.exercises.map(mapRepDB)
+            // RepDB can contain thousands of exercises. Decoding its full
+            // JSON on the MainActor previously blocked tab animations.
+            let dataset = try await Task.detached(priority: .utility) {
+                try JSONDecoder().decode(RepDBDataset.self, from: data)
+            }.value
+            try Task.checkCancellation()
+            var mapped: [ExerciseLibraryEntry] = []
+            mapped.reserveCapacity(dataset.exercises.count)
+            // Mapping uses local bundle URLs and canonical exercise IDs.
+            // Keep it on the store's actor, but yield between small batches
+            // so tab-bar gestures and scrolling retain frame opportunities.
+            for start in stride(
+                from: 0, to: dataset.exercises.count, by: 48
+            ) {
+                try Task.checkCancellation()
+                let end = min(start + 48, dataset.exercises.count)
+                mapped.append(contentsOf:
+                    dataset.exercises[start..<end].map(mapRepDB)
+                )
+                await Task.yield()
+            }
             guard mapped.count >= max(400, repDBExercises.count),
                   Set(mapped.map(\.id)).count == mapped.count else {
                 throw ExerciseLibraryError.invalidDataset
@@ -772,7 +791,7 @@ final class ExerciseLibraryStore: ObservableObject {
             repDBExpectedCount = dataset.count ?? mapped.count
             lastUpdated = Date()
             invalidateDerivedCaches()
-            persistRepDBCache(data)
+            await persistRepDBCache(data)
         } catch {
             errorMessage = error.localizedDescription
             if repDBExercises.isEmpty { loadCachedRepDB() }
@@ -1358,18 +1377,21 @@ final class ExerciseLibraryStore: ObservableObject {
         }
     }
 
-    private func persistRepDBCache(_ data: Data) {
+    private func persistRepDBCache(_ data: Data) async {
         guard let url = Self.repDBCacheURL else { return }
-
-        do {
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try data.write(to: url, options: .atomic)
-        } catch {
-            return
-        }
+        // Writing the downloaded dataset should not stall the main thread
+        // during a Train navigation or an exercise picker presentation.
+        await Task.detached(priority: .utility) {
+            do {
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try data.write(to: url, options: .atomic)
+            } catch {
+                // The bundled offline catalog remains available on disk.
+            }
+        }.value
     }
 
     private func loadCustomExercises() {
@@ -1905,12 +1927,12 @@ enum ExerciseLibraryError: LocalizedError {
 }
 
 
-private struct RepDBDataset: Decodable {
+private struct RepDBDataset: Decodable, Sendable {
     let count: Int?
     let exercises: [RepDBExercise]
 }
 
-private struct RepDBExercise: Decodable {
+private struct RepDBExercise: Decodable, Sendable {
     let id: String
     let nameEnglish: String
     let descriptionEnglish: String?
@@ -1940,11 +1962,11 @@ private struct RepDBExercise: Decodable {
     }
 }
 
-private struct RepDBImages: Decodable {
+private struct RepDBImages: Decodable, Sendable {
     let flat: RepDBFlatImages?
 }
 
-private struct RepDBFlatImages: Decodable {
+private struct RepDBFlatImages: Decodable, Sendable {
     let start: String?
     let peak: String?
     let main: String?
