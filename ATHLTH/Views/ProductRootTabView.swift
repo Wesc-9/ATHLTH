@@ -4342,11 +4342,18 @@ struct ATHLTHHomeView: View {
     // A standalone calendar workout has no plan ID. Launch the original
     // scheduled recipe with the existing Home iPhone/Watch recording engines.
     // Allow the detail sheet to close before showing a recorder cover.
-    private func reconcileHomeEarlyWorkoutStart(_ workout: PlannedSession) {
-        guard session.moveStartedTomorrowWorkoutToToday(
-            workoutID: workout.id, startedAt: Date()
+    private func reconcileHomeEarlyWorkoutStart(
+        _ workout: PlannedSession,
+        startedAt: Date = Date(),
+        startedOnWatch: Bool = false
+    ) {
+        // Persist actual start and reschedule tomorrow's occurrence only after
+        // the workout engine acknowledges it. Never create a second session.
+        guard session.recordPlannedWorkoutStarted(
+            workoutID: workout.id,
+            startedAt: startedAt,
+            startedOnWatch: startedOnWatch
         ) else { return }
-        // The same workout ID is now scheduled today on both devices.
         syncHomeTodayWorkoutToWatch()
     }
 
@@ -4520,11 +4527,14 @@ struct ATHLTHHomeView: View {
             ghostUpdates: treadmill ? nil : workout.ghostUpdates,
             autoPauseEnabled: autoPause,
             plannedPlanID: planID,
-            plannedSessionID: planID == nil ? nil : workout.id
+            plannedSessionID: workout.id
         )
-        // Do not move tomorrow's plan until the iPhone recorder is active.
-        if phoneWorkout.active != nil {
-            reconcileHomeEarlyWorkoutStart(workout)
+        // PhoneWorkout.start records the actual workout start before the
+        // calendar is updated. Keep that timestamp, not the planned 18:00.
+        if let active = phoneWorkout.active {
+            reconcileHomeEarlyWorkoutStart(
+                workout, startedAt: active.start
+            )
         }
         // The coordinated lobby authorizes this individual recording.
         // Only acknowledge the start after the real iPhone engine begins.
@@ -4772,7 +4782,9 @@ struct ATHLTHHomeView: View {
                 watchConnection.sendRunningWorkout(runningTransfer)
 
                 session.beginTrainingStatus(for: workout)
-                reconcileHomeEarlyWorkoutStart(workout)
+                reconcileHomeEarlyWorkoutStart(
+                    workout, startedOnWatch: true
+                )
                 WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
                         session: session,
@@ -4862,7 +4874,11 @@ struct ATHLTHHomeView: View {
                         )
                     }
                     session.beginTrainingStatus(for: workout)
-                    reconcileHomeEarlyWorkoutStart(workout)
+                    reconcileHomeEarlyWorkoutStart(
+                        workout,
+                        startedAt: strengthWorkout.activeWorkout?.startedAt ?? Date(),
+                        startedOnWatch: true
+                    )
                     _ = await social.confirmCurrentJoinedWorkoutStarted()
                     WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
@@ -4906,7 +4922,10 @@ struct ATHLTHHomeView: View {
                 return
             }
             session.beginTrainingStatus(for: workout)
-            reconcileHomeEarlyWorkoutStart(workout)
+            reconcileHomeEarlyWorkoutStart(
+                workout,
+                startedAt: strengthWorkout.activeWorkout?.startedAt ?? Date()
+            )
             Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
             WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
