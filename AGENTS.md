@@ -1,3 +1,9 @@
+# ACTIVE ATHLTH DEVELOPMENT (2026-11-14)
+
+- **CURRENT ACTIVE VERSION: 2.2.1 (build 129)** on `release/v2.2.1`. This section supersedes previous guidance naming 2.2.0 or older as active. Make all new 2.2.1 code, UI, tests and workflow changes on this branch; do not change older release branches.
+- **Do not upload to TestFlight** without an explicit new request. Regular build and simulator regression workflows may run on this branch.
+- Explore map changes use bounded, cached public route snapshots, geometry-preserving display sampling, viewport culling and clustering at broad zoom. Never simplify the canonical saved route or disclose private/account-owned route data in the public trail disk cache.
+
 # Shared iPhone / iPad product rule (2.2.0)
 
 Use the existing shared plan, goal and workout engines and the same persisted data on iPhone and iPad. iPad may add previews, inspectors and editing controls to use its larger screen, with adaptive narrow-window fallbacks. Day and week planning are views of the same draft. Never reset or erase entered plan/workout/goal data on Back, layout changes, resizing or backgrounding. Keep recoverable drafts local and account-scoped; replacing an active plan requires one explicit acknowledged choice. Use warm gold for plan actions.
