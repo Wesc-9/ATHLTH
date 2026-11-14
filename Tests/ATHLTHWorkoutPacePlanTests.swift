@@ -86,7 +86,7 @@ final class ATHLTHWorkoutPacePlanTests: XCTestCase {
     func testTenKPaceCatalogKeepsItsEightStepsAndSourceZones() throws {
         let source = try XCTUnwrap(
             ATHLTHZonedPlanLibrary.workoutCatalogEntries.first {
-                $0.title == "10K Fart"
+                $0.slug == "zoned-rp-002" // Source workout: 10K Pace, eight steps
             }
         )
         XCTAssertEqual(source.blocks.count, 8)
