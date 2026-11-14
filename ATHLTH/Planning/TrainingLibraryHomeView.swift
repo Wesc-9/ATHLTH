@@ -3673,6 +3673,13 @@ struct PersonalizeTrainingPlanView: View {
 
     private func createScheduledPlan() {
         guard hasValidDays, conflictingPlan == nil else { return }
+        guard entry.hasCompleteWorkoutPattern else {
+            scheduleError = ATHLTHLocalization.choose(
+                english: "This plan contains an unsupported workout type. No sessions were created.",
+                norwegian: "Planen inneholder en øktype som ikke støttes. Ingen økter ble opprettet."
+            )
+            return
+        }
 
         let plan: TrainingPlan?
         if createEditableCopy {
