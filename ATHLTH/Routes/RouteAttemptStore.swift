@@ -15,6 +15,7 @@ struct RouteAttemptRecord: Codable, Identifiable, Hashable {
     let averageDeviationMeters: Double?
     let maxDeviationMeters: Double?
     let source: String
+    var direction: ATHLTHRouteAttemptDirection? = nil
     let username: String?
     let displayName: String?
     let avatarURL: String?
@@ -32,6 +33,7 @@ struct RouteAttemptRecord: Codable, Identifiable, Hashable {
         case averageDeviationMeters = "average_deviation_meters"
         case maxDeviationMeters = "max_deviation_meters"
         case source
+        case direction
         case username
         case displayName = "display_name"
         case avatarURL = "avatar_url"
@@ -76,6 +78,7 @@ private struct RouteAttemptWrite: Encodable {
     let averageDeviationMeters: Double
     let maxDeviationMeters: Double
     let source: String
+    let direction: ATHLTHRouteAttemptDirection
 
     enum CodingKeys: String, CodingKey {
         case routeID = "route_id"
@@ -89,6 +92,7 @@ private struct RouteAttemptWrite: Encodable {
         case averageDeviationMeters = "average_deviation_meters"
         case maxDeviationMeters = "max_deviation_meters"
         case source
+        case direction
     }
 }
 
@@ -159,7 +163,8 @@ final class SupabaseRouteAttemptService {
             routeMatchPercent: analysis.routeMatchPercent,
             averageDeviationMeters: analysis.averageDeviationMeters,
             maxDeviationMeters: analysis.maxDeviationMeters,
-            source: "apple_health"
+            source: "apple_health",
+            direction: analysis.direction
         )
 
         try await client
@@ -182,7 +187,8 @@ final class RouteAttemptStore: ObservableObject {
 
     private let service: SupabaseRouteAttemptService
     private var latestRefreshRequestID = UUID()
-    private let routeMetricVersion = 2
+    // v3 requires a fresh GPS direction classification for legacy attempts.
+    private let routeMetricVersion = 3
 
     private func metricVersionKey(
         routeID: UUID,
