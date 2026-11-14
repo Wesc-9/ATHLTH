@@ -9,6 +9,9 @@ struct ATHLTHTrainTodayPremiumView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var goalStore: GoalStore
     @ObservedObject var workoutCatalog: WorkoutTemplateCatalogStore
+    /// Inactive Train tabs must not start network or catalog decoding work
+    /// while the user is animating between Home and another destination.
+    var isActive = true
 
     let plan: TrainingPlan?
     let sessions: [PlannedSession]
@@ -146,8 +149,18 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task {
+        .task(id: isActive) {
+            guard isActive else { return }
+            // The existing offline catalog and local check-in are already
+            // usable. Do not begin optional remote catalog synchronization
+            // in the middle of the system tab-bar animation.
             reloadCheckIn()
+            do {
+                try await Task.sleep(for: .milliseconds(700))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled, isActive else { return }
             await workoutCatalog.refresh()
         }
         .task(id: session.profile.userID) {
