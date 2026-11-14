@@ -124,6 +124,9 @@ struct ProductRootTabView: View {
     @State private var showingCoachFromDock = false
     @State private var showingSideMenu = false
     @State private var sideMenuModalDestination: ATHLTHSideMenuDestination?
+    // Search is still a compact utility sheet. Messages and notifications
+    // have their own edge-to-edge presentations, not 90% detent sheets.
+    @State private var sideMenuSearchDestination: ATHLTHSideMenuDestination?
     @State private var sideMenuUtilityDestination: ATHLTHSideMenuDestination?
     @State private var sideMenuFullScreenDestination: ATHLTHSideMenuDestination?
     @State private var friendShareToast: ATHLTHFriendQuickShareKind?
@@ -191,6 +194,7 @@ struct ProductRootTabView: View {
         selectedTab = 0
         showingSideMenu = false
         sideMenuModalDestination = nil
+        sideMenuSearchDestination = nil
         sideMenuUtilityDestination = nil
         sideMenuFullScreenDestination = nil
 
@@ -771,8 +775,18 @@ struct ProductRootTabView: View {
             }
             .presentationDragIndicator(.visible)
         }
-        .sheet(item: $sideMenuUtilityDestination) { destination in
+        .sheet(item: $sideMenuSearchDestination) { destination in
             ATHLTHSideMenuUtilitiesView(destination: destination)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.scrolls)
+                .presentationCornerRadius(28)
+        }
+        .fullScreenCover(item: $sideMenuUtilityDestination) { destination in
+            // Reuse the exact same Inbox / Notifications screens; only the
+            // host presentation changes, so Home never peeks above the card.
+            ATHLTHSideMenuUtilitiesView(destination: destination)
+                .accessibilityIdentifier("athlth-home-utility-fullscreen")
         }
         // Unlike the former 90% sheet, profile and deeper destinations
         // occupy the entire iPhone screen, including the safe area.
@@ -793,7 +807,10 @@ struct ProductRootTabView: View {
         case .home:
             selectedTab = 0
 
-        case .search, .inbox, .notifications:
+        case .search:
+            sideMenuSearchDestination = destination
+
+        case .inbox, .notifications:
             sideMenuUtilityDestination = destination
 
         case .trainingLibrary:
@@ -1540,7 +1557,8 @@ struct ATHLTHHomeView: View {
                     socialStatusRefresh
                 )
             }
-            .sheet(isPresented: $showingHomeSocialInbox) {
+            // Invitations open the same edge-to-edge inbox as the side menu.
+            .fullScreenCover(isPresented: $showingHomeSocialInbox) {
                 ATHLTHSideMenuUtilitiesView(destination: .inbox)
             }
             .sheet(item: $selectedHomeRecommendationInfo) { information in
