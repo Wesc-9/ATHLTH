@@ -415,6 +415,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
     @State private var notes = ""
     @State private var errorMessage: String?
     @State private var hasRestoredCheckpoint = false
+    @State private var recoveryCheckpointFinalized = false
 
     private struct RecoveryCheckpoint: Codable {
         let mode: String
@@ -456,7 +457,8 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
     }
 
     private func persistRecoveryCheckpoint() {
-        guard checkpointsStandaloneHome, hasRestoredCheckpoint else { return }
+        guard checkpointsStandaloneHome, hasRestoredCheckpoint,
+              !recoveryCheckpointFinalized else { return }
         let record = RecoveryCheckpoint(
             mode: mode.rawValue,
             date: date,
@@ -471,6 +473,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
     }
 
     private func clearRecoveryCheckpoint() {
+        recoveryCheckpointFinalized = true
         guard checkpointsStandaloneHome else { return }
         UserDefaults.standard.removeObject(forKey: recoveryCheckpointKey)
     }
