@@ -6627,7 +6627,18 @@ struct SessionEditorView: View {
         }
     }
 
+    @ViewBuilder
     private var editorBaseForm: some View {
+        if ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+            isStandalone: isStandalone,
+            hasScratchSource: selectedScratchWorkoutType != nil,
+            preparesForSharing: onPreparedWorkout != nil,
+            hasPartner: selectedPartnerID != nil
+        ) {
+            // Only the shared builder owns the editing screen. No old
+            // "Plan extra workout / 0 steps / Edit workout" form behind it.
+            ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
+        } else {
         Form {
             if isStandalone && !hasSelectedWorkoutSource {
                 Section {
@@ -6636,43 +6647,6 @@ struct SessionEditorView: View {
                 .listRowBackground(SwiftUI.Color.clear)
                 .listRowInsets(EdgeInsets(top: 14, leading: 14,
                                           bottom: 14, trailing: 14))
-            } else if isStandalone && selectedScratchWorkoutType != nil {
-                // The old parallel Form, run builder and route picker have
-                // been replaced by the shared studio. Keep only a small
-                // scheduling confirmation when the studio returns.
-                Section {
-                    HStack {
-                        Label(
-                            title.isEmpty
-                                ? selectedScratchWorkoutType?.title ?? "Økt"
-                                : title,
-                            systemImage: selectedScratchWorkoutType?.symbol
-                                ?? "figure.run"
-                        )
-                        .font(.headline)
-                        Spacer()
-                        Text("\(workoutBlocks.count) deløkter")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    DatePicker(
-                        ATHLTHLocalization.choose(
-                            english: "Date and time", norwegian: "Dato og tid"
-                        ), selection: $scheduledTime,
-                        displayedComponents: [.date, .hourAndMinute]
-                    )
-                    Button {
-                        showingUnifiedWorkoutComposer = true
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Edit workout",
-                                norwegian: "Rediger økten"
-                            ), systemImage: "slider.horizontal.3"
-                        )
-                    }
-                }
-                .listRowBackground(ATHLTHPlanDesign.surface)
             } else {
             // Entry from the "Train together" card puts partner selection
             // first while retaining the exact same workout editor.
@@ -6841,6 +6815,7 @@ struct SessionEditorView: View {
         } message: {
             Text(invitationError)
         }
+        } // legacy form only for partner and existing workout flows
     }
 
     private var editorPartnerSheets: some View {
@@ -6904,8 +6879,10 @@ struct SessionEditorView: View {
                                     forKey: scratchComposerEntryKey
                                 )
                             }
-                            // An actual Cancel/Save Draft returns to the
-                            // caller; there is no second editing screen.
+                            // The editor was explicitly closed. Also release
+                            // the Home day-composer restoration intent so it
+                            // cannot reopen the blank legacy host.
+                            onExit?()
                             Task { @MainActor in
                                 await Task.yield()
                                 dismiss()
@@ -6973,7 +6950,17 @@ struct SessionEditorView: View {
                     },
                     onCloseRequested: {
                         scratchBuilderClosedIntentionally = true
-                        onExit?()
+                    },
+                    onDraftDiscarded: {
+                        // Child removes its checkpoint; remove the host's
+                        // separate resume marker too. Prevent onDisappear
+                        // from silently recreating "Fortsett utkast".
+                        guard isStandalone, selectedScratchWorkoutType != nil,
+                              onPreparedWorkout == nil,
+                              selectedPartnerID == nil else { return }
+                        draftFinalized = true
+                        discardStoredStandaloneDraft()
+                        hasSelectedWorkoutSource = false
                     }
                 )
                 .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
@@ -10742,10 +10729,14 @@ struct SessionEditorView: View {
         return try? JSONDecoder().decode(ScratchComposerEntry.self, from: data)
     }
 
-    private var scratchComposerDraftStorageKey: String {
-        let context = "session-scratch.\(session.profile.userID.uuidString).\(scratchTimelineDraftID.uuidString)"
+    private func scratchDraftStorageKey(for id: UUID) -> String {
+        let context = "session-scratch.\(session.profile.userID.uuidString).\(id.uuidString)"
         let encoded = Data(context.utf8).base64EncodedString()
         return "athlth.workoutBuilder.draft.v1.\(session.profile.userID.uuidString).\(encoded)"
+    }
+
+    private var scratchComposerDraftStorageKey: String {
+        scratchDraftStorageKey(for: scratchTimelineDraftID)
     }
 
     private var draftStorageKey: String {
@@ -10769,6 +10760,12 @@ struct SessionEditorView: View {
     private func discardStoredStandaloneDraft() {
         guard isStandalone, existingWorkout == nil,
               onPreparedWorkout == nil else { return }
+        if let existingEntry = loadScratchComposerEntry() {
+            UserDefaults.standard.removeObject(
+                forKey: scratchDraftStorageKey(for: existingEntry.id)
+            )
+        }
+        UserDefaults.standard.removeObject(forKey: scratchComposerDraftStorageKey)
         UserDefaults.standard.removeObject(forKey: draftStorageKey)
         UserDefaults.standard.removeObject(forKey: scratchComposerEntryKey)
         hasStoredStandaloneDraft = false

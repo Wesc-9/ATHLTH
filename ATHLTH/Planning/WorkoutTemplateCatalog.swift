@@ -4225,6 +4225,9 @@ struct WorkoutTemplateBuilderView: View {
     /// Distinguishes an explicit Save/Cancel from an iOS sheet that vanished
     /// during backgrounding. Only the standalone scratch host supplies it.
     private let onCloseRequested: (() -> Void)?
+    /// Called only for explicit destructive deletion, never for Save Draft.
+    /// The host also owns a legacy resume marker, which must be removed.
+    private let onDraftDiscarded: (() -> Void)?
 
     init(
         initialTitle: String = "",
@@ -4252,7 +4255,8 @@ struct WorkoutTemplateBuilderView: View {
         onValidateSave: ((PlannedSession) -> String?)? = nil,
         saveButtonTitle: String? = nil,
         onCloseInline: (() -> Void)? = nil,
-        onCloseRequested: (() -> Void)? = nil
+        onCloseRequested: (() -> Void)? = nil,
+        onDraftDiscarded: (() -> Void)? = nil
     ) {
         let startBlank = ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
             initialTitle: initialTitle,
@@ -4353,6 +4357,7 @@ struct WorkoutTemplateBuilderView: View {
         self.saveButtonTitle = saveButtonTitle
         self.onCloseInline = onCloseInline
         self.onCloseRequested = onCloseRequested
+        self.onDraftDiscarded = onDraftDiscarded
     }
 
     private struct StoredWorkoutDraft: Codable {
@@ -5626,8 +5631,11 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Cancel", "Avbryt")) {
-                        if !blocks.isEmpty || !title.isEmpty ||
-                           selectedRouteID != nil || !studioVisiblePhases.isEmpty {
+                        if ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
+                            isScratchHost: onCloseRequested != nil,
+                            hasEdits: !blocks.isEmpty || !title.isEmpty ||
+                                selectedRouteID != nil || !studioVisiblePhases.isEmpty
+                        ) {
                             showingDiscardConfirmation = true
                         } else {
                             closeWorkoutEditor()
@@ -5637,7 +5645,7 @@ struct WorkoutTemplateBuilderView: View {
             }
             .sheet(isPresented: $showingDiscardConfirmation) {
                 ATHLTHDiscardDraftSheet(
-                    kind: .workout,
+                    kind: onCloseRequested != nil ? .standaloneWorkoutDraft : .workout,
                     onKeepEditing: {
                         showingDiscardConfirmation = false
                     },
@@ -5652,7 +5660,10 @@ struct WorkoutTemplateBuilderView: View {
                         // The onDisappear draft observer must not recreate
                         // the deleted checkpoint after dismissing this view.
                         draftFinished = true
+                        pendingDraftCheckpoint?.cancel()
+                        pendingDraftCheckpoint = nil
                         UserDefaults.standard.removeObject(forKey: draftStorageKey)
+                        onDraftDiscarded?()
                         showingDiscardConfirmation = false
                         closeWorkoutEditor()
                     }

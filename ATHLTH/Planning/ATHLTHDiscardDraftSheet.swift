@@ -6,6 +6,7 @@ import SwiftUI
 struct ATHLTHDiscardDraftSheet: View {
     enum Kind: Equatable {
         case workout
+        case standaloneWorkoutDraft
         case trainingPlan
         case savedTrainingPlanDraft
 
@@ -15,6 +16,11 @@ struct ATHLTHDiscardDraftSheet: View {
                 return ATHLTHLocalization.choose(
                     english: "Leave workout planning?",
                     norwegian: "Avslutte øktplanleggingen?"
+                )
+            case .standaloneWorkoutDraft:
+                return ATHLTHLocalization.choose(
+                    english: "What do you want to do with this draft?",
+                    norwegian: "Hva vil du gjøre med utkastet?"
                 )
             case .trainingPlan:
                 return ATHLTHLocalization.choose(
@@ -36,6 +42,11 @@ struct ATHLTHDiscardDraftSheet: View {
                     english: "Your changes are not yet saved as a workout. Keep editing or save the draft for later.",
                     norwegian: "Endringene er ikke lagret som treningsøkt. Du kan fortsette eller beholde utkastet til senere."
                 )
+            case .standaloneWorkoutDraft:
+                return ATHLTHLocalization.choose(
+                    english: "Keep editing, save the draft for later or permanently delete it. Your planned workouts are unaffected.",
+                    norwegian: "Fortsett å redigere, behold utkastet til senere eller slett det. Planlagte økter blir ikke berørt."
+                )
             case .trainingPlan:
                 return ATHLTHLocalization.choose(
                     english: "Your plan is not finished. Save the draft to continue building it later.",
@@ -55,7 +66,7 @@ struct ATHLTHDiscardDraftSheet: View {
                 return ATHLTHLocalization.choose(
                     english: "Discard draft", norwegian: "Forkast utkast"
                 )
-            case .savedTrainingPlanDraft:
+            case .savedTrainingPlanDraft, .standaloneWorkoutDraft:
                 return ATHLTHLocalization.choose(
                     english: "Delete draft", norwegian: "Slett utkast"
                 )

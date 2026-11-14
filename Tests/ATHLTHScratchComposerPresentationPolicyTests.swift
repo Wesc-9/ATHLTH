@@ -2,6 +2,37 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHScratchComposerPresentationPolicyTests: XCTestCase {
+    func testStandaloneScratchHidesOldFormWithoutHidingPartnerEditor() {
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+            isStandalone: true, hasScratchSource: true,
+            preparesForSharing: false, hasPartner: false
+        ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+            isStandalone: true, hasScratchSource: false,
+            preparesForSharing: false, hasPartner: false
+        ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+            isStandalone: true, hasScratchSource: true,
+            preparesForSharing: false, hasPartner: true
+        ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+            isStandalone: false, hasScratchSource: true,
+            preparesForSharing: false, hasPartner: false
+        ))
+    }
+
+    func testScratchBackAlwaysOffersDeleteEvenWithEmptyTimeline() {
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
+            isScratchHost: true, hasEdits: false
+        ))
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
+            isScratchHost: false, hasEdits: true
+        ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
+            isScratchHost: false, hasEdits: false
+        ))
+    }
+
     func testSoloScratchSessionSavesWithoutLegacySecondScreen() {
         XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.savesDirectly(
             isStandalone: true,
