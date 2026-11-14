@@ -733,6 +733,22 @@ struct RouteDetailView: View {
         return ATHLTHCard {
             if coordinates.count >= 2 {
                 VStack(alignment: .leading, spacing: 10) {
+                    if showingOfflineMap && downloaded.has(currentRoute) {
+                        Group {
+                            if let image = offlineRouteSnapshot {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                            } else {
+                                RouteMapSnapshotThumbnail(
+                                    route: currentRoute, height: 270
+                                )
+                            }
+                        }
+                        .frame(height: 270)
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                    } else {
                     Map(initialPosition: .region(region(for: currentRoute))) {
                         if let turnaround {
                             MapPolyline(coordinates: Array(coordinates[...turnaround]))
@@ -814,6 +830,7 @@ struct RouteDetailView: View {
                     .frame(height: 270)
                     .clipShape(RoundedRectangle(cornerRadius: 20,
                                                 style: .continuous))
+                    }
 
                     if turnaround != nil {
                         HStack(spacing: 14) {
