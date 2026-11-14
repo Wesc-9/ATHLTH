@@ -109,6 +109,40 @@ final class ATHLTHLibraryWorkoutHistoryTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testRunningHistoryIndexPreservesExactIdentityAndNewestRecord() throws {
+        let sourceID = UUID()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var watch = WatchWorkoutResult(
+            id: UUID(), kind: .running, healthKitWorkoutUUID: nil,
+            startedAt: now.addingTimeInterval(-600), endedAt: now,
+            duration: 600, activeCalories: 100, distanceMeters: 1_500,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+        )
+        watch.structuredWorkoutSourceID = sourceID
+        watch.structuredWorkoutFullyCompleted = true
+        watch.recordedRunningSteps = [
+            ATHLTHRecordedRunningStep(
+                index: 0, title: "Run", phase: "main",
+                activeSeconds: 600, distanceMeters: 1_500,
+                isUserReported: false, targetPaceSecondsPerKilometer: nil
+            )
+        ]
+        let first = try XCTUnwrap(ATHLTHCompletedRunningPerformance(watch: watch))
+        watch.endedAt = now.addingTimeInterval(3_600)
+        let last = try XCTUnwrap(ATHLTHCompletedRunningPerformance(watch: watch))
+        let history = [first, last]
+        let index = ATHLTHLibraryWorkoutHistory.runningIndex(records: history)
+        XCTAssertEqual(index[sourceID],
+                       ATHLTHLibraryWorkoutHistory.running(
+                           id: sourceID, records: history
+                       ))
+        XCTAssertEqual(index[sourceID]?.date, watch.endedAt)
+        XCTAssertNil(index[UUID()])
+        XCTAssertTrue(ATHLTHLibraryWorkoutHistory.runningIndex(
+            records: []
+        ).isEmpty)
+    }
+
     func testNoHistoryMeansNoSummary() {
         XCTAssertNil(ATHLTHLibraryWorkoutHistory.catalogOriginal(
             id: UUID(), completions: []))
