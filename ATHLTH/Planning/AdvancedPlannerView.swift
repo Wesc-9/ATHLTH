@@ -7287,11 +7287,17 @@ struct SessionEditorView: View {
     private var editorLifecycle: some View {
         AnyView(editorDetailSheets)
             .onAppear {
-                // Reopen the actual scratch editor on a later visit. The
-                // parent "Plan extra workout" Form is only an implementation
-                // detail and must not replace an in-progress builder.
-                if !draftRestored, isStandalone, onPreparedWorkout == nil,
+                // Restore the last visible Home card before the general
+                // source-picker policy can reset a cold-launched editor.
+                if restoreOpenNavigationStageIfNeeded() {
+                    // The account-scoped route owns this presentation.
+                } else if !draftRestored, isStandalone, onPreparedWorkout == nil,
                    selectedPartnerID == nil,
+                   // A deliberately new session must offer the source card,
+                   // even when an old saved scratch draft exists.
+                   ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+                       for: session.profile.userID
+                   ) == nil,
                    let saved = loadScratchComposerEntry() {
                     scratchTimelineDraftID = saved.id
                     selectedScratchWorkoutType = saved.type
@@ -7308,9 +7314,13 @@ struct SessionEditorView: View {
                         }
                     }
                 } else {
-                let existingDraft = UserDefaults.standard.data(
-                    forKey: draftStorageKey
-                ) != nil
+                let existingDraft = shouldTrackOpenNavigation
+                    ? ATHLTHStandaloneWorkoutDraftStore.hasDraft(
+                        for: session.profile.userID
+                      )
+                    : UserDefaults.standard.data(
+                        forKey: draftStorageKey
+                      ) != nil
                 if SessionEditorEntryRouting.requiresSourceChoice(
                     isStandalone: isStandalone,
                     hasExistingWorkout: existingWorkout != nil,
@@ -7362,15 +7372,32 @@ struct SessionEditorView: View {
                         scratchResumingSavedComposer = true
                     }
                     persistDraft()
-                } else if restoreScratchComposerOnWake && !draftFinalized {
-                    Task { @MainActor in
-                        await Task.yield()
-                        guard restoreScratchComposerOnWake && !draftFinalized else {
-                            return
+                } else {
+                    // iOS can tear down a sheet without tearing down the
+                    // editor view. Re-present its saved destination on wake.
+                    presentQueuedNavigationIfNeeded()
+                    if shouldTrackOpenNavigation && queuedNavigationStage == nil,
+                       let stage = ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+                            for: session.profile.userID
+                       ) {
+                        switch stage {
+                        case .scratchTypePicker where !showingScratchTypePicker,
+                             .savedWorkoutPicker where !showingSavedWorkoutPicker,
+                             .recoveryRestPlanner where !showingRecoveryRestPlanner:
+                            queueNavigationPresentation(stage)
+                        default: break
                         }
-                        restoreScratchComposerOnWake = false
-                        if !showingUnifiedWorkoutComposer {
-                            showingUnifiedWorkoutComposer = true
+                    }
+                    if restoreScratchComposerOnWake && !draftFinalized {
+                        Task { @MainActor in
+                            await Task.yield()
+                            guard restoreScratchComposerOnWake && !draftFinalized else {
+                                return
+                            }
+                            restoreScratchComposerOnWake = false
+                            if !showingUnifiedWorkoutComposer {
+                                showingUnifiedWorkoutComposer = true
+                            }
                         }
                     }
                 }
