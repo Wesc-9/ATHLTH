@@ -202,6 +202,7 @@ struct RouteDetailView: View {
                             )
                         }
 
+                        if currentRoute.sharedSourceRouteID == nil && !isPublicTrail {
                         Button {
                             beginMetadataEdit()
                         } label: {
@@ -212,6 +213,7 @@ struct RouteDetailView: View {
                                 ),
                                 systemImage: "tag"
                             )
+                        }
                         }
 
                         NavigationLink {
@@ -448,6 +450,104 @@ struct RouteDetailView: View {
                 ""
             )
         }
+    }
+
+    private var routeStartCoordinate: CLLocationCoordinate2D? {
+        ATHLTHRouteDetailsPolicy.ordered(currentRoute).first?.coordinate
+    }
+
+    private var routeEndCoordinate: CLLocationCoordinate2D? {
+        ATHLTHRouteDetailsPolicy.ordered(currentRoute).last?.coordinate
+    }
+
+    private var distanceToStartKilometers: Double? {
+        guard let location = routeLocation.location,
+              let start = routeStartCoordinate,
+              CLLocationCoordinate2DIsValid(start) else { return nil }
+        return location.distance(from: CLLocation(
+            latitude: start.latitude, longitude: start.longitude
+        )) / 1_000
+    }
+
+    private var resolvedProfileSamples: [Double] {
+        if let profile = publicTrailMetadata?.elevationProfile,
+           profile.count >= 2 {
+            return profile.filter { $0.isFinite }
+        }
+        return ATHLTHRouteDetailsPolicy.elevationSamples(currentRoute)
+    }
+
+    private var resolvedWalkEstimate: TimeInterval? {
+        if let seconds = publicTrailMetadata?.estimatedWalkSeconds,
+           seconds > 0 { return seconds }
+        if let seconds = currentRoute.expectedTravelTimeSeconds,
+           seconds > 0,
+           currentRoute.routeSource?.contains("apple_maps_walking") == true {
+            return seconds
+        }
+        return ATHLTHRouteDetailsPolicy.estimateSeconds(
+            distanceKilometers: currentRoute.distanceKilometers,
+            running: false
+        )
+    }
+
+    private var resolvedRunEstimate: TimeInterval? {
+        if let seconds = publicTrailMetadata?.estimatedRunSeconds,
+           seconds > 0 { return seconds }
+        return ATHLTHRouteDetailsPolicy.estimateSeconds(
+            distanceKilometers: currentRoute.distanceKilometers,
+            running: true
+        )
+    }
+
+    private var routeTypeTitle: String {
+        if let shape = publicTrailMetadata?.routeShape?.lowercased() {
+            switch shape {
+            case "loop", "circuit": return ATHLTHRouteDetailsPolicy.Shape.loop.label
+            case "out-and-back", "out_and_back", "return":
+                return ATHLTHRouteDetailsPolicy.Shape.outAndBack.label
+            case "point-to-point", "point_to_point", "linear":
+                return ATHLTHRouteDetailsPolicy.Shape.pointToPoint.label
+            default: break
+            }
+        }
+        return ATHLTHRouteDetailsPolicy.shape(currentRoute).label
+    }
+
+    private func beginMetadataEdit() {
+        guard isOwner, !isPublicTrail,
+              currentRoute.sharedSourceRouteID == nil else { return }
+        draftTags = currentRoute.tags ?? []
+        draftSurfaces = currentRoute.surfacePercentages ?? [:]
+        showingMetadataEditor = true
+    }
+
+    private func saveRouteMetadata() {
+        guard isOwner, !isPublicTrail,
+              currentRoute.sharedSourceRouteID == nil else { return }
+        session.updateSavedRouteMetadata(
+            currentRoute.id,
+            tags: draftTags,
+            surfacePercentages: draftSurfaces
+        )
+        showingMetadataEditor = false
+        if let updated = session.savedRoutes.first(where: { $0.id == currentRoute.id }) {
+            Task {
+                await discovery.publish(updated)
+            }
+        }
+    }
+
+    private func openDirectionsToStart() {
+        guard let start = routeStartCoordinate,
+              CLLocationCoordinate2DIsValid(start) else { return }
+        let destination = MKMapItem(placemark: MKPlacemark(coordinate: start))
+        destination.name = currentRoute.startName ?? currentRoute.title
+        _ = destination.openInMaps(
+            launchOptions: [
+                MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking
+            ]
+        )
     }
 
     private var mapCard: some View {
