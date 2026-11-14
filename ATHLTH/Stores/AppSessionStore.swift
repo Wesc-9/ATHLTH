@@ -5208,7 +5208,17 @@ final class AppSessionStore: ObservableObject {
 
         savedWorkoutTemplates.insert(copy, at: 0)
         persistSavedWorkoutTemplates()
-        ATHLTHWorkoutMainSectionLibrary.capture(copy, userID: profile.userID)
+        // This is a derived library index, not the saved workout itself.
+        // Defer its disk read/encode/write so a tap can navigate immediately.
+        // The session is already account-scoped and queued for persistence.
+        let savedSnapshot = copy
+        let accountID = profile.userID
+        Task { @MainActor in
+            await Task.yield()
+            ATHLTHWorkoutMainSectionLibrary.capture(
+                savedSnapshot, userID: accountID
+            )
+        }
         return copy.id
     }
 
