@@ -42,6 +42,14 @@ struct TrainingPlanProgressSnapshot {
 }
 
 
+/// Actual recording times belong to a specific calendar session ID.
+///// The planned duration remains unchanged; finish is never inferred from it.
+struct ATHLTHPlannedWorkoutRecordedTimes: Codable, Equatable {
+    var startedAt: Date
+    var endedAt: Date?
+    var startedOnWatch: Bool
+}
+
 struct AccountTrainingContent: Codable {
     var activePlan: TrainingPlan?
     // Optional for backwards-compatible decoding of existing local backups.
@@ -51,6 +59,8 @@ struct AccountTrainingContent: Codable {
     var planTemplates: [TrainingPlan]
     var savedWorkoutTemplates: [PlannedSession]
     var standalonePlannedSessions: [PlannedSession]? = nil
+    // Optional for previously saved accounts.
+    var recordedPlannedWorkoutTimes: [String: ATHLTHPlannedWorkoutRecordedTimes]? = nil
     var manuallyCompletedPlanSessions: Set<String>
     var skippedPlanSessions: Set<String>? = nil
     // Explicit user-approved Apple Health to planned-session associations.
@@ -76,6 +86,8 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var planTemplates: [TrainingPlan]
     @Published private(set) var savedWorkoutTemplates: [PlannedSession]
     @Published private(set) var standalonePlannedSessions: [PlannedSession]
+    @Published private(set) var recordedPlannedWorkoutTimes:
+        [String: ATHLTHPlannedWorkoutRecordedTimes]
     @Published private(set) var manuallyCompletedPlanSessions: Set<String>
     @Published private(set) var skippedPlanSessions: Set<String>
     @Published private(set) var linkedHealthWorkoutsByPlanSession: [String: UUID]
@@ -124,6 +136,7 @@ final class AppSessionStore: ObservableObject {
         self.planTemplates = []
         self.savedWorkoutTemplates = []
         self.standalonePlannedSessions = []
+        self.recordedPlannedWorkoutTimes = [:]
         self.manuallyCompletedPlanSessions = []
         self.skippedPlanSessions = []
         self.linkedHealthWorkoutsByPlanSession = [:]
@@ -710,6 +723,7 @@ final class AppSessionStore: ObservableObject {
         planTemplates = []
         savedWorkoutTemplates = []
         standalonePlannedSessions = []
+        recordedPlannedWorkoutTimes = [:]
         manuallyCompletedPlanSessions = []
         skippedPlanSessions = []
         linkedHealthWorkoutsByPlanSession = [:]
@@ -2071,6 +2085,154 @@ final class AppSessionStore: ObservableObject {
         replaceTrainingPlan(plan)
         PlannedWorkoutReminderScheduler.cancel(workoutID)
         return true
+    }
+
+
+    /// Only a confirmed recording start should call this method. It updates
+    /// the original session rather than creating a second calendar workout.
+    /// An early start on tomorrow's plan first relocates the session to today.
+    @discardableResult
+    func recordPlannedWorkoutStarted(
+        workoutID: UUID,
+        startedAt: Date,
+        startedOnWatch: Bool
+    ) -> Bool {
+        let key = workoutID.uuidString
+        // A delayed second callback must never overwrite the first start.
+        guard recordedPlannedWorkoutTimes[key] == nil else { return false }
+
+        let original = standalonePlannedSessions.first(where: { $0.id == workoutID })
+            ?? ([activePlan].compactMap { $0 } + scheduledPlans)
+                .flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == workoutID })
+        guard let original, !original.isExplicitRestDay,
+              original.scheduledStart != nil else { return false }
+
+        if Calendar.current.isDateInTomorrow(original.scheduledStart!) {
+            guard moveStartedTomorrowWorkoutToToday(
+                workoutID: workoutID, startedAt: startedAt
+            ) else { return false }
+        }
+        guard updateStartedPlannedWorkoutClock(workoutID: workoutID, at: startedAt)
+        else { return false }
+
+        recordedPlannedWorkoutTimes[key] = ATHLTHPlannedWorkoutRecordedTimes(
+            startedAt: startedAt,
+            endedAt: nil,
+            startedOnWatch: startedOnWatch
+        )
+        PlannedWorkoutReminderScheduler.cancel(workoutID)
+        persistAccountContent(immediate: true)
+        return true
+    }
+
+    /// Keeps the exact session ID and its planned recipe; the displayed
+    /// calendar time becomes the real recorded start, never an estimate.
+    @discardableResult
+    private func updateStartedPlannedWorkoutClock(
+        workoutID: UUID,
+        at startedAt: Date
+    ) -> Bool {
+        if let index = standalonePlannedSessions.firstIndex(
+            where: { $0.id == workoutID }
+        ) {
+            var session = standalonePlannedSessions[index]
+            session.scheduledStart = startedAt
+            updateStandalonePlannedSession(session)
+            return true
+        }
+
+        let candidates = ([activePlan].compactMap { $0 } + scheduledPlans)
+        guard var plan = candidates.first(where: {
+            $0.weeks.flatMap(\.days).flatMap(\.sessions)
+                .contains(where: { $0.id == workoutID })
+        }) else { return false }
+
+        var found = false
+        for wi in plan.weeks.indices {
+            for di in plan.weeks[wi].days.indices {
+                if let index = plan.weeks[wi].days[di].sessions.firstIndex(
+                    where: { $0.id == workoutID }
+                ) {
+                    plan.weeks[wi].days[di].sessions[index].scheduledStart =
+                        startedAt
+                    found = true
+                    break
+                }
+            }
+            if found { break }
+        }
+        guard found else { return false }
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
+    }
+
+    func recordedTimes(for workoutID: UUID) -> ATHLTHPlannedWorkoutRecordedTimes? {
+        recordedPlannedWorkoutTimes[workoutID.uuidString]
+    }
+
+    /// A finish is recorded only against an actual started session ID.
+    /// No duration target, planned end or same-title activity may populate it.
+    @discardableResult
+    func recordPlannedWorkoutFinished(
+        workoutID: UUID,
+        recordedStart: Date,
+        endedAt: Date
+    ) -> Bool {
+        let key = workoutID.uuidString
+        guard var timing = recordedPlannedWorkoutTimes[key],
+              endedAt >= recordedStart,
+              abs(timing.startedAt.timeIntervalSince(recordedStart)) < 180,
+              timing.endedAt == nil else { return false }
+        // HealthKit/Watch carries the authoritative start if it differs by a
+        // few seconds from the phone's remote-launch acknowledgement.
+        if timing.startedAt != recordedStart {
+            guard updateStartedPlannedWorkoutClock(
+                workoutID: workoutID, at: recordedStart
+            ) else { return false }
+            timing.startedAt = recordedStart
+        }
+        timing.endedAt = endedAt
+        recordedPlannedWorkoutTimes[key] = timing
+        persistAccountContent(immediate: true)
+        return true
+    }
+
+    /// Watch completion has no mandatory calendar ID on older builds.
+    /// Match by a real source ID, or by a single pending Watch start within
+    /// three minutes of the Watch's own recorded start. Never use title only.
+    func recordPlannedWatchWorkoutFinished(_ result: WatchWorkoutResult) {
+        let explicitIDs = [
+            result.structuredWorkoutSourceID,
+            result.strengthSnapshot?.workoutID
+        ].compactMap { $0 }
+        if let matchedID = explicitIDs.first(where: {
+            recordedPlannedWorkoutTimes[$0.uuidString] != nil
+        }) {
+            _ = recordPlannedWorkoutFinished(
+                workoutID: matchedID,
+                recordedStart: result.startedAt,
+                endedAt: result.endedAt
+            )
+            return
+        }
+        let candidates = recordedPlannedWorkoutTimes.compactMap {
+            (key, timing) -> UUID? in
+            guard timing.startedOnWatch, timing.endedAt == nil,
+                  abs(timing.startedAt.timeIntervalSince(result.startedAt)) < 180
+            else { return nil }
+            return UUID(uuidString: key)
+        }
+        guard candidates.count == 1, let matchedID = candidates.first else {
+            return
+        }
+        _ = recordPlannedWorkoutFinished(
+            workoutID: matchedID,
+            recordedStart: result.startedAt,
+            endedAt: result.endedAt
+        )
     }
 
     @discardableResult
@@ -5381,6 +5543,7 @@ final class AppSessionStore: ObservableObject {
             planTemplates: planTemplates,
             savedWorkoutTemplates: savedWorkoutTemplates,
             standalonePlannedSessions: standalonePlannedSessions,
+            recordedPlannedWorkoutTimes: recordedPlannedWorkoutTimes,
             manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
             skippedPlanSessions: skippedPlanSessions,
             linkedHealthWorkoutsByPlanSession: linkedHealthWorkoutsByPlanSession,
@@ -5492,6 +5655,7 @@ final class AppSessionStore: ObservableObject {
                     ($0.scheduledStart ?? .distantFuture) <
                     ($1.scheduledStart ?? .distantFuture)
                 }
+        recordedPlannedWorkoutTimes = stored?.recordedPlannedWorkoutTimes ?? [:]
         manuallyCompletedPlanSessions = stored?.manuallyCompletedPlanSessions ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadManuallyCompletedPlanSessions(from: defaults) : [])
         skippedPlanSessions = stored?.skippedPlanSessions ?? []
         linkedHealthWorkoutsByPlanSession = stored?.linkedHealthWorkoutsByPlanSession ?? [:]
