@@ -2944,6 +2944,19 @@ struct HomeWeeklyProgressStrip:
             return standalone
         }
 
+        // Always resolve dated plans by each session's actual calendar date,
+        // not only by the plan's original day bucket. A tomorrow workout
+        // recorded today must appear today, including before plan start.
+        if plan.startDate != nil {
+            let scheduled = session.plannedSessions(on: date, in: plan)
+            let standaloneIDs = Set(standalone.map(\.id))
+            return (scheduled.filter { !standaloneIDs.contains($0.id) } +
+                    standalone).sorted {
+                ($0.scheduledStart ?? .distantFuture) <
+                    ($1.scheduledStart ?? .distantFuture)
+            }
+        }
+
         let weekIndex: Int
         let dayIndex: Int
 
@@ -4523,12 +4536,24 @@ private struct HomeWeeklyProgressDaySheet: View {
         let completed = !workout.isExplicitRestDay &&
             selection.completedPlannedIDs.contains(workout.id)
 
+        let recordedTimes = session.recordedTimes(for: workout.id)
         return HStack(spacing: 10) {
-            Text(workout.scheduledStart?.formatted(date: .omitted, time: .shortened) ?? "—:—")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                .frame(width: 49, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text((recordedTimes?.startedAt ?? workout.scheduledStart)?
+                    .formatted(date: .omitted, time: .shortened) ?? "—:—")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                if let end = recordedTimes?.endedAt {
+                    Text("–" + end.formatted(
+                        date: .omitted, time: .shortened
+                    ))
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+            .monospacedDigit()
+            .frame(width: 49, alignment: .leading)
+            .accessibilityElement(children: .combine)
 
             Image(systemName:
                 completed ? "checkmark" :
@@ -4568,7 +4593,9 @@ private struct HomeWeeklyProgressDaySheet: View {
                 ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
                 : workout.isExplicitRestDay
                     ? ATHLTHLocalization.choose(english: "Rest", norwegian: "Hvile")
-                    : ATHLTHLocalization.choose(english: "Planned", norwegian: "Planlagt"))
+                    : recordedTimes != nil
+                        ? ATHLTHLocalization.choose(english: "In progress", norwegian: "Pågår")
+                        : ATHLTHLocalization.choose(english: "Planned", norwegian: "Planlagt"))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(completed
                     ? ATHLTHTheme.vitality
