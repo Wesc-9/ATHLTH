@@ -36,6 +36,7 @@ on:
       - ATHLTH/Routes/PublicTrailDiscoveryStore.swift
       - ATHLTH/Home/HomeAroundYouView.swift
       - Tests/ATHLTHExploreRoutePolicyTests.swift
+      - Tests/ATHLTHPublicTrailDiskCacheTests.swift
       - ATHLTH/Planning/ATHLTHPlannedWorkoutTypePickerView.swift
       - .github/testflight-trigger
       - .github/workflows/launch-smoke.yml
@@ -171,6 +172,7 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/HybridTests.xcresult" \
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
             -only-testing:ATHLTHTests/ATHLTHExploreRoutePolicyTests \
+            -only-testing:ATHLTHTests/ATHLTHPublicTrailDiskCacheTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
             -only-testing:ATHLTHTests/ATHLTHUnifiedMixedWorkoutPlanTests \
             -only-testing:ATHLTHTests/StrengthActiveExerciseQueueTests \
