@@ -951,6 +951,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var selectedMuscleFocus = "all"
     @State private var selectedWorkoutLevel = "all"
     @State private var selectedStrengthMuscles: Set<String> = []
+    @State private var selectedStrengthStyle: WorkoutBlockGroupKind?
     @State private var selectedRunningType: RunningWorkoutType?
     @State private var selectedWorkoutDuration:
         ATHLTHWorkoutDiscoveryFilter.Duration = .any
@@ -1232,6 +1233,7 @@ struct WorkoutTemplateLibraryView: View {
 
     private func clearStrengthFilters() {
         selectedStrengthMuscles.removeAll()
+        selectedStrengthStyle = nil
         selectedWorkoutLevel = "all"
         selectedWorkoutDuration = .any
         selectedExerciseName = nil
@@ -1286,12 +1288,14 @@ struct WorkoutTemplateLibraryView: View {
             runningType: isRunningScope ? selectedRunningType : nil,
             duration: (isStrengthScope || isRunningScope)
                 ? selectedWorkoutDuration : .any,
-            exerciseName: isStrengthScope ? selectedExerciseName : nil
+            exerciseName: isStrengthScope ? selectedExerciseName : nil,
+            strengthStyle: isStrengthScope ? selectedStrengthStyle : nil
         )
     }
 
     private var hasDiscoveryFilters: Bool {
         !selectedStrengthMuscles.isEmpty ||
+        selectedStrengthStyle != nil ||
         selectedRunningType != nil ||
         selectedWorkoutDuration != .any ||
         selectedExerciseName != nil ||
@@ -1716,6 +1720,7 @@ struct WorkoutTemplateLibraryView: View {
                                 if category != "Strength" {
                                     selectedMuscleFocus = "all"
                                     selectedStrengthMuscles.removeAll()
+                                    selectedStrengthStyle = nil
                                     selectedWorkoutLevel = "all"
                                     selectedExerciseName = nil
                                 }
@@ -1748,6 +1753,39 @@ struct WorkoutTemplateLibraryView: View {
 
                 if isStrengthScope {
                     strengthRefinementBar
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            Button {
+                                selectedStrengthStyle = nil
+                            } label: {
+                                filterChip(
+                                    ATHLTHLocalization.choose(
+                                        english: "All formats", norwegian: "Alle øktformer"
+                                    ),
+                                    systemImage: "square.grid.2x2",
+                                    selected: selectedStrengthStyle == nil
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(
+                                selectedStrengthStyle == nil ? [.isSelected] : []
+                            )
+                            ForEach([
+                                WorkoutBlockGroupKind.superset, .circuit, .emom, .amrap
+                            ], id: \.self) { style in
+                                Button {
+                                    selectedStrengthStyle = style
+                                } label: {
+                                    filterChip(style.title, systemImage: style.symbol,
+                                               selected: selectedStrengthStyle == style)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(
+                                    selectedStrengthStyle == style ? [.isSelected] : []
+                                )
+                            }
+                        }
+                    }
                 } else if initialCategory != nil || isRunningScope {
                     activityDiscoveryFilters
                 }
@@ -1952,6 +1990,7 @@ struct WorkoutTemplateLibraryView: View {
                                 english: "Clear filters", norwegian: "Nullstill filtre"
                             )) {
                                 selectedStrengthMuscles = []
+                                selectedStrengthStyle = nil
                                 selectedRunningType = nil
                                 selectedWorkoutDuration = .any
                                 selectedWorkoutLevel = "all"
