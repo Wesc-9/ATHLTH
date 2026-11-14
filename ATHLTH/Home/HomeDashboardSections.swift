@@ -442,7 +442,7 @@ struct HomeHealthMetricStrip: View {
         // Refresh the real seven-day bars whenever HealthKit publishes fresh
         // data. Previously this one-shot task never reran after the first
         // Health refresh, leaving old/empty bars until a full view reload.
-        .task(id: "\(isActive)-\(health.lastSuccessfulRefreshAt?.timeIntervalSince1970 ?? 0)") {
+        .task(id: "\(isActive)|\(health.lastSuccessfulRefreshAt?.timeIntervalSince1970 ?? 0)|\(health.training.stepsToday ?? -1)") {
             guard isActive else { return }
             let readings = await health.insightDailyValues(
                 for: .steps,
