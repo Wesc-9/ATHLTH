@@ -74,6 +74,41 @@ final class ATHLTHLibraryWorkoutHistoryTests: XCTestCase {
         XCTAssertNotEqual(template.plannedSession().id, template.id)
     }
 
+    func testCatalogHistoryIndexMatchesIdentityBasedLookups() {
+        let catalogID = UUID()
+        let personalID = UUID()
+        let planID = UUID()
+        let earlier = Date(timeIntervalSince1970: 1_700_000_000)
+        let later = earlier.addingTimeInterval(3_600)
+        let history = [
+            completion(workoutID: catalogID, templateID: catalogID, date: earlier),
+            completion(workoutID: catalogID, templateID: catalogID, date: later),
+            completion(workoutID: personalID, templateID: catalogID,
+                       date: later.addingTimeInterval(3_600)),
+            completion(workoutID: catalogID, templateID: catalogID,
+                       date: later.addingTimeInterval(7_200), planID: planID)
+        ]
+        let index = ATHLTHLibraryWorkoutHistory.catalogOriginalIndex(
+            completions: history
+        )
+        XCTAssertEqual(index[catalogID],
+                       ATHLTHLibraryWorkoutHistory.catalogOriginal(
+                           id: catalogID, completions: history
+                       ))
+        XCTAssertEqual(index[catalogID]?.date, later)
+        XCTAssertNil(index[UUID()])
+        XCTAssertEqual(index[personalID],
+                       ATHLTHLibraryWorkoutHistory.catalogOriginal(
+                           id: personalID, completions: history
+                       ))
+    }
+
+    func testCatalogHistoryIndexHandlesEmptyData() {
+        XCTAssertTrue(ATHLTHLibraryWorkoutHistory.catalogOriginalIndex(
+            completions: []
+        ).isEmpty)
+    }
+
     func testNoHistoryMeansNoSummary() {
         XCTAssertNil(ATHLTHLibraryWorkoutHistory.catalogOriginal(
             id: UUID(), completions: []))
