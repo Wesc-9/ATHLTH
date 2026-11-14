@@ -201,6 +201,60 @@ struct ATHLTHiPadLiveWorkoutStatusCard: View {
             .onChange(of: live.remote?.id) { _, newID in
                 if newID != nil { showingAccess = false }
             }
+        } else if ATHLTHDeviceRole.isIPad && account.signedIn {
+            // A permanent, light-weight connection row belongs near the top
+            // of Studio so athletes can tell whether detection is working.
+            // Do not claim that the iPhone is idle when network reads fail.
+            HStack(spacing: 12) {
+                Image(systemName: live.presenceConnectionIssue
+                    ? "wifi.exclamationmark" : "iphone.gen3.radiowaves.left.and.right")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 32, height: 32)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 10))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(live.presenceConnectionIssue
+                        ? tr("Cannot update iPhone workout status",
+                             "Kan ikke oppdatere iPhone-status")
+                        : live.hasCheckedPresence
+                            ? tr("No workout detected on iPhone",
+                                 "Ingen pågående økt registrert")
+                            : tr("Checking iPhone workout status",
+                                 "Sjekker øktstatus på iPhone"))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(live.presenceConnectionIssue
+                        ? tr("Check connection and try again",
+                             "Sjekk tilkoblingen og prøv igjen")
+                        : tr("An active workout will appear here. Detailed viewing requires iPhone approval.",
+                             "Aktive økter vises her. Detaljer krever godkjenning på iPhone."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 4)
+                if live.presenceConnectionIssue {
+                    Button {
+                        Task {
+                            await live.refreshPresenceNow(
+                                accountID: account.profile.userID
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr("Retry connection", "Prøv igjen"))
+                }
+            }
+            .padding(.horizontal, 15)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(ATHLTHPlanDesign.surface,
+                        in: RoundedRectangle(cornerRadius: 16))
+            .accessibilityIdentifier("athlth-ipad-workout-connection-status")
         }
     }
 }
