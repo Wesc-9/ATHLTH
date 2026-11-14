@@ -3892,6 +3892,8 @@ struct MyTrainingPlansLibraryView: View {
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
     @State private var libraryWidth: CGFloat = 390
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
+    @State private var preferredColumns = 0
     @State private var query = ""
     @State private var searchExpanded = false
     @State private var favoritesOnly = false
@@ -3912,66 +3914,53 @@ struct MyTrainingPlansLibraryView: View {
 
     private var cardColumns: [GridItem] {
         ATHLTHLibraryResponsiveLayout.columns(
-            mode: .list,
+            mode: displayMode,
             width: libraryWidth,
-            reservedHorizontalSpace: 36
+            reservedHorizontalSpace: 36,
+            preferredColumns: preferredColumns
         )
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                LibraryPremiumIntro(
-                    eyebrow: "MY PLANS",
-                    title: "Your training, organised",
-                    subtitle:
-                        "Keep reusable plans close, schedule what comes next and jump back into your active program.",
-                    icon: "calendar.badge.clock",
-                    accent: ATHLTHTheme.accent
-                ) {
-                    HStack(spacing: 8) {
-                        LibraryStatPill(
-                            value: "\(session.planTemplates.count)",
-                            label: "saved",
-                            icon: "bookmark.fill",
-                            tint: ATHLTHTheme.premiumGold
-                        )
-
-                        LibraryStatPill(
-                            value: "\(session.trainingPlans.count)",
-                            label: "scheduled",
-                            icon: "calendar",
-                            tint: ATHLTHTheme.accent
-                        )
-
-                        if activePlanCount > 0 {
-                            LibraryStatPill(
-                                value: "\(activePlanCount)",
-                                label: "active",
-                                icon: "play.fill",
-                                tint: ATHLTHTheme.vitality
-                            )
-                        }
-                    }
-                }
-
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(displayedTemplates.count + displayedPlans.count) plans",
+                        norwegian: "\(displayedTemplates.count + displayedPlans.count) planer"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Spacer(minLength: 4)
                     Button { searchExpanded.toggle() } label: {
-                        Label(ATHLTHLocalization.choose(english: "Search", norwegian: "Søk"),
-                              systemImage: "magnifyingglass")
+                        Image(systemName: "magnifyingglass")
+                            .frame(width: 38, height: 38)
                     }
                     .buttonStyle(.plain)
-                    .frame(minHeight: 44)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Search plans", norwegian: "Søk i planer"
+                    ))
+                    ATHLTHLibraryDisplayPicker(
+                        selection: $displayMode,
+                        columns: $preferredColumns
+                    )
+                }
+                HStack(spacing: 8) {
                     Button { favoritesOnly.toggle() } label: {
-                        Label(ATHLTHLocalization.choose(english: "Favorites", norwegian: "Favoritter"),
-                              systemImage: favoritesOnly ? "star.fill" : "star")
+                        Label(ATHLTHLocalization.choose(
+                            english: "Favorites", norwegian: "Favoritter"
+                        ), systemImage: favoritesOnly ? "star.fill" : "star")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .background(
+                                ATHLTHPlanDesign.selectedSurface, in: Capsule()
+                            )
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(favoritesOnly ? [.isSelected] : [])
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
                 if searchExpanded || !query.isEmpty {
                     TextField(
                         ATHLTHLocalization.choose(english: "Search my plans", norwegian: "Søk i mine planer"),
