@@ -31,6 +31,7 @@ struct RouteDetailView: View {
     @State private var showingOfflineMap = false
     @State private var showingInteractiveMap = false
     @State private var routeDetailScrolling = false
+    @State private var snapshotScrollID = UUID()
     @State private var cachedOfflinePreview: UIImage?
     @State private var routeHasTurnaround = false
     @State private var gpxShareFile: ATHLTHRouteShareFile?
@@ -192,6 +193,9 @@ struct RouteDetailView: View {
         }
         .onScrollPhaseChange { _, phase in
             routeDetailScrolling = phase.isScrolling
+            RouteMapSnapshotCache.setScrolling(
+                phase.isScrolling, owner: snapshotScrollID
+            )
         }
         .background(
             LinearGradient(
@@ -277,7 +281,10 @@ struct RouteDetailView: View {
             routeLocation.start()
             await prepareRouteData()
         }
-        .onDisappear { routeLocation.stop() }
+        .onDisappear {
+            routeLocation.stop()
+            RouteMapSnapshotCache.setScrolling(false, owner: snapshotScrollID)
+        }
         .onChange(of: session.profile.userID) { _, userID in
             downloaded.load(userID: userID)
             refreshOfflinePreview()
