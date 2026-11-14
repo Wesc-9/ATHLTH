@@ -1438,13 +1438,14 @@ struct WorkoutTemplateLibraryView: View {
                 selectedMuscleFocus == "all" && selectedWorkoutLevel == "all"
         else { return [] }
 
-        let clean = query
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filter = discoveryFilter
         let matching = builtInRunningTemplates.filter { workout in
-            guard discoveryFilter.matches(workout) else { return false }
+            guard filter.matches(workout) else { return false }
             let favoriteMatches =
                 !favoritesOnly ||
                 favorites.isFavorite(.workout, itemID: workout.id.uuidString)
-            let searchMatches = ATHLTHWorkoutSearch.matches(
+            let searchMatches = clean.isEmpty || ATHLTHWorkoutSearch.matches(
                 clean, texts: [workout.title, workout.summary, workout.type.title]
             )
             return favoriteMatches && searchMatches
@@ -1456,10 +1457,11 @@ struct WorkoutTemplateLibraryView: View {
 
     private var filteredEntries:
         [WorkoutTemplateCatalogEntry] {
-        let clean = query
+        let needle = ATHLTHWorkoutSearch.normalized(query)
+        let filter = discoveryFilter
 
         let matching = catalog.entries.filter { entry in
-            guard discoveryFilter.matches(entry) else { return false }
+            guard filter.matches(entry) else { return false }
             let categoryMatches =
                 selectedCategory == "All" ||
                 entry.categoryTitle == selectedCategory ||
@@ -1475,10 +1477,7 @@ struct WorkoutTemplateLibraryView: View {
                     itemID: entry.id.uuidString
                 )
 
-            let searchMatches = ATHLTHWorkoutSearch.matches(
-                clean, texts: [entry.title, entry.summary, entry.categoryTitle,
-                               entry.tags.joined(separator: " ")]
-            )
+            let searchMatches = catalog.matchesSearch(entry, normalizedNeedle: needle)
 
             let muscleMatches = selectedMuscleFocus == "all" ||
                 entry.tags.contains(selectedMuscleFocus)
@@ -1493,7 +1492,8 @@ struct WorkoutTemplateLibraryView: View {
 
     private var filteredSavedWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
-        let clean = query
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filter = discoveryFilter
         // Most library visits have no specialised filter. Only build the
         // publisher metadata index when a muscle/level/type filter needs it.
         let needMetadata = !selectedStrengthMuscles.isEmpty ||
@@ -1507,7 +1507,7 @@ struct WorkoutTemplateLibraryView: View {
         let matching = session.savedWorkoutTemplates.filter { workout in
             let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
                 workout.sharedSourceSessionID.flatMap { originals[$0] }
-            guard discoveryFilter.matches(workout, catalogEntry: source),
+            guard filter.matches(workout, catalogEntry: source),
                   initialCategory != .strength ||
                     selectedWorkoutLevel == "all" ||
                     (source.map(levelMatches) ?? false)
@@ -1519,9 +1519,9 @@ struct WorkoutTemplateLibraryView: View {
                     rawValue: selectedCategory.lowercased()
                 )?.matches(workout) ??
                     (workout.kind.title == selectedCategory))
-            return ATHLTHWorkoutSearch.matches(
+            return (clean.isEmpty || ATHLTHWorkoutSearch.matches(
                 clean, texts: [workout.title, workout.notes ?? ""]
-            ) && matchesCategory
+            )) && matchesCategory
         }
         return discoverySorted(matching, title: { $0.title }) {
             $0.durationMinutes.map(Double.init)
@@ -1532,7 +1532,8 @@ struct WorkoutTemplateLibraryView: View {
     /// økt" also needs actual sessions from the calendar and active plans.
     private var filteredScheduledWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
-        let clean = query
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filter = discoveryFilter
         let stored = session.standalonePlannedSessions +
             session.trainingPlans.flatMap { $0.weeks }
                 .flatMap { $0.days }
@@ -1552,7 +1553,7 @@ struct WorkoutTemplateLibraryView: View {
             let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
                 workout.sharedSourceSessionID.flatMap { originals[$0] }
             guard seen.insert(workout.id).inserted,
-                  discoveryFilter.matches(workout, catalogEntry: source),
+                  filter.matches(workout, catalogEntry: source),
                   initialCategory != .strength ||
                     selectedWorkoutLevel == "all" ||
                     (source.map(levelMatches) ?? false)
@@ -1565,9 +1566,9 @@ struct WorkoutTemplateLibraryView: View {
                      ATHLTHPlannedWorkoutType.custom.matches(workout)) ||
                     (matchingType?.matches(workout) ??
                      (workout.kind.title == selectedCategory))) &&
-                ATHLTHWorkoutSearch.matches(
+                (clean.isEmpty || ATHLTHWorkoutSearch.matches(
                     clean, texts: [workout.title, workout.notes ?? ""]
-                )
+                ))
         }
         .sorted {
             ($0.scheduledStart ?? .distantPast) >
