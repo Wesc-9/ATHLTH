@@ -9,6 +9,24 @@ enum ATHLTHLibraryWorkoutHistory {
         let result: String?
     }
 
+    /// Build one index per history load instead of scanning all completions
+    /// once for *each* card as SwiftUI re-renders the lazy library grid.
+    /// Catalog masters are only keyed by their own recorded ID; user copies
+    /// and completed plan sessions must never leak into this index.
+    static func catalogOriginalIndex(
+        completions: [StructuredWorkoutCompletion]
+    ) -> [UUID: Summary] {
+        var latest: [UUID: StructuredWorkoutCompletion] = [:]
+        for completion in completions where completion.sourcePlanID == nil {
+            guard let id = completion.sourceWorkoutID else { continue }
+            if let previous = latest[id], previous.endedAt >= completion.endedAt {
+                continue
+            }
+            latest[id] = completion
+        }
+        return latest.mapValues { structuredSummary($0) }
+    }
+
     /// An unmodified catalogue workout is recorded using its stable catalogue
     /// ID. Never match a personal copy by template ID or by title.
     static func catalogOriginal(
