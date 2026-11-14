@@ -355,6 +355,11 @@ struct StructuredWorkoutSessionView: View {
                     hasStarted = true
                     setupCurrentStep()
                     persistCheckpoint()
+                    // The structured iPhone recorder has now begun. Keep the
+                    // planned session ID but move tomorrow's date to today.
+                    _ = session.moveStartedTomorrowWorkoutToToday(
+                        workoutID: workout.id, startedAt: startedAt
+                    )
                     // This view itself is the iPhone interval/strength
                     // recorder. A ready lobby is only marked started when
                     // its first real recording screen becomes active.
