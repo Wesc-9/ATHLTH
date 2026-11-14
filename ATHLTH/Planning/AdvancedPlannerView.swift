@@ -10783,10 +10783,25 @@ struct SessionEditorView: View {
     private func discardStoredStandaloneDraft() {
         guard isStandalone, existingWorkout == nil,
               onPreparedWorkout == nil else { return }
-        ATHLTHStandaloneWorkoutDraftStore.discard(
-            for: session.profile.userID,
-            additionalDraftID: scratchTimelineDraftID
-        )
+        if selectedPartnerID == nil && directPartnerID == nil {
+            // A personal scratch draft owns the Home resume action. Clear
+            // both the legacy marker and the unified builder checkpoint.
+            ATHLTHStandaloneWorkoutDraftStore.discard(
+                for: session.profile.userID,
+                additionalDraftID: scratchTimelineDraftID
+            )
+        } else {
+            // Partner planning has a different draft context. Never delete
+            // the athlete's separate personal draft when editing an invite.
+            if let entry = loadScratchComposerEntry() {
+                UserDefaults.standard.removeObject(
+                    forKey: scratchDraftStorageKey(for: entry.id)
+                )
+            }
+            UserDefaults.standard.removeObject(forKey: scratchComposerDraftStorageKey)
+            UserDefaults.standard.removeObject(forKey: draftStorageKey)
+            UserDefaults.standard.removeObject(forKey: scratchComposerEntryKey)
+        }
         hasStoredStandaloneDraft = false
     }
 
