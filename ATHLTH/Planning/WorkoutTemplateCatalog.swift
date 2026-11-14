@@ -1109,10 +1109,10 @@ struct WorkoutTemplateLibraryView: View {
     @State private var showingCatalogPersonalization = false
     @State private var showingRunningPersonalization = false
     @State private var catalogPersonalBlocks: [WorkoutTemplateBlock] = []
-    @State private var libraryCompletions: [StructuredWorkoutCompletion] = []
     @State private var catalogHistoryIndex:
         [UUID: ATHLTHLibraryWorkoutHistory.Summary] = [:]
-    @State private var runningCompletions: [ATHLTHCompletedRunningPerformance] = []
+    @State private var runningHistoryIndex:
+        [UUID: ATHLTHLibraryWorkoutHistory.Summary] = [:]
     @State private var pendingHistoryRefresh: Task<Void, Never>?
 
     /// Configure the library's initial category without changing its
@@ -1134,12 +1134,13 @@ struct WorkoutTemplateLibraryView: View {
         let completions = StructuredWorkoutCompletionStore.load(
             userID: session.profile.userID
         )
-        libraryCompletions = completions
         catalogHistoryIndex = ATHLTHLibraryWorkoutHistory.catalogOriginalIndex(
             completions: completions
         )
-        runningCompletions = ATHLTHRunningPerformanceHistory.load(
-            userID: session.profile.userID
+        runningHistoryIndex = ATHLTHLibraryWorkoutHistory.runningIndex(
+            records: ATHLTHRunningPerformanceHistory.load(
+                userID: session.profile.userID
+            )
         )
     }
 
@@ -2900,9 +2901,7 @@ struct WorkoutTemplateLibraryView: View {
                     .padding(.top, 7)
                 }
 
-                if let last = ATHLTHLibraryWorkoutHistory.running(
-                    id: workout.id, records: runningCompletions
-                ) {
+                if let last = runningHistoryIndex[workout.id] {
                     ATHLTHLastWorkoutHistoryLabel(summary: last)
                         .padding(.top, 4)
                 }
