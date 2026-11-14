@@ -19,6 +19,40 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
         XCTAssertTrue(ATHLTHWorkoutSearch.matches("   ", texts: names))
     }
 
+    func testIndexedSearchKeepsNorwegianAndFourByFourMatching() {
+        let examples: [([String], [String: Bool])] = [
+            (["4 × 4 intervaller", "Løping"], [
+                "4x4": true, "norwegian 4x4": true,
+                "Norwegian 4 x 4 intervals": true, "7x3": false
+            ]),
+            (["Fullkropp – styrke", "Nybegynner", "bein"], [
+                "fullkropp": true, "FULLKROPP": true,
+                "styrke": true, "rygg": false
+            ]),
+            (["Skuldre og armer", "Dumbbell Press"], [
+                "skuldre": true, "dumbbellpress": true,
+                "mage": false
+            ])
+        ]
+        for (texts, queries) in examples {
+            let index = ATHLTHWorkoutSearch.makeIndex(texts: texts)
+            for (query, expected) in queries {
+                let needle = ATHLTHWorkoutSearch.normalized(query)
+                XCTAssertEqual(
+                    ATHLTHWorkoutSearch.matches(
+                        normalizedNeedle: needle, index: index
+                    ),
+                    expected,
+                    "\(query) should match correctly in cached search"
+                )
+                XCTAssertEqual(
+                    ATHLTHWorkoutSearch.matches(query, texts: texts),
+                    expected
+                )
+            }
+        }
+    }
+
     func testFourByFourHasConcreteWarmupAndIntervalLabels() throws {
         let workout = try XCTUnwrap(
             RunningWorkoutLibraryStore.builtInTemplates.first { $0.title == workoutTitle }
