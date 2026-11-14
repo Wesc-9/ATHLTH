@@ -4,9 +4,9 @@ import XCTest
 
 @MainActor
 final class ATHLTHLibraryDisplayModeTests: XCTestCase {
-    func testDefaultIsListUntilUserChoosesGrid() {
+    func testAdaptiveGridIsDefaultForNewAccounts() {
         let userID = UUID()
-        XCTAssertEqual(ATHLTHLibraryDisplayMode.load(userID: userID), .list)
+        XCTAssertEqual(ATHLTHLibraryDisplayMode.load(userID: userID), .grid)
     }
 
     func testLastSelectedModeSurvivesViewRecreation() {
@@ -23,7 +23,20 @@ final class ATHLTHLibraryDisplayModeTests: XCTestCase {
         let second = UUID()
         ATHLTHLibraryDisplayMode.grid.save(userID: first)
         XCTAssertEqual(ATHLTHLibraryDisplayMode.load(userID: first), .grid)
-        XCTAssertEqual(ATHLTHLibraryDisplayMode.load(userID: second), .list)
+        XCTAssertEqual(ATHLTHLibraryDisplayMode.load(userID: second), .grid)
+    }
+
+    func testColumnChoiceIsSharedByLibraryPagesButScopedToAccount() {
+        let first = UUID()
+        let second = UUID()
+        XCTAssertEqual(ATHLTHLibraryColumnPreference.load(userID: first), 0)
+        ATHLTHLibraryColumnPreference.save(3, userID: first)
+        XCTAssertEqual(ATHLTHLibraryColumnPreference.load(userID: first), 3)
+        XCTAssertEqual(ATHLTHLibraryColumnPreference.load(userID: second), 0)
+        ATHLTHLibraryColumnPreference.save(5, userID: second)
+        XCTAssertEqual(ATHLTHLibraryColumnPreference.load(userID: second), 5)
+        ATHLTHLibraryColumnPreference.save(99, userID: first)
+        XCTAssertEqual(ATHLTHLibraryColumnPreference.load(userID: first), 5)
     }
 
     func testIconsAndCasesCoverBothLayouts() {
