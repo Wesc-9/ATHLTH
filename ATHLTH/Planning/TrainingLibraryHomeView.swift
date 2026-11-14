@@ -5349,7 +5349,7 @@ struct LibraryFavoritesView: View {
         let searchMatches = kindFiltered.filter {
             searchQuery.isEmpty ||
             $0.title.localizedStandardContains(searchQuery) ||
-            $0.subtitle.localizedStandardContains(searchQuery)
+            ($0.subtitle ?? "").localizedStandardContains(searchQuery)
         }
         guard ownExerciseFavoritesOnly && initialKind == nil else { return searchMatches }
         let ownedIDs = Set(exerciseLibrary.customExercises.map(\.id))
