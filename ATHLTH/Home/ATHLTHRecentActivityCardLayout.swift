@@ -11,11 +11,11 @@ enum ATHLTHRecentActivityLayoutPolicy {
     }
 
     static func artworkHeight(horizontal: Bool) -> CGFloat {
-        horizontal ? 194 : 170
+        horizontal ? 158 : 132
     }
 
     static func artworkWidth(for width: CGFloat, horizontal: Bool) -> CGFloat {
-        horizontal ? width * 0.43 : width
+        horizontal ? width * 0.39 : width
     }
 }
 
@@ -54,8 +54,8 @@ struct ATHLTHRecentActivityCardLayout<Artwork: View, Details: View>: View {
                         .clipped()
 
                     details
-                        .padding(.horizontal, 17)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, minHeight: mediaHeight,
                                alignment: .leading)
                 }
@@ -67,8 +67,8 @@ struct ATHLTHRecentActivityCardLayout<Artwork: View, Details: View>: View {
                         .clipped()
 
                     details
-                        .padding(.horizontal, 15)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -76,11 +76,11 @@ struct ATHLTHRecentActivityCardLayout<Artwork: View, Details: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             Color.white.opacity(0.98),
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 19, style: .continuous)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
                 .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.35), lineWidth: 0.8)
                 .allowsHitTesting(false)
         }
