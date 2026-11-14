@@ -1099,6 +1099,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var catalogPersonalBlocks: [WorkoutTemplateBlock] = []
     @State private var libraryCompletions: [StructuredWorkoutCompletion] = []
     @State private var runningCompletions: [ATHLTHCompletedRunningPerformance] = []
+    @State private var pendingHistoryRefresh: Task<Void, Never>?
 
     /// Configure the library's initial category without changing its
     /// behaviour for the Home, Community and general Library entry points.
@@ -2437,7 +2438,8 @@ struct WorkoutTemplateLibraryView: View {
             }
         }
         .onAppear {
-            loadHistory()
+            // Show the library immediately; workout-history disk reads can
+            // follow after first layout rather than blocking the first frame.
             displayMode = .load(userID: session.profile.userID)
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
@@ -2450,6 +2452,21 @@ struct WorkoutTemplateLibraryView: View {
             mode.save(userID: session.profile.userID)
         }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            // Account saves can emit several notifications during selection.
+            // Coalesce them so each tap does not synchronously re-read history.
+            pendingHistoryRefresh?.cancel()
+            pendingHistoryRefresh = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(180))
+                guard !Task.isCancelled else { return }
+                loadHistory()
+            }
+        }
+        .onDisappear {
+            pendingHistoryRefresh?.cancel()
+        }
+        .task(id: session.profile.userID) {
+            await Task.yield()
+            guard !Task.isCancelled else { return }
             loadHistory()
         }
         .task(id: query) {
