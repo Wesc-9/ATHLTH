@@ -3574,6 +3574,7 @@ struct MyWorkoutTemplatesView: View {
     @State private var query = ""
     @State private var searchExpanded = false
     @State private var favoritesOnly = false
+    @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
 
     private var displayedRunningWorkouts: [RunningWorkoutTemplate] {
         runningLibrary.customTemplates.filter {
@@ -3587,6 +3588,17 @@ struct MyWorkoutTemplatesView: View {
             $0.title.localizedStandardContains(query) &&
             (!favoritesOnly || favorites.isFavorite(.workout, itemID: $0.id.uuidString))
         }
+    }
+
+    private var pagedRunningWorkouts: [RunningWorkoutTemplate] {
+        ATHLTHLibraryPagination.visible(displayedRunningWorkouts, limit: visibleLimit)
+    }
+
+    private var pagedSavedWorkouts: [PlannedSession] {
+        ATHLTHLibraryPagination.visible(
+            displayedSavedWorkouts,
+            limit: max(0, visibleLimit - pagedRunningWorkouts.count)
+        )
     }
 
     private var libraryColumns: [GridItem] {
@@ -3661,14 +3673,14 @@ struct MyWorkoutTemplatesView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
 
-                if !displayedRunningWorkouts.isEmpty {
+                if !pagedRunningWorkouts.isEmpty {
                     Text(ATHLTHLocalization.choose(
                         english: "SAVED DETAILED RUNS", norwegian: "LAGREDE DETALJØKTER"
                     ))
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
-                    ForEach(displayedRunningWorkouts) { workout in
+                    ForEach(pagedRunningWorkouts) { workout in
                         VStack(alignment: .trailing, spacing: 5) {
                         NavigationLink {
                             RunningWorkoutDetailView(
@@ -3781,14 +3793,26 @@ struct MyWorkoutTemplatesView: View {
                     .padding(.top, 60)
                 } else {
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
-                        ForEach(displayedSavedWorkouts) { workout in
+                        ForEach(pagedSavedWorkouts) { workout in
                             savedWorkoutCard(workout)
                         }
                     }
                 }
+                ATHLTHLibraryLoadMoreButton(
+                    shown: pagedRunningWorkouts.count + pagedSavedWorkouts.count,
+                    total: displayedRunningWorkouts.count + displayedSavedWorkouts.count
+                ) {
+                    visibleLimit += ATHLTHLibraryPagination.pageSize
+                }
             }
             .padding(18)
             .frame(maxWidth: .infinity)
+        }
+        .onChange(of: query) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
+        }
+        .onChange(of: favoritesOnly) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top < -28
