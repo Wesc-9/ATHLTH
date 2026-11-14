@@ -209,20 +209,19 @@ enum ATHLTHZonedPlanLibrary {
             return raceDaySession(source, week: week, sourcePlan: sourcePlan)
         }
         guard let workout = workoutsByID[source.workoutId] else { return nil }
-        var blocks = blocks(for: workout)
+        var blocks = blocks(for: workout, mainSetRepetitions: source.scaledRepetitions)
         guard !blocks.isEmpty else { return nil }
-        // Plan-specific scaling wins over the generic catalogue interval count
-        // only where the original session explicitly prescribes repetitions.
-        // We retain the underlying interval structure rather than guessing a
-        // replacement if the generic workout has nested sets.
-        if let scaled = source.scaledRepetitions, scaled > 0 {
-            let text = ATHLTHLocalization.choose(
-                english: "Plan prescribes \(scaled) repetitions; review the interval set when personalizing.",
-                norwegian: "Planen angir \(scaled) repetisjoner. Kontroller intervallene ved tilpasning."
+        // Unlike a note-only reminder, this changes the executable effort
+        // and inter-effort recovery count. Inner repeats of grouped workouts
+        // (e.g. 3 x 15) scale the inner drag count, never all outer groups.
+        if let scaled = source.scaledRepetitions, scaled > 0,
+           planRepetitionDepth(in: workout, scaled: scaled) == nil {
+            let guidance = ATHLTHLocalization.choose(
+                english: "Review \(scaled) prescribed repetitions: source grouping is ambiguous.",
+                norwegian: "Kontroller \(scaled) angitte repetisjoner: gruppestrukturen er tvetydig."
             )
-            if !blocks.isEmpty {
-                blocks[0].notes = [blocks[0].notes, text].compactMap { $0 }.joined(separator: "\n")
-            }
+            blocks[0].notes = [blocks[0].notes, guidance]
+                .compactMap { $0 }.joined(separator: "\n")
         }
         let isCycle = workout.discipline == "cycling"
         let kind: WorkoutKind = isCycle ? .custom : .running
@@ -330,12 +329,41 @@ enum ATHLTHZonedPlanLibrary {
         return event
     }
 
-    static func blocks(for workout: Workout) -> [WorkoutTemplateBlock] {
+    /// Only one unambiguous top-level repeat is eligible for a plan override.
+    /// A nested repeat changes the innermost drag count per outer set.
+    /// Ordinary workouts continue to use the untouched source recipe.
+    private static func planRepetitionDepth(
+        in workout: Workout, scaled: Int
+    ) -> Int? {
+        guard (1...50).contains(scaled),
+              let main = workout.mainSetStructure,
+              main.count == 1, let top = main.first, top.kind == "repeat",
+              let children = top.steps, !children.isEmpty else { return nil }
+        if children.count == 1, children[0].kind == "repeat" {
+            return 1
+        }
+        if children.allSatisfy({ $0.kind == "segment" }) {
+            return 0
+        }
+        return nil
+    }
+
+    static func blocks(
+        for workout: Workout, mainSetRepetitions: Int? = nil
+    ) -> [WorkoutTemplateBlock] {
         var result: [WorkoutTemplateBlock] = []
         let isCycling = workout.discipline == "cycling"
         let isSwimming = workout.discipline == "swimming"
+        let overrideDepth = mainSetRepetitions.flatMap {
+            planRepetitionDepth(in: workout, scaled: $0)
+        }
         append(workout.warmupStructure ?? [], phase: .warmup, sport: workout.discipline, depth: 0, to: &result)
-        append(workout.mainSetStructure ?? [], phase: .main, sport: workout.discipline, depth: 0, to: &result)
+        append(
+            workout.mainSetStructure ?? [], phase: .main,
+            sport: workout.discipline, depth: 0, to: &result,
+            planRepeatCount: overrideDepth == nil ? nil : mainSetRepetitions,
+            planRepeatDepth: overrideDepth
+        )
         append(workout.cooldownStructure ?? [], phase: .cooldown, sport: workout.discipline, depth: 0, to: &result)
         // A timed cycling segment uses a non-running block in ATHLTH.
         // Swimming stays in the source bundle but is not published as a workout
@@ -350,16 +378,28 @@ enum ATHLTHZonedPlanLibrary {
         phase: WorkoutPhaseKind,
         sport: String?,
         depth: Int,
-        to result: inout [WorkoutTemplateBlock]
+        to result: inout [WorkoutTemplateBlock],
+        planRepeatCount: Int? = nil,
+        planRepeatDepth: Int? = nil
     ) {
         guard depth < 9 else { return }
         for step in steps where result.count < 900 {
             if step.kind == "repeat" {
-                let repeats = min(max(step.count ?? 1, 1), 50)
+                let usePlanCount = phase == .main && depth == planRepeatDepth
+                let chosenCount = usePlanCount
+                    ? (planRepeatCount ?? step.count ?? 1)
+                    : (step.count ?? 1)
+                let repeats = min(max(chosenCount, 1), 50)
                 for index in 0..<repeats where result.count < 900 {
-                    append(step.steps ?? [], phase: phase, sport: sport, depth: depth + 1, to: &result)
+                    append(
+                        step.steps ?? [], phase: phase, sport: sport,
+                        depth: depth + 1, to: &result,
+                        planRepeatCount: planRepeatCount,
+                        planRepeatDepth: planRepeatDepth
+                    )
                     if index < repeats - 1 {
-                        append(step.between ?? [], phase: .recovery, sport: sport, depth: depth + 1, to: &result)
+                        append(step.between ?? [], phase: .recovery, sport: sport,
+                               depth: depth + 1, to: &result)
                     }
                 }
                 continue
