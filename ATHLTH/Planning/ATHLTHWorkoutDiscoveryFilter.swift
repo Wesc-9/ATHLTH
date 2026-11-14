@@ -38,8 +38,13 @@ struct ATHLTHWorkoutDiscoveryFilter {
     var runningType: RunningWorkoutType?
     var duration: Duration = .any
     var exerciseName: String? = nil
+    var strengthStyle: WorkoutBlockGroupKind? = nil
 
     func matches(_ entry: WorkoutTemplateCatalogEntry) -> Bool {
+        if let strengthStyle,
+           !entry.blocks.contains(where: { $0.groupKind == strengthStyle }) {
+            return false
+        }
         let estimatedMinutes: Int? = duration == .any ? nil :
             (entry.estimatedDurationMinutes ??
              ATHLTHWorkoutDurationEstimator.previewMinutes(for: entry.blocks))
@@ -66,6 +71,10 @@ struct ATHLTHWorkoutDiscoveryFilter {
         _ workout: PlannedSession,
         catalogEntry: WorkoutTemplateCatalogEntry? = nil
     ) -> Bool {
+        if let strengthStyle,
+           !workout.resolvedWorkoutBlocks.contains(where: {
+               $0.groupKind == strengthStyle
+           }) { return false }
         let estimatedMinutes: Int? = duration == .any ? nil :
             (workout.durationMinutes ??
              catalogEntry?.estimatedDurationMinutes ??
@@ -101,7 +110,8 @@ struct ATHLTHWorkoutDiscoveryFilter {
     }
 
     func matches(_ workout: RunningWorkoutTemplate) -> Bool {
-        guard runningType == nil || workout.type == runningType else { return false }
+        guard strengthStyle == nil,
+              runningType == nil || workout.type == runningType else { return false }
         if let exerciseName, !ATHLTHWorkoutLibraryExerciseIndex.containsExercise(
             exerciseName, in: workout.plannedSession()
         ) { return false }
