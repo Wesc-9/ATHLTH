@@ -9,8 +9,8 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     let kind: String
     let title: String
     let startedAt: Date
-    let elapsedSeconds: TimeInterval
-    let distanceMeters: Double?
+    var elapsedSeconds: TimeInterval
+    var distanceMeters: Double?
     let currentStep: String?
     let nextStep: String?
     let completedSets: Int?
@@ -699,6 +699,63 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         _ input: ATHLTHCrossDeviceWorkoutSnapshot
     ) -> ATHLTHCrossDeviceWorkoutSnapshot {
         var output = input
+        func finite(_ value: Double?) -> Double? {
+            guard let value, value.isFinite else { return nil }
+            return value
+        }
+        output.elapsedSeconds = input.elapsedSeconds.isFinite
+            ? max(0, input.elapsedSeconds) : 0
+        output.distanceMeters = finite(input.distanceMeters)
+        output.heartRateBPM = finite(input.heartRateBPM)
+        output.activeCalories = finite(input.activeCalories)
+        output.currentPaceSecondsPerKilometer = finite(
+            input.currentPaceSecondsPerKilometer
+        )
+        output.targetPaceSecondsPerKilometer = finite(
+            input.targetPaceSecondsPerKilometer
+        )
+        output.maximumHeartRateBPM = finite(input.maximumHeartRateBPM)
+        output.targetHeartRateMinimumBPM = finite(
+            input.targetHeartRateMinimumBPM
+        )
+        output.targetHeartRateMaximumBPM = finite(
+            input.targetHeartRateMaximumBPM
+        )
+        output.targetHeartRatePercentMin = finite(input.targetHeartRatePercentMin)
+        output.targetHeartRatePercentMax = finite(input.targetHeartRatePercentMax)
+        output.runningStepProgress = finite(input.runningStepProgress)
+        output.runningOverallProgress = finite(input.runningOverallProgress)
+        output.runningStepRemainingSeconds = finite(
+            input.runningStepRemainingSeconds
+        )
+        output.runningStepRemainingMeters = finite(
+            input.runningStepRemainingMeters
+        )
+        output.routeProgressPercent = finite(input.routeProgressPercent)
+        output.routeRemainingMeters = finite(input.routeRemainingMeters)
+        output.routeDistanceMeters = finite(input.routeDistanceMeters)
+        output.ghostDistanceDeltaMeters = finite(input.ghostDistanceDeltaMeters)
+        output.ghostTimeDeltaSeconds = finite(input.ghostTimeDeltaSeconds)
+        output.strengthWeightKilograms = finite(
+            input.strengthWeightKilograms
+        )
+        output.liveLatitude = finite(input.liveLatitude)
+        output.liveLongitude = finite(input.liveLongitude)
+        if output.liveLatitude == nil || output.liveLongitude == nil {
+            output.liveLatitude = nil
+            output.liveLongitude = nil
+            output.livePositionAt = nil
+        }
+        if let steps = output.runningSteps {
+            output.runningSteps = steps.filter {
+                ($0.durationSeconds?.isFinite ?? true) &&
+                ($0.distanceMeters?.isFinite ?? true)
+            }
+        }
+        if let splits = output.recentSplits,
+           (try? JSONEncoder().encode(splits)) == nil {
+            output.recentSplits = nil
+        }
         if let steps = output.runningSteps, steps.count > 24 {
             let index = max(0, output.runningStepIndex ?? 0)
             let start = min(max(0, index - 8), steps.count - 24)
