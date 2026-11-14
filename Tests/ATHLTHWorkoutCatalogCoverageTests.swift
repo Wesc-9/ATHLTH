@@ -38,6 +38,36 @@ final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
     }
 
     @MainActor
+    func testStrengthFormatsKeepStableGroupingAndExecutableTargets() throws {
+        let curated = ATHLTHCuratedStrengthWorkouts.entries
+        XCTAssertEqual(curated.count, 23)
+        let expected: [(Int, WorkoutBlockGroupKind, Int, Int?)] = [
+            (17, .superset, 3, nil),
+            (18, .superset, 3, nil),
+            (19, .circuit, 3, nil),
+            (20, .emom, 4, 60),
+            (21, .amrap, 1, 720)
+        ]
+        for (number, kind, rounds, clock) in expected {
+            let slug = String(format: "athlth-strength-%02d", number)
+            let entry = try XCTUnwrap(curated.first { $0.slug == slug })
+            let grouped = entry.blocks.filter { $0.groupKind == kind }
+            XCTAssertGreaterThanOrEqual(grouped.count, 4, slug)
+            XCTAssertTrue(grouped.allSatisfy {
+                $0.groupID != nil &&
+                $0.groupRounds == rounds &&
+                $0.groupClockSeconds == clock.map(TimeInterval.init) &&
+                $0.targetWeightKilograms == nil
+            }, slug)
+            let again = try XCTUnwrap(
+                ATHLTHCuratedStrengthWorkouts.entries.first { $0.slug == slug }
+            )
+            XCTAssertEqual(entry.blocks, again.blocks, slug)
+            XCTAssertEqual(entry.plannedSession().resolvedWorkoutBlocks, entry.blocks)
+        }
+    }
+
+    @MainActor
     func testBuiltInRunningWorkoutRemainsNativeWhenUsedInTrainingPlan() {
         guard let run = RunningWorkoutLibraryStore.builtInTemplates.first else {
             return XCTFail("Built-in running workouts are missing")
