@@ -289,45 +289,91 @@ function continuousGeometry(
     )[0] ?? [];
 }
 
+// Preserve the turns, switchbacks and road geometry that a fixed stride
+// discards. Still cap returned points so the map and network stay bounded.
 function simplify(
   points: OSMPoint[],
 ): OSMPoint[] {
-  if (
-    points.length <=
-    MAX_POINTS_PER_ROUTE
-  ) {
-    return points;
-  }
+  if (points.length <= MAX_POINTS_PER_ROUTE) return points;
 
-  const stride =
-    Math.ceil(
-      points.length /
-        MAX_POINTS_PER_ROUTE,
-    );
+  const latitude = points[Math.floor(points.length / 2)].lat;
+  const scaleX = 111_320 * Math.max(
+    0.01,
+    Math.abs(Math.cos(latitude * Math.PI / 180)),
+  );
+  const scaleY = 111_132;
+  const projected = points.map((point) => ({
+    x: point.lon * scaleX,
+    y: point.lat * scaleY,
+  }));
 
-  const result =
-    points.filter(
-      (_, index) =>
-        index === 0 ||
-        index ===
-          points.length - 1 ||
-        index % stride === 0,
-    );
-
-  const last =
-    points[
-      points.length - 1
+  function reduceAt(toleranceSquared: number): OSMPoint[] {
+    const selected = new Uint8Array(points.length);
+    selected[0] = 1;
+    selected[points.length - 1] = 1;
+    const segments: Array<[number, number]> = [
+      [0, points.length - 1],
     ];
+    while (segments.length > 0) {
+      const [first, last] = segments.pop()!;
+      const a = projected[first];
+      const b = projected[last];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lengthSquared = dx * dx + dy * dy;
 
-  if (
-    result[
-      result.length - 1
-    ] !== last
-  ) {
-    result.push(last);
+      let greatestDistance = 0;
+      let farthest = -1;
+      for (let i = first + 1; i < last; i++) {
+        const point = projected[i];
+        const t = lengthSquared > 0
+          ? Math.max(0, Math.min(
+            1,
+            ((point.x - a.x) * dx + (point.y - a.y) * dy) /
+              lengthSquared,
+          ))
+          : 0;
+        const deltaX = point.x - (a.x + t * dx);
+        const deltaY = point.y - (a.y + t * dy);
+        const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+        if (distanceSquared > greatestDistance) {
+          greatestDistance = distanceSquared;
+          farthest = i;
+        }
+      }
+      if (farthest > first && greatestDistance > toleranceSquared) {
+        selected[farthest] = 1;
+        segments.push([first, farthest], [farthest, last]);
+      }
+    }
+    return points.filter((_, index) => selected[index] === 1);
   }
 
-  return result;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const point of projected) {
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minY = Math.min(minY, point.y);
+    maxY = Math.max(maxY, point.y);
+  }
+  let lower = 0;
+  let upper = Math.hypot(maxX - minX, maxY - minY) + 1;
+  let best = reduceAt(upper * upper);
+  // Binary search the minimum tolerance retaining at most our point budget.
+  for (let iteration = 0; iteration < 12; iteration++) {
+    const middle = (lower + upper) / 2;
+    const candidate = reduceAt(middle * middle);
+    if (candidate.length > MAX_POINTS_PER_ROUTE) {
+      lower = middle;
+    } else {
+      upper = middle;
+      best = candidate;
+    }
+  }
+  return best;
 }
 
 function center(
