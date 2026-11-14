@@ -314,11 +314,14 @@ enum ATHLTHAudioCoachRuleDelivery {
     ) -> [UUID: Int] {
         var result: [UUID: Int] = [:]
         for rule in rules where (rule.scope ?? .workout) == .workout {
-            result[rule.id] = slot(
-                for: rule,
-                distanceMeters: distanceMeters,
-                elapsedSeconds: elapsedSeconds
-            )
+            // One-shot finish cues use remaining time, not elapsed-time slots.
+            // A nonzero elapsed slot would otherwise suppress the first cue.
+            result[rule.id] = rule.beforeEndSeconds == nil
+                ? slot(
+                    for: rule,
+                    distanceMeters: distanceMeters,
+                    elapsedSeconds: elapsedSeconds
+                ) : 0
         }
         return result
     }
