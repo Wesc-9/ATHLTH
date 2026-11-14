@@ -1340,6 +1340,8 @@ struct HomePersonalRecentActivitySection:
         }
     }
 
+    // Same lightweight author and metric hierarchy for my workouts and
+    // friends' workouts. Do not duplicate either the feed data or route image.
     @ViewBuilder
     private func verticalItem(_ item: HomeActivityStreamItem) -> some View {
         switch item.source {
@@ -1366,84 +1368,36 @@ struct HomePersonalRecentActivitySection:
                 }
                 .buttonStyle(.plain)
             } details: {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
                     NavigationLink {
                         ATHLTHProfileView()
                     } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Label(
-                                session.profile.username.isEmpty
-                                    ? (session.profile.displayName.isEmpty
-                                        ? ATHLTHLocalization.choose(
-                                            english: "My activity",
-                                            norwegian: "Min aktivitet"
-                                        )
-                                        : session.profile.displayName)
-                                    : "@\(session.profile.username)",
-                                systemImage: "person.crop.circle"
-                            )
-                            .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                            if !session.profile.username.isEmpty &&
-                                !session.profile.displayName.isEmpty {
-                                Text(session.profile.displayName)
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-                        }
+                        HomeRecentAuthorLine(
+                            avatar: ownRecentAvatar,
+                            username: session.profile.username.isEmpty
+                                ? (session.profile.displayName.isEmpty
+                                    ? ATHLTHLocalization.choose(
+                                        english: "My activity", norwegian: "Min aktivitet"
+                                      )
+                                    : session.profile.displayName)
+                                : "@\(session.profile.username)",
+                            displayName: session.profile.username.isEmpty
+                                ? nil : session.profile.displayName,
+                            date: workout.endDate
+                        )
                     }
                     .buttonStyle(.plain)
 
-                    Text(HomeRecentCardFormat.activity(workout.activity))
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    HomeRecentActivityMetricLine(
+                        activity: workout.activity,
+                        distanceMeters: workout.distanceMeters,
+                        durationSeconds: workout.duration,
+                        exerciseCount: workout.strengthExerciseCount,
+                        volumeKilograms: workout.strengthTotalVolumeKilograms,
+                        fallback: workout.activity == .running || workout.activity == .strength
+                            ? nil : workout.summaryText
+                    )
 
-                    if workout.activity == .running {
-                        HStack(spacing: 9) {
-                            Label(HomeRecentCardFormat.distance(workout.distanceMeters),
-                                  systemImage: "figure.run")
-                            Label(HomeRecentCardFormat.duration(workout.duration),
-                                  systemImage: "clock")
-                        }
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                    } else if workout.activity == .strength {
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let count = workout.strengthExerciseCount, count > 0 {
-                                Label(
-                                    "\(count) " + ATHLTHLocalization.choose(
-                                        english: "exercises", norwegian: "øvelser"
-                                    ),
-                                    systemImage: "dumbbell.fill"
-                                )
-                            }
-                            Label(HomeRecentCardFormat.duration(workout.duration),
-                                  systemImage: "clock")
-                            if let volume = workout.strengthTotalVolumeKilograms,
-                               volume > 0 {
-                                Label(HomeRecentCardFormat.volume(volume),
-                                      systemImage: "scalemass")
-                            }
-                        }
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
-                    } else {
-                        Text(workout.summaryText)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .lineLimit(2)
-                    }
-
-                    Text(HomeRecentCardFormat.date(workout.endDate))
-                        .font(.system(size: 10))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-
-                    Spacer(minLength: 0)
                     HomeCompactActivityEngagementRow(
                         item: socialFeedItem(for: workout)
                     )
@@ -1469,85 +1423,200 @@ struct HomePersonalRecentActivitySection:
                 }
                 .buttonStyle(.plain)
             } details: {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
                     NavigationLink {
                         FriendProfileView(userID: feedItem.actor.userID)
                     } label: {
-                        HStack(spacing: 9) {
-                            SocialAvatar(profile: feedItem.actor, size: 32)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(feedItem.actor.usernameLabel.isEmpty
-                                     ? feedItem.actor.resolvedName
-                                     : feedItem.actor.usernameLabel)
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                                if !feedItem.actor.usernameLabel.isEmpty {
-                                    Text(feedItem.actor.resolvedName)
-                                        .font(.caption)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-                                        .lineLimit(1)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                        }
+                        HomeRecentAuthorLine(
+                            avatar: SocialAvatar(profile: feedItem.actor, size: 36),
+                            username: feedItem.actor.usernameLabel.isEmpty
+                                ? feedItem.actor.resolvedName
+                                : feedItem.actor.usernameLabel,
+                            displayName: feedItem.actor.usernameLabel.isEmpty
+                                ? nil : feedItem.actor.resolvedName,
+                            date: feedItem.activity.createdAt
+                        )
                     }
                     .buttonStyle(.plain)
 
-                    Text(HomeRecentCardFormat.activity(
-                        HomeFollowingWorkoutPresentation.activity(for: feedItem)
-                    ))
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    HomeRecentActivityMetricLine(
+                        activity: HomeFollowingWorkoutPresentation.activity(for: feedItem),
+                        distanceMeters: HomeRecentCardFormat.number(
+                            feedItem, key: "distance_meters"
+                        ),
+                        durationSeconds: HomeRecentCardFormat.number(
+                            feedItem, key: "duration_seconds"
+                        ),
+                        exerciseCount: HomeRecentCardFormat.integer(
+                            feedItem, key: "exercise_count"
+                        ),
+                        volumeKilograms: HomeRecentCardFormat.number(
+                            feedItem, key: "volume_kg"
+                        ),
+                        fallback: feedItem.activity.title
+                    )
 
-                    if HomeFollowingWorkoutPresentation.activity(for: feedItem) == .running {
-                        HStack(spacing: 9) {
-                            Label(HomeRecentCardFormat.distance(
-                                HomeRecentCardFormat.number(feedItem, key: "distance_meters")
-                            ), systemImage: "figure.run")
-                            Label(HomeRecentCardFormat.duration(
-                                HomeRecentCardFormat.number(feedItem, key: "duration_seconds")
-                            ), systemImage: "clock")
-                        }
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                    } else if HomeFollowingWorkoutPresentation.activity(for: feedItem) == .strength {
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let count = HomeRecentCardFormat.integer(feedItem, key: "exercise_count") {
-                                Label("\(count) " + ATHLTHLocalization.choose(
-                                    english: "exercises", norwegian: "øvelser"
-                                ), systemImage: "dumbbell.fill")
-                            }
-                            Label(HomeRecentCardFormat.duration(
-                                HomeRecentCardFormat.number(feedItem, key: "duration_seconds")
-                            ), systemImage: "clock")
-                            if let volume = HomeRecentCardFormat.number(feedItem, key: "volume_kg") {
-                                Label(HomeRecentCardFormat.volume(volume), systemImage: "scalemass")
-                            }
-                        }
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
-                    } else {
-                        Text(feedItem.activity.title)
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .lineLimit(2)
-                    }
-
-                    Text(HomeRecentCardFormat.date(feedItem.activity.createdAt))
-                        .font(.system(size: 10))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-
-                    Spacer(minLength: 0)
                     HomeCompactActivityEngagementRow(item: feedItem)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityIdentifier("athlth-home-recent-following-card")
+        }
+    }
+
+    // The account avatar comes from the same verified profile image source
+    // used elsewhere in ATHLTH. A missing image never leaves an empty circle.
+    private var ownRecentAvatar: some View {
+        Group {
+            if let url = session.profile.avatarURL {
+                ATHLTHStorageImage(url: url, maxPixelSize: 160) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    default:
+                        ownRecentAvatarFallback
+                    }
+                }
+            } else {
+                ownRecentAvatarFallback
+            }
+        }
+        .frame(width: 36, height: 36)
+        .clipShape(Circle())
+        .overlay {
+            Circle()
+                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.38), lineWidth: 0.65)
+        }
+    }
+
+    private var ownRecentAvatarFallback: some View {
+        Circle()
+            .fill(ATHLTHTheme.accent.opacity(0.10))
+            .overlay {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 24, weight: .regular))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+    }
+
+    /// Keep the avatar, visible handle, and posting time readable at a glance.
+    /// The profile navigation remains independent of tapping the workout art.
+    private struct HomeRecentAuthorLine<Avatar: View>: View {
+        let avatar: Avatar
+        let username: String
+        let displayName: String?
+        let date: Date
+
+        var body: some View {
+            HStack(alignment: .center, spacing: 9) {
+                avatar
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(username)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.79)
+
+                    if let displayName, !displayName.isEmpty,
+                       displayName != username {
+                        Text(displayName)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(HomeRecentCardFormat.date(date))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .frame(minHeight: 36)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// Activity stays left; actual recorded metrics move to the right.
+    /// The same information layout is used for my posts and friends' posts.
+    private struct HomeRecentActivityMetricLine: View {
+        let activity: WorkoutActivity
+        let distanceMeters: Double?
+        let durationSeconds: TimeInterval?
+        let exerciseCount: Int?
+        let volumeKilograms: Double?
+        let fallback: String?
+
+        var body: some View {
+            VStack(alignment: .trailing, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(HomeRecentCardFormat.activity(activity))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 4)
+
+                    HStack(spacing: 9) {
+                        if let distanceMeters, distanceMeters > 0,
+                           distanceMeters.isFinite {
+                            metric(
+                                HomeRecentCardFormat.distance(distanceMeters),
+                                symbol: "point.topleft.down.to.point.bottomright.curvepath"
+                            )
+                        }
+                        if let exerciseCount, exerciseCount > 0,
+                           activity == .strength {
+                            metric(
+                                "\(exerciseCount) " + ATHLTHLocalization.choose(
+                                    english: "exercises", norwegian: "øvelser"
+                                ),
+                                symbol: "dumbbell"
+                            )
+                        }
+                        if let durationSeconds, durationSeconds > 0,
+                           durationSeconds.isFinite {
+                            metric(
+                                HomeRecentCardFormat.duration(durationSeconds),
+                                symbol: "clock"
+                            )
+                        }
+                    }
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                }
+
+                if activity == .strength,
+                   let volumeKilograms, volumeKilograms > 0,
+                   volumeKilograms.isFinite {
+                    metric(
+                        HomeRecentCardFormat.volume(volumeKilograms),
+                        symbol: "scalemass"
+                    )
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                } else if activity != .strength && activity != .running,
+                          let fallback, !fallback.isEmpty {
+                    Text(fallback)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+
+        private func metric(_ value: String, symbol: String) -> some View {
+            Label(value, systemImage: symbol)
+                .labelStyle(.titleAndIcon)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .accessibilityElement(children: .combine)
         }
     }
 
