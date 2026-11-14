@@ -26,10 +26,10 @@ struct ATHLTHSideMenuUtilitiesView: View {
                     }
                 }
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationContentInteraction(.scrolls)
-        .presentationCornerRadius(28)
+        // Presentation type belongs to the caller: full screen for
+        // Inbox and Notifications, a sheet only for Search.
+        // Never give the content a detent that leaves Home visible above it.
+        .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
     }
 
     private var title: String {
