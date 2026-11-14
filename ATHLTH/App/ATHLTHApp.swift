@@ -1982,6 +1982,28 @@ struct AppRootView: View {
                   let result = nextOwnedWatchResult else { return }
             handleWatchWorkoutCompletion(result)
         }
+        // Record starts launched anywhere in ATHLTH (Train, Plan Studio,
+        // Home or Quick Train), not only the Home calendar shortcut.
+        .onChange(of: phoneWorkout.active?.id) { _, _ in
+            guard appSession.signedIn,
+                  let running = phoneWorkout.active,
+                  let plannedID = running.plannedSessionID else { return }
+            _ = appSession.recordPlannedWorkoutStarted(
+                workoutID: plannedID,
+                startedAt: running.start,
+                startedOnWatch: false
+            )
+        }
+        .onChange(of: strengthWorkout.activeWorkout?.id) { _, _ in
+            guard appSession.signedIn,
+                  let workout = strengthWorkout.activeWorkout,
+                  let plannedID = workout.plannedSessionID else { return }
+            _ = appSession.recordPlannedWorkoutStarted(
+                workoutID: plannedID,
+                startedAt: workout.startedAt,
+                startedOnWatch: workout.captureDevice == .appleWatch
+            )
+        }
         .onChange(of: phoneWorkout.completionStartedWorkout?.id) { _, _ in
             guard let workout =
                     phoneWorkout.completionStartedWorkout
