@@ -289,6 +289,46 @@ struct ATHLTHRouteGuardianSettingsView: View {
     }
 }
 
+private enum GhostRaceUpdatePreset:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case quiet
+    case normal
+    case competition
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .quiet:
+            return ATHLTHLocalization.choose(
+                english: "Quiet",
+                norwegian: "Rolig"
+            )
+        case .normal:
+            return ATHLTHLocalization.choose(
+                english: "Normal",
+                norwegian: "Normal"
+            )
+        case .competition:
+            return ATHLTHLocalization.choose(
+                english: "Competition",
+                norwegian: "Konkurranse"
+            )
+        case .custom:
+            return ATHLTHLocalization.choose(
+                english: "Custom",
+                norwegian: "Egendefinert"
+            )
+        }
+    }
+
+
+}
+
 struct ATHLTHGhostUpdatesSettingsView: View {
     @EnvironmentObject private var settings:
         AppSettingsStore
