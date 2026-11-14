@@ -1091,6 +1091,8 @@ struct WorkoutTemplateLibraryView: View {
         _ entry: WorkoutTemplateCatalogEntry,
         blocks: [WorkoutTemplateBlock]
     ) {
+        let signpost = ATHLTHPerformance.begin("LibraryAddCatalogWorkout")
+        defer { ATHLTHPerformance.end("LibraryAddCatalogWorkout", id: signpost) }
         var source = entry.plannedSession()
         source.workoutBlocks = blocks
         let personalID = session.saveSharedWorkout(
@@ -1108,6 +1110,8 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     private func chooseCatalogForPlan(_ entry: WorkoutTemplateCatalogEntry) {
+        let signpost = ATHLTHPerformance.begin("LibraryChooseCatalogWorkout")
+        defer { ATHLTHPerformance.end("LibraryChooseCatalogWorkout", id: signpost) }
         if let existing = session.savedWorkoutTemplates.first(where: {
             $0.workoutTemplateID == entry.id ||
                 $0.sharedSourceSessionID == entry.id
@@ -1457,6 +1461,8 @@ struct WorkoutTemplateLibraryView: View {
 
     private var filteredEntries:
         [WorkoutTemplateCatalogEntry] {
+        let signpost = ATHLTHPerformance.begin("LibraryFilterCatalog")
+        defer { ATHLTHPerformance.end("LibraryFilterCatalog", id: signpost) }
         let needle = ATHLTHWorkoutSearch.normalized(query)
         let filter = discoveryFilter
 
@@ -1471,20 +1477,15 @@ struct WorkoutTemplateLibraryView: View {
                 (selectedCategory == "Custom" &&
                  ATHLTHPlannedWorkoutType.custom.matches(entry))
             guard categoryMatches, levelMatches(entry) else { return false }
-            guard filter.matches(entry) else { return false }
-
-            let favoriteMatches =
-                !favoritesOnly ||
-                favorites.isFavorite(
-                    .workout,
-                    itemID: entry.id.uuidString
-                )
-
-            let searchMatches = catalog.matchesSearch(entry, normalizedNeedle: needle)
-
-            let muscleMatches = selectedMuscleFocus == "all" ||
-                entry.tags.contains(selectedMuscleFocus)
-            return favoriteMatches && searchMatches && muscleMatches
+            // Search, source tags and favorite IDs are cheap metadata checks.
+            // Reject these first, before walking blocks or estimating duration.
+            guard catalog.matchesSearch(entry, normalizedNeedle: needle),
+                  selectedMuscleFocus == "all" ||
+                    entry.tags.contains(selectedMuscleFocus),
+                  !favoritesOnly ||
+                    favorites.isFavorite(.workout, itemID: entry.id.uuidString)
+            else { return false }
+            return filter.matches(entry)
         }
         return discoverySorted(matching, title: { $0.title }) {
             $0.estimatedDurationMinutes.map(Double.init)
