@@ -11,14 +11,16 @@ import SwiftUI
 enum ATHLTHUnifiedLibraryScope: String, CaseIterable, Identifiable, Hashable {
     case athlth
     case mine
+    case favorites
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .athlth: return "ATHLTH"
+        case .athlth:
+            return ATHLTHLocalization.choose(english: "Public", norwegian: "Offentlig")
         case .mine:
-            return ATHLTHLocalization.choose(
-                english: "Mine", norwegian: "Mine"
-            )
+            return ATHLTHLocalization.choose(english: "Mine", norwegian: "Mine")
+        case .favorites:
+            return ATHLTHLocalization.choose(english: "Favorites", norwegian: "Favoritter")
         }
     }
 }
@@ -34,10 +36,13 @@ struct ATHLTHUnifiedPlansLibraryView: View {
                 .padding(.top, 12)
                 .accessibilityIdentifier("training-plans-source-filter")
 
-            if scope == .athlth {
+            switch scope {
+            case .athlth:
                 TrainingPlanLibraryView()
-            } else {
+            case .mine:
                 MyTrainingPlansLibraryView(onOpenPlan: onOpenPlan)
+            case .favorites:
+                LibraryFavoritesView(initialKind: .plan)
             }
         }
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
@@ -58,10 +63,13 @@ struct ATHLTHUnifiedWorkoutsLibraryView: View {
                 .padding(.top, 12)
                 .accessibilityIdentifier("workouts-source-filter")
 
-            if scope == .athlth {
+            switch scope {
+            case .athlth:
                 WorkoutTemplateLibraryView(onStartRunning: onStartRunning)
-            } else {
+            case .mine:
                 MyWorkoutTemplatesView()
+            case .favorites:
+                LibraryFavoritesView(onStartRunning: onStartRunning, initialKind: .workout)
             }
         }
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
