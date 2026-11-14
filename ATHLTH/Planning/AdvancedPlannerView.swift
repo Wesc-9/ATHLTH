@@ -609,8 +609,7 @@ struct AdvancedPlannerView: View {
     }
 
     private var hasStandaloneDraft: Bool {
-        let key = "athlth.sessionEditor.draft.v1.\(session.profile.userID.uuidString).standalone"
-        return UserDefaults.standard.data(forKey: key) != nil
+        ATHLTHStandaloneWorkoutDraftStore.hasDraft(for: session.profile.userID)
     }
 
     private var upcomingStandaloneSessions:
@@ -6651,13 +6650,17 @@ struct SessionEditorView: View {
     private var editorBaseForm: some View {
         if ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
             isStandalone: isStandalone,
-            hasScratchSource: selectedScratchWorkoutType != nil,
+            hasScratchSource: selectedScratchWorkoutType != nil ||
+                showingUnifiedWorkoutComposer ||
+                openScratchComposerAfterPickerDismiss ||
+                scratchResumingSavedComposer,
             preparesForSharing: onPreparedWorkout != nil,
             hasPartner: selectedPartnerID != nil
         ) {
-            // Only the shared builder owns the editing screen. No old
-            // "Plan extra workout / 0 steps / Edit workout" form behind it.
+            // Never show the old "Plan extra workout / 0 steps" editor
+            // while the shared scratch builder is opening or closing.
             ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
+                .toolbar(.hidden, for: .navigationBar)
         } else {
         Form {
             if isStandalone && !hasSelectedWorkoutSource {
@@ -10780,14 +10783,10 @@ struct SessionEditorView: View {
     private func discardStoredStandaloneDraft() {
         guard isStandalone, existingWorkout == nil,
               onPreparedWorkout == nil else { return }
-        if let existingEntry = loadScratchComposerEntry() {
-            UserDefaults.standard.removeObject(
-                forKey: scratchDraftStorageKey(for: existingEntry.id)
-            )
-        }
-        UserDefaults.standard.removeObject(forKey: scratchComposerDraftStorageKey)
-        UserDefaults.standard.removeObject(forKey: draftStorageKey)
-        UserDefaults.standard.removeObject(forKey: scratchComposerEntryKey)
+        ATHLTHStandaloneWorkoutDraftStore.discard(
+            for: session.profile.userID,
+            additionalDraftID: scratchTimelineDraftID
+        )
         hasStoredStandaloneDraft = false
     }
 

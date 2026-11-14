@@ -1,3 +1,5 @@
+import Foundation
+
 /// Routing rules for the shared workout builder when it is presented from
 /// the older standalone session editor. Kept pure for regression tests.
 enum ATHLTHScratchComposerPresentationPolicy {
@@ -45,5 +47,54 @@ enum ATHLTHScratchComposerPresentationPolicy {
     ) -> Bool {
         isStandalone && hasScratchSource &&
             builderWasPresented && !isFinalized
+    }
+}
+
+
+/// The legacy standalone host and the new timeline editor each have a
+/// checkpoint. Delete them as ONE account-scoped draft so Home cannot offer
+/// "Continue draft" after the athlete explicitly chose Delete.
+enum ATHLTHStandaloneWorkoutDraftStore {
+    private struct ScratchReference: Decodable {
+        let id: UUID
+    }
+
+    static func parentKey(for userID: UUID) -> String {
+        "athlth.sessionEditor.draft.v1.\(userID.uuidString).standalone"
+    }
+
+    static func entryKey(for userID: UUID) -> String {
+        parentKey(for: userID) + ".scratchComposer"
+    }
+
+    static func childKey(for userID: UUID, draftID: UUID) -> String {
+        let context = "session-scratch.\(userID.uuidString).\(draftID.uuidString)"
+        return "athlth.workoutBuilder.draft.v1.\(userID.uuidString).\(Data(context.utf8).base64EncodedString())"
+    }
+
+    static func savedDraftID(for userID: UUID, defaults: UserDefaults = .standard) -> UUID? {
+        guard let data = defaults.data(forKey: entryKey(for: userID)) else { return nil }
+        return try? JSONDecoder().decode(ScratchReference.self, from: data).id
+    }
+
+    static func hasDraft(for userID: UUID, defaults: UserDefaults = .standard) -> Bool {
+        defaults.data(forKey: parentKey(for: userID)) != nil ||
+            defaults.data(forKey: entryKey(for: userID)) != nil
+    }
+
+    static func discard(
+        for userID: UUID,
+        additionalDraftID: UUID? = nil,
+        defaults: UserDefaults = .standard
+    ) {
+        // Remove the child snapshot before its pointer. Never touch another
+        // athlete's workout, a planned session or an unrelated partner draft.
+        let candidateIDs = Set([savedDraftID(for: userID, defaults: defaults),
+                                additionalDraftID].compactMap { $0 })
+        for id in candidateIDs {
+            defaults.removeObject(forKey: childKey(for: userID, draftID: id))
+        }
+        defaults.removeObject(forKey: parentKey(for: userID))
+        defaults.removeObject(forKey: entryKey(for: userID))
     }
 }

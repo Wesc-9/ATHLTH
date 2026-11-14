@@ -3058,11 +3058,10 @@ private struct HomeWeeklyProgressDaySheet: View {
     @SceneStorage("athlth.home.daySheet.completedWorkoutID")
     private var persistedCompletedWorkoutID = ""
     @State private var completedWorkoutPath: [UUID] = []
+    @State private var confirmingDeleteWorkoutDraft = false
 
     private var hasWorkoutDraft: Bool {
-        let key = "athlth.sessionEditor.draft.v1.\(session.profile.userID.uuidString).standalone"
-        return UserDefaults.standard.data(forKey: key) != nil ||
-            UserDefaults.standard.data(forKey: key + ".scratchComposer") != nil
+        ATHLTHStandaloneWorkoutDraftStore.hasDraft(for: session.profile.userID)
     }
 
     @EnvironmentObject private var session: AppSessionStore
@@ -3637,10 +3636,51 @@ private struct HomeWeeklyProgressDaySheet: View {
                     english: "Opens the workout planner for this day",
                     norwegian: "Åpner øktplanleggeren direkte for denne dagen"
                 ))
+                if hasWorkoutDraft {
+                    Button {
+                        confirmingDeleteWorkoutDraft = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 44, height: 44)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Delete workout draft", norwegian: "Slett øktutkast"
+                    ))
+                    .accessibilityIdentifier("athlth-home-delete-workout-draft")
+                }
             }
         }
         .padding(.horizontal, 5)
         .padding(.vertical, 5)
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Delete unfinished workout?",
+                norwegian: "Slette uferdig treningsøkt?"
+            ),
+            isPresented: $confirmingDeleteWorkoutDraft,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Delete draft", norwegian: "Slett utkast"
+            ), role: .destructive) {
+                ATHLTHStandaloneWorkoutDraftStore.discard(
+                    for: session.profile.userID
+                )
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Only the unfinished draft will be deleted. Scheduled workouts are unaffected.",
+                norwegian: "Bare det uferdige utkastet slettes. Planlagte økter beholdes."
+            ))
+        }
     }
 
     /// The empty day is an invitation to discover, not a second planning menu.
