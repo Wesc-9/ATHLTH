@@ -285,6 +285,18 @@ enum ATHLTHZonedPlanLibrary {
         )
         session.workoutBlocks = blocks
         session.workoutCategory = isCycle ? "cycling" : "running"
+        session.sourcePlanLoadScore = source.loadScore
+        session.sourcePlanIsKeySession = source.isKeySession
+        session.sourcePlanSessionType = source.sessionType
+        session.sourcePlanScaledRepetitions = source.scaledRepetitions
+        session.sourcePaceExamples = source.paceNotes?.map {
+            ATHLTHPlanPaceExample(
+                zone: $0.zone,
+                paceMinimumMinutesPerKilometer: $0.paceMinKm,
+                paceMaximumMinutesPerKilometer: $0.paceMaxKm,
+                description: $0.descriptionEn
+            )
+        }
         return session
     }
 
