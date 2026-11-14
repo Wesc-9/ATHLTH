@@ -180,45 +180,44 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    Button(action: onChooseLibraryWorkout) {
-                        Label(
+                    // All three starting points have the same visual
+                    // priority. Reuse the existing picker and add callbacks.
+                    HStack(spacing: 7) {
+                        emptyWorkoutAction(
                             ATHLTHLocalization.choose(
-                                english: "Choose a workout from the library",
-                                norwegian: "Velg en treningsøkt fra biblioteket"
+                                english: "Add exercise", norwegian: "Legg til øvelse"
                             ),
-                            systemImage: "books.vertical"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(bronze)
-                    .accessibilityIdentifier("athlth-workout-choose-from-library")
-                    HStack(spacing: 8) {
-                        Button {
-                            // Strength always enters the exercise library.
-                            // Other activities keep the existing quick-add path.
+                            symbol: "plus",
+                            identifier: "athlth-workout-add-exercise"
+                        ) {
+                            // Strength opens its exercise library; running and
+                            // walking keep their existing quick-add flow.
                             if activity == .strength {
                                 onAddExercise(.main)
                             } else {
                                 onAddRun(.main)
                             }
                             visiblePhases.insert(.main)
-                        } label: {
-                            Label(ATHLTHLocalization.choose(
-                                english: "Add activity", norwegian: "Legg til øvelse"
-                            ), systemImage: "plus")
                         }
-                        Button {
-                            onSelectRoute(.main)
-                        } label: {
-                            Label(ATHLTHLocalization.choose(
+                        emptyWorkoutAction(
+                            ATHLTHLocalization.choose(
                                 english: "Route", norwegian: "Rute"
-                            ), systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                            ),
+                            symbol: "point.topleft.down.to.point.bottomright.curvepath",
+                            identifier: "athlth-workout-add-route"
+                        ) {
+                            onSelectRoute(.main)
+                        }
+                        emptyWorkoutAction(
+                            ATHLTHLocalization.choose(
+                                english: "Workout", norwegian: "Treningsøkt"
+                            ),
+                            symbol: "books.vertical",
+                            identifier: "athlth-workout-choose-from-library"
+                        ) {
+                            onChooseLibraryWorkout()
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(bronze)
                 }
                 .padding(22)
                 .frame(maxWidth: .infinity)
@@ -494,6 +493,35 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 in: RoundedRectangle(cornerRadius: 12)
             )
         }
+    }
+
+    /// Compact, equal-priority actions in the empty workout builder.
+    /// A shared capsule style prevents the library action from dominating
+    /// the exercise and route actions on narrow iPhone displays.
+    private func emptyWorkoutAction(
+        _ title: String,
+        symbol: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .medium))
+                    .fixedSize()
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(bronze)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .padding(.horizontal, 5)
+            .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 
     private var addSectionMenu: some View {
