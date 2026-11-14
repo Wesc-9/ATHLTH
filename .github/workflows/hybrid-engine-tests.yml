@@ -40,6 +40,8 @@ on:
       - ATHLTH/Health/HealthKitManager.swift
       - ATHLTH/Models/Models.swift
       - Tests/ATHLTHRouteOfflineAndDirectionTests.swift
+      - Tests/PublicRouteBrowseRegressionTests.swift
+      - supabase/migrations/20261114133541_unified_public_and_mutual_friend_route_catalog.sql
       - supabase/migrations/20261114123021_athlth_route_attempt_direction_scoped_leaderboards.sql
       - ATHLTH/Routes/RouteDetailView.swift
       - ATHLTH/Routes/RunRouteBuilderView.swift
@@ -199,6 +201,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHExploreRoutePolicyTests \
             -only-testing:ATHLTHTests/ATHLTHRouteDetailsPolicyTests \
             -only-testing:ATHLTHTests/ATHLTHRouteOfflineAndDirectionTests \
+            -only-testing:ATHLTHTests/PublicRouteBrowseRegressionTests \
             -only-testing:ATHLTHTests/ATHLTHLibraryDisplayModeTests \
             -only-testing:ATHLTHTests/ATHLTHLibraryResponsiveLayoutTests \
             -only-testing:ATHLTHTests/ATHLTHPublicTrailDiskCacheTests \
