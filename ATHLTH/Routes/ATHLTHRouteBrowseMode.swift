@@ -42,7 +42,14 @@ struct ATHLTHRouteBrowseModePicker: View {
                             get: { selection == .list ? .list : .grid },
                             set: { selection = $0 == .list ? .list : .cards }
                         ),
-                        columns: columns
+                        columns: Binding(
+                            get: {
+                                // Avoid showing both Map and a grid mode as
+                                // selected when Map is the active presentation.
+                                selection == .map ? -1 : columns.wrappedValue
+                            },
+                            set: { columns.wrappedValue = $0 }
+                        )
                     )
                     Button {
                         selection = .map
