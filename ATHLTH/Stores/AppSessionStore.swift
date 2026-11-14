@@ -2004,6 +2004,75 @@ final class AppSessionStore: ObservableObject {
         return duplicate
     }
 
+    /// If the athlete actually begins tomorrow's session today, keep its
+    /// original ID and workout content and reassign the calendar occurrence.
+    /// Opening a preview or merely transferring it to Watch does not call this.
+    /// The caller invokes it only after the recording engine has started.
+    @discardableResult
+    func moveStartedTomorrowWorkoutToToday(
+        workoutID: UUID,
+        startedAt: Date = Date()
+    ) -> Bool {
+        let calendar = Calendar.current
+        guard calendar.isDateInToday(startedAt) else { return false }
+
+        if let existing = standalonePlannedSessions.first(where: {
+            $0.id == workoutID
+        }) {
+            guard let scheduled = existing.scheduledStart,
+                  calendar.isDateInTomorrow(scheduled) else { return false }
+            var moved = existing
+            moved.scheduledStart = startedAt
+            updateStandalonePlannedSession(moved)
+            PlannedWorkoutReminderScheduler.cancel(workoutID)
+            return true
+        }
+
+        let allPlans = ([activePlan].compactMap { $0 } + scheduledPlans)
+        guard var plan = allPlans.first(where: { candidate in
+            candidate.weeks.contains(where: { week in
+                week.days.contains(where: { day in
+                    day.sessions.contains(where: { $0.id == workoutID })
+                })
+            })
+        }),
+        let original = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+            .first(where: { $0.id == workoutID }),
+        let scheduled = original.scheduledStart,
+        calendar.isDateInTomorrow(scheduled)
+        else { return false }
+
+        if movePlanSession(
+            planID: plan.id, sessionID: workoutID, to: startedAt
+        ) {
+            PlannedWorkoutReminderScheduler.cancel(workoutID)
+            return true
+        }
+
+        // A workout on the very first day of a plan may be started before
+        // the plan's start date. Keep the other days and start date intact;
+        // the canonical calendar reads scheduledStart for this occurrence.
+        var changed = false
+        for weekIndex in plan.weeks.indices {
+            for dayIndex in plan.weeks[weekIndex].days.indices {
+                if let index = plan.weeks[weekIndex].days[dayIndex]
+                    .sessions.firstIndex(where: { $0.id == workoutID }) {
+                    plan.weeks[weekIndex].days[dayIndex]
+                        .sessions[index].scheduledStart = startedAt
+                    changed = true
+                    break
+                }
+            }
+            if changed { break }
+        }
+        guard changed else { return false }
+        plan.version += 1
+        plan.updatedAt = startedAt
+        replaceTrainingPlan(plan)
+        PlannedWorkoutReminderScheduler.cancel(workoutID)
+        return true
+    }
+
     @discardableResult
     func movePlanSession(
         planID: UUID,
