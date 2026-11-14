@@ -149,6 +149,7 @@ private struct AroundYouRouteItem: Identifiable {
     let trainingRoute: TrainingRoute
     let centerCoordinate: CLLocationCoordinate2D?
     let renderCoordinates: [CLLocationCoordinate2D]
+    let renderBounds: (south: Double, north: Double, west: Double, east: Double)?
     let hitTestLocations: [CLLocation]
 
     init(
@@ -177,6 +178,7 @@ private struct AroundYouRouteItem: Identifiable {
         if coordinates.isEmpty {
             centerCoordinate = nil
             renderCoordinates = []
+            renderBounds = nil
             hitTestLocations = []
             return
         }
@@ -226,8 +228,26 @@ private struct AroundYouRouteItem: Identifiable {
         // Map cards do not need the full GPS density. Keeping a compact
         // display/hit-test sample cuts transient allocations while panning
         // Explore without changing the stored route itself.
-        renderCoordinates = sampled(maximumCount: 96)
+        renderCoordinates = sampled(maximumCount: 160)
             .map(\.coordinate)
+
+        // Precompute geometry bounds once per route item instead of walking
+        // every polyline again whenever the user pans or zooms the map.
+        if let first = renderCoordinates.first {
+            var south = first.latitude
+            var north = first.latitude
+            var west = first.longitude
+            var east = first.longitude
+            for point in renderCoordinates.dropFirst() {
+                south = min(south, point.latitude)
+                north = max(north, point.latitude)
+                west = min(west, point.longitude)
+                east = max(east, point.longitude)
+            }
+            renderBounds = (south, north, west, east)
+        } else {
+            renderBounds = nil
+        }
 
         hitTestLocations = sampled(maximumCount: 64)
             .map {
@@ -1022,8 +1042,18 @@ struct AroundYouExploreView: View {
                                 !isSelected
 
                             MapPolyline(
-                                coordinates:
-                                    route.renderCoordinates
+                                coordinates: isSelected
+                                    // Restore precise geometry for the single
+                                    // highlighted route, not every map overlay.
+                                    ? route.coordinates
+                                        .enumerated()
+                                        .compactMap { index, point in
+                                            let step = max(1, route.coordinates.count / 600)
+                                            return (index % step == 0 ||
+                                                index == route.coordinates.count - 1)
+                                                ? point.coordinate : nil
+                                        }
+                                    : route.renderCoordinates
                             )
                             .stroke(
                                 isDimmed
@@ -1049,6 +1079,84 @@ struct AroundYouExploreView: View {
                                                         : 3.8
                                         )
                             )
+
+                            // Keep start, finish and direction visible only
+                            // for the focused route to avoid map clutter.
+                            if isSelected,
+                               let start = route.coordinates.first?.coordinate,
+                               let finish = route.coordinates.last?.coordinate,
+                               CLLocationCoordinate2DIsValid(start),
+                               CLLocationCoordinate2DIsValid(finish) {
+                                let loop = CLLocation(latitude: start.latitude,
+                                                      longitude: start.longitude)
+                                    .distance(from: CLLocation(
+                                        latitude: finish.latitude,
+                                        longitude: finish.longitude
+                                    )) < 35
+
+                                Annotation(loop ? "Start / mål" : "Start",
+                                           coordinate: start) {
+                                    Label(loop ? "Start / mål" : "Start",
+                                          systemImage: loop
+                                              ? "flag.checkered" : "figure.run")
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 7)
+                                        .background(.regularMaterial, in: Capsule())
+                                        .overlay {
+                                            Capsule().stroke(
+                                                ATHLTHTheme.premiumGold,
+                                                lineWidth: 2
+                                            )
+                                        }
+                                }
+                                .annotationTitles(.hidden)
+
+                                if !loop {
+                                    Annotation("Mål", coordinate: finish) {
+                                        Label("Mål", systemImage: "flag.checkered")
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(ATHLTHTheme.primaryText)
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 7)
+                                            .background(.regularMaterial, in: Capsule())
+                                            .overlay {
+                                                Capsule().stroke(
+                                                    ATHLTHTheme.vitality,
+                                                    lineWidth: 2
+                                                )
+                                            }
+                                    }
+                                    .annotationTitles(.hidden)
+                                }
+
+                                if route.coordinates.count >= 3 {
+                                    let midIndex = max(1, route.coordinates.count / 3)
+                                    let previous = route.coordinates[midIndex - 1]
+                                    let next = route.coordinates[
+                                        min(route.coordinates.count - 1, midIndex + 1)
+                                    ]
+                                    let mid = route.coordinates[midIndex]
+                                    let bearing = atan2(
+                                        (next.longitude - previous.longitude) *
+                                            cos(mid.latitude * .pi / 180),
+                                        next.latitude - previous.latitude
+                                    ) * 180 / .pi
+                                    Annotation("Retning", coordinate: mid.coordinate) {
+                                        Image(systemName: "arrow.up")
+                                            .font(.caption.weight(.heavy))
+                                            .foregroundStyle(ATHLTHTheme.primaryText)
+                                            .frame(width: 29, height: 29)
+                                            .background(.regularMaterial, in: Circle())
+                                            .rotationEffect(.degrees(
+                                                bearing - (lastObservedMapCamera?.heading ?? 0)
+                                            ))
+                                            .accessibilityLabel("Rutens retning")
+                                    }
+                                    .annotationTitles(.hidden)
+                                }
+                            }
 
                             if let center = route.centerCoordinate {
                                 Annotation(
@@ -3095,19 +3203,9 @@ struct AroundYouExploreView: View {
         let east = visibleRegion.center.longitude +
             visibleRegion.span.longitudeDelta / 2 + paddingLongitude
         return Array(routes.filter { route in
-            guard let start = route.renderCoordinates.first else { return false }
-            var minLatitude = start.latitude
-            var maxLatitude = start.latitude
-            var minLongitude = start.longitude
-            var maxLongitude = start.longitude
-            for point in route.renderCoordinates.dropFirst() {
-                minLatitude = min(minLatitude, point.latitude)
-                maxLatitude = max(maxLatitude, point.latitude)
-                minLongitude = min(minLongitude, point.longitude)
-                maxLongitude = max(maxLongitude, point.longitude)
-            }
-            return maxLatitude >= south && minLatitude <= north &&
-                maxLongitude >= west && minLongitude <= east
+            guard let bounds = route.renderBounds else { return false }
+            return bounds.north >= south && bounds.south <= north &&
+                bounds.east >= west && bounds.west <= east
         }.prefix(60))
     }
 
@@ -3485,7 +3583,9 @@ struct AroundYouExploreView: View {
 
         async let trails: Void = publicTrailDiscovery.refresh(
             in: requestedRegion,
-            force: true
+            // Reuse a recent in-memory trail response on initial entry.
+            // An explicit later area search still requests fresh results.
+            force: lastSearchedRegion != nil
         )
         async let routes: Void = routeDiscovery.refreshVisibleRegion(
             requestedRegion
