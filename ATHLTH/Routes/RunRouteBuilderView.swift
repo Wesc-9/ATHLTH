@@ -34,6 +34,9 @@ struct RunRouteBuilderView: View {
 
     @State private var title = ""
     @State private var visibility: ProfileVisibility = .privateOnly
+    @State private var draftTags: [String] = []
+    @State private var draftSurfaces: [String: Int] = [:]
+    @State private var showingRouteMetadataEditor = false
     @State private var isCalculating = false
     @State private var errorMessage: String?
     @State private var savedMessage: String?
@@ -160,6 +163,28 @@ struct RunRouteBuilderView: View {
         )
         .navigationTitle("Create Running Route")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingRouteMetadataEditor) {
+            NavigationStack {
+                ScrollView {
+                    ATHLTHRouteMetadataForm(
+                        tags: $draftTags,
+                        surfacePercentages: $draftSurfaces
+                    )
+                }
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Surface and tags",
+                    norwegian: "Underlag og emneknagger"
+                ))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Done", norwegian: "Ferdig"
+                        )) { showingRouteMetadataEditor = false }
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showingCoachRouteGenerator) {
             ATHLTHCoachRouteGeneratorView(onRouteSaved: { _ in
                 onRouteSaved?()
@@ -329,6 +354,42 @@ struct RunRouteBuilderView: View {
                 .frame(height: 44)
                 .background(ATHLTHPlanDesign.selectedSurface,
                             in: RoundedRectangle(cornerRadius: 13))
+
+            Button {
+                showingRouteMetadataEditor = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "tag")
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Tags and surface",
+                            norwegian: "Emneknagger og underlag"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        Text(draftTags.isEmpty && draftSurfaces.isEmpty
+                            ? ATHLTHLocalization.choose(
+                                english: "Optional · Surface unknown",
+                                norwegian: "Valgfritt · Underlag ukjent"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "\(draftTags.count) tags · \(ATHLTHRouteDetailsPolicy.unclassifiedPercent(draftSurfaces))% unknown",
+                                norwegian: "\(draftTags.count) emneknagger · \(ATHLTHRouteDetailsPolicy.unclassifiedPercent(draftSurfaces)) % ukjent"
+                            ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .padding(11)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+            }
+            .buttonStyle(.plain)
 
             if title.isEmpty, let automaticRouteTitle {
                 Text(automaticRouteTitle)
@@ -1425,7 +1486,9 @@ struct RunRouteBuilderView: View {
             endName: returnOnSamePath ? startDisplayName : endDisplayName,
             expectedTravelTimeSeconds: selectedAlternative.expectedTravelTime,
             routeSource: returnOnSamePath
-                ? "apple_maps_walking_out_and_back" : "apple_maps_walking"
+                ? "apple_maps_walking_out_and_back" : "apple_maps_walking",
+            tags: ATHLTHRouteDetailsPolicy.cleanedTags(draftTags),
+            surfacePercentages: ATHLTHRouteDetailsPolicy.cleanedSurfaces(draftSurfaces)
         )
 
         session.addImportedRoute(route)
