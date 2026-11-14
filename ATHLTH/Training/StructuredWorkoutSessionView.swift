@@ -355,10 +355,11 @@ struct StructuredWorkoutSessionView: View {
                     hasStarted = true
                     setupCurrentStep()
                     persistCheckpoint()
-                    // The structured iPhone recorder has now begun. Keep the
-                    // planned session ID but move tomorrow's date to today.
-                    _ = session.moveStartedTomorrowWorkoutToToday(
-                        workoutID: workout.id, startedAt: startedAt
+                    // Preserve the real start and the original planned ID.
+                    _ = session.recordPlannedWorkoutStarted(
+                        workoutID: workout.id,
+                        startedAt: startedAt,
+                        startedOnWatch: false
                     )
                     // This view itself is the iPhone interval/strength
                     // recorder. A ready lobby is only marked started when
@@ -1347,6 +1348,11 @@ struct StructuredWorkoutSessionView: View {
         StructuredWorkoutCompletionStore.save(
             completion,
             userID: session.profile.userID
+        )
+        _ = session.recordPlannedWorkoutFinished(
+            workoutID: workout.id,
+            recordedStart: completion.startedAt,
+            endedAt: completion.endedAt
         )
         removeCheckpoint()
         savedCompletion = true
