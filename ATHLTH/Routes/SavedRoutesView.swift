@@ -267,8 +267,8 @@ struct SavedRoutesView: View {
                             mode: viewMode == .list || viewMode == .map ? .list : .grid,
                             width: libraryViewWidth,
                             accessibilityText: dynamicTypeSize.isAccessibilitySize,
-                            preferredColumns: preferredColumns,
-                            preferredMinimumCardWidth: 104
+                            preferredMinimumCardWidth: 104,
+                            preferredColumns: preferredColumns
                         ),
                         spacing: 10
                     ) {
