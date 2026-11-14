@@ -19,9 +19,11 @@ enum ATHLTHPlanWorkoutArtwork {
     }
 
     static func scene(for entry: TrainingPlanCatalogEntry) -> TrainingScene {
+        // The plan's identity defines its cover; do not classify every
+        // marathon or consistency plan as "intervals" merely because one
+        // weekly session contains speed work.
         let phrase = (
             entry.slug + " " + entry.title + " " + entry.goal + " " +
-            entry.workoutPattern.joined(separator: " ") + " " +
             entry.tags.joined(separator: " ")
         ).lowercased()
 
