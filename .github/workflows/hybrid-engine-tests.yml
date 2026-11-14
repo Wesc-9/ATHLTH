@@ -32,6 +32,15 @@ on:
       - Tests/ATHLTHIntervalRecipeEditingTests.swift
       - .github/workflows/hybrid-engine-tests.yml
       - ATHLTH/Routes/ATHLTHExploreRoutePolicy.swift
+      - ATHLTH/Planning/ATHLTHLibraryDisplayMode.swift
+      - ATHLTH/Planning/TrainingLibraryHomeView.swift
+      - ATHLTH/Planning/WorkoutTemplateCatalog.swift
+      - ATHLTH/Exercises/ExerciseLibraryViews.swift
+      - ATHLTH/Routes/RouteLibraryListView.swift
+      - ATHLTH/Routes/SavedRoutesView.swift
+      - ATHLTH/Studio/ATHLTHiPadLibraryWorkspaceView.swift
+      - Tests/ATHLTHLibraryDisplayModeTests.swift
+      - Tests/ATHLTHLibraryResponsiveLayoutTests.swift
       - ATHLTH/Routes/ATHLTHPublicTrailDiskCache.swift
       - ATHLTH/Routes/PublicTrailDiscoveryStore.swift
       - ATHLTH/Home/HomeAroundYouView.swift
@@ -172,6 +181,8 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/HybridTests.xcresult" \
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
             -only-testing:ATHLTHTests/ATHLTHExploreRoutePolicyTests \
+            -only-testing:ATHLTHTests/ATHLTHLibraryDisplayModeTests \
+            -only-testing:ATHLTHTests/ATHLTHLibraryResponsiveLayoutTests \
             -only-testing:ATHLTHTests/ATHLTHPublicTrailDiskCacheTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
             -only-testing:ATHLTHTests/ATHLTHUnifiedMixedWorkoutPlanTests \
