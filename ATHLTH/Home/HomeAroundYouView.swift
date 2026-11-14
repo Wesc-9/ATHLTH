@@ -195,41 +195,27 @@ private struct AroundYouRouteItem: Identifiable {
             longitude: longitude
         )
 
-        func sampled(
-            maximumCount: Int
-        ) -> [RouteCoordinate] {
+        func sampled(maximumCount: Int) -> [RouteCoordinate] {
             guard coordinates.count > maximumCount else {
                 return coordinates
             }
-
-            let strideValue = max(
-                (coordinates.count + maximumCount - 1) / maximumCount,
-                1
-            )
-
-            var result = coordinates.enumerated().compactMap {
-                index,
-                point -> RouteCoordinate? in
-                guard index % strideValue == 0 else {
-                    return nil
-                }
-                return point
+            let stride = max(1, (coordinates.count + maximumCount - 1) / maximumCount)
+            var values = coordinates.enumerated().compactMap {
+                $0.offset % stride == 0 ? $0.element : nil
             }
-
-            if let last = coordinates.last,
-               result.last?.latitude != last.latitude ||
-                result.last?.longitude != last.longitude {
-                result.append(last)
+            if let last = coordinates.last, values.last != last {
+                values.append(last)
             }
-
-            return result
+            return values
         }
 
         // Map cards do not need the full GPS density. Keeping a compact
         // display/hit-test sample cuts transient allocations while panning
         // Explore without changing the stored route itself.
-        renderCoordinates = sampled(maximumCount: 160)
-            .map(\.coordinate)
+        renderCoordinates = ATHLTHExploreRoutePolicy.displayPoints(
+            coordinates.map(\.coordinate),
+            maximum: 160
+        )
 
         // Precompute geometry bounds once per route item instead of walking
         // every polyline again whenever the user pans or zooms the map.
@@ -256,6 +242,46 @@ private struct AroundYouRouteItem: Identifiable {
                     longitude: $0.longitude
                 )
             }
+    }
+}
+
+/// Cache expensive route samples once per content revision, not per camera
+/// update. This is a plain reference cache; it does not publish UI changes.
+@MainActor
+private final class AroundYouRoutePresentationCache {
+    private var items: [UUID: AroundYouRouteItem] = [:]
+
+    func item(
+        for route: TrainingRoute,
+        isMine: Bool,
+        isSaved: Bool,
+        isPublicTrail: Bool = false
+    ) -> AroundYouRouteItem {
+        if let current = items[route.id],
+           current.trainingRoute == route,
+           current.isMine == isMine,
+           current.isSaved == isSaved,
+           current.isPublicTrail == isPublicTrail {
+            return current
+        }
+        let value = AroundYouRouteItem(
+            id: route.id,
+            title: route.title,
+            distanceKilometers: route.distanceKilometers,
+            elevationGainMeters: route.elevationGainMeters,
+            coordinates: route.coordinates,
+            ownerID: route.ownerID,
+            isMine: isMine,
+            isSaved: isSaved,
+            isPublicTrail: isPublicTrail,
+            trainingRoute: route
+        )
+        items[route.id] = value
+        return value
+    }
+
+    func removeAbsent(_ ids: Set<UUID>) {
+        items = items.filter { ids.contains($0.key) }
     }
 }
 
@@ -875,6 +901,8 @@ struct AroundYouExploreView: View {
     @State private var is3DMapEnabled = false
     @State private var hasCenteredOnUser = false
     @State private var selectedRoute: TrainingRoute?
+    @State private var reverseSelectedRoute = false
+    @State private var routePresentationCache = AroundYouRoutePresentationCache()
     @State private var selectedEvent: CommunityEventItem?
     @State private var eventToOpen: CommunityEventItem?
     @State private var selectedPublicWorkout: TrainTogetherPost?
@@ -3221,64 +3249,35 @@ struct AroundYouExploreView: View {
 
         // Only results from the searched viewport are on this map.
         // Saved/owned routes are merged below from the on-device library.
-        for route in routeDiscovery.localRoutes {
-            routesByID[route.id] =
-                AroundYouRouteItem(
-                    id: route.id,
-                    title: route.title,
-                    distanceKilometers:
-                        route.distanceKilometers,
-                    elevationGainMeters:
-                        route.elevationGainMeters,
-                    coordinates: route.coordinates,
-                    ownerID: route.ownerID,
-                    isMine: route.ownerID == session.profile.userID,
-                    isSaved: savedIDs.contains(route.id) ||
-                        savedSourceIDs.contains(route.id),
-                    trainingRoute:
-                        route.trainingRoute
-                )
+        for record in routeDiscovery.localRoutes {
+            let route = record.trainingRoute
+            routesByID[route.id] = routePresentationCache.item(
+                for: route,
+                isMine: route.ownerID == session.profile.userID,
+                isSaved: savedIDs.contains(route.id) ||
+                    savedSourceIDs.contains(route.id)
+            )
         }
 
         for route in session.savedRoutes {
-            routesByID[route.id] =
-                AroundYouRouteItem(
-                    id: route.id,
-                    title: route.title,
-                    distanceKilometers:
-                        route.distanceKilometers,
-                    elevationGainMeters:
-                        route.elevationGainMeters,
-                    coordinates:
-                        route.coordinates,
-                    ownerID: route.ownerID,
-                    isMine: route.ownerID == session.profile.userID &&
-                        route.sharedSourceRouteID == nil,
-                    isSaved: true,
-                    trainingRoute: route
-                )
+            routesByID[route.id] = routePresentationCache.item(
+                for: route,
+                isMine: route.ownerID == session.profile.userID &&
+                    route.sharedSourceRouteID == nil,
+                isSaved: true
+            )
         }
 
         for trail in publicTrailDiscovery.trails {
             let route = trail.trainingRoute
-
-            routesByID[route.id] =
-                AroundYouRouteItem(
-                    id: route.id,
-                    title: route.title,
-                    distanceKilometers:
-                        route.distanceKilometers,
-                    elevationGainMeters:
-                        route.elevationGainMeters,
-                    coordinates:
-                        route.coordinates,
-                    ownerID: route.ownerID,
-                    isMine: false,
-                    isSaved: savedSourceIDs.contains(route.id),
-                    isPublicTrail: true,
-                    trainingRoute: route
-                )
+            routesByID[route.id] = routePresentationCache.item(
+                for: route,
+                isMine: false,
+                isSaved: savedSourceIDs.contains(route.id),
+                isPublicTrail: true
+            )
         }
+        routePresentationCache.removeAbsent(Set(routesByID.keys))
 
         let values =
             Array(routesByID.values)
