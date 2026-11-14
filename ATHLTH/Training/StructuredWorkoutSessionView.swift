@@ -1284,7 +1284,7 @@ struct StructuredWorkoutSessionView: View {
         else { return }
         // No invented health metrics: the structured recorder only knows
         // elapsed time, the actual current block and completed block count.
-        let stages = blocks.prefix(32).enumerated().map { index, block in
+        let stages = blocks.enumerated().map { index, block in
             ATHLTHLiveWorkoutStage(
                 index: index,
                 title: block.title,
