@@ -4132,6 +4132,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingRunningExercisePicker = false
     @State private var resumeExercisePickerAfterWake = false
     @State private var resumeRunningPickerAfterWake = false
+    @State private var resumeAuxiliarySheetAfterWake: String?
     @State private var selectedExerciseInfo: WorkoutTemplateBlock?
     @State private var selectedPhase: WorkoutPhaseKind = .main
     @State private var expandedBlockIndex: Int?
@@ -4385,6 +4386,9 @@ struct WorkoutTemplateBuilderView: View {
         // Optional to keep all existing workout drafts compatible.
         let pendingExercisePicker: Bool?
         let pendingRunningPicker: Bool?
+        // A deep Studio card is part of the active editor position.
+        // Optional so existing user drafts still decode unchanged.
+        let pendingAuxiliarySheet: String?
         let audioCoachConfiguration: WatchAudioCoachConfiguration?
         let routeAlertConfiguration: WatchRouteAlertConfiguration?
         let ghostTargetDurationSeconds: TimeInterval?
@@ -4504,9 +4508,63 @@ struct WorkoutTemplateBuilderView: View {
         }
         resumeExercisePickerAfterWake = stored.pendingExercisePicker ?? false
         resumeRunningPickerAfterWake = stored.pendingRunningPicker ?? false
+        resumeAuxiliarySheetAfterWake = stored.pendingAuxiliarySheet
         collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
         draftRestored = true
         draftNotice = true
+    }
+
+
+    /// Preserve the actual child sheet instead of returning to Studio.
+    /// The work recipe is saved independently and always restored first.
+    private var activeAuxiliarySheetKey: String? {
+        if let extra = selectedWorkoutExtra { return "extra:" + extra.rawValue }
+        if let selection = studioStepEditorSelection,
+           let index = selection.index(in: blocks) {
+            return "step:" + String(index)
+        }
+        if let block = selectedExerciseInfo,
+           let index = blocks.firstIndex(of: block) {
+            return "exerciseInfo:" + String(index)
+        }
+        if showingBlockPicker { return "blockPicker" }
+        if showingSavedWorkoutPicker { return "savedWorkoutPicker" }
+        if showingStudioRoutePicker { return "routePicker" }
+        if showingStudioRouteBuilder { return "routeBuilder" }
+        if showingCopyPicker { return "copyPicker" }
+        if showingWorkoutReview { return "workoutReview" }
+        return nil
+    }
+
+    private func resumeAuxiliarySheetIfNeeded() {
+        guard draftActive, !draftFinished, scenePhase == .active,
+              let key = resumeAuxiliarySheetAfterWake else { return }
+
+        switch key {
+        case "blockPicker": showingBlockPicker = true
+        case "savedWorkoutPicker": showingSavedWorkoutPicker = true
+        case "routePicker": showingStudioRoutePicker = true
+        case "routeBuilder": showingStudioRouteBuilder = true
+        case "copyPicker": showingCopyPicker = true
+        case "workoutReview": showingWorkoutReview = true
+        default:
+            if key.hasPrefix("extra:"),
+               let extra = ATHLTHWorkoutExtraDestination(
+                   rawValue: String(key.dropFirst("extra:".count))
+               ) {
+                selectedWorkoutExtra = extra
+            } else if key.hasPrefix("step:"),
+                      let index = Int(key.dropFirst("step:".count)),
+                      blocks.indices.contains(index) {
+                openStudioStepEditor(blockID: blocks[index].editorDragID)
+            } else if key.hasPrefix("exerciseInfo:"),
+                      let index = Int(key.dropFirst("exerciseInfo:".count)),
+                      blocks.indices.contains(index) {
+                selectedExerciseInfo = blocks[index]
+            }
+        }
+        resumeAuxiliarySheetAfterWake = nil
+        persistWorkoutDraft()
     }
 
     /// Coalesce rapid text and stepper edits so JSON encoding and UserDefaults
@@ -4553,6 +4611,8 @@ struct WorkoutTemplateBuilderView: View {
             studioDate: studioBasicDate,
             pendingExercisePicker: showingExercisePicker || resumeExercisePickerAfterWake,
             pendingRunningPicker: showingRunningExercisePicker || resumeRunningPickerAfterWake,
+            pendingAuxiliarySheet: activeAuxiliarySheetKey ??
+                resumeAuxiliarySheetAfterWake,
             audioCoachConfiguration: currentAudioCoachConfiguration,
             routeAlertConfiguration: routeIsCustomized
                 ? routeGuardianDraft.configuration : nil,
@@ -5052,6 +5112,8 @@ struct WorkoutTemplateBuilderView: View {
                         } else if resumeRunningPickerAfterWake {
                             showingRunningExercisePicker = true
                             resumeRunningPickerAfterWake = false
+                        } else if resumeAuxiliarySheetAfterWake != nil {
+                            resumeAuxiliarySheetIfNeeded()
                         }
                     }
                 } else if !initialQuickAddConsumed, let initialQuickAdd {
@@ -5164,8 +5226,12 @@ struct WorkoutTemplateBuilderView: View {
                         || resumeExercisePickerAfterWake
                     resumeRunningPickerAfterWake = showingRunningExercisePicker
                         || resumeRunningPickerAfterWake
+                    resumeAuxiliarySheetAfterWake = activeAuxiliarySheetKey ??
+                        resumeAuxiliarySheetAfterWake
                     persistWorkoutDraft()
-                } else if resumeExercisePickerAfterWake || resumeRunningPickerAfterWake {
+                } else if resumeExercisePickerAfterWake ||
+                            resumeRunningPickerAfterWake ||
+                            resumeAuxiliarySheetAfterWake != nil {
                     Task { @MainActor in
                         await Task.yield()
                         if resumeExercisePickerAfterWake && !showingExercisePicker {
@@ -5176,6 +5242,12 @@ struct WorkoutTemplateBuilderView: View {
                         }
                         resumeExercisePickerAfterWake = false
                         resumeRunningPickerAfterWake = false
+                        if resumeAuxiliarySheetAfterWake != nil {
+                            // Let the resumed child mount after Studio's
+                            // first layout, never during its state restore.
+                            await Task.yield()
+                            resumeAuxiliarySheetIfNeeded()
+                        }
                         persistWorkoutDraft()
                     }
                 }
@@ -5194,6 +5266,21 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
             .onChange(of: showingRunningExercisePicker) { _, _ in
+                persistWorkoutDraft()
+            }
+            .onChange(of: showingBlockPicker) { _, _ in persistWorkoutDraft() }
+            .onChange(of: showingSavedWorkoutPicker) { _, _ in persistWorkoutDraft() }
+            .onChange(of: showingStudioRoutePicker) { _, _ in persistWorkoutDraft() }
+            .onChange(of: showingStudioRouteBuilder) { _, _ in persistWorkoutDraft() }
+            .onChange(of: showingCopyPicker) { _, _ in persistWorkoutDraft() }
+            .onChange(of: showingWorkoutReview) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioStepEditorSelection?.id) { _, _ in
+                persistWorkoutDraft()
+            }
+            .onChange(of: selectedWorkoutExtra?.rawValue) { _, _ in
+                persistWorkoutDraft()
+            }
+            .onChange(of: selectedExerciseInfo?.editorDragID) { _, _ in
                 persistWorkoutDraft()
             }
             .task {
