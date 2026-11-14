@@ -348,6 +348,7 @@ private struct ATHLTHCompactPlanActionCard: View {
 /// Works without Apple Watch and does not create a completed workout.
 struct ATHLTHRecoveryRestPlanningSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
 
     enum Mode: String, CaseIterable, Identifiable {
@@ -413,6 +414,66 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
     @State private var durationMinutes = 20
     @State private var notes = ""
     @State private var errorMessage: String?
+    @State private var hasRestoredCheckpoint = false
+
+    private struct RecoveryCheckpoint: Codable {
+        let mode: String
+        let date: Date
+        let guideID: String
+        let durationMinutes: Int
+        let notes: String
+        let savedAt: Date
+    }
+
+    private var checkpointsStandaloneHome: Bool {
+        !allowPlanSelection && fixedPlanID == nil && fixedDayID == nil
+    }
+
+    private var recoveryCheckpointKey: String {
+        "athlth.home.recoveryDraft.v1.\(session.profile.userID.uuidString)"
+    }
+
+    private func restoreRecoveryCheckpoint() {
+        guard !hasRestoredCheckpoint else { return }
+        hasRestoredCheckpoint = true
+        guard checkpointsStandaloneHome,
+              ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+                  for: session.profile.userID
+              ) == .recoveryRestPlanner,
+              let data = UserDefaults.standard.data(forKey: recoveryCheckpointKey),
+              let record = try? JSONDecoder().decode(
+                  RecoveryCheckpoint.self, from: data
+              ),
+              record.savedAt <= Date().addingTimeInterval(300),
+              Date().timeIntervalSince(record.savedAt) < 14 * 86_400,
+              let savedMode = Mode(rawValue: record.mode)
+        else { return }
+        mode = savedMode
+        date = record.date
+        selectedGuideID = record.guideID
+        durationMinutes = min(max(record.durationMinutes, 5), 180)
+        notes = record.notes
+    }
+
+    private func persistRecoveryCheckpoint() {
+        guard checkpointsStandaloneHome, hasRestoredCheckpoint else { return }
+        let record = RecoveryCheckpoint(
+            mode: mode.rawValue,
+            date: date,
+            guideID: selectedGuideID,
+            durationMinutes: durationMinutes,
+            notes: notes,
+            savedAt: Date()
+        )
+        if let data = try? JSONEncoder().encode(record) {
+            UserDefaults.standard.set(data, forKey: recoveryCheckpointKey)
+        }
+    }
+
+    private func clearRecoveryCheckpoint() {
+        guard checkpointsStandaloneHome else { return }
+        UserDefaults.standard.removeObject(forKey: recoveryCheckpointKey)
+    }
 
     init(
         date: Date = Date(),
@@ -715,11 +776,24 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                 english: "Recovery & wellbeing", norwegian: "Restitusjon og velvære"
             ))
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { restoreRecoveryCheckpoint() }
+            .onChange(of: mode) { _, _ in persistRecoveryCheckpoint() }
+            .onChange(of: selectedGuideID) { _, _ in persistRecoveryCheckpoint() }
+            .onChange(of: durationMinutes) { _, _ in persistRecoveryCheckpoint() }
+            .onChange(of: date) { _, _ in persistRecoveryCheckpoint() }
+            .onChange(of: notes) { _, _ in persistRecoveryCheckpoint() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { persistRecoveryCheckpoint() }
+            }
+            .onDisappear { persistRecoveryCheckpoint() }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(ATHLTHLocalization.choose(
                         english: "Cancel", norwegian: "Avbryt"
-                    )) { dismiss() }
+                    )) {
+                        clearRecoveryCheckpoint()
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(ATHLTHLocalization.choose(
@@ -808,6 +882,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
         } else {
             session.addStandalonePlannedSession(planned)
         }
+        clearRecoveryCheckpoint()
         onSaved?()
         dismiss()
     }
