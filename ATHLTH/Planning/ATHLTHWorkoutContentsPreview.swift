@@ -5,15 +5,30 @@ import SwiftUI
 /// per-activity arrays of "exercises" in the selection UI. The unified
 /// PlannedSession recipe is the single source of truth.
 struct ATHLTHWorkoutContentsPreview: View {
-    let workout: PlannedSession
+    let workout: PlannedSession?
+    let catalogBlocks: [WorkoutTemplateBlock]?
     var maximumVisibleBlocks: Int? = 3
 
+    init(workout: PlannedSession, maximumVisibleBlocks: Int? = 3) {
+        self.workout = workout
+        self.catalogBlocks = nil
+        self.maximumVisibleBlocks = maximumVisibleBlocks
+    }
+
+    /// Bundled/published catalog content is already a canonical recipe.
+    /// Do not project it through PlannedSession on every row recomputation.
+    init(blocks: [WorkoutTemplateBlock], maximumVisibleBlocks: Int? = 3) {
+        self.workout = nil
+        self.catalogBlocks = blocks
+        self.maximumVisibleBlocks = maximumVisibleBlocks
+    }
+
     private var blocks: [WorkoutTemplateBlock] {
-        // Historical running templates and strength plans can still store
-        // exercises in runningWorkout(s) or PlannedExercise rather than
-        // workoutBlocks. Use the same non-destructive projection as the
-        // workout editor; never show an empty card for a valid old recipe.
-        ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        if let catalogBlocks { return catalogBlocks }
+        // Historic user workouts can store steps in legacy containers;
+        // preserve the shared editor's read-only projection for these.
+        if let workout { return ATHLTHUnifiedWorkout.editorBlocks(from: workout) }
+        return []
     }
 
     private var visible: [WorkoutTemplateBlock] {
