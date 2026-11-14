@@ -19,6 +19,7 @@ private struct PublicTrailAttemptRow:
     let averageDeviationMeters: Double?
     let maxDeviationMeters: Double?
     let source: String
+    var direction: ATHLTHRouteAttemptDirection? = nil
     let username: String?
     let displayName: String?
     let avatarURL: String?
@@ -36,6 +37,7 @@ private struct PublicTrailAttemptRow:
         case averageDeviationMeters = "average_deviation_meters"
         case maxDeviationMeters = "max_deviation_meters"
         case source
+        case direction
         case username
         case displayName = "display_name"
         case avatarURL = "avatar_url"
@@ -55,6 +57,7 @@ private struct PublicTrailAttemptRow:
             averageDeviationMeters: averageDeviationMeters,
             maxDeviationMeters: maxDeviationMeters,
             source: source,
+            direction: direction,
             username: username,
             displayName: displayName,
             avatarURL: avatarURL
@@ -74,6 +77,7 @@ private struct PublicTrailAttemptWrite: Encodable {
     let averageDeviationMeters: Double
     let maxDeviationMeters: Double
     let source: String
+    let direction: ATHLTHRouteAttemptDirection
 
     enum CodingKeys: String, CodingKey {
         case trailID = "trail_id"
@@ -87,6 +91,7 @@ private struct PublicTrailAttemptWrite: Encodable {
         case averageDeviationMeters = "average_deviation_meters"
         case maxDeviationMeters = "max_deviation_meters"
         case source
+        case direction
     }
 }
 
@@ -189,7 +194,8 @@ final class SupabasePublicTrailAttemptService {
                     analysis.averageDeviationMeters,
                 maxDeviationMeters:
                     analysis.maxDeviationMeters,
-                source: "apple_health"
+                source: "apple_health",
+            direction: analysis.direction
             )
 
         try await client
