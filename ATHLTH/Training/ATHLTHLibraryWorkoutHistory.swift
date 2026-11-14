@@ -18,7 +18,7 @@ enum ATHLTHLibraryWorkoutHistory {
     ) -> [UUID: Summary] {
         var latest: [UUID: StructuredWorkoutCompletion] = [:]
         for completion in completions where completion.sourcePlanID == nil {
-            guard let id = completion.sourceWorkoutID else { continue }
+            let id = completion.sourceWorkoutID
             if let previous = latest[id], previous.endedAt >= completion.endedAt {
                 continue
             }
