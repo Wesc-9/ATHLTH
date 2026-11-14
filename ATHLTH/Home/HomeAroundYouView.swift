@@ -281,6 +281,8 @@ private final class AroundYouRoutePresentationCache {
     }
 
     func removeAbsent(_ ids: Set<UUID>) {
+        guard items.count != ids.count ||
+                !Set(items.keys).isSubset(of: ids) else { return }
         items = items.filter { ids.contains($0.key) }
     }
 }
@@ -1062,6 +1064,43 @@ struct AroundYouExploreView: View {
                     }
 
                     if filter == .all || filter == .routes {
+                        if shouldClusterMapRoutes {
+                            ForEach(mapRouteClusters) { cluster in
+                                Annotation(
+                                    cluster.count == 1
+                                        ? "Rute" : "\(cluster.count) ruter",
+                                    coordinate: cluster.coordinate
+                                ) {
+                                    Button {
+                                        zoomToCluster(cluster.coordinate)
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "figure.run")
+                                            if cluster.count > 1 {
+                                                Text("\(cluster.count)")
+                                                    .monospacedDigit()
+                                            }
+                                        }
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .padding(.horizontal, 10)
+                                        .frame(height: 34)
+                                        .background(.regularMaterial, in: Capsule())
+                                        .overlay {
+                                            Capsule().stroke(
+                                                ATHLTHTheme.vitality.opacity(0.8),
+                                                lineWidth: 1.5
+                                            )
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(
+                                        "\(cluster.count) ruter. Trykk for å zoome inn."
+                                    )
+                                }
+                                .annotationTitles(.hidden)
+                            }
+                        } else {
                         ForEach(mapVisibleRoutes) { route in
                             let isSelected =
                                 selectedRoute?.id == route.id
@@ -1244,6 +1283,7 @@ struct AroundYouExploreView: View {
                                     )
                                 }
                             }
+                        }
                         }
                     }
 
@@ -3217,6 +3257,46 @@ struct AroundYouExploreView: View {
     /// Render only routes crossing the visible viewport before applying the
     /// 60-route drawing limit. Previously nearby off-screen routes consumed
     /// the first 35 slots and hid real trails in towns like Bodø.
+    private var shouldClusterMapRoutes: Bool {
+        guard selectedRoute == nil, let region = visibleRegion else {
+            return false
+        }
+        return region.span.latitudeDelta >= 0.20 ||
+            region.span.longitudeDelta >= 0.25
+    }
+
+    private var mapRouteClusters: [ATHLTHExploreRoutePolicy.Cluster] {
+        guard let region = visibleRegion else { return [] }
+        let halfLatitude = region.span.latitudeDelta * 0.58
+        let halfLongitude = region.span.longitudeDelta * 0.58
+        let centers = nearbyRoutes.compactMap { route
+            -> ATHLTHExploreRoutePolicy.Center? in
+            guard let coordinate = route.centerCoordinate,
+                  abs(coordinate.latitude - region.center.latitude) <= halfLatitude,
+                  abs(coordinate.longitude - region.center.longitude) <= halfLongitude
+            else { return nil }
+            return ATHLTHExploreRoutePolicy.Center(
+                id: route.id,
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
+            )
+        }
+        return ATHLTHExploreRoutePolicy.clusters(centers, region: region)
+    }
+
+    private func zoomToCluster(_ coordinate: CLLocationCoordinate2D) {
+        guard let region = visibleRegion else { return }
+        withAnimation(.easeInOut(duration: 0.28)) {
+            mapPosition = .region(MKCoordinateRegion(
+                center: coordinate,
+                span: MKCoordinateSpan(
+                    latitudeDelta: max(0.025, region.span.latitudeDelta * 0.4),
+                    longitudeDelta: max(0.025, region.span.longitudeDelta * 0.4)
+                )
+            ))
+        }
+    }
+
     private var mapVisibleRoutes: [AroundYouRouteItem] {
         let routes = nearbyRoutes
         guard let visibleRegion else { return Array(routes.prefix(60)) }
