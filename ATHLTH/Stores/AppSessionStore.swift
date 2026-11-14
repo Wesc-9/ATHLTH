@@ -43,7 +43,7 @@ struct TrainingPlanProgressSnapshot {
 
 
 /// Actual recording times belong to a specific calendar session ID.
-///// The planned duration remains unchanged; finish is never inferred from it.
+/// The planned duration remains unchanged; finish is never inferred from it.
 struct ATHLTHPlannedWorkoutRecordedTimes: Codable, Equatable {
     var startedAt: Date
     var endedAt: Date?
