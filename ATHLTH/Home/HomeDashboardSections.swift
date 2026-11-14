@@ -1741,9 +1741,9 @@ struct HomeWeeklyProgressStrip:
     let workouts: [WorkoutSummary]
     let events:
         [HomeScheduledCommunityEvent]
+    var canStartWithWatch = false
     var onStartStandaloneWorkout:
         ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
-    var canStartWithWatch = false
 
     @State private var weekOffset = 0
     @State private var selectedDay:
