@@ -6801,6 +6801,7 @@ struct SessionEditorView: View {
         if ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
             isStandalone: isStandalone,
             hasScratchSource: selectedScratchWorkoutType != nil ||
+                (editorMode == .advanced && canOpenImportedAdvancedWorkout) ||
                 showingUnifiedWorkoutComposer ||
                 openScratchComposerAfterPickerDismiss ||
                 scratchResumingSavedComposer,
@@ -7133,6 +7134,9 @@ struct SessionEditorView: View {
                             scheduled.scheduledStart = scheduledTime
                             scheduled.notes = original.notes
                             scheduled.workoutTemplateID = original.workoutTemplateID
+                            scheduled.targetDistanceKilometers =
+                                updated.targetDistanceKilometers ??
+                                original.targetDistanceKilometers
                             scheduled.targetAlertConfiguration =
                                 original.targetAlertConfiguration
                             scheduled.autoPauseEnabled = original.autoPauseEnabled
