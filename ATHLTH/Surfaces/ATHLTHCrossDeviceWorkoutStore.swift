@@ -690,6 +690,34 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         return true
     }
 
+    /// Supabase rejects snapshots larger than its 16 KB JSONB limit. Long
+    /// interval plans must keep publishing live progress rather than silently
+    /// losing iPad updates. Prefer the current phase, nearby steps and recent
+    /// splits; every omitted field remains optional on the read-only viewer.
+    static func boundedSpectatorSnapshot(
+        _ input: ATHLTHCrossDeviceWorkoutSnapshot
+    ) -> ATHLTHCrossDeviceWorkoutSnapshot {
+        var output = input
+        if let steps = output.runningSteps, steps.count > 24 {
+            let index = max(0, output.runningStepIndex ?? 0)
+            let start = min(max(0, index - 8), steps.count - 24)
+            output.runningSteps = Array(steps[start..<(start + 24)])
+        }
+        if let exercises = output.strengthExercises, exercises.count > 20 {
+            output.strengthExercises = Array(exercises.prefix(20))
+        }
+        if let splits = output.recentSplits, splits.count > 8 {
+            output.recentSplits = Array(splits.suffix(8))
+        }
+        // Leave headroom for JSONB's representation and database constraints.
+        if let size = try? JSONEncoder().encode(output).count, size > 12_000 {
+            output.runningSteps = nil
+            output.strengthExercises = nil
+            output.recentSplits = nil
+        }
+        return output
+    }
+
     private func publishLocal(
         accountID: UUID,
         phone: IPhoneWorkoutStore,
@@ -709,7 +737,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             let now = Date()
             let row = ATHLTHCrossDeviceWorkoutRow(
                 userID: accountID,
-                snapshot: active,
+                snapshot: Self.boundedSpectatorSnapshot(active),
                 updatedAt: now,
                 expiresAt: now.addingTimeInterval(30)
             )
