@@ -535,8 +535,28 @@ final class PublicTrailDiscoveryStore:
                 }
             }
             var values: [PublicTrailDiscoveryResponse] = []
+            var displayedFirstBatch = false
             for await item in group {
-                if let item { values.append(item) }
+                if Task.isCancelled {
+                    group.cancelAll()
+                    break
+                }
+                guard let item else { continue }
+                values.append(item)
+
+                // Show the first usable response immediately rather than
+                // holding the map empty for the slowest of four cells.
+                // Deduplicate the full result once after all cells finish.
+                if !displayedFirstBatch {
+                    let firstTrails = item.trails.filter(\.isUsable)
+                    if !firstTrails.isEmpty {
+                        trails = PublicTrailDeduplicator.unique(firstTrails)
+                        attribution = item.attribution.isEmpty
+                            ? "© OpenStreetMap contributors"
+                            : item.attribution
+                        displayedFirstBatch = true
+                    }
+                }
             }
             return values
         }
