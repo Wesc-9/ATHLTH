@@ -290,6 +290,49 @@ enum ATHLTHLibraryName {
 }
 
 
+/// Each library shows at most 50 new rows per explicit request.
+/// Filtering and sorting must run before this limit is applied.
+enum ATHLTHLibraryPagination {
+    static let pageSize = 50
+
+    static func visible<Item>(_ items: [Item], limit: Int) -> [Item] {
+        Array(items.prefix(max(0, limit)))
+    }
+}
+
+struct ATHLTHLibraryLoadMoreButton: View {
+    let shown: Int
+    let total: Int
+    let onLoad: () -> Void
+
+    var body: some View {
+        if shown < total {
+            Button(action: onLoad) {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.down.circle")
+                    Text(ATHLTHLocalization.choose(
+                        english: "Load more",
+                        norwegian: "Last inn flere"
+                    ))
+                    Spacer(minLength: 0)
+                    Text("\(shown) / \(total)")
+                        .font(.caption.monospacedDigit())
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 15)
+                .frame(minHeight: 48)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-library-load-more")
+        }
+    }
+}
+
 /// Identical ATHLTH / Mine selector across exercises, workouts, plans and routes.
 struct ATHLTHLibrarySourcePicker: View {
     @Binding var selection: ATHLTHUnifiedLibraryScope
