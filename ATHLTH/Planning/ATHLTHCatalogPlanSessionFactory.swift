@@ -91,8 +91,38 @@ enum ATHLTHCatalogPlanSessionFactory {
                 groupRounds: step.groupRounds,
                 cardioActivity: step.cardioActivity, isIndoor: step.isIndoor
             )
+            // The memberwise initializer above only sets historic targets.
+            // Keep all canonical authored fields when a catalogue plan builds
+            // week-specific copies, including source Z1–Z5 percentage ranges,
+            // RIR, tempo, terrain and grouped set metadata.
+            copy.routeID = step.routeID
             copy.exerciseID = step.exerciseID
             copy.exerciseSnapshot = step.exerciseSnapshot
+            copy.sourceIntensityZoneLabel = step.sourceIntensityZoneLabel
+            copy.targetHeartRatePercentMin = step.targetHeartRatePercentMin
+            copy.targetHeartRatePercentMax = step.targetHeartRatePercentMax
+            copy.targetEffortRPE = step.targetEffortRPE
+            copy.treadmillInclinePercent = step.treadmillInclinePercent
+            copy.individualSetTargets = step.individualSetTargets
+            copy.groupClockSeconds = step.groupClockSeconds
+            copy.executionGroupKind = step.executionGroupKind
+            copy.executionGroupID = step.executionGroupID
+            copy.executionRound = step.executionRound
+            copy.executionTotalRounds = step.executionTotalRounds
+            copy.executionGroupClockSeconds = step.executionGroupClockSeconds
+            copy.executionStationCount = step.executionStationCount
+            copy.wellnessKind = step.wellnessKind
+            copy.activityTag = step.activityTag
+            copy.targetVMAPercent = step.targetVMAPercent
+            copy.targetIntensityType = step.targetIntensityType
+            copy.targetElevationGainMeters = step.targetElevationGainMeters
+            copy.targetGradientPercent = step.targetGradientPercent
+            copy.targetTerrainType = step.targetTerrainType
+            copy.targetRepetitionsMaximum = step.targetRepetitionsMaximum
+            copy.targetRepsInReserve = step.targetRepsInReserve
+            copy.targetMovementTempo = step.targetMovementTempo
+            copy.sourceSupersetGroupIndex = step.sourceSupersetGroupIndex
+            copy.sourceLoadAlternativesKilograms = step.sourceLoadAlternativesKilograms
             return copy
         }
 
