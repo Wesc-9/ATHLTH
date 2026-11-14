@@ -86,6 +86,7 @@ final class ATHLTHTrainingPlanStructuredAuditTests: XCTestCase {
         XCTAssertEqual(ATHLTHCuratedTrainingPlans.entries.count, 24)
         XCTAssertEqual(TrainingPlanCatalogEntry.fallbackCatalog.count, 6)
         for plan in catalog {
+            XCTAssertTrue(plan.hasCompleteWorkoutPattern, plan.slug)
             XCTAssertEqual(plan.sessionBlueprints.count, plan.sessionsPerWeek,
                            "Unrecognized or dropped sessions in \(plan.slug)")
             XCTAssertGreaterThan(plan.durationWeeks, 0)
@@ -184,6 +185,28 @@ final class ATHLTHTrainingPlanStructuredAuditTests: XCTestCase {
     }
 
     @MainActor
+    func testInvalidCatalogBlueprintIsNotSilentlyReplacedByUnrelatedWorkouts() {
+        let bad = TrainingPlanCatalogEntry(
+            id: UUID(), slug: "unsupported-source-template",
+            title: "Unsupported", summary: "", category: "running",
+            goal: "", level: "", durationWeeks: 8, sessionsPerWeek: 3,
+            workoutPattern: ["easy_run", "unrecognized_workout", "long_run"],
+            tags: [], sortOrder: 1, catalogVersion: 1
+        )
+        XCTAssertFalse(bad.hasCompleteWorkoutPattern)
+        let suite = "ATHLTHInvalidPlanAudit.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AppSessionStore(defaults: defaults)
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        XCTAssertNil(store.saveCatalogPlanTemplate(bad))
+        XCTAssertNil(store.scheduleCatalogPlan(
+            bad, startDate: start, preferredDayIndexes: [1, 3, 5]
+        ))
+        XCTAssertTrue(store.trainingPlans.isEmpty)
+    }
+
+    @MainActor
     func testFullZonedPlanSchedulesEveryWeekWithoutDroppingSourceSessions() throws {
         let plan = try XCTUnwrap(ATHLTHZonedPlanLibrary.catalogEntries.first {
             $0.slug == "zoned-10k-intermediaire"
@@ -200,15 +223,36 @@ final class ATHLTHTrainingPlanStructuredAuditTests: XCTestCase {
         ))
         XCTAssertEqual(result.weeks.count, source.totalWeeks)
         for (index, week) in result.weeks.enumerated() {
+            let authoredWeek = source.weeks[index]
+            XCTAssertEqual(week.sourcePlanPhase, authoredWeek.phase)
+            XCTAssertEqual(week.sourcePlanRecoveryWeek, authoredWeek.isRecoveryWeek)
+            XCTAssertEqual(week.sourcePlanVolumePercent, authoredWeek.volumePercent)
+            XCTAssertEqual(week.sourcePlanRunningKilometers, authoredWeek.targetKm)
+            XCTAssertEqual(week.sourcePlanLongRunKilometers,
+                           authoredWeek.targetLongRunKm)
+            XCTAssertEqual(week.sourcePlanWeeklyLoadScore,
+                           authoredWeek.weeklyLoadScore)
+
             let scheduled = week.days.flatMap(\.sessions)
             let required = ATHLTHZonedPlanLibrary.orderedRequiredSessions(
-                in: source.weeks[index]
+                in: authoredWeek
             )
             XCTAssertEqual(scheduled.count, required.count)
-            XCTAssertTrue(scheduled.allSatisfy {
-                !$0.resolvedWorkoutBlocks.isEmpty &&
-                $0.resolvedWorkoutBlocks.allSatisfy { $0.sequence > 0 }
-            })
+            for (session, sourceSession) in zip(scheduled, required) {
+                XCTAssertFalse(session.resolvedWorkoutBlocks.isEmpty)
+                XCTAssertTrue(session.resolvedWorkoutBlocks.allSatisfy {
+                    $0.sequence > 0
+                })
+                XCTAssertEqual(session.sourcePlanLoadScore, sourceSession.loadScore)
+                XCTAssertEqual(session.sourcePlanIsKeySession,
+                               sourceSession.isKeySession)
+                XCTAssertEqual(session.sourcePlanSessionType,
+                               sourceSession.sessionType)
+                XCTAssertEqual(session.sourcePlanScaledRepetitions,
+                               sourceSession.scaledRepetitions)
+                XCTAssertEqual(session.sourcePaceExamples?.count,
+                               sourceSession.paceNotes?.count)
+            }
         }
     }
 }
