@@ -1654,6 +1654,7 @@ struct TrainingPlanLibraryView: View {
     @State private var weeklySortAscending: Bool?
     @State private var showFavoritesOnly = false
     @State private var searchExpanded = false
+    @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
@@ -1791,8 +1792,15 @@ struct TrainingPlanLibraryView: View {
     }
 
     private var listedEntries: [TrainingPlanCatalogEntry] {
-        // Featured entries remain in the normal list while editorial cards are hidden.
-        filteredEntries
+        // Search and all filters run over the complete catalog first.
+        ATHLTHLibraryPagination.visible(filteredEntries, limit: visibleLimit)
+    }
+
+    private var pageFilterKey: String {
+        [query, selectedCategory, selectedMuscle?.rawValue ?? "",
+         sessionsPerWeekFilter.map(String.init) ?? "",
+         weeklySortAscending.map(String.init) ?? "",
+         String(showFavoritesOnly), String(favoritePlansOnly)].joined(separator: "|")
     }
 
     var body: some View {
@@ -1880,6 +1888,12 @@ struct TrainingPlanLibraryView: View {
                                 }
                             }
                         }
+                        ATHLTHLibraryLoadMoreButton(
+                            shown: listedEntries.count,
+                            total: filteredEntries.count
+                        ) {
+                            visibleLimit += ATHLTHLibraryPagination.pageSize
+                        }
                     }
                 }
                 .padding(.horizontal, 18)
@@ -1896,6 +1910,9 @@ struct TrainingPlanLibraryView: View {
             }
         }
         .background(canvas.ignoresSafeArea())
+        .onChange(of: pageFilterKey) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
+        }
         .navigationTitle(favoritePlansOnly
             ? tr("Favorite plans", "Favorittplaner")
             : tr("Plans", "Planer"))
