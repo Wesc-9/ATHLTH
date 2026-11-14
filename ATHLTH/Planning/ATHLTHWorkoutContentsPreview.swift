@@ -31,12 +31,12 @@ struct ATHLTHWorkoutContentsPreview: View {
         return []
     }
 
-    private var visible: [WorkoutTemplateBlock] {
-        Array(blocks.prefix(maximumVisibleBlocks ?? blocks.count))
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        // Resolve legacy workout storage exactly once per render. Previously
+        // block count, visible rows and overflow each repeated the projection.
+        let resolved = blocks
+        let visible = Array(resolved.prefix(maximumVisibleBlocks ?? resolved.count))
+        return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 6) {
                 Text(ATHLTHLocalization.choose(
                     english: "EXERCISES & STEPS", norwegian: "ØVELSER OG ØKTDELER"
@@ -47,8 +47,8 @@ struct ATHLTHWorkoutContentsPreview: View {
 
                 Spacer(minLength: 0)
 
-                if !blocks.isEmpty {
-                    Text("\(blocks.count)")
+                if !resolved.isEmpty {
+                    Text("\(resolved.count)")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(ATHLTHTheme.mutedText)
                 }
@@ -91,10 +91,10 @@ struct ATHLTHWorkoutContentsPreview: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                if blocks.count > visible.count {
+                if resolved.count > visible.count {
                     Text(ATHLTHLocalization.choose(
-                        english: "+ \(blocks.count - visible.count) more steps",
-                        norwegian: "+ \(blocks.count - visible.count) øktdeler"
+                        english: "+ \(resolved.count - visible.count) more steps",
+                        norwegian: "+ \(resolved.count - visible.count) øktdeler"
                     ))
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
