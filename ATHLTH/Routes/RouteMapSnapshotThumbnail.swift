@@ -480,16 +480,18 @@ struct RouteMapSnapshotThumbnail: View {
     @EnvironmentObject private var session: AppSessionStore
     let route: TrainingRoute
     var height: CGFloat = 118
+    // During list momentum we keep the route vector visible and postpone
+    // MapKit work until the scroll settles.
+    var allowsLiveSnapshot = true
 
     @State private var image:
         UIImage?
     @State private var imageRequestID: String?
 
-    private var offlineTrace: some View {
-        let coordinates = route.coordinates
-            .sorted { $0.sequence < $1.sequence }
-            .map(\.coordinate)
-        let points = ATHLTHOfflineRouteTraceGeometry.normalizedPoints(coordinates)
+    private func offlineTrace(requestID: String) -> some View {
+        let points = RouteMapSnapshotCache.tracePoints(
+            for: route, key: requestID
+        )
         return ZStack(alignment: .bottomLeading) {
             ATHLTHPlanDesign.selectedSurface
             if points.count >= 2 {
@@ -577,7 +579,7 @@ struct RouteMapSnapshotThumbnail: View {
                     // Never show an endless spinner with airplane mode on.
                     // Coordinates are already in the saved route, so the
                     // track can be drawn immediately without map tiles.
-                    offlineTrace
+                    offlineTrace(requestID: requestID)
                 }
             }
             .frame(
@@ -602,25 +604,34 @@ struct RouteMapSnapshotThumbnail: View {
                     lineWidth: 0.8
                 )
             }
-            .task(id: requestID) {
+            .task(id: requestID + (allowsLiveSnapshot ? "|live" : "|scroll")
+                  + "|" + session.profile.userID.uuidString) {
                 guard proxy.size.width > 20 else { return }
-                // Show any previously downloaded snapshot immediately.
-                // A new MapKit request may fail, particularly in flight mode.
+
+                // Cached map previews are displayed even while scrolling;
+                // the async MapKit snapshotter is not started during motion.
+                if let cached = RouteMapSnapshotCache.cachedImage(
+                    requestID: requestID
+                ) {
+                    image = cached
+                    imageRequestID = requestID
+                    return
+                }
                 if let prepared = AthleteOfflinePackStore.cachedRouteSnapshot(
                     routeID: route.id, userID: session.profile.userID
                 ) {
                     image = prepared
                     imageRequestID = requestID
                 }
+                guard allowsLiveSnapshot, !Task.isCancelled else {
+                    imageRequestID = requestID
+                    return
+                }
                 let loaded = await RouteMapSnapshotCache.image(
                     for: route, size: size, requestID: requestID
                 )
                 guard !Task.isCancelled else { return }
-                if let loaded {
-                    image = loaded
-                }
-                // When neither image is available, show the local route
-                // trace rather than a blank tile or an endless spinner.
+                if let loaded { image = loaded }
                 imageRequestID = requestID
             }
         }
