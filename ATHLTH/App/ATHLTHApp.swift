@@ -2841,6 +2841,9 @@ struct AppRootView: View {
               ) else { return }
 
         let resultOwnerID = appSession.profile.userID
+        // Completion carries Watch's real start and end timestamps. Only
+        // sessions with a unique, previously recorded start can be linked.
+        appSession.recordPlannedWatchWorkoutFinished(result)
         // A completed Watch result is authoritative evidence that the matching
         // mirrored workout has ended, even if HealthKit's mirror callback is
         // a fraction of a second late.
@@ -3183,6 +3186,14 @@ struct AppRootView: View {
             return
         }
 
+        if let plannedSessionID = workout.plannedSessionID {
+            _ = appSession.recordPlannedWorkoutFinished(
+                workoutID: plannedSessionID,
+                recordedStart: workout.start,
+                endedAt: endedAt
+            )
+        }
+
         let publishable =
             SocialPublishableWorkout(
                 phoneWorkout: workout
@@ -3334,6 +3345,14 @@ struct AppRootView: View {
     private func handleStrengthWorkoutCompletion(
         _ workout: StrengthWorkoutLog
     ) {
+        if let plannedSessionID = workout.plannedSessionID,
+           let endedAt = workout.endedAt, workout.isFinished {
+            _ = appSession.recordPlannedWorkoutFinished(
+                workoutID: plannedSessionID,
+                recordedStart: workout.startedAt,
+                endedAt: endedAt
+            )
+        }
         let publishable =
             SocialPublishableWorkout(
                 strengthWorkout: workout
