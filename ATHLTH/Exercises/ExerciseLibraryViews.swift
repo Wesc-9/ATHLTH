@@ -140,6 +140,8 @@ struct ExerciseLibraryView: View {
     @State private var selectedBodyPart = "All"
     @State private var selectedEquipment = "All"
     @State private var favoritesOnly = false
+    @State private var standaloneFavorites = false
+    @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var searchExpanded = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
     @State private var preferredColumns = 0
@@ -299,16 +301,29 @@ struct ExerciseLibraryView: View {
 
     private var standaloneScope: Binding<ATHLTHUnifiedLibraryScope> {
         Binding(
-            get: { selectedSection == .mine ? .mine : .athlth },
-            set: { selectedSection = $0 == .mine ? .mine : .library }
+            get: {
+                if standaloneFavorites { return .favorites }
+                return selectedSection == .mine ? .mine : .athlth
+            },
+            set: { scope in
+                standaloneFavorites = scope == .favorites
+                selectedSection = scope == .mine ? .mine : .library
+                visibleLimit = ATHLTHLibraryPagination.pageSize
+            }
         )
+    }
+
+    private var pageFilterKey: String {
+        [query, selectedBodyPart, selectedEquipment, selectedSection.rawValue,
+         String(favoritesOnly), String(scannerResultsActive)].joined(separator: "|")
     }
 
     var body: some View {
         // Reuse one filtered/sorted list for empty state, rows and alphabet targets.
         // Marketplace has its own remote catalog. Do not filter/sort the
         // entire on-device exercise library while that tab is selected.
-        let entries = selectedSection == .marketplace ? [] : displayedResults
+        let entries = selectedSection == .marketplace ||
+            (onSelect == nil && standaloneFavorites) ? [] : displayedResults
         return VStack(spacing: 0) {
             if onSelect == nil {
                 HStack(spacing: 10) {
@@ -361,7 +376,9 @@ struct ExerciseLibraryView: View {
                 .padding(.bottom, 4)
             }
 
-            if selectedSection == .marketplace {
+            if onSelect == nil && standaloneFavorites {
+                LibraryFavoritesView(initialKind: .exercise)
+            } else if selectedSection == .marketplace {
                 ATHLTHExerciseMarketplaceView()
             } else {
             HStack {
@@ -557,7 +574,7 @@ struct ExerciseLibraryView: View {
                             ),
                             spacing: 10
                         ) {
-                            ForEach(entries) { entry in
+                            ForEach(Array(entries.prefix(visibleLimit))) { entry in
                                 Group {
                                     if displayMode == .grid, let onSelect {
                                         // A dedicated footer keeps the entire
@@ -687,6 +704,14 @@ struct ExerciseLibraryView: View {
                         .padding(.leading, 16)
                         .padding(.trailing, 34)
                         .padding(.vertical, 16)
+                        ATHLTHLibraryLoadMoreButton(
+                            shown: min(entries.count, visibleLimit),
+                            total: entries.count
+                        ) {
+                            visibleLimit += ATHLTHLibraryPagination.pageSize
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 18)
                     }
                     .onScrollGeometryChange(for: Bool.self) { geometry in
                         geometry.contentOffset.y + geometry.contentInsets.top < -28
@@ -698,7 +723,9 @@ struct ExerciseLibraryView: View {
                     ) {
                         if !entries.isEmpty {
                             ATHLTHExerciseAlphabetIndex(
-                                targets: library.alphabetIndexTargets(for: entries),
+                                targets: library.alphabetIndexTargets(
+                                    for: Array(entries.prefix(visibleLimit))
+                                ),
                                 onJump: { id in
                                     withAnimation(.easeOut(duration: 0.18)) {
                                         proxy.scrollTo(id, anchor: .top)
@@ -738,6 +765,7 @@ struct ExerciseLibraryView: View {
         .sheet(isPresented: $showingCreateExercise) {
             CustomExerciseEditorView(onSaved: { _ in
                 selectedSection = .mine
+                standaloneFavorites = false
                 selectedBodyPart = "All"
                 selectedEquipment = "All"
                 favoritesOnly = false
@@ -780,6 +808,9 @@ struct ExerciseLibraryView: View {
                 english: "A camera is required to scan gym equipment.",
                 norwegian: "Du trenger et kamera for å skanne treningsapparater."
             ))
+        }
+        .onChange(of: pageFilterKey) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .onChange(of: selectedSection) { _, section in
             if section == .mine, scannerResultsActive {
