@@ -329,6 +329,20 @@ enum ATHLTHZonedPlanLibrary {
             routeID: nil, exercises: [], notes: notes
         )
         event.workoutCategory = "running"
+        // Race-day sentinel sessions must retain the same source audit
+        // metadata as ordinary Zoned sessions when scheduled in a plan.
+        event.sourcePlanLoadScore = source.loadScore
+        event.sourcePlanIsKeySession = source.isKeySession
+        event.sourcePlanSessionType = source.sessionType
+        event.sourcePlanScaledRepetitions = source.scaledRepetitions
+        event.sourcePaceExamples = source.paceNotes?.map {
+            ATHLTHPlanPaceExample(
+                zone: $0.zone,
+                paceMinimumMinutesPerKilometer: $0.paceMinKm,
+                paceMaximumMinutesPerKilometer: $0.paceMaxKm,
+                description: $0.descriptionEn
+            )
+        }
         event.workoutBlocks = [WorkoutTemplateBlock(
             sequence: 1, kind: .run, title: ATHLTHLocalization.choose(english: "Race", norwegian: "Konkurranse"),
             exerciseSlug: nil,
