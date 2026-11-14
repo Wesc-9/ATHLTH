@@ -134,7 +134,7 @@ struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
                 Divider()
                 if let entry {
                     ATHLTHWorkoutContentsPreview(
-                        workout: entry.plannedSession(),
+                        blocks: entry.blocks,
                         maximumVisibleBlocks: nil
                     )
                     .transition(.opacity)
