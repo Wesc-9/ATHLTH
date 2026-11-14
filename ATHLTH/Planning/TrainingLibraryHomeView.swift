@@ -3980,7 +3980,11 @@ struct MyTrainingPlansLibraryView: View {
 
                     LazyVGrid(columns: cardColumns, spacing: 10) {
                         ForEach(displayedTemplates) { template in
-                            templateCard(template)
+                            if displayMode == .grid {
+                                compactPersonalPlanTile(template, reusable: true)
+                            } else {
+                                templateCard(template)
+                            }
                         }
                     }
                 }
@@ -3994,7 +3998,9 @@ struct MyTrainingPlansLibraryView: View {
                     LazyVGrid(columns: cardColumns, spacing: 12) {
                     ForEach(displayedPlans) { plan in
                         let progress = planProgress(plan)
-
+                        if displayMode == .grid {
+                            compactPersonalPlanTile(plan, reusable: false)
+                        } else {
                         VStack(spacing: 8) {
                             if let onOpenPlan {
                                 Button {
@@ -4095,6 +4101,7 @@ struct MyTrainingPlansLibraryView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
+                        }
                         }
                     }
                     }
@@ -4219,6 +4226,161 @@ struct MyTrainingPlansLibraryView: View {
             )
         } catch {
             shareError = error.localizedDescription
+        }
+    }
+
+    /// All plan actions are still available in the compact 2/3-column
+    /// presentation; only the heavy full-width card is replaced.
+    private func compactPersonalPlanBody(
+        _ plan: TrainingPlan,
+        reusable: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: reusable ? "square.stack.3d.up.fill" : "calendar")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 37, height: 37)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+            Text(plan.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(ATHLTHLocalization.format(
+                english: "%d weeks", norwegian: "%d uker", plan.weeks.count
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            HStack {
+                Text(reusable
+                    ? ATHLTHLocalization.choose(english: "Use", norwegian: "Bruk")
+                    : ATHLTHLocalization.choose(english: "Open", norwegian: "Åpne"))
+                Image(systemName: "arrow.up.right")
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private func scheduleCompactTemplate(_ plan: TrainingPlan) {
+        if let created = session.usePlanTemplate(
+            plan.id,
+            startDate: session.suggestedTrainingPlanStartDate
+        ) {
+            onOpenPlan?(created.id)
+        } else {
+            scheduleError = ATHLTHLocalization.choose(
+                english: "A plan overlaps the suggested start date. Choose another date.",
+                norwegian: "En plan overlapper foreslått startdato. Velg en annen dato."
+            )
+        }
+    }
+
+    private func compactPersonalPlanTile(
+        _ plan: TrainingPlan,
+        reusable: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Group {
+                if reusable {
+                    Button {
+                        scheduleCompactTemplate(plan)
+                    } label: {
+                        compactPersonalPlanBody(plan, reusable: true)
+                    }
+                } else if let onOpenPlan {
+                    Button { onOpenPlan(plan.id) } label: {
+                        compactPersonalPlanBody(plan, reusable: false)
+                    }
+                } else {
+                    NavigationLink {
+                        ScrollView {
+                            AdvancedPlannerView(planID: plan.id)
+                                .padding()
+                        }
+                        .navigationTitle(plan.title)
+                    } label: {
+                        compactPersonalPlanBody(plan, reusable: false)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 4) {
+                LibraryFavoriteButton(
+                    kind: .plan,
+                    itemID: plan.id.uuidString,
+                    title: plan.title,
+                    subtitle: "",
+                    icon: "calendar"
+                )
+                Spacer(minLength: 4)
+                Menu {
+                    if reusable {
+                        Button {
+                            scheduleCompactTemplate(plan)
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Schedule plan", norwegian: "Bruk planen"
+                                ),
+                                systemImage: "calendar.badge.plus"
+                            )
+                        }
+                    }
+                    Button { preparePlanShare(plan) } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Share plan", norwegian: "Del plan"
+                            ),
+                            systemImage: "square.and.arrow.up"
+                        )
+                    }
+                    if !reusable && !planProgress(plan).missed.isEmpty {
+                        Button { reviewingPlan = plan } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Review missed workouts",
+                                    norwegian: "Gjennomgå manglende økter"
+                                ),
+                                systemImage: "clock.arrow.circlepath"
+                            )
+                        }
+                    }
+                    if reusable {
+                        Button(role: .destructive) {
+                            session.deletePlanTemplate(plan.id)
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Delete plan", norwegian: "Slett plan"
+                                ),
+                                systemImage: "trash"
+                            )
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: Circle()
+                        )
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.7), lineWidth: 0.8)
         }
     }
 
