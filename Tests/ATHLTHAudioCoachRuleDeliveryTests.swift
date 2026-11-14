@@ -2,6 +2,64 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
+
+    func testNamedCoachGroupsSurviveProfileAndWatchConfigurationRoundTrip() throws {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .heartRate, interval: 300
+        )
+        let group = ATHLTHAudioCoachGroup(
+            name: "Mine motivasjonsbeskjeder",
+            ruleIDs: [rule.id], optionIDs: ["targetZoneCoach"]
+        )
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.customRules = [rule]
+        config.coachGroups = [group]
+
+        let profile = ATHLTHAudioCoachProfile(
+            name: "Min mal", configuration: config
+        )
+        let restored = try JSONDecoder().decode(
+            ATHLTHAudioCoachProfile.self,
+            from: JSONEncoder().encode(profile)
+        )
+        var draft = AudioCoachDraft()
+        draft.load(profile: restored)
+
+        XCTAssertEqual(draft.coachGroups, [group])
+        XCTAssertEqual(draft.configuration().coachGroups, [group])
+        XCTAssertEqual(draft.configuration().customRules?.first?.id, rule.id)
+    }
+
+    func testBeforeFinishMotivationIsSpokenOnceOnlyWhenFinishIsKnown() {
+        var rule = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .motivation, interval: 60
+        )
+        rule.beforeEndSeconds = 900
+        rule.customPhrase = "Nå gir du alt!"
+        var slots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: [rule], distanceMeters: 0, elapsedSeconds: 0
+        )
+
+        func messages(remaining: Double?) -> [String] {
+            ATHLTHAudioCoachRuleDelivery.dueMessages(
+                rules: [rule], distanceMeters: 1_000, elapsedSeconds: 300,
+                paceSecondsPerKilometer: 300, heartRateBPM: 150,
+                norwegian: true,
+                context: ATHLTHCoachReadoutContext(
+                    workoutRemainingSeconds: remaining
+                ),
+                lastSlots: &slots
+            )
+        }
+
+        XCTAssertTrue(messages(remaining: nil).isEmpty)
+        XCTAssertTrue(messages(remaining: 901).isEmpty)
+        XCTAssertEqual(messages(remaining: 900), ["Nå gir du alt!"])
+        XCTAssertTrue(messages(remaining: 899).isEmpty)
+        XCTAssertEqual(slots[rule.id], 1)
+    }
+
     func testIndependentDistanceAndTimeAnnouncementsDoNotRepeat() {
         let pace = ATHLTHAudioCoachRule(
             trigger: .distance, metric: .pace, interval: 1_000
