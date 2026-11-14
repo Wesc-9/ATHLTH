@@ -2725,7 +2725,9 @@ struct ATHLTHHomeView: View {
                                 selectedHomeStandaloneWorkout = workout
                             } label: {
                                 homeCompactCalendarRow(
-                                    time: workout.scheduledStart,
+                                    time: session.recordedTimes(for: workout.id)?.startedAt ??
+                                        workout.scheduledStart,
+                                    endTime: session.recordedTimes(for: workout.id)?.endedAt,
                                     title: workout.title,
                                     icon: workout.kind.systemImage,
                                     isTrainTogether: workout.trainTogetherMode != nil,
@@ -2984,26 +2986,30 @@ struct ATHLTHHomeView: View {
 
     private func homeCompactCalendarRow(
         time: Date?,
+        endTime: Date? = nil,
         title: String,
         icon: String,
         isTrainTogether: Bool = false,
         trainingPartner: String? = nil
     ) -> some View {
         HStack(alignment: .center, spacing: 7) {
-            // Time is the first, leftmost field for every calendar entry.
-            Text(time?.formatted(date: .omitted, time: .shortened) ??
-                 ATHLTHLocalization.choose(
-                    english: "—:—", norwegian: "—:—"
-                 ))
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-                .frame(width: 48, alignment: .leading)
-                .accessibilityLabel(time.map {
-                    $0.formatted(date: .omitted, time: .shortened)
-                } ?? ATHLTHLocalization.choose(
-                    english: "Time not set", norwegian: "Tid ikke satt"
-                ))
+            // Keep the time column slim: recorded finish sits under start.
+            VStack(alignment: .leading, spacing: 2) {
+                Text(time?.formatted(date: .omitted, time: .shortened) ??
+                     ATHLTHLocalization.choose(
+                        english: "—:—", norwegian: "—:—"
+                     ))
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                if let endTime {
+                    Text("–" + endTime.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+            }
+            .monospacedDigit()
+            .frame(width: 48, alignment: .leading)
+            .accessibilityElement(children: .combine)
 
             Rectangle()
                 .fill(ATHLTHTrainDesign.bronze.opacity(0.40))
@@ -3298,7 +3304,10 @@ struct ATHLTHHomeView: View {
     ) -> some View {
         homeCalendarEventRow(
             time:
+                session.recordedTimes(for: workout.id)?.startedAt ??
                 workout.scheduledStart,
+            endTime:
+                session.recordedTimes(for: workout.id)?.endedAt,
             title:
                 workout.title,
             systemImage:
@@ -3321,6 +3330,7 @@ struct ATHLTHHomeView: View {
 
     private func homeCalendarEventRow(
         time: Date?,
+        endTime: Date? = nil,
         title: String,
         systemImage: String,
         detail: String,
@@ -3328,28 +3338,18 @@ struct ATHLTHHomeView: View {
             ATHLTHTheme.recoveryBlue
     ) -> some View {
         HStack(spacing: 7) {
-            Text(
-                time?
-                    .formatted(
-                        date: .omitted,
-                        time: .shortened
-                    ) ??
-                "—"
-            )
-            .font(
-                .system(
-                    size: 9.5,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                ATHLTHTheme
-                    .mutedText
-            )
-            .frame(
-                width: 34,
-                alignment: .leading
-            )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(time?.formatted(date: .omitted, time: .shortened) ?? "—")
+                    .font(.system(size: 9.5, weight: .medium))
+                if let endTime {
+                    Text("–" + endTime.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 9, weight: .regular))
+                }
+            }
+            .monospacedDigit()
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .frame(width: endTime == nil ? 34 : 46, alignment: .leading)
+            .accessibilityElement(children: .combine)
 
             Image(
                 systemName:
