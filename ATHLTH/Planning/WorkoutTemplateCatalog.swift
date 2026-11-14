@@ -821,6 +821,8 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
     private let client: SupabaseClient
     private var loadedRemote = false
     private var lastRemoteRefreshAttemptAt: Date?
+    /// A refreshed catalog invalidates view-local result snapshots.
+    private(set) var contentRevision = 0
     /// Normalize a recipe only for its first non-empty search. Reuse that
     /// immutable index while typing; invalidate when published rows refresh.
     private var searchIndex: [UUID: ATHLTHWorkoutSearch.Index] = [:]
@@ -888,6 +890,7 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
             let localOnly = offlineEntries
                 .filter { !publishedSlugs.contains($0.slug) }
             searchIndex.removeAll(keepingCapacity: true)
+            contentRevision &+= 1
             entries = (remote + localOnly).sorted {
                 $0.sortOrder == $1.sortOrder
                     ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
@@ -987,6 +990,10 @@ struct WorkoutTemplateLibraryView: View {
     @StateObject private var catalog =
         WorkoutTemplateCatalogStore()
     @State private var query = ""
+    /// Search text the result engine sees after a brief, cancellable pause.
+    /// Typing updates the field immediately without sorting all recipes.
+    @State private var committedQuery = ""
+    @State private var catalogResultsCache = CatalogResultsCache()
     @State private var selectedCategory = "All"
     @State private var favoritesOnly = false
     @State private var expandedWorkoutCardID: String?
@@ -1002,6 +1009,38 @@ struct WorkoutTemplateLibraryView: View {
     @State private var selectedDiscoverySort: DiscoverySort = .alphabetical
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var libraryViewWidth: CGFloat = 390
+
+    /// This cache is view-owned and never publishes changes on its own.
+    /// A changed filter/revision produces a different key; changes to other
+    /// UI controls reuse the identical source entries without re-sorting.
+    private struct CatalogResultsKey: Hashable {
+        let contentRevision: Int
+        let query: String
+        let category: String
+        let focus: String
+        let level: String
+        let muscles: Set<String>
+        let runningType: String?
+        let duration: String
+        let exerciseName: String?
+        let strengthStyle: String?
+        let sort: String
+        let initialCategory: String?
+    }
+
+    private final class CatalogResultsCache {
+        private var lastKey: CatalogResultsKey?
+        private var lastResults: [WorkoutTemplateCatalogEntry] = []
+
+        func lookup(_ key: CatalogResultsKey) -> [WorkoutTemplateCatalogEntry]? {
+            lastKey == key ? lastResults : nil
+        }
+
+        func store(_ results: [WorkoutTemplateCatalogEntry], key: CatalogResultsKey) {
+            lastKey = key
+            lastResults = results
+        }
+    }
 
     private enum DiscoverySort: String, CaseIterable, Identifiable {
         case alphabetical, shortest, longest
@@ -1442,7 +1481,7 @@ struct WorkoutTemplateLibraryView: View {
                 selectedMuscleFocus == "all" && selectedWorkoutLevel == "all"
         else { return [] }
 
-        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = committedQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let filter = discoveryFilter
         let matching = builtInRunningTemplates.filter { workout in
             guard filter.matches(workout) else { return false }
@@ -1461,9 +1500,28 @@ struct WorkoutTemplateLibraryView: View {
 
     private var filteredEntries:
         [WorkoutTemplateCatalogEntry] {
+        let key = CatalogResultsKey(
+            contentRevision: catalog.contentRevision,
+            query: committedQuery,
+            category: selectedCategory,
+            focus: selectedMuscleFocus,
+            level: selectedWorkoutLevel,
+            muscles: selectedStrengthMuscles,
+            runningType: selectedRunningType?.rawValue,
+            duration: selectedWorkoutDuration.rawValue,
+            exerciseName: selectedExerciseName,
+            strengthStyle: selectedStrengthStyle.map { String(describing: $0) },
+            sort: selectedDiscoverySort.rawValue,
+            initialCategory: initialCategory?.rawValue
+        )
+        // Favorites are mutable outside this view. Recalculate while that
+        // filter is active; otherwise source data + all predicates are keyed.
+        if !favoritesOnly, let cached = catalogResultsCache.lookup(key) {
+            return cached
+        }
         let signpost = ATHLTHPerformance.begin("LibraryFilterCatalog")
         defer { ATHLTHPerformance.end("LibraryFilterCatalog", id: signpost) }
-        let needle = ATHLTHWorkoutSearch.normalized(query)
+        let needle = ATHLTHWorkoutSearch.normalized(committedQuery)
         let filter = discoveryFilter
 
         let matching = catalog.entries.filter { entry in
@@ -1487,14 +1545,18 @@ struct WorkoutTemplateLibraryView: View {
             else { return false }
             return filter.matches(entry)
         }
-        return discoverySorted(matching, title: { $0.title }) {
+        let result = discoverySorted(matching, title: { $0.title }) {
             $0.estimatedDurationMinutes.map(Double.init)
         }
+        if !favoritesOnly {
+            catalogResultsCache.store(result, key: key)
+        }
+        return result
     }
 
     private var filteredSavedWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
-        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = committedQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let filter = discoveryFilter
         // Most library visits have no specialised filter. Only build the
         // publisher metadata index when a muscle/level/type filter needs it.
@@ -1535,7 +1597,7 @@ struct WorkoutTemplateLibraryView: View {
     /// økt" also needs actual sessions from the calendar and active plans.
     private var filteredScheduledWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
-        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = committedQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let filter = discoveryFilter
         let stored = session.standalonePlannedSessions +
             session.trainingPlans.flatMap { $0.weeks }
@@ -2389,6 +2451,17 @@ struct WorkoutTemplateLibraryView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             loadHistory()
+        }
+        .task(id: query) {
+            if query.isEmpty {
+                committedQuery = ""
+            } else {
+                // Coalesce rapid keystrokes; the text field itself is never
+                // delayed and cancellation avoids stale search updates.
+                try? await Task.sleep(for: .milliseconds(110))
+                guard !Task.isCancelled else { return }
+                committedQuery = query
+            }
         }
         .task {
             async let workoutRefresh: Void =
