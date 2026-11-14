@@ -3248,7 +3248,8 @@ struct ATHLTHHomeView: View {
             onStartOnPhone: { startCalendarPreview(workout, planID: planID, device: .iPhone) },
             onStartOnWatch: { startCalendarPreview(workout, planID: planID, device: .appleWatch) },
             isCalendarWorkout: true,
-            canStart: !completed && !skipped && !workout.isExplicitRestDay,
+            canStart: !completed && !skipped && !workout.isExplicitRestDay
+                && session.recordedTimes(for: workout.id)?.endedAt == nil,
             onDelete: completed ? nil : { removeHomeCalendarWorkout(workout) }
         )
     }
@@ -4372,6 +4373,7 @@ struct ATHLTHHomeView: View {
             ) ?? session.activePlan?.weeks.flatMap(\.days)
                 .flatMap(\.sessions).first(where: { $0.id == workout.id })
             guard let persisted, !persisted.isExplicitRestDay,
+                  session.recordedTimes(for: persisted.id)?.endedAt == nil,
                   planID.map({ !session.isPlanSessionSkipped(
                       planID: $0, sessionID: persisted.id
                   ) && !session.isPlanSessionCompleted(
