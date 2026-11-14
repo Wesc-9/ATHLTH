@@ -3794,9 +3794,74 @@ struct MyWorkoutTemplatesView: View {
         }
     }
 
+    private func compactPersonalWorkoutCard(
+        _ workout: PlannedSession
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: workout.isStructuredWorkout
+                ? "rectangle.stack.fill" : workout.kind.systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 11)
+                )
+            Text(workout.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(savedWorkoutSubtitle(workout))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(1)
+            HStack(spacing: 5) {
+                LibraryFavoriteButton(
+                    kind: .workout,
+                    itemID: workout.id.uuidString,
+                    title: workout.title,
+                    subtitle: "",
+                    icon: "dumbbell"
+                )
+                Spacer(minLength: 3)
+                Menu {
+                    Button(role: .destructive) {
+                        session.deleteSavedWorkoutTemplate(workout.id)
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Delete", norwegian: "Slett"
+                            ),
+                            systemImage: "trash"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface, in: Circle()
+                        )
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        .overlay {
+            RoundedRectangle(cornerRadius: 17)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.7), lineWidth: 0.8)
+        }
+    }
+
     private func savedWorkoutCard(
         _ workout: PlannedSession
     ) -> some View {
+        Group {
+            if displayMode == .grid {
+                compactPersonalWorkoutCard(workout)
+            } else {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
                 Image(
@@ -3882,6 +3947,8 @@ struct MyWorkoutTemplatesView: View {
         }
         .padding(16)
         .athlthPlanCard(radius: 21)
+            }
+        }
     }
 
     private func savedWorkoutSubtitle(
