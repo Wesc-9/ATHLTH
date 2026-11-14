@@ -286,6 +286,9 @@ struct StructuredWorkoutSessionView: View {
                     english: "Discard workout", norwegian: "Forkast økten"
                 ), role: .destructive) {
                     removeCheckpoint()
+                    ATHLTHCrossDeviceWorkoutStore.shared.endStructuredSession(
+                        workoutID: workout.id
+                    )
                     dismiss()
                 }
                 Button(ATHLTHLocalization.choose(
@@ -366,6 +369,7 @@ struct StructuredWorkoutSessionView: View {
                     // its first real recording screen becomes active.
                     Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
                 }
+                publishStructuredSpectatorStatus()
                 updateScreenAwakeState()
             }
             .onDisappear {
@@ -392,6 +396,9 @@ struct StructuredWorkoutSessionView: View {
             .onChange(of: currentIndex) { _, _ in
                 guard !restoringCheckpoint else { return }
                 setupCurrentStep()
+                persistCheckpoint()
+            }
+            .onChange(of: completedBlockIDs) { _, _ in
                 persistCheckpoint()
             }
             .onChange(of: activeExecutionBlocks) { _, _ in
@@ -1269,6 +1276,36 @@ struct StructuredWorkoutSessionView: View {
         AccountLocalStorage.write(
             state, name: checkpointName, userID: session.profile.userID
         )
+        publishStructuredSpectatorStatus()
+    }
+
+    private func publishStructuredSpectatorStatus() {
+        guard ATHLTHDeviceRole.isIPhone, hasStarted, !savedCompletion
+        else { return }
+        // No invented health metrics: the structured recorder only knows
+        // elapsed time, the actual current block and completed block count.
+        let stages = blocks.prefix(32).enumerated().map { index, block in
+            ATHLTHLiveWorkoutStage(
+                index: index,
+                title: block.title,
+                phase: block.resolvedPhase.rawValue,
+                durationSeconds: block.durationSeconds,
+                distanceMeters: block.distanceMeters
+            )
+        }
+        ATHLTHCrossDeviceWorkoutStore.shared.updateStructuredSession(
+            ATHLTHLocalStructuredWorkoutStatus(
+                ownerID: session.profile.userID,
+                workoutID: workout.id,
+                title: workout.title,
+                kind: String(describing: workout.kind),
+                startedAt: startedAt,
+                steps: stages,
+                stepIndex: currentIndex,
+                stepEnteredAt: stepEnteredAt,
+                completedCount: completedBlockIDs.count
+            )
+        )
     }
 
     @discardableResult
@@ -1355,6 +1392,9 @@ struct StructuredWorkoutSessionView: View {
             endedAt: completion.endedAt
         )
         removeCheckpoint()
+        ATHLTHCrossDeviceWorkoutStore.shared.endStructuredSession(
+            workoutID: workout.id
+        )
         savedCompletion = true
     }
 
