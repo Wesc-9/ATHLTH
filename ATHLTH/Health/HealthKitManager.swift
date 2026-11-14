@@ -4594,7 +4594,11 @@ final class HealthKitManager: ObservableObject {
             startDistanceMeters:
                 useReverse ? reverseStart : forwardStart,
             endDistanceMeters:
-                useReverse ? reverseEnd : forwardEnd
+                useReverse ? reverseEnd : forwardEnd,
+            direction: ATHLTHRouteAttemptDirectionPolicy.classify(
+                reference: reference,
+                actual: actual
+            )
         )
     }
 
