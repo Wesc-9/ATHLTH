@@ -509,7 +509,8 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
 
     static func needsSegmentData(_ rules: [ATHLTHAudioCoachRule]) -> Bool {
         rules.contains { rule in
-            rule.isEnabled && ((rule.scope ?? .workout) != .workout ||
+            rule.isEnabled && (rule.beforeEndSeconds != nil ||
+                (rule.scope ?? .workout) != .workout ||
                 rule.selectedMetrics.contains { metric in
                     switch metric {
                     case .stepName, .stepRemainingTime, .groupRemainingTime,
