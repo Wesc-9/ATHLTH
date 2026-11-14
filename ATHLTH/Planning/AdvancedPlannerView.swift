@@ -5524,6 +5524,10 @@ struct SessionEditorView: View {
     @State private var scratchTimelineDraftID = UUID()
     @State private var scratchResumingSavedComposer = false
     @State private var showingUnifiedWorkoutComposer = false
+    // A saved library session opens in the SAME advanced Studio as a
+    // newly planned strength workout, rather than the legacy Form timeline.
+    @State private var showingImportedAdvancedWorkout = false
+    @State private var closeAfterImportedAdvancedSave = false
     @State private var queuedNavigationStage:
         ATHLTHStandaloneWorkoutDraftStore.NavigationStage?
     // Restore an involuntarily dismissed scratch builder after app suspension.
@@ -5911,8 +5915,47 @@ struct SessionEditorView: View {
                     index == 1,
                     forKey: "athlth.planWorkspace.advancedMode"
                 )
+                if index == 1 {
+                    Task { @MainActor in
+                        await Task.yield()
+                        openImportedAdvancedWorkoutIfNeeded()
+                    }
+                }
             }
         )
+    }
+
+    /// Only planning a saved personal workout takes this direct route.
+    /// Partner/proposal flows still need their own confirmation and controls.
+    private var canOpenImportedAdvancedWorkout: Bool {
+        isStandalone &&
+            existingWorkout == nil &&
+            onPreparedWorkout == nil &&
+            selectedPartnerID == nil &&
+            selectedScratchWorkoutType == nil &&
+            hasSelectedWorkoutSource &&
+            !workoutPlanningPreviewBlocks.isEmpty
+    }
+
+    private func openImportedAdvancedWorkoutIfNeeded() {
+        guard editorMode == .advanced,
+              canOpenImportedAdvancedWorkout,
+              !showingUnifiedWorkoutComposer,
+              !showingSavedWorkoutPicker,
+              !showingScratchTypePicker else { return }
+        showingImportedAdvancedWorkout = true
+        showingUnifiedWorkoutComposer = true
+    }
+
+    /// The shared Studio hands the unsaved recipe back to the compact
+    /// grouped overview when its Simple tab is selected.
+    private var importedAdvancedModeExit: ((PlannedSession) -> Void)? {
+        guard showingImportedAdvancedWorkout else { return nil }
+        return { updated in
+            applyScratchTimeline(updated)
+            editorModeIndex.wrappedValue = 0
+            showingUnifiedWorkoutComposer = false
+        }
     }
 
     private func beginPartnerPlanningFromSource() {
@@ -6988,7 +7031,21 @@ struct SessionEditorView: View {
             .fullScreenCover(
                 isPresented: $showingUnifiedWorkoutComposer,
                 onDismiss: {
-                    if closeAfterScratchSave {
+                    if showingImportedAdvancedWorkout {
+                        showingImportedAdvancedWorkout = false
+                        if closeAfterImportedAdvancedSave {
+                            closeAfterImportedAdvancedSave = false
+                            onExit?()
+                            Task { @MainActor in
+                                await Task.yield()
+                                dismiss()
+                            }
+                        } else if editorMode == .advanced {
+                            // Back from the shared editor must never expose
+                            // the old multi-row Advanced Form underneath.
+                            editorModeIndex.wrappedValue = 0
+                        }
+                    } else if closeAfterScratchSave {
                         closeAfterScratchSave = false
                         onExit?()
                         scratchBuilderClosedIntentionally = false
@@ -7052,14 +7109,41 @@ struct SessionEditorView: View {
                         plannedExercises.isEmpty &&
                         selectedRunningWorkouts.isEmpty
                         ? scratchQuickAdd : nil,
+                    initialDurationOverrideMinutes:
+                        showingImportedAdvancedWorkout && durationWasAdjustedManually
+                        ? durationMinutes : nil,
                     initialExtras: currentWorkoutPlannerExtras,
-                    draftContext: "session-scratch.\(session.profile.userID.uuidString).\(scratchTimelineDraftID.uuidString)",
+                    draftContext: showingImportedAdvancedWorkout
+                        ? "session-import.\(session.profile.userID.uuidString).\(workoutTemplateID?.uuidString ?? "standalone")"
+                        : "session-scratch.\(session.profile.userID.uuidString).\(scratchTimelineDraftID.uuidString)",
                     resumeSavedScratchDraft: scratchResumingSavedComposer,
                     plannedDate: scheduledTime,
-                    initialActivity: selectedScratchWorkoutType,
+                    initialActivity: showingImportedAdvancedWorkout
+                        ? ATHLTHPlannedWorkoutType.from(composeSession())
+                        : selectedScratchWorkoutType,
+                    initialStudioAdvanced: showingImportedAdvancedWorkout ? true : nil,
                     onScheduledTimeChanged: { scheduledTime = $0 },
                     onAddStandalone: { updated in
-                        if selectedScratchWorkoutType != nil &&
+                        if showingImportedAdvancedWorkout {
+                            // Schedule from the exact edited Studio recipe,
+                            // preserving unrelated session-level settings
+                            // that the block editor does not expose.
+                            let original = composeSession()
+                            var scheduled = updated
+                            scheduled.scheduledStart = scheduledTime
+                            scheduled.notes = original.notes
+                            scheduled.workoutTemplateID = original.workoutTemplateID
+                            scheduled.targetAlertConfiguration =
+                                original.targetAlertConfiguration
+                            scheduled.autoPauseEnabled = original.autoPauseEnabled
+                            scheduled.reminderMinutesBefore =
+                                original.reminderMinutesBefore
+                            scheduled.targetPaceSecondsPerKilometer =
+                                original.targetPaceSecondsPerKilometer
+                            persistSession(scheduled)
+                            finishDraft()
+                            closeAfterImportedAdvancedSave = true
+                        } else if selectedScratchWorkoutType != nil &&
                             ATHLTHScratchComposerPresentationPolicy.savesDirectly(
                             isStandalone: isStandalone,
                             preparesForSharing: onPreparedWorkout != nil,
@@ -7082,8 +7166,11 @@ struct SessionEditorView: View {
                         }
                         return true
                     },
+                    onSwitchToBasic: importedAdvancedModeExit,
                     onCloseRequested: {
-                        scratchBuilderClosedIntentionally = true
+                        if !showingImportedAdvancedWorkout {
+                            scratchBuilderClosedIntentionally = true
+                        }
                     },
                     onDraftDiscarded: {
                         // Child removes its checkpoint; remove the host's
@@ -7099,7 +7186,8 @@ struct SessionEditorView: View {
                 )
                 .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
                 .interactiveDismissDisabled(
-                    isStandalone && selectedScratchWorkoutType != nil
+                    isStandalone && (selectedScratchWorkoutType != nil ||
+                                     showingImportedAdvancedWorkout)
                 )
             }
             // Keep the scratch and catalog sheets independent so a
@@ -7137,6 +7225,12 @@ struct SessionEditorView: View {
                 if scenePhase == .active && !hasSelectedWorkoutSource &&
                     !draftFinalized {
                     persistOpenNavigationStage(.source)
+                }
+                if editorMode == .advanced {
+                    Task { @MainActor in
+                        await Task.yield()
+                        openImportedAdvancedWorkoutIfNeeded()
+                    }
                 }
             }) {
                 ATHLTHPlannedWorkoutTypePickerView { workout, _ in
@@ -7353,8 +7447,21 @@ struct SessionEditorView: View {
                     }
                 }
                 }
+                if editorMode == .advanced {
+                    Task { @MainActor in
+                        await Task.yield()
+                        openImportedAdvancedWorkoutIfNeeded()
+                    }
+                }
                 if social.trainingPartners.isEmpty {
                     Task { await social.refresh() }
+                }
+            }
+            .onChange(of: hasSelectedWorkoutSource) { _, selected in
+                guard selected && editorMode == .advanced else { return }
+                Task { @MainActor in
+                    await Task.yield()
+                    openImportedAdvancedWorkoutIfNeeded()
                 }
             }
             .onDisappear {
