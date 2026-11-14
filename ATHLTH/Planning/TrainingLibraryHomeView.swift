@@ -5269,7 +5269,8 @@ struct LibraryFavoritesView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
 
-    let onStartRunning: (RunningWorkoutTemplate) -> Void
+    let onStartRunning: ((RunningWorkoutTemplate) -> Void)?
+    var initialKind: LibraryFavoriteKind? = nil
 
     @StateObject private var planLibrary = TrainingPlanLibraryStore()
     @StateObject private var workoutLibrary =
@@ -5277,6 +5278,8 @@ struct LibraryFavoritesView: View {
     @State private var selectedKind: LibraryFavoriteKind?
     @State private var ownExerciseFavoritesOnly = false
     @State private var libraryWidth: CGFloat = 390
+    @State private var searchQuery = ""
+    @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
 
     private var favoriteColumns: [GridItem] {
         ATHLTHLibraryResponsiveLayout.columns(
@@ -5288,14 +5291,19 @@ struct LibraryFavoritesView: View {
 
     private var displayedFavorites: [LibraryFavoriteRecord] {
         let kindFiltered: [LibraryFavoriteRecord]
-        if let selectedKind {
-            kindFiltered = favorites.favorites.filter { $0.itemType == selectedKind }
+        if let kind = initialKind ?? selectedKind {
+            kindFiltered = favorites.favorites.filter { $0.itemType == kind }
         } else {
             kindFiltered = favorites.favorites
         }
-        guard ownExerciseFavoritesOnly else { return kindFiltered }
+        let searchMatches = kindFiltered.filter {
+            searchQuery.isEmpty ||
+            $0.title.localizedStandardContains(searchQuery) ||
+            $0.subtitle.localizedStandardContains(searchQuery)
+        }
+        guard ownExerciseFavoritesOnly && initialKind == nil else { return searchMatches }
         let ownedIDs = Set(exerciseLibrary.customExercises.map(\.id))
-        return kindFiltered.filter {
+        return searchMatches.filter {
             $0.itemType == .exercise &&
                 UUID(uuidString: $0.itemID).map { ownedIDs.contains($0) } == true
         }
@@ -5304,7 +5312,7 @@ struct LibraryFavoritesView: View {
     /// Resolve only favorited exercise IDs against the already cached offline
     /// catalog. Avoid one full library scan or an extra network call per row.
     private var favoriteExerciseEntriesByID: [UUID: ExerciseLibraryEntry] {
-        let ids = Set(displayedFavorites.compactMap { favorite -> UUID? in
+        let ids = Set(displayedFavorites.prefix(visibleLimit).compactMap { favorite -> UUID? in
             guard favorite.itemType == .exercise else { return nil }
             return UUID(uuidString: favorite.itemID)
         })
@@ -5321,6 +5329,7 @@ struct LibraryFavoritesView: View {
         let exerciseEntries = favoriteExerciseEntriesByID
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
+                if initialKind == nil {
                 LibraryPremiumIntro(
                     eyebrow: "FAVORITES",
                     title: "Your fastest way back",
@@ -5354,7 +5363,9 @@ struct LibraryFavoritesView: View {
                         }
                     }
                 }
+                }
 
+                if initialKind == nil {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         favoriteFilter(
@@ -5396,6 +5407,19 @@ struct LibraryFavoritesView: View {
                     }
                     .padding(.vertical, 2)
                 }
+                }
+
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english: "Search favorites", norwegian: "Søk i favoritter"
+                    ),
+                    text: $searchQuery
+                )
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(12)
+                .background(ATHLTHPlanDesign.surface,
+                            in: RoundedRectangle(cornerRadius: 14))
 
                 if displayedFavorites.isEmpty {
                     VStack(spacing: 15) {
@@ -5442,7 +5466,7 @@ struct LibraryFavoritesView: View {
                     )
                 } else {
                     LazyVGrid(columns: favoriteColumns, spacing: 10) {
-                        ForEach(displayedFavorites) { item in
+                        ForEach(Array(displayedFavorites.prefix(visibleLimit))) { item in
                             HStack(spacing: 8) {
                                 NavigationLink {
                                     favoriteDestination(item)
@@ -5476,10 +5500,22 @@ struct LibraryFavoritesView: View {
                             }
                         }
                     }
+                    ATHLTHLibraryLoadMoreButton(
+                        shown: min(visibleLimit, displayedFavorites.count),
+                        total: displayedFavorites.count
+                    ) {
+                        visibleLimit += ATHLTHLibraryPagination.pageSize
+                    }
                 }
             }
             .padding(18)
             .frame(maxWidth: .infinity)
+        }
+        .onChange(of: searchQuery) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
+        }
+        .onChange(of: selectedKind) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
             libraryWidth = $0
@@ -5573,7 +5609,7 @@ struct LibraryFavoritesView: View {
                ) {
                 RouteDetailView(route: saved)
             } else if let id = UUID(uuidString: item.itemID) {
-                RouteLibraryDetailLoader(routeID: id)
+                RouteLibraryDetailLoader(routeID: id, sourceType: "auto")
             } else {
                 RouteLibraryListView(source: .database)
             }
