@@ -1461,7 +1461,8 @@ struct WorkoutTemplateLibraryView: View {
         let filter = discoveryFilter
 
         let matching = catalog.entries.filter { entry in
-            guard filter.matches(entry) else { return false }
+            // Exclude irrelevant activities before inspecting workout blocks.
+            // A strength-only filter must not scan hundreds of running steps.
             let categoryMatches =
                 selectedCategory == "All" ||
                 entry.categoryTitle == selectedCategory ||
@@ -1469,6 +1470,8 @@ struct WorkoutTemplateLibraryView: View {
                  ATHLTHPlannedWorkoutType.custom.matches(entry)) ||
                 (selectedCategory == "Custom" &&
                  ATHLTHPlannedWorkoutType.custom.matches(entry))
+            guard categoryMatches, levelMatches(entry) else { return false }
+            guard filter.matches(entry) else { return false }
 
             let favoriteMatches =
                 !favoritesOnly ||
@@ -1481,9 +1484,7 @@ struct WorkoutTemplateLibraryView: View {
 
             let muscleMatches = selectedMuscleFocus == "all" ||
                 entry.tags.contains(selectedMuscleFocus)
-            return categoryMatches &&
-                favoriteMatches &&
-                searchMatches && muscleMatches && levelMatches(entry)
+            return favoriteMatches && searchMatches && muscleMatches
         }
         return discoverySorted(matching, title: { $0.title }) {
             $0.estimatedDurationMinutes.map(Double.init)
@@ -2803,10 +2804,8 @@ struct WorkoutTemplateLibraryView: View {
                 .padding(.top, 2)
 
                 if initialCategory != .running {
-                    ATHLTHWorkoutContentsPreview(
-                        workout: entry.plannedSession()
-                    )
-                    .padding(.top, 7)
+                    ATHLTHWorkoutContentsPreview(blocks: entry.blocks)
+                        .padding(.top, 7)
                 }
 
                 if let last = ATHLTHLibraryWorkoutHistory.catalogOriginal(
