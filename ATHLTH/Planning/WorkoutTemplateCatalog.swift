@@ -1008,6 +1008,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var catalogResultsCache = CatalogResultsCache()
     @State private var selectedCategory = "All"
     @State private var favoritesOnly = false
+    @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var expandedWorkoutCardID: String?
     @State private var selectedMuscleFocus = "all"
     @State private var selectedWorkoutLevel = "all"
@@ -1696,14 +1697,43 @@ struct WorkoutTemplateLibraryView: View {
         return targets
     }
 
+    private var pageFilterKey: String {
+        [committedQuery, selectedCategory, selectedMuscleFocus,
+         selectedWorkoutLevel, selectedWorkoutDuration.rawValue,
+         selectedRunningType?.rawValue ?? "",
+         selectedStrengthMuscles.sorted().joined(separator: ","),
+         selectedStrengthStyle.map { String(describing: $0) } ?? "",
+         selectedExerciseName ?? "", selectedDiscoverySort.rawValue,
+         String(favoritesOnly)].joined(separator: "|")
+    }
+
     var body: some View {
         // The library can contain hundreds of imported interval recipes.
         // Search/sort once per view update, not for every empty-state check,
         // alphabet index and lazy-grid ForEach in the same render pass.
-        let visibleEntries = filteredEntries
-        let visibleRunningTemplates = filteredRunningTemplates
-        let visibleSavedWorkouts = filteredSavedWorkouts
-        let visibleScheduledWorkouts = filteredScheduledWorkouts
+        let allEntries = filteredEntries
+        let allRunningTemplates = filteredRunningTemplates
+        let allSavedWorkouts = filteredSavedWorkouts
+        let allScheduledWorkouts = filteredScheduledWorkouts
+        // One 50-item budget across all categories, including calendar and
+        // personal choices when opened as a workout selector.
+        let totalResults = allEntries.count + allRunningTemplates.count +
+            allSavedWorkouts.count + allScheduledWorkouts.count
+        let visibleScheduledWorkouts =
+            Array(allScheduledWorkouts.prefix(visibleLimit))
+        let visibleSavedWorkouts = Array(allSavedWorkouts.prefix(
+            max(0, visibleLimit - visibleScheduledWorkouts.count)
+        ))
+        let visibleEntries = Array(allEntries.prefix(
+            max(0, visibleLimit - visibleScheduledWorkouts.count -
+                visibleSavedWorkouts.count)
+        ))
+        let visibleRunningTemplates = Array(allRunningTemplates.prefix(
+            max(0, visibleLimit - visibleScheduledWorkouts.count -
+                visibleSavedWorkouts.count - visibleEntries.count)
+        ))
+        let shownResults = visibleEntries.count + visibleRunningTemplates.count +
+            visibleSavedWorkouts.count + visibleScheduledWorkouts.count
         let alphabetTargets: [String: UUID] =
             initialCategory != nil && initialCategory != .running
             ? workoutAlphabetTargets(
@@ -1718,8 +1748,8 @@ struct WorkoutTemplateLibraryView: View {
                 HStack(spacing: 9) {
                     if initialCategory != .running {
                         Text(ATHLTHLocalization.choose(
-                            english: "\(visibleEntries.count + visibleRunningTemplates.count) workouts",
-                            norwegian: "\(visibleEntries.count + visibleRunningTemplates.count) økter"
+                            english: "\(totalResults) workouts",
+                            norwegian: "\(totalResults) økter"
                         ))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -2270,6 +2300,9 @@ struct WorkoutTemplateLibraryView: View {
                     }
                     }
                 }
+                ATHLTHLibraryLoadMoreButton(shown: shownResults, total: totalResults) {
+                    visibleLimit += ATHLTHLibraryPagination.pageSize
+                }
             }
             .padding(.leading, 18)
             .padding(.trailing, initialCategory == nil || initialCategory == .running ? 18 : 42)
@@ -2296,6 +2329,9 @@ struct WorkoutTemplateLibraryView: View {
             english: "Workouts", norwegian: "Treningsøkter"
         ))
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: pageFilterKey) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
+        }
         .searchable(
             text: $query,
             prompt: ATHLTHLocalization.choose(english: "Search workouts", norwegian: "Søk etter treningsøkter")
