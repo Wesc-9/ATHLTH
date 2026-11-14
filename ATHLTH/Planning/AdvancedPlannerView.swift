@@ -5958,13 +5958,6 @@ struct SessionEditorView: View {
         }
     }
 
-    private func beginPartnerPlanningFromSource() {
-        title = ""
-        prioritizePartnerPlanning = true
-        partnerPlanningExpanded = true
-        hasSelectedWorkoutSource = true
-    }
-
     /// The same mode controls the complete shared editor, not just one field.
     /// Switching views keeps the canonical workout draft and all phase targets.
     private var workoutEditorModeSection: some View {
@@ -6639,8 +6632,9 @@ struct SessionEditorView: View {
         return ATHLTHUnifiedWorkout.editorBlocks(from: composeSession())
     }
 
-    /// Canonical blocks are never flattened or rewritten just for display.
-    /// Simple is a short outline; Advanced exposes each block's prescription.
+    /// This legacy host now owns only the compact Basic outline.
+    /// Advanced step cards belong exclusively to WorkoutTemplateBuilderView.
+    /// Remaining Advanced consumers get a single link to that shared editor.
     @ViewBuilder
     private var workoutStructurePreviewSection: some View {
         let previewBlocks = workoutPlanningPreviewBlocks
@@ -6671,7 +6665,6 @@ struct SessionEditorView: View {
                 // Imported structured recipes use the same canonical
                 // timeline builder as Quick Train and Plan Studio.
                 if editorMode == .advanced &&
-                    !workoutBlocks.isEmpty &&
                     selectedScratchWorkoutType == nil {
                     Button {
                         showingUnifiedWorkoutComposer = true
@@ -6738,45 +6731,6 @@ struct SessionEditorView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .frame(minHeight: 44)
-                    }
-                } else {
-                    ForEach(previewBlocks) { block in
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                Image(systemName: block.kind.systemImage)
-                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                Text(ATHLTHWorkoutStepCopy.title(
-                                    for: block, workoutTitle: resolvedWorkoutTitle,
-                                    compact: true
-                                ))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                                Spacer(minLength: 4)
-                                if let seconds = block.durationSeconds,
-                                   seconds > 0 {
-                                    Text(ATHLTHWorkoutDurationEstimator
-                                        .conciseDuration(seconds))
-                                        .font(.caption)
-                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                }
-                            }
-                            if let target = block.targetText, !target.isEmpty {
-                                Text(target)
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                            if let notes = block.notes, !notes.isEmpty {
-                                Text(notes)
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                        }
-                        .padding(11)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            ATHLTHPlanDesign.selectedSurface.opacity(0.55),
-                            in: RoundedRectangle(cornerRadius: 13)
-                        )
                     }
                 }
             }
@@ -7676,20 +7630,6 @@ struct SessionEditorView: View {
 
     }
 
-    private var targetRunningSpeedBinding: Binding<Double> {
-        Binding(
-            get: {
-                let seconds = Double(targetPaceMinutes * 60 + targetPaceSeconds)
-                return seconds > 0 ? 3_600 / seconds : 12
-            },
-            set: { speed in
-                let rounded = Int((3_600 / max(speed, 0.5)).rounded())
-                targetPaceMinutes = rounded / 60
-                targetPaceSeconds = rounded % 60
-            }
-        )
-    }
-
     @ViewBuilder
     private var advancedOptions: some View {
         spotifyAdvancedOptions
@@ -8185,18 +8125,6 @@ struct SessionEditorView: View {
         return allowed.sorted {
             $0.uuidString < $1.uuidString
         }
-    }
-
-    private var audioCoachStatusText: String {
-        if let configuration = audioCoachOverride {
-            return configuration.enabled
-                ? "Custom · On"
-                : "Custom · Off"
-        }
-
-        return settings.audioCoachEnabledByDefault
-            ? "App default · On"
-            : "App default · Off"
     }
 
     private func toggleGear(_ id: UUID) {
@@ -8993,52 +8921,6 @@ struct SessionEditorView: View {
         }
     }
 
-    private func workoutOverviewMetric(
-        value: String,
-        label: String
-    ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 2
-        ) {
-            Text(value)
-                .font(
-                    .system(
-                        size: 15,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-
-            Text(label)
-                .font(.system(size: 8.5, weight: .semibold))
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .padding(9)
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 49,
-            alignment: .leading
-        )
-        .background(
-            Color.white.opacity(0.57),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.white.opacity(0.78), lineWidth: 0.7)
-        }
-    }
-
     private var workoutOverviewDuration: String {
         if (kind == .running || kind == .walking),
            let seconds = ATHLTHWorkoutDurationEstimator
@@ -9077,168 +8959,6 @@ struct SessionEditorView: View {
                     durationWasAdjustedManually = true
                 }
             }
-        )
-    }
-
-    private var workoutOverviewPrimaryCount:
-        String {
-        if kind == .running {
-            return
-                "\(selectedRunningWorkouts.count)"
-        }
-
-        return
-            "\(plannedExercises.count)"
-    }
-
-    private var workoutOverviewPrimaryLabel:
-        String {
-        if kind == .running {
-            return ATHLTHLocalization.choose(
-                english: "Runs",
-                norwegian: "Løp"
-            )
-        }
-
-        return ATHLTHLocalization.choose(
-            english: "Exercises",
-            norwegian: "Øvelser"
-        )
-    }
-
-    private var workoutOverviewSecondaryCount:
-        String {
-        if kind == .strength {
-            return
-                "\(plannedExercises.reduce(0) { $0 + max($1.sets, 1) })"
-        }
-
-        if kind == .running {
-            return
-                "\(selectedRunningWorkouts.reduce(0) { $0 + $1.blocks.count })"
-        }
-
-        return "—"
-    }
-
-    private var workoutOverviewSecondaryLabel:
-        String {
-        if kind == .strength {
-            return ATHLTHLocalization.choose(
-                english: "Sets",
-                norwegian: "Sett"
-            )
-        }
-
-        if kind == .running {
-            return ATHLTHLocalization.choose(
-                english: "Blocks",
-                norwegian: "Deler"
-            )
-        }
-
-        return ATHLTHLocalization.choose(
-            english: "Structure",
-            norwegian: "Struktur"
-        )
-    }
-
-    private var workoutOverviewLoadValue:
-        String {
-        if kind == .strength {
-            let volume =
-                plannedExercises.reduce(0.0) {
-                    total,
-                    exercise in
-
-                    guard
-                        exercise.resolvedTargetKind ==
-                            .reps,
-                        exercise.resolvedLoadKind ==
-                            .weightKilograms
-                    else {
-                        return total
-                    }
-
-                    let exerciseVolume =
-                        exercise
-                            .resolvedSetTargets
-                            .reduce(0.0) {
-                                partial,
-                                target in
-
-                                guard
-                                    let reps =
-                                        target.reps,
-                                    let load =
-                                        target
-                                            .weightKilograms
-                                else {
-                                    return partial
-                                }
-
-                                return
-                                    partial +
-                                    Double(reps) *
-                                    load
-                            }
-
-                    return
-                        total +
-                        exerciseVolume
-                }
-
-            guard volume > 0 else {
-                return "—"
-            }
-
-            if volume >= 1_000 {
-                return String(
-                    format:
-                        "%.1ft",
-                    volume / 1_000
-                )
-            }
-
-            return String(
-                format:
-                    "%.0fkg",
-                volume
-            )
-        }
-
-        if kind == .running ||
-            kind == .walking {
-            return String(
-                format:
-                    "%.1fkm",
-                distanceKilometers
-            )
-        }
-
-        return "—"
-    }
-
-    private var workoutOverviewLoadLabel:
-        String {
-        if kind == .strength {
-            return ATHLTHLocalization.choose(
-                english: "Volume",
-                norwegian: "Volum"
-            )
-        }
-
-        if kind == .running ||
-            kind == .walking {
-            return ATHLTHLocalization.choose(
-                english: "Distance",
-                norwegian: "Distanse"
-            )
-        }
-
-        return ATHLTHLocalization.choose(
-            english: "Load",
-            norwegian: "Belastning"
         )
     }
 
@@ -9401,25 +9121,6 @@ struct SessionEditorView: View {
             .enabled ??
         settings
             .audioCoachEnabledByDefault
-    }
-
-    private var plannedLiveAlertSummary:
-        String {
-        if hasLiveTargetAlerts {
-            return ATHLTHLocalization.choose(
-                english:
-                    "Heart-rate or pace alerts configured",
-                norwegian:
-                    "Puls- eller tempovarsler er satt opp"
-            )
-        }
-
-        return ATHLTHLocalization.choose(
-            english:
-                "Optional heart-rate and pace guidance",
-            norwegian:
-                "Valgfrie puls- og tempovarsler"
-        )
     }
 
     private func plannedGuidanceStatusPill(
@@ -10163,21 +9864,6 @@ struct SessionEditorView: View {
             plannedExercises[index - 1].supersetGroupID = group
             plannedExercises[index].supersetGroupID = group
         }
-    }
-
-    private var runningSelectionSummary: String {
-        let totals = estimatedRunningTotals()
-        var parts: [String] = []
-        if let meters = totals.distanceMeters {
-            parts.append(String(format: "~%.1f km", meters / 1_000))
-        }
-        if let seconds = totals.durationSeconds {
-            parts.append("\(Int((seconds / 60).rounded())) min")
-        }
-        return parts.isEmpty ? ATHLTHLocalization.choose(
-            english: "Add a pace or time target to estimate totals.",
-            norwegian: "Legg til tempo eller tidsmål for å beregne totalen."
-        ) : parts.joined(separator: " · ")
     }
 
     private func runningWorkoutMetricSummary(_ workout: RunningWorkoutTemplate) -> String {
