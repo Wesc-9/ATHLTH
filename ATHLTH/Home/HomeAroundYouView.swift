@@ -203,7 +203,7 @@ private struct AroundYouRouteItem: Identifiable {
             }
 
             let strideValue = max(
-                coordinates.count / maximumCount,
+                (coordinates.count + maximumCount - 1) / maximumCount,
                 1
             )
 
@@ -1048,7 +1048,7 @@ struct AroundYouExploreView: View {
                                     ? route.coordinates
                                         .enumerated()
                                         .compactMap { index, point in
-                                            let step = max(1, route.coordinates.count / 600)
+                                            let step = max(1, (route.coordinates.count + 599) / 600)
                                             return (index % step == 0 ||
                                                 index == route.coordinates.count - 1)
                                                 ? point.coordinate : nil
@@ -3212,6 +3212,12 @@ struct AroundYouExploreView: View {
     private var nearbyRoutes: [AroundYouRouteItem] {
         var routesByID:
             [UUID: AroundYouRouteItem] = [:]
+        // Set lookups avoid scanning every saved route for every public or
+        // community route as accounts grow into hundreds of saved tracks.
+        let savedIDs = Set(session.savedRoutes.map(\.id))
+        let savedSourceIDs = Set(
+            session.savedRoutes.compactMap(\.sharedSourceRouteID)
+        )
 
         // Only results from the searched viewport are on this map.
         // Saved/owned routes are merged below from the on-device library.
@@ -3227,9 +3233,8 @@ struct AroundYouExploreView: View {
                     coordinates: route.coordinates,
                     ownerID: route.ownerID,
                     isMine: route.ownerID == session.profile.userID,
-                    isSaved: session.savedRoutes.contains {
-                        $0.id == route.id || $0.sharedSourceRouteID == route.id
-                    },
+                    isSaved: savedIDs.contains(route.id) ||
+                        savedSourceIDs.contains(route.id),
                     trainingRoute:
                         route.trainingRoute
                 )
@@ -3269,9 +3274,7 @@ struct AroundYouExploreView: View {
                         route.coordinates,
                     ownerID: route.ownerID,
                     isMine: false,
-                    isSaved: session.savedRoutes.contains {
-                        $0.sharedSourceRouteID == route.id
-                    },
+                    isSaved: savedSourceIDs.contains(route.id),
                     isPublicTrail: true,
                     trainingRoute: route
                 )
