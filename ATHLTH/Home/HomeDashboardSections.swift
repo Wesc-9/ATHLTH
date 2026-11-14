@@ -1882,22 +1882,19 @@ struct HomeWeeklyProgressStrip:
             )
         }
         .onAppear {
-            if composerActive {
-                restoreWorkoutComposerIfNeeded()
-            } else {
-                restoreDaySheetIfNeeded()
-            }
+            restoreWorkoutComposerIfNeeded()
+            if !composerActive { restoreDaySheetIfNeeded() }
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            if composerActive {
-                restoreWorkoutComposerIfNeeded()
-            } else {
-                restoreDaySheetIfNeeded()
-            }
+            restoreWorkoutComposerIfNeeded()
+            if !composerActive { restoreDaySheetIfNeeded() }
         }
         .onChange(of: session.profile.userID) { _, _ in
-            if composerActive { restoreWorkoutComposerIfNeeded() }
+            restoreWorkoutComposerIfNeeded()
+        }
+        .onChange(of: session.signedIn) { _, signedIn in
+            if signedIn { restoreWorkoutComposerIfNeeded() }
         }
         .sheet(item: $selectedDay, onDismiss: {
             if pendingComposerPresentation {
@@ -1954,6 +1951,16 @@ struct HomeWeeklyProgressStrip:
         composerAccount = session.profile.userID.uuidString
         composerDay = Calendar.current.startOfDay(for: date)
             .timeIntervalSinceReferenceDate
+        // Preserve the selected date and the fact that the editor is open even
+        // when iOS discards the entire scene (not just its UIKit sheet).
+        ATHLTHHomeWorkoutComposerRecoveryPolicy.save(
+            accountID: session.profile.userID, day: composerDay
+        )
+        // A new visit begins at source choice. Existing saved drafts remain
+        // available behind the explicit "Continue saved draft" option.
+        ATHLTHStandaloneWorkoutDraftStore.setNavigationStage(
+            .source, for: session.profile.userID
+        )
         composerActive = true
         // Dismiss the day card before showing the actual editor. No sheet stack.
         persistedOpenDay = 0
@@ -1962,6 +1969,10 @@ struct HomeWeeklyProgressStrip:
     }
 
     private func closeWorkoutComposer() {
+        if let owner = UUID(uuidString: composerAccount) {
+            ATHLTHHomeWorkoutComposerRecoveryPolicy.clear(for: owner)
+            ATHLTHStandaloneWorkoutDraftStore.clearNavigationStage(for: owner)
+        }
         composerActive = false
         composerAccount = ""
         composerDay = 0
@@ -1971,6 +1982,17 @@ struct HomeWeeklyProgressStrip:
     }
 
     private func restoreWorkoutComposerIfNeeded() {
+        // @SceneStorage is opportunistic: recover the last *active* editor
+        // from durable account-scoped intent after an actual app relaunch.
+        guard session.signedIn else { return }
+        if !composerActive,
+           let intent = ATHLTHHomeWorkoutComposerRecoveryPolicy.load(
+                for: session.profile.userID
+           ) {
+            composerAccount = intent.accountID.uuidString
+            composerDay = intent.day
+            composerActive = true
+        }
         guard composerActive else { return }
         guard ATHLTHHomeWorkoutComposerRecoveryPolicy.canRestore(
             account: composerAccount,
