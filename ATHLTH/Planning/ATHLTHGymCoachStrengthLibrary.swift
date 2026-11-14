@@ -76,11 +76,48 @@ enum ATHLTHGymCoachStrengthLibrary {
         return Array(list.prefix(count))
     }
 
+    private static func experienceLevel(for slug: String) -> String {
+        switch slug {
+        case "starting-strength-3day", "stronglifts-5x5-3day",
+             "full-body-3day":
+            return "Beginner"
+        case "nsuns-4day", "phat-5day", "531-bbb-4day",
+             "madcow-5x5-3day":
+            return "Advanced"
+        default:
+            return "Intermediate"
+        }
+    }
+
+    private static func localizedLevel(_ level: String) -> String {
+        ATHLTHLocalization.choose(
+            english: level,
+            norwegian: level == "Beginner" ? "Nybegynner" :
+                (level == "Advanced" ? "Avansert" : "Middels")
+        )
+    }
+
+    /// Source codes such as BACK_WIDTH and SHOULDERS_FRONT are not usable
+    /// anatomical filter names. Normalize them for search and workout details.
+    private static func muscleTag(_ source: String) -> String {
+        let name = source.lowercased()
+        if name.hasPrefix("back") { return "back" }
+        if name.hasPrefix("shoulders") { return "shoulders" }
+        if name.hasPrefix("quad") { return "quads" }
+        if name.hasPrefix("hamstring") { return "hamstrings" }
+        if name.hasPrefix("glute") { return "glutes" }
+        if name.hasPrefix("calf") || name.hasPrefix("calves") { return "calves" }
+        if name.hasPrefix("ab") || name.hasPrefix("core") { return "core" }
+        if name.hasPrefix("chest") { return "chest" }
+        if name.hasPrefix("bicep") { return "biceps" }
+        if name.hasPrefix("tricep") { return "triceps" }
+        return name
+    }
+
     static var catalogEntries: [TrainingPlanCatalogEntry] {
         programs.enumerated().map { index, p in
             let count = sessionsPerWeek(p)
-            let advanced = ["nsuns-4day", "phat-5day", "531-bbb-4day", "madcow-5x5-3day"]
-                .contains(p.slug)
+            let experience = experienceLevel(for: p.slug)
             let goal = ATHLTHLocalization.choose(
                 english: "Strength and muscle development",
                 norwegian: "Styrke og muskelvekst"
@@ -90,20 +127,17 @@ enum ATHLTHGymCoachStrengthLibrary {
                 slug: "gymcoach-\(p.slug)",
                 title: p.name,
                 summary: ATHLTHLocalization.choose(
-                    english: p.summary + " Editable repeatable weeks; load is individualized.",
-                    norwegian: "Strukturert styrkeprogram med \(count) økter i uken. Sett, repetisjoner, pauser og RIR følger kildemalen. Belastning tilpasses individuelt."
+                    english: p.summary + " Editable \(count)-day weekly structure; weights and progression require your own review.",
+                    norwegian: "\(count) strukturerte økter per uke med sett, repetisjoner, pauser og RIR. Dette er et redigerbart ukeoppsett; vekt og progresjon tilpasses av deg."
                 ),
                 category: "strength",
                 goal: goal,
-                level: ATHLTHLocalization.choose(
-                    english: advanced ? "Advanced" : "Intermediate",
-                    norwegian: advanced ? "Avansert" : "Middels"
-                ),
+                level: localizedLevel(experience),
                 durationWeeks: 8,
                 sessionsPerWeek: count,
                 workoutPattern: Array(repeating: "strength", count: count),
                 tags: ["strength", "styrke", "gymcoach", "source:GymCoach",
-                       advanced ? "advanced" : "intermediate", "editable-microcycle"],
+                       experience.lowercased(), "editable-microcycle"],
                 sortOrder: 86 + index,
                 catalogVersion: 1
             )
@@ -114,6 +148,11 @@ enum ATHLTHGymCoachStrengthLibrary {
         var entries: [WorkoutTemplateCatalogEntry] = []
         for (programIndex, plan) in programs.enumerated() {
             for (workoutIndex, workout) in plan.program.workouts.enumerated() {
+                let experience = experienceLevel(for: plan.slug)
+                let muscles = Array(Set(workout.exercises.map {
+                    muscleTag($0.muscleGroup)
+                })).sorted()
+                let duration = estimatedMinutes(workout)
                 entries.append(WorkoutTemplateCatalogEntry(
                     id: UUID(uuidString: String(
                         format: "C6000000-0000-0000-0000-%012d",
@@ -122,15 +161,14 @@ enum ATHLTHGymCoachStrengthLibrary {
                     slug: "gymcoach-\(plan.slug)-\(workoutIndex + 1)",
                     title: "\(plan.name) · \(localizedWorkoutTitle(workout.name))",
                     summary: ATHLTHLocalization.choose(
-                        english: "Structured strength workout with sets, reps, RIR and recoveries.",
-                        norwegian: "Styrkeøkt med sett, repetisjoner, RIR og pauser."
+                        english: "\(workout.exercises.count) exercises · approximately \(duration) min. Sets, rep ranges, recovery and RIR are ready to edit.",
+                        norwegian: "\(workout.exercises.count) øvelser · ca. \(duration) min. Sett, repsintervaller, pauser og RIR kan tilpasses."
                     ),
                     category: "strength",
-                    difficulty: ATHLTHLocalization.choose(
-                        english: "Intermediate", norwegian: "Middels"
-                    ),
-                    estimatedDurationMinutes: estimatedMinutes(workout),
-                    tags: ["strength", "gymcoach", "sets", "RIR"],
+                    difficulty: localizedLevel(experience),
+                    estimatedDurationMinutes: duration,
+                    tags: ["strength", "styrke", "gymcoach", "sets", "RIR",
+                           experience.lowercased(), plan.program.phase.lowercased()] + muscles,
                     sourceLabel: "GymCoach · MIT",
                     sourceURL: "https://github.com/gymcoach-app/gymcoach",
                     blocks: blocks(for: workout),
@@ -232,7 +270,7 @@ enum ATHLTHGymCoachStrengthLibrary {
             block.sourceSupersetGroupIndex = exercise.supersetGroup
             block.exerciseSnapshot = ExerciseSnapshot(
                 name: exercise.name, instructions: [],
-                primaryMuscles: [exercise.muscleGroup.lowercased()],
+                primaryMuscles: [muscleTag(exercise.muscleGroup)],
                 equipment: exercise.equipmentType.map { [$0] } ?? [],
                 imageURL: nil
             )
