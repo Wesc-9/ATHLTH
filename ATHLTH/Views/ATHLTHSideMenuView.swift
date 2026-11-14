@@ -245,15 +245,15 @@ struct ATHLTHSideMenuView: View {
                 Button {
                     onSelect(.trainingLibrary)
                 } label: {
-HStack(spacing: 11) {
-                         menuIcon("books.vertical")
+                    HStack(spacing: 11) {
+                        menuIcon("books.vertical")
                         menuLabel(
                             english: "Library", norwegian: "Bibliotek"
                         )
                         Spacer(minLength: 0)
                     }
-.padding(.leading, 8)
-                     .frame(minHeight: rowHeight)
+                    .padding(.leading, 8)
+                    .frame(minHeight: rowHeight)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
@@ -361,8 +361,8 @@ HStack(spacing: 11) {
             Button { onSelect(.search) } label: {
                 HStack(spacing: 9) {
                     Image(systemName: "magnifyingglass")
-.font(.system(size: 17, weight: .regular))
-                         .foregroundStyle(menuBronze)
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(menuBronze)
                     Text(ATHLTHLocalization.choose(english: "Search", norwegian: "Søk"))
                         .font(.system(size: rowTextSize, weight: .medium))
                         .foregroundStyle(menuInk)
