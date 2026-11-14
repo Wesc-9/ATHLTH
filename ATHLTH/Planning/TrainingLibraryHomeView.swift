@@ -3922,6 +3922,7 @@ struct MyTrainingPlansLibraryView: View {
     @State private var query = ""
     @State private var searchExpanded = false
     @State private var favoritesOnly = false
+    @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
 
     private var displayedTemplates: [TrainingPlan] {
         session.planTemplates.filter {
@@ -3935,6 +3936,17 @@ struct MyTrainingPlansLibraryView: View {
             $0.title.localizedStandardContains(query) &&
             (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
         }
+    }
+
+    private var pageTemplates: [TrainingPlan] {
+        ATHLTHLibraryPagination.visible(displayedTemplates, limit: visibleLimit)
+    }
+
+    private var pagePlans: [TrainingPlan] {
+        ATHLTHLibraryPagination.visible(
+            displayedPlans,
+            limit: max(0, visibleLimit - pageTemplates.count)
+        )
     }
 
     private var cardColumns: [GridItem] {
@@ -3997,14 +4009,14 @@ struct MyTrainingPlansLibraryView: View {
                     .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 15))
                 }
 
-                if !displayedTemplates.isEmpty {
+                if !pageTemplates.isEmpty {
                     planSectionHeader(
                         "Saved Plans",
                         detail: "Reusable plans that are not on your calendar yet."
                     )
 
                     LazyVGrid(columns: cardColumns, spacing: 10) {
-                        ForEach(displayedTemplates) { template in
+                        ForEach(pageTemplates) { template in
                             if displayMode == .grid {
                                 compactPersonalPlanTile(template, reusable: true)
                             } else {
@@ -4014,14 +4026,14 @@ struct MyTrainingPlansLibraryView: View {
                     }
                 }
 
-                if !displayedPlans.isEmpty {
+                if !pagePlans.isEmpty {
                     planSectionHeader(
                         "Scheduled Plans",
                         detail: "Active, upcoming and completed plans."
                     )
 
                     LazyVGrid(columns: cardColumns, spacing: 12) {
-                    ForEach(displayedPlans) { plan in
+                    ForEach(pagePlans) { plan in
                         let progress = planProgress(plan)
                         if displayMode == .grid {
                             compactPersonalPlanTile(plan, reusable: false)
@@ -4132,6 +4144,13 @@ struct MyTrainingPlansLibraryView: View {
                     }
                 }
 
+                ATHLTHLibraryLoadMoreButton(
+                    shown: pageTemplates.count + pagePlans.count,
+                    total: displayedTemplates.count + displayedPlans.count
+                ) {
+                    visibleLimit += ATHLTHLibraryPagination.pageSize
+                }
+
                 if displayedTemplates.isEmpty &&
                     displayedPlans.isEmpty {
                     ContentUnavailableView {
@@ -4159,6 +4178,12 @@ struct MyTrainingPlansLibraryView: View {
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
             libraryWidth = $0
+        }
+        .onChange(of: query) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
+        }
+        .onChange(of: favoritesOnly) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .onAppear {
             displayMode = .load(userID: session.profile.userID)
