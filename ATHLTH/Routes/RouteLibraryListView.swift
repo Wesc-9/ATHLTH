@@ -1824,14 +1824,21 @@ struct RouteLibraryDetailLoader: View {
         errorMessage = nil
         route = nil
         do {
-            if sourceType == "public_trail" {
-                // Public trails have their own canonical table, source
-                // attribution and immutable GPS geometry.
+            if sourceType == "public_trail" || sourceType == "auto" {
+                // Favorites saved in older versions may not carry a source
+                // marker. Try the public trails table first, then community.
                 let record = try await SupabasePublicTrailDiscoveryService()
                     .fetch(id: routeID)
                 try Task.checkCancellation()
                 if let record {
                     route = record.trainingRoute
+                } else if sourceType == "auto" {
+                    let community: CommunityRouteRecord =
+                        try await SupabaseEnvironment.client
+                        .from("community_routes").select()
+                        .eq("id", value: routeID).single().execute().value
+                    try Task.checkCancellation()
+                    route = community.trainingRoute
                 } else {
                     errorMessage = ATHLTHLocalization.choose(
                         english: "This trail is no longer available.",
