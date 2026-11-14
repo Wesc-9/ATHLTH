@@ -1993,7 +1993,7 @@ struct WorkoutTemplateLibraryView: View {
                     .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(visibleScheduledWorkouts.prefix(50)) { workout in
-                        Group {
+                        VStack(alignment: .leading, spacing: 0) {
                         if initialCategory != nil && displayMode == .list {
                             ATHLTHWorkoutLibraryExpandableCard(
                                 workout: workout,
@@ -2061,7 +2061,7 @@ struct WorkoutTemplateLibraryView: View {
                         .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(visibleSavedWorkouts) { workout in
-                        Group {
+                        VStack(alignment: .leading, spacing: 0) {
                         if initialCategory != nil && displayMode == .list {
                             ATHLTHWorkoutLibraryExpandableCard(
                                 workout: workout,
@@ -2148,7 +2148,7 @@ struct WorkoutTemplateLibraryView: View {
                 } else {
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(visibleEntries) { entry in
-                        Group {
+                        VStack(alignment: .leading, spacing: 0) {
                         if initialCategory != nil && displayMode == .list,
                            onSelectPlanned != nil {
                             ATHLTHWorkoutLibraryExpandableCard(
@@ -2234,7 +2234,7 @@ struct WorkoutTemplateLibraryView: View {
                     }
 
                     ForEach(visibleRunningTemplates) { workout in
-                        Group {
+                        VStack(alignment: .leading, spacing: 0) {
                         if initialCategory != nil && displayMode == .list,
                            onSelectPlanned != nil {
                             ATHLTHWorkoutLibraryExpandableCard(
