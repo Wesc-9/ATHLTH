@@ -122,6 +122,21 @@ private struct ATHLTHLiveAccessPushResult: Decodable {
     let reason: String?
 }
 
+/// A structured iPhone workout uses its own recorder, not IPhoneWorkoutStore.
+/// Expose only its *real execution state* to the same privacy-gated publisher.
+/// This is not a second recording engine or a source of HealthKit readings.
+struct ATHLTHLocalStructuredWorkoutStatus {
+    let ownerID: UUID
+    let workoutID: UUID
+    let title: String
+    let kind: String
+    let startedAt: Date
+    let steps: [ATHLTHLiveWorkoutStage]
+    var stepIndex: Int
+    var stepEnteredAt: Date
+    var completedCount: Int
+}
+
 /// Polling deliberately shares only a compact spectator state; no second
 /// HKWorkoutSession, no mirrored GPS track, no public/social presence.
 /// Server-side RLS additionally enforces user_id = auth.uid().
@@ -145,6 +160,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     private var lastSourceSessionID: UUID?
     private var trackingAccountID: UUID?
+    private var structuredSession: ATHLTHLocalStructuredWorkoutStatus?
     private var approvedSourceSessionID: UUID?
     private var nextWorkoutSharingExpiresAt: Date?
     private var outgoingRequestID: UUID?
@@ -157,6 +173,19 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     var isSharingActiveSession: Bool {
         approvedSourceSessionID != nil &&
         approvedSourceSessionID == lastSourceSessionID
+    }
+
+    func updateStructuredSession(_ status: ATHLTHLocalStructuredWorkoutStatus) {
+        guard !ATHLTHDeviceRole.isIPad,
+              status.ownerID == trackingAccountID else { return }
+        structuredSession = status
+    }
+
+    func endStructuredSession(workoutID: UUID) {
+        guard structuredSession?.workoutID == workoutID else { return }
+        structuredSession = nil
+        // Poller clears its private presence and metrics on its next cycle.
+        reconcileSession(nil, title: nil)
     }
 
     /// A toggle is armed for one workout only. No account-wide auto-share.
@@ -219,6 +248,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         presenceConnectionIssue = false
         hasCheckedPresence = false
         trackingAccountID = nil
+        structuredSession = nil
         lastPresenceExpiry = nil
         lastPresencePublished = false
         lastPresenceCleanupAt = nil
@@ -497,6 +527,35 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 }(),
                 spotifyTrackTitle: spotify.isPlaying ? spotify.watchTrackTitle : nil,
                 spotifyArtistName: spotify.isPlaying ? spotify.watchArtistName : nil
+            )
+        }
+        if let structured = structuredSession,
+           structured.ownerID == trackingAccountID {
+            let step = structured.steps.indices.contains(structured.stepIndex)
+                ? structured.steps[structured.stepIndex] : nil
+            let nextIndex = structured.stepIndex + 1
+            let remaining = step?.durationSeconds.map {
+                max(0, $0 - Date().timeIntervalSince(structured.stepEnteredAt))
+            }
+            return ATHLTHCrossDeviceWorkoutSnapshot(
+                sessionID: structured.workoutID,
+                kind: structured.kind,
+                title: structured.title,
+                startedAt: structured.startedAt,
+                elapsedSeconds: max(0, Date().timeIntervalSince(structured.startedAt)),
+                distanceMeters: nil,
+                currentStep: step?.title,
+                nextStep: structured.steps.indices.contains(nextIndex)
+                    ? structured.steps[nextIndex].title : nil,
+                completedSets: structured.completedCount,
+                totalSets: structured.steps.count,
+                paused: false,
+                runningStepRemainingSeconds: remaining,
+                capturedAt: .now,
+                sourceDevice: "iphone",
+                runningSteps: Array(structured.steps.prefix(32)),
+                runningStepIndex: structured.stepIndex,
+                runningStepCount: structured.steps.count
             )
         }
         if let watch = mirroredWatch.snapshot,
