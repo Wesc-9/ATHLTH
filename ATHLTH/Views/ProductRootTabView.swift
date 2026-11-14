@@ -1193,6 +1193,7 @@ struct ATHLTHHomeView: View {
                         plan: session.activePlan,
                         workouts: homeRecordedWorkouts,
                         events: homeWeeklyCommunityEvents,
+                        canStartWithWatch: watchConnection.isReady,
                         onStartStandaloneWorkout: { workout, device in
                             startHomeStandaloneWorkout(workout, device: device)
                         }
@@ -1458,7 +1459,12 @@ struct ATHLTHHomeView: View {
                 // Newer workout builders store their ordered sets in blocks,
                 // not legacy session.exercises. Reuse the real timeline
                 // recorder rather than starting an empty strength log.
-                StructuredWorkoutSessionView(workout: workout)
+                StructuredWorkoutSessionView(
+                    workout: workout,
+                    linkedPlanID: HomeWeeklyProgressCalendar.containingPlanID(
+                        for: workout, in: session.activePlan
+                    )
+                )
             }
             .fullScreenCover(isPresented: $showingHomeStrengthWorkout) {
                 ActiveStrengthWorkoutView()
@@ -3247,8 +3253,16 @@ struct ATHLTHHomeView: View {
         showingHomeTodayCalendarAll = false
         Task { @MainActor in
             do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
-            if let planID { onOpenTrain(.workout(planID: planID, workoutID: workout.id)) }
-            else { startHomeStandaloneWorkout(workout, device: device) }
+            // Opening the calendar's Start action must use the actual recorder,
+            // not the read-only plan detail, on either capture device.
+            if let planID, session.trainingPlan(withID: planID) == nil {
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "The planned workout is no longer available.",
+                    norwegian: "Den planlagte økten er ikke lenger tilgjengelig."
+                )
+                return
+            }
+            startHomeStandaloneWorkout(workout, device: device)
         }
     }
 
@@ -4328,6 +4342,14 @@ struct ATHLTHHomeView: View {
     // A standalone calendar workout has no plan ID. Launch the original
     // scheduled recipe with the existing Home iPhone/Watch recording engines.
     // Allow the detail sheet to close before showing a recorder cover.
+    private func reconcileHomeEarlyWorkoutStart(_ workout: PlannedSession) {
+        guard session.moveStartedTomorrowWorkoutToToday(
+            workoutID: workout.id, startedAt: Date()
+        ) else { return }
+        // The same workout ID is now scheduled today on both devices.
+        syncHomeTodayWorkoutToWatch()
+    }
+
     private func startHomeStandaloneWorkout(
         _ workout: PlannedSession,
         device: WorkoutCaptureDevice,
@@ -4500,6 +4522,10 @@ struct ATHLTHHomeView: View {
             plannedPlanID: planID,
             plannedSessionID: planID == nil ? nil : workout.id
         )
+        // Do not move tomorrow's plan until the iPhone recorder is active.
+        if phoneWorkout.active != nil {
+            reconcileHomeEarlyWorkoutStart(workout)
+        }
         // The coordinated lobby authorizes this individual recording.
         // Only acknowledge the start after the real iPhone engine begins.
         Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
@@ -4746,6 +4772,7 @@ struct ATHLTHHomeView: View {
                 watchConnection.sendRunningWorkout(runningTransfer)
 
                 session.beginTrainingStatus(for: workout)
+                reconcileHomeEarlyWorkoutStart(workout)
                 WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
                         session: session,
@@ -4835,6 +4862,7 @@ struct ATHLTHHomeView: View {
                         )
                     }
                     session.beginTrainingStatus(for: workout)
+                    reconcileHomeEarlyWorkoutStart(workout)
                     _ = await social.confirmCurrentJoinedWorkoutStarted()
                     WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
@@ -4878,6 +4906,7 @@ struct ATHLTHHomeView: View {
                 return
             }
             session.beginTrainingStatus(for: workout)
+            reconcileHomeEarlyWorkoutStart(workout)
             Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
             WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
