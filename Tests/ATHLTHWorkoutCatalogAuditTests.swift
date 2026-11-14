@@ -14,12 +14,12 @@ final class ATHLTHWorkoutCatalogAuditTests: XCTestCase {
         let combined = WorkoutTemplateCatalogEntry.bundledCatalog
 
         XCTAssertEqual(RunningWorkoutLibraryStore.builtInTemplates.count, 54)
-        XCTAssertEqual(curated.count, 15)
+        XCTAssertEqual(curated.count, 23)
         XCTAssertEqual(premium.count, 36)
         XCTAssertEqual(zoned.count, 240, "Swimming is intentionally excluded")
         XCTAssertEqual(gymCoach.count, 40)
-        XCTAssertEqual(combined.count, 334,
-                       "3 HYROX + 15 curated + 36 premium + 240 Zoned + 40 GymCoach")
+        XCTAssertEqual(combined.count, 342,
+                       "3 HYROX + 23 curated + 36 premium + 240 Zoned + 40 GymCoach")
         XCTAssertEqual(Set(combined.map(\.id)).count, combined.count)
         XCTAssertEqual(Set(combined.map(\.slug)).count, combined.count)
         XCTAssertEqual(Set(RunningWorkoutLibraryStore.builtInTemplates.map(\.id)).count, 54)
