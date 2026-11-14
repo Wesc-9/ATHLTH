@@ -24,12 +24,18 @@ on:
       - release/v2.1.5
       - release/v2.1.6
       - release/v2.1.8
+      - release/v2.2.1
     paths:
       - ATHLTH/Planning/ATHLTHIntervalGroupAdjustmentView.swift
       - ATHLTH/Planning/ATHLTHPlannedWorkoutStudioView.swift
       - ATHLTH/Planning/ATHLTHIntervalRecipeEditing.swift
       - Tests/ATHLTHIntervalRecipeEditingTests.swift
       - .github/workflows/hybrid-engine-tests.yml
+      - ATHLTH/Routes/ATHLTHExploreRoutePolicy.swift
+      - ATHLTH/Routes/ATHLTHPublicTrailDiskCache.swift
+      - ATHLTH/Routes/PublicTrailDiscoveryStore.swift
+      - ATHLTH/Home/HomeAroundYouView.swift
+      - Tests/ATHLTHExploreRoutePolicyTests.swift
       - ATHLTH/Planning/ATHLTHPlannedWorkoutTypePickerView.swift
       - .github/testflight-trigger
       - .github/workflows/launch-smoke.yml
@@ -164,6 +170,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/HybridDerivedData" \
             -resultBundlePath "$RUNNER_TEMP/HybridTests.xcresult" \
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
+            -only-testing:ATHLTHTests/ATHLTHExploreRoutePolicyTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
             -only-testing:ATHLTHTests/ATHLTHUnifiedMixedWorkoutPlanTests \
             -only-testing:ATHLTHTests/StrengthActiveExerciseQueueTests \
