@@ -7,6 +7,70 @@ final class ATHLTHScratchComposerPresentationPolicyTests: XCTestCase {
         let id: UUID
     }
 
+    func testStandaloneNavigationStageRestoresTheSameChildForTheCorrectAccount() {
+        let user = UUID()
+        let anotherUser = UUID()
+        let suite = "athlth.scratch.route.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            XCTFail("Isolated defaults unavailable")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        ATHLTHStandaloneWorkoutDraftStore.setNavigationStage(
+            .scratchBuilder, for: user, defaults: defaults
+        )
+        XCTAssertEqual(
+            ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+                for: user, defaults: defaults
+            ),
+            .scratchBuilder
+        )
+        XCTAssertNil(ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+            for: anotherUser, defaults: defaults
+        ))
+        ATHLTHStandaloneWorkoutDraftStore.clearNavigationStage(
+            for: anotherUser, defaults: defaults
+        )
+        XCTAssertEqual(
+            ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+                for: user, defaults: defaults
+            ),
+            .scratchBuilder
+        )
+        ATHLTHStandaloneWorkoutDraftStore.clearNavigationStage(
+            for: user, defaults: defaults
+        )
+        XCTAssertNil(ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+            for: user, defaults: defaults
+        ))
+    }
+
+    func testNavigationStagesCoverSourceAndAllStandaloneEntryCards() {
+        let suite = "athlth.scratch.route.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            XCTFail("Isolated defaults unavailable")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let user = UUID()
+        let stages: [ATHLTHStandaloneWorkoutDraftStore.NavigationStage] = [
+            .source, .scratchTypePicker, .scratchBuilder,
+            .savedWorkoutPicker, .recoveryRestPlanner, .legacyEditor
+        ]
+        for stage in stages {
+            ATHLTHStandaloneWorkoutDraftStore.setNavigationStage(
+                stage, for: user, defaults: defaults
+            )
+            XCTAssertEqual(
+                ATHLTHStandaloneWorkoutDraftStore.navigationStage(
+                    for: user, defaults: defaults
+                ),
+                stage
+            )
+        }
+    }
+
     func testDeletingStandaloneDraftAlsoRemovesBuilderCheckpointAndResumeAction() throws {
         let userID = UUID()
         let otherUserID = UUID()
