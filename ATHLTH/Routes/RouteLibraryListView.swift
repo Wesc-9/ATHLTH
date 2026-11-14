@@ -399,6 +399,7 @@ struct RouteLibraryListView: View {
             if isPulling { searchExpanded = true }
         }
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+        .tint(ATHLTHTheme.accentDeep)
         .navigationTitle(tr("Routes", "Ruter"))
         .navigationBarTitleDisplayMode(.inline)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
