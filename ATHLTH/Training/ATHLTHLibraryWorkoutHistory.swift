@@ -46,6 +46,22 @@ enum ATHLTHLibraryWorkoutHistory {
             .map { structuredSummary($0) }
     }
 
+    /// Independent of visible rows: build once when history loads.
+    /// Only exact workout IDs qualify; imported/saved copies remain isolated.
+    static func runningIndex(
+        records: [ATHLTHCompletedRunningPerformance]
+    ) -> [UUID: Summary] {
+        var latest: [UUID: ATHLTHCompletedRunningPerformance] = [:]
+        for record in records {
+            guard let id = record.workoutID else { continue }
+            if let previous = latest[id], previous.completedAt >= record.completedAt {
+                continue
+            }
+            latest[id] = record
+        }
+        return latest.mapValues { runningSummary($0) }
+    }
+
     static func running(
         id: UUID, records: [ATHLTHCompletedRunningPerformance]
     ) -> Summary? {
@@ -53,6 +69,12 @@ enum ATHLTHLibraryWorkoutHistory {
         // identical workout. Especially important for edited My Workouts copies.
         guard let record = records.filter({ $0.workoutID == id })
             .max(by: { $0.completedAt < $1.completedAt }) else { return nil }
+        return runningSummary(record)
+    }
+
+    private static func runningSummary(
+        _ record: ATHLTHCompletedRunningPerformance
+    ) -> Summary {
         let speed = record.averageWorkSpeed
         let result: String?
         if let speed, speed.isFinite, speed > 0 {
