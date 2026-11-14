@@ -236,7 +236,12 @@ struct ATHLTHAudioCoachProfile: Codable, Hashable, Identifiable {
 
     var configurationSummary: String {
         let rules = configuration.customRules?.count ?? 0
+        let groups = configuration.coachGroups?.count ?? 0
         let parts: [String?] = [
+            groups > 0 ? ATHLTHLocalization.choose(
+                english: "\(groups) coach groups",
+                norwegian: "\(groups) coach-grupper"
+            ) : nil,
             configuration.distanceIntervalMeters.map {
                 "\(Int($0)) m"
             },

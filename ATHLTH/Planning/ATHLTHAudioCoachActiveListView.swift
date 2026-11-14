@@ -746,6 +746,19 @@ struct ATHLTHAudioCoachActiveListView: View {
     /// The everyday flow asks only when to speak and what to read.
     /// Advanced editing still uses the SAME underlying custom-rule model.
 
+    // Keep all legacy Audio Coach options available without crowding the
+    // first screen. The curated triggers remain first in their categories.
+    private var extraGroupTriggerOptions: [ATHLTHAudioCoachOption] {
+        let featured: Set<ATHLTHAudioCoachOption> = [
+            .targetZoneCoach, .adaptiveMotivation, .customPhrases,
+            .currentStep, .scopedCountdowns, .workoutStart, .workoutFinish
+        ]
+        return ATHLTHAudioCoachOption.allCases.filter {
+            !featured.contains($0) && $0 != .customAnnouncements &&
+            $0.isVisible(route: showRouteOptions, structured: showStructuredOptions)
+        }
+    }
+
     // The trigger catalogue is a NEW card, never an inline menu under a group.
     private var groupTriggerCatalogue: some View {
         NavigationStack {
@@ -822,6 +835,14 @@ struct ATHLTHAudioCoachActiveListView: View {
                                tr("Finish summary", "Oppsummering ved mål"),
                                icon: "flag.checkered") {
                         addGroupOption(.workoutFinish)
+                    }
+                }
+                Section(tr("MORE TRIGGERS", "FLERE TRIGGERE")) {
+                    ForEach(extraGroupTriggerOptions) { option in
+                        triggerRow(option.title, option.detail(in: draft),
+                                   icon: option.symbol) {
+                            addGroupOption(option)
+                        }
                     }
                 }
             }

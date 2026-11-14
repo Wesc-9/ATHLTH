@@ -37,6 +37,7 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         )
         rule.beforeEndSeconds = 900
         rule.customPhrase = "Nå gir du alt!"
+        XCTAssertTrue(ATHLTHCoachReadoutContext.needsSegmentData([rule]))
         var slots = ATHLTHAudioCoachRuleDelivery.initialSlots(
             rules: [rule], distanceMeters: 0, elapsedSeconds: 0
         )
