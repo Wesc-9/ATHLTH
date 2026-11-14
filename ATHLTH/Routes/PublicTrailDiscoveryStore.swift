@@ -593,7 +593,11 @@ final class PublicTrailDiscoveryStore:
                 found[trail.id] = trail
             }
         }
-        trails = PublicTrailDeduplicator.unique(Array(found.values))
+        // An empty warming response must not erase routes restored from
+        // disk (or a completed first map cell) while fetch continues.
+        if !found.isEmpty || !responses.contains(where: { $0.isRefreshing }) {
+            trails = PublicTrailDeduplicator.unique(Array(found.values))
+        }
         attribution = responses.contains { $0.attribution.contains("Kartverket") }
             ? "© OpenStreetMap contributors · © Kartverket"
             : "© OpenStreetMap contributors"
@@ -719,7 +723,11 @@ final class PublicTrailDiscoveryStore:
             response.trails
                 .filter(\.isUsable)
 
-        trails = PublicTrailDeduplicator.unique(usable)
+        // Stale-while-revalidate: retain an already visible cached snapshot
+        // until the upstream provider has completed its refresh.
+        if !usable.isEmpty || !response.isRefreshing {
+            trails = PublicTrailDeduplicator.unique(usable)
+        }
 
         attribution =
             response.attribution
