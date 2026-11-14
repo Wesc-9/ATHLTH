@@ -86,7 +86,7 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                             }
                         }
 
-                        if isPlanWorkout {
+                        if isPlanWorkout && !isCalendarWorkout {
                             Label {
                                 Text(tr(
                                     "This is the workout in your plan. Open it to use the plan's existing tracking and completion rules.",
@@ -129,7 +129,9 @@ struct HomeDailyRecommendedWorkoutSheet: View {
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 HomeDailyRecommendedWorkoutActions(
-                    isPlanWorkout: isPlanWorkout,
+                    // Calendar plan sessions can start directly on either
+                    // device; only Coach recommendations open plan details.
+                    isPlanWorkout: isPlanWorkout && !isCalendarWorkout,
                     canStartWithWatch: canStartWithWatch,
                     onOpenPlannedWorkout: onOpenPlannedWorkout,
                     onStartOnPhone: onStartOnPhone,
