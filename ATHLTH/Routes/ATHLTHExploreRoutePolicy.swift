@@ -69,8 +69,8 @@ enum ATHLTHExploreRoutePolicy {
             return kept.indices.filter { kept[$0] }
         }
 
-        let xs = planar.map(\.x)
-        let ys = planar.map(\.y)
+        let xs = planar.map { $0.x }
+        let ys = planar.map { $0.y }
         guard let minX = xs.min(), let maxX = xs.max(),
               let minY = ys.min(), let maxY = ys.max() else { return [] }
         var lower = 0.0
