@@ -123,8 +123,8 @@ enum ATHLTHPremiumStrengthSessions {
             // Repetition bounds, duration and RIR are independent
             // prescribed fields; only the coaching advice remains prose.
             let instruction = ATHLTHLocalization.choose(
-                english: "You choose the weight and may change it before or between sets.",
-                norwegian: "Du velger vekten og kan endre den før eller mellom settene."
+                english: "Choose your own weight; aim for RIR \(move.rir) and adjust between sets.",
+                norwegian: "Velg vekten selv, behold RIR \(move.rir), og juster mellom settene."
             )
             var block = WorkoutTemplateBlock(
                 sequence: result.count + 1,
