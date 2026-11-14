@@ -6422,45 +6422,54 @@ struct SessionEditorView: View {
                 norwegian: "Den samme øktmotoren brukes for egen planlegging og Train Together."
             ),
             onCreateNew: {
-                // A scratch workout has its own entry route. Never reuse
-                // the saved-workout sheet, which opens the catalog.
+                // Checkpoint the visible destination before sheet presentation.
+                persistOpenNavigationStage(.scratchTypePicker)
                 showingScratchTypePicker = true
             },
             onUsePlanned: {
+                persistOpenNavigationStage(.savedWorkoutPicker)
                 showingSavedWorkoutPicker = true
             },
             onResumeDraft: hasStoredStandaloneDraft
                 ? {
-                    // Resume only after an explicit choice, preserving all
-                    // details previously stored in the workout draft.
+                    // A real timeline draft has a stable ID. Reusing it
+                    // avoids loading a new empty timeline after app relaunch.
                     draftRestored = false
                     restoreDraftIfNeeded()
                     hasSelectedWorkoutSource = true
                     hasStoredStandaloneDraft = false
-                    // An older build may have persisted only the parent
-                    // SessionEditor draft, before the shared scratch
-                    // composer existed. Migrate it into the actual builder
-                    // instead of exposing the obsolete "0 steps" form.
                     if isStandalone, existingWorkout == nil,
                        onPreparedWorkout == nil, selectedPartnerID == nil {
-                        let type = ATHLTHPlannedWorkoutType.from(composeSession())
-                        selectedScratchWorkoutType = type
-                        scratchTimelineDraftID = UUID()
-                        scratchResumingSavedComposer = false
-                        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                           !workoutPlanningPreviewBlocks.isEmpty {
-                            // A nonblank imported source title prevents the
-                            // shared editor's new-scratch policy from
-                            // inadvertently clearing restored legacy blocks.
-                            title = type.title
+                        if let saved = loadScratchComposerEntry() {
+                            scratchTimelineDraftID = saved.id
+                            selectedScratchWorkoutType = saved.type
+                            scratchResumingSavedComposer = true
+                        } else {
+                            // Older builds saved only the parent form.
+                            let type = ATHLTHPlannedWorkoutType.from(composeSession())
+                            selectedScratchWorkoutType = type
+                            scratchTimelineDraftID = UUID()
+                            scratchResumingSavedComposer = false
+                            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                               !workoutPlanningPreviewBlocks.isEmpty {
+                                title = type.title
+                            }
+                            storeScratchComposerEntry(
+                                type: type, draftID: scratchTimelineDraftID
+                            )
                         }
-                        storeScratchComposerEntry(type: type, draftID: scratchTimelineDraftID)
+                        persistOpenNavigationStage(.scratchBuilder)
                         showingUnifiedWorkoutComposer = true
+                    } else {
+                        persistOpenNavigationStage(.legacyEditor)
                     }
                 }
                 : nil,
             onRecoveryRest: onPreparedWorkout == nil
-                ? { showingRecoveryRestPlanner = true }
+                ? {
+                    persistOpenNavigationStage(.recoveryRestPlanner)
+                    showingRecoveryRestPlanner = true
+                }
                 : nil,
             onRestDay: onPreparedWorkout == nil
                 ? { scheduleRestDayForSelectedDate() }
@@ -6501,6 +6510,7 @@ struct SessionEditorView: View {
         if isStandalone, onPreparedWorkout == nil, selectedPartnerID == nil {
             storeScratchComposerEntry(type: type, draftID: scratchTimelineDraftID)
         }
+        persistOpenNavigationStage(.scratchBuilder)
         hasSelectedWorkoutSource = true
         title = ""
         notes = ""
@@ -6959,7 +6969,11 @@ struct SessionEditorView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingRecoveryRestPlanner) {
+            .sheet(isPresented: $showingRecoveryRestPlanner, onDismiss: {
+                if scenePhase == .active && !draftFinalized {
+                    persistOpenNavigationStage(.source)
+                }
+            }) {
                 ATHLTHRecoveryRestPlanningSheet(
                     date: scheduledTime,
                     allowPlanSelection: false,
@@ -7094,7 +7108,12 @@ struct SessionEditorView: View {
             .sheet(
                 isPresented: $showingScratchTypePicker,
                 onDismiss: {
-                    guard openScratchComposerAfterPickerDismiss else { return }
+                    guard openScratchComposerAfterPickerDismiss else {
+                        if scenePhase == .active && !draftFinalized {
+                            persistOpenNavigationStage(.source)
+                        }
+                        return
+                    }
                     openScratchComposerAfterPickerDismiss = false
                     // Open the unified timeline only after the type picker
                     // has fully closed: no overlapping sheet presentations.
@@ -7114,7 +7133,12 @@ struct SessionEditorView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showingSavedWorkoutPicker) {
+            .sheet(isPresented: $showingSavedWorkoutPicker, onDismiss: {
+                if scenePhase == .active && !hasSelectedWorkoutSource &&
+                    !draftFinalized {
+                    persistOpenNavigationStage(.source)
+                }
+            }) {
                 ATHLTHPlannedWorkoutTypePickerView { workout, _ in
                     applySavedWorkout(workout)
                     // Preserve the chosen workout name in the new independent
@@ -7122,6 +7146,8 @@ struct SessionEditorView: View {
                     selectedScratchWorkoutType = nil
                     discardStoredStandaloneDraft()
                     hasSelectedWorkoutSource = true
+                    persistDraft()
+                    persistOpenNavigationStage(.legacyEditor)
                     showingSavedWorkoutPicker = false
                 }
                 .presentationDetents([.large])
@@ -10974,6 +11000,11 @@ struct SessionEditorView: View {
         draftFinalized = true
         UserDefaults.standard.removeObject(forKey: draftStorageKey)
         UserDefaults.standard.removeObject(forKey: scratchComposerEntryKey)
+        if shouldTrackOpenNavigation {
+            ATHLTHStandaloneWorkoutDraftStore.clearNavigationStage(
+                for: session.profile.userID
+            )
+        }
     }
 
     private func compactPlannedSetLabel(
