@@ -5268,19 +5268,9 @@ struct WorkoutTemplateBuilderView: View {
             .onChange(of: showingRunningExercisePicker) { _, _ in
                 persistWorkoutDraft()
             }
-            .onChange(of: showingBlockPicker) { _, _ in persistWorkoutDraft() }
-            .onChange(of: showingSavedWorkoutPicker) { _, _ in persistWorkoutDraft() }
-            .onChange(of: showingStudioRoutePicker) { _, _ in persistWorkoutDraft() }
-            .onChange(of: showingStudioRouteBuilder) { _, _ in persistWorkoutDraft() }
-            .onChange(of: showingCopyPicker) { _, _ in persistWorkoutDraft() }
-            .onChange(of: showingWorkoutReview) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioStepEditorSelection?.id) { _, _ in
-                persistWorkoutDraft()
-            }
-            .onChange(of: selectedWorkoutExtra?.rawValue) { _, _ in
-                persistWorkoutDraft()
-            }
-            .onChange(of: selectedExerciseInfo?.editorDragID) { _, _ in
+            // One observer avoids another nine nested SwiftUI modifier
+            // types in this already large editor's view graph.
+            .onChange(of: activeAuxiliarySheetKey) { _, _ in
                 persistWorkoutDraft()
             }
             .task {
