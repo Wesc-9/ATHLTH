@@ -1603,6 +1603,10 @@ struct TrainingRoute: Identifiable, Codable, Hashable {
     var endName: String? = nil
     var expectedTravelTimeSeconds: TimeInterval? = nil
     var routeSource: String? = nil
+    // Optional and backwards-compatible for routes saved before 2.2.1.
+    // Never infer a known surface from missing data.
+    var tags: [String]? = nil
+    var surfacePercentages: [String: Int]? = nil
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceRouteID: UUID? = nil
 }
