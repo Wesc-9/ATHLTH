@@ -151,6 +151,7 @@ struct RouteLibraryListView: View {
     @State private var showingMapRoute: TrainingRoute?
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
+    @State private var routeCardsScrolling = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var viewMode: ATHLTHRouteBrowseMode {
@@ -388,6 +389,9 @@ struct RouteLibraryListView: View {
             .padding(.top, 14)
             .padding(.bottom, 76)
             .frame(maxWidth: .infinity)
+        }
+        .onScrollPhaseChange { _, phase in
+            routeCardsScrolling = phase.isScrolling
         }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top < -28
@@ -794,7 +798,11 @@ struct RouteLibraryListView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     Group {
                         if let route = hydratedRoutes[entry.id] {
-                            RouteMapSnapshotThumbnail(route: route, height: 106)
+                            RouteMapSnapshotThumbnail(
+                                route: route,
+                                height: 106,
+                                allowsLiveSnapshot: !routeCardsScrolling
+                            )
                         } else {
                             RoundedRectangle(cornerRadius: 11)
                                 .fill(ATHLTHPlanDesign.selectedSurface)
@@ -842,7 +850,10 @@ struct RouteLibraryListView: View {
             RoundedRectangle(cornerRadius: 17)
                 .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.70), lineWidth: 0.8)
         }
-        .task(id: entry.id) { await loadRouteDetail(entry.id) }
+        .task(id: entry.id.uuidString + (routeCardsScrolling ? "|scroll" : "|idle")) {
+            guard !routeCardsScrolling else { return }
+            await loadRouteDetail(entry.id)
+        }
     }
 
     private func databasePremiumCard(_ entry: RouteLibraryEntry) -> some View {
@@ -1094,6 +1105,14 @@ struct RouteLibraryListView: View {
     @MainActor
     private func loadRouteDetail(_ id: UUID) async {
         guard hydratedRoutes[id] == nil, !loadingDetails.contains(id) else { return }
+        // Do not fire dozens of route-geometry requests while quickly
+        // swiping through a grid. The lazy cells request only when idle.
+        while loadingDetails.count >= 2 {
+            guard !Task.isCancelled, !routeCardsScrolling else { return }
+            try? await Task.sleep(nanoseconds: 90_000_000)
+        }
+        guard !Task.isCancelled, !routeCardsScrolling,
+              hydratedRoutes[id] == nil else { return }
         loadingDetails.insert(id)
         defer { loadingDetails.remove(id) }
         do {
