@@ -475,12 +475,18 @@ struct RouteDetailView: View {
         }
     }
 
+    private var directedRoute: TrainingRoute {
+        selectedAttemptDirection == .reverse
+            ? ATHLTHExploreRoutePolicy.reversedForWorkout(currentRoute)
+            : currentRoute
+    }
+
     private var routeStartCoordinate: CLLocationCoordinate2D? {
-        ATHLTHRouteDetailsPolicy.ordered(currentRoute).first?.coordinate
+        ATHLTHRouteDetailsPolicy.ordered(directedRoute).first?.coordinate
     }
 
     private var routeEndCoordinate: CLLocationCoordinate2D? {
-        ATHLTHRouteDetailsPolicy.ordered(currentRoute).last?.coordinate
+        ATHLTHRouteDetailsPolicy.ordered(directedRoute).last?.coordinate
     }
 
     private var distanceToStartKilometers: Double? {
@@ -717,7 +723,7 @@ struct RouteDetailView: View {
 
     private func exportGPX() {
         do {
-            let url = try ATHLTHRouteGPXExport.temporaryFile(currentRoute)
+            let url = try ATHLTHRouteGPXExport.temporaryFile(directedRoute)
             gpxShareFile = ATHLTHRouteShareFile(url: url)
         } catch {
             gpxExportError = error.localizedDescription
@@ -725,7 +731,7 @@ struct RouteDetailView: View {
     }
 
     private var mapCard: some View {
-        let coordinates = currentRoute.coordinates
+        let coordinates = directedRoute.coordinates
             .sorted { $0.sequence < $1.sequence }
             .map(\.coordinate)
         let turnaround = ATHLTHRouteDirectionGeometry.turnaroundIndex(coordinates)
@@ -741,7 +747,7 @@ struct RouteDetailView: View {
                                     .scaledToFill()
                             } else {
                                 RouteMapSnapshotThumbnail(
-                                    route: currentRoute, height: 270
+                                    route: directedRoute, height: 270
                                 )
                             }
                         }
@@ -749,7 +755,7 @@ struct RouteDetailView: View {
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                     } else {
-                    Map(initialPosition: .region(region(for: currentRoute))) {
+                    Map(initialPosition: .region(region(for: directedRoute))) {
                         if let turnaround {
                             MapPolyline(coordinates: Array(coordinates[...turnaround]))
                                 .stroke(ATHLTHTheme.premiumGold, lineWidth: 6)
@@ -778,14 +784,14 @@ struct RouteDetailView: View {
                                 .stroke(ATHLTHTheme.accent, lineWidth: 6)
                             if let first = coordinates.first {
                                 Marker(
-                                    currentRoute.startName ?? "Start",
+                                    directedRoute.startName ?? "Start",
                                     coordinate: first
                                 )
                                 .tint(ATHLTHTheme.accent)
                             }
                             if let last = coordinates.last {
                                 Marker(
-                                    currentRoute.endName ?? "Finish",
+                                    directedRoute.endName ?? "Finish",
                                     coordinate: last
                                 )
                                 .tint(.red)
@@ -881,7 +887,7 @@ struct RouteDetailView: View {
                         ))
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.mutedText)
-                        Text(currentRoute.startName ?? ATHLTHLocalization.choose(
+                        Text(directedRoute.startName ?? ATHLTHLocalization.choose(
                             english: "GPS start point", norwegian: "Startpunkt på kartet"
                         ))
                         .font(.subheadline.weight(.semibold))
@@ -900,8 +906,8 @@ struct RouteDetailView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         Text(ATHLTHRouteDetailsPolicy.shape(currentRoute) == .loop
-                            ? (currentRoute.startName ?? "Start")
-                            : (currentRoute.endName ?? ATHLTHLocalization.choose(
+                            ? (directedRoute.startName ?? "Start")
+                            : (directedRoute.endName ?? ATHLTHLocalization.choose(
                                 english: "Finish point on map",
                                 norwegian: "Målpunkt på kartet"
                             )))
@@ -2259,9 +2265,7 @@ struct RouteDetailView: View {
                 }
 
                 Button {
-                    routeToStart = selectedAttemptDirection == .reverse
-                        ? ATHLTHExploreRoutePolicy.reversedForWorkout(currentRoute)
-                        : currentRoute
+                    routeToStart = directedRoute
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
@@ -2799,9 +2803,7 @@ struct RouteDetailView: View {
         do {
             try await GhostRaceStartService.start(
                 attempt: attempt,
-                route: selectedAttemptDirection == .reverse
-                    ? ATHLTHExploreRoutePolicy.reversedForWorkout(currentRoute)
-                    : currentRoute,
+                route: directedRoute,
                 health: health,
                 ownerID: session.profile.userID,
                 ghostRace: ghostRace,
