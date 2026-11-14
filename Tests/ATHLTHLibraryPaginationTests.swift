@@ -25,7 +25,7 @@ final class ATHLTHLibraryPaginationTests: XCTestCase {
         XCTAssertEqual(initial.count, 50)
         XCTAssertEqual(initial.first, 0)
         XCTAssertEqual(initial.last, 49)
-        XCTAssertEqual(ATHLTHLibraryPagination.visible([], limit: 50).count, 0)
+        XCTAssertEqual(ATHLTHLibraryPagination.visible([Int](), limit: 50).count, 0)
         XCTAssertEqual(ATHLTHLibraryPagination.visible(entries, limit: 0).count, 0)
     }
 
