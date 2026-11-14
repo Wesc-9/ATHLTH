@@ -429,6 +429,7 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     // An optional ruleset keeps previously persisted and Watch transfers
     // backwards compatible. Each metric has its own cadence.
     var customRules: [ATHLTHAudioCoachRule]? = nil
+    var coachGroups: [ATHLTHAudioCoachGroup]? = nil
     // Motivation, varied encouragements and user-selected GPS landmarks.
     // Optional so older persisted configurations still decode.
     var smartPrompts: ATHLTHAudioCoachSmartSettings? = nil

@@ -531,6 +531,9 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachCustomRules: [ATHLTHAudioCoachRule] {
         didSet { persist() }
     }
+    @Published var audioCoachGroups: [ATHLTHAudioCoachGroup] {
+        didSet { persist() }
+    }
     @Published var audioCoachSavedRuleSets: [ATHLTHAudioCoachRuleSet] {
         didSet { persist() }
     }
@@ -929,6 +932,11 @@ final class AppSettingsStore: ObservableObject {
                 .flatMap { try? JSONDecoder().decode(
                     [ATHLTHAudioCoachRule].self, from: $0) }
         ) ?? []
+        audioCoachGroups = defaults.data(
+            forKey: "settings.audioCoach.groups.v1"
+        ).flatMap { try? JSONDecoder().decode(
+            [ATHLTHAudioCoachGroup].self, from: $0
+        ) } ?? []
         audioCoachSavedRuleSets = (
             defaults.data(forKey: "settings.audioCoach.savedRuleSets.v1")
                 .flatMap { try? JSONDecoder().decode(
@@ -1280,6 +1288,10 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(
             try? JSONEncoder().encode(audioCoachCustomRules),
             forKey: "settings.audioCoach.customRules.v1"
+        )
+        defaults.set(
+            try? JSONEncoder().encode(audioCoachGroups),
+            forKey: "settings.audioCoach.groups.v1"
         )
         defaults.set(
             try? JSONEncoder().encode(audioCoachSavedRuleSets),
@@ -1637,6 +1649,7 @@ final class AppSettingsStore: ObservableObject {
                 audioCoachAnnounceWorkoutComplete
         )
 
+        configuration.coachGroups = audioCoachGroups
         return applyingFuelVoice(to: configuration)
     }
 
@@ -1651,6 +1664,7 @@ final class AppSettingsStore: ObservableObject {
         if audioCoachTimeIntervalMinutes != draft.timeIntervalMinutes { audioCoachTimeIntervalMinutes = draft.timeIntervalMinutes }
         if audioCoachTimeIntervalSeconds != draft.timeIntervalSeconds { audioCoachTimeIntervalSeconds = draft.timeIntervalSeconds }
         if audioCoachCustomRules != Array(draft.customRules.prefix(20)) { audioCoachCustomRules = Array(draft.customRules.prefix(20)) }
+        if audioCoachGroups != draft.coachGroups { audioCoachGroups = draft.coachGroups }
         if audioCoachSmartSettings != draft.smartPrompts { audioCoachSmartSettings = draft.smartPrompts }
         if audioCoachAnnounceDistance != draft.announceDistance { audioCoachAnnounceDistance = draft.announceDistance }
         if audioCoachAnnounceElapsedTime != draft.announceElapsedTime { audioCoachAnnounceElapsedTime = draft.announceElapsedTime }
@@ -1691,6 +1705,7 @@ final class AppSettingsStore: ObservableObject {
     func applyAudioCoachProfile(_ profile: ATHLTHAudioCoachProfile) {
         let config = profile.configuration
         audioCoachCustomRules = config.customRules ?? []
+        audioCoachGroups = config.coachGroups ?? []
         audioCoachSmartSettings = config.smartPrompts ?? ATHLTHAudioCoachSmartSettings()
         audioCoachDistanceTriggerEnabled = config.distanceIntervalMeters != nil
         if let distance = config.distanceIntervalMeters {

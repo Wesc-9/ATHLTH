@@ -90,6 +90,10 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     var enabled: Bool? = nil
     var encouragementStyle: ATHLTHCoachEncouragementStyle? = nil
     var scope: Scope? = nil
+    /// An optional single-shot cue before a planned finish. Nothing is
+    /// announced if the workout has no reliable remaining-duration estimate.
+    var beforeEndSeconds: Int? = nil
+    var customPhrase: String? = nil
 
     var isEnabled: Bool { enabled ?? true }
 
@@ -119,6 +123,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         now: Date = .now,
         excluding excludedMetrics: Set<Metric> = []
     ) -> String? {
+        if beforeEndSeconds != nil,
+           let phrase = customPhrase?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !phrase.isEmpty {
+            return phrase
+        }
         let intervalValue = trigger == .distance ? distanceMeters : elapsedSeconds
         let motivationSlot = intervalValue.isFinite && intervalValue >= 0
             ? Int(min(floor(intervalValue / Double(validatedInterval)),
@@ -372,7 +381,16 @@ enum ATHLTHAudioCoachRuleDelivery {
                 elapsed = context.groupElapsedSeconds
                 segment = index
             }
-            let milestone = slot(for: rule, distanceMeters: distance, elapsedSeconds: elapsed)
+            let milestone: Int
+            if let beforeEnd = rule.beforeEndSeconds {
+                // A remaining-time cue is one-shot, not a repeating cadence.
+                // In an open-ended workout no prediction means no announcement.
+                guard let remaining = context.workoutRemainingSeconds,
+                      remaining.isFinite, remaining >= 0 else { continue }
+                milestone = remaining <= Double(max(1, beforeEnd)) ? 1 : 0
+            } else {
+                milestone = slot(for: rule, distanceMeters: distance, elapsedSeconds: elapsed)
+            }
             guard milestone > 0 else { continue }
             let current = segment.map { ($0 + 1) * 100_000 + min(milestone, 99_999) } ?? milestone
             let previous = lastSlots[rule.id] ?? 0
@@ -450,6 +468,18 @@ enum ATHLTHAudioCoachRuleDelivery {
             Double(Int.max / 2)
         ))
     }
+}
+
+/// Athlete-named, ordered presentation groups. A group does not change the
+/// scheduling model: every linked rule stays owned by the existing Watch and
+/// iPhone voice engine. Optional groups in the transfer payload preserve older
+/// saved workout and profile decoding.
+struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var name: String
+    var ruleIDs: [UUID] = []
+    /// Existing smart/structured Audio Coach options belonging to this group.
+    var optionIDs: [String] = []
 }
 
 struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {

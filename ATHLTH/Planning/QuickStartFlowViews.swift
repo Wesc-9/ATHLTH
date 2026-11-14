@@ -96,6 +96,7 @@ struct AudioCoachDraft {
     // Existing rules and motivation engine are shared with Settings and Watch.
     // Per-workout selections are snapshots, never edits to the saved preset.
     var customRules: [ATHLTHAudioCoachRule] = []
+    var coachGroups: [ATHLTHAudioCoachGroup] = []
     var smartPrompts = ATHLTHAudioCoachSmartSettings()
 
     var announceDistance = true
@@ -138,6 +139,7 @@ struct AudioCoachDraft {
         timeIntervalMinutes = 10
         timeIntervalSeconds = 600
         customRules = []
+        coachGroups = []
         announceDistance = true
         announceElapsedTime = true
         announceAveragePace = true
@@ -244,6 +246,7 @@ struct AudioCoachDraft {
             settings.audioCoachTimeIntervalMinutes
         timeIntervalSeconds = min(max(settings.audioCoachTimeIntervalSeconds, 15), 7_200)
         customRules = settings.audioCoachCustomRules
+        coachGroups = settings.audioCoachGroups
         smartPrompts = settings.audioCoachSmartSettings
         announceDistance =
             settings.audioCoachAnnounceDistance
@@ -297,6 +300,7 @@ struct AudioCoachDraft {
         enabled = true
         language = config.language
         customRules = config.customRules ?? []
+        coachGroups = config.coachGroups ?? []
         smartPrompts = config.smartPrompts ?? ATHLTHAudioCoachSmartSettings()
         distanceTriggerEnabled = config.distanceIntervalMeters != nil
         distanceIntervalKilometers = (config.distanceIntervalMeters ?? 1_000) / 1_000
@@ -349,6 +353,7 @@ struct AudioCoachDraft {
         saved.distanceIntervalMeters = values.distanceIntervalMeters
         saved.timeIntervalSeconds = values.timeIntervalSeconds
         saved.customRules = values.customRules
+        saved.coachGroups = values.coachGroups
         saved.smartPrompts = values.smartPrompts
         saved.announceDistance = values.announceDistance
         saved.announceElapsedTime = values.announceElapsedTime
@@ -390,7 +395,7 @@ struct AudioCoachDraft {
         // The Watch/iPhone rule schedulers already merge simultaneous events
         // and suppress duplicated metrics when a custom milestone is due.
         let standardCadenceEnabled = enabled
-        return WatchAudioCoachConfiguration(
+        var configuration = WatchAudioCoachConfiguration(
             enabled: enabled,
             language: language,
             distanceIntervalMeters:
@@ -459,6 +464,8 @@ struct AudioCoachDraft {
             announceWorkoutComplete:
                 announceWorkoutComplete
         )
+        configuration.coachGroups = coachGroups
+        return configuration
     }
 }
 
