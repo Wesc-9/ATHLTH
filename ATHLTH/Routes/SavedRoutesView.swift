@@ -631,7 +631,7 @@ struct SavedRoutesView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(tr("From \(Int(minLength)) km", "Fra \(Int(minLength)) km"))
                     Slider(value: $minLength, in: 0...100, step: 1)
-                        .tint(ATHLTHPlanDesign.accentInk)
+                        .tint(ATHLTHTheme.accentDeep)
                         .onChange(of: minLength) { _, value in
                             if value > maxLength { maxLength = value }
                         }
@@ -639,7 +639,7 @@ struct SavedRoutesView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(tr("To \(Int(maxLength)) km", "Til \(Int(maxLength)) km"))
                     Slider(value: $maxLength, in: 0...100, step: 1)
-                        .tint(ATHLTHPlanDesign.accentInk)
+                        .tint(ATHLTHTheme.accentDeep)
                         .onChange(of: maxLength) { _, value in
                             if value < minLength { minLength = value }
                         }
@@ -1062,7 +1062,7 @@ struct SavedRouteFullscreenMap: View {
                             Label(ATHLTHLocalization.choose(english: "Directions to start", norwegian: "Veibeskrivelse til start"),
                                   systemImage: "location.north.line")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
                         }
                     }
                 }
