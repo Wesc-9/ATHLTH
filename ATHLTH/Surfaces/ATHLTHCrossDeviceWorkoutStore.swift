@@ -530,7 +530,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             )
         }
         if let structured = structuredSession,
-           structured.ownerID == trackingAccountID {
+           structured.ownerID == trackingAccountID,
+           !mirroredWatch.hasActiveMirroredWorkout {
             let step = structured.steps.indices.contains(structured.stepIndex)
                 ? structured.steps[structured.stepIndex] : nil
             let nextIndex = structured.stepIndex + 1
