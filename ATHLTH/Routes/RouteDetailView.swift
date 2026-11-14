@@ -27,6 +27,7 @@ struct RouteDetailView: View {
 
     @State private var showingDeleteConfirmation = false
     @State private var showingFullLeaderboard = false
+    @State private var showingAllPersonalAttempts = false
     @State private var showingOfflineMap = false
     @State private var gpxShareFile: ATHLTHRouteShareFile?
     @State private var gpxExportError: String?
@@ -421,6 +422,34 @@ struct RouteDetailView: View {
             ) { configuration in
                 launchRunFromDetails(configuration)
                 return nil
+            }
+        }
+        .sheet(isPresented: $showingAllPersonalAttempts) {
+            NavigationStack {
+                List {
+                    ForEach(
+                        allRouteAttempts
+                            .filter { $0.userID == session.profile.userID }
+                            .sorted { $0.startedAt > $1.startedAt }
+                    ) { attempt in
+                        VStack(alignment: .leading, spacing: 4) {
+                            attemptRow(attempt)
+                            Text((attempt.direction ?? .unknown).title)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "My attempts", norwegian: "Mine forsøk"
+                ))
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Done", norwegian: "Ferdig"
+                        )) { showingAllPersonalAttempts = false }
+                    }
+                }
             }
         }
         .sheet(isPresented: $showingFullLeaderboard) {
@@ -2112,31 +2141,53 @@ struct RouteDetailView: View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Your attempts")
-                        .font(.headline)
-
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your attempts", norwegian: "Mine forsøk"
+                    ))
+                    .font(.headline)
                     Spacer()
-
                     Text("\(ownAttempts.count)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.accent)
+                    Button {
+                        showingAllPersonalAttempts = true
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "View all", norwegian: "Se alle"
+                        ))
+                        .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(allRouteAttempts.allSatisfy {
+                        $0.userID != session.profile.userID
+                    })
                 }
 
                 if ownAttempts.isEmpty {
-                    Text("No attempts recorded on this route yet.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Text(ATHLTHLocalization.choose(
+                        english: "No qualified attempts in this direction yet.",
+                        norwegian: "Ingen kvalifiserte forsøk i denne retningen ennå."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 } else {
-                    ForEach(
-                        Array(ownAttempts.prefix(5).enumerated()),
-                        id: \.element.id
-                    ) { index, attempt in
+                    ForEach(Array(ownAttempts.prefix(5).enumerated()),
+                            id: \.element.id) { index, attempt in
                         attemptRow(attempt)
-
-                        if index < min(ownAttempts.count, 5) - 1 {
-                            Divider()
-                        }
+                        if index < min(ownAttempts.count, 5) - 1 { Divider() }
                     }
+                }
+                if !historicalAttemptsWithoutDirection.isEmpty {
+                    Divider()
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.arrow.circlepath")
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(historicalAttemptsWithoutDirection.count) historical attempts · direction unverified",
+                            norwegian: "\(historicalAttemptsWithoutDirection.count) historiske forsøk · retning ubekreftet"
+                        ))
+                        .font(.caption)
+                    }
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
             }
         }
