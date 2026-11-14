@@ -3,6 +3,57 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHRouteNavigationCueTests: XCTestCase {
+
+    func testLegacyRouteAlertsPreserveTurnCoachingAndSafeDefaults() throws {
+        let legacy = """
+        {
+          "enabled": true,
+          "deviationMeters": 80,
+          "graceSeconds": 20,
+          "repeatSeconds": 120,
+          "delivery": "both",
+          "announceBackOnRoute": true
+        }
+        """
+        let restored = try JSONDecoder().decode(
+            WatchRouteAlertConfiguration.self, from: Data(legacy.utf8)
+        )
+        XCTAssertTrue(restored.shouldAnnounceUpcomingTurns)
+        XCTAssertEqual(restored.resolvedTurnCueLeadMeters, 85)
+        XCTAssertTrue(restored.shouldAnnounceTurn(distanceMeters: 75))
+        XCTAssertFalse(restored.shouldAnnounceTurn(distanceMeters: 130))
+    }
+
+    func testRouteCoachTurnLeadDistanceAndDisableStateSurviveRoundTrip() throws {
+        var settings = WatchRouteAlertConfiguration.standard
+        settings.announceUpcomingTurns = true
+        settings.turnCueLeadMeters = 140
+        let saved = try JSONDecoder().decode(
+            WatchRouteAlertConfiguration.self,
+            from: JSONEncoder().encode(settings)
+        )
+        var workout = RouteGuardianDraft()
+        workout.load(configuration: saved)
+        XCTAssertTrue(workout.announceUpcomingTurns)
+        XCTAssertEqual(workout.turnCueLeadMeters, 140)
+        XCTAssertTrue(workout.configuration.shouldAnnounceTurn(distanceMeters: 118))
+        XCTAssertFalse(workout.configuration.shouldAnnounceTurn(distanceMeters: 65))
+
+        workout.announceUpcomingTurns = false
+        XCTAssertFalse(workout.configuration.shouldAnnounceTurn(distanceMeters: 118))
+        workout.enabled = false
+        workout.announceUpcomingTurns = true
+        XCTAssertFalse(workout.configuration.shouldAnnounceTurn(distanceMeters: 118))
+    }
+
+    func testInvalidTurnLeadAndGPSDistanceNeverCreateTurnPrompts() {
+        var config = WatchRouteAlertConfiguration.standard
+        config.turnCueLeadMeters = .infinity
+        XCTAssertEqual(config.resolvedTurnCueLeadMeters, 85)
+        XCTAssertFalse(config.shouldAnnounceTurn(distanceMeters: .nan))
+        XCTAssertFalse(config.shouldAnnounceTurn(distanceMeters: -.infinity))
+    }
+
     private func coordinate(_ lat: Double, _ lon: Double) -> CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }

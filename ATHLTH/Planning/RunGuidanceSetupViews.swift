@@ -8,6 +8,8 @@ struct RouteGuardianDraft {
     var delivery:
         WatchAlertDelivery = .both
     var announceBackOnRoute = true
+    var announceUpcomingTurns = true
+    var turnCueLeadMeters = 85.0
 
     @MainActor
     mutating func load(
@@ -23,9 +25,9 @@ struct RouteGuardianDraft {
             settings.routeAlertRepeatSeconds
         delivery =
             settings.routeAlertDelivery
-        announceBackOnRoute =
-            settings
-                .routeAlertAnnounceBackOnRoute
+        announceBackOnRoute = settings.routeAlertAnnounceBackOnRoute
+        announceUpcomingTurns = settings.routeAlertAnnounceUpcomingTurns
+        turnCueLeadMeters = settings.routeAlertTurnCueLeadMeters
     }
 
     mutating func load(
@@ -48,8 +50,9 @@ struct RouteGuardianDraft {
                     .rounded()
             )
         delivery = configuration.delivery
-        announceBackOnRoute =
-            configuration.announceBackOnRoute
+        announceBackOnRoute = configuration.announceBackOnRoute
+        announceUpcomingTurns = configuration.shouldAnnounceUpcomingTurns
+        turnCueLeadMeters = configuration.resolvedTurnCueLeadMeters
     }
 
     var configuration:
@@ -85,8 +88,9 @@ struct RouteGuardianDraft {
                     )
                 ),
             delivery: delivery,
-            announceBackOnRoute:
-                announceBackOnRoute
+            announceBackOnRoute: announceBackOnRoute,
+            announceUpcomingTurns: announceUpcomingTurns,
+            turnCueLeadMeters: turnCueLeadMeters
         )
     }
 }
@@ -491,198 +495,16 @@ struct PerWorkoutAudioCoachView: View {
     }
 }
 
+
 struct PerWorkoutRouteGuardianView: View {
     @Binding var draft: RouteGuardianDraft
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                ATHLTHPlanSectionIntro(
-                    eyebrow: ATHLTHLocalization.choose(
-                        english: "ROUTE GUIDANCE",
-                        norwegian: "RUTEVEILEDNING"
-                    ),
-                    title: ATHLTHLocalization.choose(
-                        english: "Navigation",
-                        norwegian: "Navigasjon"
-                    ),
-                    subtitle: ATHLTHLocalization.choose(
-                        english: "Choose when and how the coach warns you about route deviation.",
-                        norwegian: "Velg når og hvordan coachen varsler at du er utenfor ruten."
-                    ),
-                    icon: "location.north.line"
-                )
-
-                ATHLTHPlanSurface(ghost: false) {
-                    Toggle(isOn: $draft.enabled) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Navigation",
-                                norwegian: "Navigasjon"
-                            ))
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            Text(ATHLTHLocalization.choose(
-                                english: "Alerts during this run",
-                                norwegian: "Varsler under denne økten"
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                    }
-                    .tint(ATHLTHPlanDesign.accentInk)
-                    if draft.enabled {
-                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                        VStack(alignment: .leading, spacing: 9) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "ALERT SENSITIVITY",
-                                norwegian: "FØLSOMHET"
-                            ))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            HStack(spacing: 8) {
-                                sensitivityChoice(
-                                    ATHLTHLocalization.choose(
-                                        english: "Precise", norwegian: "Presis"
-                                    ),
-                                    meters: 50, grace: 10
-                                )
-                                sensitivityChoice(
-                                    ATHLTHLocalization.choose(
-                                        english: "Balanced", norwegian: "Balansert"
-                                    ),
-                                    meters: 80, grace: 20
-                                )
-                                sensitivityChoice(
-                                    ATHLTHLocalization.choose(
-                                        english: "Relaxed", norwegian: "Rolig"
-                                    ),
-                                    meters: 150, grace: 30
-                                )
-                            }
-                            Text(ATHLTHLocalization.choose(
-                                english: "GPS uncertainty is accounted for before a warning is spoken.",
-                                norwegian: "GPS-usikkerhet tas med i vurderingen før varsel gis."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                        Text(ATHLTHLocalization.choose(
-                            english: "DEVIATION",
-                            norwegian: "AVVIK FRA RUTEN"
-                        ))
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.25)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-
-                        HStack {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Alert distance", norwegian: "Avstand for varsel"
-                            ))
-                            .font(.subheadline)
-                            Spacer()
-                            Picker(ATHLTHLocalization.choose(
-                                english: "Alert distance", norwegian: "Avstand for varsel"
-                            ), selection: $draft.deviationMeters) {
-                                ForEach([25.0, 50.0, 80.0, 100.0, 150.0, 250.0],
-                                        id: \.self) { value in
-                                    Text("\(Int(value)) m").tag(value)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-                        .frame(minHeight: 44)
-
-                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                        HStack {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Wait before alert", norwegian: "Vent før varsel"
-                            ))
-                            .font(.subheadline)
-                            Spacer()
-                            Picker(ATHLTHLocalization.choose(
-                                english: "Wait before alert", norwegian: "Vent før varsel"
-                            ), selection: $draft.graceSeconds) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Immediately", norwegian: "Straks"
-                                )).tag(0)
-                                Text("5 s").tag(5)
-                                Text("10 s").tag(10)
-                                Text("20 s").tag(20)
-                                Text("30 s").tag(30)
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-                        .frame(minHeight: 44)
-
-                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                        HStack {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Repeat interval", norwegian: "Gjenta varsel"
-                            ))
-                            .font(.subheadline)
-                            Spacer()
-                            Picker(ATHLTHLocalization.choose(
-                                english: "Repeat interval", norwegian: "Gjenta varsel"
-                            ), selection: $draft.repeatSeconds) {
-                                Text("30 s").tag(30)
-                                Text("1 min").tag(60)
-                                Text("2 min").tag(120)
-                                Text("5 min").tag(300)
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-                        .frame(minHeight: 44)
-                    }
-                }
-
-                if draft.enabled {
-                    ATHLTHPlanSurface(ghost: false) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "HOW YOU'RE NOTIFIED",
-                            norwegian: "SLIK VARSLES DU"
-                        ))
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.25)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-
-                        HStack {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Alert style", norwegian: "Varseltype"
-                            ))
-                            .font(.subheadline)
-                            Spacer()
-                            Picker(ATHLTHLocalization.choose(
-                                english: "Alert style", norwegian: "Varseltype"
-                            ), selection: $draft.delivery) {
-                                ForEach(WatchAlertDelivery.allCases) { delivery in
-                                    Text(delivery.title).tag(delivery)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-                        .frame(minHeight: 44)
-
-                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                        Toggle(isOn: $draft.announceBackOnRoute) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Announce when back on route",
-                                norwegian: "Gi beskjed når jeg er tilbake på ruten"
-                            ))
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                        }
-                        .tint(ATHLTHPlanDesign.accentInk)
-                    }
-                }
-            }
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
-            .frame(maxWidth: .infinity)
-            .padding(16)
+            ATHLTHRouteGuidanceStudioView(draft: $draft)
+                .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+                .frame(maxWidth: .infinity)
+                .padding(16)
         }
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .tint(ATHLTHPlanDesign.accentInk)
@@ -691,37 +513,413 @@ struct PerWorkoutRouteGuardianView: View {
         ))
         .navigationBarTitleDisplayMode(.inline)
     }
-    private func sensitivityChoice(
-        _ title: String,
-        meters: Double,
-        grace: Int
-    ) -> some View {
-        let selected = draft.deviationMeters == meters &&
-            draft.graceSeconds == grace
-        return Button {
-            draft.deviationMeters = meters
-            draft.graceSeconds = grace
-            draft.enabled = true
-        } label: {
-            VStack(spacing: 5) {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                Text("\(Int(meters)) m · \(grace) s")
-                    .font(.caption2.monospacedDigit())
-            }
-            .foregroundStyle(selected ? Color.white : ATHLTHPlanDesign.ink)
-            .frame(maxWidth: .infinity, minHeight: 62)
-            .background(
-                selected
-                    ? Color(red: 0.20, green: 0.21, blue: 0.24)
-                    : Color(red: 0.955, green: 0.954, blue: 0.95),
-                in: RoundedRectangle(cornerRadius: 13)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+}
+
+/// A single visual and behavioural editor for global Navigation defaults
+/// and workout-scoped Route Coach. No new GPS/voice engine is introduced.
+struct ATHLTHRouteGuidanceStudioView: View {
+    @Binding var draft: RouteGuardianDraft
+
+    @State private var routeCoachExpanded = true
+    @State private var deviationExpanded = true
+    @State private var deliveryExpanded = false
+
+    private let gold = ATHLTHPlanDesign.accentInk
+    private let ink = ATHLTHPlanDesign.ink
+    private let dim = ATHLTHPlanDesign.secondaryInk
+
+    private struct Preset: Identifiable {
+        let id: Int
+        let nameEnglish: String
+        let nameNorwegian: String
+        let distance: Double
+        let grace: Int
+        let icon: String
     }
 
+    private let presets = [
+        Preset(id: 0, nameEnglish: "Precise", nameNorwegian: "Presis",
+               distance: 50, grace: 10, icon: "scope"),
+        Preset(id: 1, nameEnglish: "Balanced", nameNorwegian: "Balansert",
+               distance: 80, grace: 20, icon: "location.north.line"),
+        Preset(id: 2, nameEnglish: "Relaxed", nameNorwegian: "Rolig",
+               distance: 150, grace: 30, icon: "leaf")
+    ]
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private var currentPresetIndex: Int? {
+        presets.firstIndex {
+            draft.deviationMeters == $0.distance &&
+            draft.graceSeconds == $0.grace
+        }
+    }
+
+    private var title: String {
+        guard draft.enabled else { return tr("Off", "Av") }
+        guard let index = currentPresetIndex else { return tr("Custom", "Egendefinert") }
+        return tr(presets[index].nameEnglish, presets[index].nameNorwegian)
+    }
+
+    private func selectPreset(_ index: Int) {
+        guard presets.indices.contains(index) else { return }
+        let preset = presets[index]
+        draft.deviationMeters = preset.distance
+        draft.graceSeconds = preset.grace
+        draft.enabled = true
+    }
+
+    private func cyclePreset(_ offset: Int) {
+        let current = currentPresetIndex ?? 1
+        selectPreset((current + offset + presets.count) % presets.count)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ATHLTHPlanSectionIntro(
+                eyebrow: tr("ROUTE GUIDANCE", "RUTEVEILEDNING"),
+                title: tr("Navigation & Route Coach", "Navigasjon og Rute-coach"),
+                subtitle: tr(
+                    "Stay on your route, hear upcoming bends and get calmly guided back if you stray.",
+                    "Følg ruten, få beskjed om kommende svinger og finn rolig tilbake hvis du havner utenfor."
+                ),
+                icon: "location.north.line"
+            )
+
+            ATHLTHPlanSurface(ghost: false) {
+                HStack(spacing: 12) {
+                    Image(systemName: "location.north.line")
+                        .font(.title3)
+                        .foregroundStyle(gold)
+                        .frame(width: 45, height: 45)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 14))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("Navigation", "Navigasjon"))
+                            .font(.headline)
+                            .foregroundStyle(ink)
+                        Text(tr("Route guidance during a workout",
+                                "Ruteveiledning under økten"))
+                            .font(.caption)
+                            .foregroundStyle(dim)
+                    }
+                    Spacer(minLength: 6)
+                    Toggle(tr("Navigation", "Navigasjon"), isOn: $draft.enabled)
+                        .labelsHidden()
+                        .tint(gold)
+                        .accessibilityIdentifier("athlth-navigation-enabled")
+                }
+            }
+
+            if draft.enabled {
+                VStack(spacing: 12) {
+                    HStack {
+                        Text(tr("ROUTE SENSITIVITY", "FØLSOMHET FOR RUTEAVVIK"))
+                            .font(.caption.weight(.bold))
+                            .tracking(1.7)
+                            .foregroundStyle(gold)
+                        Spacer()
+                    }
+
+                    HStack(spacing: 5) {
+                        Button { withAnimation(.easeInOut(duration: 0.2)) {
+                            cyclePreset(-1)
+                        }} label: {
+                            Image(systemName: "chevron.left")
+                                .font(.title3.weight(.semibold))
+                                .frame(width: 40, height: 60)
+                        }
+                        .accessibilityLabel(tr("Previous mode", "Forrige modus"))
+
+                        Spacer(minLength: 0)
+                        ZStack {
+                            Circle()
+                                .stroke(gold.opacity(0.12), lineWidth: 12)
+                            Circle()
+                                .stroke(
+                                    AngularGradient(colors: [
+                                        gold.opacity(0.30), gold, gold.opacity(0.72), gold
+                                    ], center: .center),
+                                    style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                                )
+                            Circle()
+                                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+                                .padding(13)
+                            VStack(spacing: 7) {
+                                Image(systemName: "location.north.line")
+                                    .font(.system(size: 29, weight: .medium))
+                                    .foregroundStyle(gold)
+                                Text(tr("ACTIVE MODE", "AKTIV MODUS"))
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(1.2)
+                                    .foregroundStyle(dim)
+                                Text(title)
+                                    .font(.system(size: 23, weight: .medium, design: .serif))
+                                    .foregroundStyle(ink)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                                Text("\(Int(draft.deviationMeters)) m · \(draft.graceSeconds) s")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(dim)
+                            }
+                        }
+                        .frame(width: 208, height: 208)
+                        .accessibilityIdentifier("athlth-route-mode-circle")
+                        Spacer(minLength: 0)
+
+                        Button { withAnimation(.easeInOut(duration: 0.2)) {
+                            cyclePreset(1)
+                        }} label: {
+                            Image(systemName: "chevron.right")
+                                .font(.title3.weight(.semibold))
+                                .frame(width: 40, height: 60)
+                        }
+                        .accessibilityLabel(tr("Next mode", "Neste modus"))
+                    }
+                    .foregroundStyle(gold)
+
+                    HStack(spacing: 9) {
+                        ForEach(presets) { preset in
+                            let selected = currentPresetIndex == preset.id
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectPreset(preset.id)
+                                }
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(systemName: preset.icon)
+                                        .font(.subheadline)
+                                    Text(tr(preset.nameEnglish, preset.nameNorwegian))
+                                        .font(.caption.weight(.semibold))
+                                    Text("\(Int(preset.distance)) m")
+                                        .font(.caption2.monospacedDigit())
+                                }
+                                .foregroundStyle(selected ? gold : dim)
+                                .frame(maxWidth: .infinity, minHeight: 72)
+                                .background(
+                                    selected
+                                        ? ATHLTHPlanDesign.selectedSurface
+                                        : Color.white,
+                                    in: RoundedRectangle(cornerRadius: 17)
+                                )
+                                .overlay(RoundedRectangle(cornerRadius: 17)
+                                    .stroke(selected ? gold.opacity(0.6) :
+                                            ATHLTHPlanDesign.warmDivider))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(selected ? .isSelected : [])
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+
+                ATHLTHPlanSurface(ghost: false) {
+                    DisclosureGroup(isExpanded: $routeCoachExpanded) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            Toggle(isOn: $draft.announceUpcomingTurns) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(tr("Announce approaching bends",
+                                            "Varsle før kommende svinger"))
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(ink)
+                                    Text(tr("Uses the actual saved route line",
+                                            "Bruker den lagrede rutelinjen"))
+                                        .font(.caption)
+                                        .foregroundStyle(dim)
+                                }
+                            }
+                            .tint(gold)
+                            if draft.announceUpcomingTurns {
+                                HStack(spacing: 10) {
+                                    Text(tr("How early?", "Hvor tidlig?"))
+                                        .font(.subheadline)
+                                        .foregroundStyle(ink)
+                                    Spacer()
+                                    Picker(tr("Lead distance", "Avstand før sving"),
+                                           selection: $draft.turnCueLeadMeters) {
+                                        Text(tr("Near · 40 m", "Nært · 40 m")).tag(40.0)
+                                        Text(tr("Normal · 85 m", "Normal · 85 m")).tag(85.0)
+                                        Text(tr("Early · 140 m", "Tidlig · 140 m")).tag(140.0)
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "arrow.turn.up.left")
+                                        .foregroundStyle(gold)
+                                        .frame(width: 29)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(tr("EXAMPLE", "EKSEMPEL"))
+                                            .font(.caption2.weight(.bold))
+                                            .tracking(1.3)
+                                            .foregroundStyle(gold)
+                                        Text(tr(
+                                            "In \(Int(draft.turnCueLeadMeters)) metres, the route bends left.",
+                                            "Om \(Int(draft.turnCueLeadMeters)) meter svinger ruten mot venstre."
+                                        ))
+                                        .font(.subheadline)
+                                        .foregroundStyle(ink)
+                                    }
+                                }
+                                .padding(13)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(ATHLTHPlanDesign.selectedSurface,
+                                            in: RoundedRectangle(cornerRadius: 15))
+                                Text(tr(
+                                    "Only clear turns with reliable GPS are announced. This is route-line guidance, not street-by-street directions.",
+                                    "Bare tydelige svinger med pålitelig GPS varsles. Dette er ruteveiledning, ikke veinavigasjon med gatenavn."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(dim)
+                            }
+                        }
+                        .padding(.top, 8)
+                    } label: {
+                        sectionLabel(
+                            tr("Route Coach", "Rute-coach"),
+                            subtitle: draft.announceUpcomingTurns
+                                ? tr("Upcoming bends", "Kommende svinger")
+                                : tr("Turn guidance off", "Svingvarsler av"),
+                            icon: "arrow.triangle.turn.up.right.diamond"
+                        )
+                    }
+                    .accessibilityIdentifier("athlth-route-coach-card")
+                }
+
+                ATHLTHPlanSurface(ghost: false) {
+                    DisclosureGroup(isExpanded: $deviationExpanded) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            fieldMenu(
+                                tr("Off-route distance", "Avstand fra ruten"),
+                                selection: $draft.deviationMeters,
+                                options: [25.0, 50.0, 80.0, 100.0, 150.0, 250.0],
+                                label: { "\(Int($0)) m" }
+                            )
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            fieldMenu(
+                                tr("Wait for stable deviation", "Vent på stabilt avvik"),
+                                selection: $draft.graceSeconds,
+                                options: [0, 5, 10, 20, 30],
+                                label: { $0 == 0 ? tr("Immediately", "Straks") : "\($0) s" }
+                            )
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            fieldMenu(
+                                tr("Repeat while off route", "Gjenta ved fortsatt avvik"),
+                                selection: $draft.repeatSeconds,
+                                options: [30, 60, 120, 300],
+                                label: { $0 >= 60 ? "\($0 / 60) min" : "\($0) s" }
+                            )
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            Toggle(tr("Tell me when I'm back on route",
+                                      "Gi beskjed når jeg er tilbake på ruten"),
+                                   isOn: $draft.announceBackOnRoute)
+                                .tint(gold)
+                                .font(.subheadline)
+                            Text(tr(
+                                "GPS uncertainty is discounted before warnings. The original route remains unchanged.",
+                                "GPS-usikkerhet trekkes fra før varsling. Den opprinnelige ruten endres ikke."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(dim)
+                        }
+                        .padding(.top, 8)
+                    } label: {
+                        sectionLabel(
+                            tr("Off-route alerts", "Ruteavvik"),
+                            subtitle: tr("Warn and find the route again", "Varsle og finn tilbake"),
+                            icon: "location.slash"
+                        )
+                    }
+                    .accessibilityIdentifier("athlth-route-deviation-card")
+                }
+
+                ATHLTHPlanSurface(ghost: false) {
+                    DisclosureGroup(isExpanded: $deliveryExpanded) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            HStack {
+                                Text(tr("Alert delivery", "Slik varsles du"))
+                                    .font(.subheadline)
+                                    .foregroundStyle(ink)
+                                Spacer()
+                                Picker(tr("Delivery", "Varseltype"),
+                                       selection: $draft.delivery) {
+                                    ForEach(WatchAlertDelivery.allCases) { kind in
+                                        Text(kind.title).tag(kind)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            }
+                            Text(tr(
+                                "Voice and/or watch vibrations apply to both route turns and off-route alerts. Critical route alerts take priority over routine motivational cues.",
+                                "Stemme og/eller klokkevibrasjon gjelder både svinger og ruteavvik. Viktige rutevarsler prioriteres foran vanlig motivasjon."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(dim)
+                        }
+                        .padding(.top, 8)
+                    } label: {
+                        sectionLabel(
+                            tr("Voice and haptics", "Stemme og vibrasjon"),
+                            subtitle: draft.delivery.title,
+                            icon: "speaker.wave.2"
+                        )
+                    }
+                    .accessibilityIdentifier("athlth-route-delivery-card")
+                }
+            }
+
+            Text(tr(
+                "Navigation needs an actual saved route and reliable GPS. Your settings do not turn a route into road-level turn-by-turn directions. The route remains available on screen even when voice is off.",
+                "Navigasjon krever en lagret rute og pålitelig GPS. Innstillingene gir ikke gatenavigasjon. Ruten vises fortsatt på skjermen selv om stemmen er av."
+            ))
+            .font(.caption)
+            .foregroundStyle(dim)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 4)
+        }
+    }
+
+    private func sectionLabel(_ title: String, subtitle: String, icon: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(gold)
+                .frame(width: 37, height: 37)
+                .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 19, weight: .medium, design: .serif))
+                    .foregroundStyle(ink)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(dim)
+            }
+        }
+        .frame(minHeight: 52)
+    }
+
+    private func fieldMenu<Value: Hashable>(
+        _ title: String, selection: Binding<Value>,
+        options: [Value], label: @escaping (Value) -> String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(ink)
+            Spacer(minLength: 0)
+            Picker(title, selection: selection) {
+                ForEach(options, id: \.self) { option in
+                    Text(label(option)).tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+        .frame(minHeight: 43)
+    }
 }
 
 struct PerWorkoutGhostView: View {

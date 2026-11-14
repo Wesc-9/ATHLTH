@@ -993,6 +993,24 @@ struct WatchRouteAlertConfiguration: Codable, Hashable {
     var repeatSeconds: TimeInterval
     var delivery: WatchAlertDelivery
     var announceBackOnRoute: Bool
+    // Optional fields preserve older persisted workouts and Watch transfers.
+    var announceUpcomingTurns: Bool? = nil
+    var turnCueLeadMeters: Double? = nil
+
+    var shouldAnnounceUpcomingTurns: Bool { announceUpcomingTurns ?? true }
+    var resolvedTurnCueLeadMeters: Double {
+        let value = turnCueLeadMeters ?? 85
+        return value.isFinite ? min(max(value, 40), 140) : 85
+    }
+
+    /// Shared turn-warning window for the Watch cue engine. No street-level
+    /// routing is inferred from the route polyline.
+    func shouldAnnounceTurn(distanceMeters: Double) -> Bool {
+        guard enabled, shouldAnnounceUpcomingTurns,
+              distanceMeters.isFinite else { return false }
+        let lead = resolvedTurnCueLeadMeters
+        return (max(20, lead - 60)...lead).contains(distanceMeters)
+    }
 
     static let standard = WatchRouteAlertConfiguration(
         enabled: true,

@@ -6838,7 +6838,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         guard isActive, state == .running,
               routeAlertConfiguration.enabled,
-              audioCoachConfiguration.enabled,
+              routeAlertConfiguration.shouldAnnounceUpcomingTurns,
               location.horizontalAccuracy >= 0,
               location.horizontalAccuracy <= 25,
               abs(location.timestamp.timeIntervalSinceNow) <= 10,
@@ -6850,7 +6850,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                    progressMeters: progressMeters
               ),
               let turnIndex = cue.pointIndex,
-              (25...85).contains(cue.distanceMeters),
+              routeAlertConfiguration.shouldAnnounceTurn(
+                  distanceMeters: cue.distanceMeters
+              ),
               turnIndex > (lastSpokenRouteTurnIndex ?? -1)
         else { return }
         lastSpokenRouteTurnIndex = turnIndex

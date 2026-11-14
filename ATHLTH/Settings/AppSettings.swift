@@ -514,6 +514,8 @@ final class AppSettingsStore: ObservableObject {
     @Published var routeAlertRepeatSeconds: Int { didSet { persist() } }
     @Published var routeAlertDelivery: WatchAlertDelivery { didSet { persist() } }
     @Published var routeAlertAnnounceBackOnRoute: Bool { didSet { persist() } }
+    @Published var routeAlertAnnounceUpcomingTurns: Bool { didSet { persist() } }
+    @Published var routeAlertTurnCueLeadMeters: Double { didSet { persist() } }
 
     @Published var audioCoachEnabledByDefault: Bool { didSet { persist() } }
     @Published var audioCoachLanguage: WatchAudioCoachLanguage {
@@ -895,6 +897,14 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.routeAlerts.announceBackOnRoute"
             ) as? Bool ?? true
+        routeAlertAnnounceUpcomingTurns =
+            defaults.object(
+                forKey: "settings.routeAlerts.announceUpcomingTurns"
+            ) as? Bool ?? true
+        routeAlertTurnCueLeadMeters =
+            defaults.object(
+                forKey: "settings.routeAlerts.turnCueLeadMeters"
+            ) as? Double ?? 85
 
         audioCoachEnabledByDefault =
             defaults.object(
@@ -1256,6 +1266,14 @@ final class AppSettingsStore: ObservableObject {
             routeAlertAnnounceBackOnRoute,
             forKey: "settings.routeAlerts.announceBackOnRoute"
         )
+        defaults.set(
+            routeAlertAnnounceUpcomingTurns,
+            forKey: "settings.routeAlerts.announceUpcomingTurns"
+        )
+        defaults.set(
+            routeAlertTurnCueLeadMeters,
+            forKey: "settings.routeAlerts.turnCueLeadMeters"
+        )
 
         defaults.set(
             audioCoachEnabledByDefault,
@@ -1567,8 +1585,9 @@ final class AppSettingsStore: ObservableObject {
                     )
                 ),
             delivery: routeAlertDelivery,
-            announceBackOnRoute:
-                routeAlertAnnounceBackOnRoute
+            announceBackOnRoute: routeAlertAnnounceBackOnRoute,
+            announceUpcomingTurns: routeAlertAnnounceUpcomingTurns,
+            turnCueLeadMeters: routeAlertTurnCueLeadMeters
         )
     }
 

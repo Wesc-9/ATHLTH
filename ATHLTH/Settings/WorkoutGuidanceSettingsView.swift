@@ -56,8 +56,8 @@ struct ATHLTHWorkoutGuidanceSettingsView: View {
                     guidanceLink(
                         title: tr("Navigation", "Navigasjon"),
                         description: tr(
-                            "Route deviation, warning thresholds and back-on-track cues",
-                            "Ruteavvik, varselgrenser og melding når du er tilbake"
+                            "Upcoming turns, route deviation and recovery alerts",
+                            "Kommende svinger, ruteavvik og veiledning tilbake"
                         ),
                         symbol: "location.north.line",
                         status: settings.routeAlertsEnabled
@@ -222,6 +222,9 @@ struct ATHLTHWorkoutGuidanceSettingsView: View {
     }
 }
 
+/// Shares the same premium route editor as the workout's own Navigation
+/// settings. Global changes update defaults; existing planned workouts remain
+/// independent snapshots and are never silently overwritten.
 struct ATHLTHRouteGuardianSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
 
@@ -229,198 +232,61 @@ struct ATHLTHRouteGuardianSettingsView: View {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
+    private var routeDraft: Binding<RouteGuardianDraft> {
+        Binding(
+            get: {
+                RouteGuardianDraft(
+                    enabled: settings.routeAlertsEnabled,
+                    deviationMeters: settings.routeAlertDeviationMeters,
+                    graceSeconds: settings.routeAlertGraceSeconds,
+                    repeatSeconds: settings.routeAlertRepeatSeconds,
+                    delivery: settings.routeAlertDelivery,
+                    announceBackOnRoute: settings.routeAlertAnnounceBackOnRoute,
+                    announceUpcomingTurns: settings.routeAlertAnnounceUpcomingTurns,
+                    turnCueLeadMeters: settings.routeAlertTurnCueLeadMeters
+                )
+            },
+            set: { next in
+                if settings.routeAlertsEnabled != next.enabled {
+                    settings.routeAlertsEnabled = next.enabled
+                }
+                if settings.routeAlertDeviationMeters != next.deviationMeters {
+                    settings.routeAlertDeviationMeters = next.deviationMeters
+                }
+                if settings.routeAlertGraceSeconds != next.graceSeconds {
+                    settings.routeAlertGraceSeconds = next.graceSeconds
+                }
+                if settings.routeAlertRepeatSeconds != next.repeatSeconds {
+                    settings.routeAlertRepeatSeconds = next.repeatSeconds
+                }
+                if settings.routeAlertDelivery != next.delivery {
+                    settings.routeAlertDelivery = next.delivery
+                }
+                if settings.routeAlertAnnounceBackOnRoute != next.announceBackOnRoute {
+                    settings.routeAlertAnnounceBackOnRoute = next.announceBackOnRoute
+                }
+                if settings.routeAlertAnnounceUpcomingTurns != next.announceUpcomingTurns {
+                    settings.routeAlertAnnounceUpcomingTurns = next.announceUpcomingTurns
+                }
+                if settings.routeAlertTurnCueLeadMeters != next.turnCueLeadMeters {
+                    settings.routeAlertTurnCueLeadMeters = next.turnCueLeadMeters
+                }
+            }
+        )
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 15) {
-                ATHLTHPlanSectionIntro(
-                    eyebrow: tr("ROUTE GUIDANCE", "RUTEVEILEDNING"),
-                    title: tr("Navigation", "Navigasjon"),
-                    subtitle: tr(
-                        "Quiet until your position is reliably off route. Get a clear warning and know when you're back.",
-                        "Rolig så lenge du følger ruten. Få et tydelig varsel ved avvik og beskjed når du er tilbake."
-                    ),
-                    icon: "location.north.line"
-                )
-
-                ATHLTHPlanSurface(ghost: false) {
-                    Toggle(isOn: $settings.routeAlertsEnabled) {
-                        Text(tr("Off-route navigation alerts", "Varsler ved ruteavvik"))
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                    }
-                    .tint(ATHLTHPlanDesign.accentInk)
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(tr("ALERT SENSITIVITY", "FØLSOMHET FOR RUTEAVVIK"))
-                        .font(.caption.weight(.semibold))
-                        .tracking(0.8)
-                        .foregroundStyle(.secondary)
-
-                    HStack(spacing: 9) {
-                        routePreset(
-                            tr("Precise", "Presis"), distance: 50, grace: 10
-                        )
-                        routePreset(
-                            tr("Balanced", "Balansert"), distance: 80, grace: 20
-                        )
-                        routePreset(
-                            tr("Relaxed", "Rolig"), distance: 150, grace: 30
-                        )
-                    }
-
-                    Text(tr(
-                        "GPS accuracy varies near buildings, woods and tunnels. A larger distance and grace period helps prevent false alarms.",
-                        "GPS-nøyaktighet varierer ved bygninger, skog og tunneler. Større avstand og litt ventetid reduserer unødvendige varsler."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                .padding(18)
-                .background(.white, in: RoundedRectangle(cornerRadius: 20))
-
-                if settings.routeAlertsEnabled {
-                    ATHLTHPlanSurface(ghost: false) {
-                        heading(tr("When to alert", "Når skal du varsles"),
-                                "point.topleft.down.to.point.bottomright.curvepath")
-                        Picker(tr("Deviation", "Avstand fra ruten"),
-                               selection: $settings.routeAlertDeviationMeters) {
-                            Text("25 m").tag(25.0)
-                            Text("50 m").tag(50.0)
-                            Text("80 m").tag(80.0)
-                            Text("100 m").tag(100.0)
-                            Text("150 m").tag(150.0)
-                            Text("250 m").tag(250.0)
-                        }
-                        .pickerStyle(.menu)
-                        Picker(tr("Wait for stable deviation", "Vent på stabilt avvik"),
-                               selection: $settings.routeAlertGraceSeconds) {
-                            Text(tr("Immediately", "Straks")).tag(0)
-                            Text("5 s").tag(5)
-                            Text("10 s").tag(10)
-                            Text("20 s").tag(20)
-                            Text("30 s").tag(30)
-                        }
-                        .pickerStyle(.menu)
-                        Picker(tr("Repeat if still off route", "Gjenta ved fortsatt avvik"),
-                               selection: $settings.routeAlertRepeatSeconds) {
-                            Text("30 s").tag(30)
-                            Text("1 min").tag(60)
-                            Text("2 min").tag(120)
-                            Text("5 min").tag(300)
-                        }
-                        .pickerStyle(.menu)
-                    }
-
-                    ATHLTHPlanSurface(ghost: false) {
-                        heading(tr("How to notify", "Slik blir du varslet"),
-                                "speaker.wave.2")
-                        Picker(tr("Alert method", "Varseltype"),
-                               selection: $settings.routeAlertDelivery) {
-                            ForEach(WatchAlertDelivery.allCases) { delivery in
-                                Text(delivery.title).tag(delivery)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        Toggle(tr("Tell me when back on route",
-                                  "Gi beskjed når jeg er tilbake på ruten"),
-                               isOn: $settings.routeAlertAnnounceBackOnRoute)
-                            .tint(ATHLTHPlanDesign.accentInk)
-                    }
-                }
-
-                Text(tr(
-                    "Navigation does not change the GPS route or compete with Ghost Race. Warnings have priority over motivational messages.",
-                    "Navigasjon endrer ikke GPS-ruten og konkurrerer ikke med Ghost Race. Varsler om ruteavvik prioriteres foran motivasjon."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
-            .frame(maxWidth: .infinity)
-            .padding(16)
+            ATHLTHRouteGuidanceStudioView(draft: routeDraft)
+                .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+                .frame(maxWidth: .infinity)
+                .padding(16)
         }
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .tint(ATHLTHPlanDesign.accentInk)
         .navigationTitle(tr("Navigation", "Navigasjon"))
         .navigationBarTitleDisplayMode(.inline)
     }
-
-    private func heading(_ title: String, _ icon: String) -> some View {
-        Label(title, systemImage: icon)
-            .font(.system(size: 19, weight: .semibold, design: .serif))
-            .foregroundStyle(ATHLTHPlanDesign.ink)
-    }
-
-    private func routePreset(
-        _ title: String, distance: Double, grace: Int
-    ) -> some View {
-        let selected = settings.routeAlertsEnabled &&
-            settings.routeAlertDeviationMeters == distance &&
-            settings.routeAlertGraceSeconds == grace
-        return Button {
-            settings.routeAlertDeviationMeters = distance
-            settings.routeAlertGraceSeconds = grace
-            settings.routeAlertsEnabled = true
-        } label: {
-            VStack(spacing: 6) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text("\(Int(distance)) m · \(grace) s")
-                    .font(.caption)
-            }
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .foregroundStyle(selected ? Color.white : Color.primary)
-            .background(
-                selected
-                    ? Color(red: 0.20, green: 0.21, blue: 0.24)
-                    : Color(red: 0.95, green: 0.95, blue: 0.94),
-                in: RoundedRectangle(cornerRadius: 14)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
-private enum GhostRaceUpdatePreset:
-    String,
-    CaseIterable,
-    Identifiable
-{
-    case quiet
-    case normal
-    case competition
-    case custom
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .quiet:
-            return ATHLTHLocalization.choose(
-                english: "Quiet",
-                norwegian: "Rolig"
-            )
-        case .normal:
-            return ATHLTHLocalization.choose(
-                english: "Normal",
-                norwegian: "Normal"
-            )
-        case .competition:
-            return ATHLTHLocalization.choose(
-                english: "Competition",
-                norwegian: "Konkurranse"
-            )
-        case .custom:
-            return ATHLTHLocalization.choose(
-                english: "Custom",
-                norwegian: "Egendefinert"
-            )
-        }
-    }
-
-
 }
 
 struct ATHLTHGhostUpdatesSettingsView: View {
