@@ -1646,7 +1646,8 @@ struct TrainingPlanLibraryView: View {
     @State private var weeklySortAscending: Bool?
     @State private var showFavoritesOnly = false
     @State private var searchExpanded = false
-    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
+    @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
     @FocusState private var searchFocused: Bool
 
@@ -1789,31 +1790,53 @@ struct TrainingPlanLibraryView: View {
     var body: some View {
         ScrollViewReader { scroll in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    HStack(alignment: .top, spacing: 12) {
-                        libraryHeading
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
+                        Text(tr("\(filteredEntries.count) plans", "\(filteredEntries.count) planer"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+
+                        Spacer(minLength: 4)
+
                         Button { searchExpanded.toggle() } label: {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 18, weight: .medium))
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(ink)
-                                .frame(width: 44, height: 44)
-                                .background(.white, in: Circle())
+                                .frame(width: 38, height: 38)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(tr("Search plans", "Søk i planer"))
+
+                        ATHLTHLibraryDisplayPicker(
+                            selection: $displayMode,
+                            columns: $preferredColumns
+                        )
                     }
                     if searchExpanded || !query.isEmpty { inlineSearch }
                     categoryStrip
 
-                    resultsHeader
-                        .id("all-training-plans")
-                    HStack {
-                        Text(tr("View", "Visning"))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(muted)
-                        Spacer()
-                        ATHLTHLibraryDisplayPicker(selection: $displayMode)
+                    HStack(spacing: 8) {
+                        if !favoritePlansOnly {
+                            Button { showFavoritesOnly.toggle() } label: {
+                                Label(tr("Favorites", "Favoritter"),
+                                      systemImage: showFavoritesOnly ? "star.fill" : "star")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(showFavoritesOnly ? bronze : ink)
+                                    .padding(.horizontal, 12)
+                                    .frame(minHeight: 38)
+                                    .background(
+                                        .white.opacity(0.88),
+                                        in: Capsule()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(showFavoritesOnly ? [.isSelected] : [])
+                            .accessibilityIdentifier("training-plans-favorites-filter")
+                        }
+                        catalogFiltersMenu
+                        Spacer(minLength: 0)
                     }
+                    .id("all-training-plans")
 
                     if filteredEntries.isEmpty {
                         ContentUnavailableView(
@@ -1836,7 +1859,8 @@ struct TrainingPlanLibraryView: View {
                                 mode: displayMode,
                                 width: libraryViewWidth,
                                 reservedHorizontalSpace: 36,
-                                accessibilityText: dynamicTypeSize.isAccessibilitySize
+                                accessibilityText: dynamicTypeSize.isAccessibilitySize,
+                                preferredColumns: preferredColumns
                             ),
                             spacing: 10
                         ) {
@@ -2663,7 +2687,8 @@ struct TrainingPlanCatalogDetailView: View {
                 .buttonStyle(.plain)
             }
             .padding(20)
-            .frame(maxWidth: 720)
+            // iPad / Stage Manager: use the whole available detail column.
+            // Responsive cards inside the plan still control readability.
             .frame(maxWidth: .infinity)
         }
         .background(
