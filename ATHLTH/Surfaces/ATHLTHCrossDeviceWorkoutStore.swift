@@ -497,7 +497,21 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 mirroredSessionID = UUID()
             }
             guard let sessionID = mirroredSessionID else { return nil }
-            return ATHLTHCrossDeviceWorkoutSnapshot(
+            // Split the large snapshot into typed assignments: a single
+            // 45-field memberwise initializer exhausted Swift's type checker.
+            let verifiedPosition: (latitude: Double, longitude: Double, at: Date)? = {
+                guard let latitude = watch.currentLatitude,
+                      let longitude = watch.currentLongitude,
+                      let sampled = watch.currentLocationSampledAt,
+                      Self.isFreshPosition(
+                          latitude: latitude, longitude: longitude, sampledAt: sampled
+                      ) else { return nil }
+                return (latitude, longitude, sampled)
+            }()
+            let freshHeartRate = ATHLTHCoachSensorFreshness.validHeartRate(
+                watch.heartRate, sampledAt: watch.coachHeartRateSampleAt
+            ) ? watch.heartRate : nil
+            var snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
                 sessionID: sessionID,
                 kind: watch.kind.rawValue,
                 title: watch.workoutDisplayTitle ?? watch.kind.title,
@@ -509,92 +523,63 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 currentStep: watch.runningStepTitle ?? watch.strengthExerciseName,
                 nextStep: watch.runningNextStepTitle ?? watch.strengthNextExerciseName,
                 completedSets: nil,
-                totalSets: nil,
-                paused: watch.state == .paused,
-                runningIntervalOrdinal: watch.runningIntervalOrdinal,
-                runningIntervalTotal: watch.runningIntervalTotal,
-                runningInRecovery: watch.runningInRecovery,
-                runningStepRemainingSeconds: watch.runningStepRemainingSeconds,
-                capturedAt: watch.capturedAt,
-                sourceDevice: "watch",
-                heartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
-                    watch.heartRate, sampledAt: watch.coachHeartRateSampleAt
-                ) ? watch.heartRate : nil,
-                activeCalories: watch.activeCalories > 0
-                    ? Double(watch.activeCalories) : nil,
-                currentPaceSecondsPerKilometer:
-                    watch.currentPaceSecondsPerKilometer,
-                targetPaceSecondsPerKilometer:
-                    watch.runningStepTargetPaceSecondsPerKilometer,
-                targetHeartRateZone:
-                    watch.runningStepTargetHeartRateZone ??
-                    watch.heartRateTargetZone,
-                maximumHeartRateBPM: watch.coachResolvedMaximumHeartRateBPM,
-                targetHeartRateMinimumBPM: watch.heartRateTargetMinimumBPM,
-                targetHeartRateMaximumBPM: watch.heartRateTargetMaximumBPM,
-                runningStepProgress: watch.runningStepProgress,
-                runningOverallProgress: watch.runningOverallProgress,
-                routeTitle: watch.routeTitle,
-                ghostRaceTitle: watch.ghostRaceTitle,
-                ghostDistanceDeltaMeters: watch.ghostDistanceDeltaMeters,
-                ghostTimeDeltaSeconds: watch.ghostTimeDeltaSeconds,
-                runningSteps: watch.runningStageSummaries?.map {
-                    ATHLTHLiveWorkoutStage(
-                        index: $0.index,
-                        title: $0.title,
-                        phase: $0.phase ?? "unspecified",
-                        durationSeconds: $0.durationSeconds,
-                        distanceMeters: $0.distanceMeters
-                    )
-                },
-                runningStepIndex: watch.runningStepIndex,
-                runningStepCount: watch.runningStepCount,
-                runningStepRemainingMeters: watch.runningStepRemainingMeters,
-                routeProgressPercent: watch.routeProgressPercent,
-                routeRemainingMeters: watch.routeRemainingMeters,
-                routeDistanceMeters: watch.routeDistanceMeters,
-                strengthSetNumber: watch.strengthSetIndex,
-                strengthSetTotal: watch.strengthSetCount,
-                strengthReps: watch.strengthReps,
-                strengthWeightKilograms: watch.strengthWeightKilograms,
-                strengthRestEndsAt: watch.strengthRestEndsAt,
-                audioCoachEnabled: watch.watchAudioCoachEnabled,
-                // Only Spotify's verified account playback is relayed.
-                // Online Watch Spotify Connect playback may be available;
-                // independent offline music remains deliberately unknown.
-                spotifyPlaying: spotify.isPlaying,
-                spotifyTrackTitle: spotify.isPlaying
-                    ? spotify.watchTrackTitle : nil,
-                spotifyArtistName: spotify.isPlaying
-                    ? spotify.watchArtistName : nil,
-                liveLatitude: {
-                    guard let lat = watch.currentLatitude,
-                          let lon = watch.currentLongitude,
-                          let sampled = watch.currentLocationSampledAt,
-                          Self.isFreshPosition(
-                              latitude: lat, longitude: lon, sampledAt: sampled
-                          ) else { return nil }
-                    return lat
-                }(),
-                liveLongitude: {
-                    guard let lat = watch.currentLatitude,
-                          let lon = watch.currentLongitude,
-                          let sampled = watch.currentLocationSampledAt,
-                          Self.isFreshPosition(
-                              latitude: lat, longitude: lon, sampledAt: sampled
-                          ) else { return nil }
-                    return lon
-                }(),
-                livePositionAt: {
-                    guard let lat = watch.currentLatitude,
-                          let lon = watch.currentLongitude,
-                          let sampled = watch.currentLocationSampledAt,
-                          Self.isFreshPosition(
-                              latitude: lat, longitude: lon, sampledAt: sampled
-                          ) else { return nil }
-                    return sampled
-                }()
+                totalSets: nil
             )
+            snapshot.paused = watch.state == .paused
+            snapshot.runningIntervalOrdinal = watch.runningIntervalOrdinal
+            snapshot.runningIntervalTotal = watch.runningIntervalTotal
+            snapshot.runningInRecovery = watch.runningInRecovery
+            snapshot.runningStepRemainingSeconds = watch.runningStepRemainingSeconds
+            snapshot.capturedAt = watch.capturedAt
+            snapshot.sourceDevice = "watch"
+            snapshot.heartRateBPM = freshHeartRate
+            snapshot.activeCalories = watch.activeCalories > 0
+                ? Double(watch.activeCalories) : nil
+            snapshot.currentPaceSecondsPerKilometer = watch.currentPaceSecondsPerKilometer
+            snapshot.targetPaceSecondsPerKilometer =
+                watch.runningStepTargetPaceSecondsPerKilometer
+            snapshot.targetHeartRateZone =
+                watch.runningStepTargetHeartRateZone ?? watch.heartRateTargetZone
+            snapshot.maximumHeartRateBPM = watch.coachResolvedMaximumHeartRateBPM
+            snapshot.targetHeartRateMinimumBPM = watch.heartRateTargetMinimumBPM
+            snapshot.targetHeartRateMaximumBPM = watch.heartRateTargetMaximumBPM
+            snapshot.runningStepProgress = watch.runningStepProgress
+            snapshot.runningOverallProgress = watch.runningOverallProgress
+            snapshot.routeTitle = watch.routeTitle
+            snapshot.ghostRaceTitle = watch.ghostRaceTitle
+            snapshot.ghostDistanceDeltaMeters = watch.ghostDistanceDeltaMeters
+            snapshot.ghostTimeDeltaSeconds = watch.ghostTimeDeltaSeconds
+            snapshot.runningSteps = watch.runningStageSummaries?.map {
+                ATHLTHLiveWorkoutStage(
+                    index: $0.index,
+                    title: $0.title,
+                    phase: $0.phase ?? "unspecified",
+                    durationSeconds: $0.durationSeconds,
+                    distanceMeters: $0.distanceMeters
+                )
+            }
+            snapshot.runningStepIndex = watch.runningStepIndex
+            snapshot.runningStepCount = watch.runningStepCount
+            snapshot.runningStepRemainingMeters = watch.runningStepRemainingMeters
+            snapshot.routeProgressPercent = watch.routeProgressPercent
+            snapshot.routeRemainingMeters = watch.routeRemainingMeters
+            snapshot.routeDistanceMeters = watch.routeDistanceMeters
+            snapshot.strengthSetNumber = watch.strengthSetIndex
+            snapshot.strengthSetTotal = watch.strengthSetCount
+            snapshot.strengthReps = watch.strengthReps
+            snapshot.strengthWeightKilograms = watch.strengthWeightKilograms
+            snapshot.strengthRestEndsAt = watch.strengthRestEndsAt
+            snapshot.audioCoachEnabled = watch.watchAudioCoachEnabled
+            // Spotify is only shown when account playback is confirmed.
+            snapshot.spotifyPlaying = spotify.isPlaying
+            snapshot.spotifyTrackTitle = spotify.isPlaying
+                ? spotify.watchTrackTitle : nil
+            snapshot.spotifyArtistName = spotify.isPlaying
+                ? spotify.watchArtistName : nil
+            snapshot.liveLatitude = verifiedPosition?.latitude
+            snapshot.liveLongitude = verifiedPosition?.longitude
+            snapshot.livePositionAt = verifiedPosition?.at
+            return snapshot
         }
         return nil
     }
