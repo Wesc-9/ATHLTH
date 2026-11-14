@@ -155,7 +155,8 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
     @MainActor
     func testEveryCuratedStrengthWorkoutHasSafeReferencesWhenAvailable() {
         let entries = ATHLTHCuratedStrengthWorkouts.entries
-        XCTAssertEqual(entries.count, 15)
+        // The curated library now includes eight additional complete sessions.
+        XCTAssertEqual(entries.count, 23)
         XCTAssertTrue(entries.flatMap(\.blocks).contains {
             $0.title == "Lat Pulldown" &&
             $0.exerciseSlug == "athlth-native-lat-pulldown"
