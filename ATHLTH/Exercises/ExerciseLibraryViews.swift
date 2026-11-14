@@ -789,15 +789,24 @@ struct ExerciseLibraryView: View {
         .onAppear {
             refreshExerciseHistory()
             displayMode = .load(userID: session.profile.userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(
+                userID: session.profile.userID
+            )
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
             libraryViewWidth = width
         }
         .onChange(of: session.profile.userID) { _, userID in
             displayMode = .load(userID: userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: userID)
         }
         .onChange(of: displayMode) { _, mode in
             mode.save(userID: session.profile.userID)
+        }
+        .onChange(of: preferredColumns) { _, count in
+            ATHLTHLibraryColumnPreference.save(
+                count, userID: session.profile.userID
+            )
         }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             refreshExerciseHistory()
