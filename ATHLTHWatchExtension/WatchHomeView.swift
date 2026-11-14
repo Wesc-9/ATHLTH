@@ -442,6 +442,7 @@ struct WatchHomeView: View {
     private func startPreparedWorkout(
         _ workout: WatchPreparedWorkoutTransfer
     ) {
+        workoutManager.configureCalendarSessionID(workout.id)
         Task {
             await routeStore.launchPreparedWorkout(
                 workout,
@@ -621,6 +622,7 @@ struct WatchHomeView: View {
         guard !workoutManager.isActive,
               workoutManager.state != .preparing,
               workoutManager.state != .ending else { return }
+        workoutManager.configureCalendarSessionID(workout.workoutID)
         let route =
             workout.routeID.flatMap {
                 routeStore.route(
