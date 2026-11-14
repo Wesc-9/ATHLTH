@@ -1049,6 +1049,8 @@ struct ATHLTHHomeView: View {
     @State private var homeStreakDays: [Date]?
     @State private var lastHomeInitialLoadAt: Date?
     @State private var homeInitialLoadAccountID: UUID?
+    @State private var lastHomeSocialLoadAt: Date?
+    @State private var homeSocialLoadAccountID: UUID?
     @State private var showingHomeTodayCalendarAll = false
     @State private var showingHomeSocialInbox = false
     @State private var showingHomeCalendarWorkoutPicker = false
@@ -1677,6 +1679,41 @@ struct ATHLTHHomeView: View {
                 guard !Task.isCancelled, isActive else { return }
                 homeRecoveryTrendSnapshot = trend
             }
+            // Social feeds and group calendars are secondary to the Health
+            // cards. Give the native tab transition the first render frames.
+            // Fast Home -> Train taps cancel this work before it begins.
+            .task(id: "\(isActive)-\(session.profile.userID.uuidString)-social") {
+                guard isActive, !session.previewModeEnabled else { return }
+                let userID = session.profile.userID
+                if homeSocialLoadAccountID == userID,
+                   let lastHomeSocialLoadAt,
+                   Date().timeIntervalSince(lastHomeSocialLoadAt) < 90 {
+                    return
+                }
+                do {
+                    try await Task.sleep(for: .milliseconds(750))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled, isActive,
+                      session.profile.userID == userID else { return }
+                let signpost = ATHLTHPerformance.begin("HomeSecondaryData")
+                defer { ATHLTHPerformance.end("HomeSecondaryData", id: signpost) }
+                async let communityRefresh: Void = community.refresh()
+                async let groupRefresh: Void = refreshHomeGroupCalendar()
+                async let activityRefresh: Void = social.refreshHomeFeed()
+                async let friendsRefresh: Void = social.refreshHomeFriends()
+                async let socialStatusRefresh: Void =
+                    social.refreshHomeSocialStatus(challengeStore: challenges)
+                _ = await (
+                    communityRefresh, groupRefresh, activityRefresh,
+                    friendsRefresh, socialStatusRefresh
+                )
+                guard !Task.isCancelled, isActive,
+                      session.profile.userID == userID else { return }
+                homeSocialLoadAccountID = userID
+                lastHomeSocialLoadAt = Date()
+            }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)-arena") {
                 guard isActive, !session.previewModeEnabled else { return }
                 _ = await tournamentCalendar.refresh(for: session.profile.userID)
@@ -1709,23 +1746,10 @@ struct ATHLTHHomeView: View {
                         "HomeInitialData", id: homeLoadSignpost
                     )
                 }
-                async let communityRefresh: Void = community.refresh()
-                async let groupRefresh: Void =
-                    refreshHomeGroupCalendar()
-                async let activityRefresh: Void = social.refreshHomeFeed()
-                async let friendsRefresh: Void = social.refreshHomeFriends()
-                async let socialStatusRefresh: Void =
-                    social.refreshHomeSocialStatus(challengeStore: challenges)
-
+                // Independent secondary network work now owns its own
+                // cancellable task above, never this Health-critical path.
                 guard !health.shouldDeferAutomaticHealthWork else {
                     await loadHomeStreak()
-                    _ = await (
-                        communityRefresh,
-                        groupRefresh,
-                        activityRefresh,
-                        friendsRefresh,
-                        socialStatusRefresh
-                    )
                     return
                 }
 
@@ -1745,16 +1769,8 @@ struct ATHLTHHomeView: View {
                         strength: strengthWorkout
                     )
 
-                _ = await (
-                    streakRefresh,
-                    goalsRefresh,
-                    communityRefresh,
-                    groupRefresh,
-                    activityRefresh,
-                    friendsRefresh,
-                    socialStatusRefresh
-                )
-                guard !Task.isCancelled else { return }
+                _ = await (streakRefresh, goalsRefresh)
+                guard !Task.isCancelled, isActive else { return }
                 homeInitialLoadAccountID = session.profile.userID
                 lastHomeInitialLoadAt = Date()
             }
