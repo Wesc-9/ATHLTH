@@ -59,7 +59,7 @@ final class ATHLTHGymCoachStrengthLibraryTests: XCTestCase {
     }
 
     @MainActor
-    func testABThreeDayPlansAlternateAcrossWeeks() throws
+    func testABThreeDayPlansAlternateAcrossWeeks() throws {
         for slug in ["starting-strength-3day", "stronglifts-5x5-3day"] {
             let plan = try XCTUnwrap(ATHLTHGymCoachStrengthLibrary.programs.first {
                 $0.slug == slug
