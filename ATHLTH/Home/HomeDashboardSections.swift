@@ -4442,6 +4442,7 @@ private struct HomeWeeklyProgressDaySheet: View {
         guard onStartStandaloneWorkout != nil,
               !workout.isExplicitRestDay,
               workout.trainTogetherMode == nil,
+              session.recordedTimes(for: workout.id)?.endedAt == nil,
               !selection.completedPlannedIDs.contains(workout.id)
         else { return false }
         if let planID = HomeWeeklyProgressCalendar.containingPlanID(
@@ -4533,10 +4534,10 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     private func plannedRowContent(_ workout: PlannedSession) -> some View {
-        let completed = !workout.isExplicitRestDay &&
-            selection.completedPlannedIDs.contains(workout.id)
-
         let recordedTimes = session.recordedTimes(for: workout.id)
+        let completed = !workout.isExplicitRestDay &&
+            (selection.completedPlannedIDs.contains(workout.id) ||
+             recordedTimes?.endedAt != nil)
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text((recordedTimes?.startedAt ?? workout.scheduledStart)?
