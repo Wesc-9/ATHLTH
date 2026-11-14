@@ -1935,7 +1935,8 @@ struct WorkoutTemplateLibraryView: View {
                                         title: workout.title,
                                         subtitle: workout.kind.title,
                                         symbol: workout.kind.systemImage,
-                                        workout: workout
+                                        blockCount: workout.resolvedWorkoutBlocks.count,
+                                        estimatedMinutes: workout.durationMinutes
                                     )
                                 } else {
                                 VStack(alignment: .leading, spacing: 10) {
@@ -2002,7 +2003,8 @@ struct WorkoutTemplateLibraryView: View {
                                         title: workout.title,
                                         subtitle: workout.kind.title,
                                         symbol: workout.kind.systemImage,
-                                        workout: workout
+                                        blockCount: workout.resolvedWorkoutBlocks.count,
+                                        estimatedMinutes: workout.durationMinutes
                                     )
                                 } else {
                                 HStack(spacing: 10) {
@@ -2653,7 +2655,7 @@ struct WorkoutTemplateLibraryView: View {
                 title: entry.title,
                 subtitle: entry.categoryTitle,
                 symbol: entry.systemImage,
-                workout: entry.plannedSession(),
+                blockCount: entry.blocks.count,
                 estimatedMinutes: entry.estimatedDurationMinutes
             )
         } else {
@@ -2668,7 +2670,7 @@ struct WorkoutTemplateLibraryView: View {
                 title: workout.title,
                 subtitle: workout.type.title,
                 symbol: workout.type.systemImage,
-                workout: workout.plannedSession(),
+                blockCount: workout.recipePreviewBlocks.count,
                 estimatedMinutes: workout.estimatedDurationSeconds.map {
                     Int(($0 / 60).rounded(.up))
                 }
@@ -2682,7 +2684,7 @@ struct WorkoutTemplateLibraryView: View {
     /// Detailed exercises and targets belong to the preview, not the grid.
     private func workoutGridCard(
         title: String, subtitle: String, symbol: String,
-        workout: PlannedSession, estimatedMinutes: Int? = nil
+        blockCount: Int, estimatedMinutes: Int? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: symbol)
@@ -2711,11 +2713,9 @@ struct WorkoutTemplateLibraryView: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 9) {
-                if let minutes = estimatedMinutes ?? workout.durationMinutes,
-                   minutes > 0 {
+                if let minutes = estimatedMinutes, minutes > 0 {
                     Label("~\(minutes) min", systemImage: "clock")
                 }
-                let blockCount = workout.resolvedWorkoutBlocks.count
                 if blockCount > 0 {
                     Label(
                         ATHLTHLocalization.choose(
