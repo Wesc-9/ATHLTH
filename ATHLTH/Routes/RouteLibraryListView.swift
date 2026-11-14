@@ -152,6 +152,7 @@ struct RouteLibraryListView: View {
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
     @State private var routeCardsScrolling = false
+    @State private var snapshotScrollID = UUID()
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var viewMode: ATHLTHRouteBrowseMode {
@@ -392,6 +393,9 @@ struct RouteLibraryListView: View {
         }
         .onScrollPhaseChange { _, phase in
             routeCardsScrolling = phase.isScrolling
+            RouteMapSnapshotCache.setScrolling(
+                phase.isScrolling, owner: snapshotScrollID
+            )
         }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top < -28
@@ -436,7 +440,10 @@ struct RouteLibraryListView: View {
                 Task { await loadMapRouteGeometry() }
             }
         }
-        .onDisappear { locationStore.stop() }
+        .onDisappear {
+            locationStore.stop()
+            RouteMapSnapshotCache.setScrolling(false, owner: snapshotScrollID)
+        }
         .sheet(isPresented: $showingCustomLength) { publicCustomLengthSheet }
         .fullScreenCover(item: $showingMapRoute) { route in
             SavedRouteFullscreenMap(route: route)
