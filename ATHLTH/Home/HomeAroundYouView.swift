@@ -1110,16 +1110,7 @@ struct AroundYouExploreView: View {
 
                             MapPolyline(
                                 coordinates: isSelected
-                                    // Restore precise geometry for the single
-                                    // highlighted route, not every map overlay.
-                                    ? route.coordinates
-                                        .enumerated()
-                                        .compactMap { index, point in
-                                            let step = max(1, (route.coordinates.count + 599) / 600)
-                                            return (index % step == 0 ||
-                                                index == route.coordinates.count - 1)
-                                                ? point.coordinate : nil
-                                        }
+                                    ? selectedDisplayCoordinates
                                     : route.renderCoordinates
                             )
                             .stroke(
@@ -1150,8 +1141,10 @@ struct AroundYouExploreView: View {
                             // Keep start, finish and direction visible only
                             // for the focused route to avoid map clutter.
                             if isSelected,
-                               let start = route.coordinates.first?.coordinate,
-                               let finish = route.coordinates.last?.coordinate,
+                               let start = (reverseSelectedRoute
+                                   ? route.coordinates.last : route.coordinates.first)?.coordinate,
+                               let finish = (reverseSelectedRoute
+                                   ? route.coordinates.first : route.coordinates.last)?.coordinate,
                                CLLocationCoordinate2DIsValid(start),
                                CLLocationCoordinate2DIsValid(finish) {
                                 let loop = CLLocation(latitude: start.latitude,
@@ -1199,12 +1192,14 @@ struct AroundYouExploreView: View {
                                 }
 
                                 if route.coordinates.count >= 3 {
-                                    let midIndex = max(1, route.coordinates.count / 3)
-                                    let previous = route.coordinates[midIndex - 1]
-                                    let next = route.coordinates[
-                                        min(route.coordinates.count - 1, midIndex + 1)
+                                    let directedPoints = reverseSelectedRoute
+                                        ? Array(route.coordinates.reversed()) : route.coordinates
+                                    let midIndex = max(1, directedPoints.count / 3)
+                                    let previous = directedPoints[midIndex - 1]
+                                    let next = directedPoints[
+                                        min(directedPoints.count - 1, midIndex + 1)
                                     ]
-                                    let mid = route.coordinates[midIndex]
+                                    let mid = directedPoints[midIndex]
                                     let bearing = atan2(
                                         (next.longitude - previous.longitude) *
                                             cos(mid.latitude * .pi / 180),
@@ -2173,6 +2168,21 @@ struct AroundYouExploreView: View {
         .shadow(color: .black.opacity(0.12), radius: 14, y: 7)
     }
 
+    private var selectedDisplayCoordinates: [CLLocationCoordinate2D] {
+        guard let selectedRoute else { return [] }
+        let source = selectedRoute.coordinates.map(\.coordinate)
+        return ATHLTHExploreRoutePolicy.displayPoints(
+            reverseSelectedRoute ? Array(source.reversed()) : source,
+            maximum: 600
+        )
+    }
+
+    private func routeForWorkout(_ route: TrainingRoute) -> TrainingRoute {
+        reverseSelectedRoute
+            ? ATHLTHExploreRoutePolicy.reversedForWorkout(route)
+            : route
+    }
+
     private func selectRoute(
         _ route: TrainingRoute
     ) {
@@ -2184,6 +2194,7 @@ struct AroundYouExploreView: View {
                 dampingFraction: 0.86
             )
         ) {
+            reverseSelectedRoute = false
             selectedRoute = route
         }
     }
@@ -2253,6 +2264,9 @@ struct AroundYouExploreView: View {
         )
         let saved = isRouteSaved(route)
         let creator = creatorProfile(for: route)
+        let loop = ATHLTHExploreRoutePolicy.isLoop(
+            route.coordinates.map(\.coordinate)
+        )
 
         return VStack(
             alignment: .leading,
@@ -2399,7 +2413,7 @@ struct AroundYouExploreView: View {
                 }
 
                 if let distance =
-                    distanceToRouteStart(route) {
+                    distanceToRouteStart(routeForWorkout(route)) {
                     previewMetric(
                         value: distance,
                         icon: "location.fill"
@@ -2415,6 +2429,48 @@ struct AroundYouExploreView: View {
                     )
                 }
             }
+
+            HStack(spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: loop ? "Loop route" : "Point-to-point route",
+                        norwegian: loop ? "Rundløype" : "Fra A til B"
+                    ),
+                    systemImage: loop
+                        ? "arrow.triangle.2.circlepath" : "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                if let seconds = route.expectedTravelTimeSeconds,
+                   seconds > 0 {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "About \(Int((seconds / 60).rounded())) min",
+                            norwegian: "Ca. \(Int((seconds / 60).rounded())) min"
+                        ),
+                        systemImage: "clock"
+                    )
+                }
+                Spacer(minLength: 0)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        reverseSelectedRoute.toggle()
+                    }
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: reverseSelectedRoute
+                                ? "Original direction" : "Reverse",
+                            norwegian: reverseSelectedRoute
+                                ? "Normal retning" : "Snu retning"
+                        ),
+                        systemImage: "arrow.left.arrow.right"
+                    )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .accessibilityHint("Endrer start, mål og rutens retning")
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.mutedText)
 
             if isPublicTrailRoute(route) {
                 Text(
@@ -2614,7 +2670,7 @@ struct AroundYouExploreView: View {
             HStack(spacing: 8) {
                 if isPublicTrailRoute(route) {
                     Button {
-                        routeToStart = route
+                        routeToStart = routeForWorkout(route)
                     } label: {
                         routePreviewActionLabel(
                             title:
@@ -2632,7 +2688,7 @@ struct AroundYouExploreView: View {
                     Button {
                         Task {
                             await startRouteOnWatch(
-                                route
+                                routeForWorkout(route)
                             )
                         }
                     } label: {
