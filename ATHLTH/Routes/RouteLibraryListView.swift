@@ -80,6 +80,13 @@ struct RouteLibraryEntry: Decodable, Identifiable {
     let centerLatitude: Double?
     let centerLongitude: Double?
     let createdAt: Date
+    // Only small catalogue fields are decoded. GPS is loaded on detail.
+    let sourceType: String?
+    let visibility: String?
+    let sourceLabel: String?
+
+    var isPublicTrail: Bool { sourceType == "public_trail" }
+    var isFriendsOnly: Bool { visibility == "friends" }
 
     enum CodingKeys: String, CodingKey {
         case id, title
@@ -91,6 +98,8 @@ struct RouteLibraryEntry: Decodable, Identifiable {
         case centerLatitude = "center_latitude"
         case centerLongitude = "center_longitude"
         case createdAt = "created_at"
+        case sourceType = "source_type"
+        case visibility, sourceLabel = "source_label"
     }
 
     init(route: TrainingRoute) {
@@ -104,6 +113,9 @@ struct RouteLibraryEntry: Decodable, Identifiable {
         centerLatitude = route.discoveryCenterCoordinate?.latitude
         centerLongitude = route.discoveryCenterCoordinate?.longitude
         createdAt = route.createdAt
+        sourceType = "community"
+        visibility = nil
+        sourceLabel = route.routeSource
     }
 
     func distance(from location: CLLocation?) -> Double? {
@@ -164,12 +176,15 @@ struct RouteLibraryListView: View {
     }
 
     private var catalogKey: String {
-        [query, sort.rawValue, String(lengthFilter),
+        [session.profile.userID.uuidString,
+         query, sort.rawValue, String(lengthFilter),
          lengthFilter == 6 ? String(minLength) : "",
          lengthFilter == 6 ? String(maxLength) : "",
          String(publicFilter == .friends),
-         String(locationStore.location?.coordinate.latitude ?? 0),
-         String(locationStore.location?.coordinate.longitude ?? 0)].joined(separator: "|")
+         // Prevent GPS jitter from re-querying the catalogue every second.
+         String(Int(((locationStore.location?.coordinate.latitude ?? 0) * 50).rounded())),
+         String(Int(((locationStore.location?.coordinate.longitude ?? 0) * 50).rounded()))
+        ].joined(separator: "|")
     }
 
     private var entries: [RouteLibraryEntry] {
@@ -260,7 +275,10 @@ struct RouteLibraryListView: View {
     }
 
     private var routeCollectionPicker: some View {
-        ATHLTHLibrarySourcePicker(selection: $selectedCollection)
+        ATHLTHLibrarySourcePicker(
+            selection: $selectedCollection,
+            athlthTitle: tr("Public", "Offentlig")
+        )
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 3)
@@ -323,10 +341,10 @@ struct RouteLibraryListView: View {
                         systemImage: "map",
                         description: Text(tr(
                             publicFilter == .friends
-                                ? "Only public routes shared by mutual friends appear here."
+                                ? "Only routes shared by mutually following friends appear here."
                                 : "Try a different search or adjust your filters.",
                             publicFilter == .friends
-                                ? "Her vises bare offentlige ruter fra venner som følger hverandre."
+                                ? "Her vises ruter fra brukere som følger hverandre gjensidig."
                                 : "Prøv et annet søk eller juster filtrene."))
                     )
                     .padding(.vertical, 20)
@@ -1711,8 +1729,11 @@ struct RouteLibraryListView: View {
                 p_min_length: minLength,
                 p_max_length: maxLength
             )
+            // One RLS-protected 50-item metadata page: public community,
+            // indexed trail data, and mutual friends' routes. No polylines
+            // or elevation arrays are returned.
             let page: [RouteLibraryEntry] = try await SupabaseEnvironment.client
-                .rpc("search_public_route_catalog", params: params).execute().value
+                .rpc("search_shared_route_library", params: params).execute().value
             try Task.checkCancellation()
             guard catalogRequestID == requestID else { return }
             catalog += page
