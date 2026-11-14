@@ -672,6 +672,301 @@ struct RouteDetailView: View {
         }
     }
 
+    private var startDirectionsCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Start and finish", norwegian: "Start og mål"
+                    ),
+                    systemImage: "mappin.and.ellipse"
+                )
+                .font(.headline)
+
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "START", norwegian: "START"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        Text(currentRoute.startName ?? ATHLTHLocalization.choose(
+                            english: "GPS start point", norwegian: "Startpunkt på kartet"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image(systemName: "arrow.right")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.top, 9)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "FINISH", norwegian: "MÅL"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        Text(ATHLTHRouteDetailsPolicy.shape(currentRoute) == .loop
+                            ? (currentRoute.startName ?? "Start")
+                            : (currentRoute.endName ?? ATHLTHLocalization.choose(
+                                english: "Finish point on map",
+                                norwegian: "Målpunkt på kartet"
+                            )))
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                HStack(spacing: 12) {
+                    Image(systemName: "location")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(distanceToStartKilometers.map {
+                            String(format: "%.1f km", $0)
+                        } ?? ATHLTHLocalization.choose(
+                            english: "Location unavailable",
+                            norwegian: "Posisjon utilgjengelig"
+                        ))
+                        .font(.subheadline.weight(.bold))
+                        Text(ATHLTHLocalization.choose(
+                            english: "Straight-line distance to route start",
+                            norwegian: "Avstand i luftlinje til rutens start"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                }
+                .padding(11)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+
+                Button(action: openDirectionsToStart) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Directions to start",
+                            norwegian: "Veibeskrivelse til start"
+                        ),
+                        systemImage: "arrow.up.right"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .disabled(routeStartCoordinate == nil)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Opens walking directions in Apple Maps",
+                    norwegian: "Åpner gangveibeskrivelse i Apple Kart"
+                ))
+            }
+        }
+    }
+
+    private var elevationCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Elevation profile", norwegian: "Høydeprofil"
+                    ),
+                    systemImage: "mountain.2"
+                )
+                .font(.headline)
+
+                let samples = resolvedProfileSamples
+                if samples.count >= 2 {
+                    elevationProfileView(samples)
+                    HStack(spacing: 10) {
+                        if let minimum = samples.min() {
+                            metric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Lowest", norwegian: "Lavest"
+                                ),
+                                value: "\(Int(minimum.rounded())) m",
+                                icon: "arrow.down"
+                            )
+                        }
+                        if let maximum = samples.max() {
+                            metric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Highest", norwegian: "Høyest"
+                                ),
+                                value: "\(Int(maximum.rounded())) m",
+                                icon: "arrow.up"
+                            )
+                        }
+                    }
+                    if let ascent = resolvedElevationGain {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Total ascent: \(Int(ascent.rounded())) m",
+                            norwegian: "Samlet stigning: \(Int(ascent.rounded())) m"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                } else {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "No measured elevation profile is available for this route.",
+                            norwegian: "Ingen målt høydeprofil er tilgjengelig for denne ruten."
+                        ),
+                        systemImage: "info.circle"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var tagsAndSurfacesCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Surface and tags",
+                            norwegian: "Underlag og emneknagger"
+                        ),
+                        systemImage: "tag"
+                    )
+                    .font(.headline)
+                    Spacer(minLength: 4)
+                    if isOwner && !isPublicTrail &&
+                       currentRoute.sharedSourceRouteID == nil {
+                        Button {
+                            beginMetadataEdit()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Edit", norwegian: "Rediger"
+                                ),
+                                systemImage: "pencil"
+                            )
+                            .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                }
+
+                let surfaces = ATHLTHRouteDetailsPolicy.cleanedSurfaces(
+                    currentRoute.surfacePercentages ?? [:]
+                )
+                let unknown = ATHLTHRouteDetailsPolicy.unclassifiedPercent(surfaces)
+                if !surfaces.isEmpty {
+                    GeometryReader { geometry in
+                        HStack(spacing: 0) {
+                            ForEach(ATHLTHRouteSurface.allCases) { surface in
+                                let percent = surfaces[surface.rawValue] ?? 0
+                                if percent > 0 {
+                                    Rectangle()
+                                        .fill(surfaceTint(surface))
+                                        .frame(
+                                            width: max(0, geometry.size.width *
+                                                CGFloat(percent) / 100)
+                                        )
+                                }
+                            }
+                            if unknown > 0 {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.32))
+                                    .frame(width: geometry.size.width *
+                                        CGFloat(unknown) / 100)
+                            }
+                        }
+                        .clipShape(Capsule())
+                    }
+                    .frame(height: 12)
+
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 112), spacing: 9)],
+                        alignment: .leading,
+                        spacing: 9
+                    ) {
+                        ForEach(ATHLTHRouteSurface.allCases) { surface in
+                            if let percent = surfaces[surface.rawValue], percent > 0 {
+                                Label("\(surface.title) \(percent) %",
+                                      systemImage: "circle.fill")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(surfaceTint(surface))
+                            }
+                        }
+                        if unknown > 0 {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Unknown \(unknown) %",
+                                    norwegian: "Ukjent \(unknown) %"
+                                ),
+                                systemImage: "circle.fill"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                } else if let summary = publicTrailMetadata?.surfaceSummary,
+                          !summary.isEmpty {
+                    Text(summary)
+                        .font(.subheadline.weight(.medium))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Source describes the surface but not its percentage.",
+                        norwegian: "Kilden angir underlag, men ikke prosentfordeling."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Surface unknown",
+                        norwegian: "Underlag ukjent"
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+
+                let tags = ATHLTHRouteDetailsPolicy.cleanedTags(currentRoute.tags ?? [])
+                if !tags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 7) {
+                            ForEach(tags, id: \.self) { tag in
+                                Text(tag)
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        ATHLTHTheme.accentSoft,
+                                        in: Capsule()
+                                    )
+                            }
+                        }
+                    }
+                } else if isOwner && !isPublicTrail {
+                    Text(ATHLTHLocalization.choose(
+                        english: "No tags yet. Edit the route to add them.",
+                        norwegian: "Ingen emneknagger. Rediger ruten for å legge til."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func surfaceTint(_ surface: ATHLTHRouteSurface) -> Color {
+        switch surface {
+        case .asphalt: ATHLTHTheme.accentDeep
+        case .gravel: ATHLTHTheme.premiumGold
+        case .trail: ATHLTHTheme.accent
+        case .dirt: .brown
+        case .track: .orange
+        case .other: .gray
+        }
+    }
+
     private var overviewCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 16) {
@@ -1072,25 +1367,6 @@ struct RouteDetailView: View {
                             value: "\(leaderboard.count)",
                             icon: "trophy.fill"
                         )
-                    }
-
-                    if let profile =
-                        metadata.elevationProfile,
-                       profile.count >= 2 {
-                        VStack(
-                            alignment: .leading,
-                            spacing: 8
-                        ) {
-                            Text("Elevation profile")
-                                .font(
-                                    .subheadline
-                                        .weight(.semibold)
-                                )
-
-                            elevationProfileView(
-                                profile
-                            )
-                        }
                     }
 
                     if metadata.reference != nil ||
