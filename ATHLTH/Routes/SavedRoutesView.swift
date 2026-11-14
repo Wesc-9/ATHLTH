@@ -85,6 +85,7 @@ struct SavedRoutesView: View {
 
     @State private var search = ""
     @State private var searchExpanded = false
+    @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var showingCustomLength = false
     @State private var previewRoute: TrainingRoute?
     @State private var watchMessage: String?
@@ -109,6 +110,11 @@ struct SavedRoutesView: View {
     }
 
     private var hasLocation: Bool { locationStore.location != nil }
+
+    private var pageFilterKey: String {
+        [search, sortPreference, visibilityPreference, String(lengthPreference),
+         String(minLength), String(maxLength)].joined(separator: "|")
+    }
 
     private func startDistance(for route: TrainingRoute) -> Double? {
         guard let current = locationStore.location,
@@ -274,7 +280,8 @@ struct SavedRoutesView: View {
                         ),
                         spacing: 10
                     ) {
-                        ForEach(visibleRoutes, id: \.route.id) { entry in
+                        ForEach(Array(visibleRoutes.prefix(visibleLimit)),
+                                id: \.route.id) { entry in
                             if viewMode == .cards {
                                 compactSavedRouteTile(entry)
                             } else {
@@ -282,12 +289,21 @@ struct SavedRoutesView: View {
                             }
                         }
                     }
+                    ATHLTHLibraryLoadMoreButton(
+                        shown: min(visibleLimit, visibleRoutes.count),
+                        total: visibleRoutes.count
+                    ) {
+                        visibleLimit += ATHLTHLibraryPagination.pageSize
+                    }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
             .padding(.bottom, 80)
             .frame(maxWidth: .infinity)
+        }
+        .onChange(of: pageFilterKey) { _, _ in
+            visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .onScrollPhaseChange { _, phase in
             routeCardsScrolling = phase.isScrolling
