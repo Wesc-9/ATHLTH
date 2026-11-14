@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Deterministic local imagery for ATHLTH training plans and their daily
 /// sessions. The image must fit the workout, not just its broad category.
@@ -100,28 +101,29 @@ enum ATHLTHPlanWorkoutArtwork {
         return .easyRun
     }
 
+    /// A new editorial image activates as soon as the imageset is bundled.
+    /// Existing shipped artwork remains a safe offline fallback during the
+    /// transition, so no image request, blank tile or per-card image lookup.
+    private static let resolvedAssets: [TrainingScene: String] = {
+        let candidates: [(TrainingScene, String, String)] = [
+            (.stadiumIntervals, "ATHLTHTrackIntervals", "GoalRunning"),
+            (.stadiumRace, "ATHLTHTrackRace", "GoalProgress"),
+            (.trailEndurance, "ATHLTHTrailEndurance", "GoalEndurance"),
+            (.easyRun, "ATHLTHTrackTeam", "GoalEndurance"),
+            (.uphillRunning, "ATHLTHHillRun", "GoalSprint"),
+            (.strength, "ATHLTHStrengthTeam", "StrengthQuickHero"),
+            (.hybrid, "ATHLTHHybridSled", "StrengthQuickHero"),
+            (.recovery, "ATHLTHRecoveryWalk", "GoalRecovery"),
+            (.walking, "ATHLTHRecoveryWalk", "GoalWalking")
+        ]
+        return Dictionary(uniqueKeysWithValues: candidates.map {
+            scene, newAsset, existingAsset in
+            (scene, UIImage(named: newAsset) == nil ? existingAsset : newAsset)
+        })
+    }()
+
     static func asset(for scene: TrainingScene) -> String {
-        switch scene {
-        case .stadiumIntervals:
-            // Track athlete, real stadium environment rather than a gym photo.
-            return "GoalRunning"
-        case .stadiumRace:
-            return "GoalProgress"
-        case .trailEndurance:
-            return "GoalEndurance"
-        case .easyRun:
-            return "GoalEndurance"
-        case .uphillRunning:
-            return "GoalSprint"
-        case .strength:
-            return "StrengthQuickHero"
-        case .hybrid:
-            return "StrengthQuickHero"
-        case .recovery:
-            return "GoalRecovery"
-        case .walking:
-            return "GoalWalking"
-        }
+        resolvedAssets[scene] ?? "GoalRunning"
     }
 
     static func asset(for entry: TrainingPlanCatalogEntry) -> String {
