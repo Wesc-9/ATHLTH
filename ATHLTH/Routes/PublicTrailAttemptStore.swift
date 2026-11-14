@@ -388,10 +388,26 @@ final class PublicTrailAttemptStore:
                         .map(\.workoutID)
                 )
 
-            for workout in candidates
-            where !existingWorkoutIDs
-                .contains(workout.id)
-            {
+            // Reclassify older records with no direction once the user's
+            // original HealthKit workout becomes locally available. No
+            // direction is inferred from the old leaderboard row itself.
+            var candidatesByID: [UUID: WorkoutSummary] = [:]
+            for workout in health.workouts where existingWorkoutIDs.contains(workout.id) {
+                candidatesByID[workout.id] = workout
+            }
+            for workout in candidates {
+                candidatesByID[workout.id] = workout
+            }
+            for workout in candidatesByID.values.sorted(by: {
+                $0.startDate > $1.startDate
+            }) {
+                let old = existing.first {
+                    $0.userID == userID && $0.workoutID == workout.id
+                }
+                if let old, old.direction != nil,
+                   old.direction != .unknown {
+                    continue
+                }
                 guard let analysis =
                     await health.routePerformance(
                         for: workout,
@@ -418,7 +434,7 @@ final class PublicTrailAttemptStore:
                     distanceRatio >= 0.55 &&
                     distanceRatio <= 1.55
 
-                guard likelyTrailAttempt else {
+                guard old != nil || likelyTrailAttempt else {
                     continue
                 }
 
