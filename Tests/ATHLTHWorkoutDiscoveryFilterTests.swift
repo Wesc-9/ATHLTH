@@ -17,6 +17,19 @@ final class ATHLTHWorkoutDiscoveryFilterTests: XCTestCase {
         XCTAssertFalse(legs.map(filter.matches) ?? true)
     }
 
+    func testStrengthFormatFilterMatchesRealGroupsWithoutHidingPlainWorkouts() {
+        let entries = ATHLTHCuratedStrengthWorkouts.entries
+        var filter = ATHLTHWorkoutDiscoveryFilter()
+        filter.strengthStyle = .emom
+        XCTAssertEqual(entries.filter(filter.matches).map(\.slug),
+                       ["athlth-strength-20"])
+        filter.strengthStyle = .superset
+        XCTAssertEqual(Set(entries.filter(filter.matches).map(\.slug)),
+                       Set(["athlth-strength-17", "athlth-strength-18"]))
+        filter.strengthStyle = nil
+        XCTAssertEqual(entries.filter(filter.matches).count, entries.count)
+    }
+
     func testMuscleChoicesCombineWithOrSemantics() {
         let selected: Set<String> = ["chest", "back"]
         XCTAssertTrue(ATHLTHWorkoutDiscoveryFilter.matchesMuscles(
