@@ -23,7 +23,7 @@ enum ATHLTHLibraryDisplayMode: String, Codable, CaseIterable, Identifiable {
     static func load(userID: UUID) -> Self {
         AccountLocalStorage.read(
             Self.self, name: "libraryDisplayModeV1", userID: userID
-        ) ?? .list
+        ) ?? .grid
     }
     func save(userID: UUID) {
         AccountLocalStorage.write(
@@ -193,7 +193,7 @@ enum ATHLTHLibraryResponsiveLayout {
             // On iPhone, let users choose two or three. On iPad allow four
             // or five, but always respect the actual Stage Manager window.
             let desired = min(usable < 740 ? 3 : 5, preferredColumns)
-            let minimum = accessibilityText ? 160.0
+            let minimum: CGFloat = accessibilityText ? 160.0
                 : (desired == 2 ? 140.0 : (desired == 3 ? 102.0 : 185.0))
             let fitting = max(1, Int((usable + spacing) / (minimum + spacing)))
             let count = min(desired, fitting)
