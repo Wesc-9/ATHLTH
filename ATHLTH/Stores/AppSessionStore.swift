@@ -5281,16 +5281,13 @@ final class AppSessionStore: ObservableObject {
         savedRoutes.insert(copy, at: 0)
     }
 
-    private func persistAccountContent(
-        immediate: Bool = false
-    ) {
-        guard !loadingAccountContent,
-              let userID = localAccountID
-        else {
-            return
-        }
-
-        let content = AccountTrainingContent(
+    /// Build an immutable point-in-time snapshot only when a write actually
+    /// proceeds. The old path copied the entire plan/workout graph for every
+    /// keystroke or quick add even when a subsequent edit cancelled that write.
+    private func accountTrainingSnapshot() -> AccountTrainingContent {
+        let signpost = ATHLTHPerformance.begin("TrainingContentSnapshot")
+        defer { ATHLTHPerformance.end("TrainingContentSnapshot", id: signpost) }
+        return AccountTrainingContent(
             activePlan: activePlan,
             pausedTrainingPlanIDs: pausedTrainingPlanIDs,
             deactivatedTrainingPlanIDs: deactivatedTrainingPlanIDs,
@@ -5306,24 +5303,34 @@ final class AppSessionStore: ObservableObject {
             pendingCoachPlanProposal: pendingCoachPlanProposal,
             coachPlanAdaptationHistory: coachPlanAdaptationHistory
         )
+    }
+
+    private func persistAccountContent(
+        immediate: Bool = false
+    ) {
+        guard !loadingAccountContent,
+              let userID = localAccountID
+        else {
+            return
+        }
 
         accountContentSaveTask?.cancel()
         accountContentSaveTask = nil
 
         if immediate {
-            writeAccountContent(
-                content,
-                userID: userID
-            )
+            // Explicit checkpoints and account changes remain synchronous to
+            // guarantee durability before switching/reloading the account.
+            writeAccountContent(accountTrainingSnapshot(), userID: userID)
             return
         }
 
         accountContentSaveTask =
             Task { @MainActor [weak self] in
-                try? await Task.sleep(
-                    for: .milliseconds(400)
-                )
-
+                do {
+                    try await Task.sleep(for: .milliseconds(400))
+                } catch {
+                    return
+                }
                 guard !Task.isCancelled,
                       let self,
                       !self.loadingAccountContent,
@@ -5332,9 +5339,10 @@ final class AppSessionStore: ObservableObject {
                     return
                 }
 
+                // Snapshot the *latest* state after the debounce, not stale
+                // state from the tap that originally scheduled this task.
                 self.writeAccountContent(
-                    content,
-                    userID: userID
+                    self.accountTrainingSnapshot(), userID: userID
                 )
                 self.accountContentSaveTask = nil
             }
