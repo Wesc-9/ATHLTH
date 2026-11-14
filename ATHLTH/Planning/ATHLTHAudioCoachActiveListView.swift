@@ -22,6 +22,11 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var quickInterval = 60
     @State private var showingVoice = false
     @State private var showingProfiles = false
+    @State private var showingSaveNewProfile = false
+    @State private var showingGroupTriggerCatalogue = false
+    @State private var targetCoachGroupID: UUID?
+    @State private var pendingGroupRuleEditorID: UUID?
+    @State private var pendingGroupOptionEditor: ATHLTHAudioCoachOption?
     @State private var editingOption: ATHLTHAudioCoachOption?
     @State private var selectedRule: SelectedRule?
     @State private var expandedCoachGroups: Set<UUID> = []
@@ -192,6 +197,10 @@ struct ATHLTHAudioCoachActiveListView: View {
                         onShowProfiles: {
                             showingProfiles = true
                         },
+                        onSaveAsNew: {
+                            profileName = ""
+                            showingSaveNewProfile = true
+                        },
                         onUseStandard: {
                             if hasAdvancedConfiguration {
                                 confirmReplaceWithStandard = true
@@ -200,8 +209,9 @@ struct ATHLTHAudioCoachActiveListView: View {
                                 selectedProfileName = nil
                             }
                         },
-                        onAddMessage: {
-                            showingQuickMessage = true
+                        onAddTrigger: { groupID in
+                            targetCoachGroupID = groupID
+                            showingGroupTriggerCatalogue = true
                         },
                         onShowAdvanced: {
                             editorMode = "advanced"
@@ -247,6 +257,20 @@ struct ATHLTHAudioCoachActiveListView: View {
         }) {
             catalogueSheet
         }
+        .sheet(isPresented: $showingGroupTriggerCatalogue, onDismiss: {
+            if let id = pendingGroupRuleEditorID {
+                pendingGroupRuleEditorID = nil
+                selectedRule = SelectedRule(id: id)
+            } else if let option = pendingGroupOptionEditor {
+                pendingGroupOptionEditor = nil
+                editingOption = option
+            }
+        }) {
+            groupTriggerCatalogue
+        }
+        .sheet(isPresented: $showingSaveNewProfile) {
+            saveNewProfileSheet
+        }
         .sheet(item: $selectedRule) { selection in
             NavigationStack {
                 ScrollView {
@@ -254,7 +278,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                         .padding(16)
                 }
                 .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-                .navigationTitle(tr("Announcement group", "Varslingsgruppe"))
+                .navigationTitle(tr("Edit trigger", "Rediger trigger"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
@@ -721,6 +745,216 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     /// The everyday flow asks only when to speak and what to read.
     /// Advanced editing still uses the SAME underlying custom-rule model.
+
+    // The trigger catalogue is a NEW card, never an inline menu under a group.
+    private var groupTriggerCatalogue: some View {
+        NavigationStack {
+            List {
+                Section(tr("TIME AND PROGRESS", "TID OG PROGRESJON")) {
+                    triggerRow(tr("After time", "Etter tid"),
+                               tr("For example every 5 minutes", "For eksempel hvert 5. minutt"),
+                               icon: "clock") {
+                        addGroupRule(metric: .elapsedTime, trigger: .time, interval: 300)
+                    }
+                    triggerRow(tr("After distance", "Etter distanse"),
+                               tr("For example every kilometer", "For eksempel hver kilometer"),
+                               icon: "figure.run") {
+                        addGroupRule(metric: .distance, trigger: .distance, interval: 1_000)
+                    }
+                    triggerRow(tr("Before workout ends", "Før økten er ferdig"),
+                               tr("Push me 15 minutes before the finish", "Push meg 15 min før slutt"),
+                               icon: "flag") {
+                        addGroupRule(metric: .motivation, trigger: .time,
+                                     interval: 60, beforeEndMinutes: 15)
+                    }
+                }
+                Section(tr("HEART RATE AND INTENSITY", "PULS OG INTENSITET")) {
+                    triggerRow(tr("Target zone", "Veiledning for pulssone"),
+                               tr("Outside the target and back in", "Utenfor målsonen og tilbake"),
+                               icon: "heart.text.square") {
+                        addGroupOption(.targetZoneCoach)
+                    }
+                    triggerRow(tr("Heart rate", "Puls"),
+                               tr("Read pulse at chosen intervals", "Les opp puls etter intervall"),
+                               icon: "heart") {
+                        addGroupRule(metric: .heartRate, trigger: .time, interval: 300)
+                    }
+                    triggerRow(tr("Pace", "Tempo"),
+                               tr("Read out current pace", "Les opp gjeldende tempo"),
+                               icon: "speedometer") {
+                        addGroupRule(metric: .pace, trigger: .time, interval: 300)
+                    }
+                }
+                Section(tr("MOTIVATION AND FOCUS", "MOTIVASJON OG FOKUS")) {
+                    triggerRow(tr("Motivation during workout", "Motivasjon under økt"),
+                               tr("Encouragement at a chosen interval", "Oppmuntring ved valgt intervall"),
+                               icon: "bolt.heart") {
+                        addGroupRule(metric: .motivation, trigger: .time, interval: 180)
+                    }
+                    triggerRow(tr("Situation-aware encouragement", "Situasjonsstyrt motivasjon"),
+                               tr("Respond to effort and progress", "Reager på innsats og fremdrift"),
+                               icon: "sparkles") {
+                        addGroupOption(.adaptiveMotivation)
+                    }
+                    triggerRow(tr("Custom messages", "Egne beskjeder"),
+                               tr("Personal phrases in Coach's voice", "Egne fraser med Coach-stemmen"),
+                               icon: "text.bubble") {
+                        addGroupOption(.customPhrases)
+                    }
+                }
+                Section(tr("INTERVALS AND EVENTS", "INTERVALLER OG HENDELSER")) {
+                    triggerRow(tr("Interval / phase", "Intervall / deløvelse"),
+                               tr("Announce the current part", "Les opp gjeldende deløvelse"),
+                               icon: "list.number") {
+                        addGroupOption(.currentStep)
+                    }
+                    triggerRow(tr("Spoken countdown", "Nedtelling"),
+                               tr("Before and after workout boundaries", "Før og etter øktgrenser"),
+                               icon: "timer") {
+                        addGroupOption(.scopedCountdowns)
+                    }
+                    triggerRow(tr("Workout start", "Start på økt"),
+                               tr("Start cues", "Startbeskjeder"),
+                               icon: "play.circle") {
+                        addGroupOption(.workoutStart)
+                    }
+                    triggerRow(tr("Workout finish", "Øktslutt"),
+                               tr("Finish summary", "Oppsummering ved mål"),
+                               icon: "flag.checkered") {
+                        addGroupOption(.workoutFinish)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("Add trigger", "Legg til trigger"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Close", "Lukk")) {
+                        showingGroupTriggerCatalogue = false
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Text(tr(
+                    "Before-finish cues require a workout with a known or estimated finish time.",
+                    "Varsler før slutt krever en økt med kjent eller beregnbar sluttid."
+                ))
+                .font(.caption).foregroundStyle(dim)
+                .padding(12)
+                .frame(maxWidth: .infinity)
+                .background(ATHLTHPlanDesign.canvas)
+            }
+        }
+        .presentationDetents([.large])
+        .accessibilityIdentifier("athlth-coach-trigger-catalogue")
+    }
+
+    private func triggerRow(_ title: String, _ subtitle: String, icon: String,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title3).foregroundStyle(bronze).frame(width: 34)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(ink)
+                    Text(subtitle).font(.caption).foregroundStyle(dim)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption).foregroundStyle(dim)
+            }
+            .frame(minHeight: 50).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func addGroupRule(
+        metric: ATHLTHAudioCoachRule.Metric,
+        trigger: ATHLTHAudioCoachRule.Trigger, interval: Int,
+        beforeEndMinutes: Int? = nil
+    ) {
+        guard draft.customRules.count < 20,
+              let id = targetCoachGroupID,
+              let index = draft.coachGroups.firstIndex(where: { $0.id == id })
+        else { return }
+        var rule = ATHLTHAudioCoachRule(
+            trigger: trigger, metric: metric, interval: interval, scope: .workout
+        )
+        if let beforeEndMinutes {
+            rule.beforeEndSeconds = beforeEndMinutes * 60
+            rule.encouragementStyle = .push
+        }
+        draft.customRules.append(rule)
+        draft.coachGroups[index].ruleIDs.append(rule.id)
+        pendingGroupRuleEditorID = rule.id
+        showingGroupTriggerCatalogue = false
+    }
+
+    private func addGroupOption(_ option: ATHLTHAudioCoachOption) {
+        guard let id = targetCoachGroupID,
+              let index = draft.coachGroups.firstIndex(where: { $0.id == id })
+        else { return }
+        if !option.isContentList { option.setActive(true, in: &draft) }
+        // Smart options are shared engine behaviours, not independent copies.
+        for i in draft.coachGroups.indices {
+            draft.coachGroups[i].optionIDs.removeAll { $0 == option.rawValue }
+        }
+        draft.coachGroups[index].optionIDs.append(option.rawValue)
+        pendingGroupOptionEditor = option.requiresConfiguration ? option : nil
+        showingGroupTriggerCatalogue = false
+    }
+
+    private var saveNewProfileSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(tr("Template name", "Navn på mal"), text: $profileName)
+                        .textInputAutocapitalization(.words)
+                } header: {
+                    Text(tr("Save current Coach as new", "Lagre aktiv coach som ny mal"))
+                } footer: {
+                    Text(tr("Includes named groups and every configured trigger.",
+                            "Lagrer gruppenavnene og alle triggerne."))
+                }
+                Section {
+                    Button {
+                        let name = String(profileName.trimmingCharacters(
+                            in: .whitespacesAndNewlines).prefix(60))
+                        guard !name.isEmpty, settings.audioCoachProfiles.count < 30 else { return }
+                        let profile = ATHLTHAudioCoachProfile(
+                            name: name, configuration: draft.configuration()
+                        )
+                        settings.audioCoachProfiles.append(profile)
+                        settings.activeAudioCoachProfileID = profile.id
+                        selectedProfileName = profile.name
+                        profileName = ""
+                        showingSaveNewProfile = false
+                    } label: {
+                        Label(tr("Save as new template", "Lagre som ny mal"),
+                              systemImage: "bookmark.badge.plus")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(bronze)
+                    .disabled(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              settings.audioCoachProfiles.count >= 30)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("New Coach template", "Ny coach-mal"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Cancel", "Avbryt")) { showingSaveNewProfile = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
     private var quickMessageSheet: some View {
         NavigationStack {
             Form {
@@ -1260,7 +1494,35 @@ struct ATHLTHAudioCoachActiveListView: View {
                 Text(tr("For heart-rate zone, pace or interval events, use the event alert catalogue.", "For pulssone, tempo eller intervallhendelser bruker du hendelsesvarslene."))
                     .font(.caption)
                     .foregroundStyle(dim)
-                Picker(tr("Trigger", "Utløser"), selection: rule.trigger) {
+                if rule.wrappedValue.beforeEndSeconds != nil {
+                    Stepper(
+                        value: Binding(
+                            get: { (rule.wrappedValue.beforeEndSeconds ?? 900) / 60 },
+                            set: { rule.wrappedValue.beforeEndSeconds = $0 * 60 }
+                        ),
+                        in: 1...120, step: 1
+                    ) {
+                        Text(tr(
+                            "\((rule.wrappedValue.beforeEndSeconds ?? 900) / 60) min before finish",
+                            "\((rule.wrappedValue.beforeEndSeconds ?? 900) / 60) min før slutt"
+                        ))
+                    }
+                    Text(tr(
+                        "Only plays when a reliable estimated finish time exists.",
+                        "Spilles bare når økten har en beregnbar sluttid."
+                    ))
+                    .font(.caption).foregroundStyle(dim)
+                    TextField(
+                        tr("Personal message (optional)", "Personlig beskjed (valgfritt)"),
+                        text: Binding(
+                            get: { rule.wrappedValue.customPhrase ?? "" },
+                            set: { rule.wrappedValue.customPhrase = $0.isEmpty ? nil : $0 }
+                        ),
+                        axis: .vertical
+                    )
+                    .lineLimit(2...4)
+                } else {
+                    Picker(tr("Trigger", "Utløser"), selection: rule.trigger) {
                     ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                         Text(trigger.title).tag(trigger)
                     }
@@ -1280,6 +1542,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
                 .onChange(of: rule.wrappedValue.trigger) { _, newValue in
                     rule.wrappedValue.interval = newValue == .time ? 60 : 1_000
+                }
                 }
 
                 Text(tr("2 · What should the coach say?", "2 · Hva skal coachen si?"))
@@ -1316,6 +1579,11 @@ struct ATHLTHAudioCoachActiveListView: View {
                     var duplicate = rule.wrappedValue
                     duplicate.id = UUID()
                     draft.customRules.append(duplicate)
+                    if let index = draft.coachGroups.firstIndex(where: {
+                        $0.ruleIDs.contains(id)
+                    }) {
+                        draft.coachGroups[index].ruleIDs.append(duplicate.id)
+                    }
                     selectedRule = SelectedRule(id: duplicate.id)
                 } label: {
                     Label(tr("Duplicate group", "Dupliser gruppe"),
@@ -1325,6 +1593,9 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .disabled(draft.customRules.count >= 20)
                 Button(role: .destructive) {
                     draft.customRules.removeAll { $0.id == id }
+                    for index in draft.coachGroups.indices {
+                        draft.coachGroups[index].ruleIDs.removeAll { $0 == id }
+                    }
                     selectedRule = nil
                 } label: {
                     Label(tr("Delete group", "Slett gruppe"), systemImage: "trash")
