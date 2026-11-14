@@ -297,6 +297,7 @@ struct SavedRoutesView: View {
             if isPulling { searchExpanded = true }
         }
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+        .tint(ATHLTHTheme.accentDeep)
         .navigationTitle(selectionTitle ?? tr("My routes", "Mine ruter"))
         .navigationBarTitleDisplayMode(.inline)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
