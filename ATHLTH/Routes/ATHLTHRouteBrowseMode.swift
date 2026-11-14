@@ -31,8 +31,45 @@ enum ATHLTHRouteBrowseMode: String, CaseIterable, Identifiable {
 /// Supports Dynamic Type without overflowing the library header.
 struct ATHLTHRouteBrowseModePicker: View {
     @Binding var selection: ATHLTHRouteBrowseMode
+    var columns: Binding<Int>? = nil
 
     var body: some View {
+        Group {
+            if let columns {
+                HStack(spacing: 7) {
+                    ATHLTHLibraryDisplayPicker(
+                        selection: Binding(
+                            get: { selection == .list ? .list : .grid },
+                            set: { selection = $0 == .list ? .list : .cards }
+                        ),
+                        columns: columns
+                    )
+                    Button {
+                        selection = .map
+                    } label: {
+                        Image(systemName: "map")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(selection == .map
+                                ? Color.white : ATHLTHPlanDesign.secondaryInk)
+                            .frame(width: 40, height: 43)
+                            .background(
+                                selection == .map
+                                    ? ATHLTHPlanDesign.ink : ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Map", norwegian: "Kart"
+                    ))
+                }
+            } else {
+                legacyPicker
+            }
+        }
+    }
+
+    private var legacyPicker: some View {
         HStack(spacing: 3) {
             ForEach(ATHLTHRouteBrowseMode.allCases) { mode in
                 Button {
