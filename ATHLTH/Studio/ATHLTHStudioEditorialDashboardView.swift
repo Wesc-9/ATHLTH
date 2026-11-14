@@ -291,6 +291,13 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: split ? 20 : 16) {
+                            // This is the actual signed-in iPad Home, not the
+                            // legacy dashboard. Keep cross-device discovery
+                            // above the large next-workout and analytics cards.
+                            // The child observes live state independently,
+                            // avoiding rebuilding the full training dashboard
+                            // for every four-second spectator heartbeat.
+                            ATHLTHiPadLiveWorkoutStatusCard()
                             let upcoming = nextWorkout(from: windows.upcoming)
 
                             if split && width >= 1080 {
@@ -315,10 +322,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                 compactReadinessCard
                                 ATHLTHStudioHomeSocialHighlight()
                             }
-
-                            // Only the existence of an active session is visible
-                            // without permission. Opening the card requests it.
-                            ATHLTHiPadLiveWorkoutStatusCard()
 
                             weekCard(week, width: width)
                             ATHLTHStudioHomeCommunitySummary()
