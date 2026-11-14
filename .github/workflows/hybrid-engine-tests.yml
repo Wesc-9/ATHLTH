@@ -33,6 +33,14 @@ on:
       - .github/workflows/hybrid-engine-tests.yml
       - ATHLTH/Routes/ATHLTHExploreRoutePolicy.swift
       - ATHLTH/Routes/ATHLTHRouteDetailsPolicy.swift
+      - ATHLTH/Routes/ATHLTHRouteAttemptDirection.swift
+      - ATHLTH/Routes/ATHLTHDownloadedRouteStore.swift
+      - ATHLTH/Routes/RouteAttemptStore.swift
+      - ATHLTH/Routes/PublicTrailAttemptStore.swift
+      - ATHLTH/Health/HealthKitManager.swift
+      - ATHLTH/Models/Models.swift
+      - Tests/ATHLTHRouteOfflineAndDirectionTests.swift
+      - supabase/migrations/20261114123021_athlth_route_attempt_direction_scoped_leaderboards.sql
       - ATHLTH/Routes/RouteDetailView.swift
       - ATHLTH/Routes/RunRouteBuilderView.swift
       - ATHLTH/Routes/RouteDiscoveryStore.swift
@@ -190,6 +198,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
             -only-testing:ATHLTHTests/ATHLTHExploreRoutePolicyTests \
             -only-testing:ATHLTHTests/ATHLTHRouteDetailsPolicyTests \
+            -only-testing:ATHLTHTests/ATHLTHRouteOfflineAndDirectionTests \
             -only-testing:ATHLTHTests/ATHLTHLibraryDisplayModeTests \
             -only-testing:ATHLTHTests/ATHLTHLibraryResponsiveLayoutTests \
             -only-testing:ATHLTHTests/ATHLTHPublicTrailDiskCacheTests \
