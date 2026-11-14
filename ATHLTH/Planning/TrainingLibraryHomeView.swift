@@ -5579,16 +5579,24 @@ struct LibraryFavoritesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             recents.refresh()
-            async let saved: Void = favorites.refresh()
-            async let plans: Void = planLibrary.refresh()
-            async let workouts: Void = workoutLibrary.refresh()
-            async let exercises: Void = exerciseLibrary.refresh()
-            _ = await (
-                saved,
-                plans,
-                workouts,
-                exercises
-            )
+            await favorites.refresh()
+            // Standalone tabs should not fetch three unrelated catalogues
+            // just to display a list of favorite metadata.
+            switch initialKind {
+            case .plan:
+                await planLibrary.refresh()
+            case .workout:
+                await workoutLibrary.refresh()
+            case .exercise:
+                await exerciseLibrary.refresh()
+            case .route:
+                break // Route detail loader fetches only the opened route.
+            case nil:
+                async let plans: Void = planLibrary.refresh()
+                async let workouts: Void = workoutLibrary.refresh()
+                async let exercises: Void = exerciseLibrary.refresh()
+                _ = await (plans, workouts, exercises)
+            }
         }
     }
 
