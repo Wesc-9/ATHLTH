@@ -32,43 +32,117 @@ enum ATHLTHLibraryDisplayMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// A single compact layout control for exercises, workouts, plans and
+/// routes. The grid density is shared across library categories; map remains
+/// a route-specific presentation.
 struct ATHLTHLibraryDisplayPicker: View {
     @Binding var selection: ATHLTHLibraryDisplayMode
+    var columns: Binding<Int>? = nil
 
     var body: some View {
         HStack(spacing: 3) {
-            ForEach(ATHLTHLibraryDisplayMode.allCases) { mode in
-                Button {
-                    selection = mode
+            if let columns {
+                layoutButton(symbol: "list.bullet", title: label("List", "Liste"),
+                             active: selection == .list) {
+                    selection = .list
+                }
+                layoutButton(symbol: "square.grid.2x2", title: label("2 columns", "2 kolonner"),
+                             active: selection == .grid && columns.wrappedValue == 2) {
+                    columns.wrappedValue = 2
+                    selection = .grid
+                }
+                layoutButton(symbol: "square.grid.3x2", title: label("3 columns", "3 kolonner"),
+                             active: selection == .grid && columns.wrappedValue == 3) {
+                    columns.wrappedValue = 3
+                    selection = .grid
+                }
+                Menu {
+                    Button(label("Automatic", "Automatisk"),
+                           systemImage: selection == .grid && columns.wrappedValue == 0
+                               ? "checkmark" : "square.grid.2x2") {
+                        columns.wrappedValue = 0
+                        selection = .grid
+                    }
+                    Button(label("4 columns (iPad)", "4 kolonner (iPad)")) {
+                        columns.wrappedValue = 4
+                        selection = .grid
+                    }
+                    Button(label("5 columns (iPad)", "5 kolonner (iPad)")) {
+                        columns.wrappedValue = 5
+                        selection = .grid
+                    }
                 } label: {
-                    Image(systemName: mode.symbol)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(
-                            selection == mode
-                                ? Color.white : ATHLTHPlanDesign.secondaryInk
-                        )
-                        .frame(width: 42, height: 37)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(selection == .grid &&
+                            (columns.wrappedValue == 0 || columns.wrappedValue >= 4)
+                                ? Color.white : ATHLTHPlanDesign.secondaryInk)
+                        .frame(width: 35, height: 37)
                         .background(
-                            selection == mode
+                            selection == .grid &&
+                            (columns.wrappedValue == 0 || columns.wrappedValue >= 4)
                                 ? ATHLTHPlanDesign.ink : Color.clear,
                             in: RoundedRectangle(cornerRadius: 10)
                         )
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(mode.title)
-                .accessibilityAddTraits(selection == mode ? [.isSelected] : [])
+                .accessibilityLabel(label("More layout options", "Flere visninger"))
+            } else {
+                ForEach(ATHLTHLibraryDisplayMode.allCases) { mode in
+                    layoutButton(symbol: mode.symbol, title: mode.title,
+                                 active: selection == mode) {
+                        selection = mode
+                    }
+                }
             }
         }
-        .padding(4)
+        .padding(3)
         .background(
             ATHLTHPlanDesign.selectedSurface,
-            in: RoundedRectangle(cornerRadius: 14)
+            in: RoundedRectangle(cornerRadius: 13)
         )
         .accessibilityElement(children: .contain)
     }
+
+    private func label(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private func layoutButton(symbol: String, title: String, active: Bool,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(active ? Color.white : ATHLTHPlanDesign.secondaryInk)
+                .frame(width: 36, height: 37)
+                .background(active ? ATHLTHPlanDesign.ink : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 10))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(active ? [.isSelected] : [])
+    }
 }
 
+/// Personal layout preference, not a server-side workout or route setting.
+/// Stored by account so multiple users on one device do not affect each other.
+enum ATHLTHLibraryColumnPreference {
+    static func load(userID: UUID) -> Int {
+        let value = AccountLocalStorage.read(
+            Int.self, name: "libraryColumnPreferenceV1", userID: userID
+        ) ?? 0
+        return (0...5).contains(value) ? value : 0
+    }
+
+    static func save(_ value: Int, userID: UUID) {
+        AccountLocalStorage.write(
+            max(0, min(5, value)),
+            name: "libraryColumnPreferenceV1",
+            userID: userID
+        )
+    }
+}
 
 /// Caps the library at three cards across. A small phone or enlarged text
 /// automatically falls back to fewer columns rather than squeezing titles.
@@ -105,7 +179,8 @@ enum ATHLTHLibraryResponsiveLayout {
         reservedHorizontalSpace: CGFloat = 36,
         spacing: CGFloat = 10,
         accessibilityText: Bool = false,
-        preferredMinimumCardWidth: CGFloat = 0
+        preferredMinimumCardWidth: CGFloat = 0,
+        preferredColumns: Int = 0
     ) -> [GridItem] {
         let usable = max(0, width - reservedHorizontalSpace)
         if mode == .list {
@@ -114,8 +189,20 @@ enum ATHLTHLibraryResponsiveLayout {
             let count = usable >= threshold ? 2 : 1
             return (0..<count).map { _ in GridItem(.flexible(), spacing: spacing) }
         }
+        if preferredColumns > 0 {
+            // On iPhone, let users choose two or three. On iPad allow four
+            // or five, but always respect the actual Stage Manager window.
+            let desired = min(usable < 740 ? 3 : 5, preferredColumns)
+            let minimum = accessibilityText ? 160.0
+                : (desired == 2 ? 140.0 : (desired == 3 ? 102.0 : 185.0))
+            let fitting = max(1, Int((usable + spacing) / (minimum + spacing)))
+            let count = min(desired, fitting)
+            return (0..<count).map { _ in
+                GridItem(.flexible(), spacing: spacing)
+            }
+        }
         if usable < 820 || accessibilityText {
-            // Preserve the familiar iPhone layouts and larger text sizes.
+            // Adaptive defaults: 2 or 3 phone cards, up to 5 on iPad.
             return ATHLTHLibraryGridColumns.make(
                 mode: mode,
                 width: width,
