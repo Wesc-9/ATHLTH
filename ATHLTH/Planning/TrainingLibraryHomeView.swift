@@ -1321,6 +1321,14 @@ struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
         )
     }
 
+    /// Do not silently drop an unrecognized catalog activity and then
+    /// fabricate a different training plan when scheduling it.
+    var hasCompleteWorkoutPattern: Bool {
+        !workoutPattern.isEmpty &&
+        workoutPattern.count == sessionBlueprints.count &&
+        workoutPattern.count == sessionsPerWeek
+    }
+
     var workoutKinds: [WorkoutKind] {
         sessionBlueprints.map(\.kind)
     }
