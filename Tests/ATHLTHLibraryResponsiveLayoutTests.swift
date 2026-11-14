@@ -17,6 +17,47 @@ final class ATHLTHLibraryResponsiveLayoutTests: XCTestCase {
         XCTAssertEqual(ATHLTHLibraryResponsiveLayout.hubColumns(for: 390).count, 2)
     }
 
+    func testUserCanChooseTwoOrThreePhoneColumns() {
+        XCTAssertEqual(
+            ATHLTHLibraryResponsiveLayout.columns(
+                mode: .grid, width: 390,
+                reservedHorizontalSpace: 50,
+                preferredColumns: 2
+            ).count, 2
+        )
+        XCTAssertEqual(
+            ATHLTHLibraryResponsiveLayout.columns(
+                mode: .grid, width: 390,
+                reservedHorizontalSpace: 50,
+                preferredColumns: 3
+            ).count, 3
+        )
+        XCTAssertEqual(
+            ATHLTHLibraryResponsiveLayout.columns(
+                mode: .list, width: 390,
+                reservedHorizontalSpace: 50,
+                preferredColumns: 3
+            ).count, 1
+        )
+    }
+
+    func testIPadCanFitFiveButNeverForcesFiveInNarrowWindows() {
+        XCTAssertEqual(
+            ATHLTHLibraryResponsiveLayout.columns(
+                mode: .grid, width: 1400,
+                reservedHorizontalSpace: 50,
+                preferredColumns: 5
+            ).count, 5
+        )
+        XCTAssertLessThanOrEqual(
+            ATHLTHLibraryResponsiveLayout.columns(
+                mode: .grid, width: 440,
+                reservedHorizontalSpace: 50,
+                preferredColumns: 5
+            ).count, 3
+        )
+    }
+
     func testIPadPortraitUsesAvailableWidth() {
         XCTAssertEqual(
             ATHLTHLibraryResponsiveLayout.columns(
