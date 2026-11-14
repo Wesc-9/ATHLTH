@@ -2205,6 +2205,7 @@ final class AppSessionStore: ObservableObject {
     /// three minutes of the Watch's own recorded start. Never use title only.
     func recordPlannedWatchWorkoutFinished(_ result: WatchWorkoutResult) {
         let explicitIDs = [
+            result.plannedCalendarSessionID,
             result.structuredWorkoutSourceID,
             result.strengthSnapshot?.workoutID
         ].compactMap { $0 }
@@ -2217,6 +2218,28 @@ final class AppSessionStore: ObservableObject {
                 endedAt: result.endedAt
             )
             return
+        }
+        // Starting from Watch Today does not run the iPhone start callback.
+        // A Watch completion containing an exact saved workout ID supplies
+        // both authoritative times even when the phone was offline.
+        if let plannedID = explicitIDs.first(where: { id in
+            standalonePlannedSessions.contains(where: { $0.id == id }) ||
+            ([activePlan].compactMap { $0 } + scheduledPlans)
+                .flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
+                .contains(where: { $0.id == id })
+        }) {
+            if recordPlannedWorkoutStarted(
+                workoutID: plannedID,
+                startedAt: result.startedAt,
+                startedOnWatch: true
+            ) {
+                _ = recordPlannedWorkoutFinished(
+                    workoutID: plannedID,
+                    recordedStart: result.startedAt,
+                    endedAt: result.endedAt
+                )
+                return
+            }
         }
         let candidates = recordedPlannedWorkoutTimes.compactMap {
             (key, timing) -> UUID? in
