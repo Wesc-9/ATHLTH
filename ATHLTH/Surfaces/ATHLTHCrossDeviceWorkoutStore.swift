@@ -554,7 +554,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 runningStepRemainingSeconds: remaining,
                 capturedAt: .now,
                 sourceDevice: "iphone",
-                runningSteps: Array(structured.steps.prefix(32)),
+                runningSteps: structured.steps,
                 runningStepIndex: structured.stepIndex,
                 runningStepCount: structured.steps.count
             )
