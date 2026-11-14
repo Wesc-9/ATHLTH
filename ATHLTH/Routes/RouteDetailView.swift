@@ -20,12 +20,16 @@ struct RouteDetailView: View {
     @StateObject private var publicTrailAttempts =
         PublicTrailAttemptStore()
     @StateObject private var discovery = RouteDiscoveryStore()
+    @StateObject private var downloaded = ATHLTHDownloadedRouteStore()
     @StateObject private var routeLocation = HomeLocationStore()
 
     let route: TrainingRoute
 
     @State private var showingDeleteConfirmation = false
     @State private var showingFullLeaderboard = false
+    @State private var showingOfflineMap = false
+    @State private var gpxShareFile: ATHLTHRouteShareFile?
+    @State private var gpxExportError: String?
     @State private var editingTitle = false
     @State private var draftTitle = ""
     @State private var watchMessage: String?
@@ -156,6 +160,7 @@ struct RouteDetailView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 mapCard
+                offlineAndExportCard
                 overviewCard
                 startDirectionsCard
                 elevationCard
@@ -253,10 +258,14 @@ struct RouteDetailView: View {
     var body: some View {
         routePrimaryContent
         .task(id: currentRoute.id) {
+            downloaded.load(userID: session.profile.userID)
             routeLocation.start()
             await prepareRouteData()
         }
         .onDisappear { routeLocation.stop() }
+        .onChange(of: session.profile.userID) { _, userID in
+            downloaded.load(userID: userID)
+        }
         .refreshable {
             await prepareRouteData(forceHealthSync: true)
         }
@@ -398,6 +407,9 @@ struct RouteDetailView: View {
                 .large
             ])
         }
+        .sheet(item: $gpxShareFile) { file in
+            ATHLTHRouteShareSheet(url: file.url)
+        }
         .sheet(item: $routeToStart) { route in
             RunQuickStartSheet(
                 trainingDeviceProvider:
@@ -432,7 +444,9 @@ struct RouteDetailView: View {
                     watchMessage != nil ||
                     watchError != nil ||
                     attemptErrorMessage != nil ||
-                    discovery.errorMessage != nil
+                    discovery.errorMessage != nil ||
+                    downloaded.errorMessage != nil ||
+                    gpxExportError != nil
                 },
                 set: { visible in
                     if !visible {
@@ -441,6 +455,8 @@ struct RouteDetailView: View {
                         attempts.errorMessage = nil
                         publicTrailAttempts.errorMessage = nil
                         discovery.errorMessage = nil
+                        downloaded.errorMessage = nil
+                        gpxExportError = nil
                     }
                 }
             )
@@ -451,6 +467,8 @@ struct RouteDetailView: View {
                 watchError ??
                 attemptErrorMessage ??
                 discovery.errorMessage ??
+                downloaded.errorMessage ??
+                gpxExportError ??
                 watchMessage ??
                 ""
             )
@@ -571,6 +589,139 @@ struct RouteDetailView: View {
                 MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking
             ]
         )
+    }
+
+    private var offlineRouteSnapshot: UIImage? {
+        guard downloaded.has(currentRoute) else { return nil }
+        let id = downloaded.downloadedIDs.contains(currentRoute.id)
+            ? currentRoute.id
+            : (currentRoute.sharedSourceRouteID ?? currentRoute.id)
+        return ATHLTHDownloadedRouteStore.snapshot(
+            routeID: id,
+            userID: session.profile.userID
+        )
+    }
+
+    private var offlineAndExportCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: downloaded.has(currentRoute)
+                        ? "checkmark.circle.fill" : "arrow.down.circle")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Offline route", norwegian: "Rute uten nett"
+                        ))
+                        .font(.headline)
+                        Text(downloaded.has(currentRoute)
+                            ? ATHLTHLocalization.choose(
+                                english: "GPS track saved on this device",
+                                norwegian: "GPS-sporet er lagret på denne enheten"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Save GPS and a static map preview before you leave",
+                                norwegian: "Lagre GPS og statisk kartforhåndsvisning før turen"
+                            ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 9) {
+                    Button {
+                        if downloaded.has(currentRoute) {
+                            showingOfflineMap.toggle()
+                        } else {
+                            Task { await downloadRouteToDevice() }
+                        }
+                    } label: {
+                        if downloaded.downloadingRouteID != nil {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, minHeight: 43)
+                        } else {
+                            Label(
+                                downloaded.has(currentRoute)
+                                    ? (showingOfflineMap
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Interactive map", norwegian: "Vanlig kart"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Offline map", norwegian: "Offlinekart"
+                                        ))
+                                    : ATHLTHLocalization.choose(
+                                        english: "Download route", norwegian: "Last ned rute"
+                                    ),
+                                systemImage: downloaded.has(currentRoute)
+                                    ? "map" : "arrow.down.to.line"
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 43)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .disabled(downloaded.downloadingRouteID != nil)
+
+                    Button(action: exportGPX) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Export GPX", norwegian: "Eksporter GPX"
+                            ),
+                            systemImage: "square.and.arrow.up"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 43)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(currentRoute.coordinates.count < 2)
+                }
+                if downloaded.has(currentRoute) {
+                    Button(role: .destructive) {
+                        downloaded.remove(currentRoute)
+                        showingOfflineMap = false
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Remove offline download",
+                            norwegian: "Fjern nedlastingen"
+                        ))
+                        .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "The offline preview and GPS trace work without service. Interactive street maps may still need network access.",
+                    norwegian: "Forhåndsvisning og GPS-spor virker uten dekning. Interaktive gatekart kan fortsatt kreve nett."
+                ))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func downloadRouteToDevice() async {
+        guard await downloaded.download(
+            currentRoute,
+            for: session.profile.userID
+        ) else { return }
+        // For remote routes, a private saved copy also makes the GPS track
+        // available from My Routes after relaunching without internet.
+        if !isOwner && savedCopy == nil {
+            session.saveSharedRoute(
+                currentRoute,
+                sourceOwnerID: currentRoute.ownerID,
+                sourceRouteID: currentRoute.id
+            )
+        }
+        showingOfflineMap = true
+    }
+
+    private func exportGPX() {
+        do {
+            let url = try ATHLTHRouteGPXExport.temporaryFile(currentRoute)
+            gpxShareFile = ATHLTHRouteShareFile(url: url)
+        } catch {
+            gpxExportError = error.localizedDescription
+        }
     }
 
     private var mapCard: some View {
