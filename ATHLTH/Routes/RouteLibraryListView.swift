@@ -36,15 +36,13 @@ enum RouteLibraryCollection: String, CaseIterable, Identifiable {
 // Shared visual language with My Routes, with public-only content in Routes.
 // Friends means mutually followed route owners, never friends-only visibility.
 enum PublicRouteBrowseFilter: String, CaseIterable, Identifiable {
-    case all, favorites, friends
+    case all, friends
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .all:
             return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
-        case .favorites:
-            return ATHLTHLocalization.choose(english: "Favorites", norwegian: "Favoritter")
         case .friends:
             return ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner")
         }
@@ -52,7 +50,6 @@ enum PublicRouteBrowseFilter: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .all: return "square.grid.2x2"
-        case .favorites: return "star.fill"
         case .friends: return "person.2.fill"
         }
     }
@@ -188,16 +185,7 @@ struct RouteLibraryListView: View {
     }
 
     private var entries: [RouteLibraryEntry] {
-        if source == .database {
-            return publicFilter == .favorites
-                ? catalog.filter {
-                    favorites.isFavorite(
-                        .route,
-                        itemID: $0.id.uuidString
-                    )
-                }
-                : catalog
-        }
+        if source == .database { return catalog }
 
         let values = session.savedRoutes.map(RouteLibraryEntry.init(route:))
         let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -261,13 +249,13 @@ struct RouteLibraryListView: View {
         } else {
             VStack(spacing: 0) {
                 routeCollectionPicker
-                if selectedCollection == .athlth {
+                switch selectedCollection {
+                case .athlth:
                     databaseBrowseView
-                } else {
-                    // The same owned-route view already used in the rest of
-                    // ATHLTH. It includes private and public saved routes,
-                    // without uploading private routes to public discovery.
+                case .mine:
                     SavedRoutesView()
+                case .favorites:
+                    LibraryFavoritesView(initialKind: .route)
                 }
             }
             .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
