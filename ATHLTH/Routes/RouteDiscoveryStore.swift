@@ -15,6 +15,8 @@ struct CommunityRouteRecord: Codable, Identifiable, Hashable {
     let endName: String?
     let expectedTravelTimeSeconds: TimeInterval?
     let routeSource: String?
+    let tags: [String]?
+    let surfacePercentages: [String: Int]?
     let centerLatitude: Double
     let centerLongitude: Double
     let createdAt: Date
@@ -32,6 +34,8 @@ struct CommunityRouteRecord: Codable, Identifiable, Hashable {
         case endName = "end_name"
         case expectedTravelTimeSeconds = "expected_travel_time_seconds"
         case routeSource = "route_source"
+        case tags
+        case surfacePercentages = "surface_percentages"
         case centerLatitude = "center_latitude"
         case centerLongitude = "center_longitude"
         case createdAt = "created_at"
@@ -59,7 +63,9 @@ struct CommunityRouteRecord: Codable, Identifiable, Hashable {
             startName: startName,
             endName: endName,
             expectedTravelTimeSeconds: expectedTravelTimeSeconds,
-            routeSource: routeSource
+            routeSource: routeSource,
+            tags: tags,
+            surfacePercentages: surfacePercentages
         )
     }
 }
@@ -160,6 +166,8 @@ private struct CommunityRouteWrite: Encodable {
     let endName: String?
     let expectedTravelTimeSeconds: TimeInterval?
     let routeSource: String?
+    let tags: [String]?
+    let surfacePercentages: [String: Int]?
     let centerLatitude: Double
     let centerLongitude: Double
     let createdAt: Date
@@ -177,6 +185,8 @@ private struct CommunityRouteWrite: Encodable {
         case endName = "end_name"
         case expectedTravelTimeSeconds = "expected_travel_time_seconds"
         case routeSource = "route_source"
+        case tags
+        case surfacePercentages = "surface_percentages"
         case centerLatitude = "center_latitude"
         case centerLongitude = "center_longitude"
         case createdAt = "created_at"
@@ -341,6 +351,8 @@ final class SupabaseRouteDiscoveryService {
             endName: route.endName,
             expectedTravelTimeSeconds: route.expectedTravelTimeSeconds,
             routeSource: route.routeSource,
+            tags: route.tags ?? [],
+            surfacePercentages: route.surfacePercentages ?? [:],
             centerLatitude: center.latitude,
             centerLongitude: center.longitude,
             createdAt: route.createdAt,
