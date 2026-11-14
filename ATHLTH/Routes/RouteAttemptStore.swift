@@ -388,32 +388,12 @@ final class RouteAttemptStore: ObservableObject {
     }
 
     func leaderboard(
-        currentUserID: UUID? = nil
+        currentUserID: UUID? = nil,
+        direction: ATHLTHRouteAttemptDirection = .forward
     ) -> [RouteAttemptRecord] {
-        let eligible = attempts.filter(\.leaderboardEligible)
-        var bestByUser: [UUID: RouteAttemptRecord] = [:]
-
-        for attempt in eligible {
-            if let current = bestByUser[attempt.userID] {
-                if attempt.durationSeconds < current.durationSeconds {
-                    bestByUser[attempt.userID] = attempt
-                }
-            } else {
-                bestByUser[attempt.userID] = attempt
-            }
-        }
-
-        return bestByUser.values.sorted {
-            if abs($0.durationSeconds - $1.durationSeconds) > 0.1 {
-                return $0.durationSeconds < $1.durationSeconds
-            }
-
-            if abs($0.routeMatchPercent - $1.routeMatchPercent) > 0.01 {
-                return $0.routeMatchPercent > $1.routeMatchPercent
-            }
-
-            return $0.startedAt < $1.startedAt
-        }
+        ATHLTHRouteAttemptDirectionPolicy.bestByAthlete(
+            attempts, direction: direction
+        )
     }
 
     func attempts(for userID: UUID) -> [RouteAttemptRecord] {
