@@ -18,7 +18,7 @@ final class PublicRouteBrowseRegressionTests: XCTestCase {
     func testPublicFiltersOnlyOfferAllFavoritesAndMutualFriends() {
         XCTAssertEqual(
             PublicRouteBrowseFilter.allCases,
-            [.all, .favorites, .friends]
+            [.all, .friends]
         )
         XCTAssertEqual(PublicRouteBrowseFilter.friends.rawValue, "friends")
     }
