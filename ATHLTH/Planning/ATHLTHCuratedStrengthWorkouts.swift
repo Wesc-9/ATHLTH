@@ -29,6 +29,22 @@ enum ATHLTHCuratedStrengthWorkouts {
              rest: rest, cue: cue)
     }
 
+    /// Exercise positions are 1-based; block zero is the shared warm-up.
+    private struct FormatGroup {
+        let positions: ClosedRange<Int>
+        let kind: WorkoutBlockGroupKind
+        let rounds: Int
+        let clockSeconds: Int?
+    }
+
+    private static func group(
+        _ positions: ClosedRange<Int>, _ kind: WorkoutBlockGroupKind,
+        rounds: Int, clockSeconds: Int? = nil
+    ) -> FormatGroup {
+        FormatGroup(positions: positions, kind: kind,
+                    rounds: rounds, clockSeconds: clockSeconds)
+    }
+
     private static func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
@@ -37,9 +53,9 @@ enum ATHLTHCuratedStrengthWorkouts {
         _ number: Int, _ englishTitle: String, _ norwegianTitle: String,
         _ englishSummary: String, _ norwegianSummary: String,
         minutes: Int, difficulty: String, tags: [String],
-        moves: [Move]
+        moves: [Move], groups: [FormatGroup] = []
     ) -> WorkoutTemplateCatalogEntry {
-        let blocks: [WorkoutTemplateBlock] = [
+        var blocks: [WorkoutTemplateBlock] = [
             WorkoutTemplateBlock(
                 sequence: 1, kind: .note,
                 title: tr("Prepare for the session", "Forbered økten"),
@@ -53,7 +69,7 @@ enum ATHLTHCuratedStrengthWorkouts {
                 phase: .warmup
             )
         ] + moves.enumerated().map { index, move in
-            WorkoutTemplateBlock(
+            var block = WorkoutTemplateBlock(
                 sequence: index + 2, kind: .exercise, title: move.title,
                 exerciseSlug: ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(
                     for: move.title
@@ -69,6 +85,26 @@ enum ATHLTHCuratedStrengthWorkouts {
                 phase: .main, setCount: move.sets,
                 restBetweenSetsSeconds: TimeInterval(move.rest)
             )
+            if move.durationSeconds == nil {
+                block.targetRepsInReserve = 2
+                block.targetEffortRPE = 8
+            }
+            return block
+        }
+        for (groupIndex, format) in groups.enumerated() {
+            // Stable IDs: grouped workouts must not change identity on reload.
+            guard let groupID = UUID(uuidString: String(
+                format: "C8000000-0000-0000-0000-%012d",
+                number * 10 + groupIndex + 1
+            )) else { continue }
+            for position in format.positions where blocks.indices.contains(position) {
+                blocks[position].groupID = groupID
+                blocks[position].groupKind = format.kind
+                blocks[position].groupRounds = format.rounds
+                blocks[position].groupClockSeconds =
+                    format.clockSeconds.map(TimeInterval.init)
+                if format.kind != .amrap { blocks[position].setCount = format.rounds }
+            }
         }
         return WorkoutTemplateCatalogEntry(
             id: UUID(uuidString: String(
@@ -291,6 +327,114 @@ enum ATHLTHCuratedStrengthWorkouts {
                     exercise("Incline Dumbbell Curl", 3, 10, 60),
                     exercise("Overhead Triceps Extension", 3, 12, 60),
                     exercise("Hammer Curl", 2, 12, 60)
+                  ]),
+            entry(16, "Express Full Body", "Fullkropp på 25 minutter",
+                  "A practical short session: squat, push, pull and hip hinge.",
+                  "Effektiv kortøkt med knebøy, press, trekk og hoftestrekk.",
+                  minutes: 25, difficulty: "Beginner",
+                  tags: ["fullbody", "full body", "fullkropp", "express", "short", "chest", "back", "legs", "home"],
+                  moves: [
+                    exercise("Goblet Squat", 2, 10, 45),
+                    exercise("Push Up", 2, 10, 45),
+                    exercise("One Arm Dumbbell Row", 2, 10, 45),
+                    exercise("Glute Bridge", 2, 12, 45)
+                  ]),
+            entry(17, "Upper Body Supersets", "Overkropp – supersett",
+                  "Two push/pull pairings, three rounds per pairing.",
+                  "To press- og trekkpar med tre runder per par.",
+                  minutes: 40, difficulty: "Intermediate",
+                  tags: ["superset", "upper body", "overkropp", "chest", "back", "shoulders", "arms"],
+                  moves: [
+                    exercise("Dumbbell Bench Press", 3, 10, 20),
+                    exercise("Seated Cable Row", 3, 10, 90),
+                    exercise("Dumbbell Shoulder Press", 3, 10, 20),
+                    exercise("Lat Pulldown", 3, 10, 90)
+                  ],
+                  groups: [
+                    group(1...2, .superset, rounds: 3),
+                    group(3...4, .superset, rounds: 3)
+                  ]),
+            entry(18, "Lower Body Supersets", "Bein og sete – supersett",
+                  "Three rounds of two complementary lower-body pairings.",
+                  "Tre runder med to utfyllende par for underkroppen.",
+                  minutes: 42, difficulty: "Intermediate",
+                  tags: ["superset", "legs", "bein", "glutes", "setemuskler", "hamstrings", "quads"],
+                  moves: [
+                    exercise("Goblet Squat", 3, 10, 20),
+                    exercise("Romanian Deadlift", 3, 10, 90),
+                    exercise("Reverse Lunge", 3, 10, 20),
+                    exercise("Hip Thrust", 3, 12, 90)
+                  ],
+                  groups: [
+                    group(1...2, .superset, rounds: 3),
+                    group(3...4, .superset, rounds: 3)
+                  ]),
+            entry(19, "Full Body Circuit", "Fullkropp – sirkeltrening",
+                  "Three rounds across five stations; recover at the last station.",
+                  "Tre runder med fem stasjoner og pause etter siste stasjon.",
+                  minutes: 30, difficulty: "Beginner",
+                  tags: ["circuit", "sirkeltrening", "fullbody", "fullkropp", "home", "bodyweight", "legs", "chest", "core"],
+                  moves: [
+                    exercise("Bodyweight Squat", 3, 12, 15),
+                    exercise("Push Up", 3, 8, 15),
+                    exercise("Glute Bridge", 3, 12, 15),
+                    exercise("Bird Dog", 3, 10, 15),
+                    timedExercise("Plank", 3, 30, 90)
+                  ],
+                  groups: [
+                    group(1...5, .circuit, rounds: 3)
+                  ]),
+            entry(20, "16 Minute Strength EMOM", "Styrke-EMOM – 16 minutter",
+                  "Four stations repeated four times, one minute per station.",
+                  "Fire stasjoner over fire runder, ett minutt per stasjon.",
+                  minutes: 23, difficulty: "Intermediate",
+                  tags: ["emom", "timed", "fullbody", "fullkropp", "legs", "back", "chest", "core"],
+                  moves: [
+                    exercise("Goblet Squat", 4, 8, 15),
+                    exercise("One Arm Dumbbell Row", 4, 8, 15),
+                    exercise("Push Up", 4, 8, 15),
+                    exercise("Reverse Lunge", 4, 8, 15)
+                  ],
+                  groups: [
+                    group(1...4, .emom, rounds: 4, clockSeconds: 60)
+                  ]),
+            entry(21, "12 Minute Strength AMRAP", "Styrke-AMRAP – 12 minutter",
+                  "Repeat controlled rounds for twelve minutes; stop if form fades.",
+                  "Gjenta kontrollerte runder i 12 minutter. Stopp ved teknikkfall.",
+                  minutes: 20, difficulty: "Intermediate",
+                  tags: ["amrap", "timed", "fullbody", "fullkropp", "home", "legs", "chest", "core"],
+                  moves: [
+                    exercise("Bodyweight Squat", 1, 10, 15),
+                    exercise("Push Up", 1, 8, 15),
+                    exercise("Reverse Lunge", 1, 8, 15),
+                    exercise("Bird Dog", 1, 10, 15)
+                  ],
+                  groups: [
+                    group(1...4, .amrap, rounds: 1, clockSeconds: 720)
+                  ]),
+            entry(22, "Runner Strength", "Styrke for løpere",
+                  "Single-leg strength, posterior-chain work and trunk control.",
+                  "Ettbeinsstyrke, baksidekjede og kjernestabilitet for løpere.",
+                  minutes: 38, difficulty: "Intermediate",
+                  tags: ["runners", "running support", "legs", "bein", "glutes", "hamstrings", "core", "fullbody"],
+                  moves: [
+                    exercise("Bulgarian Split Squat", 3, 8, 75),
+                    exercise("Romanian Deadlift", 3, 10, 90),
+                    exercise("Standing Calf Raise", 3, 15, 45),
+                    exercise("Pallof Press", 3, 10, 45),
+                    exercise("Dead Bug", 2, 10, 45)
+                  ]),
+            entry(23, "Dumbbell-Only Upper Body", "Overkropp – kun manualer",
+                  "A complete push and pull session with dumbbells.",
+                  "Komplett press- og trekkøkt med manualer.",
+                  minutes: 35, difficulty: "Beginner",
+                  tags: ["dumbbells", "home", "overkropp", "upper body", "chest", "back", "shoulders", "arms"],
+                  moves: [
+                    exercise("Dumbbell Bench Press", 3, 10, 60),
+                    exercise("One Arm Dumbbell Row", 3, 10, 60),
+                    exercise("Dumbbell Shoulder Press", 3, 10, 60),
+                    exercise("Dumbbell Curl", 2, 12, 45),
+                    exercise("Overhead Triceps Extension", 2, 12, 45)
                   ])
         ]
     }
