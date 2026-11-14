@@ -29,6 +29,8 @@ struct RouteDetailView: View {
     @State private var showingFullLeaderboard = false
     @State private var showingAllPersonalAttempts = false
     @State private var showingOfflineMap = false
+    @State private var showingInteractiveMap = false
+    @State private var routeDetailScrolling = false
     @State private var gpxShareFile: ATHLTHRouteShareFile?
     @State private var gpxExportError: String?
     @State private var editingTitle = false
@@ -185,6 +187,9 @@ struct RouteDetailView: View {
             .padding(.bottom, 80)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
+        }
+        .onScrollPhaseChange { _, phase in
+            routeDetailScrolling = phase.isScrolling
         }
         .background(
             LinearGradient(
@@ -408,6 +413,9 @@ struct RouteDetailView: View {
                 .medium,
                 .large
             ])
+        }
+        .fullScreenCover(isPresented: $showingInteractiveMap) {
+            SavedRouteFullscreenMap(route: directedRoute)
         }
         .sheet(item: $gpxShareFile) { file in
             ATHLTHRouteShareSheet(url: file.url)
@@ -785,88 +793,37 @@ struct RouteDetailView: View {
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                     } else {
-                    Map(initialPosition: .region(region(for: directedRoute))) {
-                        if let turnaround {
-                            MapPolyline(coordinates: Array(coordinates[...turnaround]))
-                                .stroke(ATHLTHTheme.premiumGold, lineWidth: 6)
-                            MapPolyline(coordinates: Array(coordinates[turnaround...]))
-                                .stroke(ATHLTHTheme.accentDeep.opacity(0.9),
-                                        lineWidth: 4)
-
-                            Marker(
-                                ATHLTHLocalization.choose(
-                                    english: "Start / Finish",
-                                    norwegian: "Start / Mål"
-                                ),
-                                coordinate: coordinates[0]
-                            )
-                            .tint(ATHLTHTheme.accentDeep)
-
-                            Marker(
-                                ATHLTHLocalization.choose(
-                                    english: "Turn around", norwegian: "Vendepunkt"
-                                ),
-                                coordinate: coordinates[turnaround]
-                            )
-                            .tint(ATHLTHTheme.premiumGold)
-                        } else {
-                            MapPolyline(coordinates: coordinates)
-                                .stroke(ATHLTHTheme.accent, lineWidth: 6)
-                            if let first = coordinates.first {
-                                Marker(
-                                    directedRoute.startName ?? "Start",
-                                    coordinate: first
-                                )
-                                .tint(ATHLTHTheme.accent)
-                            }
-                            if let last = coordinates.last {
-                                Marker(
-                                    directedRoute.endName ?? "Finish",
-                                    coordinate: last
-                                )
-                                .tint(.red)
-                            }
-                        }
-
-                        ForEach(ATHLTHRouteDirectionGeometry.arrows(
-                            for: coordinates
-                        )) { arrow in
-                            Annotation(
-                                "",
-                                coordinate: arrow.coordinate,
-                                anchor: .center
-                            ) {
-                                Image(systemName: "arrow.up")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 29, height: 29)
-                                    .background(
-                                        arrow.returning
-                                            ? ATHLTHTheme.accentDeep
-                                            : ATHLTHTheme.premiumGold,
-                                        in: Circle()
-                                    )
-                                    .rotationEffect(.degrees(arrow.bearingDegrees))
-                                    .shadow(color: .black.opacity(0.16),
-                                            radius: 3, y: 2)
-                                    .accessibilityLabel(
-                                        arrow.returning
-                                            ? ATHLTHLocalization.choose(
-                                                english: "Return direction",
-                                                norwegian: "Returretning"
-                                            )
-                                            : ATHLTHLocalization.choose(
-                                                english: "Route direction",
-                                                norwegian: "Løpsretning"
-                                            )
-                                    )
-                            }
-                        }
+                        // A static route snapshot inside the scrolling page
+                        // avoids MapKit competing with the page's gestures.
+                        // The full interactive map is one tap away.
+                        RouteMapSnapshotThumbnail(
+                            route: directedRoute,
+                            height: 270,
+                            allowsLiveSnapshot: !routeDetailScrolling
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture { showingInteractiveMap = true }
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Open interactive route map",
+                            norwegian: "Åpne interaktivt rutekart"
+                        ))
                     }
-                    .frame(height: 270)
-                    .clipShape(RoundedRectangle(cornerRadius: 20,
-                                                style: .continuous))
+
+                    Button {
+                        showingInteractiveMap = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Open interactive map",
+                                norwegian: "Åpne interaktivt kart"
+                            ),
+                            systemImage: "arrow.up.left.and.arrow.down.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 42)
                     }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTheme.accentDeep)
 
                     if turnaround != nil {
                         HStack(spacing: 14) {
