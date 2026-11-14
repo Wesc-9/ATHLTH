@@ -4128,6 +4128,22 @@ struct MyTrainingPlansLibraryView: View {
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
             libraryWidth = $0
         }
+        .onAppear {
+            displayMode = .load(userID: session.profile.userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(
+                userID: session.profile.userID
+            )
+        }
+        .onChange(of: session.profile.userID) { _, userID in
+            displayMode = .load(userID: userID)
+            preferredColumns = ATHLTHLibraryColumnPreference.load(userID: userID)
+        }
+        .onChange(of: displayMode) { _, mode in
+            mode.save(userID: session.profile.userID)
+        }
+        .onChange(of: preferredColumns) { _, count in
+            ATHLTHLibraryColumnPreference.save(count, userID: session.profile.userID)
+        }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top < -28
         } action: { _, isPulling in
