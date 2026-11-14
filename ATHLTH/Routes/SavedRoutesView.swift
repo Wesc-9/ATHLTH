@@ -92,6 +92,7 @@ struct SavedRoutesView: View {
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
     @State private var routeCardsScrolling = false
+    @State private var snapshotScrollID = UUID()
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(selectionTitle: String? = nil, onSelect: ((TrainingRoute) -> Void)? = nil) {
@@ -290,6 +291,9 @@ struct SavedRoutesView: View {
         }
         .onScrollPhaseChange { _, phase in
             routeCardsScrolling = phase.isScrolling
+            RouteMapSnapshotCache.setScrolling(
+                phase.isScrolling, owner: snapshotScrollID
+            )
         }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top < -28
@@ -321,7 +325,10 @@ struct SavedRoutesView: View {
         .onChange(of: sortPreference) { _, value in
             if value == SavedRouteSort.nearest.rawValue { locationStore.refresh() }
         }
-        .onDisappear { locationStore.stop() }
+        .onDisappear {
+            locationStore.stop()
+            RouteMapSnapshotCache.setScrolling(false, owner: snapshotScrollID)
+        }
         .sheet(isPresented: $showingCustomLength) { customLengthSheet }
         .fullScreenCover(item: $previewRoute) { route in
             SavedRouteFullscreenMap(route: route)
