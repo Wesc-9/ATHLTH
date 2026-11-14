@@ -299,15 +299,6 @@ struct RouteLibraryListView: View {
                     .font(.subheadline.weight(.semibold))
                 }
 
-                HStack(alignment: .center, spacing: 12) {
-                    Text(hasMore
-                         ? tr("\(entries.count) routes loaded", "\(entries.count) ruter lastet inn")
-                         : tr("\(entries.count) routes", "\(entries.count) ruter"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                    Spacer(minLength: 0)
-                }
-
                 HStack(spacing: 10) {
                     ATHLTHRouteBrowseModePicker(
                         selection: viewModeBinding,
