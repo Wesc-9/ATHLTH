@@ -31,16 +31,16 @@ enum ATHLTHPlanWorkoutArtwork {
         if matches(phrase, ["hill", "mountain", "bakke", "trail", "terreng", "vertical"]) {
             return .uphillRunning
         }
-        if matches(phrase, ["interval", "vo2", "vma", "sprint", "speed", "4x4",
-                            "hurtig", "tempo_run", "threshold"]) {
-            return .stadiumIntervals
-        }
         if entry.category == "hybrid" ||
            matches(phrase, ["hyrox", "hybrid", "cross_training", "functional_fitness"]) {
             return .hybrid
         }
         if entry.category == "strength" || entry.category == "muscle_focus" {
             return .strength
+        }
+        if matches(phrase, ["interval", "vo2", "vma", "sprint", "speed", "4x4",
+                            "hurtig", "tempo_run", "threshold"]) {
+            return .stadiumIntervals
         }
         if matches(phrase, ["race", "competition", "marathon", "half_marathon",
                             "10k", "5k", "konkurranse", "event", "finish"]) {
