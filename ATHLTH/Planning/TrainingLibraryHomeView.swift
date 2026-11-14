@@ -1700,16 +1700,10 @@ struct TrainingPlanLibraryView: View {
         }
     }
 
-    /// Only use artwork bundled with ATHLTH; the cards never need remote
-    /// image requests and the library stays usable when offline.
+    /// Workout-aware photography, not five broad-category images reused
+    /// for every training plan. All assets are bundled and work offline.
     private func categoryArtwork(_ entry: TrainingPlanCatalogEntry) -> String {
-        switch entry.category {
-        case "strength", "muscle_focus": return "StrengthFeedGym"
-        case "hybrid": return "GoalEndurance"
-        case "competition": return "GoalEvent"
-        case "general_fitness": return "GoalWalking"
-        default: return "GoalRunning"
-        }
+        ATHLTHPlanWorkoutArtwork.asset(for: entry)
     }
 
     private func localizedLevel(_ level: String) -> String {
@@ -3031,16 +3025,22 @@ struct TrainingPlanCatalogDetailView: View {
         isExpanded: Bool
     ) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: workout.kind.systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                .frame(width: 35, height: 35)
-                .background(ATHLTHPlanDesign.selectedSurface,
-                            in: RoundedRectangle(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 3) {
+            Image(ATHLTHPlanWorkoutArtwork.asset(for: workout))
+                .resizable()
+                .scaledToFill()
+                .frame(width: 65, height: 61)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ATHLTHPlanWorkoutArtwork.label(for: workout).uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 Text(workout.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(2)
                 Text(ATHLTHLocalization.choose(
                     english: "See exercises and targets",
                     norwegian: "Se øvelser, sett og mål"
