@@ -433,7 +433,19 @@ struct RouteLibraryListView: View {
             )
         }
         .onChange(of: session.profile.userID) { _, userID in
+            // Never carry a former account's friends-only metadata into
+            // another account while the new RLS-protected page is loading.
+            catalogRequestID = UUID()
+            catalog.removeAll()
+            hydratedRoutes.removeAll()
+            loadingDetails.removeAll()
+            hasMore = false
+            errorMessage = nil
             preferredColumns = ATHLTHLibraryColumnPreference.load(userID: userID)
+        }
+        .onChange(of: social.mutualFollows.map(\.userID)) { _, _ in
+            // A follow or unfollow immediately refreshes the visible list.
+            Task { await loadCatalog() }
         }
         .onChange(of: preferredColumns) { _, count in
             ATHLTHLibraryColumnPreference.save(count, userID: session.profile.userID)
@@ -1763,7 +1775,8 @@ struct RouteLibraryListView: View {
         let offset = catalog.count
         defer { if catalogRequestID == requestID { loading = false } }
         do {
-            if reset { try await Task.sleep(nanoseconds: 250_000_000) }
+            // The server returns only ~50 small records; no artificial
+            // delay is needed before starting the request.
             let params = RouteCatalogSearchParameters(
                 p_query: String(query.prefix(200)),
                 p_sort: sort == .nearest && locationStore.location == nil ? "Name A–Z" : sort.rawValue,
