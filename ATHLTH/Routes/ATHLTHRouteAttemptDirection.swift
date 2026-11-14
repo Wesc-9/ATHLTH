@@ -37,7 +37,7 @@ enum ATHLTHRouteAttemptDirectionPolicy {
         reference: [CLLocation],
         actual: [CLLocation]
     ) -> ATHLTHRouteAttemptDirection {
-        guard reference.count >= 3, actual.count >= 3,
+        guard reference.count >= 2, actual.count >= 2,
               let first = reference.first, let last = reference.last,
               let observedStart = actual.first, let observedEnd = actual.last
         else { return .unknown }
@@ -55,7 +55,8 @@ enum ATHLTHRouteAttemptDirectionPolicy {
             return original < reversed ? .forward : .reverse
         }
 
-        guard observedStart.distance(from: first) <= 250,
+        guard reference.count >= 3, actual.count >= 3,
+              observedStart.distance(from: first) <= 250,
               observedEnd.distance(from: first) <= 350,
               let observed = sample(actual, metersFromStart: 160),
               let ahead = sample(reference, metersFromStart: 160),
