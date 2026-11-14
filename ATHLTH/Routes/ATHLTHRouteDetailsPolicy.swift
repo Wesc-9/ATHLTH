@@ -221,7 +221,23 @@ struct ATHLTHRouteMetadataForm: View {
                                 surfacePercentages.removeValue(forKey: surface.rawValue)
                             } else {
                                 let occupied = surfacePercentages.values.reduce(0, +)
-                                surfacePercentages[surface.rawValue] = max(0, 100 - occupied)
+                                if occupied == 0 {
+                                    surfacePercentages[surface.rawValue] = 100
+                                } else if occupied < 100 {
+                                    // Explicitly account for previously unknown surface.
+                                    surfacePercentages[surface.rawValue] = 100 - occupied
+                                } else if let largest = surfacePercentages.max(
+                                    by: { $0.value < $1.value }
+                                ) {
+                                    // Adding another surface should be usable
+                                    // immediately, not be stuck at 0% until
+                                    // the athlete finds another slider.
+                                    let allocation = surfacePercentages.count == 1
+                                        ? 50 : min(25, max(5, largest.value / 2))
+                                    surfacePercentages[largest.key] =
+                                        max(0, largest.value - allocation)
+                                    surfacePercentages[surface.rawValue] = allocation
+                                }
                             }
                         } label: {
                             HStack {
