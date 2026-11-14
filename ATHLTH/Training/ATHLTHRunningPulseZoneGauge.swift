@@ -43,8 +43,9 @@ struct ATHLTHRunningPulseZoneGauge: View {
            (35...240).contains(targetMinimumBPM),
            (35...240).contains(targetMaximumBPM),
            targetMinimumBPM <= targetMaximumBPM {
-            return Int(targetMinimumBPM.rounded())...
-                   Int(targetMaximumBPM.rounded())
+            let lower = Int(targetMinimumBPM.rounded())
+            let upper = Int(targetMaximumBPM.rounded())
+            return lower...upper
         }
         if let percent = ATHLTHHeartRateZones.range(
             fromPercent: targetPercentMin, toPercent: targetPercentMax,
