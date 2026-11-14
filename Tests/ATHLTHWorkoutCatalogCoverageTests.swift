@@ -138,7 +138,9 @@ final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
         for entry in WorkoutTemplateCatalogEntry.bundledCatalog {
             let workout = entry.plannedSession()
             let steps = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-            XCTAssertEqual(steps, entry.blocks, entry.slug)
+            // Read-time migration restores authored typed targets from legacy
+            // notes; compare against the same lossless normalized source.
+            XCTAssertEqual(steps, entry.blocks.recoveringLegacyStructuredTargets(), entry.slug)
         }
     }
 
