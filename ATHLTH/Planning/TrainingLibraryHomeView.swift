@@ -5614,8 +5614,15 @@ struct LibraryFavoritesView: View {
                 }
             ) {
                 TrainingPlanCatalogDetailView(entry: entry)
+            } else if let id = UUID(uuidString: item.itemID),
+                      session.trainingPlans.contains(where: { $0.id == id }) {
+                ScrollView {
+                    AdvancedPlannerView(planID: id)
+                        .padding()
+                }
             } else {
-                TrainingPlanLibraryView()
+                // Reusable personal plans are held by the account store.
+                MyTrainingPlansLibraryView()
             }
 
         case .workout:
@@ -5638,6 +5645,9 @@ struct LibraryFavoritesView: View {
                 WorkoutTemplateDetailView(
                     entry: workout
                 )
+            } else if let id = UUID(uuidString: item.itemID),
+                      session.savedWorkoutTemplates.contains(where: { $0.id == id }) {
+                MyWorkoutTemplatesView()
             } else {
                 WorkoutTemplateLibraryView()
             }
