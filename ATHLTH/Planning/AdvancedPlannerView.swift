@@ -6341,6 +6341,26 @@ struct SessionEditorView: View {
                     restoreDraftIfNeeded()
                     hasSelectedWorkoutSource = true
                     hasStoredStandaloneDraft = false
+                    // An older build may have persisted only the parent
+                    // SessionEditor draft, before the shared scratch
+                    // composer existed. Migrate it into the actual builder
+                    // instead of exposing the obsolete "0 steps" form.
+                    if isStandalone, existingWorkout == nil,
+                       onPreparedWorkout == nil, selectedPartnerID == nil {
+                        let type = ATHLTHPlannedWorkoutType.from(composeSession())
+                        selectedScratchWorkoutType = type
+                        scratchTimelineDraftID = UUID()
+                        scratchResumingSavedComposer = false
+                        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                           !workoutPlanningPreviewBlocks.isEmpty {
+                            // A nonblank imported source title prevents the
+                            // shared editor's new-scratch policy from
+                            // inadvertently clearing restored legacy blocks.
+                            title = type.title
+                        }
+                        storeScratchComposerEntry(type: type, draftID: scratchTimelineDraftID)
+                        showingUnifiedWorkoutComposer = true
+                    }
                 }
                 : nil,
             onRecoveryRest: onPreparedWorkout == nil
