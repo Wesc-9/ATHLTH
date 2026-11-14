@@ -146,6 +146,25 @@ final class ATHLTHTrainingProfileAndExerciseProgressTests: XCTestCase {
         XCTAssertEqual(summary.firstToLastWeightChange, 10)
     }
 
+    func testBodyweightProgressShowsRepsButNoZeroKilogramVolume() {
+        let bodyweight = ATHLTHExerciseProgress.summary(
+            exerciseID: UUID(), name: "Bench Press", isCustom: false,
+            workouts: [strengthSession(weight: 0, days: 1)]
+        )
+        XCTAssertEqual(bodyweight.uses, 1)
+        XCTAssertEqual(bodyweight.totalSets, 3)
+        XCTAssertEqual(bodyweight.totalRepetitions, 24)
+        XCTAssertEqual(bodyweight.totalVolume, 0)
+        XCTAssertNil(bodyweight.bestWeight)
+        XCTAssertFalse(bodyweight.hasMeaningfulLoad)
+
+        let loaded = ATHLTHExerciseProgress.summary(
+            exerciseID: UUID(), name: "Bench Press", isCustom: false,
+            workouts: [strengthSession(weight: 50, days: 2)]
+        )
+        XCTAssertTrue(loaded.hasMeaningfulLoad)
+    }
+
     func testCustomExerciseDoesNotInheritOtherExercisesHistoryByName() {
         let summary = ATHLTHExerciseProgress.summary(
             exerciseID: UUID(), name: "Bench Press", isCustom: true,

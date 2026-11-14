@@ -22,6 +22,10 @@ enum ATHLTHExerciseProgress {
             sessions.reduce(0) { $0 + $1.volumeKilograms }
         }
         var bestWeight: Double? { sessions.compactMap(\.highestWeightKilograms).max() }
+        /// Bodyweight-only movements should not show an artificial 0 kg metric.
+        var hasMeaningfulLoad: Bool {
+            (bestWeight ?? 0) > 0 || totalVolume > 0
+        }
         var lastTrained: Date? { sessions.last?.date }
         var firstToLastWeightChange: Double? {
             guard let first = sessions.compactMap(\.highestWeightKilograms).first,

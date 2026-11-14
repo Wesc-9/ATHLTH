@@ -1,152 +1,209 @@
 import Charts
 import SwiftUI
 
+/// A compact, low-noise progress footer for the exercise detail.
+/// Full charts and recent sessions remain available, but are not expanded
+/// in front of technique instructions or on first opening the exercise.
 struct ATHLTHExerciseProgressView: View {
     let progress: ATHLTHExerciseProgress.Summary
+    @State private var showingHistory = false
+
+    private let ink = ATHLTHPlanDesign.ink
+    private let dim = ATHLTHPlanDesign.secondaryInk
+    private let gold = ATHLTHPlanDesign.accentInk
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Label(tr("YOUR PROGRESS", "DIN FREMGANG"),
-                      systemImage: "chart.xyaxis.line")
-                    .font(.caption.weight(.bold))
-                    .tracking(1)
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Spacer()
-                if let date = progress.lastTrained {
-                    Text(date.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 10) {
+                Capsule()
+                    .fill(gold)
+                    .frame(width: 3, height: 19)
+                    .accessibilityHidden(true)
+                Text(tr("Your progress", "Din fremgang"))
+                    .font(.system(size: 21, weight: .medium, design: .serif))
+                    .foregroundStyle(ink)
+                Spacer(minLength: 0)
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.subheadline)
+                    .foregroundStyle(gold)
+                    .accessibilityHidden(true)
             }
 
             if progress.uses == 0 {
                 Text(tr(
-                    "No completed working sets for this exercise yet. Your first recorded session will appear here.",
-                    "Ingen gjennomførte arbeidssett registrert på denne øvelsen ennå. Første gjennomføring vises her."
+                    "No completed working sets registered yet.",
+                    "Ingen fullførte arbeidssett registrert ennå."
                 ))
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .foregroundStyle(dim)
             } else {
-                LazyVGrid(columns: [.init(.flexible()), .init(.flexible())], spacing: 9) {
-                    statistic(tr("Times trained", "Ganger trent"),
-                              value: "\(progress.uses)", symbol: "repeat")
-                    statistic(tr("Completed sets", "Fullførte sett"),
-                              value: "\(progress.totalSets)", symbol: "checkmark.circle")
-                    statistic(tr("Repetitions", "Repetisjoner"),
-                              value: "\(progress.totalRepetitions)", symbol: "number")
-                    statistic(tr("Total recorded volume", "Registrert totalvolum"),
-                              value: String(format: "%.0f kg", progress.totalVolume),
-                              symbol: "scalemass")
+                HStack(spacing: 8) {
+                    statistic(tr("Sessions", "Økter"),
+                              value: "\(progress.uses)")
+                    statistic(tr("Sets", "Sett"),
+                              value: "\(progress.totalSets)")
+                    statistic(tr("Reps", "Reps"),
+                              value: "\(progress.totalRepetitions)")
                 }
 
-                if let best = progress.bestWeight {
-                    HStack(spacing: 8) {
+                // For sit-ups and other bodyweight movements, zero kg is not
+                // a meaningful performance metric. Show weight only when a
+                // positive load was actually logged.
+                if progress.hasMeaningfulLoad {
+                    HStack(spacing: 7) {
                         Image(systemName: "trophy")
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        Text(tr("Highest recorded working weight",
-                                "Høyeste registrerte arbeidsvekt"))
+                            .foregroundStyle(gold)
                             .font(.caption)
-                        Spacer()
-                        Text(String(format: "%.1f kg", best))
-                            .font(.subheadline.weight(.semibold))
-                    }
-                }
-                if let change = progress.firstToLastWeightChange {
-                    HStack {
-                        Text(tr("First to latest session", "Første til siste økt"))
-                            .font(.caption)
-                        Spacer()
-                        Text(String(format: "%+.1f kg", change))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    }
-                }
-                let weightPoints = progress.sessions.filter {
-                    $0.highestWeightKilograms != nil
-                }
-                if weightPoints.count >= 2 {
-                    Text(tr("Recorded working weight", "Registrert arbeidsvekt"))
-                        .font(.caption.weight(.semibold))
-                    Chart(weightPoints) { item in
-                        if let weight = item.highestWeightKilograms {
-                            LineMark(x: .value("Date", item.date),
-                                     y: .value("kg", weight))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            PointMark(x: .value("Date", item.date),
-                                      y: .value("kg", weight))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        if let best = progress.bestWeight {
+                            Text(tr("Highest weight", "Høyeste vekt"))
+                                .foregroundStyle(dim)
+                            Text(String(format: "%.1f kg", best))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(ink)
+                        }
+                        Spacer(minLength: 5)
+                        if progress.totalVolume > 0 {
+                            Text(tr("Volume", "Volum"))
+                                .foregroundStyle(dim)
+                            Text(String(format: "%.0f kg", progress.totalVolume))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(ink)
                         }
                     }
-                    .frame(height: 148)
-                    .chartYAxis { AxisMarks(position: .leading) }
-                } else if progress.sessions.count >= 2 {
-                    Text(tr("Completed reps per session",
-                            "Fullførte repetisjoner per økt"))
-                        .font(.caption.weight(.semibold))
-                    Chart(progress.sessions) { item in
-                        BarMark(x: .value("Date", item.date),
-                                y: .value("Reps", item.repetitions))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    }
-                    .frame(height: 148)
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.horizontal, 5)
                 }
 
-                VStack(alignment: .leading, spacing: 9) {
-                    Text(tr("Recent sessions", "Siste gjennomføringer"))
-                        .font(.subheadline.weight(.semibold))
-                    ForEach(Array(progress.sessions.suffix(5).reversed())) { item in
-                        HStack(alignment: .firstTextBaseline) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.date.formatted(date: .abbreviated,
-                                                         time: .omitted))
-                                    .font(.caption.weight(.semibold))
-                                Text(item.workoutTitle)
-                                    .font(.caption2)
-                                    .lineLimit(1)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                DisclosureGroup(isExpanded: $showingHistory) {
+                    VStack(alignment: .leading, spacing: 13) {
+                        if let change = progress.firstToLastWeightChange {
+                            HStack(spacing: 8) {
+                                Text(tr("First to latest session", "Første til siste økt"))
+                                    .foregroundStyle(dim)
+                                Spacer()
+                                Text(String(format: "%+.1f kg", change))
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(gold)
                             }
-                            Spacer(minLength: 8)
-                            Text("\(item.completedSets) " +
-                                 tr("sets", "sett") + " · " +
-                                 "\(item.repetitions) " + tr("reps", "reps"))
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .font(.caption)
                         }
-                        Divider().opacity(0.4)
+
+                        let weighted = progress.sessions.filter {
+                            $0.highestWeightKilograms != nil
+                        }
+                        if weighted.count >= 2 {
+                            Text(tr("Working weight", "Arbeidsvekt"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ink)
+                            Chart(weighted) { item in
+                                if let weight = item.highestWeightKilograms {
+                                    LineMark(
+                                        x: .value("Date", item.date),
+                                        y: .value("kg", weight)
+                                    )
+                                    .foregroundStyle(gold)
+                                    PointMark(
+                                        x: .value("Date", item.date),
+                                        y: .value("kg", weight)
+                                    )
+                                    .foregroundStyle(gold)
+                                }
+                            }
+                            .frame(height: 118)
+                            .chartYAxis { AxisMarks(position: .leading) }
+                        } else if progress.sessions.count >= 2 {
+                            Text(tr("Reps per session", "Reps per økt"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ink)
+                            Chart(progress.sessions) { item in
+                                BarMark(
+                                    x: .value("Date", item.date),
+                                    y: .value("Reps", item.repetitions)
+                                )
+                                .foregroundStyle(gold)
+                            }
+                            .frame(height: 118)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(tr("Recent sessions", "Siste gjennomføringer"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                            ForEach(Array(progress.sessions.suffix(5).reversed())) { item in
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.date.formatted(
+                                            date: .abbreviated, time: .omitted
+                                        ))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ink)
+                                        Text(item.workoutTitle)
+                                            .font(.caption2)
+                                            .lineLimit(1)
+                                            .foregroundStyle(dim)
+                                    }
+                                    Spacer(minLength: 5)
+                                    Text("\(item.completedSets) " +
+                                         tr("sets", "sett") + " · " +
+                                         "\(item.repetitions) reps")
+                                        .font(.caption2)
+                                        .foregroundStyle(dim)
+                                }
+                                Divider().opacity(0.35)
+                            }
+                        }
+                        Text(tr(
+                            "Based on completed recorded working sets; planned loads and warm-up sets are excluded.",
+                            "Kun registrerte arbeidssett. Planlagte vekter og oppvarmingssett telles ikke."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(dim)
                     }
+                    .padding(.top, 10)
+                } label: {
+                    HStack {
+                        Text(tr("History and development", "Historikk og utvikling"))
+                            .font(.subheadline.weight(.medium))
+                        Spacer(minLength: 0)
+                        Text("\(progress.uses)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(dim)
+                    }
+                    .foregroundStyle(gold)
+                    .frame(minHeight: 40)
                 }
+                .tint(gold)
+                .accessibilityIdentifier("athlth-exercise-progress-history")
             }
-            Text(tr(
-                "Based only on finished, logged working sets. Planned loads and warm-up sets are not counted.",
-                "Kun basert på fullførte, registrerte arbeidssett. Planlagte vekter og oppvarmingssett telles ikke."
-            ))
-            .font(.caption2)
-            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
-        .padding(15)
-        .athlthPlanCard(radius: 19)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .athlthTrainPaper()
+        .accessibilityIdentifier("athlth-exercise-progress-footer")
     }
 
-    private func statistic(_ label: String, value: String,
-                           symbol: String) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Label(label, systemImage: symbol)
+    private func statistic(_ label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
                 .font(.caption2)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .lineLimit(2)
+                .foregroundStyle(dim)
+                .lineLimit(1)
             Text(value)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                .minimumScaleFactor(0.75)
+                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .foregroundStyle(ink)
+                .monospacedDigit()
+                .minimumScaleFactor(0.7)
         }
-        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-        .padding(11)
+        .frame(maxWidth: .infinity, minHeight: 45, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(ATHLTHPlanDesign.selectedSurface,
-                    in: RoundedRectangle(cornerRadius: 13))
+                    in: RoundedRectangle(cornerRadius: 14))
     }
 }

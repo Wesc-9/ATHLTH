@@ -1750,6 +1750,26 @@ struct ExerciseDetailView: View {
             : library.localizedExerciseTips(currentEntry)
     }
 
+    /// Both the title subtitle and the detail history use the same completed
+    /// workout source; no planned sets or exercises from other athletes.
+    private var lastExerciseCompletion: ATHLTHLibraryWorkoutHistory.Summary? {
+        ATHLTHLibraryWorkoutHistory.strengthExercise(
+            id: currentEntry.id,
+            canonicalName: currentEntry.canonicalName,
+            isCustom: currentEntry.source == .custom,
+            workouts: exerciseHistory
+        )
+    }
+
+    private var exerciseProgress: ATHLTHExerciseProgress.Summary {
+        ATHLTHExerciseProgress.summary(
+            exerciseID: currentEntry.id,
+            name: currentEntry.canonicalName,
+            isCustom: currentEntry.source == .custom,
+            workouts: exerciseHistory
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -1773,6 +1793,28 @@ struct ExerciseDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
 
+                    // Quiet completion metadata belongs below the exercise
+                    // name, not in a full-size card above the instructions.
+                    if let last = lastExerciseCompletion {
+                        HStack(alignment: .firstTextBaseline, spacing: 5) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.caption2)
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Last completed",
+                                    norwegian: "Sist gjennomført"
+                                ) + ": " +
+                                last.date.formatted(date: .abbreviated, time: .omitted) +
+                                (last.result.map { " · " + $0 } ?? "")
+                            )
+                            .font(.caption2)
+                            .lineLimit(2)
+                        }
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .padding(.top, 4)
+                        .accessibilityIdentifier("athlth-exercise-last-completed")
+                    }
+
                     if let attribution = currentEntry.exercise.sharedAttributionText {
                         Text(attribution)
                             .font(.caption2)
@@ -1780,24 +1822,6 @@ struct ExerciseDetailView: View {
                             .lineLimit(1)
                     }
                 }
-
-                ATHLTHLastWorkoutHistoryCard(summary:
-                    ATHLTHLibraryWorkoutHistory.strengthExercise(
-                        id: currentEntry.id,
-                        canonicalName: currentEntry.canonicalName,
-                        isCustom: currentEntry.source == .custom,
-                        workouts: exerciseHistory
-                    )
-                )
-
-                ATHLTHExerciseProgressView(
-                    progress: ATHLTHExerciseProgress.summary(
-                        exerciseID: currentEntry.id,
-                        name: currentEntry.canonicalName,
-                        isCustom: currentEntry.source == .custom,
-                        workouts: exerciseHistory
-                    )
-                )
 
                 if let summary = displayedSummary, !summary.isEmpty {
                     detailCard(ATHLTHLocalization.choose(
@@ -1807,20 +1831,6 @@ struct ExerciseDetailView: View {
                             .font(.subheadline)
                             .foregroundStyle(ATHLTHTrainDesign.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                if ATHLTHLocalization.isNorwegian,
-                   currentEntry.source == .repDB {
-                    HStack(spacing: 8) {
-                        Text("Norsk tekst kan være automatisk oversatt.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        Spacer(minLength: 0)
-                        Button(showOriginalEnglish ? "Vis norsk" : "Vis original (EN)") {
-                            showOriginalEnglish.toggle()
-                        }
-                        .font(.caption2.weight(.semibold))
                     }
                 }
 
@@ -1845,8 +1855,17 @@ struct ExerciseDetailView: View {
                         english: "How to perform",
                         norwegian: "Slik utfører du øvelsen"
                     )) {
-                        HStack {
-                            Spacer()
+                        HStack(spacing: 12) {
+                            if ATHLTHLocalization.isNorwegian,
+                               currentEntry.source == .repDB {
+                                Button(showOriginalEnglish ? "Vis norsk" : "Vis original (EN)") {
+                                    showOriginalEnglish.toggle()
+                                }
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .accessibilityIdentifier("athlth-exercise-language-toggle")
+                            }
+                            Spacer(minLength: 0)
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     instructionsAsList.toggle()
@@ -2030,6 +2049,10 @@ struct ExerciseDetailView: View {
                         in: RoundedRectangle(cornerRadius: 18)
                     )
                 }
+
+                // Technique and tips come first. Progress is a compact,
+                // opt-in detail at the bottom rather than the second card.
+                ATHLTHExerciseProgressView(progress: exerciseProgress)
 
                 if currentEntry.source == .custom {
                     Button("Delete Custom Exercise", role: .destructive) {
