@@ -4800,6 +4800,7 @@ final class AppSessionStore: ObservableObject {
         _ entry: TrainingPlanCatalogEntry,
         preferredDayIndexes: [Int]? = nil
     ) -> TrainingPlan? {
+        guard entry.hasCompleteWorkoutPattern else { return nil }
         let catalogTag = "catalog:\(entry.slug)"
         let versionTag =
             "catalog-version:\(entry.catalogVersion)"
@@ -4869,6 +4870,7 @@ final class AppSessionStore: ObservableObject {
         startDate: Date,
         preferredDayIndexes: [Int]
     ) -> TrainingPlan? {
+        guard entry.hasCompleteWorkoutPattern else { return nil }
         let start = Self.catalogWeekStart(
             onOrAfter: startDate
         )
@@ -4911,13 +4913,9 @@ final class AppSessionStore: ObservableObject {
             max(entry.sessionsPerWeek, 2),
             6
         )
-        let blueprints =
-            entry.sessionBlueprints.isEmpty
-                ? [
-                    TrainingPlanCatalogSessionBlueprint.easyRun,
-                    .strength
-                ]
-                : entry.sessionBlueprints
+        // Public entry points validate the complete source pattern. No
+        // invented fallback workouts when an external plan is malformed.
+        let blueprints = entry.sessionBlueprints
         let targetDayIndexes =
             resolvedCatalogDayIndexes(
                 preferredDayIndexes,
