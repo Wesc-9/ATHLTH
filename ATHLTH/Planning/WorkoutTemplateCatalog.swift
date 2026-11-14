@@ -810,6 +810,11 @@ extension WorkoutTemplateCatalogEntry {
 
 @MainActor
 final class WorkoutTemplateCatalogStore: ObservableObject {
+    /// Only published/offline public recipes are shared, never personal
+    /// workouts, favorites or navigation. Reopening the library preserves the
+    /// ready-to-use catalog and normalized search index.
+    static let shared = WorkoutTemplateCatalogStore()
+
     @Published private(set) var entries: [WorkoutTemplateCatalogEntry]
     private let offlineEntries: [WorkoutTemplateCatalogEntry]
     @Published private(set) var isLoading = false
@@ -820,6 +825,7 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
 
     private let client: SupabaseClient
     private var loadedRemote = false
+    private var lastRemoteRefreshSucceededAt: Date?
     private var lastRemoteRefreshAttemptAt: Date?
     /// A refreshed catalog invalidates view-local result snapshots.
     private(set) var contentRevision = 0
@@ -855,7 +861,13 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
     }
 
     func refresh(force: Bool = false) async {
-        if loadedRemote && !force { return }
+        // Reuse published data across visits but pick up new publications
+        // periodically. Explicit pull-to-refresh still forces a new fetch.
+        if !force, loadedRemote,
+           let lastRemoteRefreshSucceededAt,
+           Date().timeIntervalSince(lastRemoteRefreshSucceededAt) < 15 * 60 {
+            return
+        }
         guard !isLoading else { return }
 
         // The Train Today view is recreated when switching Plan/Today.
@@ -896,6 +908,7 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
                     ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
             }
             loadedRemote = true
+            lastRemoteRefreshSucceededAt = Date()
             hasPublishedCatalog = !remote.isEmpty
             errorMessage = nil
         } catch {
@@ -987,8 +1000,7 @@ struct WorkoutTemplateLibraryView: View {
     /// Other library entry points continue to start with "All".
     var initialCategory: ATHLTHPlannedWorkoutType? = nil
 
-    @StateObject private var catalog =
-        WorkoutTemplateCatalogStore()
+    @ObservedObject private var catalog = WorkoutTemplateCatalogStore.shared
     @State private var query = ""
     /// Search text the result engine sees after a brief, cancellable pause.
     /// Typing updates the field immediately without sorting all recipes.
