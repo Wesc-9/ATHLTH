@@ -25,9 +25,15 @@ actor ATHLTHPublicTrailDiskCache {
     private let maximumBytes = 7_000_000
     private let maximumAge: TimeInterval = 7 * 24 * 60 * 60
     private var loaded: [Entry]?
+    private let overrideFileURL: URL?
+
+    init(fileURL: URL? = nil) {
+        overrideFileURL = fileURL
+    }
 
     private var fileURL: URL? {
-        FileManager.default.urls(
+        if let overrideFileURL { return overrideFileURL }
+        return FileManager.default.urls(
             for: .cachesDirectory,
             in: .userDomainMask
         ).first?.appendingPathComponent(
