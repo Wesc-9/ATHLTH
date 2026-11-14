@@ -10836,6 +10836,7 @@ struct ATHLTHProfileView: View {
         [HealthPersonalRecord] = []
     @State private var profilePerformanceWorkoutHistory:
         [WorkoutSummary] = []
+    @State private var mostTrainedItems: [ATHLTHProfileHighlights.TrainedItem] = []
     @State private var loadingProfileData = false
     @State private var showingProfilePhotoPicker =
         false
@@ -10883,7 +10884,12 @@ struct ATHLTHProfileView: View {
             profileHero
         } content: {
             LazyVStack(spacing: 12) {
-                trophyCabinetSection
+                ATHLTHProfileCompetitionCard(userID: session.profile.userID)
+                HStack(alignment: .top, spacing: 10) {
+                    compactProfileTrophies
+                    ATHLTHProfileMostTrainedCard(items: mostTrainedItems)
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
                 ATHLTHPrivateGoalsProfileCard()
                 personalRecordsSection
                 gearSection
@@ -10921,8 +10927,17 @@ struct ATHLTHProfileView: View {
             )
         }
         .task {
+            refreshMostTrained()
             await refreshProfile()
             await pets.refresh()
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            refreshMostTrained()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)
+        ) { _ in
+            refreshMostTrained()
         }
         .photosPicker(
             isPresented:
@@ -11614,140 +11629,27 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    // Compact profile shelf: full medal artwork remains available in
-    // the collection, while the four preview badges need less vertical room.
-    private let profileTrophyBadgeSize: CGFloat = 52
+    /// The profile shows two equally important compact cards; the full trophy
+    /// editor and collection remain available from the preview's See all link.
+    private var compactProfileTrophies: some View {
+        ATHLTHProfileCompactTrophyCard(
+            trophies: profileTrophySlots,
+            unlockedCount: trophyStore.trophies.filter(\.isUnlocked).count
+        )
+    }
 
-    private var trophyCabinetSection: some View {
-        profileSection(
-            title: ATHLTHLocalization.choose(
-                english: "Trophy cabinet",
-                norwegian: "Troféskap"
-            ),
-            icon: "trophy.fill",
-            actionTitle: ATHLTHLocalization.choose(
-                english: "Edit",
-                norwegian: "Rediger"
-            ),
-            destination: AnyView(TrophyCollectionView(startInCabinet: true)),
-            compact: true
-        ) {
-            HStack(alignment: .top, spacing: 9) {
-                ForEach(0..<TrophyStore.showcaseLimit, id: \.self) { index in
-                    if profileTrophySlots.indices.contains(index) {
-                        let trophy = profileTrophySlots[index]
-                        NavigationLink {
-                            TrophyCollectionView(
-                                startInCabinet: true,
-                                replacingTrophyID: trophy.id
-                            )
-                        } label: {
-                            VStack(spacing: 3) {
-                                ATHLTHTrophyCoreView(
-                                    trophy: trophy,
-                                    size: profileTrophyBadgeSize
-                                )
-                                .frame(
-                                    width: profileTrophyBadgeSize,
-                                    height: profileTrophyBadgeSize * 1.10
-                                )
-
-                                Text(trophy.title)
-                                    .font(.system(size: 10.5, weight: .semibold))
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.80)
-                                    .multilineTextAlignment(.center)
-                                    .frame(
-                                        maxWidth: .infinity,
-                                        minHeight: 25,
-                                        alignment: .top
-                                    )
-
-                                // One concise footer instead of percentage + a
-                                // second progress row under every medal.
-                                if !trophy.isComplete, trophy.nextTargetValue != nil {
-                                    ProgressView(value: min(max(trophy.progress, 0), 1))
-                                        .tint(ATHLTHTheme.premiumGold)
-                                        .frame(height: 4)
-                                        .padding(.horizontal, 7)
-                                        .accessibilityLabel(
-                                            "\(Int((trophy.progress * 100).rounded()))%"
-                                        )
-                                } else {
-                                    Text(trophy.stageLabel)
-                                        .font(.system(size: 8, weight: .medium))
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.8)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .top)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(trophy.title), \(trophy.stageLabel)")
-                    } else {
-                        NavigationLink {
-                            TrophyCollectionView(startInCabinet: true)
-                        } label: {
-                            VStack(spacing: 3) {
-                                ZStack {
-                                    ATHLTHTrophyPlateShape()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color(.systemGray6),
-                                                    Color(.systemGray5).opacity(0.54),
-                                                    Color(.systemGray6)
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .overlay {
-                                            ATHLTHTrophyPlateShape()
-                                                .stroke(
-                                                    Color.black.opacity(0.10),
-                                                    style: StrokeStyle(
-                                                        lineWidth: 1.2,
-                                                        dash: [4, 4]
-                                                    )
-                                                )
-                                        }
-
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 21, weight: .light))
-                                        .foregroundStyle(
-                                            ATHLTHTheme.premiumGold.opacity(0.78)
-                                        )
-                                }
-                                .frame(
-                                    width: profileTrophyBadgeSize,
-                                    height: profileTrophyBadgeSize * 1.10
-                                )
-
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Choose",
-                                    norwegian: "Velg"
-                                ))
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .frame(
-                                    maxWidth: .infinity,
-                                    minHeight: 25,
-                                    alignment: .top
-                                )
-                            }
-                            .frame(maxWidth: .infinity, alignment: .top)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
+    @MainActor
+    private func refreshMostTrained() {
+        let accountID = session.profile.userID
+        let running = ATHLTHRunningPerformanceHistory.load(userID: accountID)
+        let phone = AccountLocalStorage.read(
+            [PhoneWorkout].self, name: "phoneHistory", userID: accountID
+        ) ?? []
+        mostTrainedItems = ATHLTHProfileHighlights.mostTrained(
+            strength: strengthWorkout.workoutHistory,
+            running: running,
+            phone: phone
+        )
     }
 
     private var personalRecordsSection: some View {
