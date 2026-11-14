@@ -3,7 +3,8 @@ import XCTest
 
 final class ATHLTHUnifiedLibraryNavigationTests: XCTestCase {
     func testPlanAndWorkoutSourcesShareUnifiedPickerOptions() {
-        XCTAssertEqual(ATHLTHUnifiedLibraryScope.allCases, [.athlth, .mine])
+        // All shared library pickers expose Favorites alongside ATHLTH and Mine.
+        XCTAssertEqual(ATHLTHUnifiedLibraryScope.allCases, [.athlth, .mine, .favorites])
         XCTAssertNotEqual(
             ATHLTHUnifiedLibraryScope.athlth.title,
             ATHLTHUnifiedLibraryScope.mine.title
