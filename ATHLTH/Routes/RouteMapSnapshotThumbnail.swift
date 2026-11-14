@@ -92,16 +92,58 @@ enum ATHLTHRouteDirectionGeometry {
 enum RouteMapSnapshotCache {
     private static let images: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
-        cache.countLimit = 12
-        cache.totalCostLimit = 12 * 1_024 * 1_024
+        // Enough for recently scrolled tiles, while capping decoded memory.
+        cache.countLimit = 32
+        cache.totalCostLimit = 24 * 1_024 * 1_024
         return cache
     }()
+
+    // Coalesce identical thumbnails and limit simultaneous expensive
+    // MapKit snapshots. Scroll cells can disappear without starting more
+    // than two renders in parallel on the main actor.
+    private static var pending: [String: Task<UIImage?, Never>] = [:]
+    private static var activeRenders = 0
+
+    private final class TraceBox: NSObject {
+        let points: [CGPoint]
+        init(_ points: [CGPoint]) { self.points = points }
+    }
+    private static let traces: NSCache<NSString, TraceBox> = {
+        let cache = NSCache<NSString, TraceBox>()
+        cache.countLimit = 100
+        return cache
+    }()
+
+    static func tracePoints(for route: TrainingRoute, key: String) -> [CGPoint] {
+        let id = key as NSString
+        if let cached = traces.object(forKey: id) { return cached.points }
+        let coordinates = route.coordinates.sorted { $0.sequence < $1.sequence }
+            .map(\.coordinate)
+        // The canonical GPS track stays intact. This only limits work needed
+        // to draw a small placeholder while map tiles load.
+        let strideBy = max(1, (coordinates.count + 239) / 240)
+        var sampled = Swift.stride(from: 0, to: coordinates.count, by: strideBy)
+            .map { coordinates[$0] }
+        if let last = coordinates.last, coordinates.count > 1,
+           sampled.last?.latitude != last.latitude ||
+           sampled.last?.longitude != last.longitude {
+            sampled.append(last)
+        }
+        let points = ATHLTHOfflineRouteTraceGeometry.normalizedPoints(sampled)
+        traces.setObject(TraceBox(points), forKey: id)
+        return points
+    }
 
     private static var generation: UInt64 = 0
 
     static func clearCache() {
+        traces.removeAllObjects()
         generation &+= 1
         images.removeAllObjects()
+    }
+
+    static func cachedImage(requestID: String) -> UIImage? {
+        images.object(forKey: requestID as NSString)
     }
 
     static func image(
@@ -109,68 +151,60 @@ enum RouteMapSnapshotCache {
         size: CGSize,
         requestID: String
     ) async -> UIImage? {
-        let key = requestID as NSString
+        if let cached = cachedImage(requestID: requestID) { return cached }
+        if let running = pending[requestID] { return await running.value }
 
-        if let cached =
-            images.object(
-                forKey: key
-            ) {
-            return cached
+        let task = Task { await render(route: route, size: size, requestID: requestID) }
+        pending[requestID] = task
+        let result = await task.value
+        pending.removeValue(forKey: requestID)
+        return result
+    }
+
+    private static func render(
+        route: TrainingRoute,
+        size: CGSize,
+        requestID: String
+    ) async -> UIImage? {
+        // Avoid several MapKit instances allocating and compositing images
+        // during a single scroll frame. Awaiting yields instead of blocking.
+        while activeRenders >= 2 {
+            if Task.isCancelled { return nil }
+            try? await Task.sleep(nanoseconds: 70_000_000)
         }
+        guard !Task.isCancelled else { return nil }
+        activeRenders += 1
+        defer { activeRenders -= 1 }
 
+        if let cached = cachedImage(requestID: requestID) { return cached }
         let signpost = ATHLTHPerformance.begin("RouteThumbnailRender")
         defer { ATHLTHPerformance.end("RouteThumbnailRender", id: signpost) }
         let requestedGeneration = generation
-        let coordinates =
-            route.coordinates
-                .sorted {
-                    $0.sequence <
-                    $1.sequence
-                }
-                .map(\.coordinate)
+        let coordinates = route.coordinates.sorted { $0.sequence < $1.sequence }
+            .map(\.coordinate)
+        guard coordinates.count >= 2 else { return nil }
 
-        guard coordinates.count >= 2
-        else {
-            return nil
-        }
-
-        let options =
-            MKMapSnapshotter.Options()
-        options.region =
-            region(
-                for: coordinates
-            )
+        let options = MKMapSnapshotter.Options()
+        options.region = region(for: coordinates)
         options.size = size
-        options.scale =
-            UIScreen.main.scale
+        options.scale = UIScreen.main.scale
         options.mapType = .standard
         options.showsBuildings = false
-        options.pointOfInterestFilter =
-            .excludingAll
+        options.pointOfInterestFilter = .excludingAll
 
         do {
-            let snapshot =
-                try await MKMapSnapshotter(
-                    options: options
-                )
-                .start()
-
+            let snapshot = try await MKMapSnapshotter(options: options).start()
             guard !Task.isCancelled else { return nil }
-            let rendered =
-                drawRoute(
-                    coordinates,
-                    on: snapshot,
-                    size: size
-                )
-
+            let rendered = drawRoute(coordinates, on: snapshot, size: size)
             if requestedGeneration == generation {
                 images.setObject(
                     rendered,
-                    forKey: key,
-                    cost: rendered.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+                    forKey: requestID as NSString,
+                    cost: rendered.cgImage.map {
+                        $0.bytesPerRow * $0.height
+                    } ?? 0
                 )
             }
-
             return rendered
         } catch {
             return nil
