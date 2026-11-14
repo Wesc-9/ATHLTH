@@ -240,3 +240,5 @@ ATHLTH 2.1.9 build 127 – retry after fixing immutable live snapshot XCTest fix
 ATHLTH 2.1.9 build 127 – TestFlight retry: fixed racy watchOS Info.plist build script – 2026-11-13
 
 ATHLTH 2.1.9 build 127 – retry: fixed optional Bool XCTest assertion in Quick Run timeline adapter – 2026-11-13
+
+ATHLTH 2.2.0 build 128 — user-authorized overnight TestFlight upload 2026-11-14 Europe/Oslo after cinematic workout imagery, training library data migration and shared running/Watch/iPad improvements. Require exact-commit green Build ATHLTH and backend tests, iPad verification, valid four-bundle signing, signed archive and confirmed App Store Connect delivery. Diagnose failures, retry safely on release/v2.2.0, keep previous releases unchanged; do not claim success before upload and Apple processing are verified.
