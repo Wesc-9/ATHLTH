@@ -36,7 +36,30 @@ final class ATHLTHGymCoachStrengthLibraryTests: XCTestCase {
     }
 
     @MainActor
-    func testABThreeDayPlansAlternateAcrossWeeks() throws {
+    func testSourceMusclesAndExperienceLevelsAreDiscoverable() throws {
+        let entries = ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries
+        let beginner = try XCTUnwrap(entries.first {
+            $0.slug.hasPrefix("gymcoach-full-body-3day-")
+        })
+        XCTAssertEqual(beginner.difficulty, ATHLTHLocalization.choose(
+            english: "Beginner", norwegian: "Nybegynner"
+        ))
+        let advanced = try XCTUnwrap(entries.first {
+            $0.slug.hasPrefix("gymcoach-nsuns-4day-")
+        })
+        XCTAssertEqual(advanced.difficulty, ATHLTHLocalization.choose(
+            english: "Advanced", norwegian: "Avansert"
+        ))
+        for group in ["back", "shoulders"] {
+            let filter = ATHLTHWorkoutDiscoveryFilter(
+                muscleGroups: [group], runningType: nil, duration: .any
+            )
+            XCTAssertTrue(entries.contains(where: filter.matches), group)
+        }
+    }
+
+    @MainActor
+    func testABThreeDayPlansAlternateAcrossWeeks() throws
         for slug in ["starting-strength-3day", "stronglifts-5x5-3day"] {
             let plan = try XCTUnwrap(ATHLTHGymCoachStrengthLibrary.programs.first {
                 $0.slug == slug
