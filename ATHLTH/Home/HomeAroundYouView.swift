@@ -2430,44 +2430,47 @@ struct AroundYouExploreView: View {
                 }
             }
 
-            HStack(spacing: 12) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: loop ? "Loop route" : "Point-to-point route",
-                        norwegian: loop ? "Rundløype" : "Fra A til B"
-                    ),
-                    systemImage: loop
-                        ? "arrow.triangle.2.circlepath" : "point.topleft.down.to.point.bottomright.curvepath"
-                )
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: loop ? "Loop route" : "Point-to-point route",
+                            norwegian: loop ? "Rundløype" : "Fra A til B"
+                        ),
+                        systemImage: loop
+                            ? "arrow.triangle.2.circlepath" : "arrow.right"
+                    )
+                    Spacer(minLength: 4)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            reverseSelectedRoute.toggle()
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: reverseSelectedRoute
+                                    ? "Original direction" : "Reverse",
+                                norwegian: reverseSelectedRoute
+                                    ? "Normal retning" : "Snu retning"
+                            ),
+                            systemImage: "arrow.left.arrow.right"
+                        )
+                        .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .accessibilityHint("Endrer start, mål og rutens retning")
+                }
                 if let seconds = route.expectedTravelTimeSeconds,
                    seconds > 0 {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "About \(Int((seconds / 60).rounded())) min",
-                            norwegian: "Ca. \(Int((seconds / 60).rounded())) min"
+                            english: "Estimated \(Int((seconds / 60).rounded())) min",
+                            norwegian: "Estimert \(Int((seconds / 60).rounded())) min"
                         ),
                         systemImage: "clock"
                     )
                 }
-                Spacer(minLength: 0)
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        reverseSelectedRoute.toggle()
-                    }
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: reverseSelectedRoute
-                                ? "Original direction" : "Reverse",
-                            norwegian: reverseSelectedRoute
-                                ? "Normal retning" : "Snu retning"
-                        ),
-                        systemImage: "arrow.left.arrow.right"
-                    )
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .accessibilityHint("Endrer start, mål og rutens retning")
             }
             .font(.caption2.weight(.semibold))
             .foregroundStyle(ATHLTHTheme.mutedText)
