@@ -136,6 +136,7 @@ struct RouteLibraryListView: View {
     @State private var didSaveRouteInBuilder = false
     @State private var catalog: [RouteLibraryEntry] = []
     @State private var query = ""
+    @State private var committedQuery = ""
     @State private var searchExpanded = false
     @State private var sort: RouteLibrarySort = .nearest
     @State private var lengthFilter = 0
@@ -174,7 +175,7 @@ struct RouteLibraryListView: View {
 
     private var catalogKey: String {
         [session.profile.userID.uuidString,
-         query, sort.rawValue, String(lengthFilter),
+         committedQuery, sort.rawValue, String(lengthFilter),
          lengthFilter == 6 ? String(minLength) : "",
          lengthFilter == 6 ? String(maxLength) : "",
          String(publicFilter == .friends),
@@ -439,6 +440,13 @@ struct RouteLibraryListView: View {
             ATHLTHLibraryColumnPreference.save(count, userID: session.profile.userID)
         }
         .refreshable { await loadCatalog() }
+        .task(id: query) {
+            // Avoid one database roundtrip for every keystroke.
+            do { try await Task.sleep(for: .milliseconds(250)) }
+            catch { return }
+            guard !Task.isCancelled else { return }
+            committedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         .task(id: catalogKey) {
             await refreshCatalogOnAppear()
         }
@@ -1766,7 +1774,7 @@ struct RouteLibraryListView: View {
             // The server returns only ~50 small records; no artificial
             // delay is needed before starting the request.
             let params = RouteCatalogSearchParameters(
-                p_query: String(query.prefix(200)),
+                p_query: String(committedQuery.prefix(200)),
                 p_sort: sort == .nearest && locationStore.location == nil ? "Name A–Z" : sort.rawValue,
                 p_length: lengthFilter,
                 p_latitude: locationStore.location?.coordinate.latitude,
