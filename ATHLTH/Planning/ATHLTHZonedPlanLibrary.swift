@@ -424,7 +424,7 @@ enum ATHLTHZonedPlanLibrary {
             // Source percentages, hill grade, altitude and terrain are
             // separate executable/inspectable targets, never "hidden" in
             // the combined instructions. The prose only retains coaching.
-            let instructions = copy.instructions.trimmingCharacters(
+            let instructions = (copy.instructions ?? "").trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
             let zone = step.zone.flatMap(zonePrescription)
