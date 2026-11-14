@@ -7290,65 +7290,6 @@ struct WorkoutTemplateBuilderView: View {
             }
     }
 
-    private var workoutActions: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Button {
-                    saveToMyWorkouts()
-                } label: {
-                    Label(savedToMyWorkouts
-                        ? tr("Saved in My workouts", "Lagret i mine økter")
-                        : savedTemplateID == nil
-                            ? tr("Save to My workouts", "Lagre til mine økter")
-                            : tr("Update My workout", "Oppdater min økt"),
-                          systemImage: savedToMyWorkouts ? "checkmark.circle.fill" : "bookmark")
-                        .frame(maxWidth: .infinity, minHeight: 46)
-                }
-                .disabled(!canSave || savedToMyWorkouts)
-                if savedTemplateID != nil {
-                    Menu {
-                        Button {
-                            saveToMyWorkouts(asNew: true)
-                        } label: {
-                            Label(tr("Save as new workout", "Lagre som ny økt"),
-                                  systemImage: "plus.square.on.square")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .frame(width: 30, height: 46)
-                    }
-                    .disabled(!canSave)
-                }
-                if onCopyToPlan != nil && !planCopyDays.isEmpty {
-                    Button {
-                        selectedCopyDayIDs = pendingCopyDayIDs
-                        showingCopyPicker = true
-                    } label: {
-                        Label(tr("Copy to days", "Kopier til andre dager"),
-                              systemImage: "calendar.badge.plus")
-                            .frame(maxWidth: .infinity, minHeight: 46)
-                    }
-                    .disabled(!canSave)
-                }
-            }
-            .buttonStyle(.bordered)
-            .tint(studioInk)
-            if !pendingCopyDayIDs.isEmpty {
-                Label("\(pendingCopyDayIDs.count) " +
-                      tr("copy destinations selected; saved together with the workout",
-                         "valgte dager; kopiene lagres sammen med originaløkten"),
-                      systemImage: "calendar.badge.clock")
-                    .font(.caption)
-                    .foregroundStyle(studioInk.opacity(0.7))
-            }
-            if let actionNotice {
-                Label(actionNotice, systemImage: "checkmark.circle.fill")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(studioAccent)
-            }
-        }
-    }
-
     private func pickerRow(
         _ name: String, icon: String, action: @escaping () -> Void
     ) -> some View {
@@ -7826,29 +7767,6 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
-    private func blockAddButton(
-        _ label: String,
-        icon: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 9) {
-                Image(systemName: icon)
-                Text(label)
-                Spacer(minLength: 0)
-                Image(systemName: "plus")
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(ATHLTHTheme.accentDeep)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity)
-            .frame(height: 51)
-            .background(ATHLTHTheme.accentSoft.opacity(0.72),
-                        in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
     private func openExercisePicker(for groupID: UUID? = nil) {
         exerciseTargetGroupID = groupID
         pendingNewGroupKind = nil
@@ -7998,21 +7916,6 @@ struct WorkoutTemplateBuilderView: View {
         insertBlock(block, toGroup: groupID)
     }
 
-    private func addWarmUpRun() {
-        var block = WorkoutTemplateBlock(
-            sequence: 0, kind: .run,
-            title: tr("Easy jogging warm-up", "Oppvarming – rolig jogg"),
-            exerciseSlug: nil, distanceMeters: nil,
-            repetitions: nil, durationSeconds: 600,
-            targetWeightKilograms: nil, loadNote: nil,
-            notes: nil, phase: .warmup
-        )
-        block.cardioActivity = .running
-        blocks.insert(block, at: 0)
-        resequence()
-        expandedBlockIndex = 0
-    }
-
     private func addWellnessBlock(_ wellness: WorkoutWellnessKind) {
         let minutes: Double = wellness == .meditation ? 5 : wellness == .yoga ? 15 : 10
         var block = WorkoutTemplateBlock(
@@ -8024,13 +7927,6 @@ struct WorkoutTemplateBuilderView: View {
         )
         block.wellnessKind = wellness
         insertBlock(block, toGroup: nil)
-    }
-
-    private func addWellnessGuide(_ guide: ATHLTHWellnessGuide) {
-        insertBlock(
-            ATHLTHWellnessBlockFactory.block(for: guide, phase: selectedPhase),
-            toGroup: nil
-        )
     }
 
     private func addRestBlock(toGroup groupID: UUID? = nil) {
@@ -8318,26 +8214,6 @@ struct WorkoutTemplateBuilderView: View {
         ATHLTHPlannedDurationEditor(durationSeconds: $blocks[index].durationSeconds)
     }
 
-    private func distanceBinding(_ index: Int) -> Binding<Double> {
-        Binding(
-            get: { blocks[index].distanceMeters ?? 1_000 },
-            set: { blocks[index].distanceMeters = $0 }
-        )
-    }
-
-    private func repetitionsBinding(_ index: Int) -> Binding<Int> {
-        Binding(
-            get: { blocks[index].repetitions ?? 10 },
-            set: { blocks[index].repetitions = $0 }
-        )
-    }
-
-    private func durationBinding(_ index: Int) -> Binding<Double> {
-        Binding(
-            get: { blocks[index].durationSeconds ?? 60 },
-            set: { blocks[index].durationSeconds = $0 }
-        )
-    }
 }
 
 struct SavedWorkoutPickerView: View {
