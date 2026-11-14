@@ -5554,8 +5554,11 @@ struct ATHLTHTrainView: View {
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
     @State private var selectedSuggestedWorkout: WorkoutTemplateCatalogEntry?
-    // Retained across Train tabs; avoid reloading the catalog on every visit.
-    @StateObject private var trainWorkoutCatalog = WorkoutTemplateCatalogStore()
+    // Reuse the immutable published catalog and search cache already shared
+    // with other workout-library entry points. Avoid rebuilding all bundled
+    // recipes or fetching the same remote data on the first Train tab tap.
+    @ObservedObject private var trainWorkoutCatalog =
+        WorkoutTemplateCatalogStore.shared
     @State private var pendingRunningTemplate: RunningWorkoutTemplate?
     @State private var pendingPlannedEnduranceWorkout: PlannedWorkoutSelection?
     @State private var showingRunQuickStart = false
@@ -6128,12 +6131,28 @@ struct ATHLTHTrainView: View {
                 // Resolve navigation first so the selected tab can render
                 // before expensive plan reconciliation and catalog refresh.
                 handleNavigationRequest()
-                if preparedTrainUserID != session.profile.userID {
-                    let userID = session.profile.userID
-                    // Yield the first Train frame to SwiftUI on cold entry.
-                    try? await Task.sleep(for: .milliseconds(160))
-                    guard !Task.isCancelled, isActive,
-                          session.profile.userID == userID else { return }
+                let userID = session.profile.userID
+                // Previously plan graph reconciliation started after 160 ms,
+                // right in the native floating tab-pill animation (~300 ms).
+                // Existing plan data already renders immediately: do the
+                // expensive account reconciliation only after navigation has
+                // settled. Cancelling an abandoned Train tap skips the work.
+                do {
+                    try await Task.sleep(for: .milliseconds(480))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled, isActive,
+                      session.profile.userID == userID else { return }
+                let reconciliationID = ATHLTHPerformance.begin(
+                    "TrainPostTransitionReconcile"
+                )
+                defer {
+                    ATHLTHPerformance.end(
+                        "TrainPostTransitionReconcile", id: reconciliationID
+                    )
+                }
+                if preparedTrainUserID != userID {
                     session.refreshActivePlanForToday()
                     session.reconcilePlanLinkedPhoneWorkouts(
                         phoneWorkout.history, healthWorkouts: health.workouts
@@ -6165,8 +6184,12 @@ struct ATHLTHTrainView: View {
                 handleNavigationRequest()
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active {
-                    refreshTrainDayIfChanged()
+                if phase == .active, isActive {
+                    // The first Train activation owns the heavy daily refresh
+                    // in the post-transition task above.
+                    if preparedTrainUserID == session.profile.userID {
+                        refreshTrainDayIfChanged()
+                    }
                     resolveDelayedPlanStartIfReady()
                 }
             }
@@ -6187,10 +6210,10 @@ struct ATHLTHTrainView: View {
                 refreshTrainDayIfChanged()
             }
             .onChange(of: isActive) { _, active in
-                if active {
-                    refreshTrainDayIfChanged()
-                    return
-                }
+                // Do not normalize the entire training plan on the same
+                // frame as the native tab selection animation. The task above
+                // validates today and reconciles after the transition.
+                if active { return }
                 trainHistoryReconcileTask?.cancel()
                 trainHistoryReconcileTask = nil
                 // Preserve the viewport when leaving Train. Resetting three
@@ -6662,6 +6685,7 @@ struct ATHLTHTrainView: View {
 
             ATHLTHTrainTodayPremiumView(
                 workoutCatalog: trainWorkoutCatalog,
+                isActive: isActive,
             plan: active,
             sessions: sessions,
             completedIDs: completedIDs,
