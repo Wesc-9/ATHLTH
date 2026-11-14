@@ -37,6 +37,7 @@ struct RouteDetailView: View {
     @State private var loadingSimilarTrails = false
     @State private var showingSimilarTrails = false
     @State private var routeToStart: TrainingRoute?
+    @State private var selectedAttemptDirection: ATHLTHRouteAttemptDirection = .forward
     @State private var showingMetadataEditor = false
     @State private var draftTags: [String] = []
     @State private var draftSurfaces: [String: Int] = [:]
@@ -98,10 +99,15 @@ struct RouteDetailView: View {
         }
     }
 
+    private var allRouteAttempts: [RouteAttemptRecord] {
+        isPublicTrail ? publicTrailAttempts.attempts : attempts.attempts
+    }
+
     private var leaderboard: [RouteAttemptRecord] {
-        isPublicTrail
-            ? publicTrailAttempts.leaderboard()
-            : attempts.leaderboard()
+        ATHLTHRouteAttemptDirectionPolicy.bestByAthlete(
+            allRouteAttempts,
+            direction: selectedAttemptDirection
+        )
     }
 
     private var topThree: [RouteAttemptRecord] {
@@ -109,42 +115,40 @@ struct RouteDetailView: View {
     }
 
     private var ownAttempts: [RouteAttemptRecord] {
-        isPublicTrail
-            ? publicTrailAttempts.attempts(
-                for: session.profile.userID
-            )
-            : attempts.attempts(
-                for: session.profile.userID
-            )
+        allRouteAttempts
+            .filter {
+                $0.userID == session.profile.userID &&
+                $0.direction == selectedAttemptDirection
+            }
+            .sorted { $0.startedAt > $1.startedAt }
     }
 
-    private var ownBest: RouteAttemptRecord? {
-        isPublicTrail
-            ? publicTrailAttempts.bestAttempt(
-                for: session.profile.userID
-            )
-            : attempts.bestAttempt(
-                for: session.profile.userID
-            )
+    private var historicalAttemptsWithoutDirection: [RouteAttemptRecord] {
+        allRouteAttempts
+            .filter {
+                $0.userID == session.profile.userID &&
+                ($0.direction ?? .unknown) == .unknown
+            }
+            .sorted { $0.startedAt > $1.startedAt }
     }
 
-    private var ownLatest: RouteAttemptRecord? {
-        isPublicTrail
-            ? publicTrailAttempts.latestAttempt(
-                for: session.profile.userID
-            )
-            : attempts.latestAttempt(
-                for: session.profile.userID
-            )
+    private var personalProgress:
+        (best: RouteAttemptRecord?, latest: RouteAttemptRecord?, gainSeconds: Double?) {
+        ATHLTHRouteAttemptDirectionPolicy.personalProgress(
+            allRouteAttempts,
+            direction: selectedAttemptDirection,
+            userID: session.profile.userID
+        )
     }
+
+    private var ownBest: RouteAttemptRecord? { personalProgress.best }
+
+    private var ownLatest: RouteAttemptRecord? { personalProgress.latest }
 
     private var ownRank: Int? {
         guard let index = leaderboard.firstIndex(
             where: { $0.userID == session.profile.userID }
-        ) else {
-            return nil
-        }
-
+        ) else { return nil }
         return index + 1
     }
 
@@ -165,6 +169,7 @@ struct RouteDetailView: View {
                     privacyCard
                 }
 
+                attemptDirectionCard
                 performanceCard
                 leaderboardCard
                 attemptsCard
@@ -1648,6 +1653,46 @@ struct RouteDetailView: View {
         }
     }
 
+    private var attemptDirectionCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Results by direction", norwegian: "Resultater etter retning"
+                ))
+                .font(.headline)
+                Picker(
+                    ATHLTHLocalization.choose(english: "Direction", norwegian: "Retning"),
+                    selection: $selectedAttemptDirection
+                ) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Original", norwegian: "Normal"
+                    )).tag(ATHLTHRouteAttemptDirection.forward)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Reverse", norwegian: "Motsatt"
+                    )).tag(ATHLTHRouteAttemptDirection.reverse)
+                }
+                .pickerStyle(.segmented)
+                Text(ATHLTHLocalization.choose(
+                    english: "Only GPS-verified attempts in this direction count towards these rankings.",
+                    norwegian: "Kun GPS-bekreftede forsøk i valgt retning teller på disse ledertavlene."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                if !historicalAttemptsWithoutDirection.isEmpty {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "\(historicalAttemptsWithoutDirection.count) older attempts have unverified direction and are excluded from rankings.",
+                            norwegian: "\(historicalAttemptsWithoutDirection.count) eldre forsøk har ubekreftet retning og teller ikke på ledertavlen."
+                        ),
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     private var performanceCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 14) {
@@ -1669,6 +1714,24 @@ struct RouteDetailView: View {
                         ProgressView()
                             .controlSize(.small)
                     }
+                }
+
+                if let progress = personalProgress.gainSeconds {
+                    HStack(spacing: 8) {
+                        Image(systemName: progress >= 0 ? "arrow.up.right" : "arrow.down.right")
+                        Text(progress >= 0
+                            ? ATHLTHLocalization.choose(
+                                english: "Faster than last time: \(clock(progress))",
+                                norwegian: "Raskere enn sist: \(clock(progress))"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Slower than last time: \(clock(-progress))",
+                                norwegian: "Saktere enn sist: \(clock(-progress))"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(progress >= 0
+                        ? ATHLTHTheme.vitality : ATHLTHTheme.mutedText)
                 }
 
                 if let latest = ownLatest {
@@ -2028,7 +2091,9 @@ struct RouteDetailView: View {
                 }
 
                 Button {
-                    routeToStart = currentRoute
+                    routeToStart = selectedAttemptDirection == .reverse
+                        ? ATHLTHExploreRoutePolicy.reversedForWorkout(currentRoute)
+                        : currentRoute
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
@@ -2566,7 +2631,9 @@ struct RouteDetailView: View {
         do {
             try await GhostRaceStartService.start(
                 attempt: attempt,
-                route: currentRoute,
+                route: selectedAttemptDirection == .reverse
+                    ? ATHLTHExploreRoutePolicy.reversedForWorkout(currentRoute)
+                    : currentRoute,
                 health: health,
                 ownerID: session.profile.userID,
                 ghostRace: ghostRace,
