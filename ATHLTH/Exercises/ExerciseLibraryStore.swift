@@ -792,6 +792,10 @@ final class ExerciseLibraryStore: ObservableObject {
             lastUpdated = Date()
             invalidateDerivedCaches()
             await persistRepDBCache(data)
+        } catch is CancellationError {
+            // Switching away from Train cancels optional downloads; that is
+            // not a user-visible library error or a reason to reload disk.
+            return
         } catch {
             errorMessage = error.localizedDescription
             if repDBExercises.isEmpty { loadCachedRepDB() }
