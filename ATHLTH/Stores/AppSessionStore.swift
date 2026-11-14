@@ -1235,6 +1235,21 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+    /// Metadata edits keep the canonical route GPS and leaderboard unchanged.
+    func updateSavedRouteMetadata(
+        _ routeID: UUID,
+        tags: [String],
+        surfacePercentages: [String: Int]
+    ) {
+        guard let index = savedRoutes.firstIndex(where: { $0.id == routeID }),
+              savedRoutes[index].ownerID == profile.userID,
+              savedRoutes[index].sharedSourceRouteID == nil
+        else { return }
+        savedRoutes[index].tags = ATHLTHRouteDetailsPolicy.cleanedTags(tags)
+        savedRoutes[index].surfacePercentages =
+            ATHLTHRouteDetailsPolicy.cleanedSurfaces(surfacePercentages)
+    }
+
     func deleteSavedRoute(_ routeID: UUID) {
         savedRoutes.removeAll { $0.id == routeID }
 
@@ -5273,6 +5288,8 @@ final class AppSessionStore: ObservableObject {
             expectedTravelTimeSeconds: source.expectedTravelTimeSeconds,
             routeSource: "shared"
         )
+        copy.tags = source.tags
+        copy.surfacePercentages = source.surfacePercentages
         copy.sharedSourceOwnerID =
             source.sharedSourceOwnerID ?? sourceOwnerID ?? source.ownerID
         copy.sharedSourceRouteID =
