@@ -154,6 +154,9 @@ struct ATHLTHStudioDashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 17) {
                     heading(wide: wide)
+                    // Cross-device session discovery is a primary command,
+                    // not buried below the (potentially tall) week planner.
+                    ATHLTHiPadLiveWorkoutStatusCard()
 
                     if wide {
                         HStack(alignment: .top, spacing: 15) {
@@ -170,7 +173,6 @@ struct ATHLTHStudioDashboardView: View {
                     }
 
                     weekCard(currentWeek, width: geometry.size.width)
-                    ATHLTHiPadLiveWorkoutStatusCard()
 
                     if wide {
                         HStack(alignment: .top, spacing: 15) {
