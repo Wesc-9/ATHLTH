@@ -258,6 +258,7 @@ struct RouteDetailView: View {
 
     var body: some View {
         routePrimaryContent
+        .tint(ATHLTHTheme.accentDeep)
         .task(id: currentRoute.id) {
             downloaded.load(userID: session.profile.userID)
             routeLocation.start()
@@ -2228,11 +2229,7 @@ struct RouteDetailView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(
-                        savedCopy == nil
-                            ? ATHLTHTheme.accent
-                            : ATHLTHTheme.vitality
-                    )
+                    .tint(ATHLTHTheme.accentDeep)
                     .controlSize(.large)
                 }
 
@@ -2279,7 +2276,7 @@ struct RouteDetailView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.vitality)
+                    .tint(ATHLTHTheme.accentDeep)
                     .controlSize(.large)
                     .disabled(
                         startingGhostAttemptID != nil ||
@@ -2328,7 +2325,7 @@ struct RouteDetailView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
+                .tint(ATHLTHTheme.accentDeep)
                 .controlSize(.large)
                 .disabled(phoneWorkout.active != nil)
 
