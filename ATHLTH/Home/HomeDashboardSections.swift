@@ -1743,6 +1743,7 @@ struct HomeWeeklyProgressStrip:
         [HomeScheduledCommunityEvent]
     var onStartStandaloneWorkout:
         ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
+    var canStartWithWatch = false
 
     @State private var weekOffset = 0
     @State private var selectedDay:
@@ -1911,6 +1912,7 @@ struct HomeWeeklyProgressStrip:
                 selection: selection,
                 plan: plan,
                 recentWorkouts: workouts,
+                canStartWithWatch: canStartWithWatch,
                 onStartStandaloneWorkout: { workout, device in
                     // Close the day sheet before the chosen recorder opens.
                     selectedDay = nil
@@ -3072,6 +3074,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     let selection: HomeWeeklyProgressDaySelection
     let plan: TrainingPlan?
     let recentWorkouts: [WorkoutSummary]
+    var canStartWithWatch = false
     var onStartStandaloneWorkout:
         ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
     let onOpenWorkout: () -> Void
@@ -3540,20 +3543,23 @@ private struct HomeWeeklyProgressDaySheet: View {
                 HomeDailyRecommendedWorkoutSheet(
                     workout: workout,
                     isPlanWorkout: isPlanWorkout,
-                    canStartWithWatch: false,
+                    canStartWithWatch: canStartWithWatch,
                     onOpenPlannedWorkout: {
                         pendingPlanTracking = workout
                         selectedPlannedWorkout = nil
                     },
                     onStartOnPhone: {
+                        guard canLaunchPlannedWorkout(workout) else { return }
                         selectedPlannedWorkout = nil
                         onStartStandaloneWorkout?(workout, .iPhone)
                     },
-                    onStartOnWatch: {},
+                    onStartOnWatch: {
+                        guard canLaunchPlannedWorkout(workout), canStartWithWatch else { return }
+                        selectedPlannedWorkout = nil
+                        onStartStandaloneWorkout?(workout, .appleWatch)
+                    },
                     isCalendarWorkout: true,
-                    canStart: !selection.completedPlannedIDs.contains(workout.id)
-                        && !workout.isExplicitRestDay
-                        && (isPlanWorkout || onStartStandaloneWorkout != nil),
+                    canStart: canLaunchPlannedWorkout(workout),
                     onDelete: canRemovePlannedWorkout(workout)
                         ? { removePlannedWorkout(workout) } : nil
                 )
@@ -4417,8 +4423,32 @@ private struct HomeWeeklyProgressDaySheet: View {
         scheduleConfirmation = nil
     }
 
+    /// Resolve the live plan/standalone record before advertising a start.
+    /// A completed, skipped, deleted or invited session never gains a second start.
+    private func canLaunchPlannedWorkout(_ workout: PlannedSession) -> Bool {
+        guard onStartStandaloneWorkout != nil,
+              !workout.isExplicitRestDay,
+              workout.trainTogetherMode == nil,
+              !selection.completedPlannedIDs.contains(workout.id)
+        else { return false }
+        if let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: session.activePlan
+        ) {
+            return !session.isPlanSessionSkipped(
+                planID: planID, sessionID: workout.id
+            ) && !session.isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: recentWorkouts,
+                strengthHistory: strength.workoutHistory
+            )
+        }
+        return session.standalonePlannedSessions.contains {
+            $0.id == workout.id
+        }
+    }
+
     private func plannedRow(_ workout: PlannedSession) -> some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 6) {
             Button {
                 if workout.trainTogetherMode != nil {
                     selectedInvitationLobby = workout
@@ -4436,7 +4466,40 @@ private struct HomeWeeklyProgressDaySheet: View {
                 norwegian: "Åpne den planlagte økten"
             ))
 
-
+            if canLaunchPlannedWorkout(workout) {
+                Menu {
+                    Button {
+                        onStartStandaloneWorkout?(workout, .iPhone)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Start on iPhone", norwegian: "Start på iPhone"
+                        ), systemImage: "iphone")
+                    }
+                    if canStartWithWatch {
+                        Button {
+                            onStartStandaloneWorkout?(workout, .appleWatch)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Start on Apple Watch",
+                                norwegian: "Start på Apple Watch"
+                            ), systemImage: "applewatch")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(dayInk, in: Circle())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Start (workout.title)",
+                    norwegian: "Start (workout.title)"
+                ))
+                .accessibilityIdentifier("athlth-home-day-start-planned-workout")
+            }
         }
         .background {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
