@@ -2098,8 +2098,14 @@ final class AppSessionStore: ObservableObject {
         startedOnWatch: Bool
     ) -> Bool {
         let key = workoutID.uuidString
-        // A delayed second callback must never overwrite the first start.
-        guard recordedPlannedWorkoutTimes[key] == nil else { return false }
+        // Duplicate callbacks for one launch are idempotent. An unfinished
+        // workout which was abandoned can be restarted later without keeping
+        // the previous attempt's start time forever.
+        if let previous = recordedPlannedWorkoutTimes[key] {
+            guard previous.endedAt == nil,
+                  abs(previous.startedAt.timeIntervalSince(startedAt)) >= 30
+            else { return false }
+        }
 
         let original = standalonePlannedSessions.first(where: { $0.id == workoutID })
             ?? ([activePlan].compactMap { $0 } + scheduledPlans)
@@ -2244,9 +2250,17 @@ final class AppSessionStore: ObservableObject {
         let candidates = recordedPlannedWorkoutTimes.compactMap {
             (key, timing) -> UUID? in
             guard timing.startedOnWatch, timing.endedAt == nil,
-                  abs(timing.startedAt.timeIntervalSince(result.startedAt)) < 180
+                  abs(timing.startedAt.timeIntervalSince(result.startedAt)) < 180,
+                  let id = UUID(uuidString: key)
             else { return nil }
-            return UUID(uuidString: key)
+            let planned = standalonePlannedSessions.first(where: { $0.id == id })
+                ?? ([activePlan].compactMap { $0 } + scheduledPlans)
+                    .flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
+                    .first(where: { $0.id == id })
+            guard let planned,
+                  PlannedWorkoutWatchBuilder.watchKind(for: planned.kind) ==
+                    result.kind else { return nil }
+            return id
         }
         guard candidates.count == 1, let matchedID = candidates.first else {
             return
