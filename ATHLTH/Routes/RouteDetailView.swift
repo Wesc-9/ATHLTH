@@ -31,6 +31,8 @@ struct RouteDetailView: View {
     @State private var showingOfflineMap = false
     @State private var showingInteractiveMap = false
     @State private var routeDetailScrolling = false
+    @State private var cachedOfflinePreview: UIImage?
+    @State private var routeHasTurnaround = false
     @State private var gpxShareFile: ATHLTHRouteShareFile?
     @State private var gpxExportError: String?
     @State private var editingTitle = false
@@ -266,12 +268,19 @@ struct RouteDetailView: View {
         .tint(ATHLTHTheme.accentDeep)
         .task(id: currentRoute.id) {
             downloaded.load(userID: session.profile.userID)
+            refreshOfflinePreview()
+            let coordinates = currentRoute.coordinates.sorted {
+                $0.sequence < $1.sequence
+            }.map(\.coordinate)
+            routeHasTurnaround =
+                ATHLTHRouteDirectionGeometry.turnaroundIndex(coordinates) != nil
             routeLocation.start()
             await prepareRouteData()
         }
         .onDisappear { routeLocation.stop() }
         .onChange(of: session.profile.userID) { _, userID in
             downloaded.load(userID: userID)
+            refreshOfflinePreview()
         }
         .refreshable {
             await prepareRouteData(forceHealthSync: true)
@@ -636,13 +645,20 @@ struct RouteDetailView: View {
     }
 
     private var offlineRouteSnapshot: UIImage? {
-        guard downloaded.has(currentRoute) else { return nil }
+        // The downloaded bitmap is read once, not decoded every time a
+        // location or performance metric causes SwiftUI to recompute cards.
+        selectedAttemptDirection == .forward ? cachedOfflinePreview : nil
+    }
+
+    private func refreshOfflinePreview() {
+        guard downloaded.has(currentRoute) else {
+            cachedOfflinePreview = nil
+            return
+        }
         let id = downloaded.downloadedIDs.contains(currentRoute.id)
-            ? currentRoute.id
-            : (currentRoute.sharedSourceRouteID ?? currentRoute.id)
-        return ATHLTHDownloadedRouteStore.snapshot(
-            routeID: id,
-            userID: session.profile.userID
+            ? currentRoute.id : (currentRoute.sharedSourceRouteID ?? currentRoute.id)
+        cachedOfflinePreview = ATHLTHDownloadedRouteStore.snapshot(
+            routeID: id, userID: session.profile.userID
         )
     }
 
@@ -722,6 +738,7 @@ struct RouteDetailView: View {
                 if downloaded.has(currentRoute) {
                     Button(role: .destructive) {
                         downloaded.remove(currentRoute)
+                        cachedOfflinePreview = nil
                         showingOfflineMap = false
                     } label: {
                         Text(ATHLTHLocalization.choose(
@@ -756,6 +773,7 @@ struct RouteDetailView: View {
                 sourceRouteID: currentRoute.id
             )
         }
+        refreshOfflinePreview()
         showingOfflineMap = true
     }
 
@@ -769,13 +787,8 @@ struct RouteDetailView: View {
     }
 
     private var mapCard: some View {
-        let coordinates = directedRoute.coordinates
-            .sorted { $0.sequence < $1.sequence }
-            .map(\.coordinate)
-        let turnaround = ATHLTHRouteDirectionGeometry.turnaroundIndex(coordinates)
-
-        return ATHLTHCard {
-            if coordinates.count >= 2 {
+        ATHLTHCard {
+            if currentRoute.coordinates.count >= 2 {
                 VStack(alignment: .leading, spacing: 10) {
                     if showingOfflineMap && downloaded.has(currentRoute) {
                         Group {
@@ -785,7 +798,9 @@ struct RouteDetailView: View {
                                     .scaledToFill()
                             } else {
                                 RouteMapSnapshotThumbnail(
-                                    route: directedRoute, height: 270
+                                    route: directedRoute,
+                                    height: 270,
+                                    allowsLiveSnapshot: false
                                 )
                             }
                         }
@@ -825,7 +840,7 @@ struct RouteDetailView: View {
                     .buttonStyle(.bordered)
                     .tint(ATHLTHTheme.accentDeep)
 
-                    if turnaround != nil {
+                    if routeHasTurnaround {
                         HStack(spacing: 14) {
                             Label(
                                 ATHLTHLocalization.choose(
