@@ -410,6 +410,8 @@ struct HomeHealthMetricStrip: View {
     let hrvText: String
     let loadText: String
     let readinessText: String?
+    /// Off-screen Home must not run HealthKit trend queries during a tab animation.
+    var isActive = true
 
     var body: some View {
         HStack(spacing: 8) {
@@ -437,13 +439,16 @@ struct HomeHealthMetricStrip: View {
                     readinessText
             )
         }
-        .task {
-            // A bounded HealthKit query; values and gaps are real.
+        // Refresh the real seven-day bars whenever HealthKit publishes fresh
+        // data. Previously this one-shot task never reran after the first
+        // Health refresh, leaving old/empty bars until a full view reload.
+        .task(id: "\(isActive)-\(health.lastSuccessfulRefreshAt?.timeIntervalSince1970 ?? 0)") {
+            guard isActive else { return }
             let readings = await health.insightDailyValues(
                 for: .steps,
                 days: 14
             )
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isActive else { return }
             stepHistory = readings
         }
     }
