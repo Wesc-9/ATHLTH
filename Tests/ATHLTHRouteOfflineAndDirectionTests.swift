@@ -30,6 +30,23 @@ final class ATHLTHRouteOfflineAndDirectionTests: XCTestCase {
         )
     }
 
+    func testTwoPointRouteStillSupportsDirectionWhenEndpointsAreDistinct() {
+        let start = location(63.4, 10.4)
+        let finish = location(63.41, 10.41)
+        XCTAssertEqual(
+            ATHLTHRouteAttemptDirectionPolicy.classify(
+                reference: [start, finish],
+                actual: [start, finish]
+            ), .forward
+        )
+        XCTAssertEqual(
+            ATHLTHRouteAttemptDirectionPolicy.classify(
+                reference: [start, finish],
+                actual: [finish, start]
+            ), .reverse
+        )
+    }
+
     func testOverlappingOutAndBackDoesNotInventDirection() {
         let course = [
             location(63.4, 10.4),
