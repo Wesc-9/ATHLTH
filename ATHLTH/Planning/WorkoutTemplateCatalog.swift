@@ -4221,6 +4221,9 @@ struct WorkoutTemplateBuilderView: View {
     /// Used by Coach's Add flow: schedule an edited workout without
     /// automatically saving a template in My Workouts.
     private let onAddStandalone: ((PlannedSession) -> Bool)?
+    /// The imported-session planner keeps its compact grouped Basic view in
+    /// SessionEditorView. Switching modes returns the complete unsaved recipe.
+    private let onSwitchToBasic: ((PlannedSession) -> Void)?
     private let onValidateSave: ((PlannedSession) -> String?)?
     private let saveButtonTitle: String?
     /// An embedded iPad inspector closes itself, not the surrounding plan.
@@ -4256,6 +4259,7 @@ struct WorkoutTemplateBuilderView: View {
         onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int], ATHLTHWorkoutPlannerExtras) -> Bool)? = nil,
         onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool, ATHLTHWorkoutPlannerExtras) -> Bool)? = nil,
         onAddStandalone: ((PlannedSession) -> Bool)? = nil,
+        onSwitchToBasic: ((PlannedSession) -> Void)? = nil,
         onValidateSave: ((PlannedSession) -> String?)? = nil,
         saveButtonTitle: String? = nil,
         onCloseInline: (() -> Void)? = nil,
@@ -4357,6 +4361,7 @@ struct WorkoutTemplateBuilderView: View {
         self.initialSourceTitle = initialTitle
         self.onSaveToPlan = onSaveToPlan
         self.onAddStandalone = onAddStandalone
+        self.onSwitchToBasic = onSwitchToBasic
         self.onValidateSave = onValidateSave
         self.saveButtonTitle = saveButtonTitle
         self.onCloseInline = onCloseInline
@@ -5203,7 +5208,21 @@ struct WorkoutTemplateBuilderView: View {
             .onChange(of: pendingCopyDayIDs) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioVisiblePhases) { _, _ in persistWorkoutDraft() }
             .onChange(of: selectedPhase) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioAdvanced) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioAdvanced) { _, isAdvanced in
+                if !isAdvanced, let onSwitchToBasic {
+                    // Basic for an imported workout remains the concise
+                    // grouped SessionEditorView, not a second Basic builder.
+                    // Hand off before removing this editor's checkpoint.
+                    let snapshot = workoutSnapshot()
+                    draftFinished = true
+                    pendingDraftCheckpoint?.cancel()
+                    pendingDraftCheckpoint = nil
+                    UserDefaults.standard.removeObject(forKey: draftStorageKey)
+                    onSwitchToBasic(snapshot)
+                } else {
+                    persistWorkoutDraft()
+                }
+            }
             .onChange(of: studioBasicRunMode) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicGoalSelected) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicGhostSelected) { _, _ in persistWorkoutDraft() }
