@@ -132,9 +132,6 @@ struct ATHLTHPlanDraftWorkoutEditor: View {
             draftContext: "coach-proposal-" + selection.id,
             initialActivity: activity,
             initialStudioAdvanced: false,
-            saveButtonTitle: ATHLTHLocalization.choose(
-                english: "Save to Coach draft", norwegian: "Lagre i Coach-utkast"
-            ),
             onSaveToPlan: { name, blocks, routeID, minutes, _, extras in
                 let cleanTitle = name.trimmingCharacters(
                     in: .whitespacesAndNewlines
@@ -176,7 +173,10 @@ struct ATHLTHPlanDraftWorkoutEditor: View {
                 )
                 updated.authoredWorkout = edited
                 return onSave(updated)
-            }
+            },
+            saveButtonTitle: ATHLTHLocalization.choose(
+                english: "Save to Coach draft", norwegian: "Lagre i Coach-utkast"
+            )
         )
         .preferredColorScheme(.light)
     }
