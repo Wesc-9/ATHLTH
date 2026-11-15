@@ -15,7 +15,6 @@ struct ATHLTHAdvancedGuidedDayView: View {
     let onAddExercise: (WorkoutPhaseKind, Int) -> Void
     let onAddWorkout: () -> Void
     let onQuick: (String) -> Void
-    let onAddGroup: ([WorkoutTemplateBlock], WorkoutKind) -> Void
     let onEditWorkout: (Int) -> Void
     let onEditBlock: (Int, Int) -> Void
     let onDeleteWorkout: (Int) -> Void
@@ -27,7 +26,6 @@ struct ATHLTHAdvancedGuidedDayView: View {
     @State private var pendingWorkoutDeletion: Int?
     @State private var confirmingWorkoutDeletion = false
     @State private var showingDayPicker = false
-    @State private var composingGroup: WorkoutBlockGroupKind?
     private let ink = ATHLTHTrainDesign.ink
     private let secondary = ATHLTHTrainDesign.secondary
     private let gold = ATHLTHTrainDesign.bronze
@@ -80,22 +78,8 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 }
                 .buttonStyle(.plain)
             }
-            if let composingGroup, !isRestDay {
-                ATHLTHPlanInlineGroupComposer(
-                    groupKind: composingGroup,
-                    onInsert: { blocks, kind in
-                        onAddGroup(blocks, kind)
-                        self.composingGroup = nil
-                    },
-                    onCancel: { self.composingGroup = nil }
-                )
-            }
         }
         .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
-        .onChange(of: date) { _, _ in
-            // Never carry an uncommitted group to another calendar day.
-            composingGroup = nil
-        }
         .confirmationDialog(
             tr("Delete workout?", "Slette treningsøkt?"),
             isPresented: $confirmingWorkoutDeletion,
@@ -490,13 +474,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
 
     private func quick(_ id: String, _ symbol: String, _ text: String) -> some View {
         Button {
-            if id == "interval" || id == "superset" {
-                composingGroup = id == "interval" ? .intervals : .superset
-            } else if id == "restday" && !workouts.isEmpty {
-                confirmingRestReplacement = true
-            } else {
-                onQuick(id)
-            }
+            onQuick(id)
         } label: {
             Label(text, systemImage: symbol)
                 .font(.system(size: 11, weight: .medium))
