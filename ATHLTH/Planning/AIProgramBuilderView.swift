@@ -1195,16 +1195,23 @@ struct AIProgramBuilderView: View {
     private func applyStandaloneIntakeToRequest() {
         guard standaloneIntake.isComplete,
               let focus = standaloneIntake.resolvedTrainingFocus,
-              let durationWeeks = standaloneIntake.durationWeeks,
-              let requestedSessions = standaloneIntake.sessionsPerWeek,
-              let requestedMinutes = standaloneIntake.sessionDurationMinutes
+              let durationWeeks = standaloneIntake.durationWeeks
         else { return }
+
+        // The server uses the available-day count as a ceiling when the
+        // athlete delegates frequency. Time is a reference only when Coach
+        // is explicitly allowed to vary it between workouts.
+        let requestedSessions = standaloneIntake.coachChoosesFrequency
+            ? standaloneIntake.availableDays.count
+            : (standaloneIntake.sessionsPerWeek ?? 3)
+        let requestedMinutes = standaloneIntake.coachChoosesDuration
+            ? 60 : (standaloneIntake.sessionDurationMinutes ?? 60)
 
         trainingFocus = focus
         weekCount = durationWeeks
         timelineMode = .weeks
         sessionsPerWeek = requestedSessions
-        aiChoosesFrequency = false
+        aiChoosesFrequency = standaloneIntake.coachChoosesFrequency
         availableDays = standaloneIntake.availableDays
         sessionDurationMinutes = requestedMinutes
         experience = standaloneIntake.experience?.rawValue ?? ""
@@ -1223,6 +1230,16 @@ struct AIProgramBuilderView: View {
             return ATHLTHLocalization.choose(english: "Choose what you want to train", norwegian: "Velg hva du ønsker å trene")
         case "outcomes":
             return ATHLTHLocalization.choose(english: "Choose what you want to achieve", norwegian: "Velg hva du ønsker å oppnå")
+        case "targetExerciseName":
+            return ATHLTHLocalization.choose(
+                english: "Enter the exercise for your lift target",
+                norwegian: "Skriv inn øvelsen for løftemålet"
+            )
+        case "targetLiftKilograms":
+            return ATHLTHLocalization.choose(
+                english: "Choose a weight target in kilograms",
+                norwegian: "Velg målvekt i kilo"
+            )
         case "muscleGroups":
             return ATHLTHLocalization.choose(english: "Choose muscle focus", norwegian: "Velg muskelgrupper")
         case "experience":
@@ -2598,6 +2615,8 @@ struct AIProgramBuilderView: View {
             aiChoosesFrequency: aiChoosesFrequency && mode == .generate,
             preferredDays: availableDays.sorted(),
             sessionDurationMinutes: sessionDurationMinutes,
+            aiChoosesDuration: isStandaloneCoachJourney &&
+                standaloneIntake.coachChoosesDuration,
             userNotes: String(coachContext.prefix(2_200)) +
                 "\nAdditional preferences: " + String(userNotes.prefix(400)) +
                 "\nRecent training context: " + String(historyContext.prefix(400)),
@@ -2827,12 +2846,9 @@ struct AIProgramBuilderView: View {
         savedProfileTrainingNotes = String(savedTrainingNotes.prefix(700))
         if !savedLimitations.isEmpty {
             limitations = String(savedLimitations.prefix(1_200))
-            if isStandaloneCoachJourney {
-                standaloneIntake.injuryStatus = .considerations
-                standaloneIntake.injuryNotes = limitations
-                // Existing injuries are NEVER forwarded on default.
-                standaloneIntake.healthSharingAuthorized = false
-            }
+            // A private training profile never silently answers Coach's
+            // injury question. The athlete can explicitly import notes.
+            // An untouched standalone intake may remain entirely blank.
         }
 
         if !isStandaloneCoachJourney {
