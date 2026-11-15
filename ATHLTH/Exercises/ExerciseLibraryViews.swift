@@ -3014,7 +3014,9 @@ struct CustomExerciseEditorView: View {
                 }
             }
             .sheet(item: $friendShareDraft, onDismiss: { dismiss() }) { draft in
-                ATHLTHDirectShareSheet(draft: draft)
+                ATHLTHDirectShareSheet(
+                    draft: draft, mutualFollowsOnly: true
+                )
             }
             .fileImporter(
                 isPresented: $showingVideoImporter,
