@@ -66,6 +66,11 @@ enum ATHLTHWorkoutNameSuggestion {
     }
 
     static func displayStepTitle(_ block: WorkoutTemplateBlock) -> String {
+        if ATHLTHFreeStrengthRecipePolicy.isFreeStrength(block) {
+            return ATHLTHLocalization.choose(
+                english: "Free strength training", norwegian: "Fri styrketrening"
+            )
+        }
         // Older imported/existing recipes can contain an English default,
         // even when the app is now displayed in Norwegian.
         switch block.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
