@@ -32,6 +32,21 @@ final class ATHLTHPlanGoalOptionsTests: XCTestCase {
         XCTAssertFalse(running.contains(where: { $0.goal == .getStronger }))
     }
 
+    func testGoalCategoriesMatchActualTrackingCapabilities() {
+        XCTAssertEqual(ATHLTHPlanGoalOption.linkedCategory(
+            for: .strength, choice: "muscle"), .custom)
+        XCTAssertEqual(ATHLTHPlanGoalOption.linkedCategory(
+            for: .strength, choice: "power"), .strength)
+        XCTAssertEqual(ATHLTHPlanGoalOption.linkedCategory(
+            for: .running, choice: "power"), .consistency)
+        XCTAssertEqual(ATHLTHPlanGoalOption.linkedCategory(
+            for: .general, choice: "wellness"), .recovery)
+        XCTAssertEqual(ATHLTHPlanGoalOption.linkedCategory(
+            for: .specific, choice: "speed"), .custom)
+        XCTAssertEqual(ATHLTHPlanGoalOption.linkedCategory(
+            for: .specific, choice: "power"), .strength)
+    }
+
     func testExistingGoalDraftIdentifiersStillResolve() {
         XCTAssertTrue(ATHLTHPlanGoalOption.options(for: .strength)
             .contains(where: { $0.id == "power" }))
