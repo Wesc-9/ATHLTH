@@ -4,13 +4,15 @@ import SwiftUI
 struct MessageInboxDestinationView: View {
     @State private var showingNewMessage = false
 
-    /// Populated only when the inbox was launched from the Home side drawer.
-    /// Other inbox entry points retain their original profile shortcut.
+    /// Used for dismissing the inbox from iPhone navigation or the iPad inspector.
     var onBack: (() -> Void)? = nil
+    /// iPad inspector collapses to the right; iPhone navigation goes back left.
+    var isInspectorPanel = false
 
     var body: some View {
         MessageInboxView(
             onBack: onBack,
+            isInspectorPanel: isInspectorPanel,
             onNewMessage: { showingNewMessage = true }
         )
         .navigationTitle("")
@@ -76,6 +78,7 @@ struct MessageInboxView: View {
     // Keep onNewMessage last so existing trailing-closure callers still
     // open the composer rather than unintentionally wiring a back action.
     var onBack: (() -> Void)? = nil
+    var isInspectorPanel = false
     var onNewMessage: () -> Void = {}
 
     @State private var arenaInboxVisibleCount = 0
@@ -350,7 +353,7 @@ struct MessageInboxView: View {
             HStack(alignment: .center, spacing: 12) {
                 if let onBack {
                     Button(action: onBack) {
-                        Image(systemName: "chevron.left")
+                        Image(systemName: isInspectorPanel ? "chevron.right" : "chevron.left")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .frame(width: 48, height: 48)
@@ -368,12 +371,21 @@ struct MessageInboxView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Back to Home",
-                            norwegian: "Tilbake til Hjem"
-                        )
+                        isInspectorPanel
+                            ? ATHLTHLocalization.choose(
+                                english: "Hide Inbox",
+                                norwegian: "Skjul innboks"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Back to Home",
+                                norwegian: "Tilbake til Hjem"
+                            )
                     )
-                    .accessibilityIdentifier("athlth-inbox-back-to-home")
+                    .accessibilityIdentifier(
+                        isInspectorPanel
+                            ? "athlth-ipad-hide-inspector"
+                            : "athlth-inbox-back-to-home"
+                    )
                 }
 
                 Spacer(minLength: 0)
@@ -446,7 +458,8 @@ struct MessageInboxView: View {
         .simultaneousGesture(
             DragGesture(minimumDistance: 24)
                 .onEnded { value in
-                    guard let onBack,
+                    guard isInspectorPanel,
+                          let onBack,
                           ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
                             translation: value.translation
                           )
