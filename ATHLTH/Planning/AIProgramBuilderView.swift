@@ -168,6 +168,7 @@ struct AIProgramBuilderView: View {
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var canRetryCoachError = false
+    @State private var coachRetryUntil: Date?
     @State private var didLoadDefaults = false
     @State private var completingPlanID: UUID?
     @State private var completingPlanVersion: Int?
@@ -277,6 +278,7 @@ struct AIProgramBuilderView: View {
     }
 
     private var canGenerate: Bool {
+        if let coachRetryUntil, Date() < coachRetryUntil { return false }
         if isStandaloneCoachJourney {
             return standaloneIntake.isComplete && !isGenerating
         }
@@ -390,6 +392,18 @@ struct AIProgramBuilderView: View {
                 loadDefaultsIfNeeded()
                 if isStandaloneCoachJourney {
                     coachStrengthSummary = coachStrengthSnapshot?.summary
+                }
+            }
+            .task(id: coachRetryUntil) {
+                guard let until = coachRetryUntil else { return }
+                let seconds = max(0, until.timeIntervalSinceNow)
+                if seconds > 0 {
+                    try? await Task.sleep(
+                        nanoseconds: UInt64(ceil(seconds * 1_000_000_000))
+                    )
+                }
+                if !Task.isCancelled && coachRetryUntil == until {
+                    coachRetryUntil = nil
                 }
             }
             .alert(
@@ -2728,7 +2742,15 @@ struct AIProgramBuilderView: View {
 
     @MainActor
     private func generatePreview() async {
-        guard canGenerate else { return }
+        guard canGenerate else {
+            if let until = coachRetryUntil, Date() < until {
+                let remaining = max(1, Int(ceil(until.timeIntervalSinceNow)))
+                let delayError = AIProgramError.rateLimited(retryAfterSeconds: remaining)
+                canRetryCoachError = false
+                errorMessage = delayError.localizedDescription
+            }
+            return
+        }
         canRetryCoachError = false
         errorMessage = nil
 
@@ -2817,6 +2839,9 @@ struct AIProgramBuilderView: View {
         } catch {
             if isStandaloneCoachJourney { coachJourneyStage = .intake }
             let coachError = error as? AIProgramError ?? .unavailable
+            if let cooldown = coachError.cooldownSeconds {
+                coachRetryUntil = Date().addingTimeInterval(TimeInterval(cooldown))
+            }
             canRetryCoachError = coachError.canRetry
             errorMessage = coachError.localizedDescription
         }
