@@ -179,4 +179,29 @@ final class ATHLTHAIProgramIntakeTests: XCTestCase {
         intake.injuryStatus = .none
         return intake
     }
+    func testCoachRequestSendsAutonomyAndUnavailableEquipmentSeparately() throws {
+        let request = AIProgramRequest(
+            mode: "generate",
+            startDate: "2026-11-15T00:00:00Z",
+            weekCount: 8,
+            sessionsPerWeek: 5,
+            aiChoosesFrequency: true,
+            preferredDays: [1, 2, 3, 4, 5],
+            sessionDurationMinutes: 60,
+            aiChoosesDuration: true,
+            userNotes: "Cycle for aerobic conditioning",
+            unavailableEquipment: ["Treadmill"],
+            goals: [],
+            existingDays: []
+        )
+        let data = try JSONEncoder().encode(request)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        XCTAssertEqual(object["aiChoosesFrequency"] as? Bool, true)
+        XCTAssertEqual(object["aiChoosesDuration"] as? Bool, true)
+        XCTAssertEqual(object["unavailableEquipment"] as? [String], ["Treadmill"])
+    }
+
+
 }
