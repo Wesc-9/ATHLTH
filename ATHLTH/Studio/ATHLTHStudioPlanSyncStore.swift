@@ -267,6 +267,10 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 }
             }
 
+            // An account switch during the final network request must never
+            // publish the previous account's plan identities on the new one.
+            guard enabled, accountID == userID, session.signedIn,
+                  session.profile.userID == userID else { return }
             // Only claim cloud presence after the server has returned the
             // document or acknowledged a successful upload for this account.
             verifiedRemotePlanIDs = remoteIDs
