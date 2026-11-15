@@ -1,4 +1,33 @@
 import AVFoundation
+
+/// Avoid repeating identical spoken content when default and custom
+/// audio channels happen to issue a cue at the same moment.
+struct ATHLTHCoachCueRepeatPolicy {
+    private var accepted: [String: Date] = [:]
+    static let window: TimeInterval = 12
+    mutating func reset() { accepted.removeAll() }
+    mutating func shouldAccept(_ text: String, at now: Date = Date()) -> Bool {
+        let key = Self.normalized(text)
+        guard !key.isEmpty else { return false }
+        accepted = accepted.filter { now.timeIntervalSince($0.value) < Self.window }
+        guard accepted[key] == nil else { return false }
+        accepted[key] = now
+        return true
+    }
+    static func normalized(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive],
+                     locale: Locale(identifier: "nb_NO"))
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .punctuationCharacters)
+    }
+    static func uniqueSentences(_ sentences: [String]) -> [String] {
+        var seen = Set<String>()
+        return sentences.filter { seen.insert(normalized($0)).inserted }
+    }
+}
+
 import Foundation
 
 @MainActor
@@ -18,6 +47,7 @@ final class MirroredWorkoutAudioCoach:
         ATHLTHGuidancePriorityGate()
     private var eventLedger = ATHLTHCoachEventLedger()
     private var cueQueue = ATHLTHCoachCueQueue()
+    private var recentCueText = ATHLTHCoachCueRepeatPolicy()
     private var localSpeechWatchdog: Task<Void, Never>?
     private var coachReplayMemory = ATHLTHCoachReplayMemory()
     var onLastSpokenCoachMessage: ((String?) -> Void)?
@@ -84,6 +114,7 @@ final class MirroredWorkoutAudioCoach:
         guidanceGate.reset()
         eventLedger.reset()
         cueQueue.reset()
+        recentCueText.reset()
         coachReplayMemory.reset()
         onLastSpokenCoachMessage?(nil)
         lastState = nil
@@ -347,6 +378,7 @@ final class MirroredWorkoutAudioCoach:
         guidanceGate.reset()
         eventLedger.reset()
         cueQueue.reset()
+        recentCueText.reset()
         coachReplayMemory.reset()
         onLastSpokenCoachMessage?(nil)
         configuration = .disabled
@@ -883,10 +915,11 @@ final class MirroredWorkoutAudioCoach:
             if !regular.isEmpty { parts.append(regular) }
         }
         parts.append(contentsOf: customDue.map(\.text))
-        guard !parts.isEmpty else { return }
+        let uniqueParts = ATHLTHCoachCueRepeatPolicy.uniqueSentences(parts)
+        guard !uniqueParts.isEmpty else { return }
 
         speak(
-            parts.joined(separator: ". "),
+            uniqueParts.joined(separator: ". "),
             priority: .routineCoach,
             event: ATHLTHCoachEvent(
                 kind: .routineMilestone,
@@ -1232,6 +1265,12 @@ final class MirroredWorkoutAudioCoach:
             )
         case .deliver:
             break
+        }
+
+        // Explicit Replay remains available. Routine, rules and step cues
+        // cannot issue the same phrase twice within the safety window.
+        if rememberForReplay && !recentCueText.shouldAccept(text) {
+            return
         }
 
         // Only acknowledge a cue when the selected speech engine starts.
