@@ -436,15 +436,12 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .onChange(of: selection) { _, destination in
-            clearWeekInspectorIfNeeded()
-            // Switching to a main Studio destination clears the inline
-            // library selection without dismissing any modal.
-            libraryPage = nil
-            sidebarPage = nil
-            resetDetailNavigation()
+            // openStudio(_:) already resets navigation and side destinations.
+            // Resetting NavigationStack a second time in this observer can
+            // race SwiftUI's detail-column transition and leave Home blank.
+            // This observer only persists state, including the scene restore
+            // path that sets selection directly.
             savedDestination = destination.rawValue
-            // Inbox stays docked until the user closes it; Coach is a page.
-            // A new destination must never open or close the sidebar.
             if destination != .overview { focusedPlanningDate = nil }
         }
         .onChange(of: selectedHomeWeekDate) { _, date in
