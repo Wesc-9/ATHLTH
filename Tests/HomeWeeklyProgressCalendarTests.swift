@@ -104,6 +104,31 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
         )
     }
 
+    func testCompletedWorkoutShowsExplicitFinishTime() {
+        let start = date(2026, 11, 11)
+        let finish = calendar.date(byAdding: .minute, value: 4, to: start)!
+        let clockText = finish.formatted(date: .omitted, time: .shortened)
+
+        XCTAssertEqual(
+            HomeCompletedWorkoutPresentation.finishTimeLabel(
+                startDate: start, endDate: finish, norwegian: true
+            ),
+            "Ferdig \(clockText)"
+        )
+        XCTAssertEqual(
+            HomeCompletedWorkoutPresentation.finishTimeLabel(
+                startDate: start, endDate: finish, norwegian: false
+            ),
+            "Finished \(clockText)"
+        )
+        XCTAssertNil(HomeCompletedWorkoutPresentation.finishTimeLabel(
+            startDate: start, endDate: start, norwegian: true
+        ))
+        XCTAssertNil(HomeCompletedWorkoutPresentation.finishTimeLabel(
+            startDate: finish, endDate: start, norwegian: true
+        ))
+    }
+
     func testStandaloneShortcutAllowsOnlyTodayAndFutureDays() {
         let now = calendar.date(from: DateComponents(
             year: 2026, month: 10, day: 10, hour: 23, minute: 59
