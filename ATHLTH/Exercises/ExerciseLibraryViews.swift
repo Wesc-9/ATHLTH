@@ -2212,9 +2212,37 @@ struct ExerciseDetailView: View {
             isPresented: $showingDelete,
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) {
-                library.deleteCustomExercise(currentEntry.id)
-                dismiss()
+            Button(ATHLTHLocalization.choose(
+                english: "Delete", norwegian: "Slett"
+            ), role: .destructive) {
+                Task {
+                    // Do not leave a public listing online when its
+                    // owner deletes the original exercise.
+                    if currentEntry.exercise.sharedSourceExerciseID == nil,
+                       currentEntry.exercise.ownerID == session.profile.userID {
+                        guard let existing = await marketplace.publicationExists(
+                            currentEntry.id
+                        ) else {
+                            marketplaceFeedback = marketplace.errorMessage ??
+                                ATHLTHLocalization.choose(
+                                    english: "Could not verify public access. Try again online.",
+                                    norwegian: "Kunne ikke kontrollere publiseringen. Prøv igjen med nett."
+                                )
+                            return
+                        }
+                        if existing {
+                            guard await marketplace.remove(
+                                currentEntry.id,
+                                ownerID: session.profile.userID
+                            ) else {
+                                marketplaceFeedback = marketplace.errorMessage
+                                return
+                            }
+                        }
+                    }
+                    library.deleteCustomExercise(currentEntry.id)
+                    dismiss()
+                }
             }
             Button("Cancel", role: .cancel) {}
         }
@@ -3073,7 +3101,6 @@ struct CustomExerciseEditorView: View {
                     $0.id == pendingPublicExerciseID
                 })
             let previouslyShareable = oldRecord?.exercise.isVisibleOutsideOwnerLibrary == true
-            var existingPublicListing = false
             // Never demote an old publicly listed exercise locally while
             // leaving the remotely visible copy behind. Private-only edits
             // without any previous sharing need no network request.
@@ -3087,7 +3114,6 @@ struct CustomExerciseEditorView: View {
                         )
                     return
                 }
-                existingPublicListing = published
                 if published {
                     guard await marketplace.remove(
                         oldRecord.id, ownerID: session.profile.userID
@@ -3157,6 +3183,12 @@ struct CustomExerciseEditorView: View {
                     username: session.profile.username
                 ) else {
                     pendingPublicExerciseID = saved.id
+                    // An upload failure never makes an exercise publicly
+                    // accessible: keep its local copy private for retry.
+                    var localCopy = saved.exercise
+                    localCopy.visibility = .privateOnly
+                    localCopy.isVisibleOutsideOwnerLibrary = false
+                    library.updateCustomExercise(localCopy)
                     studioError = (marketplace.errorMessage ??
                         ATHLTHLocalization.choose(
                             english: "Could not publish the exercise.",
@@ -3192,7 +3224,6 @@ struct CustomExerciseEditorView: View {
             } else {
                 dismiss()
             }
-            _ = existingPublicListing // Presence was checked before mutation.
         } catch {
             studioError = error.localizedDescription
         }
