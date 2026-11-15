@@ -236,7 +236,8 @@ struct AIProgramBuilderView: View {
             allowedDayIndexes: availableDays,
             maximumSessionsPerWeek: limit,
             lockedDayKeys: lockedDays,
-            requireFullWeeks: true
+            requireFullWeeks: true,
+            requireExecutableWorkouts: true
         )
         if isStandaloneCoachJourney &&
            standaloneIntake.injuryStatus == .considerations {
