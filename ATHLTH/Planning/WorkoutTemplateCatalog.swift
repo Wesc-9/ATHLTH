@@ -4352,7 +4352,9 @@ struct WorkoutTemplateBuilderView: View {
                 ? (firstRun?.treadmillInclinePercent != nil ? .treadmill : .indoor)
                 : .outdoor
         )
-        _studioBasicDate = State(initialValue: plannedDate ?? Date())
+        _studioBasicDate = State(initialValue:
+            (plannedDate?.timeIntervalSinceReferenceDate ?? 0) > 0
+                ? (plannedDate ?? Date()) : Date())
         self.planCopyDays = planCopyDays
         self.onCopyToPlan = onCopyToPlan
         _copyWeekIndex = State(initialValue: initialCopyWeekIndex)
@@ -4483,7 +4485,10 @@ struct WorkoutTemplateBuilderView: View {
         }
         selectedPhase = stored.selectedPhase ?? selectedPhase
         studioAdvanced = stored.studioAdvanced ?? studioAdvanced
-        studioBasicDate = stored.studioDate ?? studioBasicDate
+        if let restored = stored.studioDate,
+           restored.timeIntervalSinceReferenceDate > 0 {
+            studioBasicDate = restored
+        }
         if initialActivity == .running {
             studioBasicRunMode = stored.basicRunMode
                 .flatMap(RunQuickStartMode.init(rawValue:)) ??
@@ -5815,7 +5820,7 @@ struct WorkoutTemplateBuilderView: View {
             if !blocks.isEmpty {
                 ATHLTHWorkoutRecipePreview(
                     title: title, summary: "", category: category,
-                    symbol: initialActivity?.systemImage ?? "figure.run",
+                    symbol: initialActivity?.symbol ?? "figure.run",
                     difficulty: nil,
                     durationMinutes: resolvedDurationMinutes,
                     blocks: blocks, embeddedInDetails: true
