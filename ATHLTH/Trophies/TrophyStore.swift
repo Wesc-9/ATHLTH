@@ -1131,6 +1131,12 @@ final class TrophyStore: ObservableObject {
                 )
                 lastCloudSyncIssue = nil
                 lastCloudSyncAt = Date()
+                // Cabinet saves are rejected until these award IDs exist
+                // server-side. Replay a pending local selection immediately
+                // after its corresponding unlocks have been accepted.
+                if pendingCabinetUpload {
+                    await flushCabinetEdit(for: currentUserID)
+                }
             } catch {
                 lastCloudSyncIssue = ATHLTHLocalization.choose(
                     english: "Trophy unlocks are saved locally but not yet synced.",
