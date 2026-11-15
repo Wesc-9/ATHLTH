@@ -11,19 +11,22 @@ enum ATHLTHPlanJourneyStep: Int, CaseIterable {
     case approach
     case week
     case review
+    // Dedicated goal-creation screen before plan schedule; appended so legacy
+    // raw step values remain stable for old drafts and test fixtures.
+    case goalDetails
 }
 
 enum ATHLTHPlanJourney {
     static func sequence(advanced: Bool) -> [ATHLTHPlanJourneyStep] {
         if advanced {
-            return [.mode, .goal, .basics, .week, .review]
+            return [.mode, .goal, .goalDetails, .basics, .week, .review]
         }
-        return [.mode, .goal, .basics]
+        return [.mode, .goal, .goalDetails, .basics]
     }
 
     static func displayedCount(advanced: Bool) -> Int {
-        // Advanced now has five distinct stages; the planning method
-        // belongs to the setup page rather than an extra navigation step.
+        // Goal creation has a dedicated step before schedule setup. The
+        // planning method remains part of the setup page.
         sequence(advanced: advanced).count
     }
 
