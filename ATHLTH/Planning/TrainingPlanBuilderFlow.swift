@@ -1543,11 +1543,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private let sourceCanvas = ATHLTHTrainDesign.canvas
 
     private var stepDisplayTotal: Int {
-        ATHLTHPlanJourney.displayedCount(advanced: mode == .advanced)
+        // Mode is an entry selector rather than one of the visible plan steps.
+        // Display goal selection → goal creation → plan details in order.
+        max(1, ATHLTHPlanJourney.displayedCount(advanced: mode == .advanced) - 1)
     }
 
     private var stepDisplayNumber: Int {
-        ATHLTHPlanJourney.position(of: step, advanced: mode == .advanced) ?? 1
+        max(1, (ATHLTHPlanJourney.position(of: step, advanced: mode == .advanced) ?? 2) - 1)
     }
 
     // Single visible entry screen, composed as a native photo-first page.
@@ -1826,18 +1828,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
                 Spacer(minLength: 0)
 
-                Text("1 / 5")
+                Text("1 / \(stepDisplayTotal)")
                     .font(.system(size: 14, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(sourceInk)
                     .frame(width: 49, alignment: .trailing)
                     .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Step 1 of 5", norwegian: "Steg 1 av 5"
+                        english: "Step 1 of \(stepDisplayTotal)", norwegian: "Steg 1 av \(stepDisplayTotal)"
                     ))
             }
 
             HStack(spacing: 4) {
-                ForEach(0..<5, id: \.self) { index in
+                ForEach(0..<stepDisplayTotal, id: \.self) { index in
                     Capsule()
                         .fill(index == 0 ? sourceGold :
                               Color(red: 0.87, green: 0.85, blue: 0.82))
