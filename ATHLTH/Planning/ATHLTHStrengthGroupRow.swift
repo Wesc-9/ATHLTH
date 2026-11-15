@@ -8,6 +8,23 @@ struct ATHLTHStrengthGroupRow: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onMoveBy: (Int) -> Void
+    let onMoveToPhase: (WorkoutPhaseKind) -> Void
+    let onReorderMove: (CGPoint) -> Void
+    let onReorderEnd: () -> Void
+
+    private var reorderGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.28)
+            .sequenced(before: DragGesture(
+                minimumDistance: 0,
+                coordinateSpace: .named("athlthWorkoutStudio")
+            ))
+            .onChanged { phase in
+                if case .second(true, let drag?) = phase {
+                    onReorderMove(drag.location)
+                }
+            }
+            .onEnded { _ in onReorderEnd() }
+    }
 
     @State private var expanded = false
     private let ink = ATHLTHTrainDesign.ink
@@ -56,7 +73,28 @@ struct ATHLTHStrengthGroupRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(ink.opacity(0.31))
+                    .frame(width: 21, height: 44)
+                    .contentShape(Rectangle())
+                    .gesture(reorderGesture)
+                    .accessibilityLabel(tr(
+                        "Drag to move exercise",
+                        "Dra for å flytte øvelsen"
+                    ))
+                    .accessibilityAction(
+                        named: Text(tr("Move up", "Flytt opp"))
+                    ) {
+                        if canMoveUp { onMoveBy(-1) }
+                    }
+                    .accessibilityAction(
+                        named: Text(tr("Move down", "Flytt ned"))
+                    ) {
+                        if canMoveDown { onMoveBy(1) }
+                    }
+
                 Image(systemName: "dumbbell.fill")
                     .font(.system(size: 15))
                     .foregroundStyle(bronze)
@@ -115,6 +153,18 @@ struct ATHLTHStrengthGroupRow: View {
                         } label: {
                             Label(tr("Move down", "Flytt ned"), systemImage: "arrow.down")
                         }
+                    }
+                    Menu {
+                        ForEach(WorkoutPhaseKind.allCases.filter { $0 != .recovery }) { phase in
+                            Button {
+                                onMoveToPhase(phase)
+                            } label: {
+                                Label(phase.title, systemImage: phase.symbol)
+                            }
+                        }
+                    } label: {
+                        Label(tr("Move to workout section", "Flytt til øktdel"),
+                              systemImage: "arrow.up.arrow.down")
                     }
                     Divider()
                     Button(role: .destructive, action: onDelete) {
