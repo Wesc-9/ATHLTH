@@ -106,73 +106,6 @@ private struct ATHLTHStudioHomeProjection {
     let completedByPlanSession: [String: Bool]
 }
 
-/// Remote Ghost updates own their SwiftUI state, so a four-second spectator
-/// refresh never invalidates the entire Studio Home calendar and charts.
-private struct ATHLTHStudioGhostHomeStatusView: View {
-    @EnvironmentObject private var session: AppSessionStore
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var snapshot: ATHLTHPrivateGhostSpectatorSnapshot?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            if let snapshot, snapshot.isFresh() {
-                ATHLTHStudioPrivateGhostSpectatorCard(snapshot: snapshot)
-            }
-        }
-        .task(id: "\(session.profile.userID.uuidString)-\(session.signedIn)-\(scenePhase == .active)") {
-            snapshot = nil
-            guard ATHLTHDeviceRole.isIPad, session.signedIn,
-                  scenePhase == .active else { return }
-            while !Task.isCancelled {
-                let userID = session.profile.userID
-                let fetched = await ATHLTHPrivateGhostSpectatorStore.fetch(
-                    for: userID
-                )
-                guard !Task.isCancelled, userID == session.profile.userID
-                else { return }
-                snapshot = fetched
-                try? await Task.sleep(
-                    for: .seconds(snapshot == nil ? 12 : 4)
-                )
-            }
-        }
-    }
-}
-
-/// A local strength session takes priority over the remote read-only card.
-/// Neither remote fetch nor refresh changes Home's other derived data.
-private struct ATHLTHStudioStrengthHomeStatusView: View {
-    @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var strength: StrengthWorkoutStore
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var snapshot: ATHLTHPrivateLiveStrengthSnapshot?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            if strength.activeWorkout != nil {
-                ATHLTHStudioLiveStrengthReadOnlyCard()
-            } else if let snapshot, snapshot.isFresh() {
-                ATHLTHStudioRemoteStrengthStatusCard(snapshot: snapshot)
-            }
-        }
-        .task(id: "\(session.profile.userID.uuidString)-\(session.signedIn)-\(scenePhase == .active)") {
-            snapshot = nil
-            guard ATHLTHDeviceRole.isIPad, session.signedIn,
-                  scenePhase == .active else { return }
-            while !Task.isCancelled {
-                let account = session.profile.userID
-                let fetched = await ATHLTHPrivateLiveStrengthStatusStore.fetch(
-                    for: account
-                )
-                guard !Task.isCancelled, account == session.profile.userID
-                else { return }
-                snapshot = fetched
-                try? await Task.sleep(for: .seconds(12))
-            }
-        }
-    }
-}
-
 /// iPad-only Studio home, inspired by the approved airy ATHLTH Studio reference.
 /// The content is sourced from existing local session and Health stores; no
 /// demonstration values, artificial readiness scores or implicit completions.
@@ -185,19 +118,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     let onInspect: (WorkoutSummary) -> Void
-    /// The current week strip remains on Home; details dock on the right.
-    let onSelectWeekDay: (Date) -> Void
     let onOpenPlanner: () -> Void
     let onOpenPlanSync: () -> Void
     let onOpenInsights: () -> Void
-    let onOpenHistory: () -> Void
     let onOpenSettings: () -> Void
-    let onOpenLibrary: () -> Void
     let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
     let onOpenTrainTogether: () -> Void
     let onOpenNotifications: () -> Void
     let onOpenWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
-    let onStartQuick: () -> Void
     let onStartWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onSendToWatch: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onStartAfter: (ATHLTHStudioSchedule.Occurrence, TimeInterval) -> Void
@@ -277,34 +205,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 && !completed(item)
                 && !item.workout.isExplicitRestDay
         }
-    }
-
-    /// A transparent activity hint, not a recovery diagnosis or AI promise.
-    /// Calculated once from the same training history and next session
-    /// used by the rest of the current Home render.
-    private func homeRecommendation(
-        recorded: [WorkoutSummary],
-        next: ATHLTHStudioSchedule.Occurrence?
-    ) -> ATHLTHStudioHomeRecommendation.Result {
-        ATHLTHStudioHomeRecommendation.make(
-            nextWorkoutTitle: next?.workout.title,
-            workouts: recorded
-        )
-    }
-
-    private func calendarWeek(
-        recorded: [WorkoutSummary],
-        planned: [ATHLTHStudioSchedule.Occurrence]
-    ) -> ATHLTHStudioHomeWeek.Snapshot {
-        ATHLTHStudioHomeWeek.make(
-            plans: session.trainingPlans,
-            standalone: session.standalonePlannedSessions,
-            recorded: recorded,
-            pausedPlanIDs: session.pausedTrainingPlanIDs,
-            deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
-            now: selectedDate,
-            plannedOverride: planned
-        )
     }
 
     private func makeHomeProjection() -> ATHLTHStudioHomeProjection {
@@ -654,228 +554,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
             .clipped()
         }
         .accessibilityIdentifier("athlth-ipad-full-bleed-plan-hero")
-    }
-
-    private func titleRow(expanded: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("ATHLTH")
-                .font(.caption.weight(.semibold))
-                .tracking(2.4)
-                .foregroundStyle(bronze)
-            Text(tr("Your training today", "Treningen din i dag"))
-                .font(.system(size: expanded ? 32 : 27, weight: .regular, design: .serif))
-                .foregroundStyle(ink)
-                .accessibilityAddTraits(.isHeader)
-            Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 16) {
-                Button {
-                    focusedPlanningDate = Calendar.current.startOfDay(for: .now)
-                } label: {
-                    Label(tr("Plan workout", "Planlegg økt"), systemImage: "calendar.badge.plus")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(ink)
-                .frame(minHeight: 44)
-                Button(action: onStartQuick) {
-                    Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(bronze)
-            }
-            .font(.subheadline.weight(.semibold))
-        }
-        .padding(22)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            GeometryReader { bounds in
-                Image("HomeHero")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: bounds.size.width, height: bounds.size.height)
-                    .clipped()
-                    .overlay {
-                        LinearGradient(colors: [cream, cream.opacity(0.95), cream.opacity(0.45)],
-                                       startPoint: .leading, endPoint: .trailing)
-                    }
-            }
-            .accessibilityHidden(true)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 22))
-        .accessibilityIdentifier("athlth-ipad-training-command-header")
-    }
-
-    private var activePlanSummary: some View {
-        Button(action: onOpenPlanner) {
-            HStack(spacing: 18) {
-                Image(systemName: "calendar")
-                    .font(.title2)
-                    .foregroundStyle(bronze)
-                    .frame(width: 48, height: 48)
-                    .background(cream, in: RoundedRectangle(cornerRadius: 14))
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(ATHLTHStudioHomePlanHeroPolicy.statusLabel(
-                        for: programStatus,
-                        norwegian: ATHLTHLocalization.isNorwegian
-                    ))
-                        .font(.caption2.weight(.semibold))
-                        .tracking(1.2)
-                        .foregroundStyle(.secondary)
-                    Text(program?.title ?? tr("Create your training plan", "Lag treningsplanen din"))
-                        .font(.system(.title3, design: .serif, weight: .medium))
-                        .foregroundStyle(ink)
-                        .multilineTextAlignment(.leading)
-                    if let plan = program {
-                        Text(weekLabel(plan)).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right").foregroundStyle(bronze)
-            }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white, in: RoundedRectangle(cornerRadius: 18))
-            .contentShape(RoundedRectangle(cornerRadius: 18))
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(tr("Open your training plan", "Åpne treningsplanen din"))
-    }
-
-    private var planCard: some View {
-        Button(action: onOpenPlanner) {
-            VStack(alignment: .leading, spacing: 16) {
-                Label(tr("ACTIVE TRAINING PLAN", "AKTIV TRENINGsPLAN").uppercased(),
-                      systemImage: "calendar")
-                    .font(.caption.weight(.semibold))
-                    .tracking(1)
-                    .foregroundStyle(bronze)
-
-                if let plan = program {
-                    Text(plan.title)
-                        .font(.system(size: 27, weight: .medium, design: .serif))
-                        .foregroundStyle(ink)
-                        .lineLimit(2)
-                    Text(weekLabel(plan))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    let progress = session.trainingPlanProgress(
-                        plan,
-                        healthWorkouts: health.workouts,
-                        strengthHistory: strength.workoutHistory
-                    )
-                    let fraction = progress.totalSessions > 0
-                        ? min(1, max(0, Double(progress.completedSessions) /
-                                          Double(progress.totalSessions)))
-                        : 0.0
-
-                    HStack(spacing: 12) {
-                        ProgressView(value: fraction)
-                            .tint(bronze)
-                        Text("\(Int((fraction * 100).rounded())) %")
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(ink)
-                    }
-                    Text("\(progress.completedSessions) / \(progress.totalSessions) " +
-                         tr("workouts completed", "økter fullført"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(tr("Build your training plan", "Bygg treningsplanen din"))
-                        .font(.system(size: 25, weight: .medium, design: .serif))
-                        .foregroundStyle(ink)
-                    Text(tr("Create a plan in Plan Studio to follow it here.",
-                            "Opprett en plan i Plan Studio for å følge den her."))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-                Label(
-                    program == nil ? tr("Create plan", "Opprett plan")
-                        : tr("View full plan", "Se hele planen"),
-                    systemImage: "arrow.up.right"
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(bronze)
-            }
-            .frame(maxWidth: .infinity, minHeight: 204, alignment: .leading)
-            .padding(21)
-            .background {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.white)
-                    .overlay(alignment: .trailing) {
-                        Image("HomeHero")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 255)
-                            .opacity(0.15)
-                            .mask(
-                                LinearGradient(
-                                    colors: [.clear, .white.opacity(0.5), .white],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-            }
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline, lineWidth: 1))
-            .contentShape(RoundedRectangle(cornerRadius: 20))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("athlth-ipad-active-training-plan")
-    }
-
-    private func recommendationCard(
-        _ recommendation: ATHLTHStudioHomeRecommendation.Result,
-        next: ATHLTHStudioSchedule.Occurrence?
-    ) -> some View {
-        HStack(alignment: .center, spacing: 16) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 19, weight: .medium))
-                .foregroundStyle(bronze)
-                .frame(width: 44, height: 44)
-                .background(cream, in: RoundedRectangle(cornerRadius: 13))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(tr("Today's recommendation", "Dagens anbefaling"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(bronze)
-                Text(tr(recommendation.titleEnglish, recommendation.titleNorwegian))
-                    .font(.system(size: 19, weight: .medium, design: .serif))
-                    .foregroundStyle(ink)
-                Text(tr(recommendation.reasonEnglish, recommendation.reasonNorwegian))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 6)
-            Button {
-                if let item = next {
-                    onOpenWorkout(item)
-                } else {
-                    onStartQuick()
-                }
-            } label: {
-                Label(
-                    next == nil
-                        ? tr("Choose workout", "Velg økt")
-                        : tr("View workout", "Se økt"),
-                    systemImage: "arrow.up.right"
-                )
-                .lineLimit(1)
-            }
-            .buttonStyle(.bordered)
-            .tint(bronze)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline.opacity(0.45), lineWidth: 0.6))
-        .accessibilityIdentifier("athlth-ipad-home-recommendation")
     }
 
     private func nextWorkoutCard(
