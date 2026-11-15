@@ -167,6 +167,7 @@ struct AIProgramBuilderView: View {
     @State private var editingDraftWorkout: ATHLTHPlanDraftWorkoutSelection?
     @State private var isGenerating = false
     @State private var errorMessage: String?
+    @State private var canRetryCoachError = false
     @State private var didLoadDefaults = false
     @State private var completingPlanID: UUID?
     @State private var completingPlanVersion: Int?
@@ -392,15 +393,29 @@ struct AIProgramBuilderView: View {
                 }
             }
             .alert(
-                "AI Program",
+                "ATHLTH Coach",
                 isPresented: Binding(
                     get: { errorMessage != nil },
                     set: { shown in
-                        if !shown { errorMessage = nil }
+                        if !shown {
+                            errorMessage = nil
+                            canRetryCoachError = false
+                        }
                     }
                 )
             ) {
-                Button("OK", role: .cancel) {}
+                if canRetryCoachError {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Try again", norwegian: "Prøv igjen"
+                    )) {
+                        canRetryCoachError = false
+                        errorMessage = nil
+                        Task { await generatePreview() }
+                    }
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Back to choices", norwegian: "Tilbake til valgene"
+                ), role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "")
             }
@@ -2714,6 +2729,8 @@ struct AIProgramBuilderView: View {
     @MainActor
     private func generatePreview() async {
         guard canGenerate else { return }
+        canRetryCoachError = false
+        errorMessage = nil
 
         if isStandaloneCoachJourney {
             coachJourneyStage = .generating
@@ -2780,6 +2797,7 @@ struct AIProgramBuilderView: View {
                         norwegian: "AI foreslo en øvelse du har oppgitt at du ikke kan utføre: \(excluded.joined(separator: ", ")). Ingenting ble lagret. Kontroller begrensningene før du prøver igjen."
                     )
                 } else {
+                    canRetryCoachError = true
                     errorMessage = ATHLTHLocalization.choose(
                         english: "AI returned an incomplete or invalid plan. No changes have been saved. Try again.",
                         norwegian: "AI leverte en ufullstendig eller ugyldig plan. Ingenting er lagret. Prøv på nytt."
@@ -2794,9 +2812,13 @@ struct AIProgramBuilderView: View {
                 coachJourneyStage = .preview
             }
             errorMessage = nil
+        } catch is CancellationError {
+            if isStandaloneCoachJourney { coachJourneyStage = .intake }
         } catch {
             if isStandaloneCoachJourney { coachJourneyStage = .intake }
-            errorMessage = error.localizedDescription
+            let coachError = error as? AIProgramError ?? .unavailable
+            canRetryCoachError = coachError.canRetry
+            errorMessage = coachError.localizedDescription
         }
     }
 
