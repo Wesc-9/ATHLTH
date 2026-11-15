@@ -9,6 +9,9 @@ struct HomeDailyRecommendedWorkoutSheet: View {
     let onOpenPlannedWorkout: () -> Void
     let onStartOnPhone: () -> Void
     let onStartOnWatch: () -> Void
+    var onSendToWatch: (() -> Void)? = nil
+    var onDelayOnPhone: ((TimeInterval) -> Void)? = nil
+    var onDelayOnWatch: (() -> Void)? = nil
 
     var isCalendarWorkout = false
     var canStart = true
@@ -145,7 +148,10 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                     canStartWithWatch: canStartWithWatch,
                     onOpenPlannedWorkout: onOpenPlannedWorkout,
                     onStartOnPhone: onStartOnPhone,
-                    onStartOnWatch: onStartOnWatch
+                    onStartOnWatch: onStartOnWatch,
+                    onSendToWatch: onSendToWatch,
+                    onDelayOnPhone: onDelayOnPhone,
+                    onDelayOnWatch: onDelayOnWatch
                 )
                 .disabled(!canStart)
                 .padding(.horizontal, 20)
