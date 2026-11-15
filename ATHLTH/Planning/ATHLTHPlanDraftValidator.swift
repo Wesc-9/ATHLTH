@@ -78,6 +78,7 @@ enum ATHLTHPlanDraftValidator {
                         issues.append("invalid_pace")
                     }
                     if requireExecutableWorkouts {
+                        let authored = workout.authoredWorkout?.resolvedWorkoutBlocks ?? []
                         let isStrength = workout.kind == "strength"
                         let isCardio = workout.kind == "running" ||
                             workout.kind == "walking"
@@ -90,6 +91,10 @@ enum ATHLTHPlanDraftValidator {
                             $0.kind == "exercise" &&
                                 (($0.repetitions ?? 0) > 0 ||
                                  ($0.durationSeconds ?? 0) > 0)
+                        } || authored.contains {
+                            $0.kind == .exercise &&
+                                (($0.repetitions ?? 0) > 0 ||
+                                 ($0.durationSeconds ?? 0) > 0)
                         }
                         if isStrength && !playableStrength {
                             issues.append("strength_missing_structured_sets")
@@ -100,7 +105,12 @@ enum ATHLTHPlanDraftValidator {
                                 (($0.durationSeconds ?? 0) > 0 ||
                                  ($0.distanceMeters ?? 0) > 0)
                             }
-                            if timedBlocks.isEmpty &&
+                            let authoredRun = authored.contains {
+                                $0.kind == .run &&
+                                    (($0.durationSeconds ?? 0) > 0 ||
+                                     ($0.distanceMeters ?? 0) > 0)
+                            }
+                            if timedBlocks.isEmpty && !authoredRun &&
                                 (workout.durationMinutes ?? 0) <= 0 &&
                                 (workout.targetDistanceKilometers ?? 0) <= 0 {
                                 issues.append("cardio_missing_executable_target")
@@ -117,7 +127,14 @@ enum ATHLTHPlanDraftValidator {
                                 let recovery = (workout.blocks ?? []).contains {
                                     $0.kind == "rest" || $0.phase == "recovery"
                                 }
-                                if main < 2 || !recovery {
+                                let actualMain = authored.filter {
+                                    $0.kind == .run && $0.resolvedPhase == .main
+                                }.count
+                                let actualRecovery = authored.contains {
+                                    $0.kind == .rest || $0.resolvedPhase == .recovery
+                                }
+                                if (main < 2 || !recovery) &&
+                                    (actualMain < 2 || !actualRecovery) {
                                     issues.append("interval_missing_drags")
                                 }
                             }
