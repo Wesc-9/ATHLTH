@@ -140,6 +140,10 @@ struct ATHLTHiPadStudioRootView: View {
     @SceneStorage("athlth.studio.selectedDestination")
     private var savedDestination = ATHLTHStudioDestination.overview.rawValue
     @State private var selection: ATHLTHStudioDestination = .overview
+    // Home can be selected twice in a row: the second tap must still return
+    // to a fresh, unobstructed dashboard rather than doing nothing.
+    @State private var homeNavigationRevision = 0
+    @State private var communityTab: ATHLTHCommunityMainTab = .overview
     @State private var selectedWorkout: WorkoutSummary?
     @State private var inspectedWeekDate: Date?
     @State private var showingWorkoutDetail = false
@@ -669,6 +673,7 @@ struct ATHLTHiPadStudioRootView: View {
                         selected: selection == .overview && libraryPage == nil &&
                             sidebarPage == nil
                     ) { openStudio(.overview) }
+                    .accessibilityIdentifier("athlth-ipad-sidebar-home")
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Notifications", norwegian: "Varsler"),
@@ -1028,8 +1033,22 @@ struct ATHLTHiPadStudioRootView: View {
         resetDetailNavigation()
         libraryPage = nil
         sidebarPage = nil
+        if destination == .overview {
+            // A tap on the already-selected Home item is still a real
+            // navigation request. Reset any inline planner focus and force
+            // the dashboard to become the visible detail root again.
+            focusedPlanningDate = nil
+            showingInspector = false
+            homeNavigationRevision &+= 1
+        }
         selection = destination
-        // Switching Home, Coach, Studio or Settings never toggles the menu.
+        savedDestination = destination.rawValue
+        // The sidebar width/visibility remains completely user-controlled.
+    }
+
+    private func openCommunity(_ tab: ATHLTHCommunityMainTab) {
+        communityTab = tab
+        openStudio(.community)
     }
 
     @ViewBuilder
@@ -1046,6 +1065,12 @@ struct ATHLTHiPadStudioRootView: View {
                 onOpenSettings: { openStudio(.settings) },
                 onOpenLibrary: {
                     openLibrary(.overview)
+                },
+                onOpenCommunity: { tab in
+                    openCommunity(tab)
+                },
+                onOpenTrainTogether: {
+                    openSidebarPage(.trainTogether)
                 },
                 onOpenWorkout: { entry in
                     if let planID = entry.planID {
@@ -1092,6 +1117,7 @@ struct ATHLTHiPadStudioRootView: View {
                 focusedPlanningDate: $focusedPlanningDate,
                 selectedDate: $selectedHomeWeekDate
             )
+            .id(homeNavigationRevision)
         case .planner:
             ATHLTHStudioPlannerView(
                 onStartWorkout: { planID, workoutID in
@@ -1121,7 +1147,8 @@ struct ATHLTHiPadStudioRootView: View {
         case .explore:
             ATHLTHStudioRouteWorkspaceView()
         case .community:
-            ATHLTHCommunityV5View()
+            ATHLTHCommunityV5View(initialTab: communityTab)
+                .id(communityTab)
         case .coach:
             RecoveryCoachInboxDestinationView()
         case .settings:
