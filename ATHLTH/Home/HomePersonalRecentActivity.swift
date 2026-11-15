@@ -483,6 +483,61 @@ private enum HomePersonalWorkoutCatalog {
 
 @MainActor
 private enum HomeActivityStreamBuilder {
+    /// Bounded newest-first insertion. Home needs only six rows (plus the
+    /// newest opposite-scope item); never sort the complete social feed just
+    /// because a like, a Health sample or a Home metric changes.
+    static func recentPreview(
+        mine: [SocialPublishableWorkout],
+        social: SocialStore,
+        maximumCount: Int = 6
+    ) -> [HomeActivityStreamItem] {
+        let limit = max(0, maximumCount)
+        guard limit > 0 else { return [] }
+
+        var newest: [HomeActivityStreamItem] = []
+        var newestMine: HomeActivityStreamItem?
+        var newestFollowing: HomeActivityStreamItem?
+
+        func consider(_ item: HomeActivityStreamItem) {
+            if item.isMine {
+                if newestMine == nil || item.date > newestMine!.date {
+                    newestMine = item
+                }
+            } else if newestFollowing == nil || item.date > newestFollowing!.date {
+                newestFollowing = item
+            }
+
+            if newest.count == limit, let last = newest.last,
+               item.date <= last.date { return }
+            let position = newest.firstIndex { $0.date < item.date } ?? newest.endIndex
+            newest.insert(item, at: position)
+            if newest.count > limit { newest.removeLast() }
+        }
+
+        for workout in mine {
+            consider(HomeActivityStreamItem(source: .mine(workout)))
+        }
+        for item in social.feed where item.activity.kind == "workout" &&
+            item.actor.userID != social.currentUserID {
+            consider(HomeActivityStreamItem(source: .following(item)))
+        }
+
+        guard let first = newest.first else { return [] }
+        var result = [first]
+        // Preserve the existing contract: show at least one own activity
+        // and one mutual-follow activity when both sources contain entries.
+        if first.isMine, let opposite = newestFollowing {
+            result.append(opposite)
+        } else if !first.isMine, let opposite = newestMine {
+            result.append(opposite)
+        }
+        for item in newest where result.count < limit &&
+            !result.contains(where: { $0.id == item.id }) {
+            result.append(item)
+        }
+        return result
+    }
+
     static func make(
         mine:
             [SocialPublishableWorkout],
@@ -524,8 +579,6 @@ private enum HomeActivityStreamBuilder {
 
 private struct HomeRecentActivityRevision:
     Hashable {
-    let healthCount: Int
-    let healthFirstID: UUID?
     let strengthCount: Int
     let strengthFirstID: UUID?
     let strengthFirstEnd: Date?
@@ -1111,10 +1164,6 @@ struct HomePersonalRecentActivitySection:
     private var recentRevision:
         HomeRecentActivityRevision {
         HomeRecentActivityRevision(
-            healthCount:
-                health.workouts.count,
-            healthFirstID:
-                health.workouts.first?.id,
             strengthCount:
                 strength.workoutHistory.count,
             strengthFirstID:
@@ -1132,74 +1181,31 @@ struct HomePersonalRecentActivitySection:
         )
     }
 
-    private var stream:
-        [HomeActivityStreamItem] {
-        HomeActivityStreamBuilder.make(
-            mine: myWorkouts,
-            social: social
+    // Store calculated muscle maps for the few Home cards rather than
+    // rebuilding the full strength anatomy on every SwiftUI body update.
+    @State private var recentStrengthProfiles: [UUID: StrengthMuscleProfile] = [:]
+
+    private var visibleItems: [HomeActivityStreamItem] {
+        HomeActivityStreamBuilder.recentPreview(
+            mine: myWorkouts, social: social
         )
     }
 
-    private var visibleItems:
-        [HomeActivityStreamItem] {
-        guard let first = stream.first else {
-            return []
-        }
-
-        var result:
-            [HomeActivityStreamItem] =
-                [first]
-
-        let needsMine =
-            !first.isMine
-        let needsFollowing =
-            first.isMine
-
-        if needsMine,
-           let mine =
-                stream.first(
-                    where: {
-                        $0.isMine
-                    }
-                ) {
-            result.append(mine)
-        } else if needsFollowing,
-                  let following =
-                    stream.first(
-                        where: {
-                            !$0.isMine
-                        }
-                  ) {
-            result.append(following)
-        }
-
-        for candidate in stream
-        where result.count < 6 &&
-              !result.contains(
-                where: {
-                    $0.id == candidate.id
-                }
-              ) {
-            result.append(candidate)
-        }
-
-        return result
-    }
-
     var body: some View {
-        VStack(
+        let recent = visibleItems
+        return VStack(
             alignment: .leading,
             spacing: 12
         ) {
             header
 
-            if visibleItems.isEmpty {
+            if recent.isEmpty {
                 emptyState
             } else {
-                // Vertical feed uses the existing order, workout evidence,
-                // friend identities and engagement stores unchanged.
+                // Only the six visible rows are materialized; the history screen
+                // still retains its full, independently sorted activity feed.
                 LazyVStack(spacing: 12) {
-                    ForEach(visibleItems) { item in
+                    ForEach(recent) { item in
                         verticalItem(item)
                     }
                 }
@@ -1211,7 +1217,7 @@ struct HomePersonalRecentActivitySection:
                 .accessibilityIdentifier("athlth-home-recent-vertical-feed")
             }
         }
-        .task(id: recentRevision) {
+        .onChange(of: recentRevision) { _, _ in
             rebuildRecentWorkouts()
         }
         .onAppear {
@@ -1224,9 +1230,10 @@ struct HomePersonalRecentActivitySection:
             guard newPhase == .active else { return }
             Task { await refreshRecentWorkouts() }
         }
-        .onReceive(health.$workouts) { _ in
-            // A HealthKit read may finish without changing the number of
-            // workouts; don't rely exclusively on the old revision key.
+        .onReceive(health.$workouts.removeDuplicates()) { _ in
+            // Also observes edits that retain the same workout ID and count.
+            // Health refresh and strength/phone revisions no longer both
+            // rebuild for the same HealthKit publication.
             rebuildRecentWorkouts()
         }
         .onReceive(
@@ -1255,7 +1262,8 @@ struct HomePersonalRecentActivitySection:
         // A narrow workout-only Health query is much cheaper than
         // refreshAll(), which also fetches sleep, readiness, HRV, etc.
         _ = await health.refreshRecentWorkoutsForHome(force: force)
-        rebuildRecentWorkouts()
+        // HealthKit's published workout collection drives the rebuild.
+        // A no-change refresh must not reconstruct all six cards.
     }
 
     private func rebuildRecentWorkouts() {
@@ -1279,6 +1287,19 @@ struct HomePersonalRecentActivitySection:
                 )
 
         if refreshed != myWorkouts {
+            let recentStrengthHistory = Array(strength.workoutHistory.prefix(32))
+            var profiles: [UUID: StrengthMuscleProfile] = [:]
+            // Only the newest six personal sessions can appear on Home.
+            // Full-history cards retain their existing on-demand calculation.
+            for workout in refreshed.prefix(6) where workout.activity == .strength {
+                guard let log = HomePersonalWorkoutCatalog.strengthWorkout(
+                    for: workout, in: recentStrengthHistory
+                ) else { continue }
+                profiles[workout.id] = StrengthMuscleProfileBuilder.make(
+                    workout: log, library: []
+                ).profile
+            }
+            recentStrengthProfiles = profiles
             myWorkouts = refreshed
         }
     }
@@ -1346,21 +1367,24 @@ struct HomePersonalRecentActivitySection:
     private func verticalItem(_ item: HomeActivityStreamItem) -> some View {
         switch item.source {
         case .mine(let workout):
+            let strengthLog = strengthWorkout(for: workout)
+            let phoneLog = localPhoneWorkout(for: workout)
             ATHLTHRecentActivityCardLayout(
                 availableWidth: availableFeedWidth
             ) {
                 NavigationLink {
                     HomePersonalActivityDestination(
                         workout: workout,
-                        strengthWorkout: strengthWorkout(for: workout),
-                        phoneWorkout: localPhoneWorkout(for: workout)
+                        strengthWorkout: strengthLog,
+                        phoneWorkout: phoneLog
                     )
                 } label: {
                     HomePersonalWorkoutVisual(
                         workout: workout,
-                        strengthWorkout: strengthWorkout(for: workout),
-                        phoneWorkout: localPhoneWorkout(for: workout),
+                        strengthWorkout: strengthLog,
+                        phoneWorkout: phoneLog,
                         height: recentArtworkHeight,
+                        precomputedStrengthProfile: recentStrengthProfiles[workout.id],
                         recentActivityStrip: true
                     )
                     .frame(maxWidth: .infinity)
@@ -1399,7 +1423,9 @@ struct HomePersonalRecentActivitySection:
                     )
 
                     HomeCompactActivityEngagementRow(
-                        item: socialFeedItem(for: workout)
+                        item: socialFeedItem(
+                            for: workout, strengthLog: strengthLog, phoneLog: phoneLog
+                        )
                     )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1723,16 +1749,17 @@ struct HomePersonalRecentActivitySection:
     }
 
     private func socialFeedItem(
-        for workout:
-            SocialPublishableWorkout
+        for workout: SocialPublishableWorkout,
+        strengthLog: StrengthWorkoutLog?,
+        phoneLog: PhoneWorkout?
     ) -> SocialFeedItem? {
         // The social strength publisher posts StrengthWorkoutLog.id,
         // while the personal history prefers its HealthKit UUID. Include
         // both IDs: otherwise the published strength post looks unlikable.
         let IDs = HomeSocialWorkoutIdentity.allIDs(
             visibleWorkoutID: workout.id,
-            originalStrengthID: strengthWorkout(for: workout)?.id,
-            originalPhoneID: localPhoneWorkout(for: workout)?.id
+            originalStrengthID: strengthLog?.id,
+            originalPhoneID: phoneLog?.id
         )
 
         return social.feed.first { item in
