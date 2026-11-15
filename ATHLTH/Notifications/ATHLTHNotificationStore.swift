@@ -100,25 +100,106 @@ enum ATHLTHDailyCheckInReminderPolicy {
 final class ATHLTHNotificationStore: ObservableObject {
     @Published private(set) var items: [ATHLTHNotificationItem] = []
     @Published private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
+    @Published private(set) var lastAccountSyncError: String?
+    @Published private(set) var lastAccountSyncAt: Date?
 
     private let activationDate: Date
+    private var accountID: UUID?
+    private var tombstones: [ATHLTHNotificationTombstone] = []
+    private var syncTask: Task<Void, Never>?
+    private var isSyncing = false
 
     init() {
         activationDate = Self.loadOrCreateActivationDate()
-
-        // Raw workout-completion rows are activity history, not useful
-        // notifications. Purge legacy rows from older builds on first load.
-        let loadedItems = Self.loadItems()
-        items = loadedItems.filter {
-            $0.kind != .workoutCompleted
-        }
-
-        if items.count != loadedItems.count {
-            persist()
-        }
-
+        // A device-global JSON file must never appear for the wrong account.
+        // Switch to the verified, account-scoped cache during app login.
+        items = []
         Task {
             await refreshAuthorizationStatus()
+        }
+    }
+
+    func switchAccount(_ userID: UUID?) {
+        guard accountID != userID else { return }
+        syncTask?.cancel()
+        syncTask = nil
+        accountID = userID
+        lastAccountSyncError = nil
+        lastAccountSyncAt = nil
+
+        guard let userID else {
+            items = []
+            tombstones = []
+            return
+        }
+        if let cached = Self.loadAccountSnapshot(userID: userID) {
+            items = Array(cached.items.filter {
+                $0.kind != .workoutCompleted
+            }.prefix(250))
+            tombstones = cached.tombstones
+        } else if Self.verifiedLegacyAccountID() == userID {
+            // Import old local notifications only for the identity verified
+            // on this installation. Never give them to another signed-in user.
+            items = Self.loadItems().filter {
+                $0.kind != .workoutCompleted
+            }
+            tombstones = []
+            persist(scheduleRemote: false)
+        } else {
+            items = []
+            tombstones = []
+        }
+        scheduleAccountSync()
+    }
+
+    func scheduleAccountSync() {
+        guard accountID != nil else { return }
+        syncTask?.cancel()
+        syncTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(550)) }
+            catch { return }
+            await self?.refreshAccountNotifications()
+        }
+    }
+
+    func refreshAccountNotifications() async {
+        guard !isSyncing, let userID = accountID else { return }
+        guard SupabaseEnvironment.client.auth.currentUser?.id == userID else {
+            lastAccountSyncError = ATHLTHLocalization.choose(
+                english: "Notification sync awaits verified sign-in.",
+                norwegian: "Varselsynkronisering venter på bekreftet innlogging."
+            )
+            return
+        }
+
+        isSyncing = true
+        defer { isSyncing = false }
+        let original = ATHLTHAccountNotificationSnapshot(
+            items: items, tombstones: tombstones
+        )
+        do {
+            let cloud = try await ATHLTHAccountNotificationSyncService.reconcile(
+                accountID: userID, local: original
+            )
+            guard !Task.isCancelled, accountID == userID else { return }
+            // Preserve read/dismiss actions performed locally during the
+            // network request; the next sync will publish those changes.
+            let merged = ATHLTHAccountNotificationSnapshot.merged(
+                .init(items: items, tombstones: tombstones), cloud
+            )
+            items = Array(merged.items.prefix(250))
+            tombstones = merged.tombstones
+            persist(scheduleRemote: false)
+            lastAccountSyncAt = Date()
+            lastAccountSyncError = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard accountID == userID else { return }
+            lastAccountSyncError = ATHLTHLocalization.choose(
+                english: "Notifications are saved locally. Account sync will retry.",
+                norwegian: "Varsler er lagret lokalt. Kontosynkroniseringen prøver igjen."
+            )
         }
     }
 
@@ -213,6 +294,9 @@ final class ATHLTHNotificationStore: ObservableObject {
     }
 
     func add(_ draft: ATHLTHNotificationDraft, deliverSystemAlert: Bool = true) {
+        guard accountID != nil,
+              !tombstones.contains(where: { $0.item.eventKey == draft.eventKey })
+        else { return }
         if let index = items.firstIndex(
             where: { $0.eventKey == draft.eventKey }
         ) {
@@ -679,7 +763,8 @@ final class ATHLTHNotificationStore: ObservableObject {
         let now = Date()
         var changed = false
 
-        for index in items.indices where items[index].readAt == nil {
+        for index in items.indices where items[index].readAt == nil &&
+            !isMessageInboxOwned(items[index]) {
             items[index].readAt = now
             changed = true
         }
@@ -690,7 +775,11 @@ final class ATHLTHNotificationStore: ObservableObject {
     }
 
     func delete(_ id: UUID) {
-        items.removeAll { $0.id == id }
+        guard let item = items.first(where: { $0.id == id }) else { return }
+        // Do not actually delete the cloud record. A tombstone makes the
+        // dismissal permanent on all devices, even after an offline reimport.
+        tombstones.append(.init(item: item, deletedAt: Date()))
+        items.removeAll { $0.eventKey == item.eventKey }
         persist()
     }
 
@@ -968,20 +1057,53 @@ final class ATHLTHNotificationStore: ObservableObject {
         }
     }
 
-    private func persist() {
-        guard let url = Self.itemsURL else { return }
-
+    private func persist(scheduleRemote: Bool = true) {
+        guard let userID = accountID,
+              let url = Self.accountItemsURL(userID: userID) else { return }
         do {
-            let directory = url.deletingLastPathComponent()
             try FileManager.default.createDirectory(
-                at: directory,
+                at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            let data = try JSONEncoder().encode(items)
+            let data = try JSONEncoder().encode(
+                ATHLTHAccountNotificationSnapshot(
+                    items: items, tombstones: tombstones
+                )
+            )
             try data.write(to: url, options: .atomic)
         } catch {
             return
         }
+        if scheduleRemote { scheduleAccountSync() }
+    }
+
+    private static func loadAccountSnapshot(
+        userID: UUID
+    ) -> ATHLTHAccountNotificationSnapshot? {
+        guard let url = accountItemsURL(userID: userID),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(
+            ATHLTHAccountNotificationSnapshot.self, from: data
+        )
+    }
+
+    private static func accountItemsURL(userID: UUID) -> URL? {
+        itemsURL?.deletingLastPathComponent()
+            .appendingPathComponent(
+                "notifications-\(userID.uuidString.lowercased()).json",
+                isDirectory: false
+            )
+    }
+
+    private static func verifiedLegacyAccountID() -> UUID? {
+        guard let data = UserDefaults.standard.data(
+            forKey: "session.verifiedOfflineProfile.v1"
+        ),
+              let profile = try? JSONDecoder().decode(
+                UserProfile.self, from: data
+              )
+        else { return nil }
+        return profile.userID
     }
 
     private static func loadItems() -> [ATHLTHNotificationItem] {
