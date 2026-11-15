@@ -187,7 +187,9 @@ enum ATHLTHSimpleWorkoutOutline {
                 detail = workText + workZone
             }
             let itemTitle = conciseTitle(
-                ATHLTHZonedLocalization.normalizeLegacyAllOutStep(work.block).title
+                ATHLTHWorkoutNameSuggestion.displayStepTitle(
+                    ATHLTHZonedLocalization.normalizeLegacyAllOutStep(work.block)
+                )
             )
             let displayTitle = count > 1 ? "\(count) × \(itemTitle)" : itemTitle
             result.append(Item(
