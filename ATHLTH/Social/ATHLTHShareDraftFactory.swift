@@ -170,7 +170,7 @@ enum ATHLTHShareDraftFactory {
             throw ATHLTHDirectShareError.onlyPersonalExercises
         }
         guard let consented = ATHLTHExerciseReferenceResolver.shareableSnapshot(
-            entry.exercise
+            entry.exercise, allowDirectFriendShare: true
         ) else {
             throw ATHLTHDirectShareError.privateExercise
         }
