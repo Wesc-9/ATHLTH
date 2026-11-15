@@ -2438,7 +2438,7 @@ struct CustomExerciseEditorView: View {
         ))
         _equipment = State(initialValue: editing?.exercise.equipment.joined(separator: ", ") ?? "")
         _instructions = State(initialValue: editing?.exercise.instructions.joined(separator: "\n") ?? "")
-        _shareable = State(initialValue: editing?.exercise.isVisibleOutsideOwnerLibrary ?? false)
+        _visibility = State(initialValue: editing?.exercise.resolvedVisibility ?? .privateOnly)
         _videoURLText = State(initialValue: editing?.exercise.videoURL.flatMap {
             $0.isFileURL ? nil : $0.absoluteString
         } ?? "")
@@ -2454,7 +2454,10 @@ struct CustomExerciseEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var subscriptionStore: SubscriptionStore
+    @StateObject private var marketplace = ATHLTHExerciseMarketplaceStore()
+    @State private var friendShareDraft: MessageShareDraft?
+    @State private var savingExercise = false
+    @State private var pendingPublicExerciseID: UUID?
 
     @State private var name = ""
     @State private var activityCategory: ATHLTHExerciseActivity = .strength
@@ -2464,7 +2467,7 @@ struct CustomExerciseEditorView: View {
         Set<ExerciseMuscleGroup> = []
     @State private var equipment = ""
     @State private var instructions = ""
-    @State private var shareable = false
+    @State private var visibility: ATHLTHExerciseVisibility = .privateOnly
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
     @State private var videoURLText = ""
@@ -2474,8 +2477,6 @@ struct CustomExerciseEditorView: View {
     @State private var isImportingVideo = false
     @State private var didSaveExercise = false
     @State private var studioError: String?
-    @State private var showingEquipmentScanner = false
-    @State private var showingScannerSubscription = false
     @State private var aiPrompt = ""
     @State private var aiVideoBrief = ""
     @State private var isGeneratingAIDraft = false
@@ -2486,32 +2487,15 @@ struct CustomExerciseEditorView: View {
     var body: some View {
         return NavigationStack {
             Form {
-                Section("Exercise") {
-                    // Images move to the very top of Exercise Studio,
-                    // while a fresh exercise still starts with the name.
-                    if let selectedImageData,
-                       let image = UIImage(data: selectedImageData) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 190)
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
-                            .accessibilityLabel(ATHLTHLocalization.choose(
-                                english: "Exercise image preview",
-                                norwegian: "Forhåndsvisning av øvelsesbilde"
-                            ))
-                    } else if let originalImageURL = editing?.exercise.imageURL,
-                              originalImageURL.isFileURL,
-                              let image = UIImage(contentsOfFile: originalImageURL.path) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 190)
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
-                    }
+                Section {
+                    exercisePreviewCard
+                }
+                .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 6, trailing: 14))
+                .listRowBackground(Color.clear)
 
+                Section(ATHLTHLocalization.choose(
+                    english: "Exercise", norwegian: "Øvelse"
+                )) {
                     TextField(
                         ATHLTHLocalization.choose(english: "Name", norwegian: "Navn"),
                         text: $name
@@ -2790,47 +2774,49 @@ struct CustomExerciseEditorView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                Section {
-                    Button {
-                        if session.hasPaidAccess {
-                            showingEquipmentScanner = true
-                        } else {
-                            showingScannerSubscription = true
+                Section(ATHLTHLocalization.choose(
+                    english: "Visibility", norwegian: "Synlighet"
+                )) {
+                    HStack(spacing: 8) {
+                        ForEach(ATHLTHExerciseVisibility.allCases) { option in
+                            Button {
+                                visibility = option
+                            } label: {
+                                VStack(spacing: 5) {
+                                    Image(systemName: option.iconName)
+                                        .font(.system(size: 18))
+                                    Text(option.title)
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .foregroundStyle(
+                                    visibility == option
+                                        ? Color.white : ATHLTHPlanDesign.accentInk
+                                )
+                                .frame(maxWidth: .infinity, minHeight: 64)
+                                .background(
+                                    visibility == option
+                                        ? ATHLTHPlanDesign.accentInk
+                                        : ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 13)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier(
+                                "exercise-visibility-\(option.rawValue)"
+                            )
                         }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Scan a gym machine and suggest an exercise",
-                                norwegian: "Skann et apparat og få øvelsesforslag"
-                            ),
-                            systemImage: session.hasPaidAccess
-                                ? "camera.viewfinder" : "lock.fill"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(minHeight: 48)
                     }
-                    .tint(ATHLTHPlanDesign.ink)
-                } header: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Identify equipment with AI",
-                        norwegian: "Gjenkjenn apparat med AI"
-                    ))
-                }
-
-                Section("Sharing") {
-                    Toggle(
-                        "Allow this exercise in shared plans",
-                        isOn: $shareable
-                    )
-
-                    Text(
-                        shareable
-                            ? "The exercise snapshot can travel with a plan you share."
-                            : "This custom exercise stays private to your library."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text(exerciseVisibilityExplanation)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    if editing?.exercise.sharedSourceExerciseID != nil {
+                        Text(ATHLTHLocalization.choose(
+                            english: "An exercise imported from another athlete remains private.",
+                            norwegian: "En øvelse importert fra en annen utøver forblir privat."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                 }
             }
             .athlthBrandedForm()
@@ -2851,6 +2837,7 @@ struct CustomExerciseEditorView: View {
                         saveExercise()
                     }
                     .disabled(
+                        savingExercise ||
                         name
                             .trimmingCharacters(
                                 in:
@@ -2861,29 +2848,6 @@ struct CustomExerciseEditorView: View {
                         isImportingVideo
                     )
                 }
-            }
-            .sheet(isPresented: $showingScannerSubscription) {
-                SubscriptionOfferView {
-                    session.applyStoreKitEntitlement(
-                        subscriptionStore.activeEntitlement
-                    )
-                    showingScannerSubscription = false
-                }
-            }
-            .sheet(isPresented: $showingEquipmentScanner) {
-                ATHLTHEquipmentScannerView(onSelect: { entry in
-                    name = library.localizedExerciseName(entry)
-                    primaryMuscles = Set(ExerciseMuscleGroup.allCases.filter {
-                        entry.exercise.primaryMuscles.contains($0.rawValue)
-                    })
-                    secondaryMuscles = Set(ExerciseMuscleGroup.allCases.filter {
-                        entry.exercise.secondaryMuscles.contains($0.rawValue) &&
-                        !primaryMuscles.contains($0)
-                    })
-                    equipment = entry.exercise.equipment.joined(separator: ", ")
-                    instructions = library.localizedExerciseInstructions(entry).joined(separator: "\n")
-                })
-                .environmentObject(library)
             }
             .fileImporter(
                 isPresented: $showingVideoImporter,
