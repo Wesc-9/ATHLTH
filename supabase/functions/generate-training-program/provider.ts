@@ -588,3 +588,114 @@ export function coachProviderRetryAfter(response: Response): number {
     ? Math.min(86400, Math.max(1, Math.ceil(seconds)))
     : 60;
 }
+
+/** The plan summary must be derived from the actual ATHLTH sessions, not
+ * AI prose claiming a fixed weekly frequency that the schedule contradicts. */
+export function coachGroundedProgramSummary(
+  value: { weeks?: unknown }, language: "no" | "en" = "no",
+): string {
+  const weeks = Array.isArray(value.weeks) ? value.weeks : [];
+  const counts = new Map<string, number>();
+  const weeklyCounts: number[] = [];
+  let minutes = 0;
+  for (const week of weeks) {
+    const days = week && typeof week === "object" && Array.isArray(week.days)
+      ? week.days : [];
+    let count = 0;
+    for (const day of days) {
+      const sessions = day && typeof day === "object" &&
+        Array.isArray(day.sessions) ? day.sessions : [];
+      for (const workout of sessions) {
+        if (!workout || typeof workout !== "object") continue;
+        const kind = typeof workout.kind === "string" ? workout.kind : "custom";
+        counts.set(kind, (counts.get(kind) ?? 0) + 1);
+        if (Number.isFinite(workout.durationMinutes)) {
+          minutes += Math.max(0, Number(workout.durationMinutes));
+        }
+        count++;
+      }
+    }
+    weeklyCounts.push(count);
+  }
+  const total = weeklyCounts.reduce((sum, n) => sum + n, 0);
+  const names: [string, string, string][] = [
+    ["strength", "styrke", "strength"], ["running", "løping", "running"],
+    ["walking", "gåing", "walking"], ["mobility", "bevegelighet", "mobility"],
+    ["recovery", "restitusjon", "recovery"], ["custom", "andre", "other"],
+  ];
+  const distribution = names.filter(([key]) => counts.has(key))
+    .map(([key, no, en]) =>
+      String(counts.get(key)) + " " + (language === "no" ? no : en)
+    ).join(", ");
+  return language === "no"
+    ? String(weeks.length) + " uker med " + total + " økter. " +
+      "Økter per uke: " + weeklyCounts.join(" / ") + ". " +
+      (distribution ? "Fordeling: " + distribution + ". " : "") +
+      (minutes > 0 ? "Totalt " + minutes + " planlagte minutter. " : "") +
+      "Kontroller øktdetaljene før du lagrer planen."
+    : String(weeks.length) + " weeks with " + total + " sessions. " +
+      "Sessions per week: " + weeklyCounts.join(" / ") + ". " +
+      (distribution ? "Breakdown: " + distribution + ". " : "") +
+      (minutes > 0 ? minutes + " scheduled minutes in total. " : "") +
+      "Review the workout details before saving.";
+}
+
+/** Protect the unified motor against text-only strength and malformed
+ * intervals. A steady run with duration/distance is a valid basic recipe;
+ * a named interval must contain real repetitions and recovery blocks. */
+export function coachExecutableProgramIssues(
+  value: { weeks?: unknown },
+): string[] {
+  const errors: string[] = [];
+  const weeks = Array.isArray(value.weeks) ? value.weeks : [];
+  for (let index = 0; index < weeks.length; index++) {
+    const days = Array.isArray(weeks[index]?.days) ? weeks[index].days : [];
+    for (const day of days) {
+      const sessions = Array.isArray(day?.sessions) ? day.sessions : [];
+      for (const workout of sessions) {
+        const kind = workout?.kind;
+        const blocks = Array.isArray(workout?.blocks) ? workout.blocks : [];
+        const exercises = Array.isArray(workout?.exercises) ? workout.exercises : [];
+        if (kind === "strength") {
+          const validExercises = exercises.filter((e: any) =>
+            typeof e?.name === "string" && Boolean(e.name.trim()) &&
+            Number.isInteger(e.sets) && e.sets > 0 &&
+            Number.isInteger(e.reps) && e.reps > 0
+          );
+          const validTimeline = blocks.some((b: any) =>
+            b.kind === "exercise" && typeof b.title === "string" &&
+            Boolean(b.title.trim()) && (
+              Number.isFinite(b.repetitions) && b.repetitions > 0 ||
+              Number.isFinite(b.durationSeconds) && b.durationSeconds > 0
+            )
+          );
+          if (validExercises.length === 0 && !validTimeline) {
+            errors.push("week_" + (index + 1) + ":strength_missing_sets");
+          }
+        }
+        if (kind === "running" || kind === "walking") {
+          const playable = blocks.some((b: any) => b.kind === "run" &&
+            (Number.isFinite(b.durationSeconds) && b.durationSeconds > 0 ||
+             Number.isFinite(b.distanceMeters) && b.distanceMeters > 0));
+          const basic = (Number.isFinite(workout?.durationMinutes) &&
+              workout.durationMinutes > 0) ||
+            (Number.isFinite(workout?.targetDistanceKilometers) &&
+              workout.targetDistanceKilometers > 0);
+          if (!playable && !basic) {
+            errors.push("week_" + (index + 1) + ":cardio_without_target");
+          }
+          if (/interval|intervall|4\s*[x×]\s*4/i.test(String(workout?.title ?? ""))) {
+            const efforts = blocks.filter((b: any) =>
+              b.kind === "run" && b.phase === "main").length;
+            const rests = blocks.filter((b: any) =>
+              b.kind === "rest" || b.phase === "recovery").length;
+            if (efforts < 2 || rests < 1) {
+              errors.push("week_" + (index + 1) + ":interval_without_drags");
+            }
+          }
+        }
+      }
+    }
+  }
+  return errors;
+}
