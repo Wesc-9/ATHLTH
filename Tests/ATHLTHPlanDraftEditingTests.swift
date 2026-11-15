@@ -238,8 +238,13 @@ final class ATHLTHPlanDraftEditingTests: XCTestCase {
             selected.makePlannedSession().resolvedWorkoutBlocks,
             changedWorkout.resolvedWorkoutBlocks
         )
+        // Fix plan start to a Monday; persisted indices are relative
+        // to the plan start date, not the AI calendar weekday.
+        let monday = Calendar(identifier: .gregorian).date(from:
+            DateComponents(year: 2026, month: 11, day: 16, hour: 12)
+        )!
         let plan = decoded.makeTrainingPlan(
-            ownerID: UUID(), startDate: Date()
+            ownerID: UUID(), startDate: monday
         )
         let copied = plan.weeks[1].days.first {
             $0.dayIndex == 1
