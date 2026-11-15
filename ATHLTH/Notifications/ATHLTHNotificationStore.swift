@@ -1,4 +1,5 @@
 import Foundation
+import Supabase
 import UserNotifications
 
 /// Copy for scheduled challenge alerts. Text is resolved when iOS queues the
@@ -294,9 +295,11 @@ final class ATHLTHNotificationStore: ObservableObject {
     }
 
     func add(_ draft: ATHLTHNotificationDraft, deliverSystemAlert: Bool = true) {
-        guard accountID != nil,
-              !tombstones.contains(where: { $0.item.eventKey == draft.eventKey })
-        else { return }
+        // Transient notification drafts can still be used in preview/tests
+        // before authentication. Only verified account caches persist/upload.
+        guard !tombstones.contains(where: {
+            $0.item.eventKey == draft.eventKey
+        }) else { return }
         if let index = items.firstIndex(
             where: { $0.eventKey == draft.eventKey }
         ) {
