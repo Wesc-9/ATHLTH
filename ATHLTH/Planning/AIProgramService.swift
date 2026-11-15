@@ -455,7 +455,11 @@ final class AIProgramService {
         case 401: return .sessionExpired
         case 403: return .premiumRequired
         case 422 where code == "AI_COACH_INJURY_CONFLICT": return .unsafeProgram
-        case 429: return .rateLimited
+        case 429:
+            let delay = min(3600, max(1, (
+                try? JSONDecoder().decode(CoachServerError.self, from: data)
+            )?.retryAfterSeconds ?? 60))
+            return .rateLimited(retryAfterSeconds: delay)
         case 502 where code == "AI_INVALID_PROGRAM": return .invalidProgram
         case 502, 503, 504: return .unavailable
         case 400: return .invalidRequest
@@ -465,13 +469,14 @@ final class AIProgramService {
 
     private struct CoachServerError: Decodable {
         let code: String?
+        let retryAfterSeconds: Int?
     }
 }
 
-enum AIProgramError: LocalizedError {
+enum AIProgramError: LocalizedError, Equatable {
     case noGoals
     case unavailable
-    case rateLimited
+    case rateLimited(retryAfterSeconds: Int)
     case premiumRequired
     case sessionExpired
     case unsafeProgram
@@ -480,6 +485,11 @@ enum AIProgramError: LocalizedError {
 
     var canRetry: Bool {
         self == .unavailable || self == .invalidProgram
+    }
+
+    var cooldownSeconds: Int? {
+        guard case .rateLimited(let seconds) = self else { return nil }
+        return seconds
     }
 
     var errorDescription: String? {
@@ -494,10 +504,11 @@ enum AIProgramError: LocalizedError {
                 english: "ATHLTH Coach is temporarily unavailable. Your choices are saved in this form. Please try again.",
                 norwegian: "ATHLTH Coach er midlertidig utilgjengelig. Valgene dine er fortsatt her. Prøv igjen."
             )
-        case .rateLimited:
+        case .rateLimited(let seconds):
+            let minutes = max(1, Int(ceil(Double(seconds) / 60.0)))
             return ATHLTHLocalization.choose(
-                english: "ATHLTH Coach has reached its request limit. Please try again later.",
-                norwegian: "ATHLTH Coach har nådd forespørselsgrensen. Prøv igjen senere."
+                english: "ATHLTH Coach is temporarily busy. Try again in about \(minutes) min. Your choices are preserved.",
+                norwegian: "ATHLTH Coach er midlertidig opptatt. Prøv igjen om omtrent \(minutes) min. Valgene dine er beholdt."
             )
         case .premiumRequired:
             return ATHLTHLocalization.choose(
