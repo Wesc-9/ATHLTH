@@ -1,9 +1,10 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks, coachCompactProgramSchema, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks, coachCompactProgramSchema, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText } from "./provider.ts";
 const check = (condition: boolean) => { if (!condition) throw new Error("Assertion failed"); };
 Deno.test("Coach sends structured goals and selected scope using the chat contract", () => {
   const constraints = { weekCount: 4, userNotes: "Adjust Tuesday only", goals: [{ title: "5K" }] };
   const schema = { type: "object" };
   const request = coachProgramRequest("openai/gpt-oss-120b", "Prepare a plan", constraints, schema);
+  check(request.reasoning_format === "parsed");
   check(request.messages[0].role === "system");
   check(JSON.parse(request.messages[1].content).userNotes === constraints.userNotes);
   check(request.response_format.json_schema.strict === true);
@@ -21,7 +22,7 @@ Deno.test("Provider errors cannot log athlete notes or untrusted error prose", (
 });
 
 
-Deno.test("Groq schema mismatch retries once using JSON object mode, not other 400s", () => {
+Deno.test("Groq schema mismatch permits one plain-text fallback, not other 400s", () => {
   const rejected = { error: { code: "json_validate_failed", message: "may contain private user content" } };
   check(coachShouldRetryInvalidSchema(400, rejected));
   check(!coachShouldRetryInvalidSchema(400, { error: { code: "rate_limit_exceeded" } }));
@@ -30,7 +31,9 @@ Deno.test("Groq schema mismatch retries once using JSON object mode, not other 4
 
   const input = { weekCount: 2, preferredDays: [1, 3], userNotes: "private" };
   const req = coachProgramFallbackRequest("openai/gpt-oss-120b", "Create safe plan", input);
-  check(req.response_format.type === "json_object");
+  check(req.reasoning_format === "parsed");
+  check(!("response_format" in req));
+  check(!JSON.stringify(req).includes("response_format"));
   check(req.messages[0].content.includes("JSON object"));
   check(JSON.parse(req.messages[1].content).weekCount === 2);
 });
@@ -144,8 +147,9 @@ Deno.test("Coach compact schema keeps strict JSON while reducing multiweek outpu
     injurySafetyNotes: "Do not load knee", unavailableEquipment: ["Barbell"],
   });
   check(request.reasoning_effort === "low");
-  check(request.response_format.type === "json_schema");
-  check(request.response_format.json_schema?.strict === true);
+  check(request.reasoning_format === "parsed");
+  check(request.response_format?.type === "json_schema");
+  check(request.response_format?.json_schema?.strict === true);
   const constraints = JSON.parse(request.messages[1].content);
   check(constraints.weekCount === 4);
   check(constraints.injurySafetyNotes === "Do not load knee");
@@ -157,7 +161,9 @@ Deno.test("Coach compact schema keeps strict JSON while reducing multiweek outpu
   const fallback = coachCompactProgramRequest("openai/gpt-oss-120b", "Safe plan", {
     weekCount: 4, preferredDays: [1],
   }, true);
-  check(fallback.response_format.type === "json_object");
+  check(fallback.reasoning_format === "parsed");
+  check(fallback.response_format === undefined);
+  check(!JSON.stringify(fallback).includes("response_format"));
 });
 
 Deno.test("Coach compact plan safely normalizes generated days to allowed weekdays", () => {
@@ -227,4 +233,19 @@ Deno.test("Coach fills omitted selected rest weekdays but never invents workouts
   const invalid = structuredClone(weeks);
   invalid[0].days[0].dayIndex=8;
   check(coachCompactValidatedProgram({title:"Plan",weeks:invalid},4,[1,3,5],2)===null);
+});
+
+Deno.test("Coach parses a complete JSON plan from unconstrained Groq output", () => {
+  const result = { title: "Running plan", weeks: [{ weekNumber: 1, days: [] }] };
+  const raw = JSON.stringify(result);
+  const fence = String.fromCharCode(96).repeat(3);
+  const examples = [raw, fence + "json\n" + raw + "\n" + fence,
+    "Generated plan:\n" + raw];
+  for (const text of examples) {
+    check(JSON.stringify(coachParseProgramText(text)) === raw);
+  }
+  check(coachParseProgramText(null) === null);
+  check(coachParseProgramText("This is not a JSON plan") === null);
+  check(coachParseProgramText(raw.slice(0, -2)) === null);
+  check(coachParseProgramText("{" + "x".repeat(300_001) + "}") === null);
 });
