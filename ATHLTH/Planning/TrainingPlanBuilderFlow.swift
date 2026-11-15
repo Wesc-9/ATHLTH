@@ -5677,7 +5677,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         if hasRunning { return .running }
         if hasWalking { return .walking }
-        if blocks.allSatisfy({ $0.kind == .rest }) { return .recovery }
+        if !blocks.isEmpty && blocks.allSatisfy({ $0.kind == .rest }) {
+            return .recovery
+        }
         // Cycling has its own category, but WorkoutKind has no cycling case.
         // Never label a cycling-only session as strength.
         if blocks.contains(where: { $0.activityTag == "cycling" }) {
