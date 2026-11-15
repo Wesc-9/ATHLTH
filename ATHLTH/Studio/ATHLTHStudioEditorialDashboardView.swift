@@ -190,6 +190,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     @Binding var focusedPlanningDate: Date?
 
     @Binding var selectedDate: Date
+    let scrollToTopRequest: Int
     @State private var periodDays = 28
     /// Auto-follow today unless the user explicitly browses a date.
     @State private var followsToday = true
@@ -320,6 +321,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: split ? 344 : 308)
 
+                    ScrollViewReader { scrollProxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: split ? 20 : 16) {
                             // This is the actual signed-in iPad Home, not the
@@ -355,9 +357,16 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         .padding(.vertical, 17)
                         .frame(maxWidth: 1500)
                         .frame(maxWidth: .infinity)
+                        .id("athlth-studio-home-top")
                     }
                     .scrollIndicators(.hidden)
                     .background(cream)
+                    .onChange(of: scrollToTopRequest) { _, _ in
+                        withAnimation(.easeOut(duration: 0.20)) {
+                            scrollProxy.scrollTo("athlth-studio-home-top", anchor: .top)
+                        }
+                    }
+                    }
                 }
                 .ignoresSafeArea(.container, edges: .top)
             }
