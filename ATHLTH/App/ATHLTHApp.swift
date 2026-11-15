@@ -231,6 +231,9 @@ private struct ATHLTHSceneRootView: View {
             watchConnection.setCurrentAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
+            notifications.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             studioPlanSync.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
@@ -256,6 +259,7 @@ private struct ATHLTHSceneRootView: View {
                 // returning from an offline period.
                 appSession.checkpointTrainingContent()
                 studioPlanSync.scheduleSync(session: appSession)
+                notifications.scheduleAccountSync()
             }
         }
         .onChange(of: pets.pets) { _, _ in
@@ -283,6 +287,9 @@ private struct ATHLTHSceneRootView: View {
                 watchConnection.setCurrentAccount(nil)
                 watchConnection.sendAccountIdentity(nil)
             }
+            notifications.switchAccount(
+                signedIn ? appSession.profile.userID : nil
+            )
             studioPlanSync.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
@@ -314,7 +321,8 @@ private struct ATHLTHSceneRootView: View {
             guard appSession.signedIn, scenePhase == .active else { return }
             while !Task.isCancelled {
                 studioPlanSync.scheduleSync(session: appSession)
-                do { try await Task.sleep(for: .seconds(20)) } catch { return }
+                await notifications.refreshAccountNotifications()
+                do { try await Task.sleep(for: .seconds(25)) } catch { return }
             }
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -328,6 +336,9 @@ private struct ATHLTHSceneRootView: View {
             scheduleProfileRecordSummaryPublish()
         }
         .onChange(of: appSession.profile.userID) { _, _ in
+            notifications.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             studioPlanSync.switchAccount(appSession.signedIn ? appSession.profile.userID : nil)
             studioPlanSync.scheduleSync(session: appSession)
             // The account identity can be resolved after the signed-in
@@ -345,6 +356,7 @@ private struct ATHLTHSceneRootView: View {
             // own permission/account checks. Offline saves are never gated
             // on these network operations.
             studioPlanSync.scheduleSync(session: appSession)
+            notifications.scheduleAccountSync()
             let accountID = appSession.profile.userID
             Task {
                 await trainingBackups.backUp(userID: accountID)
