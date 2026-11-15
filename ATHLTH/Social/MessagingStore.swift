@@ -149,11 +149,9 @@ final class MessagingStore: ObservableObject {
     }
 
     func loadPinnedConversations() {
-        // This legacy entry point is still invoked when the inbox appears.
-        // Do not reload stale UserDefaults over newer account data.
-        if let userID = currentUserID, preferenceAccountID != userID {
-            switchAccount(userID)
-        }
+        // The signed-in AppSession identity owns account switching. A
+        // still-restoring or stale Supabase session must never replace it
+        // with another account's local conversation preferences.
         schedulePreferenceSync()
     }
 
