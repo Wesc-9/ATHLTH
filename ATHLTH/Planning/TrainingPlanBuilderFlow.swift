@@ -4729,12 +4729,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             onQuick: { quick in
                 addAdvancedQuickContent(quick)
             },
-            onAddGroup: { blocks, kind in
-                insertAdvancedInlineGroup(
-                    blocks, kind: kind,
-                    day: guidedCurrentWeekday, week: guidedCurrentWeek
-                )
-            },
             onEditWorkout: { index in
                 selectedPlanWeekIndex = guidedCurrentWeek
                 editPreviewWorkout(guidedCurrentWeekday, index: index)
