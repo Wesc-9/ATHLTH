@@ -39,7 +39,10 @@ struct ATHLTHStudioHomeCommunitySummary: View {
     }
 
     private var nextEvents: [CommunityGroupEventRecord] {
-        Array(groups.calendarEvents.filter {
+        guard session.signedIn,
+              groups.homeUpcomingEventsAccountID == session.profile.userID
+        else { return [] }
+        return Array(groups.homeUpcomingEvents.filter {
             ATHLTHStudioHomeCommunityDisplayPolicy.isUpcoming(
                 status: $0.status, start: $0.startsAt, now: .now
             )
@@ -109,7 +112,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
             // public-club search or repeated network request per row.
             await groups.refresh(force: false)
             guard !Task.isCancelled else { return }
-            await groups.refreshCalendarContent()
+            await groups.refreshHomeUpcomingEvents()
             guard !Task.isCancelled else { return }
             await social.refreshIfStale(challengeStore: challenges)
         }
@@ -226,7 +229,17 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                 action: { onOpenCommunity(.events) }
             )
 
-            if nextEvents.isEmpty {
+            if groups.homeUpcomingEventsLoadFailed {
+                Label(tr(
+                    "Events are temporarily unavailable. Your last data is kept.",
+                    "Kunne ikke oppdatere arrangementer. Tidligere data er beholdt."
+                ), systemImage: "wifi.exclamationmark")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if nextEvents.isEmpty && !groups.homeUpcomingEventsLoadFailed {
                 HStack(alignment: .top, spacing: 10) {
                     symbolTile("calendar.badge.plus")
                     VStack(alignment: .leading, spacing: 5) {
@@ -479,6 +492,7 @@ enum ATHLTHStudioHomeCommunityDisplayPolicy {
     static func isUpcoming(
         status: String, start: Date, now: Date
     ) -> Bool {
-        start >= now && !["cancelled", "draft", "completed"].contains(status)
+        start >= now && !["cancelled", "draft", "completed"]
+            .contains(status.lowercased())
     }
 }
