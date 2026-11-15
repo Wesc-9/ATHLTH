@@ -5617,6 +5617,8 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var selectedSection: ATHLTHTrainSection = .today
+    @SceneStorage("athlth.train.selectedSection") private var persistedTrainSection = "today"
+    @State private var restoredTrainSectionAccount: UUID?
     @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
     @State private var preparedTrainUserID: UUID?
     @State private var trainHistoryReconcileTask: Task<Void, Never>?
@@ -6207,6 +6209,24 @@ struct ATHLTHTrainView: View {
                 .environmentObject(session)
             }
             .athlthStablePresentationBoundary()
+            .onAppear {
+                if restoredTrainSectionAccount != session.profile.userID {
+                    restoredTrainSectionAccount = session.profile.userID
+                    switch persistedTrainSection {
+                    case "plan": selectedSection = .plan
+                    case "progress": selectedSection = .progress
+                    default: selectedSection = .today
+                    }
+                }
+                restoreInterruptedPlanDestinationIfNeeded()
+            }
+            .onChange(of: selectedSection) { _, section in
+                switch section {
+                case .today: persistedTrainSection = "today"
+                case .plan: persistedTrainSection = "plan"
+                case .progress: persistedTrainSection = "progress"
+                }
+            }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
                 // Retain the prepared catalog and plan state across quick
@@ -6269,6 +6289,7 @@ struct ATHLTHTrainView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active, isActive {
+                    restoreInterruptedPlanDestinationIfNeeded()
                     // The first Train activation owns the heavy daily refresh
                     // in the post-transition task above.
                     if preparedTrainUserID == session.profile.userID {
@@ -6646,6 +6667,22 @@ struct ATHLTHTrainView: View {
             english: "Return to the current workout",
             norwegian: "Åpner økten som allerede pågår"
         ))
+    }
+
+    /// If the app was killed while editing the five-step plan wizard,
+    /// show the Plan workspace so its existing draft auto-resume can reopen
+    /// the saved stage and selected date. Never restart at step one.
+    private func restoreInterruptedPlanDestinationIfNeeded() {
+        guard isActive, trainProgramCreationLaunch == nil else { return }
+        let store = ATHLTHPlanCreationDraftStore()
+        let userID = session.profile.userID
+        let wasEditingUnfinished = store.records(userID: userID).contains { record in
+            store.wasEditing(userID: userID, draftID: record.draftID) &&
+                Date().timeIntervalSince(record.draft.savedAt) < 24 * 60 * 60
+        }
+        if wasEditingUnfinished {
+            selectedSection = .plan
+        }
     }
 
     /// Reopen the same unfinished plan after closing the composer. Finished
