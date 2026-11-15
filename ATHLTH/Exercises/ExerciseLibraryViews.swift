@@ -2481,7 +2481,7 @@ struct CustomExerciseEditorView: View {
                 editing?.exercise.secondaryMuscles.contains($0.rawValue) ?? false
             }
         ))
-        _equipment = State(initialValue: editing?.exercise.equipment.joined(separator: ", ") ?? "")
+        _selectedEquipment = State(initialValue: editing?.exercise.equipment ?? [])
         _instructions = State(initialValue: editing?.exercise.instructions.joined(separator: "\n") ?? "")
         _visibility = State(initialValue:
             editing?.exercise.sharedSourceExerciseID == nil
@@ -2520,7 +2520,10 @@ struct CustomExerciseEditorView: View {
         Set<ExerciseMuscleGroup> = []
     @State private var secondaryMuscles:
         Set<ExerciseMuscleGroup> = []
-    @State private var equipment = ""
+    @State private var selectedEquipment: [String] = []
+    @State private var equipmentQuery = ""
+    @State private var equipmentPickerQuery = ""
+    @State private var showingEquipmentPicker = false
     @State private var instructions = ""
     @State private var visibility: ATHLTHExerciseVisibility = .privateOnly
     @State private var selectedPhoto: PhotosPickerItem?
@@ -2540,57 +2543,106 @@ struct CustomExerciseEditorView: View {
     @State private var aiErrorMessage: String?
     private let aiDraftService = ATHLTHAIExerciseDraftService()
 
-    private func muscleSelectionRow(_ role: MuscleSelectionRole) -> some View {
+    private func muscleSelectionRow(
+        _ role: MuscleSelectionRole,
+        compact: Bool = false
+    ) -> some View {
         let selection = role == .primary ? primaryMuscles : secondaryMuscles
+        let selected = ExerciseMuscleGroup.allCases.first(where: {
+            selection.contains($0)
+        })
         return Button {
             choosingMuscles = role
         } label: {
-            HStack(spacing: 11) {
-                if let first = ExerciseMuscleGroup.allCases.first(where: {
-                    selection.contains($0)
-                }) {
-                    ATHLTHMuscleGroupIcon(group: first, size: 31)
-                        .frame(width: 37, height: 38)
-                } else {
-                    Image(systemName: "figure.arms.open")
-                        .font(.system(size: 18))
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        .frame(width: 37, height: 38)
-                }
-                VStack(alignment: .leading, spacing: 4) {
+            if compact {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        if let selected {
+                            ATHLTHMuscleGroupIcon(group: selected, size: 28)
+                        } else {
+                            Image(systemName: "figure.arms.open")
+                                .font(.system(size: 21))
+                                .frame(width: 28, height: 28)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     Text(role == .primary
                          ? ATHLTHLocalization.choose(
-                            english: "Primary muscle groups",
-                            norwegian: "Primære muskelgrupper"
+                             english: "Main muscle", norwegian: "Hovedmuskel"
                            )
                          : ATHLTHLocalization.choose(
-                            english: "Secondary muscle groups",
-                            norwegian: "Sekundære muskelgrupper"
+                             english: "Secondary", norwegian: "Sekundær"
                            ))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(1)
                     Text(muscleSelectionSummary(
                         selection,
-                        empty: role == .primary
-                            ? ATHLTHLocalization.choose(
-                                english: "Select at least one", norwegian: "Velg minst én"
-                              )
-                            : ATHLTHLocalization.choose(
-                                english: "Optional", norwegian: "Valgfritt"
-                              )
+                        empty: ATHLTHLocalization.choose(
+                            english: "Choose", norwegian: "Velg"
+                        )
                     ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Spacer(minLength: 4)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 91,
+                       alignment: .topLeading)
+                .padding(13)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 16))
+            } else {
+                HStack(spacing: 11) {
+                    if let selected {
+                        ATHLTHMuscleGroupIcon(group: selected, size: 31)
+                            .frame(width: 37, height: 38)
+                    } else {
+                        Image(systemName: "figure.arms.open")
+                            .font(.system(size: 18))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 37, height: 38)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(role == .primary
+                             ? ATHLTHLocalization.choose(
+                                english: "Primary muscle groups",
+                                norwegian: "Primære muskelgrupper"
+                               )
+                             : ATHLTHLocalization.choose(
+                                english: "Secondary muscle groups",
+                                norwegian: "Sekundære muskelgrupper"
+                               ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(muscleSelectionSummary(
+                            selection,
+                            empty: role == .primary
+                                ? ATHLTHLocalization.choose(
+                                    english: "Select at least one",
+                                    norwegian: "Velg minst én"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "Optional", norwegian: "Valgfritt"
+                                  )
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .frame(minHeight: 48)
             }
-            .frame(minHeight: 48)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel((role == .primary ? "Hovedmuskel" : "Sekundær") +
+            ", " + muscleSelectionSummary(selection, empty: "Velg"))
     }
 
     private func muscleSelectionSheet(_ role: MuscleSelectionRole) -> some View {
@@ -2859,25 +2911,35 @@ struct CustomExerciseEditorView: View {
                         }
                     }
 
-                    muscleSelectionRow(.primary)
-                    muscleSelectionRow(.secondary)
+                    HStack(alignment: .top, spacing: 10) {
+                        muscleSelectionRow(.primary, compact: true)
+                        muscleSelectionRow(.secondary, compact: true)
+                    }
+                    .listRowInsets(EdgeInsets(
+                        top: 7, leading: 12, bottom: 7, trailing: 12
+                    ))
+                    .accessibilityIdentifier("exercise-studio-muscles-side-by-side")
 
-                    TextField(
-                        "Equipment, comma separated",
-                        text: $equipment
-                    )
+                    equipmentEditor
                 }
 
-                Section("Instructions") {
+                Section(ATHLTHLocalization.choose(
+                    english: "Instructions", norwegian: "Instruksjoner"
+                )) {
                     TextField(
-                        "One instruction per line",
+                        ATHLTHLocalization.choose(
+                            english: "One instruction per line",
+                            norwegian: "Én instruksjon per linje"
+                        ),
                         text: $instructions,
                         axis: .vertical
                     )
                     .lineLimit(5...12)
                 }
 
-                Section("Media") {
+                Section(ATHLTHLocalization.choose(
+                    english: "Demonstration", norwegian: "Demonstrasjon"
+                )) {
                     Button {
                         showingVideoImporter = true
                     } label: {
@@ -3048,6 +3110,9 @@ struct CustomExerciseEditorView: View {
             .sheet(item: $choosingMuscles) { role in
                 muscleSelectionSheet(role)
             }
+            .sheet(isPresented: $showingEquipmentPicker) {
+                equipmentSelectionSheet
+            }
             .sheet(item: $friendShareDraft, onDismiss: { dismiss() }) { draft in
                 ATHLTHDirectShareSheet(
                     draft: draft, mutualFollowsOnly: true
@@ -3189,7 +3254,7 @@ struct CustomExerciseEditorView: View {
                 updated.instructions = splitLines(instructions)
                 updated.primaryMuscles = selectedMuscleValues(primaryMuscles)
                 updated.secondaryMuscles = selectedMuscleValues(secondaryMuscles)
-                updated.equipment = splitCSV(equipment)
+                updated.equipment = resolvedEquipment
                 updated.activityCategory = activityCategory
                 updated.visibility = scopedVisibility
                 updated.isVisibleOutsideOwnerLibrary = scopedVisibility.shareable
@@ -3217,7 +3282,7 @@ struct CustomExerciseEditorView: View {
                     instructions: splitLines(instructions),
                     primaryMuscles: selectedMuscleValues(primaryMuscles),
                     secondaryMuscles: selectedMuscleValues(secondaryMuscles),
-                    equipment: splitCSV(equipment),
+                    equipment: resolvedEquipment,
                     isVisibleOutsideOwnerLibrary: scopedVisibility.shareable,
                     imageData: selectedImageData,
                     videoURL: video,
@@ -3307,7 +3372,8 @@ struct CustomExerciseEditorView: View {
             ))
             primaryMuscles = primary
             secondaryMuscles = secondary
-            equipment = suggestion.equipment.joined(separator: ", ")
+            selectedEquipment = suggestion.equipment
+            equipmentQuery = ""
             instructions = suggestion.instructions.joined(separator: "\n")
             aiVideoBrief = suggestion.videoBrief
             hasAIDraft = true
