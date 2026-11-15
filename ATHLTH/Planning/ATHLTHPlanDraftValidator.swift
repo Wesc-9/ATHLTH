@@ -10,7 +10,8 @@ enum ATHLTHPlanDraftValidator {
         allowedDayIndexes: Set<Int>? = nil,
         maximumSessionsPerWeek: Int? = nil,
         lockedDayKeys: Set<String> = [],
-        requireFullWeeks: Bool = false
+        requireFullWeeks: Bool = false,
+        requireExecutableWorkouts: Bool = false
     ) -> [String] {
         var issues: [String] = []
         if draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -76,6 +77,53 @@ enum ATHLTHPlanDraftValidator {
                        !pace.isFinite || pace <= 0 {
                         issues.append("invalid_pace")
                     }
+                    if requireExecutableWorkouts {
+                        let isStrength = workout.kind == "strength"
+                        let isCardio = workout.kind == "running" ||
+                            workout.kind == "walking"
+                        let playableStrength = workout.exercises.contains {
+                            !$0.name.trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            ).isEmpty && $0.sets > 0 &&
+                                ($0.reps ?? 0) > 0
+                        } || (workout.blocks ?? []).contains {
+                            $0.kind == "exercise" &&
+                                (($0.repetitions ?? 0) > 0 ||
+                                 ($0.durationSeconds ?? 0) > 0)
+                        }
+                        if isStrength && !playableStrength {
+                            issues.append("strength_missing_structured_sets")
+                        }
+                        if isCardio {
+                            let timedBlocks = (workout.blocks ?? []).filter {
+                                $0.kind == "run" &&
+                                (($0.durationSeconds ?? 0) > 0 ||
+                                 ($0.distanceMeters ?? 0) > 0)
+                            }
+                            if timedBlocks.isEmpty &&
+                                (workout.durationMinutes ?? 0) <= 0 &&
+                                (workout.targetDistanceKilometers ?? 0) <= 0 {
+                                issues.append("cardio_missing_executable_target")
+                            }
+                            let lower = workout.title.lowercased()
+                            let interval = lower.contains("interval") ||
+                                lower.contains("intervall") ||
+                                lower.contains("4x4") ||
+                                lower.contains("4×4")
+                            if interval {
+                                let main = (workout.blocks ?? []).filter {
+                                    $0.kind == "run" && $0.phase == "main"
+                                }.count
+                                let recovery = (workout.blocks ?? []).contains {
+                                    $0.kind == "rest" || $0.phase == "recovery"
+                                }
+                                if main < 2 || !recovery {
+                                    issues.append("interval_missing_drags")
+                                }
+                            }
+                        }
+                    }
+
                     for exercise in workout.exercises {
                         if exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                            !(1...30).contains(exercise.sets) ||
