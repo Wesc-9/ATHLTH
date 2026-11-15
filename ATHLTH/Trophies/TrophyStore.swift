@@ -9,6 +9,8 @@ final class TrophyStore: ObservableObject {
         [String: TrophyInscription] = [:]
     @Published private(set) var isRefreshing = false
     @Published private(set) var pendingReveal: TrophyUnlockRecord?
+    @Published private(set) var lastCloudSyncIssue: String?
+    @Published private(set) var lastCloudSyncAt: Date?
 
     static let showcaseLimit = 4
 
@@ -25,6 +27,8 @@ final class TrophyStore: ObservableObject {
         hasInitializedShowcase = false
         showcaseUpdatedAt = nil
         pendingCabinetUpload = false
+        lastCloudSyncIssue = nil
+        lastCloudSyncAt = nil
         revealQueue = []
         pendingReveal = nil
     }
@@ -181,10 +185,31 @@ final class TrophyStore: ObservableObject {
             await flushCabinetEdit(for: currentUserID)
         }
 
-        if currentUserID != nil,
-           let remote =
-                try? await cloud
-                    .loadState() {
+        var remoteState: TrophyCloudState?
+        if let currentUserID {
+            if SupabaseEnvironment.client.auth.currentUser?.id == currentUserID {
+                do {
+                    remoteState = try await cloud.loadState()
+                    lastCloudSyncIssue = nil
+                    lastCloudSyncAt = Date()
+                } catch {
+                    // Keep verified local trophies; never show an empty state
+                    // merely because this device is offline or authentication
+                    // has expired.
+                    lastCloudSyncIssue = ATHLTHLocalization.choose(
+                        english: "Trophy account sync could not be confirmed.",
+                        norwegian: "Kunne ikke bekrefte synkronisering av trofeer."
+                    )
+                }
+            } else {
+                lastCloudSyncIssue = ATHLTHLocalization.choose(
+                    english: "Trophy sync is waiting for account sign-in.",
+                    norwegian: "Trofésynkronisering venter på kontoinnlogging."
+                )
+            }
+        }
+
+        if let remote = remoteState {
             guard activeUserID == currentUserID else { return }
             mergeRemoteUnlocks(
                 remote.unlocks
@@ -1098,14 +1123,20 @@ final class TrophyStore: ObservableObject {
             )
         }
 
-        if currentUserID != nil {
-            try? await cloud
-                .syncAchievements(
-                    unlocks,
-                    trophies: trophies,
-                    username:
-                        activeUsername
+        if let currentUserID, !unlocks.isEmpty,
+           SupabaseEnvironment.client.auth.currentUser?.id == currentUserID {
+            do {
+                try await cloud.syncAchievements(
+                    unlocks, trophies: trophies, username: activeUsername
                 )
+                lastCloudSyncIssue = nil
+                lastCloudSyncAt = Date()
+            } catch {
+                lastCloudSyncIssue = ATHLTHLocalization.choose(
+                    english: "Trophy unlocks are saved locally but not yet synced.",
+                    norwegian: "Trofeene er lagret lokalt, men er ikke synkronisert ennå."
+                )
+            }
 
             // Reading cloud state must never write it back. That caused
             // stale devices to overwrite other devices' cabinet changes and
@@ -1223,10 +1254,16 @@ final class TrophyStore: ObservableObject {
             if captured == showcaseIDs {
                 pendingCabinetUpload = false
                 showcaseUpdatedAt = cloudDate ?? Date()
+                lastCloudSyncIssue = nil
+                lastCloudSyncAt = Date()
                 persist()
             }
         } catch {
             // Keep pending locally. Failed sync is retried on reconnection.
+            lastCloudSyncIssue = ATHLTHLocalization.choose(
+                english: "The trophy shelf is saved locally; cloud sync is pending.",
+                norwegian: "Troféhyllen er lagret lokalt; kontosynkronisering gjenstår."
+            )
         }
     }
 
