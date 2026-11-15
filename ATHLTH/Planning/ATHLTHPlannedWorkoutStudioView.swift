@@ -52,6 +52,23 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     @State private var intervalToAdjust: IntervalSelection?
     @State private var intervalPendingDeletion: UUID?
     @State private var draggingID: UUID?
+    @State private var addSheetPhase: WorkoutPhaseKind?
+    @State private var queuedAddAction: AddSheetAction?
+
+    private enum AddSheetAction {
+        case run(WorkoutPhaseKind)
+        case exercise(WorkoutPhaseKind)
+        case freeStrength(WorkoutPhaseKind)
+        case superset(WorkoutPhaseKind)
+        case circuit(WorkoutPhaseKind)
+        case strengthMode(WorkoutPhaseKind, WorkoutBlockGroupKind)
+        case workout(WorkoutPhaseKind)
+        case intervals(WorkoutPhaseKind)
+        case rest(WorkoutPhaseKind)
+        case activeRest(WorkoutPhaseKind)
+        case route(WorkoutPhaseKind)
+        case buildRoute(WorkoutPhaseKind)
+    }
 
     private struct IntervalSelection: Identifiable {
         let id: UUID
@@ -236,6 +253,37 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         }
         .animation(.easeInOut(duration: 0.18), value: visiblePhases)
         .coordinateSpace(name: "athlthWorkoutStudio")
+        // A native Menu with thirteen items resets its scroll position when
+        // live workout/settings data updates the parent. A persistent sheet
+        // owns scrolling independently of those updates and keeps the same
+        // underlying add callbacks, with no duplicated workout engine.
+        .sheet(item: $addSheetPhase, onDismiss: performQueuedAddAction) { phase in
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        addSheetOptions(for: phase)
+                    }
+                    .padding(17)
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity)
+                }
+                .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Add to workout", norwegian: "Legg til i økten"
+                ))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Close", norwegian: "Lukk"
+                        )) {
+                            addSheetPhase = nil
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(item: $intervalToAdjust) { selection in
             ATHLTHIntervalGroupAdjustmentView(
                 groupID: selection.id, blocks: blocks
@@ -1280,110 +1328,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
 
     private func addContentMenu(_ phase: WorkoutPhaseKind) -> some View {
-        Menu {
-            // Strength uses the existing library picker below. The former
-            // "Strength exercise" action opened that same picker twice.
-            if activity != .strength {
-                Button {
-                    onAddRun(phase)
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Running exercise", norwegian: "Løpeøvelse"
-                        ),
-                        systemImage: "figure.run"
-                    )
-                }
-            }
-            Button {
-                onAddExercise(phase)
-            } label: {
-                Label(activity == .running
-                    ? ATHLTHLocalization.choose(
-                        english: "Running exercises from library",
-                        norwegian: "Løpeøvelser fra bibliotek"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "Exercise from library",
-                        norwegian: "Øvelse fra bibliotek"
-                    ),
-                    systemImage: activity == .running ? "figure.run" : "dumbbell")
-            }
-            if activity == .strength {
-                Button {
-                    onAddFreeStrength(phase)
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Free strength training", norwegian: "Fri styrketrening"
-                    ), systemImage: "stopwatch")
-                }
-                Button {
-                    onAddSuperset(phase)
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Superset", norwegian: "Supersett"
-                    ), systemImage: "square.stack.3d.up")
-                }
-                Button {
-                    onAddCircuit(phase)
-                } label: {
-                    Label(WorkoutBlockGroupKind.circuit.title,
-                          systemImage: WorkoutBlockGroupKind.circuit.symbol)
-                }
-                ForEach([WorkoutBlockGroupKind.emom, .amrap, .dropSet],
-                        id: \.self) { kind in
-                    Button {
-                        onAddStrengthMode(phase, kind)
-                    } label: {
-                        Label(kind.title, systemImage: kind.symbol)
-                    }
-                }
-            }
-            if activity != .running {
-                Button {
-                    onAddWorkout(phase)
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Complete workout", norwegian: "Hel treningsøkt"
-                    ), systemImage: "rectangle.stack")
-                }
-            }
-            Button {
-                onAddIntervals(phase)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Interval sequence", norwegian: "Intervallrekke"
-                ), systemImage: "repeat")
-            }
-            Button {
-                onAddRest(phase)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Rest", norwegian: "Pause"
-                ), systemImage: "pause")
-            }
-            Button {
-                onAddActiveRest(phase)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Active recovery", norwegian: "Aktiv joggepause"
-                ), systemImage: "figure.walk")
-            }
-            Divider()
-            Button {
-                onSelectRoute(phase)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Choose route", norwegian: "Velg rute"
-                ), systemImage: "map")
-            }
-            Button {
-                onBuildRoute(phase)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Create route", norwegian: "Lag egen rute"
-                ), systemImage: "pencil.and.scribble")
-            }
+        Button {
+            addSheetPhase = phase
         } label: {
             Label(ATHLTHLocalization.choose(
                 english: "Add exercise, workout or route",
@@ -1395,5 +1341,122 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             .background(ATHLTHPlanDesign.selectedSurface,
                         in: RoundedRectangle(cornerRadius: 13))
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-studio-open-stable-add-sheet")
     }
+
+    @ViewBuilder
+    private func addSheetOptions(for phase: WorkoutPhaseKind) -> some View {
+        if activity != .strength {
+            addSheetRow(
+                ATHLTHLocalization.choose(
+                    english: "Running activity", norwegian: "Løpeaktivitet"
+                ), "figure.run", action: .run(phase)
+            )
+        }
+        addSheetRow(
+            ATHLTHLocalization.choose(
+                english: "Exercise from library", norwegian: "Øvelse fra bibliotek"
+            ), "dumbbell", action: .exercise(phase)
+        )
+        if activity == .strength {
+            addSheetRow(
+                ATHLTHLocalization.choose(
+                    english: "Free strength training", norwegian: "Fri styrketrening"
+                ), "stopwatch", action: .freeStrength(phase)
+            )
+            addSheetRow(
+                ATHLTHLocalization.choose(english: "Superset", norwegian: "Supersett"),
+                "square.stack.3d.up", action: .superset(phase)
+            )
+            addSheetRow(
+                WorkoutBlockGroupKind.circuit.title,
+                WorkoutBlockGroupKind.circuit.symbol,
+                action: .circuit(phase)
+            )
+            ForEach([WorkoutBlockGroupKind.emom, .amrap, .dropSet],
+                    id: \.self) { kind in
+                addSheetRow(kind.title, kind.symbol,
+                            action: .strengthMode(phase, kind))
+            }
+        }
+        if activity != .running {
+            addSheetRow(
+                ATHLTHLocalization.choose(
+                    english: "Complete workout", norwegian: "Hel treningsøkt"
+                ), "rectangle.stack", action: .workout(phase)
+            )
+        }
+        addSheetRow(
+            ATHLTHLocalization.choose(
+                english: "Intervals", norwegian: "Intervallrekke"
+            ), "repeat", action: .intervals(phase)
+        )
+        addSheetRow(
+            ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"),
+            "pause", action: .rest(phase)
+        )
+        addSheetRow(
+            ATHLTHLocalization.choose(
+                english: "Active recovery", norwegian: "Aktiv joggepause"
+            ), "figure.walk", action: .activeRest(phase)
+        )
+        addSheetRow(
+            ATHLTHLocalization.choose(english: "Choose route", norwegian: "Velg rute"),
+            "map", action: .route(phase)
+        )
+        addSheetRow(
+            ATHLTHLocalization.choose(english: "Create route", norwegian: "Lag egen rute"),
+            "pencil.and.scribble", action: .buildRoute(phase)
+        )
+    }
+
+    private func addSheetRow(
+        _ title: String,
+        _ icon: String,
+        action: AddSheetAction
+    ) -> some View {
+        Button {
+            queuedAddAction = action
+            addSheetPhase = nil
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(bronze)
+                    .frame(width: 28)
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "plus")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze.opacity(0.7))
+            }
+            .padding(.horizontal, 15)
+            .frame(minHeight: 53)
+            .background(paper, in: RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func performQueuedAddAction() {
+        guard let action = queuedAddAction else { return }
+        queuedAddAction = nil
+        switch action {
+        case .run(let phase): onAddRun(phase)
+        case .exercise(let phase): onAddExercise(phase)
+        case .freeStrength(let phase): onAddFreeStrength(phase)
+        case .superset(let phase): onAddSuperset(phase)
+        case .circuit(let phase): onAddCircuit(phase)
+        case let .strengthMode(phase, kind): onAddStrengthMode(phase, kind)
+        case .workout(let phase): onAddWorkout(phase)
+        case .intervals(let phase): onAddIntervals(phase)
+        case .rest(let phase): onAddRest(phase)
+        case .activeRest(let phase): onAddActiveRest(phase)
+        case .route(let phase): onSelectRoute(phase)
+        case .buildRoute(let phase): onBuildRoute(phase)
+        }
+    }
+
 }
