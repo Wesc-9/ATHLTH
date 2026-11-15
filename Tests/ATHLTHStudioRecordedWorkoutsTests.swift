@@ -256,4 +256,21 @@ final class ATHLTHStudioAnalyticsTests: XCTestCase {
         XCTAssertEqual(report.sessions, 2)
         XCTAssertEqual(report.minutes, 60, accuracy: 0.001)
     }
+
+    func testRecordedWorkoutShowsStartAndEndWhenFinished() {
+        let start = Date(timeIntervalSince1970: 1_794_744_000)
+        let record = WorkoutSummary(localStrengthWorkout:
+            strength(started: start, duration: 45 * 60))
+        let label = ATHLTHStudioRecordedWorkouts.timeRange(record)
+        XCTAssertTrue(label.contains("–"))
+        XCTAssertFalse(label.isEmpty)
+    }
+
+    func testZeroDurationRecordingDoesNotInventFinishTime() {
+        let start = Date(timeIntervalSince1970: 1_794_744_000)
+        let record = WorkoutSummary(localStrengthWorkout:
+            strength(started: start, duration: 0))
+        XCTAssertFalse(ATHLTHStudioRecordedWorkouts.timeRange(record).contains("–"))
+    }
+
 }
