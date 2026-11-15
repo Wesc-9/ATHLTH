@@ -1769,19 +1769,7 @@ struct ExerciseDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                // Only the isolated squat test gets video. Until an approved
-                // real-motion MP4 is bundled, show the existing art unchanged.
-                if let demoURL = ATHLTHCatalogExerciseVideoAsset.localURL(
-                    for: currentEntry.sourceIdentifier
-                ) {
-                    ATHLTHCatalogExerciseVideoView(url: demoURL)
-                        .frame(maxWidth: 360)
-                        .padding(13)
-                        .frame(maxWidth: .infinity)
-                        .athlthTrainPaper()
-                } else {
-                    artwork
-                }
+                artwork
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(library.localizedExerciseName(currentEntry))
