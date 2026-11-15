@@ -4189,6 +4189,8 @@ struct WorkoutTemplateBuilderView: View {
     @State private var studioBasicDate = Date()
     @State private var pendingBasicActivityReplacement: String?
     @State private var confirmingBasicActivityReplacement = false
+    @State private var pendingBasicLibraryWorkout: PlannedSession?
+    @State private var confirmingBasicLibraryReplacement = false
     @State private var studioBasicOwnedBlockIDs: Set<UUID> = []
     @State private var studioBasicWorkoutTitle: String?
     @State private var showingCopyPicker = false
@@ -4708,6 +4710,9 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var hasStrengthGroupsInNonStrengthWorkout: Bool {
+        // Basic may import a full library strength workout even when its
+        // original quick-choice category was walking or mixed.
+        if isPlannedWorkout && !studioAdvanced { return false }
         guard let activity = initialActivity, activity != .strength else {
             return false
         }
@@ -5458,6 +5463,24 @@ struct WorkoutTemplateBuilderView: View {
                 )
             }
             .confirmationDialog(
+                tr("Use this complete workout?", "Bruke denne treningsøkten?"),
+                isPresented: $confirmingBasicLibraryReplacement,
+                titleVisibility: .visible
+            ) {
+                Button(tr("Replace the current workout", "Erstatt dagens økt")) {
+                    if let workout = pendingBasicLibraryWorkout {
+                        applyBasicLibraryWorkout(workout)
+                    }
+                    pendingBasicLibraryWorkout = nil
+                }
+                Button(tr("Keep current workout", "Behold dagens økt"), role: .cancel) {
+                    pendingBasicLibraryWorkout = nil
+                }
+            } message: {
+                Text(tr("A complete library workout replaces your current quick activity.",
+                        "En ferdig treningsøkt erstatter den raske aktiviteten du har valgt."))
+            }
+            .confirmationDialog(
                 tr("Replace workout content?", "Erstatte øktinnholdet?"),
                 isPresented: $confirmingBasicActivityReplacement,
                 titleVisibility: .visible
@@ -5501,18 +5524,19 @@ struct WorkoutTemplateBuilderView: View {
                 if isPlannedWorkout {
                     WorkoutTemplateLibraryView(
                         onSelectPlanned: { workout in
-                            let wasBlank = blocks.isEmpty
-                            appendSavedWorkout(workout)
-                            if wasBlank && !blocks.isEmpty {
-                                title = workout.title
-                                // The selected prescription is always editable
-                                // in the existing shared workout engine.
-                                studioBasicRunMode = .structured
-                            }
-                            if !studioAdvanced && initialActivity == .running {
-                                studioBasicWorkoutTitle = workout.title
-                            }
                             showingSavedWorkoutPicker = false
+                            if !studioAdvanced {
+                                if !blocks.isEmpty {
+                                    pendingBasicLibraryWorkout = workout
+                                    confirmingBasicLibraryReplacement = true
+                                } else {
+                                    applyBasicLibraryWorkout(workout)
+                                }
+                            } else {
+                                let wasBlank = blocks.isEmpty
+                                appendSavedWorkout(workout)
+                                if wasBlank && !blocks.isEmpty { title = workout.title }
+                            }
                         },
                         initialCategory: studioAdvanced ? initialActivity : nil
                     )
@@ -5846,6 +5870,10 @@ struct WorkoutTemplateBuilderView: View {
         _ key: String, icon: String, title displayTitle: String
     ) -> some View {
         Button {
+            let currentQuickActivity = key == category ||
+                (key == "yoga" && category == "mobility") ||
+                (key == "meditation" && category == "recovery")
+            if currentQuickActivity && blocks.count == 1 { return }
             if !blocks.isEmpty {
                 pendingBasicActivityReplacement = key
                 confirmingBasicActivityReplacement = true
@@ -5872,6 +5900,29 @@ struct WorkoutTemplateBuilderView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    /// A complete saved workout is one selection in Basic. It must never
+    /// append a second hidden recipe to the quick activity behind the card.
+    private func applyBasicLibraryWorkout(_ workout: PlannedSession) {
+        let recipe = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        guard !recipe.isEmpty else { return }
+        blocks = recipe.map { source in
+            var copy = source
+            copy.editorDragID = UUID()
+            return copy
+        }
+        studioBasicOwnedBlockIDs.removeAll()
+        studioVisiblePhases = Set(blocks.map(\.resolvedPhase))
+        selectedPhase = blocks.first?.resolvedPhase ?? .main
+        selectedRouteID = workout.routeID
+        manualDurationMinutes = workout.durationMinutes
+        durationInputText = workout.durationMinutes.map(String.init) ?? ""
+        title = workout.title
+        studioBasicRunMode = .structured
+        studioBasicWorkoutTitle = workout.title
+        resequence()
+        persistWorkoutDraft()
     }
 
     private func applyBasicQuickActivity(_ choice: String) {
