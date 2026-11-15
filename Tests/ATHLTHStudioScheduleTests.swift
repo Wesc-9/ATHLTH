@@ -247,4 +247,36 @@ final class ATHLTHStudioScheduleTests: XCTestCase {
         XCTAssertEqual(shared.upcoming.map(\.date), [upcomingDate])
     }
 
+
+    func testSameWorkoutIDOnMultipleDaysRemainsTwoCalendarOccurrences() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let monday = try XCTUnwrap(calendar.date(from:
+            DateComponents(year: 2026, month: 11, day: 16)))
+        let thursday = try XCTUnwrap(calendar.date(byAdding: .day, value: 3, to: monday))
+        let repeatedID = UUID()
+        func workout(at date: Date) -> PlannedSession {
+            PlannedSession(
+                id: repeatedID, title: "Repeated 4×4", kind: .running,
+                scheduledStart: date, durationMinutes: 45,
+                targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil,
+                routeID: nil, exercises: [], notes: nil
+            )
+        }
+        let sessions = [workout(at: monday), workout(at: thursday)]
+        let timeline = ATHLTHStudioSchedule.window(
+            plans: [], standalone: sessions,
+            startDate: monday, days: 7, calendar: calendar
+        )
+        XCTAssertEqual(timeline.count, 2)
+        XCTAssertEqual(timeline.map(\.date), [monday, thursday])
+        XCTAssertEqual(Set(timeline.map(\.id)).count, 2)
+        let repeatedImport = ATHLTHStudioSchedule.window(
+            plans: [], standalone: sessions + sessions,
+            startDate: monday, days: 7, calendar: calendar
+        )
+        XCTAssertEqual(repeatedImport.count, 2)
+    }
+
 }
