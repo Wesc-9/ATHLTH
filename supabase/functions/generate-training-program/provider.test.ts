@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks, coachCompactProgramSchema, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks, coachCompactProgramSchema, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText, coachBackfillSparseFinalWeek } from "./provider.ts";
 const check = (condition: boolean) => { if (!condition) throw new Error("Assertion failed"); };
 Deno.test("Coach sends structured goals and selected scope using the chat contract", () => {
   const constraints = { weekCount: 4, userNotes: "Adjust Tuesday only", goals: [{ title: "5K" }] };
@@ -248,4 +248,83 @@ Deno.test("Coach parses a complete JSON plan from unconstrained Groq output", ()
   check(coachParseProgramText("This is not a JSON plan") === null);
   check(coachParseProgramText(raw.slice(0, -2)) === null);
   check(coachParseProgramText("{" + "x".repeat(300_001) + "}") === null);
+});
+
+Deno.test("Coach repairs a nearly empty final deload week without fabricating exercises", () => {
+  const makeWorkout = (kind: string, title: string) => ({
+    title, kind, durationMinutes: 60,
+    exercises: kind === "strength"
+      ? [{ name: "Bench Press", sets: 4, reps: 8, targetRPE: 8 }] : [],
+    blocks: kind === "running"
+      ? [{ title: "Easy", kind: "run", phase: "main",
+           durationSeconds: 1800, targetHeartRateZone: 2, targetEffortRPE: 5 }] : [],
+  });
+  const days = [1, 2, 3, 4, 5];
+  const base = days.map(dayIndex => ({
+    dayIndex,
+    sessions: [makeWorkout(dayIndex % 2 ? "strength" : "running",
+      dayIndex % 2 ? "Full Body" : "Easy Aerobic Run")],
+  }));
+  const weeks = [1, 2, 3].map(weekNumber => ({
+    weekNumber, days: structuredClone(base),
+  }));
+  weeks.push({
+    weekNumber: 4,
+    days: [{ dayIndex: 1, sessions: [{
+      ...makeWorkout("strength", "Strength (Deload)"),
+    }] }, ...days.slice(1).map(dayIndex => ({ dayIndex, sessions: [] as
+      ReturnType<typeof makeWorkout>[] }))],
+  });
+  const original = { title: "Mixed plan", summary: "Four weeks", weeks };
+  const snapshot = JSON.stringify(original);
+  const repaired = coachBackfillSparseFinalWeek(
+    original, days, 5, true, true,
+  );
+  check(repaired.added === 3);
+  const outputWeeks = repaired.program.weeks as typeof weeks;
+  const last = outputWeeks[3].days;
+  check(last.filter(day => day.sessions.length > 0).length === 4);
+  check(last[0].sessions[0].title === "Strength (Deload)");
+  check(last.slice(1).filter(day => day.sessions.length > 0)
+    .every(day => day.sessions[0].durationMinutes === 45));
+  check(last.slice(1).filter(day => day.sessions[0]?.kind === "strength")
+    .every(day => day.sessions[0].exercises[0].sets === 3));
+  check(outputWeeks[0].days.every(day => day.sessions.length === 1));
+  check(JSON.stringify(original) === snapshot);
+  check(repaired.program !== original);
+});
+
+Deno.test("Coach never fills recovery weeks from outside the user's allowed days or with health exclusions", () => {
+  const sample = (kind: string) => ({
+    kind, title: "Easy", durationMinutes: 30,
+    exercises: [], blocks: [],
+  });
+  const weekdays = [1, 3, 5];
+  const full = (n: number) => ({
+    weekNumber: n,
+    days: weekdays.map(dayIndex => ({
+      dayIndex, sessions: [sample("walking")],
+    })),
+  });
+  const last = { weekNumber: 4,
+    days: weekdays.map(dayIndex => ({
+      dayIndex, sessions: dayIndex === 1 ? [sample("walking")] : [] as ReturnType<typeof sample>[],
+    })),
+  };
+  const program = { title: "Walking", weeks: [full(1), full(2), full(3), last] };
+  const protectedProgram = coachBackfillSparseFinalWeek(
+    program, weekdays, 3, false, true,
+  );
+  check(protectedProgram.added === 0 && protectedProgram.program === program);
+  const repaired = coachBackfillSparseFinalWeek(program, weekdays, 3, true, false);
+  check(repaired.added === 2);
+  const out = repaired.program.weeks as typeof program.weeks;
+  check(out[3].days.every(day => weekdays.includes(day.dayIndex)));
+  check(out[3].days.every(day => day.sessions.length === 1));
+  const normal = coachBackfillSparseFinalWeek({title:"Plan", weeks: [
+    full(1), full(2), full(3), full(4),
+  ]}, weekdays, 3, true, true);
+  check(normal.added === 0);
+  const lowFrequency = coachBackfillSparseFinalWeek(program, weekdays, 1, true, true);
+  check(lowFrequency.added === 0);
 });
