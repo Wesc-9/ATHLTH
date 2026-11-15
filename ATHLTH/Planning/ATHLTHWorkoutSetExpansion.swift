@@ -133,3 +133,56 @@ enum ATHLTHWorkoutSetExpansion {
         return steps
     }
 }
+
+
+/// Free strength is an open *timed* activity, not an exercise with
+/// repetitions or set recoveries. All plan/quick/library editors must use
+/// the same persisted block and preserve the existing strength engine.
+enum ATHLTHFreeStrengthRecipePolicy {
+    static let sourceSlug = "athlth-native-free-strength-training"
+    static let defaultDurationSeconds: TimeInterval = 45 * 60
+
+    static func isFreeStrength(_ block: WorkoutTemplateBlock) -> Bool {
+        block.kind == .exercise &&
+            (block.exerciseSlug == sourceSlug ||
+             block.exerciseSlug == "free-strength-training")
+    }
+
+    static func normalized(_ source: WorkoutTemplateBlock) -> WorkoutTemplateBlock {
+        guard isFreeStrength(source) else { return source }
+        var block = source
+        block.setCount = 1
+        block.repetitions = nil
+        block.individualSetTargets = nil
+        block.restBetweenSetsSeconds = nil
+        block.targetWeightKilograms = nil
+        if block.durationSeconds == nil || (block.durationSeconds ?? 0) <= 0 {
+            block.durationSeconds = defaultDurationSeconds
+        }
+        block.title = ATHLTHLocalization.choose(
+            english: "Free strength training", norwegian: "Fri styrketrening"
+        )
+        return block
+    }
+
+    static func make(
+        phase: WorkoutPhaseKind = .main,
+        exerciseID: UUID? = nil
+    ) -> WorkoutTemplateBlock {
+        var block = WorkoutTemplateBlock(
+            sequence: 0,
+            kind: .exercise,
+            title: ATHLTHLocalization.choose(
+                english: "Free strength training", norwegian: "Fri styrketrening"
+            ),
+            exerciseSlug: sourceSlug,
+            distanceMeters: nil, repetitions: nil,
+            durationSeconds: defaultDurationSeconds,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: phase
+        )
+        block.setCount = 1
+        block.exerciseID = exerciseID
+        return block
+    }
+}
