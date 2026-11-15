@@ -12,7 +12,14 @@ struct ATHLTHCoachInjuryEntriesView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 11) {
+            Text(tr(
+                "Optional. Leave this blank if you don't want to provide health information.",
+                "Valgfritt. La dette stå tomt hvis du ikke ønsker å oppgi helseopplysninger."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHTrainDesign.secondary)
+
             Button {
                 intake.injuryStatus = .none
                 intake.injuries = []
@@ -111,12 +118,14 @@ struct ATHLTHCoachInjuryEntriesView: View {
                     tr("Add injury or limitation", "Legg til skade eller begrensning"),
                     systemImage: "plus"
                 )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 49)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(maxWidth: .infinity, minHeight: 44,
+                       alignment: .leading)
+                .padding(.horizontal, 12)
                 .background(
-                    ATHLTHTrainDesign.bronze,
-                    in: RoundedRectangle(cornerRadius: 15)
+                    ATHLTHPlanDesign.selectedSurface.opacity(0.56),
+                    in: RoundedRectangle(cornerRadius: 13)
                 )
             }
             .buttonStyle(.plain)
