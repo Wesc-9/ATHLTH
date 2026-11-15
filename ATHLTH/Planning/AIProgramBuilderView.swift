@@ -793,30 +793,61 @@ struct AIProgramBuilderView: View {
                     }
                 }
 
-                Text(ATHLTHLocalization.choose(
-                    english: "Sessions per week", norwegian: "Antall økter per uke"))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Sessions per week", norwegian: "Antall økter per uke"
+                    ))
                     .font(.subheadline.weight(.semibold))
-                coachChoiceGrid {
-                    coachToggleOption(
-                        ATHLTHLocalization.choose(
-                            english: "Let Coach decide",
-                            norwegian: "La Coach bestemme"
-                        ),
-                        selected: standaloneIntake.coachChoosesFrequency
-                    ) {
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    Spacer(minLength: 4)
+                    Button {
                         standaloneIntake.coachChoosesFrequency = true
                         standaloneIntake.sessionsPerWeek = nil
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Let Coach decide", norwegian: "La Coach bestemme"
+                        ))
+                        .underline(standaloneIntake.coachChoosesFrequency)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(
+                        standaloneIntake.coachChoosesFrequency ? .isSelected : []
+                    )
+                    .accessibilityIdentifier("athlth-coach-weekly-auto")
+                }
+
+                // Keep all seven choices on one row, like the training-day selector.
+                HStack(spacing: 5) {
                     ForEach(1...7, id: \.self) { count in
-                        coachToggleOption(
-                            "\(count)",
-                            selected: !standaloneIntake.coachChoosesFrequency &&
-                                standaloneIntake.sessionsPerWeek == count,
-                            enabled: standaloneIntake.availableDays.count >= count
-                        ) {
+                        let selected = !standaloneIntake.coachChoosesFrequency &&
+                            standaloneIntake.sessionsPerWeek == count
+                        let enabled = standaloneIntake.availableDays.count >= count
+                        Button {
                             standaloneIntake.coachChoosesFrequency = false
                             standaloneIntake.sessionsPerWeek = count
+                        } label: {
+                            Text("\(count)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(
+                                    selected ? .white : ATHLTHTrainDesign.ink
+                                )
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(
+                                    selected ? ATHLTHTrainDesign.bronze :
+                                        ATHLTHTrainDesign.canvas,
+                                    in: Capsule()
+                                )
                         }
+                        .buttonStyle(.plain)
+                        .disabled(!enabled)
+                        .opacity(enabled ? 1 : 0.45)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                        .accessibilityIdentifier("athlth-coach-weekly-count-\(count)")
                     }
                 }
 
