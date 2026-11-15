@@ -575,6 +575,43 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertEqual(count(index: 2, elapsed: 30, isEffort: true), 1)
     }
 
+    func testHydrationReminderEveryFifteenMinutesOnPhoneAndWatch() throws {
+        let reminder = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .hydrationReminder,
+            interval: 15 * 60, scope: .workout
+        )
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.customRules = [reminder]
+        // The rule is saved in the same payload that is sent to Apple Watch.
+        let restored = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self,
+            from: JSONEncoder().encode(config)
+        )
+        XCTAssertEqual(restored.customRules, [reminder])
+        var slots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: restored.customRules ?? [], distanceMeters: 0, elapsedSeconds: 0
+        )
+        func due(_ seconds: TimeInterval, norwegian: Bool) -> [ATHLTHAudioCoachDueAnnouncement] {
+            ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+                rules: restored.customRules ?? [], distanceMeters: 0,
+                elapsedSeconds: seconds, paceSecondsPerKilometer: nil,
+                heartRateBPM: nil, norwegian: norwegian, lastSlots: &slots
+            )
+        }
+        XCTAssertTrue(due(899, norwegian: true).isEmpty)
+        let first = due(900, norwegian: true)
+        XCTAssertEqual(first.count, 1)
+        XCTAssertTrue(first[0].text.contains("vann"))
+        XCTAssertEqual(first[0].metrics, [.hydrationReminder])
+        XCTAssertTrue(due(901, norwegian: true).isEmpty)
+        XCTAssertTrue(due(1_799, norwegian: true).isEmpty)
+        let second = due(1_800, norwegian: false)
+        XCTAssertEqual(second.count, 1)
+        XCTAssertTrue(second[0].text.contains("water"))
+        XCTAssertNotEqual(first[0].milestoneKey, second[0].milestoneKey)
+    }
+
     func testOpenCooldownDoesNotInventAnEstimatedFinishTime() throws {
         let groupID = UUID()
         let steps = [
