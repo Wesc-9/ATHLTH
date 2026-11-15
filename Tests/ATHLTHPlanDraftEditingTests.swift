@@ -181,4 +181,73 @@ final class ATHLTHPlanDraftEditingTests: XCTestCase {
         ))
     }
 
+
+    func testCoachAuthoredBasicWorkoutPreservesFullEngineTimelineThroughDraftAndPlan() throws {
+        let initial = makeDraft()
+        let selection = ATHLTHPlanDraftWorkoutSelection(
+            weekNumber: 2, dayIndex: 1, sessionIndex: 0
+        )
+        let source = try XCTUnwrap(ATHLTHPlanDraftEditing.workout(
+            in: initial, selection: selection
+        ))
+        let original = source.makePlannedSession()
+        XCTAssertEqual(
+            original.resolvedWorkoutBlocks.filter { $0.kind == .exercise }.count, 3
+        )
+        XCTAssertEqual(
+            original.resolvedWorkoutBlocks.filter { $0.kind == .rest }.count, 2
+        )
+
+        var changedWorkout = original
+        ATHLTHUnifiedWorkout.apply(
+            blocks: original.resolvedWorkoutBlocks,
+            title: "Full Body — edited in Basic",
+            routeID: nil, estimatedMinutes: 50,
+            to: &changedWorkout
+        )
+
+        var authored = AIProgramDraftSession(
+            title: changedWorkout.title, kind: changedWorkout.kind.rawValue,
+            durationMinutes: changedWorkout.durationMinutes,
+            targetDistanceKilometers: changedWorkout.targetDistanceKilometers,
+            targetPaceSecondsPerKilometer:
+                changedWorkout.targetPaceSecondsPerKilometer,
+            notes: changedWorkout.notes, exercises: []
+        )
+        authored.authoredWorkout = changedWorkout
+        let revised = try XCTUnwrap(ATHLTHPlanDraftEditing.replacing(
+            in: initial, selection: selection, with: authored
+        ))
+        XCTAssertEqual(revised.weeks[0], initial.weeks[0])
+        XCTAssertEqual(revised.weeks[2], initial.weeks[2])
+        XCTAssertTrue(ATHLTHPlanDraftValidator.issues(
+            in: revised, expectedWeeks: 3,
+            requireExecutableWorkouts: true
+        ).isEmpty)
+
+        // The preview and its stored Codable draft must not reduce Basic
+        // sets/pauses back to flat text when the entire plan is approved.
+        let decoded = try JSONDecoder().decode(
+            AIProgramDraft.self, from: JSONEncoder().encode(revised)
+        )
+        let selected = try XCTUnwrap(ATHLTHPlanDraftEditing.workout(
+            in: decoded, selection: selection
+        ))
+        XCTAssertEqual(selected.visibleExerciseCount, 1)
+        XCTAssertEqual(
+            selected.makePlannedSession().resolvedWorkoutBlocks,
+            changedWorkout.resolvedWorkoutBlocks
+        )
+        let plan = decoded.makeTrainingPlan(
+            ownerID: UUID(), startDate: Date()
+        )
+        let copied = plan.weeks[1].days.first {
+            $0.dayIndex == 1
+        }?.sessions.first
+        XCTAssertEqual(
+            copied?.resolvedWorkoutBlocks,
+            changedWorkout.resolvedWorkoutBlocks
+        )
+    }
+
 }
