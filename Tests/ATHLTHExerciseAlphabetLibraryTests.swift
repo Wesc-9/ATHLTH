@@ -61,4 +61,22 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
             entries.map(\.id)
         )
     }
+    func testSquatPrototypeIsSelectableWithoutReplacingOriginal() throws {
+        let store = ExerciseLibraryStore()
+        let prototype = try XCTUnwrap(store.athlthCatalogExercises.first {
+            $0.sourceIdentifier == "athlth-native-test-bodyweight-squat"
+        })
+        let original = try XCTUnwrap(store.athlthCatalogExercises.first {
+            $0.sourceIdentifier == "athlth-native-back-squat"
+        })
+        XCTAssertEqual(prototype.name, "test")
+        XCTAssertEqual(store.localizedExerciseName(prototype), "test")
+        XCTAssertEqual(prototype.exercise.primaryMuscles, ["Quads"])
+        XCTAssertEqual(prototype.exercise.secondaryMuscles, ["Glutes", "Core"])
+        XCTAssertEqual(prototype.exercise.equipment, ["Bodyweight"])
+        XCTAssertNotEqual(prototype.id, original.id)
+        XCTAssertTrue(store.selectableExercises.contains { $0.id == prototype.id })
+        XCTAssertEqual(original.name, "Barbell Back Squat")
+    }
+
 }
