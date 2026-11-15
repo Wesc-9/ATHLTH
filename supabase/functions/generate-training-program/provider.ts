@@ -296,7 +296,7 @@ export function coachCompactProgramRequest(
     "No unnecessary blocks, note fields, or unrequested training. The athlete's " +
     "injury and equipment restrictions remain mandatory. Return JSON only.";
   return {
-    model, reasoning_effort: "low", max_completion_tokens: 3500,
+    model, reasoning_effort: "low", max_completion_tokens: 5000,
     messages: [
       { role: "system", content: compactInstructions },
       { role: "user", content: JSON.stringify(constraints) },
@@ -317,40 +317,90 @@ export function coachCompactValidatedProgram(
 ): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const raw = value as Record<string, unknown>;
-  if (typeof raw.title !== "string" || !raw.title.trim() ||
-      !Array.isArray(raw.weeks) || raw.weeks.length !== weekCount) return null;
-  const allowed = new Set(preferredDays);
+  if (!Array.isArray(raw.weeks) || raw.weeks.length !== weekCount ||
+      !Number.isInteger(weekCount) || weekCount < 1 ||
+      weeklyLimit < 1 || preferredDays.length < 1) return null;
+
+  const validKinds = new Set([
+    "running", "walking", "strength", "mobility", "recovery", "custom",
+  ]);
+  const allowedDays = [...new Set(preferredDays)].sort((a, b) => a - b);
+  const allowed = new Set(allowedDays);
   const weeks: Record<string, unknown>[] = [];
   let totalSessions = 0;
-  for (let i = 0; i < weekCount; i++) {
-    const week = raw.weeks[i];
+
+  for (let index = 0; index < weekCount; index++) {
+    const week = raw.weeks[index];
     if (!week || typeof week !== "object" || Array.isArray(week) ||
-        week.weekNumber !== i + 1 || !Array.isArray(week.days) ||
-        week.days.length < 1 || week.days.length > 7) return null;
+        week.weekNumber !== index + 1 || !Array.isArray(week.days) ||
+        week.days.length > 7) return null;
+
     const seen = new Set<number>();
-    const selected: unknown[] = [];
+    const existing = new Map<number, Record<string, unknown>>();
+    const misplaced: Record<string, unknown>[] = [];
+
     for (const day of week.days) {
       if (!day || typeof day !== "object" || Array.isArray(day) ||
           !Number.isInteger(day.dayIndex) || day.dayIndex < 1 ||
           day.dayIndex > 7 || seen.has(day.dayIndex) ||
           !Array.isArray(day.sessions) || day.sessions.length > 1) return null;
       seen.add(day.dayIndex);
-      if (!allowed.has(day.dayIndex)) {
-        if (day.sessions.length !== 0) return null;
-      } else {
-        selected.push(day);
-        totalSessions += day.sessions.length;
+      const workout: Record<string, unknown>[] = [];
+      for (const item of day.sessions) {
+        if (!item || typeof item !== "object" || Array.isArray(item) ||
+            typeof item.title !== "string" || !item.title.trim() ||
+            !validKinds.has(item.kind) ||
+            (item.blocks != null && !Array.isArray(item.blocks)) ||
+            (item.exercises != null && !Array.isArray(item.exercises))) return null;
+        // Optional arrays may be omitted by a compact provider response.
+        workout.push({
+          ...item,
+          blocks: Array.isArray(item.blocks) ? item.blocks : [],
+          exercises: Array.isArray(item.exercises) ? item.exercises : [],
+        });
+      }
+      if (allowed.has(day.dayIndex)) {
+        existing.set(day.dayIndex, { ...day, sessions: workout });
+      } else if (workout.length > 0) {
+        // Relocate rather than sending a workout on an athlete-unavailable
+        // weekday. Never add a workout or cross an explicitly selected week.
+        misplaced.push(workout[0]);
       }
     }
-    const canonical = { ...(week as Record<string, unknown>), days: selected };
-    if (!coachProgramValidWeek({ weeks: [canonical] }, i + 1, preferredDays, weeklyLimit)) {
-      return null;
+
+    // Keep the user's selected weekdays authoritative. Fill only empty
+    // REST-day slots here; no exercise or training is invented.
+    const days = allowedDays.map((dayIndex) =>
+      existing.get(dayIndex) ?? { dayIndex, sessions: [] }
+    );
+    let weekSessions = days.reduce(
+      (sum, day) => sum + (day.sessions as unknown[]).length, 0,
+    );
+    for (const session of misplaced) {
+      if (weekSessions >= weeklyLimit) break;
+      const free = days.find((day) => (day.sessions as unknown[]).length === 0);
+      if (!free) break;
+      free.sessions = [session];
+      weekSessions++;
     }
-    weeks.push(canonical);
+    // Cap overly eager model output to the selected frequency. The athlete
+    // always reviews the resulting unsaved draft before accepting it.
+    let used = 0;
+    for (const day of days) {
+      const sessions = day.sessions as unknown[];
+      if (sessions.length && used >= weeklyLimit) day.sessions = [];
+      else if (sessions.length) used++;
+    }
+    totalSessions += used;
+    weeks.push({
+      ...week, days,
+    });
   }
+  // Never return a fabricated all-rest plan after a provider failure.
   if (totalSessions < 1) return null;
   return {
-    title: raw.title.slice(0, 160),
+    title: typeof raw.title === "string" && raw.title.trim()
+      ? raw.title.slice(0, 160) : "ATHLTH training plan",
     summary: typeof raw.summary === "string" ? raw.summary.slice(0, 1500) : "",
     weeks,
   };
