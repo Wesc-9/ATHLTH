@@ -1719,9 +1719,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         goal = .improveFitness
                     }
                 )
-                if !selectedGoalChoice.isEmpty && !["none", "area"].contains(selectedGoalChoice) {
-                    inlineGoalLinkFields
-                }
+                // Goal creation belongs to the next plan step.
+                // This page only chooses direction and shows the preview.
             }
             .padding(.horizontal, 18)
             .padding(.top, 10)
@@ -1801,6 +1800,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var inlineGoalCategory: GoalCategory {
         if selectedGoalArea == .specific { return .event }
+        if selectedGoalArea == .strength && selectedGoalChoice == "muscle" {
+            // Hypertrophy is a targeted, manually tracked goal, not a
+            // kilogram PR disguised as muscle growth.
+            return .custom
+        }
         if focus == .strength || focus == .hypertrophy { return .strength }
         if selectedGoalArea == .general { return .consistency }
         return .endurance
@@ -1809,7 +1813,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var inlineGoalLinkFields: some View {
         builderPanel {
             VStack(alignment: .leading, spacing: 14) {
-                Label(ATHLTHLocalization.choose(english: "Link to goal or event", norwegian: "Knytt til mål eller arrangement"), systemImage: "target")
+                Label(ATHLTHLocalization.choose(
+                    english: "Goal linked to training plan",
+                    norwegian: "Mål knyttet til treningsplan"
+                ), systemImage: "target")
                     .font(.headline)
                 ForEach(goalStore.activeGoals.filter { $0.status == .active && $0.category == inlineGoalCategory }) { linked in
                     Button {
@@ -1824,6 +1831,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         initialCategory: inlineGoalCategory,
                         initialTitle: ATHLTHPlanGoalOption.options(for: selectedGoalArea).first { $0.id == selectedGoalChoice }?.title ?? "",
                         embeddedInPlan: true,
+                        planGoalChoice: selectedGoalChoice,
                         checkpoint: $inlineGoalDraft
                     ) { id in
                         selectedGoalIDs = [id]
@@ -2826,6 +2834,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     onCreateGoal: openGoalCreationFromPlan,
                     onSelectAdvanced: { openModeStart(advanced: true) }
                 )
+                if selectedGoalChoice != "none" && selectedGoalChoice != "area" &&
+                   !selectedGoalChoice.isEmpty {
+                    inlineGoalLinkFields
+                }
                 planLibrarySaveChoice
                 if let conflictingPlan, approvedPlanReplacementID != conflictingPlan.id {
                     conflictCard(conflictingPlan)
@@ -3083,6 +3095,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     adaptivePlanPair(AnyView(advancedScheduleFields), AnyView(scheduleWeekPreview))
                 } else {
                     advancedScheduleFields
+                }
+                if selectedGoalChoice != "none" && selectedGoalChoice != "area" &&
+                   !selectedGoalChoice.isEmpty {
+                    inlineGoalLinkFields
                 }
                 if let conflictingPlan, approvedPlanReplacementID != conflictingPlan.id {
                     conflictCard(conflictingPlan)
@@ -7983,15 +7999,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case .mode:
             return true
         case .goal:
+            // The selectable goal is complete once a direction is chosen.
+            // Linking and personalizing it happens on the following page.
             return selectedGoalChoice == "none" ||
-                (ATHLTHPlanGoalOption.options(for: selectedGoalArea)
-                    .contains { $0.id == selectedGoalChoice } && !selectedGoalIDs.isEmpty)
+                ATHLTHPlanGoalOption.options(for: selectedGoalArea)
+                    .contains { $0.id == selectedGoalChoice }
         case .source:
             return true
         case .approach:
             return true
         case .basics:
-            return conflictIsResolved &&
+            let goalIsLinked = selectedGoalChoice == "none" ||
+                selectedGoalChoice.isEmpty || !selectedGoalIDs.isEmpty
+            return conflictIsResolved && goalIsLinked &&
                 (mode != .advanced || weekPlanningApproach != nil)
         case .profile:
             return
