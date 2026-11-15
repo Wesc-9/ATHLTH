@@ -1783,14 +1783,13 @@ struct GoalCreationView: View {
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                     categoryStep
+                } else if step == 1 {
+                    // Goal details use the same photo-first editorial
+                    // identity as the Plan Studio workout detail card.
+                    targetStep
                 } else {
                     goalSelectedCategoryCard
-                    Group {
-                        switch step {
-                        case 1: targetStep
-                        default: reviewStep
-                        }
-                    }
+                    reviewStep
                 }
             }
             .padding(.horizontal, 18)
@@ -2323,33 +2322,15 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
-            if embeddedInPlan {
-                planGoalCoverPreview
-                planGoalNameField
-                if planGoalChoice == "muscle" {
-                    planGoalMuscleTargetFields
-                }
+            // One reusable hierarchy for standalone Goals and plans:
+            // hero photo, chosen goal type, custom name, target, then notes.
+            planGoalCoverPreview
+            goalSelectedCategoryCard
+            planGoalNameField
+            if embeddedInPlan && planGoalChoice == "muscle" {
+                planGoalMuscleTargetFields
             }
             compactGoalImagePicker
-            if !embeddedInPlan {
-                goalInputCard(
-                    icon: "text.cursor",
-                    title: ATHLTHLocalization.choose(
-                        english: "Goal name", norwegian: "Navn på målet"
-                    )
-                ) {
-                    TextField(ATHLTHLocalization.choose(
-                        english: "Optional — ATHLTH can name it for you",
-                        norwegian: "Valgfritt – ATHLTH kan navngi det for deg"
-                    ), text: $title)
-                    .font(.subheadline)
-                    .textInputAutocapitalization(.sentences)
-                    .padding(.horizontal, 12)
-                    .frame(height: 42)
-                    .background(Color.black.opacity(0.035),
-                                in: RoundedRectangle(cornerRadius: 12))
-                }
-            }
 
             goalTargetDateRow
 
@@ -2770,7 +2751,7 @@ struct GoalCreationView: View {
     // is computed from the selected objective and muscle/exercise.
     private var planGoalNameSuggestion: String {
         let prefix = suggestedPlanTitle.isEmpty
-            ? ATHLTHLocalization.choose(english: "My goal", norwegian: "Mitt mål")
+            ? category.title
             : suggestedPlanTitle
         if planGoalChoice == "muscle" {
             let exercise = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2821,20 +2802,25 @@ struct GoalCreationView: View {
             LinearGradient(colors: [.clear, .black.opacity(0.55)],
                            startPoint: .center, endPoint: .bottom)
             VStack(alignment: .leading, spacing: 4) {
-                Text(ATHLTHLocalization.choose(
-                    english: "GOAL LINKED TO YOUR PLAN",
-                    norwegian: "MÅL KNYTTET TIL TRENINGSPLAN"
-                ))
+                Text(embeddedInPlan
+                    ? ATHLTHLocalization.choose(
+                        english: "GOAL LINKED TO YOUR PLAN",
+                        norwegian: "MÅL KNYTTET TIL TRENINGSPLAN"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "YOUR GOAL", norwegian: "DITT MÅL"
+                    ))
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.4)
-                Text(suggestedPlanTitle)
+                Text(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                     ? planGoalNameSuggestion : title)
                     .font(.system(size: 23, weight: .medium, design: .serif))
                     .lineLimit(2)
             }
             .foregroundStyle(.white)
             .padding(16)
         }
-        .frame(height: 172)
+        .frame(height: 186)
         .clipShape(RoundedRectangle(cornerRadius: 19))
         .accessibilityElement(children: .combine)
     }
