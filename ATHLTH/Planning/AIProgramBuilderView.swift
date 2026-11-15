@@ -933,8 +933,8 @@ struct AIProgramBuilderView: View {
                     norwegian: "Utstyr du har tilgang til"))
                     .font(.subheadline.bold())
                 Text(ATHLTHLocalization.choose(
-                    english: "Choose bodyweight if you do not have equipment.",
-                    norwegian: "Velg kroppsvekt dersom du ikke har utstyr."))
+                    english: "If neither list is filled, Coach assumes you have access to all standard equipment.",
+                    norwegian: "Hvis du ikke velger noe, antar Coach at du har tilgang til alt vanlig utstyr."))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                 if !standaloneIntake.equipment.isEmpty {
@@ -953,9 +953,11 @@ struct AIProgramBuilderView: View {
                 }
                 Menu {
                     ForEach(equipmentOptions.filter {
-                        !standaloneIntake.equipment.contains($0)
+                        !standaloneIntake.equipment.contains($0) &&
+                        !standaloneIntake.unavailableEquipment.contains($0)
                     }, id: \.self) { equipment in
                         Button(localizedEquipment(equipment)) {
+                            standaloneIntake.unavailableEquipment.remove(equipment)
                             standaloneIntake.equipment.insert(equipment)
                         }
                     }
@@ -968,9 +970,49 @@ struct AIProgramBuilderView: View {
                         .frame(maxWidth: .infinity, minHeight: 44,
                                alignment: .leading)
                 }
+                Divider()
+                Text(ATHLTHLocalization.choose(
+                    english: "Equipment you cannot use",
+                    norwegian: "Utstyr du ikke har tilgjengelig"
+                ))
+                .font(.subheadline.bold())
+                if !standaloneIntake.unavailableEquipment.isEmpty {
+                    coachChoiceGrid {
+                        ForEach(equipmentOptions.filter {
+                            standaloneIntake.unavailableEquipment.contains($0)
+                        }, id: \.self) { equipment in
+                            coachToggleOption(
+                                localizedEquipment(equipment) + "  ×",
+                                selected: true
+                            ) {
+                                standaloneIntake.unavailableEquipment.remove(equipment)
+                            }
+                        }
+                    }
+                }
+                Menu {
+                    ForEach(equipmentOptions.filter {
+                        !standaloneIntake.unavailableEquipment.contains($0) &&
+                        !standaloneIntake.equipment.contains($0)
+                    }, id: \.self) { equipment in
+                        Button(localizedEquipment(equipment)) {
+                            standaloneIntake.equipment.remove(equipment)
+                            standaloneIntake.unavailableEquipment.insert(equipment)
+                        }
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Exclude equipment",
+                        norwegian: "Legg til utilgjengelig utstyr"
+                    ), systemImage: "minus.circle")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(maxWidth: .infinity, minHeight: 44,
+                           alignment: .leading)
+                }
                 TextField(ATHLTHLocalization.choose(
-                    english: "Other equipment (optional)",
-                    norwegian: "Annet utstyr (valgfritt)"),
+                    english: "Other available equipment (optional)",
+                    norwegian: "Annet tilgjengelig utstyr (valgfritt)"),
                           text: $standaloneIntake.otherEquipment, axis: .vertical)
                     .lineLimit(1...3)
                     .textFieldStyle(.roundedBorder)
