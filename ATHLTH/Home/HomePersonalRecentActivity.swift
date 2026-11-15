@@ -1380,6 +1380,7 @@ struct HomePersonalRecentActivitySection:
                     )
                 } label: {
                     HomePersonalWorkoutVisual(
+                        health: health,
                         workout: workout,
                         strengthWorkout: strengthLog,
                         phoneWorkout: phoneLog,
@@ -3118,6 +3119,7 @@ struct HomePersonalActivityHistoryView:
 private struct HomePersonalHistoryCard:
     View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
@@ -3128,6 +3130,7 @@ private struct HomePersonalHistoryCard:
             spacing: 0
         ) {
             HomePersonalWorkoutVisual(
+                health: health,
                 workout: workout,
                 strengthWorkout:
                     strengthWorkout,
@@ -4478,9 +4481,9 @@ private struct HomeStrengthRecentPhotoArtwork: View {
 
 private struct HomePersonalWorkoutVisual:
     View {
-    @EnvironmentObject private var health:
-        HealthKitManager
-
+    // The artwork is data-backed but must not observe every live HealthKit
+    // metric; the parent handles workout-list invalidation explicitly.
+    let health: HealthKitManager
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
