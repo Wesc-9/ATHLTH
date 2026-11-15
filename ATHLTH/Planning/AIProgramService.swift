@@ -124,7 +124,8 @@ struct AIProgramDraft: Codable, Hashable {
     func makeTrainingPlan(
         ownerID: UUID,
         startDate: Date,
-        visibility: ProfileVisibility = .privateOnly
+        visibility: ProfileVisibility = .privateOnly,
+        exerciseLibrary: [ExerciseLibraryEntry] = []
     ) -> TrainingPlan {
         let dayTitles = [
             "Monday", "Tuesday", "Wednesday", "Thursday",
@@ -158,7 +159,7 @@ struct AIProgramDraft: Codable, Hashable {
                     dayIndex: dayIndex,
                     title: generatedDay?.title ?? dayTitles[weekday - 1],
                     sessions: generatedDay?.sessions.map {
-                        $0.makePlannedSession()
+                        $0.makePlannedSession(exerciseLibrary: exerciseLibrary)
                     } ?? []
                 )
             }
@@ -295,7 +296,9 @@ struct AIProgramDraftSession: Codable, Hashable {
     /// Optional for older deployed Coach functions and stored drafts.
     var blocks: [AIProgramDraftStep]? = nil
 
-    func makePlannedSession() -> PlannedSession {
+    func makePlannedSession(
+        exerciseLibrary: [ExerciseLibraryEntry] = []
+    ) -> PlannedSession {
         var workout = PlannedSession(
             id: UUID(),
             title: title,
@@ -305,17 +308,61 @@ struct AIProgramDraftSession: Codable, Hashable {
             targetDistanceKilometers: targetDistanceKilometers,
             targetPaceSecondsPerKilometer: targetPaceSecondsPerKilometer,
             routeID: nil,
-            exercises: exercises.map { $0.makePlannedExercise() },
+            exercises: exercises.map {
+                $0.makePlannedExercise(in: exerciseLibrary)
+            },
             notes: notes
         )
         let resolved = (blocks ?? []).prefix(100).enumerated().compactMap {
-            index, step in step.plannedBlock(sequence: index + 1, kind: workout.kind)
+            index, step in step.plannedBlock(
+                sequence: index + 1, kind: workout.kind
+            )
         }
-        if resolved.contains(where: { $0.kind == .run || $0.kind == .exercise }) {
+
+        // ATHLTH Advanced executes a single ordered timeline. AI strength
+        // responses may provide exercise sets without per-set blocks. Project
+        // these through the SAME bridge used by manually planned sessions
+        // so sets, rests, exercise references and RPE are not discarded.
+        // Avoid executing both the AI exercise list and its projected copy.
+        if workout.kind == .strength, !workout.exercises.isEmpty {
+            let strengthBlocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+            if strengthBlocks.contains(where: { $0.kind == .exercise }) {
+                ATHLTHUnifiedWorkout.apply(
+                    blocks: strengthBlocks, title: workout.title,
+                    routeID: workout.routeID,
+                    estimatedMinutes: workout.durationMinutes, to: &workout
+                )
+            }
+            return workout
+        }
+
+        let compatibleBlocks = resolved.filter { block in
+            if workout.kind == .running || workout.kind == .walking {
+                return block.kind == .run || block.kind == .rest ||
+                    block.kind == .note
+            }
+            return true
+        }
+        if compatibleBlocks.contains(where: {
+            $0.kind == .run || $0.kind == .exercise
+        }) {
             ATHLTHUnifiedWorkout.apply(
-                blocks: resolved, title: workout.title, routeID: workout.routeID,
+                blocks: compatibleBlocks, title: workout.title,
+                routeID: workout.routeID,
                 estimatedMinutes: workout.durationMinutes, to: &workout
             )
+        } else if workout.kind == .running || workout.kind == .walking {
+            // A steady/easy run without explicit AI blocks is a valid Basic
+            // prescription. Convert its real duration/distance into a
+            // single runnable ATHLTH main block, not an empty placeholder.
+            let steady = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+            if steady.contains(where: { $0.kind == .run }) {
+                ATHLTHUnifiedWorkout.apply(
+                    blocks: steady, title: workout.title,
+                    routeID: workout.routeID,
+                    estimatedMinutes: workout.durationMinutes, to: &workout
+                )
+            }
         }
         return workout
     }
@@ -387,23 +434,47 @@ struct AIProgramDraftExercise: Codable, Hashable {
     let restSeconds: Int?
     let notes: String?
 
-    func makePlannedExercise() -> PlannedExercise {
-        PlannedExercise(
-            id: UUID(),
-            exerciseID: nil,
-            embeddedExercise: ExerciseSnapshot(
-                name: name,
-                instructions: [],
-                primaryMuscles: [],
-                equipment: [],
-                imageURL: nil
-            ),
-            sets: max(sets, 1),
-            reps: reps,
-            targetWeightKilograms: nil,
-            targetRPE: targetRPE,
-            restSeconds: restSeconds,
-            notes: notes
+    func makePlannedExercise(
+        in library: [ExerciseLibraryEntry] = []
+    ) -> PlannedExercise {
+        // Match canonical licensed/ATHLTH exercises only when unambiguous.
+        // Never guess a user-created movement from a similar title or
+        // substitute equipment variants based on fuzzy name similarity.
+        let normalized = ATHLTHExerciseReferenceResolver.key(name)
+        let exact = library.filter {
+            ($0.source == .repDB || $0.source == .athlthCatalog) &&
+            ATHLTHExerciseReferenceResolver.key($0.canonicalName) == normalized
+        }
+        let alias = ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(
+            for: name
+        )
+        let native = exact.isEmpty ? library.filter {
+            $0.source == .athlthCatalog && $0.sourceIdentifier == alias
+        } : []
+        let matched = exact.count == 1 ? exact[0] :
+            native.count == 1 ? native[0] : nil
+        let snapshot: ExerciseSnapshot
+        if let matched {
+            snapshot = ExerciseSnapshot(
+                name: matched.canonicalName,
+                instructions: matched.exercise.instructions,
+                primaryMuscles: matched.exercise.primaryMuscles,
+                secondaryMuscles: matched.exercise.secondaryMuscles,
+                equipment: matched.exercise.equipment,
+                imageURL: matched.exercise.imageURL
+            )
+        } else {
+            snapshot = ExerciseSnapshot(
+                name: name, instructions: [], primaryMuscles: [],
+                equipment: [], imageURL: nil
+            )
+        }
+
+        return PlannedExercise(
+            id: UUID(), exerciseID: matched?.id,
+            embeddedExercise: snapshot,
+            sets: max(sets, 1), reps: reps, targetWeightKilograms: nil,
+            targetRPE: targetRPE, restSeconds: restSeconds, notes: notes
         )
     }
 }
