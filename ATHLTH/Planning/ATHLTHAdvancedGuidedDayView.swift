@@ -18,10 +18,14 @@ struct ATHLTHAdvancedGuidedDayView: View {
     let onAddGroup: ([WorkoutTemplateBlock], WorkoutKind) -> Void
     let onEditWorkout: (Int) -> Void
     let onEditBlock: (Int, Int) -> Void
+    let onDeleteWorkout: (Int) -> Void
+    let onCoachFill: () -> Void
     let onRestDay: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var confirmingRestReplacement = false
+    @State private var pendingWorkoutDeletion: Int?
+    @State private var confirmingWorkoutDeletion = false
     @State private var showingDayPicker = false
     @State private var composingGroup: WorkoutBlockGroupKind?
     private let ink = ATHLTHTrainDesign.ink
@@ -46,18 +50,36 @@ struct ATHLTHAdvancedGuidedDayView: View {
                     workoutCard(pair.element, index: pair.offset)
                 }
             }
-            if !isRestDay && !workouts.isEmpty {
+            if !isRestDay {
+                quickActions
+                VStack(spacing: 9) {
+                    goldAction(
+                        tr("Add workout", "Legg til treningsøkt"),
+                        symbol: "plus"
+                    ) {
+                        onAddWorkout()
+                    }
+                    goldAction(
+                        tr("Ask Coach to fill empty days", "Be Coach fylle ut"),
+                        symbol: "sparkles"
+                    ) {
+                        onCoachFill()
+                    }
+                }
                 Button {
-                    confirmingRestReplacement = true
+                    if workouts.isEmpty {
+                        onRestDay()
+                    } else {
+                        confirmingRestReplacement = true
+                    }
                 } label: {
-                    Label(tr("Set rest day", "Sett som hviledag"), systemImage: "moon.stars")
-                        .font(.subheadline)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    Label(tr("Rest day", "Legg til hviledag"), systemImage: "moon.stars")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(secondary)
+                        .frame(minHeight: 44, alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(gold)
             }
-            if !isRestDay { quickActions }
             if let composingGroup, !isRestDay {
                 ATHLTHPlanInlineGroupComposer(
                     groupKind: composingGroup,
@@ -73,6 +95,23 @@ struct ATHLTHAdvancedGuidedDayView: View {
         .onChange(of: date) { _, _ in
             // Never carry an uncommitted group to another calendar day.
             composingGroup = nil
+        }
+        .confirmationDialog(
+            tr("Delete workout?", "Slette treningsøkt?"),
+            isPresented: $confirmingWorkoutDeletion,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Delete workout", "Slett treningsøkt"), role: .destructive) {
+                guard let pendingWorkoutDeletion else { return }
+                onDeleteWorkout(pendingWorkoutDeletion)
+                self.pendingWorkoutDeletion = nil
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                pendingWorkoutDeletion = nil
+            }
+        } message: {
+            Text(tr("Only this workout will be removed from the day.",
+                    "Kun denne treningsøkten fjernes fra dagen."))
         }
         .confirmationDialog(
             tr("Replace workouts with a rest day?", "Erstatte øktene med en hviledag?"),
@@ -220,19 +259,8 @@ struct ATHLTHAdvancedGuidedDayView: View {
             Text(tr("Add exercises or a complete workout, or mark this date as a rest day.",
                     "Legg til øvelser eller en komplett treningsøkt, eller sett dagen som hviledag."))
                 .font(.caption).foregroundStyle(secondary)
-            HStack(spacing: 8) {
-                actionButton(tr("Exercise", "Øvelse"), symbol: "dumbbell") {
-                    onAddExercise(.main, 0)
-                }
-                actionButton(tr("Workout", "Treningsøkt"), symbol: "list.bullet") {
-                    onAddWorkout()
-                }
-            }
-            Button(action: onRestDay) {
-                Label(tr("Rest day", "Hviledag"), systemImage: "moon.stars")
-                    .font(.caption)
-                    .foregroundStyle(secondary)
-            }
+            // The two gold actions and the simple rest-day action are
+            // shared with populated days below; no duplicate button row.
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -285,26 +313,33 @@ struct ATHLTHAdvancedGuidedDayView: View {
                         Text("\(workout.blocks.count) " + tr("blocks", "blokker"))
                             .font(.caption).foregroundStyle(secondary)
                     }
-                    Spacer()
-                    Image(systemName: "ellipsis")
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
                         .foregroundStyle(secondary)
                 }
             }
             .buttonStyle(.plain)
+            HStack {
+                Spacer(minLength: 0)
+                Button(role: .destructive) {
+                    pendingWorkoutDeletion = index
+                    confirmingWorkoutDeletion = true
+                } label: {
+                    Label(tr("Delete workout", "Slett treningsøkt"),
+                          systemImage: "trash")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(secondary)
+                        .frame(minHeight: 34)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-guided-delete-workout-\(index)")
+            }
             ForEach(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks)) { section in
                 phaseSection(section, workoutIndex: index, workout: workout)
             }
-            if index == 0 {
-                Button(action: onAddWorkout) {
-                    Label(tr("Add another workout", "Legg til en treningsøkt"),
-                          systemImage: "plus")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(gold)
-                        .frame(maxWidth: .infinity, minHeight: 37)
-                        .background(canvas.opacity(0.8), in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-            }
+            // Additional workouts are inserted by the common gold action
+            // below every day, not by a second control inside the first card.
         }
         .padding(12)
         .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 18))
@@ -411,56 +446,45 @@ struct ATHLTHAdvancedGuidedDayView: View {
         }
     }
 
-    private func actionButton(_ text: String, symbol: String, action: @escaping () -> Void) -> some View {
+    private func goldAction(
+        _ title: String, symbol: String, action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            Label(text, systemImage: symbol)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(gold)
-                .frame(maxWidth: .infinity, minHeight: 38)
-                .background(canvas, in: RoundedRectangle(cornerRadius: 11))
+            Label(title, systemImage: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(gold.gradient, in: RoundedRectangle(cornerRadius: 15))
+                .contentShape(RoundedRectangle(cornerRadius: 15))
         }
         .buttonStyle(.plain)
     }
 
+    // One consistent two-row action palette across empty and populated dates.
+    // Choices append directly to the current workout when one exists.
     private var quickActions: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
+                HStack(spacing: 6) {
+                    quick("walking", "figure.walk", tr("Walk", "Gå"))
                     quick("running", "figure.run", tr("Running", "Løping"))
-                    quick("walking", "figure.walk", tr("Walking", "Gå"))
+                    quick("strength", "dumbbell", tr("Strength", "Styrke"))
                     quick("cycling", "bicycle", tr("Cycling", "Sykling"))
                     quick("yoga", "figure.yoga", "Yoga")
                     quick("meditation", "leaf", tr("Meditation", "Meditasjon"))
-                    quick("restday", "moon.stars", tr("Rest day", "Hviledag"))
                 }
+                .frame(minHeight: 35)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
-                    Button { onAddExercise(.main, 0) } label: {
-                        Label(tr("Exercise", "Øvelse"), systemImage: "dumbbell")
-                    }
-                    Button(action: onAddWorkout) {
-                        Label(tr("Workout", "Treningsøkt"), systemImage: "list.bullet")
-                    }
-                    quick("interval", "waveform.path", tr("Interval", "Intervall"))
-                    quick("superset", "link", "Supersett")
+                HStack(spacing: 6) {
+                    quick("workout", "list.bullet", tr("Workout", "Treningsøkt"))
+                    quick("exercise", "dumbbell", tr("Exercise", "Øvelse"))
                     quick("rest", "pause.fill", tr("Rest", "Pause"))
-                    Button { onQuick("stretching") } label: {
-                        Label(tr("Stretching", "Uttøying"), systemImage: "figure.cooldown")
-                    }
+                    quick("active-rest", "figure.walk", tr("Active rest", "Aktiv pause"))
+                    quick("stretching", "figure.cooldown", tr("Stretching", "Uttøying"))
                 }
-                .font(.system(size: 10))
-                .buttonStyle(.bordered)
-                .tint(gold)
+                .frame(minHeight: 35)
             }
-            Button { onAddExercise(.main, 0) } label: {
-                Label(tr("Add block", "Legg til blokk"), systemImage: "plus")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 42)
-                    .background(gold.gradient, in: RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
         }
     }
 
@@ -475,10 +499,10 @@ struct ATHLTHAdvancedGuidedDayView: View {
             }
         } label: {
             Label(text, systemImage: symbol)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ink)
-                .padding(.horizontal, 10)
-                .frame(minHeight: 31)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 34)
                 .background(.white, in: Capsule())
         }
         .buttonStyle(.plain)
