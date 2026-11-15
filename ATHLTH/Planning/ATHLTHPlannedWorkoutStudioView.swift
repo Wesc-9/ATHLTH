@@ -325,6 +325,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     onEdit: {},
                     onDelete: {},
                     onMoveBy: { _ in },
+                    onMoveToPhase: { _ in },
                     onReorderMove: { _ in },
                     onReorderEnd: {}
                 )
@@ -657,8 +658,23 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                                         guard rows.indices.contains(destination) else { return }
                                         onMove(block.editorDragID, phase,
                                                rows[destination].editorDragID)
-                                    }
+                                    },
+                                    onMoveToPhase: { destination in
+                                        moveToPhase(block.editorDragID, destination)
+                                    },
+                                    onReorderMove: { point in
+                                        liveReorder(block.editorDragID, finger: point)
+                                    },
+                                    onReorderEnd: endLiveReorder
                                 )
+                                .onGeometryChange(for: CGRect.self) { geometry in
+                                    geometry.frame(in: .named("athlthWorkoutStudio"))
+                                } action: { _, frame in
+                                    if dragGeometry.rowFrames[block.editorDragID] != frame {
+                                        dragGeometry.rowFrames[block.editorDragID] = frame
+                                    }
+                                }
+                                .opacity(draggingID == block.editorDragID ? 0.13 : 1)
                             } else {
                                 stepRow(block, position: position + 1, phase: phase)
                             }
@@ -1111,6 +1127,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     onMove(block.editorDragID, phase, rows[destination].editorDragID)
                 }
             },
+            onMoveToPhase: { destination in
+                moveToPhase(block.editorDragID, destination)
+            },
             onReorderMove: { point in
                 if supersetIndex != nil {
                     liveReorderSupersetMember(block.editorDragID, finger: point)
@@ -1128,6 +1147,15 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             }
         }
         .opacity(draggingID == block.editorDragID ? 0.13 : 1)
+    }
+
+    private func moveToPhase(_ id: UUID, _ phase: WorkoutPhaseKind) {
+        // Shared canonical move for exercise, rest, interval and strength.
+        // The underlying recipe changes, not merely this card's position.
+        visiblePhases.insert(phase)
+        collapsedPhases.remove(phase)
+        selectedPhase = phase
+        onMove(id, phase, nil)
     }
 
     /// The ordinary drag policy moves a whole group. Within supersets or
