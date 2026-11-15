@@ -181,6 +181,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     let onOpenLibrary: () -> Void
     let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
     let onOpenTrainTogether: () -> Void
+    let onOpenNotifications: () -> Void
     let onOpenWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onStartQuick: () -> Void
     let onStartWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
@@ -345,7 +346,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             weekCard(week, width: width)
                             ATHLTHStudioHomeCommunitySummary(
                                 onOpenCommunity: onOpenCommunity,
-                                onOpenTrainTogether: onOpenTrainTogether
+                                onOpenTrainTogether: onOpenTrainTogether,
+                                onOpenNotifications: onOpenNotifications
                             )
                             progressCard(wide: split, recorded: workouts, week: week)
                         }
