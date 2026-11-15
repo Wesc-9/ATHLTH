@@ -82,6 +82,7 @@ struct AIProgramBuilderView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     let mode: AIProgramGenerationMode
     let seed: AIProgramBuilderSeed?
@@ -2931,7 +2932,8 @@ struct AIProgramBuilderView: View {
         }
         var generated = draft.makeTrainingPlan(
             ownerID: session.profile.userID,
-            startDate: startDate
+            startDate: startDate,
+            exerciseLibrary: exerciseLibrary.selectableExercises
         )
 
         if mode == .generate,
