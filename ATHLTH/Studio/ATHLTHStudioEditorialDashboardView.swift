@@ -359,9 +359,13 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
         .background(cream.ignoresSafeArea())
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active, followsToday, focusedPlanningDate == nil {
+            guard phase == .active else { return }
+            if followsToday, focusedPlanningDate == nil {
                 selectedDate = .now
             }
+            // The 7/28/90-day chart is relative to today even when the
+            // selected calendar week is historical.
+            scheduleProjectionRefresh()
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .NSCalendarDayChanged
@@ -369,6 +373,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
             if followsToday, focusedPlanningDate == nil {
                 selectedDate = .now
             }
+            scheduleProjectionRefresh()
         }
         .task(id: session.profile.userID) {
             scheduleProjectionRefresh()
