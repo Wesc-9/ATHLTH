@@ -1,3 +1,10 @@
+# ACTIVE ATHLTH DEVELOPMENT (2026-11-15)
+
+- **CURRENT ACTIVE VERSION: 2.2.2 (build 130)** on `release/v2.2.2`, created from exact verified 2.2.1 TestFlight source `7e9c26532032f24d12c1d2d84d935406f67248b9`. Make ALL new ATHLTH source, UI, tests and workflow changes only on `release/v2.2.2`; older versions remain immutable.
+- **VERSION 2.2.1 (build 129) IS FROZEN** at `7e9c26532032f24d12c1d2d84d935406f67248b9`. Preservation refs: `locked/v2.2.1` and `backup/v2.2.1-locked-before-v2.2.2-20261115`. Same-commit GitHub Actions successes: TestFlight upload run `43675965773`, Build ATHLTH `43675965749`, backend regressions `43675965717`, Train/Hybrid XCTest `43675965729`. This confirms the GitHub upload to App Store Connect; Apple processing and tester availability require separate verification. Never modify `release/v2.2.1`, its locked ref, or backup branch.
+- **VERSION TRANSITION:** This 2.2.2 section supersedes the historical active-2.2.1 and earlier guidance below. Preserve the shared iPhone/iPad/Watch planning, workout, Coach and HealthKit engines and every approved 2.2.1 behavior. Do not upload 2.2.2 to TestFlight without a NEW explicit user request. Keep 2.2.2 in development, and run routine test/build workflows.
+- **Freeze enforcement:** immutable preservation is guaranteed by policy and independent Git refs; repository admin branch protection is separate and is not configured by this transition.
+
 # ACTIVE ATHLTH DEVELOPMENT (2026-11-14)
 
 - **CURRENT ACTIVE VERSION: 2.2.1 (build 129)** on `release/v2.2.1`. This section supersedes previous guidance naming 2.2.0 or older as active. Make all new 2.2.1 code, UI, tests and workflow changes on this branch; do not change older release branches.
