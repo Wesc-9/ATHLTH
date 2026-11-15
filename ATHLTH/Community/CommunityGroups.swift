@@ -2105,7 +2105,13 @@ final class CommunityGroupStore: ObservableObject {
     }
 
     var joinedGroupIDs: Set<UUID> {
-        Set(ownMemberships.map(\.groupID))
+        // A long-lived Store may still contain the previous account's
+        // memberships during a sign-out/sign-in transition. Never surface
+        // their private clubs or use them in the Home event query.
+        guard let userID = currentUserID else { return [] }
+        return Set(
+            ownMemberships.filter { $0.userID == userID }.map(\.groupID)
+        )
     }
 
     var joinedGroups: [CommunityGroupRecord] {
