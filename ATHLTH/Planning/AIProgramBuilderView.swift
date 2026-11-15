@@ -133,8 +133,17 @@ struct AIProgramBuilderView: View {
     @State private var currentSessionsPerWeek = 0
     @State private var useProfileInterests = true
     @State private var standaloneIntake = ATHLTHAIProgramIntake()
+    @State private var showingCoachExitConfirmation = false
+    @State private var coachDateEdited = false
     @State private var savedProfileInjuryNotes = ""
     @State private var savedProfileTrainingNotes = ""
+
+    /// Intentional order and no recovery goal posing as an activity.
+    /// Cycling is stored as a separate Coach choice because TrainingFocus
+    /// is persisted elsewhere and does not have a cycling enum case.
+    private let coachTrainingFocusOptions: [TrainingFocus] = [
+        .walking, .running, .strength, .generalFitness
+    ]
 
     private let equipmentOptions = [
         "Bodyweight / no equipment", "Dumbbells", "Kettlebells",
@@ -234,6 +243,35 @@ struct AIProgramBuilderView: View {
         return issues
     }
 
+    /// A sheet drag must never discard filled Coach answers. The
+    /// confirmation is limited to explicit Close; before any choices,
+    /// the sheet may still be dismissed normally.
+    private var hasCoachIntakeChanges: Bool {
+        let intake = standaloneIntake
+        return !intake.trainingTypes.isEmpty || intake.includesCycling ||
+            !intake.outcomes.isEmpty || !intake.muscleGroups.isEmpty ||
+            intake.experience != nil || intake.durationWeeks != nil ||
+            intake.sessionsPerWeek != nil || intake.coachChoosesFrequency ||
+            !intake.availableDays.isEmpty || intake.sessionDurationMinutes != nil ||
+            intake.coachChoosesDuration || !intake.locations.isEmpty ||
+            !intake.equipment.isEmpty || !intake.unavailableEquipment.isEmpty ||
+            !intake.injuries.isEmpty || intake.injuryStatus != nil ||
+            !intake.injuryNotes.isEmpty || !intake.excludedMovements.isEmpty ||
+            !coachFocusNotes.isEmpty || !selectedGoalIDs.isEmpty ||
+            !intake.targetExerciseName.isEmpty ||
+            intake.targetLiftKilograms != nil || currentSessionsPerWeek > 0 ||
+            coachDateEdited || preview != nil
+    }
+
+    private func requestCloseCoach() {
+        guard isStandaloneCoachJourney, hasCoachIntakeChanges,
+              coachJourneyStage != .ready else {
+            dismiss()
+            return
+        }
+        showingCoachExitConfirmation = true
+    }
+
     private var canGenerate: Bool {
         if isStandaloneCoachJourney {
             return standaloneIntake.isComplete && !isGenerating
@@ -298,6 +336,9 @@ struct AIProgramBuilderView: View {
             .onChange(of: coachContext) { _, _ in
                 if coachJourneyStage != .ready { preview = nil }
             }
+            .onChange(of: startDate) { _, _ in
+                if didLoadDefaults { coachDateEdited = true }
+            }
             .onChange(of: standaloneIntake) { _, _ in
                 // The consented injury details are intentionally NOT in
                 // coachContext. Invalidate an old AI draft whenever the
@@ -320,8 +361,10 @@ struct AIProgramBuilderView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
+                    Button(ATHLTHLocalization.choose(
+                        english: "Close", norwegian: "Lukk"
+                    )) {
+                        requestCloseCoach()
                     }
                 }
             }
@@ -341,6 +384,31 @@ struct AIProgramBuilderView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+        }
+        .interactiveDismissDisabled(isStandaloneCoachJourney &&
+                                    hasCoachIntakeChanges)
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Leave Coach plan builder?",
+                norwegian: "Forlate Coach-planleggeren?"
+            ),
+            isPresented: $showingCoachExitConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Keep editing", norwegian: "Fortsett redigering"
+            ), role: .cancel) {}
+            Button(ATHLTHLocalization.choose(
+                english: "Discard answers and close",
+                norwegian: "Forkast valgene og lukk"
+            ), role: .destructive) {
+                dismiss()
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Your selected plan details will be lost if you leave.",
+                norwegian: "Valgene du har gjort i planen går tapt hvis du lukker."
+            ))
         }
         .sheet(isPresented: $showingCoachGoalCreator, onDismiss: {
             if let created = goalStore.activeGoals.first(where: {
