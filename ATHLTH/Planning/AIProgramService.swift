@@ -92,6 +92,8 @@ struct AIProgramRequest: Encodable {
     let aiChoosesFrequency: Bool
     let preferredDays: [Int]
     let sessionDurationMinutes: Int
+    /// Explicit permission for Coach to vary each session's length.
+    var aiChoosesDuration: Bool = false
     let userNotes: String
     // Defaults preserve existing non-injury plan-generation call sites.
     var injurySafetyNotes: String? = nil
