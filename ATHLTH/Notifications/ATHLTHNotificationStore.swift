@@ -139,10 +139,15 @@ final class ATHLTHNotificationStore: ObservableObject {
             }.prefix(250))
             tombstones = cached.tombstones
         } else if Self.verifiedLegacyAccountID() == userID {
-            // Import old local notifications only for the identity verified
-            // on this installation. Never give them to another signed-in user.
-            items = Self.loadItems().filter {
-                $0.kind != .workoutCompleted
+            // The legacy file was device-global and could contain events
+            // from multiple historical accounts. Only migrate entries with
+            // an explicit verified account identifier; server-backed inbox
+            // events are reloaded by SocialStore for their true recipient.
+            items = Self.loadItems().filter { item in
+                item.kind != .workoutCompleted &&
+                item.eventKey.localizedCaseInsensitiveContains(
+                    userID.uuidString
+                )
             }
             tombstones = []
             persist(scheduleRemote: false)
