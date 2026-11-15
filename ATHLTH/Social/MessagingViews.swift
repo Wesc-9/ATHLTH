@@ -344,11 +344,10 @@ struct MessageInboxView: View {
     }
 
     private var messagesHeader: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 16
-        ) {
-            HStack(alignment: .center) {
+        VStack(alignment: .leading, spacing: 16) {
+            // The inbox owns its navigation controls on iPhone and iPad.
+            // No duplicate profile shortcut or wordmark is needed here.
+            HStack(alignment: .center, spacing: 12) {
                 if let onBack {
                     Button(action: onBack) {
                         Image(systemName: "chevron.left")
@@ -375,63 +374,25 @@ struct MessageInboxView: View {
                         )
                     )
                     .accessibilityIdentifier("athlth-inbox-back-to-home")
-                } else {
-                    NavigationLink {
-                        ATHLTHProfileView()
-                    } label: {
-                        ownProfileAvatar
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Open your profile",
-                            norwegian: "Åpne profilen din"
-                        )
-                    )
                 }
 
-                Spacer()
-
-                Text("ATHLTH")
-                    .font(
-                        .system(
-                            size: 23,
-                            weight: .medium,
-                            design: .rounded
-                        )
-                    )
-                    .tracking(7)
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .padding(.leading, 7)
-
-                Spacer()
+                Spacer(minLength: 0)
 
                 HStack(spacing: 9) {
                     headerAction(
-                        systemImage:
-                            showingSearch
-                                ? "xmark"
-                                : "magnifyingglass",
-                        accessibilityLabel:
-                            showingSearch
-                                ? ATHLTHLocalization.choose(
-                                    english: "Close search",
-                                    norwegian: "Lukk søk"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Search messages",
-                                    norwegian: "Søk i meldinger"
-                                )
-                    ) {
-                        withAnimation(
-                            .easeInOut(
-                                duration: 0.20
+                        systemImage: showingSearch ? "xmark" : "magnifyingglass",
+                        accessibilityLabel: showingSearch
+                            ? ATHLTHLocalization.choose(
+                                english: "Close search",
+                                norwegian: "Lukk søk"
                             )
-                        ) {
+                            : ATHLTHLocalization.choose(
+                                english: "Search messages",
+                                norwegian: "Søk i meldinger"
+                            )
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.20)) {
                             showingSearch.toggle()
-
                             if !showingSearch {
                                 searchText = ""
                             }
@@ -440,36 +401,25 @@ struct MessageInboxView: View {
 
                     headerAction(
                         systemImage: "plus",
-                        accessibilityLabel:
-                            ATHLTHLocalization.choose(
-                                english: "New message",
-                                norwegian: "Ny melding"
-                            ),
+                        accessibilityLabel: ATHLTHLocalization.choose(
+                            english: "New message",
+                            norwegian: "Ny melding"
+                        ),
                         action: onNewMessage
                     )
                 }
             }
 
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(
                     ATHLTHLocalization.choose(
                         english: "INNER CIRCLE",
                         norwegian: "INNER CIRCLE"
                     )
                 )
-                .font(
-                    .system(
-                        size: 10,
-                        weight: .semibold
-                    )
-                )
+                .font(.system(size: 10, weight: .semibold))
                 .tracking(3.2)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+                .foregroundStyle(ATHLTHTheme.mutedText)
 
                 Text(
                     ATHLTHLocalization.choose(
@@ -477,99 +427,33 @@ struct MessageInboxView: View {
                         norwegian: "Meldinger"
                     )
                 )
-                .font(
-                    .system(
-                        size: 40,
-                        weight: .bold,
-                        design: .serif
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
+                .font(.system(size: 40, weight: .bold, design: .serif))
+                .foregroundStyle(ATHLTHTheme.primaryText)
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english:
-                            "The people who move you forward.",
-                        norwegian:
-                            "Menneskene som får deg videre."
+                        english: "The people who move you forward.",
+                        norwegian: "Menneskene som får deg videre."
                     )
                 )
-                .font(
-                    .system(
-                        size: 16,
-                        weight: .regular
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(ATHLTHTheme.mutedText)
             }
         }
-        .padding(.top, 4)
-    }
-
-    @ViewBuilder
-    private var ownProfileAvatar:
-        some View {
-        if let avatarURL =
-                session.profile.avatarURL {
-            ATHLTHStorageImage(
-                url: avatarURL
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    ownProfileAvatarFallback
+        .padding(.top, 0)
+        // Preserve the iPad inspector's header-only close gesture without
+        // interfering with gestures inside actual conversations.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    guard let onBack,
+                          ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
+                            translation: value.translation
+                          )
+                    else { return }
+                    onBack()
                 }
-            }
-            .frame(
-                width: 48,
-                height: 48
-            )
-            .clipShape(Circle())
-            .overlay {
-                Circle()
-                    .stroke(
-                        Color.white.opacity(
-                            0.96
-                        ),
-                        lineWidth: 2
-                    )
-            }
-        } else {
-            ownProfileAvatarFallback
-                .frame(
-                    width: 48,
-                    height: 48
-                )
-        }
-    }
-
-    private var ownProfileAvatarFallback:
-        some View {
-        Circle()
-            .fill(
-                ATHLTHTheme.accentSoft
-            )
-            .overlay {
-                Image(
-                    systemName: "person.fill"
-                )
-                .font(
-                    .system(
-                        size: 21,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-            }
+        )
     }
 
     private struct RecentInboxConversation: Identifiable {
