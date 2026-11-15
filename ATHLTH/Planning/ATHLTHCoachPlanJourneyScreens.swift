@@ -97,17 +97,15 @@ struct ATHLTHCoachPlanGeneratingScreen: View {
     }
 
     var body: some View {
-        VStack(spacing: 23) {
-            Spacer(minLength: 22)
-            Text("ATHLTH COACH")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2.8)
-                .foregroundStyle(muted)
+        VStack(spacing: 22) {
+            Spacer(minLength: 24)
             Text(tr("Coach is building\nyour plan", "Coach lager\ntreningsplanen din"))
                 .font(.system(size: 32, weight: .regular, design: .serif))
                 .multilineTextAlignment(.center)
-            Text(tr("We are using the goals and preferences you chose. No plan is saved until you approve it.",
-                    "Vi bruker målene og valgene dine. Ingen plan lagres før du godkjenner forslaget."))
+            Text(tr(
+                "Review the plan before anything is saved.",
+                "Du godkjenner planen før noe lagres."
+            ))
                 .font(.system(size: 12.5))
                 .foregroundStyle(muted)
                 .multilineTextAlignment(.center)
@@ -123,9 +121,14 @@ struct ATHLTHCoachPlanGeneratingScreen: View {
                 Circle()
                     .strokeBorder(bronze.opacity(0.25), lineWidth: 1)
                     .frame(width: 165, height: 165)
-                Image(systemName: "sparkles")
-                    .font(.system(size: 43, weight: .ultraLight))
-                    .foregroundStyle(.white)
+                // Use the canonical ATHLTH identity instead of a generic AI
+                // sparkle. Shared mark artwork is also used by onboarding,
+                // headers and the Apple Watch, with a lighter stroke here.
+                ATHLTHMarkShape(strokeScale: 0.74)
+                    .fill(Color.white.opacity(0.97))
+                    .frame(width: 91, height: 67)
+                    .accessibilityLabel("ATHLTH")
+                    .accessibilityAddTraits(.isImage)
                 ProgressView()
                     .tint(bronze)
                     .offset(y: 112)
@@ -135,9 +138,8 @@ struct ATHLTHCoachPlanGeneratingScreen: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 status("target", tr("Goals and available days", "Mål og treningsdager"))
-                status("calendar", tr("Periodization and progression", "Periodisering og progresjon"))
-                status("dumbbell", tr("Workouts and exercises", "Økter og øvelser"))
-                status("leaf", tr("Recovery and balance", "Restitusjon og balanse"))
+                status("dumbbell", tr("Workouts and progression", "Økter og progresjon"))
+                status("leaf", tr("Recovery", "Restitusjon"))
             }
             .padding(15)
             .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 19))
@@ -153,8 +155,12 @@ struct ATHLTHCoachPlanGeneratingScreen: View {
                 .frame(width: 24)
             Text(title).font(.system(size: 12))
             Spacer()
-            Image(systemName: "circle.dotted")
-                .font(.caption).foregroundStyle(muted)
+            // These are the topics Coach considers, not fabricated live
+            // milestones. The real indeterminate ProgressView is above.
+            Image(systemName: "checkmark")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(bronze.opacity(0.42))
+                .accessibilityHidden(true)
         }
     }
 }
