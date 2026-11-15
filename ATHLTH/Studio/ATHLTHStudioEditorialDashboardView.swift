@@ -166,6 +166,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var studioPlanSync: ATHLTHStudioPlanSyncStore
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
 
@@ -173,6 +174,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     /// The current week strip remains on Home; details dock on the right.
     let onSelectWeekDay: (Date) -> Void
     let onOpenPlanner: () -> Void
+    let onOpenPlanSync: () -> Void
     let onOpenInsights: () -> Void
     let onOpenHistory: () -> Void
     let onOpenSettings: () -> Void
@@ -211,12 +213,38 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private var program: TrainingPlan? {
+        // Offline-first account data can include plans that are not yet on
+        // the server. Only consider plans belonging to the signed-in user.
+        guard session.signedIn else { return nil }
         if let active = session.activePlan,
+           active.ownerID == session.profile.userID,
            !session.pausedTrainingPlanIDs.contains(active.id),
-           !session.deactivatedTrainingPlanIDs.contains(active.id) {
+           !session.deactivatedTrainingPlanIDs.contains(active.id),
+           session.trainingPlanStatus(active) == .active {
             return active
         }
-        return session.nextTrainingPlan
+        guard let upcoming = session.nextTrainingPlan,
+              upcoming.ownerID == session.profile.userID else { return nil }
+        return upcoming
+    }
+
+    private var programStatus: TrainingPlanTimingStatus? {
+        program.map { session.trainingPlanStatus($0) }
+    }
+
+    private var planSyncHint: String? {
+        guard let plan = program else { return nil }
+        if !studioPlanSync.enabled {
+            return tr("Saved on this device · account sync is off",
+                      "Lagret på denne enheten · kontosynkronisering er av")
+        }
+        guard let remoteIDs = studioPlanSync.verifiedRemotePlanIDs else {
+            return tr("Saved on this device · account sync not confirmed",
+                      "Lagret på denne enheten · kontosynkronisering ikke bekreftet")
+        }
+        guard !remoteIDs.contains(plan.id) else { return nil }
+        return tr("Only on this device · not in your account yet",
+                  "Kun på denne enheten · ikke på kontoen ennå")
     }
 
     private func nextWorkout(
@@ -419,7 +447,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
                     HStack(alignment: .bottom, spacing: 16) {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(tr("ACTIVE TRAINING PLAN", "AKTIV TRENINGSPLAN"))
+                            Text(ATHLTHStudioHomePlanHeroPolicy.statusLabel(
+                                for: programStatus,
+                                norwegian: ATHLTHLocalization.isNorwegian
+                            ))
                                 .font(.system(size: 10, weight: .semibold))
                                 .tracking(1.3)
                                 .foregroundStyle(.white.opacity(0.86))
@@ -436,12 +467,29 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                     .font(.subheadline)
                                     .foregroundStyle(.white.opacity(0.90))
                             }
+                            if let planSyncHint {
+                                Button(action: onOpenPlanSync) {
+                                    Label(planSyncHint, systemImage: "icloud.slash")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint(tr(
+                                    "Review account plan synchronization",
+                                    "Kontroller kontosynkronisering av treningsplaner"
+                                ))
+                                .accessibilityIdentifier("athlth-ipad-plan-sync-warning")
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         Button(action: onOpenPlanner) {
                             HStack(spacing: 8) {
-                                Text(tr("View plan", "Se planen"))
+                                Text(program == nil
+                                    ? tr("Create plan", "Opprett plan")
+                                    : tr("View plan", "Se planen"))
                                 Image(systemName: "chevron.right")
                             }
                             .font(.subheadline.weight(.semibold))
@@ -528,9 +576,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .frame(width: 48, height: 48)
                     .background(cream, in: RoundedRectangle(cornerRadius: 14))
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(program?.id == session.activePlan?.id && program != nil
-                         ? tr("ACTIVE TRAINING PLAN", "AKTIV TRENINGSPLAN")
-                         : tr("TRAINING PLAN", "TRENINGSPLAN"))
+                    Text(ATHLTHStudioHomePlanHeroPolicy.statusLabel(
+                        for: programStatus,
+                        norwegian: ATHLTHLocalization.isNorwegian
+                    ))
                         .font(.caption2.weight(.semibold))
                         .tracking(1.2)
                         .foregroundStyle(.secondary)
