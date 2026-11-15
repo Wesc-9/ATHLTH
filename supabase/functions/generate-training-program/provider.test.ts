@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks, coachCompactProgramSchema, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter } from "./provider.ts";
 const check = (condition: boolean) => { if (!condition) throw new Error("Assertion failed"); };
 Deno.test("Coach sends structured goals and selected scope using the chat contract", () => {
   const constraints = { weekCount: 4, userNotes: "Adjust Tuesday only", goals: [{ title: "5K" }] };
@@ -135,4 +135,65 @@ Deno.test("Coach merges exactly four verified weeks without inventing workouts",
   check(!coachProgramMergeWeeks([makeChunk(1), makeChunk(2), makeChunk(3), {
     title: "T", summary: "S", weeks: [{weekNumber:4,days:[]}]
   }], 4, [1,3,5], 2));
+});
+
+
+Deno.test("Coach compact schema keeps strict JSON while reducing multiweek output", () => {
+  const request = coachCompactProgramRequest("openai/gpt-oss-120b", "Use safe progression", {
+    weekCount: 4, sessionsPerWeek: 3, preferredDays: [1,3,5],
+    injurySafetyNotes: "Do not load knee", unavailableEquipment: ["Barbell"],
+  });
+  check(request.reasoning_effort === "low");
+  check(request.response_format.type === "json_schema");
+  check(request.response_format.json_schema?.strict === true);
+  const constraints = JSON.parse(request.messages[1].content);
+  check(constraints.weekCount === 4);
+  check(constraints.injurySafetyNotes === "Do not load knee");
+  check(constraints.unavailableEquipment[0] === "Barbell");
+  const session = coachCompactProgramSchema.properties.weeks.items.properties.days.items
+    .properties.sessions.items;
+  check(session.required.includes("exercises") && session.required.includes("blocks"));
+  check(!session.required.includes("notes"));
+  const fallback = coachCompactProgramRequest("openai/gpt-oss-120b", "Safe plan", {
+    weekCount: 4, preferredDays: [1],
+  }, true);
+  check(fallback.response_format.type === "json_object");
+});
+
+Deno.test("Coach compact plan accepts safe selected days and rejects off-day workouts", () => {
+  const week = (n: number) => ({
+    weekNumber: n,
+    days: [
+      { dayIndex: 1, sessions: [{
+        title: "Easy run", kind: "running", durationMinutes: 30,
+        exercises: [], blocks: [],
+      }] },
+      { dayIndex: 2, sessions: [] },
+      { dayIndex: 3, sessions: [] },
+    ],
+  });
+  const source = {title:"Plan",summary:"Safe progression",weeks:[1,2,3,4].map(week)};
+  const normalized = coachCompactValidatedProgram(source, 4, [1,3], 2);
+  check(normalized !== null);
+  check((normalized?.weeks as {days:unknown[]}[]).every(w=>w.days.length === 2));
+  check(coachCompactValidatedProgram({...source,weeks:source.weeks.slice(0,3)},4,[1,3],2) === null);
+  const offDayWorkout = JSON.parse(JSON.stringify(source));
+  offDayWorkout.weeks[0].days[1].sessions.push({
+    title: "Off day run", kind: "running", exercises: [], blocks: [],
+  });
+  check(coachCompactValidatedProgram(offDayWorkout, 4, [1,3], 2) === null);
+  const tooMany = JSON.parse(JSON.stringify(source));
+  tooMany.weeks[0].days[2].sessions.push({
+    title: "A", kind: "strength", exercises: [], blocks: [],
+  });
+  check(coachCompactValidatedProgram(tooMany, 4, [1,3], 1) === null);
+  const empty = JSON.parse(JSON.stringify(source));
+  for (const w of empty.weeks) for (const day of w.days) day.sessions = [];
+  check(coachCompactValidatedProgram(empty, 4, [1,3], 2) === null);
+});
+
+Deno.test("Groq 429 retry header is bounded and never includes private output", () => {
+  check(coachProviderRetryAfter(new Response("", {status:429,headers:{"retry-after":"2.3"}}))===3);
+  check(coachProviderRetryAfter(new Response("", {status:429,headers:{"retry-after":"invalid"}}))===60);
+  check(coachProviderRetryAfter(new Response("", {status:429,headers:{"retry-after":"999999"}}))===86400);
 });
