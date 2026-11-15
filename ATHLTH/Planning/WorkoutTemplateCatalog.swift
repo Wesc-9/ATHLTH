@@ -8137,8 +8137,12 @@ struct WorkoutTemplateBuilderView: View {
     ) {
         // A single canonical item is shared by Simple and Advanced.
         // Do not infer sets, reps or rest from ordinary strength defaults.
+        let resolvedExerciseID = exerciseID ??
+            exerciseLibrary.athlthCatalogExercises.first(where: {
+                $0.sourceIdentifier == ATHLTHFreeStrengthRecipePolicy.sourceSlug
+            })?.id
         let block = ATHLTHFreeStrengthRecipePolicy.make(
-            phase: phase, exerciseID: exerciseID
+            phase: phase, exerciseID: resolvedExerciseID
         )
         insertBlock(block, toGroup: nil)
     }
