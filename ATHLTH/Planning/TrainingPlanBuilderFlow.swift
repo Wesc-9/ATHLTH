@@ -1839,10 +1839,55 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         saveResumableDraft()
                     }
                     .id(selectedGoalArea.rawValue + selectedGoalChoice)
-                } else {
-                    Label(ATHLTHLocalization.choose(english: "Goal linked to this plan", norwegian: "Målet er knyttet til planen"), systemImage: "checkmark.circle.fill")
-                    Button(ATHLTHLocalization.choose(english: "Create a different goal", norwegian: "Opprett et annet mål")) {
-                        selectedGoalIDs.removeAll()
+                } else if let selected = goalStore.activeGoals.first(where: {
+                    selectedGoalIDs.contains($0.id)
+                }) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ZStack(alignment: .bottomLeading) {
+                            GoalCoverView(goal: selected, showsDecorativeSymbol: false)
+                                .frame(height: 146)
+                            LinearGradient(
+                                colors: [.clear, .black.opacity(0.58)],
+                                startPoint: .center, endPoint: .bottom
+                            )
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "LINKED GOAL", norwegian: "TILKNYTTET MÅL"
+                                ))
+                                .font(.system(size: 10, weight: .semibold))
+                                .tracking(1.3)
+                                Text(selected.title)
+                                    .font(.system(size: 21, weight: .medium,
+                                                  design: .serif))
+                                    .lineLimit(2)
+                            }
+                            .foregroundStyle(.white)
+                            .padding(15)
+                        }
+                        .frame(height: 146)
+                        Button {
+                            selectedGoalIDs.removeAll()
+                        } label: {
+                            HStack {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Choose another goal",
+                                    norwegian: "Velg et annet mål"
+                                ), systemImage: "arrow.triangle.2.circlepath")
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .padding(.horizontal, 15)
+                            .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.75)
                     }
                 }
             }
