@@ -336,8 +336,22 @@ struct AIProgramBuilderView: View {
                 )
             )
             .disabled(isGenerating)
-            .onChange(of: coachContext) { _, _ in
+            // Standalone Coach already watches the intake itself below.
+            // Avoid rebuilding its full AI request text on every view update.
+            .onChange(of: isStandaloneCoachJourney ? "" : coachContext) { _, _ in
                 if coachJourneyStage != .ready { preview = nil }
+            }
+            .onChange(of: coachFocusNotes) { _, _ in
+                if isStandaloneCoachJourney, preview != nil {
+                    preview = nil
+                    coachJourneyStage = .intake
+                }
+            }
+            .onChange(of: selectedGoalIDs) { _, _ in
+                if isStandaloneCoachJourney, preview != nil {
+                    preview = nil
+                    coachJourneyStage = .intake
+                }
             }
             .onChange(of: startDate) { _, _ in
                 if didLoadDefaults { coachDateEdited = true }
