@@ -1939,9 +1939,9 @@ struct HomeWeeklyProgressStrip:
             onDismiss: { restoreWorkoutComposerIfNeeded() }
         ) {
             SessionEditorView(
-                standaloneDate: composerDay.isFinite && composerDay > 0
-                    ? Date(timeIntervalSinceReferenceDate: composerDay)
-                    : Date(),
+                standaloneDate: ATHLTHHomeWorkoutComposerRecoveryPolicy.validComposerDate(
+                    referenceInterval: composerDay, fallback: Date()
+                ),
                 onExit: closeWorkoutComposer
             )
             .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
