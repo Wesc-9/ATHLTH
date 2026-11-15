@@ -109,6 +109,25 @@ enum ExerciseMuscleGroup: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    /// Shared muscle glyphs for Exercise Studio, library filters and
+    /// exercise cards. Choose the movement emphasizing each muscle,
+    /// never a generic hand icon for forearms.
+    var iconName: String {
+        switch self {
+        case .chest: return "figure.strengthtraining.traditional"
+        case .back: return "figure.rower"
+        case .shoulders: return "figure.boxing"
+        case .biceps: return "figure.strengthtraining.functional"
+        case .triceps: return "figure.pushups"
+        case .forearms: return "figure.climbing"
+        case .core: return "figure.core.training"
+        case .glutes: return "figure.squat"
+        case .quads: return "figure.stairs"
+        case .hamstrings: return "figure.flexibility"
+        case .calves: return "figure.run"
+        }
+    }
+
     var title: String {
         switch self {
         case .chest:
