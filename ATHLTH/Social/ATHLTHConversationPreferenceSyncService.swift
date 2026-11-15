@@ -54,7 +54,10 @@ private struct ATHLTHCloudConversationPreference: Codable {
         userID: UUID, preference: ATHLTHConversationPreference
     ) -> Self {
         func stamp(_ date: Date?) -> String? {
-            date.map { ISO8601DateFormatter().string(from: $0) }
+            guard let date else { return nil }
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter.string(from: date)
         }
         return .init(user_id: userID, conversation_id: preference.conversationID,
                      pinned_at: stamp(preference.pinnedAt),
