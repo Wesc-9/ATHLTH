@@ -75,6 +75,14 @@ enum ATHLTHProfileMostTrainedSyncService {
     /// completed history. Empty local history is a read, never a deletion.
     static func synchronize(userID: UUID, local: [Item]) async -> [Item] {
         let client = SupabaseEnvironment.client
+        // Offline account restoration may precede Keychain-backed Supabase
+        // restoration on a newly installed iPad. Retry briefly while it
+        // finishes rather than treating the account as having zero history.
+        for _ in 0..<4 where client.auth.currentUser == nil {
+            guard !Task.isCancelled else { return local }
+            do { try await Task.sleep(for: .milliseconds(600)) }
+            catch { return local }
+        }
         guard client.auth.currentUser?.id == userID else { return local }
         do {
             let rows: [CloudRow] = try await client
