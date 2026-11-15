@@ -105,204 +105,79 @@ private extension Array {
     }
 }
 
-/// The editor changes a copy of the proposal, never active-plan records.
-/// A separate "Use program" action is required before any data is saved.
+/// Coach proposal editing uses the exact same Basic/Advanced ATHLTH
+/// workout planner as Plan Studio and Quick Train. This is not a second
+/// editor with a parallel exercise or interval model.
 struct ATHLTHPlanDraftWorkoutEditor: View {
-    @Environment(\.dismiss) private var dismiss
-    let onSave: (AIProgramDraftSession) -> Void
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
-    @State private var title: String
-    @State private var notes: String
-    @State private var hasDuration: Bool
-    @State private var duration: Int
-    @State private var hasDistance: Bool
-    @State private var distance: Double
-    @State private var hasPace: Bool
-    @State private var paceSeconds: Double
-    @State private var targets: [ExerciseTarget]
-    private let source: AIProgramDraftSession
-
-    private struct ExerciseTarget: Identifiable {
-        let id: Int
-        let source: AIProgramDraftExercise
-        var name: String
-        var sets: Int
-        var reps: Int
-        var hasReps: Bool
-        var restSeconds: Int
-        var hasRest: Bool
-    }
-
-    init(
-        workout: AIProgramDraftSession,
-        onSave: @escaping (AIProgramDraftSession) -> Void
-    ) {
-        source = workout
-        self.onSave = onSave
-        _title = State(initialValue: workout.title)
-        _notes = State(initialValue: workout.notes ?? "")
-        _hasDuration = State(initialValue: workout.durationMinutes != nil)
-        _duration = State(initialValue: workout.durationMinutes ?? 45)
-        _hasDistance = State(initialValue: workout.targetDistanceKilometers != nil)
-        _distance = State(initialValue: workout.targetDistanceKilometers ?? 5)
-        _hasPace = State(initialValue: workout.targetPaceSecondsPerKilometer != nil)
-        _paceSeconds = State(initialValue: workout.targetPaceSecondsPerKilometer ?? 360)
-        _targets = State(initialValue: workout.exercises.enumerated().map { i, exercise in
-            ExerciseTarget(
-                id: i, source: exercise, name: exercise.name,
-                sets: exercise.sets, reps: exercise.reps ?? 10,
-                hasReps: exercise.reps != nil,
-                restSeconds: exercise.restSeconds ?? 90,
-                hasRest: exercise.restSeconds != nil
-            )
-        })
-    }
+    let workout: AIProgramDraftSession
+    let selection: ATHLTHPlanDraftWorkoutSelection
+    /// Return false to keep the shared planner open if the proposed change
+    /// fails validation. Only the in-memory Coach draft is modified.
+    let onSave: (AIProgramDraftSession) -> Bool
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField(
-                        ATHLTHLocalization.choose(english: "Workout name", norwegian: "Navn på økt"),
-                        text: $title
-                    )
-                    .textInputAutocapitalization(.sentences)
-                    TextField(
-                        ATHLTHLocalization.choose(english: "Notes (optional)", norwegian: "Notater (valgfritt)"),
-                        text: $notes,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...5)
-                } header: {
-                    Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
-                }
-
-                Section {
-                    Toggle(
-                        ATHLTHLocalization.choose(english: "Planned duration", norwegian: "Planlagt varighet"),
-                        isOn: $hasDuration
-                    )
-                    if hasDuration {
-                        Stepper(
-                            "\(duration) min",
-                            value: $duration, in: 1...360, step: 5
-                        )
-                    }
-                    Toggle(
-                        ATHLTHLocalization.choose(english: "Distance target", norwegian: "Distansemål"),
-                        isOn: $hasDistance
-                    )
-                    if hasDistance {
-                        Stepper(
-                            "\(distance.formatted(.number.precision(.fractionLength(1)))) km",
-                            value: $distance, in: 0.5...400, step: 0.5
-                        )
-                    }
-                    Toggle(
-                        ATHLTHLocalization.choose(english: "Pace target", norwegian: "Fartsmål"),
-                        isOn: $hasPace
-                    )
-                    if hasPace {
-                        Stepper(
-                            "\(Int(paceSeconds) / 60):\(String(format: "%02d", Int(paceSeconds) % 60)) min/km",
-                            value: $paceSeconds, in: 60...1800, step: 5
-                        )
-                    }
-                } header: {
-                    Text(ATHLTHLocalization.choose(english: "Targets", norwegian: "Mål"))
-                }
-
-                ForEach($targets) { $target in
-                    Section {
-                        TextField(
-                            ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
-                            text: $target.name
-                        )
-                        Stepper(
-                            "\(target.sets) " +
-                                ATHLTHLocalization.choose(english: "sets", norwegian: "sett"),
-                            value: $target.sets, in: 1...30
-                        )
-                        Toggle(
-                            ATHLTHLocalization.choose(english: "Repetition target", norwegian: "Repetisjonsmål"),
-                            isOn: $target.hasReps
-                        )
-                        if target.hasReps {
-                            Stepper(
-                                "\(target.reps) " +
-                                    ATHLTHLocalization.choose(english: "reps", norwegian: "reps"),
-                                value: $target.reps, in: 1...1000
-                            )
-                        }
-                        Toggle(
-                            ATHLTHLocalization.choose(english: "Rest between sets", norwegian: "Pause mellom sett"),
-                            isOn: $target.hasRest
-                        )
-                        if target.hasRest {
-                            Stepper(
-                                "\(target.restSeconds) s",
-                                value: $target.restSeconds, in: 0...3600, step: 15
-                            )
-                        }
-                    } header: {
-                        Text(ATHLTHLocalization.choose(english: "Exercise \(target.id + 1)", norwegian: "Øvelse \(target.id + 1)"))
-                    }
-                }
-
-                Section {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Changes stay in the AI draft until you approve the whole program.",
-                        norwegian: "Endringene blir i AI-utkastet til du godkjenner hele programmet."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
-            }
-            .navigationTitle(ATHLTHLocalization.choose(
-                english: "Edit proposed workout", norwegian: "Rediger foreslått økt"
-            ))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(ATHLTHLocalization.choose(english: "Save draft", norwegian: "Lagre utkast")) {
-                        save()
-                    }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                              targets.contains(where: {
-                                  $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              }))
-                }
-            }
-        }
-        .preferredColorScheme(.light)
-    }
-
-    private func save() {
-        let exercises = targets.map { target in
-            AIProgramDraftExercise(
-                name: target.name.trimmingCharacters(in: .whitespacesAndNewlines),
-                sets: target.sets,
-                reps: target.hasReps ? target.reps : nil,
-                targetRPE: target.source.targetRPE,
-                restSeconds: target.hasRest ? target.restSeconds : nil,
-                notes: target.source.notes
-            )
-        }
-        let updated = AIProgramDraftSession(
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            kind: source.kind,
-            durationMinutes: hasDuration ? duration : nil,
-            targetDistanceKilometers: hasDistance ? distance : nil,
-            targetPaceSecondsPerKilometer: hasPace ? paceSeconds : nil,
-            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes,
-            exercises: exercises
+        let original = workout.makePlannedSession(
+            exerciseLibrary: exerciseLibrary.selectableExercises
         )
-        onSave(updated)
-        dismiss()
+        let sourceBlocks = ATHLTHUnifiedWorkout.editorBlocks(from: original)
+        let activity = ATHLTHPlannedWorkoutType(rawValue: workout.kind) ?? .custom
+
+        WorkoutTemplateBuilderView(
+            initialTitle: original.title,
+            initialBlocks: sourceBlocks,
+            initialRouteID: original.routeID,
+            initialDurationOverrideMinutes: original.durationMinutes,
+            draftContext: "coach-proposal-" + selection.id,
+            initialActivity: activity,
+            initialStudioAdvanced: false,
+            saveButtonTitle: ATHLTHLocalization.choose(
+                english: "Save to Coach draft", norwegian: "Lagre i Coach-utkast"
+            ),
+            onSaveToPlan: { name, blocks, routeID, minutes, _, extras in
+                let cleanTitle = name.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                guard !cleanTitle.isEmpty,
+                      blocks.contains(where: {
+                          $0.kind == .run || $0.kind == .exercise
+                      }),
+                      let duration = minutes ?? original.durationMinutes,
+                      (1...240).contains(duration) else {
+                    return false
+                }
+
+                // Preserve the original in-memory proposal (including its
+                // exercises and privacy), then replace ONLY its editable
+                // workout recipe. The shared engine assigns real categories,
+                // chronological phases, set pauses and execution metadata.
+                var edited = original
+                ATHLTHUnifiedWorkout.apply(
+                    blocks: blocks, title: cleanTitle, routeID: routeID,
+                    estimatedMinutes: duration, to: &edited
+                )
+                edited.gearIDs = extras.gearIDs
+                edited.spotifyPlaylist = extras.spotifyPlaylist
+                edited.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
+                edited.spotifyIntervalTrack = extras.spotifyIntervalTrack
+                edited.audioCoachConfiguration = extras.audioCoachConfiguration
+                edited.routeAlertConfiguration = extras.routeAlertConfiguration
+                edited.ghostTargetDurationSeconds = extras.ghostTargetDurationSeconds
+                edited.ghostUpdates = extras.ghostUpdates
+
+                var updated = AIProgramDraftSession(
+                    title: edited.title, kind: edited.kind.rawValue,
+                    durationMinutes: edited.durationMinutes,
+                    targetDistanceKilometers: edited.targetDistanceKilometers,
+                    targetPaceSecondsPerKilometer:
+                        edited.targetPaceSecondsPerKilometer,
+                    notes: edited.notes, exercises: []
+                )
+                updated.authoredWorkout = edited
+                return onSave(updated)
+            }
+        )
+        .preferredColorScheme(.light)
     }
 }
