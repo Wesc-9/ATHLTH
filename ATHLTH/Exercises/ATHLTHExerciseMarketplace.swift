@@ -131,6 +131,26 @@ final class ATHLTHExerciseMarketplaceStore: ObservableObject {
         }
     }
 
+    /// Query the exact exercise rather than assuming the newest 300
+    /// marketplace rows contain the owner's older publication. A failed
+    /// check must never be interpreted as "not public" during revocation.
+    func publicationExists(_ id: UUID) async -> Bool? {
+        do {
+            let entries: [ATHLTHMarketplaceExercise] = try await client
+                .from("exercise_marketplace")
+                .select()
+                .eq("id", value: id.uuidString)
+                .limit(1)
+                .execute()
+                .value
+            errorMessage = nil
+            return !entries.isEmpty
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     /// Publication is separate from the private "share in plans" permission.
     /// Only the actual original author may publish this exercise record.
     @discardableResult
