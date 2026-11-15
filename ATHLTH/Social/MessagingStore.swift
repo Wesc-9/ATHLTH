@@ -10,9 +10,14 @@ final class MessagingStore: ObservableObject {
     @Published private(set) var archivedConversationIDs: Set<UUID> = []
     @Published private(set) var isRefreshing = false
     @Published var errorMessage: String?
+    @Published private(set) var preferenceSyncError: String?
 
     private let service: SupabaseMessagingService
     private var lastRefreshAt: Date?
+    private var preferenceAccountID: UUID?
+    private var preferences: [UUID: ATHLTHConversationPreference] = [:]
+    private var preferenceSyncTask: Task<Void, Never>?
+    private var isPreferencesSyncing = false
 
     init(service: SupabaseMessagingService = SupabaseMessagingService()) {
         self.service = service
@@ -94,31 +99,122 @@ final class MessagingStore: ObservableObject {
             .max { $0.createdAt < $1.createdAt }
     }
 
-    func loadPinnedConversations() {
-        guard let key = pinnedStorageKey else {
-            pinnedConversationIDs = []
-            return
-        }
+    func switchAccount(_ userID: UUID?) {
+        guard preferenceAccountID != userID else { return }
+        preferenceSyncTask?.cancel()
+        preferenceSyncTask = nil
+        preferenceAccountID = userID
+        lastRefreshAt = nil
+        preferenceSyncError = nil
+        conversations = []
+        recentMessages = []
+        messagesByConversation = [:]
+        pinnedConversationIDs = []
+        archivedConversationIDs = []
+        preferences = [:]
+        guard let userID else { return }
 
-        let storedIDs = UserDefaults.standard.stringArray(forKey: key) ?? []
-        pinnedConversationIDs = Set(storedIDs.compactMap(UUID.init(uuidString:)))
-
-        if let archiveKey = archiveStorageKey {
-            let archivedIDs =
-                UserDefaults.standard
-                    .stringArray(
-                        forKey: archiveKey
-                    ) ?? []
-            archivedConversationIDs =
-                Set(
-                    archivedIDs.compactMap {
-                        UUID(
-                            uuidString: $0
-                        )
-                    }
-                )
+        let defaults = UserDefaults.standard
+        let key = preferenceStorageKey(userID)
+        if let data = defaults.data(forKey: key),
+           let cached = try? JSONDecoder().decode(
+               [ATHLTHConversationPreference].self, from: data
+           ) {
+            preferences = Dictionary(
+                cached.map { ($0.conversationID, $0) },
+                uniquingKeysWith: { current, _ in current }
+            )
         } else {
-            archivedConversationIDs = []
+            // Device-only lists from earlier versions are converted into
+            // low-priority snapshots. Server changes win over these imports.
+            let initial = Date(timeIntervalSince1970: 1)
+            let pinKey = "athlth.messaging.pinned.\(userID.uuidString.lowercased())"
+            let archiveKey = "athlth.messaging.archived.\(userID.uuidString.lowercased())"
+            let pinned = Set((defaults.stringArray(forKey: pinKey) ?? [])
+                .compactMap(UUID.init(uuidString:)))
+            let archived = Set((defaults.stringArray(forKey: archiveKey) ?? [])
+                .compactMap(UUID.init(uuidString:)))
+            for id in pinned.union(archived) {
+                preferences[id] = ATHLTHConversationPreference(
+                    conversationID: id,
+                    pinnedAt: pinned.contains(id) ? initial : nil,
+                    unpinnedAt: nil,
+                    archivedAt: archived.contains(id) ? initial : nil,
+                    unarchivedAt: nil
+                )
+            }
+        }
+        applyPreferences()
+        schedulePreferenceSync()
+    }
+
+    func loadPinnedConversations() {
+        // This legacy entry point is still invoked when the inbox appears.
+        // Do not reload stale UserDefaults over newer account data.
+        if let userID = currentUserID, preferenceAccountID != userID {
+            switchAccount(userID)
+        }
+        schedulePreferenceSync()
+    }
+
+    private func applyPreferences() {
+        let pinned = Set(preferences.values.filter(\.isPinned).map(\.conversationID))
+        let archived = Set(preferences.values.filter(\.isArchived).map(\.conversationID))
+        if pinnedConversationIDs != pinned { pinnedConversationIDs = pinned }
+        if archivedConversationIDs != archived { archivedConversationIDs = archived }
+    }
+
+    private func preferenceStorageKey(_ userID: UUID) -> String {
+        "athlth.messaging.preferences.\(userID.uuidString.lowercased())"
+    }
+
+    private func savePreferences() {
+        guard let userID = preferenceAccountID,
+              let data = try? JSONEncoder().encode(
+                Array(preferences.values)
+              ) else { return }
+        UserDefaults.standard.set(data, forKey: preferenceStorageKey(userID))
+        schedulePreferenceSync()
+    }
+
+    private func schedulePreferenceSync() {
+        guard preferenceAccountID != nil else { return }
+        preferenceSyncTask?.cancel()
+        preferenceSyncTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(450)) }
+            catch { return }
+            await self?.refreshPreferences()
+        }
+    }
+
+    func refreshPreferences() async {
+        guard !isPreferencesSyncing, let userID = preferenceAccountID,
+              currentUserID == userID else { return }
+        isPreferencesSyncing = true
+        defer { isPreferencesSyncing = false }
+        do {
+            let merged = try await ATHLTHConversationPreferenceSyncService
+                .reconcile(userID: userID, local: preferences)
+            guard !Task.isCancelled, preferenceAccountID == userID else {
+                return
+            }
+            // Never lose a pin/archive edit made while the request ran.
+            preferences = ATHLTHConversationPreferenceSyncService.merged(
+                local: preferences, remote: merged
+            )
+            applyPreferences()
+            if let data = try? JSONEncoder().encode(Array(preferences.values)) {
+                UserDefaults.standard.set(data, forKey: preferenceStorageKey(userID))
+            }
+            preferenceSyncError = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard preferenceAccountID == userID else { return }
+            preferenceSyncError = ATHLTHLocalization.choose(
+                english: "Conversation preferences are saved locally until sync succeeds.",
+                norwegian: "Samtalevalg er lagret lokalt til synkronisering lykkes."
+            )
         }
     }
 
@@ -127,13 +223,22 @@ final class MessagingStore: ObservableObject {
     }
 
     func togglePinned(_ conversationID: UUID) {
-        if pinnedConversationIDs.contains(conversationID) {
-            pinnedConversationIDs.remove(conversationID)
+        guard preferenceAccountID != nil else { return }
+        var value = preferences[conversationID] ??
+            ATHLTHConversationPreference(
+                conversationID: conversationID,
+                pinnedAt: nil, unpinnedAt: nil,
+                archivedAt: nil, unarchivedAt: nil
+            )
+        if value.isPinned {
+            value.unpinnedAt = Date()
         } else {
-            pinnedConversationIDs.insert(conversationID)
+            value.pinnedAt = Date()
         }
-
+        preferences[conversationID] = value
+        applyPreferences()
         persistPinnedConversations()
+        savePreferences()
     }
 
     func isArchived(
@@ -145,25 +250,23 @@ final class MessagingStore: ObservableObject {
             )
     }
 
-    func toggleArchived(
-        _ conversationID: UUID
-    ) {
-        if archivedConversationIDs
-            .contains(
-                conversationID
-            ) {
-            archivedConversationIDs
-                .remove(
-                    conversationID
-                )
+    func toggleArchived(_ conversationID: UUID) {
+        guard preferenceAccountID != nil else { return }
+        var value = preferences[conversationID] ??
+            ATHLTHConversationPreference(
+                conversationID: conversationID,
+                pinnedAt: nil, unpinnedAt: nil,
+                archivedAt: nil, unarchivedAt: nil
+            )
+        if value.isArchived {
+            value.unarchivedAt = Date()
         } else {
-            archivedConversationIDs
-                .insert(
-                    conversationID
-                )
+            value.archivedAt = Date()
         }
-
+        preferences[conversationID] = value
+        applyPreferences()
         persistArchivedConversations()
+        savePreferences()
     }
 
     private var pinnedStorageKey: String? {
@@ -249,6 +352,7 @@ final class MessagingStore: ObservableObject {
             }
             lastRefreshAt = Date()
             await syncApplicationIconBadge()
+            await refreshPreferences()
         } catch is CancellationError {
             return
         } catch {
