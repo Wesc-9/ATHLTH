@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText, coachBackfillSparseFinalWeek } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText, coachBackfillSparseFinalWeek, coachGroundedProgramSummary, coachExecutableProgramIssues } from "./provider.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { conflictsWithInjuryRestrictions } from "../_shared/ai-training-injury-guard.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -465,6 +465,27 @@ function normalizeProgram(
             }))
           : [],
       }));
+
+      // For fully timed running/interval recipes, the ordered ATHLTH
+      // timeline is authoritative. An AI prose duration must not disagree
+      // with the actual workout intervals and pauses.
+      for (const session of sessions) {
+        if ((session.kind !== "running" && session.kind !== "walking") ||
+            !Array.isArray(session.blocks) || session.blocks.length === 0) continue;
+        const timed = session.blocks.filter((block: any) =>
+          block.kind === "run" || block.kind === "rest");
+        const allTimed = timed.some((block: any) => block.kind === "run") &&
+          timed.every((block: any) =>
+            Number.isFinite(block.durationSeconds) && block.durationSeconds > 0);
+        if (allTimed) {
+          const seconds = timed.reduce(
+            (sum: number, block: any) => sum + block.durationSeconds, 0);
+          const actualMinutes = Math.round(seconds / 60);
+          if (actualMinutes >= 1 && actualMinutes <= 240) {
+            session.durationMinutes = actualMinutes;
+          }
+        }
+      }
 
       if (sessions.length > 0) usedSessions += 1;
 
@@ -1017,6 +1038,22 @@ Hard rules:
     mode,
   );
 
+  const executableIssues = coachExecutableProgramIssues(normalized);
+  if (executableIssues.length > 0) {
+    // Never present an unexecutable strength prescription or a named
+    // interval without its actual work/recovery blocks. Do not log
+    // session titles or athlete health notes.
+    console.error("Coach returned non-executable workout structure", {
+      requestId, issueCount: executableIssues.length,
+      reasons: [...new Set(executableIssues.map((v) => v.split(":")[1]))],
+    });
+    return json({
+      code: "AI_INVALID_PROGRAM",
+      error: "ATHLTH Coach needs to generate more complete workout details.",
+      requestId,
+    }, 502);
+  }
+
   if (conflictsWithInjuryRestrictions(
     normalized,
     constraints.excludedMovements,
@@ -1029,6 +1066,16 @@ Hard rules:
       code: "AI_COACH_INJURY_CONFLICT",
     }, 422);
   }
+
+  // An AI sentence may claim five sessions every week when the data has
+  // 5/5/5/4. Always show a factual, localized summary from the finalized
+  // and safety-checked workout records instead.
+  const requestedLanguage = typeof body.language === "string"
+    ? body.language.toLowerCase() : "";
+  const responseLanguage = requestedLanguage.startsWith("en") ? "en" : "no";
+  normalized.summary = coachGroundedProgramSummary(
+    normalized, responseLanguage,
+  );
 
   return json(normalized);
 });
