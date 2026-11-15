@@ -126,4 +126,43 @@ final class SimpleExerciseMuscleFilterTests: XCTestCase {
         ), "The Mine tab should contain only exercises")
     }
 
+    func testEveryExerciseStudioMuscleGroupUsesSharedDistinctIcon() {
+        let groups = ExerciseMuscleGroup.allCases
+        let symbols = groups.map(\.iconName)
+        XCTAssertEqual(Set(symbols).count, groups.count)
+        for group in groups {
+            XCTAssertEqual(
+                ATHLTHExerciseMuscleFilterPresentation.icon(for: group.rawValue),
+                group.iconName
+            )
+        }
+        XCTAssertEqual(
+            ATHLTHExerciseMuscleFilterPresentation.icon(for: "Forearms"),
+            "figure.climbing"
+        )
+        XCTAssertFalse(symbols.contains("hand.raised.fingers.spread"))
+    }
+
+    func testExerciseVisibilityNeverMigratesPreviousSharingToPublic() {
+        XCTAssertEqual(ATHLTHExerciseVisibility.allCases.map(\.rawValue),
+                       ["private", "friends", "public"])
+        XCTAssertFalse(ATHLTHExerciseVisibility.privateOnly.shareable)
+        XCTAssertTrue(ATHLTHExerciseVisibility.friends.shareable)
+        XCTAssertTrue(ATHLTHExerciseVisibility.publicListing.shareable)
+        let owner = UUID()
+        var legacy = Exercise(
+            id: UUID(), origin: .custom, ownerID: owner,
+            name: "My Row", instructions: [],
+            primaryMuscles: ["Back"], secondaryMuscles: [],
+            equipment: [], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true
+        )
+        XCTAssertEqual(legacy.resolvedVisibility, .friends)
+        legacy.visibility = .publicListing
+        XCTAssertEqual(legacy.resolvedVisibility, .publicListing)
+        legacy.visibility = .privateOnly
+        legacy.isVisibleOutsideOwnerLibrary = false
+        XCTAssertEqual(legacy.resolvedVisibility, .privateOnly)
+    }
+
 }
