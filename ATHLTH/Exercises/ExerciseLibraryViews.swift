@@ -2219,8 +2219,7 @@ struct ExerciseDetailView: View {
                     // Do not leave a public listing online when its
                     // owner deletes the original exercise.
                     if currentEntry.exercise.sharedSourceExerciseID == nil,
-                       currentEntry.exercise.ownerID == session.profile.userID,
-                       currentEntry.exercise.isVisibleOutsideOwnerLibrary {
+                       currentEntry.exercise.ownerID == session.profile.userID {
                         guard let existing = await marketplace.publicationExists(
                             currentEntry.id
                         ) else {
