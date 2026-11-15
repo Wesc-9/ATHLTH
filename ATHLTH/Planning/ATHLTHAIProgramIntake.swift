@@ -285,15 +285,18 @@ struct ATHLTHAIProgramIntake: Equatable {
         // as either an explicit declaration of no injury or permission
         // to share private health information.
         if injuryStatus == .considerations {
-            if !injuries.isEmpty {
-                // A row is an independent selection: never apply one global
-                // severity to another injury or silently fill an empty row.
-                if injuries.contains(where: { $0.area == nil || $0.condition == nil }) {
-                    issues.append("injuryEntries")
-                }
-            } else if healthSharingAuthorized {
-                // Preserve explicit consent validation for older callers.
-                if injuryAreas.isEmpty { issues.append("injuryAreas") }
+            // An accidentally added but completely untouched row is not a
+            // disclosure of an injury and must never block plan creation.
+            let touchedRows = injuries.filter {
+                $0.area != nil || $0.condition != nil
+            }
+            if touchedRows.contains(where: {
+                $0.area == nil || $0.condition == nil
+            }) {
+                issues.append("injuryEntries")
+            } else if touchedRows.isEmpty && injuries.isEmpty &&
+                      healthSharingAuthorized && !injuryAreas.isEmpty {
+                // Legacy clients store a single shared injury restriction.
                 if injurySeverity == nil { issues.append("injurySeverity") }
                 if injuryRestriction == nil { issues.append("injuryRestriction") }
             }
@@ -327,6 +330,16 @@ struct ATHLTHAIProgramIntake: Equatable {
     /// so request truncation can never silently remove safety restrictions.
     var sharedInjurySafetyNotes: String? {
         guard injuryStatus == .considerations, healthSharingAuthorized else { return nil }
+        let hasLegacySelection = !injuryAreas.isEmpty
+        let hasDescription = !injuryNotes.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty || !excludedExerciseNames.isEmpty
+        let hasCompletedEntry = injuries.contains {
+            $0.area != nil && $0.condition != nil
+        }
+        guard hasLegacySelection || hasDescription || hasCompletedEntry else {
+            return nil
+        }
         let detailedEntries = injuries.compactMap { injury -> String? in
             guard let area = injury.area, let condition = injury.condition else {
                 return nil
