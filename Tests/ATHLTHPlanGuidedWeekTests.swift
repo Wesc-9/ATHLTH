@@ -195,4 +195,33 @@ final class ATHLTHPlanGuidedWeekTests: XCTestCase {
     }
 
 
+    func testSecondWorkoutAndExactGuidedEditingPositionSurviveRelaunch() throws {
+        var day = ATHLTHPlanWeekDayEdit(
+            kind: .strength, title: "Morgen", durationMinutes: 45,
+            detailedWorkout: workout("Morgen")
+        )
+        day.additionalDetailedWorkouts = [workout("Kveld")]
+        let initial = ATHLTHPlanCreationDraft(
+            title: "Ukeprogram", weekCount: 3,
+            startDate: Date(timeIntervalSince1970: 1_800_000_000),
+            advanced: true, source: "scratch", stage: "week",
+            weekDayEdits: [8: day], planningApproach: "guided",
+            guidedDayCursor: 7, selectedPlanWeekIndex: 1,
+            editorDay: 1, editorKind: "studio", editorWorkoutIndex: 1
+        )
+        let restored = try JSONDecoder().decode(
+            ATHLTHPlanCreationDraft.self,
+            from: JSONEncoder().encode(initial)
+        )
+        XCTAssertEqual(restored.stage, "week")
+        XCTAssertEqual(restored.guidedDayCursor, 7)
+        XCTAssertEqual(restored.selectedPlanWeekIndex, 1)
+        XCTAssertEqual(restored.editorDay, 1)
+        XCTAssertEqual(restored.editorKind, "studio")
+        XCTAssertEqual(restored.editorWorkoutIndex, 1)
+        XCTAssertEqual(restored.weekDayEdits?[8]?.detailedWorkout?.title, "Morgen")
+        XCTAssertEqual(restored.weekDayEdits?[8]?.additionalDetailedWorkouts?.map(\.title), ["Kveld"])
+    }
+
+
 }
