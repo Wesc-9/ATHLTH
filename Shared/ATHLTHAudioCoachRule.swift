@@ -24,6 +24,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case heartRate
         case heartRateZone
         case motivation
+        case hydrationReminder
         case averagePace
         case speed
         case clockTime
@@ -50,6 +51,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 english: "Heart-rate zone", norwegian: "Pulssone")
             case .motivation: return ATHLTHLocalization.choose(
                 english: "Motivation", norwegian: "Motivasjon")
+            case .hydrationReminder: return ATHLTHLocalization.choose(
+                english: "Hydration reminder", norwegian: "Drikkepåminnelse")
             case .averagePace: return ATHLTHLocalization.choose(english: "Average pace", norwegian: "Snittempo")
             case .speed: return ATHLTHLocalization.choose(english: "Speed", norwegian: "Hastighet")
             case .clockTime: return ATHLTHLocalization.choose(english: "Clock time", norwegian: "Klokkeslett")
@@ -240,6 +243,12 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             return Self.remaining(meters * pace / 1000,
                                   label: norwegian ? "Estimert igjen av ruten" : "Estimated route time left",
                                   norwegian: norwegian)
+        case .hydrationReminder:
+            // A short, optional reminder; never imply a fixed drinking dose
+            // or pause the running workout/interval timers.
+            return norwegian
+                ? "Husk å ta en slurk vann når det passer."
+                : "Remember to take a sip of water when convenient."
         case .motivation:
             return ATHLTHAudioCoachScheduledMotivation.phrase(
                 slot: motivationSlot,
