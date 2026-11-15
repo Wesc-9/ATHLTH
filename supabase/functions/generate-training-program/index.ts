@@ -29,6 +29,8 @@ type ProgramRequest = {
   aiChoosesFrequency?: boolean;
   aiChoosesDuration?: boolean;
   varyWeeks?: boolean;
+  // Public UI language code only; no athlete profile data.
+  language?: string;
   preferredDays?: number[];
   sessionDurationMinutes?: number;
   userNotes?: string;
