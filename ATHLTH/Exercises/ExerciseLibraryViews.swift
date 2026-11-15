@@ -72,25 +72,14 @@ enum ATHLTHExerciseMuscleFilterPresentation {
         part == "Legs" ? ["Quads", "Hamstrings", "Calves"] : [part]
     }
 
-    /// Give each muscle filter a recognizably different icon. Tiny
-    /// full-body anatomy silhouettes all looked identical in a 20pt chip.
-    /// The existing detailed anatomy illustrations remain in exercise cards.
+    /// All muscle surfaces use the same central icon map. No separate
+    /// icon overrides in menus, chips or saved exercise previews.
     static func icon(for part: String) -> String {
-        switch part {
-        case "Back": return "figure.rower"
-        case "Chest": return "figure.strengthtraining.traditional"
-        case "Shoulders": return "figure.boxing"
-        case "Biceps": return "dumbbell.fill"
-        case "Triceps": return "figure.strengthtraining.functional"
-        case "Forearms": return "hand.raised.fingers.spread"
-        case "Core": return "figure.core.training"
-        case "Glutes": return "figure.squat"
-        case "Quads": return "figure.stairs"
-        case "Hamstrings": return "figure.flexibility"
-        case "Legs": return "figure.walk"
-        case "Calves": return "figure.run"
-        default: return "figure.strengthtraining.traditional"
+        if let group = ExerciseMuscleGroup(rawValue: part) {
+            return group.iconName
         }
+        if part == "Legs" { return "figure.hiking" }
+        return "figure.strengthtraining.traditional"
     }
 }
 
