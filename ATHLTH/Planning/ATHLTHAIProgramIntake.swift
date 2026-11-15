@@ -391,7 +391,7 @@ struct ATHLTHAIProgramIntake: Equatable {
             before attempting potentially aggravating exercise. Never infer
             undisclosed injuries or present the plan as individually safe.
             """
-        } else if injuryStatus == .none {
+        } else if injuryStatus == ATHLTHAIProgramIntake.InjuryStatus.none {
             injuryText = "The athlete explicitly reported no injuries or training limitations."
         } else {
             injuryText = "Injury status was not provided. No inference about injury status or medical safety is permitted."
