@@ -215,3 +215,151 @@ export function coachProgramMergeWeeks(
   };
   return coachProgramHasUsableWeeks(result, expectedWeeks) ? result : null;
 }
+
+/** Compact strict schema: only fields required to reconstruct safe, structured
+ * workouts. normalizeProgram fills omitted optional fields with null or []. */
+export const coachCompactProgramSchema = {
+  type: "object", additionalProperties: false,
+  required: ["title", "summary", "weeks"],
+  properties: {
+    title: { type: "string" },
+    summary: { type: "string" },
+    weeks: {
+      type: "array", items: {
+        type: "object", additionalProperties: false,
+        required: ["weekNumber", "days"],
+        properties: {
+          weekNumber: { type: "integer" },
+          days: { type: "array", items: {
+            type: "object", additionalProperties: false,
+            required: ["dayIndex", "sessions"],
+            properties: {
+              dayIndex: { type: "integer" },
+              sessions: { type: "array", items: {
+                type: "object", additionalProperties: false,
+                required: ["title", "kind", "durationMinutes", "exercises", "blocks"],
+                properties: {
+                  title: { type: "string" },
+                  kind: { type: "string", enum: ["running", "walking", "strength", "mobility", "recovery", "custom"] },
+                  durationMinutes: { type: ["integer", "null"] },
+                  exercises: { type: "array", items: {
+                    type: "object", additionalProperties: false,
+                    required: ["name", "sets", "reps", "targetRPE", "restSeconds"],
+                    properties: {
+                      name: { type: "string" }, sets: { type: "integer" },
+                      reps: { type: ["integer", "null"] },
+                      targetRPE: { type: ["number", "null"] },
+                      restSeconds: { type: ["integer", "null"] },
+                    },
+                  }},
+                  blocks: { type: "array", items: {
+                    type: "object", additionalProperties: false,
+                    required: [
+                      "title", "kind", "phase", "durationSeconds", "distanceMeters",
+                      "repetitions", "targetPaceSecondsPerKilometer",
+                      "treadmillInclinePercent", "targetHeartRateZone", "targetEffortRPE",
+                    ],
+                    properties: {
+                      title: { type: "string" },
+                      kind: { type: "string", enum: ["run", "exercise", "rest", "note"] },
+                      phase: { type: "string", enum: ["warmup", "main", "recovery", "cooldown"] },
+                      durationSeconds: { type: ["number", "null"] },
+                      distanceMeters: { type: ["number", "null"] },
+                      repetitions: { type: ["integer", "null"] },
+                      targetPaceSecondsPerKilometer: { type: ["number", "null"] },
+                      treadmillInclinePercent: { type: ["number", "null"] },
+                      targetHeartRateZone: { type: ["integer", "null"] },
+                      targetEffortRPE: { type: ["integer", "null"] },
+                    },
+                  }},
+                },
+              }},
+            },
+          }},
+        },
+      },
+    },
+  },
+};
+
+export function coachCompactProgramRequest(
+  model: string, instructions: string, constraints: Record<string, unknown>,
+  jsonFallback = false,
+) {
+  const compactInstructions = instructions +
+    "\nCOMPACT OUTPUT CONTRACT: Produce exactly " + constraints.weekCount +
+    " consecutive weeks numbered from 1. Each week needs weekNumber and days. " +
+    "Include only preferredDays; each day needs dayIndex and sessions ([] for rest). " +
+    "Each session contains only title, kind, durationMinutes, exercises and blocks. " +
+    "Use null for unknown numeric fields and [] for unavailable exercise or block " +
+    "details. Keep justified workout durations, distances, pace and zones in blocks. " +
+    "No unnecessary blocks, note fields, or unrequested training. The athlete's " +
+    "injury and equipment restrictions remain mandatory. Return JSON only.";
+  return {
+    model, reasoning_effort: "low", max_completion_tokens: 3500,
+    messages: [
+      { role: "system", content: compactInstructions },
+      { role: "user", content: JSON.stringify(constraints) },
+    ],
+    response_format: jsonFallback
+      ? { type: "json_object" }
+      : { type: "json_schema", json_schema: {
+          name: "athlth_compact_program", strict: true,
+          schema: coachCompactProgramSchema,
+        } },
+  };
+}
+
+/** Reject incomplete weeks, duplicate weekdays, excess sessions, and any
+ * workout on unavailable days. Ignore only empty extra rest-day entries. */
+export function coachCompactValidatedProgram(
+  value: unknown, weekCount: number, preferredDays: number[], weeklyLimit: number,
+): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.title !== "string" || !raw.title.trim() ||
+      !Array.isArray(raw.weeks) || raw.weeks.length !== weekCount) return null;
+  const allowed = new Set(preferredDays);
+  const weeks: Record<string, unknown>[] = [];
+  let totalSessions = 0;
+  for (let i = 0; i < weekCount; i++) {
+    const week = raw.weeks[i];
+    if (!week || typeof week !== "object" || Array.isArray(week) ||
+        week.weekNumber !== i + 1 || !Array.isArray(week.days) ||
+        week.days.length < 1 || week.days.length > 7) return null;
+    const seen = new Set<number>();
+    const selected: unknown[] = [];
+    for (const day of week.days) {
+      if (!day || typeof day !== "object" || Array.isArray(day) ||
+          !Number.isInteger(day.dayIndex) || day.dayIndex < 1 ||
+          day.dayIndex > 7 || seen.has(day.dayIndex) ||
+          !Array.isArray(day.sessions) || day.sessions.length > 1) return null;
+      seen.add(day.dayIndex);
+      if (!allowed.has(day.dayIndex)) {
+        if (day.sessions.length !== 0) return null;
+      } else {
+        selected.push(day);
+        totalSessions += day.sessions.length;
+      }
+    }
+    const canonical = { ...(week as Record<string, unknown>), days: selected };
+    if (!coachProgramValidWeek({ weeks: [canonical] }, i + 1, preferredDays, weeklyLimit)) {
+      return null;
+    }
+    weeks.push(canonical);
+  }
+  if (totalSessions < 1) return null;
+  return {
+    title: raw.title.slice(0, 160),
+    summary: typeof raw.summary === "string" ? raw.summary.slice(0, 1500) : "",
+    weeks,
+  };
+}
+
+/** Groq 429 responses include a Retry-After delay in seconds. */
+export function coachProviderRetryAfter(response: Response): number {
+  const seconds = Number(response.headers.get("retry-after"));
+  return Number.isFinite(seconds) && seconds > 0
+    ? Math.min(86400, Math.max(1, Math.ceil(seconds)))
+    : 60;
+}
