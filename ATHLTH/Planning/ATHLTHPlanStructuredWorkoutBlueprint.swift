@@ -23,7 +23,8 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     var isValid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !blocks.isEmpty && blocks.count <= 200
-            && blocks.contains { $0.kind == .run || $0.kind == .exercise
+            && blocks.contains { $0.kind == .rest && ( $0.durationSeconds ?? 0 ) > 0
+                || $0.kind == .run || $0.kind == .exercise
                 || ($0.kind == .note
                     && ($0.wellnessKind != nil || $0.activityTag == "cycling")
                     && ($0.durationSeconds ?? 0) > 0) }
@@ -151,11 +152,14 @@ struct ATHLTHPlanWeekDayEdit: Codable, Hashable {
     // Optional: existing persisted plans must continue decoding.
     var isRestDay: Bool? = nil
     var additionalDetailedWorkouts: [ATHLTHPlanStructuredWorkoutBlueprint]? = nil
+    /// Explicitly empty day: deleting its last workout must not resurrect a
+    /// template or a generated default during saving or draft restoration.
+    var removeAllWorkouts: Bool? = nil
     /// Optional per-date location, independent of the plan's other dates.
     var trainingPlace: ATHLTHTrainingPlace? = nil
 
     func scheduledSessions(from originals: [PlannedSession]) -> [PlannedSession] {
-        if isRestDay == true { return [] }
+        if isRestDay == true || removeAllWorkouts == true { return [] }
         // Selecting only a place must not manufacture a workout on an empty day.
         if originals.isEmpty, detailedWorkout == nil, kind == nil,
            title == nil, (additionalDetailedWorkouts ?? []).isEmpty {
