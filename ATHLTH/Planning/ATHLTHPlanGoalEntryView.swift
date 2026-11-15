@@ -449,18 +449,21 @@ struct ATHLTHPlanGoalEntryView: View {
     private func goalSelectionPreview(_ option: ATHLTHPlanGoalOption) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .bottomLeading) {
-                Image(area.imageName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 136)
-                    .clipped()
-                    .overlay {
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.59)],
-                            startPoint: .center, endPoint: .bottom
-                        )
-                    }
+                GeometryReader { bounds in
+                    Image(area.imageName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: bounds.size.width,
+                               height: bounds.size.height)
+                        .clipped()
+                        .overlay {
+                            LinearGradient(
+                                colors: [.clear, .black.opacity(0.59)],
+                                startPoint: .center, endPoint: .bottom
+                            )
+                        }
+                }
+                .frame(height: 136)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(ATHLTHLocalization.choose(
                         english: "YOUR GOAL · PREVIEW", norwegian: "DITT MÅL · FORHÅNDSVISNING"
