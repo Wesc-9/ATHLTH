@@ -1022,12 +1022,11 @@ struct ATHLTHiPadStudioRootView: View {
         )
     }
 
-    private func resetDetailNavigation() {
-        // A previous implementation recreated the entire NavigationStack on
-        // every Home tap, which could leave SwiftUI briefly blank and trigger
-        // expensive Home reloads. Only rebuild the stack if something really
-        // has been pushed above its root.
-        guard !detailNavigationPath.isEmpty else { return }
+    private func resetDetailNavigation(force: Bool = false) {
+        // An implicit NavigationLink(destination:) can push without changing
+        // the NavigationPath. Pop those routes when crossing destinations,
+        // but never remount Home merely because Home is tapped twice.
+        guard force || !detailNavigationPath.isEmpty else { return }
         detailNavigationPath = NavigationPath()
         detailNavigationIdentity = UUID()
     }
@@ -1036,7 +1035,7 @@ struct ATHLTHiPadStudioRootView: View {
         clearWeekInspectorIfNeeded()
         libraryExpanded = true
         focusedPlanningDate = nil
-        resetDetailNavigation()
+        resetDetailNavigation(force: libraryPage != page)
         sidebarPage = nil
         libraryPage = page
         // Replace the detail page only; do not force the sidebar open.
@@ -1049,14 +1048,14 @@ struct ATHLTHiPadStudioRootView: View {
     private func openSidebarPage(_ destination: ATHLTHSideMenuDestination) {
         clearWeekInspectorIfNeeded()
         focusedPlanningDate = nil
-        resetDetailNavigation()
+        resetDetailNavigation(force: sidebarPage != destination)
         libraryPage = nil
         sidebarPage = destination
         // The user controls the sidebar independently of opened pages.
     }
 
     private func returnFromSidebarPage() {
-        resetDetailNavigation()
+        resetDetailNavigation(force: true)
         libraryPage = nil
         sidebarPage = nil
         // Back navigation leaves the sidebar unchanged.
@@ -1064,7 +1063,9 @@ struct ATHLTHiPadStudioRootView: View {
 
     private func openStudio(_ destination: ATHLTHStudioDestination) {
         clearWeekInspectorIfNeeded()
-        resetDetailNavigation()
+        let changingDestination = selection != destination ||
+            libraryPage != nil || sidebarPage != nil
+        resetDetailNavigation(force: changingDestination)
         libraryPage = nil
         sidebarPage = nil
         if destination == .overview {
