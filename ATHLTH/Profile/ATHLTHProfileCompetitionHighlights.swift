@@ -354,6 +354,7 @@ struct ATHLTHProfileCompetitionCard: View {
 struct ATHLTHProfileCompactTrophyCard: View {
     let trophies: [TrophyProgressItem]
     let unlockedCount: Int
+    var syncWarning: String? = nil
     private let gold = ATHLTHPlanDesign.accentInk
     private let ink = ATHLTHPlanDesign.ink
     private let dim = ATHLTHPlanDesign.secondaryInk
@@ -395,6 +396,13 @@ struct ATHLTHProfileCompactTrophyCard: View {
             )
             .font(.caption2)
             .foregroundStyle(dim)
+            if let syncWarning {
+                Label(syncWarning, systemImage: "icloud.slash")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(dim)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Spacer(minLength: 0)
             NavigationLink {
                 TrophyCollectionView(startInCabinet: true)
