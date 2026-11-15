@@ -140,3 +140,32 @@ final class ATHLTHStudioInboxPanelGesturePolicyTests: XCTestCase {
         ))
     }
 }
+
+final class ATHLTHiPadStudioSidebarPolicyTests: XCTestCase {
+    func testSidebarWidthStaysAtScreenshotSize() {
+        // The expanded Studio sidebar on regular-width iPads is 280pt.
+        XCTAssertEqual(ATHLTHStudioSidebarLayoutPolicy.fixedWidth, 280, accuracy: 0.01)
+    }
+
+    func testOnlyExplicitMenuToggleChangesVisibility() {
+        XCTAssertEqual(
+            ATHLTHStudioSidebarLayoutPolicy.toggled(.all),
+            .detailOnly
+        )
+        XCTAssertEqual(
+            ATHLTHStudioSidebarLayoutPolicy.toggled(.detailOnly),
+            .all
+        )
+    }
+
+    func testTogglingTwiceRestoresOriginalVisibility() {
+        for visibility: NavigationSplitViewVisibility in [.all, .detailOnly] {
+            XCTAssertEqual(
+                ATHLTHStudioSidebarLayoutPolicy.toggled(
+                    ATHLTHStudioSidebarLayoutPolicy.toggled(visibility)
+                ),
+                visibility
+            )
+        }
+    }
+}
