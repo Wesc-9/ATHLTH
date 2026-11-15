@@ -4851,14 +4851,17 @@ struct WorkoutTemplateBuilderView: View {
         guard let from = sections.firstIndex(where: { $0.id == draggedID }),
               let target = sections.firstIndex(where: { $0.id == targetID }),
               from != target else { return }
-        var grouped = sections.map { section in
-            groupIndices(startingAt: section.start).map { blocks[$0] }
-        }
-        let moved = grouped.remove(at: from)
-        grouped.insert(moved, at: target)
+        guard blocks.indices.contains(sections[target].start) else { return }
+        // Generic library/quick editor uses the exact same relocation policy
+        // as the planned Advanced editor. Dragging a warmup exercise to a
+        // main section changes the persisted phase AND chronological order.
+        let destinationPhase = blocks[sections[target].start].resolvedPhase
+        let moved = ATHLTHStudioBlockReorder.moving(
+            draggedID, to: destinationPhase, over: targetID, in: blocks
+        )
+        guard moved != blocks else { return }
         withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
-            blocks = grouped.flatMap { $0 }
-            resequence()
+            blocks = moved
             expandedBlockIndex = nil
         }
     }
