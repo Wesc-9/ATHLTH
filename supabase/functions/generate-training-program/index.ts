@@ -34,6 +34,7 @@ type ProgramRequest = {
   // Explicitly opted-in by the athlete, only for this request.
   injurySafetyNotes?: string | null;
   excludedMovements?: string[] | null;
+  unavailableEquipment?: string[] | null;
   // Explicitly consented strength signal summary from on-device Coach History.
   coachStrengthContext?: unknown;
   goals?: GoalInput[];
@@ -630,6 +631,12 @@ Deno.serve(async (req: Request) => {
           .filter((name) => name.length >= 2)
           .slice(0, 40)
       : [],
+    unavailableEquipment: Array.isArray(body.unavailableEquipment)
+      ? body.unavailableEquipment
+          .filter((name): name is string => typeof name === "string")
+          .map((name) => name.trim().slice(0, 80))
+          .filter(Boolean).slice(0, 30)
+      : [],
     goals,
     existingDays: mode === "complete" ? existingDays : [],
   };
@@ -653,6 +660,7 @@ Hard rules:
 - Use conservative progression, recovery, and rest. Avoid repeated maximal-effort sessions.
 - The injurySafetyNotes field, when present, contains the athlete's expressly consented health restrictions. It is a mandatory exercise-exclusion safety constraint, not optional context.
 - Never prescribe, suggest or include any exercise explicitly listed in excludedMovements, including close variations and exercises that put load on an area the user said cannot be loaded.
+- unavailableEquipment is a hard equipment restriction. Never prescribe exercises that require those items, even when the generic note assumes full gym access. Select accessible equipment-free substitutions or leave a rest day if necessary. Do not silently assume excluded gear can be borrowed.
 - If the athlete forbids lower-body loading, no running, walking, squats, lunges, jumping, cycling or lower-body strength blocks are allowed. If activities selected earlier conflict with these restrictions, the injury restrictions always take priority.
 - Respect the athlete's injury description even if it conflicts with their preferred sport, goals or session count. If a safe workout cannot be selected, leave that day as a rest day and explain the limitation in the summary. Do not replace an excluded exercise with a similarly aggravating variation.
 - If there is no injurySafetyNotes field, do not assume you know a diagnosis or which exercises are individually safe. Do not claim a generated workout is medically cleared.
