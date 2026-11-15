@@ -130,7 +130,10 @@ enum ATHLTHStudioSchedule {
 
         func append(_ item: PlannedSession, date: Date,
                     planID: UUID?, planTitle: String?) {
-            let key = "\(planID?.uuidString ?? "standalone"):\(item.id.uuidString)"
+            // A saved workout template may be reused on several dates.
+            // Its UUID identifies the template, NOT one calendar occurrence.
+            // Include the actual start so no repeated interval/week vanishes.
+            let key = "\(planID?.uuidString ?? "standalone"):\(item.id.uuidString):\(Int(date.timeIntervalSince1970))"
             for index in ranges.indices {
                 let range = ranges[index]
                 guard (range.includeRestDays || !item.isExplicitRestDay),
