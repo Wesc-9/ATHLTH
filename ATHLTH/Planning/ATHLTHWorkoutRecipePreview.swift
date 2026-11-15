@@ -781,6 +781,9 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     private func localizedTitle(_ block: WorkoutTemplateBlock, compact: Bool) -> String {
+        if ATHLTHFreeStrengthRecipePolicy.isFreeStrength(block) {
+            return ATHLTHWorkoutNameSuggestion.displayStepTitle(block)
+        }
         guard block.kind == .exercise else {
             return ATHLTHWorkoutStepCopy.title(
                 for: block, workoutTitle: title, compact: compact
