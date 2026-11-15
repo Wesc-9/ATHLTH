@@ -1035,6 +1035,7 @@ struct ATHLTHiPadStudioRootView: View {
                 onInspect: inspect,
                 onSelectWeekDay: showWeekDay,
                 onOpenPlanner: { openStudio(.planner) },
+                onOpenPlanSync: { showingPlanSync = true },
                 onOpenInsights: { openStudio(.insights) },
                 onOpenHistory: { openStudio(.history) },
                 onOpenSettings: { openStudio(.settings) },
