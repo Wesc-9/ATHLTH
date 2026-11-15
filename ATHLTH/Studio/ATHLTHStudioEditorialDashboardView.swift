@@ -416,13 +416,17 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
                             if split {
                                 HStack(alignment: .top, spacing: 18) {
-                                    nextWorkoutCard(upcoming)
-                                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                                    nextWorkoutCard(
+                                        upcoming,
+                                        availableWidth: max(300, width - 44 - 18 -
+                                            min(390, max(310, width * 0.30)) - 36)
+                                    )
+                                    .frame(maxWidth: .infinity, alignment: .topLeading)
                                     compactReadinessCard
                                         .frame(width: min(390, max(310, width * 0.30)))
                                 }
                             } else {
-                                nextWorkoutCard(upcoming)
+                                nextWorkoutCard(upcoming, availableWidth: max(280, width - 64))
                                 compactReadinessCard
                             }
 
@@ -875,7 +879,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private func nextWorkoutCard(
-        _ next: ATHLTHStudioSchedule.Occurrence?
+        _ next: ATHLTHStudioSchedule.Occurrence?,
+        availableWidth: CGFloat
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
@@ -894,7 +899,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
             if let item = next {
                 ATHLTHStudioPlannedWorkoutHeroCard(
                     workout: item.workout,
-                    availableWidth: 650,
+                    availableWidth: availableWidth,
                     isCompleted: completed(item),
                     isSkipped: item.planID.map {
                         session.isPlanSessionSkipped(
