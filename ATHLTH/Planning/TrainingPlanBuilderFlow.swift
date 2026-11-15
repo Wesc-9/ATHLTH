@@ -4981,7 +4981,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 phase: .main
             )
             block.cardioActivity = choice == "running" ? .running : .walking
-            block.isActiveRecovery = choice == "active-rest"
+            if choice == "active-rest" {
+                block.activityTag = "active_recovery"
+                block.cardioActivity = .running
+                block.phase = .recovery
+            }
             return block
         case "strength":
             title = ATHLTHLocalization.choose(
@@ -5043,8 +5047,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         var current = edit.detailedWorkout ??
             (edit.removeTemplateDetail || edit.removeAllWorkouts == true
                 ? nil : structuredWorkoutsByDay[day])
-        var next = block
-        next.sequence = (current?.blocks.map(\.sequence).max() ?? 0) + 1
+        let next = ATHLTHWorkoutPhasePlacement.renumbered(
+            block, sequence: (current?.blocks.map(\.sequence).max() ?? 0) + 1
+        )
         if var workout = current {
             guard workout.blocks.count < 200 else { return }
             workout.blocks.append(next)
