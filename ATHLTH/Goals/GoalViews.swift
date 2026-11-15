@@ -1532,6 +1532,7 @@ struct GoalCreationView: View {
     /// fake PR measured in kilograms. The existing GoalStore still owns it.
     let planGoalChoice: String?
     let suggestedPlanTitle: String
+    var onPlanGoalMuscleChanged: ((String?) -> Void)? = nil
     var onPlanGoalCreated: ((UUID) -> Void)? = nil
     @Binding var planCheckpoint: Data?
     @State private var didLoadPlanCheckpoint = false
@@ -1542,12 +1543,14 @@ struct GoalCreationView: View {
         initialTitle: String = "",
         embeddedInPlan: Bool = false,
         planGoalChoice: String? = nil,
+        onMuscleChanged: ((String?) -> Void)? = nil,
         checkpoint: Binding<Data?> = .constant(nil),
         onCreated: ((UUID) -> Void)? = nil
     ) {
         self.embeddedInPlan = embeddedInPlan
         self.planGoalChoice = planGoalChoice
         self.suggestedPlanTitle = initialTitle
+        self.onPlanGoalMuscleChanged = onMuscleChanged
         self.onPlanGoalCreated = onCreated
         self._planCheckpoint = checkpoint
         self._category = State(initialValue:
@@ -2877,6 +2880,7 @@ struct GoalCreationView: View {
                     .tint(ATHLTHPlanDesign.accentInk)
                     .onChange(of: selectedPlanMuscleRegion) { _, selection in
                         if !selection.isEmpty { exerciseName = "" }
+                        onPlanGoalMuscleChanged?(selection.isEmpty ? nil : selection)
                     }
 
                     Button {
