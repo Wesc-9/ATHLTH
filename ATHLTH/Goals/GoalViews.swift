@@ -1528,6 +1528,10 @@ struct GoalCreationView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     var embeddedInPlan = false
+    /// A hypertrophy goal is a targeted muscle/technique objective, not a
+    /// fake PR measured in kilograms. The existing GoalStore still owns it.
+    let planGoalChoice: String?
+    let suggestedPlanTitle: String
     var onPlanGoalCreated: ((UUID) -> Void)? = nil
     @Binding var planCheckpoint: Data?
     @State private var didLoadPlanCheckpoint = false
@@ -1537,20 +1541,27 @@ struct GoalCreationView: View {
         initialCategory: GoalCategory = .endurance,
         initialTitle: String = "",
         embeddedInPlan: Bool = false,
+        planGoalChoice: String? = nil,
         checkpoint: Binding<Data?> = .constant(nil),
         onCreated: ((UUID) -> Void)? = nil
     ) {
         self.embeddedInPlan = embeddedInPlan
+        self.planGoalChoice = planGoalChoice
+        self.suggestedPlanTitle = initialTitle
         self.onPlanGoalCreated = onCreated
         self._planCheckpoint = checkpoint
-        self._category = State(initialValue: initialCategory)
-        self._title = State(initialValue: initialTitle)
+        self._category = State(initialValue:
+            embeddedInPlan && planGoalChoice == "muscle" ? .custom : initialCategory)
+        // The suggested name is a grey placeholder, not actual user input.
+        self._title = State(initialValue: embeddedInPlan ? "" : initialTitle)
+        self._exerciseName = State(initialValue: embeddedInPlan ? "" : "Squat")
     }
 
     private struct PlanCheckpoint: Codable {
         let title: String
         let targetValue: Double
         let exerciseName: String
+        let muscleRegion: String?
         let activity: GoalActivityFilter
         let hasDeadline: Bool
         let deadline: Date
@@ -1571,6 +1582,7 @@ struct GoalCreationView: View {
         encoder.outputFormatting = .sortedKeys
         return try? encoder.encode(PlanCheckpoint(
             title: title, targetValue: targetValue, exerciseName: exerciseName,
+            muscleRegion: selectedPlanMuscleRegion.isEmpty ? nil : selectedPlanMuscleRegion,
             activity: activity, hasDeadline: hasDeadline, deadline: deadline,
             coverStyle: coverStyle, whyItMatters: whyItMatters, notes: notes,
             privacy: privacy, makePrimary: makePrimary, imageData: imageData,
@@ -1586,6 +1598,7 @@ struct GoalCreationView: View {
             title = saved.title
             targetValue = saved.targetValue
             exerciseName = saved.exerciseName
+            selectedPlanMuscleRegion = saved.muscleRegion ?? ""
             activity = saved.activity
             hasDeadline = saved.hasDeadline
             deadline = saved.deadline
@@ -1601,6 +1614,10 @@ struct GoalCreationView: View {
             newMilestoneDetail = saved.milestoneDetail
         } else {
             applyDefaults(for: category)
+            if planGoalChoice == "muscle" {
+                coverStyle = .strength
+                automaticTracking = false
+            }
             makePrimary = goalStore.primaryGoal == nil
         }
         didLoadPlanCheckpoint = true
@@ -1614,7 +1631,7 @@ struct GoalCreationView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(goalFlowGold)
-            .disabled(targetValue <= 0 || (category == .strength && exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+            .disabled(!canSaveEmbeddedGoal)
         }
         .onAppear { restorePlanCheckpoint() }
         .onChange(of: encodedPlanCheckpoint) { _, value in
@@ -1633,6 +1650,8 @@ struct GoalCreationView: View {
     @State private var title: String
     @State private var targetValue = 5.0
     @State private var exerciseName = "Squat"
+    @State private var selectedPlanMuscleRegion = ""
+    @FocusState private var planGoalNameFocused: Bool
     @State private var showingExercisePicker = false
     @State private var showingBodyGoalCreation = false
     @State private var activity: GoalActivityFilter = .running
@@ -1710,6 +1729,9 @@ struct GoalCreationView: View {
                         .trimmingCharacters(
                             in: .whitespacesAndNewlines
                         )
+                if embeddedInPlan && planGoalChoice == "muscle" {
+                    selectedPlanMuscleRegion = ""
+                }
                 showingExercisePicker = false
             }
         }
@@ -2298,6 +2320,13 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
+            if embeddedInPlan {
+                planGoalCoverPreview
+                planGoalNameField
+                if planGoalChoice == "muscle" {
+                    planGoalMuscleTargetFields
+                }
+            }
             compactGoalImagePicker
             DisclosureGroup(ATHLTHLocalization.choose(english: "Why this matters and notes", norwegian: "Hvorfor dette er viktig og notater")) {
                 goalPersonalDetails
@@ -2307,34 +2336,24 @@ struct GoalCreationView: View {
                 milestoneStep
             }
             .tint(goalFlowGold)
-            goalInputCard(
-                icon: "text.cursor",
-                title:
-                    ATHLTHLocalization.format(
-                        english: "Goal name",
-                        norwegian: "Navn på målet"
+            if !embeddedInPlan {
+                goalInputCard(
+                    icon: "text.cursor",
+                    title: ATHLTHLocalization.choose(
+                        english: "Goal name", norwegian: "Navn på målet"
                     )
-            ) {
-                TextField(
-                    ATHLTHLocalization.format(
+                ) {
+                    TextField(ATHLTHLocalization.choose(
                         english: "Optional — ATHLTH can name it for you",
                         norwegian: "Valgfritt – ATHLTH kan navngi det for deg"
-                    ),
-                    text: $title
-                )
-                .font(.subheadline)
-                .textInputAutocapitalization(
-                    .sentences
-                )
-                .padding(.horizontal, 12)
-                .frame(height: 42)
-                .background(
-                    Color.black.opacity(0.035),
-                    in: RoundedRectangle(
-                        cornerRadius: 12,
-                        style: .continuous
-                    )
-                )
+                    ), text: $title)
+                    .font(.subheadline)
+                    .textInputAutocapitalization(.sentences)
+                    .padding(.horizontal, 12)
+                    .frame(height: 42)
+                    .background(Color.black.opacity(0.035),
+                                in: RoundedRectangle(cornerRadius: 12))
+                }
             }
 
             goalTargetDateRow
@@ -2731,6 +2750,170 @@ struct GoalCreationView: View {
                         )
                 )
             }
+        }
+    }
+
+    // The plan's selected goal has a photo-first preview, like workout
+    // details. User text stays empty until typed; the visible grey name
+    // is computed from the selected objective and muscle/exercise.
+    private var planGoalNameSuggestion: String {
+        let prefix = suggestedPlanTitle.isEmpty
+            ? ATHLTHLocalization.choose(english: "My goal", norwegian: "Mitt mål")
+            : suggestedPlanTitle
+        if planGoalChoice == "muscle" {
+            let exercise = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !exercise.isEmpty { return prefix + " – " + exercise }
+            if let region = StrengthMuscleRegion(rawValue: selectedPlanMuscleRegion) {
+                return prefix + " – " + region.activityDisplayTitle
+            }
+            return prefix + " – " + ATHLTHLocalization.choose(
+                english: "choose a muscle or exercise",
+                norwegian: "velg muskelgruppe eller øvelse"
+            )
+        }
+        if planGoalChoice == "power" && category == .strength {
+            let exercise = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return prefix + (exercise.isEmpty ? "" :
+                " – " + exercise + " " + targetValue.cleanNumber + " kg")
+        }
+        return prefix
+    }
+
+    private var canSaveEmbeddedGoal: Bool {
+        guard targetValue > 0 else { return false }
+        if planGoalChoice == "muscle" {
+            return !exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                !selectedPlanMuscleRegion.isEmpty
+        }
+        if category == .strength {
+            return !exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return true
+    }
+
+    private var planGoalCoverPreview: some View {
+        ZStack(alignment: .bottomLeading) {
+            GeometryReader { size in
+                Group {
+                    if let imageData, let photo = UIImage(data: imageData) {
+                        Image(uiImage: photo).resizable().scaledToFill()
+                    } else if let cover = coverStyle.resolvedUIImage {
+                        Image(uiImage: cover).resizable().scaledToFill()
+                    } else {
+                        ATHLTHPlanDesign.selectedSurface
+                    }
+                }
+                .frame(width: size.size.width, height: size.size.height)
+                .clipped()
+            }
+            LinearGradient(colors: [.clear, .black.opacity(0.55)],
+                           startPoint: .center, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ATHLTHLocalization.choose(
+                    english: "GOAL LINKED TO YOUR PLAN",
+                    norwegian: "MÅL KNYTTET TIL TRENINGSPLAN"
+                ))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.4)
+                Text(suggestedPlanTitle)
+                    .font(.system(size: 23, weight: .medium, design: .serif))
+                    .lineLimit(2)
+            }
+            .foregroundStyle(.white)
+            .padding(16)
+        }
+        .frame(height: 172)
+        .clipShape(RoundedRectangle(cornerRadius: 19))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var planGoalNameField: some View {
+        goalInputCard(
+            icon: "textformat",
+            title: ATHLTHLocalization.choose(
+                english: "Name of your goal", norwegian: "Navn på målet"
+            )
+        ) {
+            TextField(
+                planGoalNameFocused ? "" : planGoalNameSuggestion,
+                text: $title
+            )
+            .focused($planGoalNameFocused)
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .textInputAutocapitalization(.sentences)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 48)
+            .background(ATHLTHPlanDesign.selectedSurface.opacity(0.45),
+                        in: RoundedRectangle(cornerRadius: 12))
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "The grey suggested name disappears when you start typing.",
+                norwegian: "Det grå navneforslaget forsvinner når du begynner å skrive."
+            ))
+        }
+    }
+
+    private var planGoalMuscleTargetFields: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            goalInputCard(
+                icon: "figure.strengthtraining.traditional",
+                title: ATHLTHLocalization.choose(
+                    english: "Prioritize a muscle group or exercise",
+                    norwegian: "Velg muskelgruppe eller øvelse"
+                )
+            ) {
+                VStack(alignment: .leading, spacing: 11) {
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Muscle group", norwegian: "Muskelgruppe"
+                    ), selection: $selectedPlanMuscleRegion) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Choose muscle group", norwegian: "Velg muskelgruppe"
+                        )).tag("")
+                        ForEach(StrengthMuscleRegion.allCases) { region in
+                            Text(region.activityDisplayTitle).tag(region.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    .onChange(of: selectedPlanMuscleRegion) { _, selection in
+                        if !selection.isEmpty { exerciseName = "" }
+                    }
+
+                    Button {
+                        showingExercisePicker = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Choose from exercise library",
+                            norwegian: "Velg fra øvelsesbiblioteket"
+                        ), systemImage: "list.bullet.rectangle")
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity, minHeight: 42,
+                               alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Or write the exercise name",
+                        norwegian: "Eller skriv inn navnet på øvelsen"
+                    ), text: $exerciseName)
+                    .font(.subheadline)
+                    .padding(12)
+                    .background(ATHLTHPlanDesign.selectedSurface.opacity(0.5),
+                                in: RoundedRectangle(cornerRadius: 12))
+                    .onChange(of: exerciseName) { _, name in
+                        if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            selectedPlanMuscleRegion = ""
+                        }
+                    }
+                }
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Muscle growth is tracked with your own check-ins and milestones, not estimated from lifting weight alone.",
+                norwegian: "Muskelvekst følges med egne innsjekkinger og delmål, ikke beregnet kun fra løftevekter."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
     }
 
@@ -4412,6 +4595,12 @@ struct GoalCreationView: View {
     private var resolvedTitle: String {
         let cleaned = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !cleaned.isEmpty { return cleaned }
+        if embeddedInPlan {
+            if planGoalChoice == "muscle" && !canSaveEmbeddedGoal {
+                return ""
+            }
+            return planGoalNameSuggestion
+        }
 
         switch category {
         case .event: return "My Event"
