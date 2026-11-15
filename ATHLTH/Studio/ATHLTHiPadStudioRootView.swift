@@ -3,6 +3,14 @@ import SwiftUI
 /// Separate iPad presentation over the same stores used by iPhone.
 /// The sidebar is permanent in regular-width landscape windows; the system
 /// collapses columns naturally when Stage Manager provides a narrow window.
+/// Fixed-width iPad sidebar; only explicit user interaction changes visibility.
+enum ATHLTHStudioSidebarLayoutPolicy {
+    static let fixedWidth: CGFloat = 280
+    static func toggled(_ value: NavigationSplitViewVisibility) -> NavigationSplitViewVisibility {
+        value == .detailOnly ? .all : .detailOnly
+    }
+}
+
 private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
     case overview, planner, insights, history, explore, community, coach, settings
     var id: String { rawValue }
@@ -151,6 +159,8 @@ struct ATHLTHiPadStudioRootView: View {
     /// Secondary Studio tools also replace the detail column, not modal sheets.
     @State private var sidebarPage: ATHLTHSideMenuDestination?
     @SceneStorage("athlth.studio.libraryExpanded") private var libraryExpanded = false
+    // A user-controlled, per-window preference independent of the active page.
+    @SceneStorage("athlth.studio.sidebarUserVisible") private var sidebarUserVisible = true
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var focusedPlanningDate: Date?
     @State private var trainRequest: ATHLTHTrainNavigationRequest?
@@ -201,10 +211,8 @@ struct ATHLTHiPadStudioRootView: View {
         _selection = State(initialValue: initial)
         _libraryPage = State(initialValue: libraryPreview)
         _sidebarPage = State(initialValue: sidebarPreview)
-        // Plan Studio starts with its sidebar fully hidden; library pages
-        // keep their sidebar visible in both preview and normal navigation.
-        _sidebarVisibility = State(initialValue:
-            libraryPreview == nil && initial == .planner ? .detailOnly : .all)
+        // Plan Studio and every other destination start with the same menu.
+        _sidebarVisibility = State(initialValue: .all)
     }
 
     var body: some View {
@@ -213,7 +221,11 @@ struct ATHLTHiPadStudioRootView: View {
                 // Suppress the system button in the left sidebar. The
                 // existing single hamburger in the detail toolbar remains.
                 .toolbar(removing: .sidebarToggle)
-                .navigationSplitViewColumnWidth(min: 210, ideal: 244, max: 280)
+                .navigationSplitViewColumnWidth(
+                    min: ATHLTHStudioSidebarLayoutPolicy.fixedWidth,
+                    ideal: ATHLTHStudioSidebarLayoutPolicy.fixedWidth,
+                    max: ATHLTHStudioSidebarLayoutPolicy.fixedWidth
+                )
         } detail: {
             NavigationStack(path: $detailNavigationPath) {
                 studioDetail
@@ -282,9 +294,14 @@ struct ATHLTHiPadStudioRootView: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button {
-                                withAnimation { sidebarVisibility = sidebarVisibility == .detailOnly ? .all : .detailOnly }
+                                let next = ATHLTHStudioSidebarLayoutPolicy.toggled(sidebarVisibility)
+                                sidebarUserVisible = next != .detailOnly
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    sidebarVisibility = next
+                                }
                             } label: { Image(systemName: "line.3.horizontal") }
                             .accessibilityLabel(ATHLTHLocalization.choose(english: "Side menu", norwegian: "Sidemeny"))
+                            .accessibilityIdentifier("athlth-ipad-sidebar-toggle")
                         }
                         // NavigationSplitView supplies the native sidebar
                         // visibility control. Do not draw a second identical
@@ -336,6 +353,8 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .onAppear {
+            // Only restore the menu preference explicitly set in this window.
+            sidebarVisibility = sidebarUserVisible ? .all : .detailOnly
             // Scene-local, not shared across windows: Stage Manager windows
             // can keep different destinations without fighting each other.
             let compatibilityLaunch = ProcessInfo.processInfo.arguments
@@ -416,11 +435,8 @@ struct ATHLTHiPadStudioRootView: View {
             resetDetailNavigation()
             savedDestination = destination.rawValue
             // Inbox stays docked until the user closes it; Coach is a page.
+            // A new destination must never open or close the sidebar.
             if destination != .overview { focusedPlanningDate = nil }
-            withAnimation(.easeInOut(duration: 0.18)) {
-                sidebarVisibility = destination == .planner
-                    ? .detailOnly : .all
-            }
         }
         .onChange(of: selectedHomeWeekDate) { _, date in
             // Keep the selected day accurate if the week changes while
@@ -435,11 +451,7 @@ struct ATHLTHiPadStudioRootView: View {
                 clearWeekInspectorIfNeeded()
                 showingInspector = false
             }
-            withAnimation(.easeInOut(duration: 0.18)) {
-                sidebarVisibility = (libraryPage != nil || sidebarPage != nil)
-                    ? .all :
-                    (newDate != nil || selection == .planner) ? .detailOnly : .all
-            }
+            // Opening a planning day changes only the detail/inspector.
         }
         .inspector(isPresented: $showingInspector) {
             // Reuse the actual iPhone inbox and DirectMessageThreadView.
@@ -614,8 +626,8 @@ struct ATHLTHiPadStudioRootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            // Plan Studio uses the full detail width. The native sidebar
-            // control switches between fully hidden and the regular sidebar.
+            // Plan Studio is a detail destination. The sidebar stays at
+            // the exact width and visibility chosen by the user.
             page
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -990,11 +1002,7 @@ struct ATHLTHiPadStudioRootView: View {
         resetDetailNavigation()
         sidebarPage = nil
         libraryPage = page
-        // The selected library replaces the Studio detail page. It never
-        // launches the full-screen Train shell.
-        withAnimation(.easeInOut(duration: 0.18)) {
-            sidebarVisibility = .all
-        }
+        // Replace the detail page only; do not force the sidebar open.
     }
 
     private func openPersonalLibrary(_ section: ATHLTHPersonalLibrarySection) {
@@ -1007,18 +1015,14 @@ struct ATHLTHiPadStudioRootView: View {
         resetDetailNavigation()
         libraryPage = nil
         sidebarPage = destination
-        withAnimation(.easeInOut(duration: 0.18)) {
-            sidebarVisibility = .all
-        }
+        // The user controls the sidebar independently of opened pages.
     }
 
     private func returnFromSidebarPage() {
         resetDetailNavigation()
         libraryPage = nil
         sidebarPage = nil
-        withAnimation(.easeInOut(duration: 0.18)) {
-            sidebarVisibility = selection == .planner ? .detailOnly : .all
-        }
+        // Back navigation leaves the sidebar unchanged.
     }
 
     private func openStudio(_ destination: ATHLTHStudioDestination) {
@@ -1027,9 +1031,7 @@ struct ATHLTHiPadStudioRootView: View {
         libraryPage = nil
         sidebarPage = nil
         selection = destination
-        withAnimation(.easeInOut(duration: 0.18)) {
-            sidebarVisibility = destination == .planner ? .detailOnly : .all
-        }
+        // Switching Home, Coach, Studio or Settings never toggles the menu.
     }
 
     @ViewBuilder
