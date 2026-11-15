@@ -18,6 +18,9 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     @Published private(set) var conflicts: [Conflict] = []
     @Published private(set) var status = "Sign in to synchronize training plans."
     @Published private(set) var lastSuccessfulSync: Date?
+    // nil means the current account has not completed a remote listing yet.
+    // An empty set means the server has been checked and has no plan documents.
+    @Published private(set) var verifiedRemotePlanIDs: Set<UUID>? = nil
 
     private struct ConsentWrite: Codable {
         let user_id: UUID
@@ -52,6 +55,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         scheduledTask = nil
         accountID = userID
         conflicts = []
+        verifiedRemotePlanIDs = nil
+        lastSuccessfulSync = nil
         isBusy = false
         // Existing explicit opt-outs must not be silently reversed by an update.
         enabled = userID.map {
@@ -143,6 +148,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     Bool.self, name: "studioPlanSyncConsent", userID: userID
                 ) == false {
                 enabled = false
+                verifiedRemotePlanIDs = nil
                 status = ATHLTHLocalization.choose(
                     english: "Your previous sync opt-out is respected. Review it in account settings.",
                     norwegian: "Tidligere fravalg av synkronisering er beholdt. Se kontoinnstillinger."
@@ -171,6 +177,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             let remoteByID = Dictionary(uniqueKeysWithValues: remoteRows.map {
                 ($0.plan_id, $0)
             })
+            var remoteIDs = Set(remoteByID.keys)
             let localPlans = session.accountPlanDocuments.filter { $0.ownerID == userID }
             // Corrupted/legacy duplicate local plan IDs must never crash sync.
             let localByID = Dictionary(
@@ -213,6 +220,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     do {
                         let revision = try await save(local, expected: expected)
                         guard accountID == userID else { return }
+                        remoteIDs.insert(planID)
                         // Acknowledging the uploaded snapshot is safe, but it
                         // must not imply newer local edits were uploaded too.
                         acknowledge(planID, revision: revision,
@@ -248,6 +256,9 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 }
             }
 
+            // Only claim cloud presence after the server has returned the
+            // document or acknowledged a successful upload for this account.
+            verifiedRemotePlanIDs = remoteIDs
             conflicts = unresolved
             lastSuccessfulSync = Date()
             if hasNewLocalEdits {
@@ -412,6 +423,11 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             }
             guard accountID == userID else { return }
             conflicts.removeAll { $0.id == planID }
+            // The resolved document may have been uploaded, downloaded or
+            // explicitly deleted. Refresh the remote presence before Home
+            // claims that it is synced.
+            verifiedRemotePlanIDs = nil
+            scheduleSync(session: session)
             status = ATHLTHLocalization.choose(
                 english: "Plan conflict resolved.", norwegian: "Plankonflikten er løst."
             )
