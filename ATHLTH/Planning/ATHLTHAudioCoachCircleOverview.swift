@@ -351,7 +351,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
                             rowLabel(
                                 rule.beforeEndSeconds.map {
                                     tr("\($0 / 60) min before finish", "\($0 / 60) min før slutt")
-                                } ?? (rule.trigger == .time
+                                } ?? (rule.metric == .hydrationReminder && rule.trigger == .time
+                                      ? tr("Every \(rule.validatedInterval / 60) minutes",
+                                           "Hvert \(rule.validatedInterval / 60). minutt")
+                                      : rule.trigger == .time
                                       ? tr("Every \(rule.validatedInterval) seconds",
                                            "Hvert \(rule.validatedInterval) sekund")
                                       : tr("Every \(rule.validatedInterval) m",
