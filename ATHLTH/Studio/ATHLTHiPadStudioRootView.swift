@@ -387,6 +387,9 @@ struct ATHLTHiPadStudioRootView: View {
                 session.signedIn ? session.profile.userID : nil
             )
             goalAccountSync.scheduleSync(session: session, goals: goalStore)
+            if session.signedIn {
+                studioPlanSync.scheduleSync(session: session)
+            }
         }
         .onChange(of: session.signedIn) { _, signedIn in
             if !signedIn { showingInspector = false }
@@ -394,6 +397,7 @@ struct ATHLTHiPadStudioRootView: View {
             goalAccountSync.switchAccount(signedIn ? session.profile.userID : nil)
             if signedIn {
                 goalAccountSync.scheduleSync(session: session, goals: goalStore)
+                studioPlanSync.scheduleSync(session: session)
             }
         }
         .onChange(of: goalStore.goals) { _, _ in
