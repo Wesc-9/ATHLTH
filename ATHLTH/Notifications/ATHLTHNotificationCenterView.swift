@@ -100,8 +100,9 @@ struct ATHLTHNotificationCenterView: View {
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 36)
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity)
+            // Notifications belong to the entire iPad detail column:
+            // do not impose the old phone-sized 760 pt content limit.
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(
             ATHLTHPremiumCanvas(
@@ -158,6 +159,15 @@ struct ATHLTHNotificationCenterView: View {
             _ = await (
                 notificationStatus,
                 workoutImports
+            )
+            // Invitations are events, not their source of truth. Refresh
+            // their current session state so withdrawn invitations do not
+            // remain in "Needs attention" after the workout was cancelled.
+            await social.refreshIfStale(
+                maxAge: 60,
+                challengeStore: challenges,
+                notificationStore: notifications,
+                deliverSystemAlertsForImportedInbox: false
             )
         }
     }
@@ -609,6 +619,10 @@ struct ATHLTHNotificationCenterView: View {
             return followRequest(for: item) != nil
         }
 
+        if let status = workoutInvitationStatus(for: item) {
+            return status == .actionable
+        }
+
         // An old challenge_invite remains an event named "invite" even
         // after the competition was cancelled. Its live challenge state and
         // the recipient's actual invitation state determine priority.
@@ -627,6 +641,26 @@ struct ATHLTHNotificationCenterView: View {
         }
 
         return eventKind.contains("invite")
+    }
+
+    private func workoutInvitationStatus(
+        for item: ATHLTHNotificationItem
+    ) -> ATHLTHNotificationWorkoutInvitationStatus? {
+        guard item.socialEventKind?.lowercased() == "workout_invite",
+              item.socialEntityType?.lowercased() == "workout_session"
+        else { return nil }
+
+        let sessionRecord = item.socialEntityID.flatMap { id in
+            social.workoutSessions.first(where: { $0.id == id })
+        }
+        let participant = item.socialEntityID.flatMap { id in
+            social.workoutParticipants.first(where: {
+                $0.sessionID == id && $0.userID == session.profile.userID
+            })
+        }
+        return ATHLTHNotificationWorkoutInvitationPolicy.status(
+            session: sessionRecord, participant: participant
+        )
     }
 
     private var emptyState: some View {
@@ -1731,6 +1765,14 @@ struct ATHLTHNotificationCenterView: View {
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     .lineLimit(2)
 
+                if let status = workoutInvitationStatus(for: item),
+                   status != .actionable, status != .unverified {
+                    Label(status.localizedLabel, systemImage: status.systemImage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.top, 1)
+                }
+
                 if !item.message
                     .trimmingCharacters(
                         in: .whitespacesAndNewlines
@@ -2227,6 +2269,9 @@ struct ATHLTHNotificationCenterView: View {
     private func hasDestination(
         _ item: ATHLTHNotificationItem
     ) -> Bool {
+        if let status = workoutInvitationStatus(for: item) {
+            return status == .actionable
+        }
         if item.kind == .dailyCheckIn { return true }
         if item.socialEntityType?.lowercased() == "arena_series" &&
             item.socialEntityID != nil {
