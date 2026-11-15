@@ -5773,6 +5773,20 @@ struct WorkoutTemplateBuilderView: View {
                         source: nil,
                         selectionTitle: tr("Add Exercise", "Legg til øvelse")
                     ) { entry in
+                        // Explicitly choosing an exercise switches away from
+                        // an isolated free-strength block; it never leaves a
+                        // hidden 45-minute activity in the resulting recipe.
+                        if isPlannedWorkout && !studioAdvanced &&
+                           initialActivity == .strength &&
+                           blocks.count == 1 &&
+                           blocks.first.map(
+                               ATHLTHFreeStrengthRecipePolicy.isFreeStrength
+                           ) == true {
+                            blocks.removeAll()
+                            manualDurationMinutes = nil
+                            durationInputText = ""
+                            title = tr("Strength workout", "Styrkeøkt")
+                        }
                         addExerciseBlock(entry, toGroup: exerciseTargetGroupID)
                         showingExercisePicker = false
                     }
@@ -5811,9 +5825,12 @@ struct WorkoutTemplateBuilderView: View {
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
-                    LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: 104), spacing: 8)
-                    ], spacing: 8) {
+                    if initialActivity == .strength {
+                        basicStrengthChoices
+                    } else {
+                        LazyVGrid(columns: [
+                            GridItem(.adaptive(minimum: 104), spacing: 8)
+                        ], spacing: 8) {
                         basicActivityButton("walking", icon: "figure.walk",
                             title: tr("Walk", "Gå"))
                         basicActivityButton("running", icon: "figure.run",
@@ -5826,6 +5843,7 @@ struct WorkoutTemplateBuilderView: View {
                             title: "Yoga")
                         basicActivityButton("meditation", icon: "leaf",
                             title: tr("Meditation", "Meditasjon"))
+                        }
                     }
 
                     Button {
@@ -5867,6 +5885,96 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    /// One free-duration activity or a normal exercise-by-exercise
+    /// strength workout. Both are authored into the same blocks array as
+    /// the Advanced editor and Watch executor.
+    private var basicStrengthChoices: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Button {
+                if blocks.count == 1,
+                   blocks.first.map(ATHLTHFreeStrengthRecipePolicy.isFreeStrength) == true {
+                    return
+                }
+                if !blocks.isEmpty {
+                    pendingBasicActivityReplacement = "strength"
+                    confirmingBasicActivityReplacement = true
+                } else {
+                    applyBasicQuickActivity("strength")
+                }
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "stopwatch")
+                        .font(.system(size: 20, weight: .medium))
+                        .frame(width: 36, height: 36)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("Free strength training", "Fri styrketrening"))
+                            .font(.headline)
+                        Text(tr(
+                            "One open 45-minute workout, without prescribed exercises, sets or reps.",
+                            "Én åpen styrkeøkt på 45 minutter, uten forhåndsvalgte øvelser, sett eller repetisjoner."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer(minLength: 2)
+                    if blocks.count == 1 &&
+                       blocks.first.map(ATHLTHFreeStrengthRecipePolicy.isFreeStrength) == true {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                }
+                .padding(13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-basic-free-strength-45min")
+
+            Button {
+                // Do not replace the existing free workout until an actual
+                // library exercise is selected; Cancel preserves the draft.
+                selectedPhase = .main
+                studioVisiblePhases.insert(.main)
+                openExercisePicker()
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "dumbbell")
+                        .font(.system(size: 20, weight: .medium))
+                        .frame(width: 36, height: 36)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("Strength with exercises",
+                                "Styrketrening med øvelser"))
+                            .font(.headline)
+                        Text(tr(
+                            "Choose exercises from the library and plan sets, repetitions and rest.",
+                            "Legg til øvelser fra biblioteket og planlegg sett, repetisjoner og pauser."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Text(tr("Add exercise", "Legg til øvelse") + "  +")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .padding(.top, 3)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ATHLTHPlanDesign.canvas,
+                            in: RoundedRectangle(cornerRadius: 16))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-basic-strength-exercises")
         }
     }
 
@@ -6370,94 +6478,6 @@ struct WorkoutTemplateBuilderView: View {
     /// The same Basic entry hierarchy is used when planning a strength
     /// workout on a calendar day. Advanced retains the full timeline and
     /// every selected exercise/group is preserved while switching modes.
-    private var studioBasicStrengthModeSelector: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(tr("Strength", "Styrketrening"))
-                .font(.system(size: 23, weight: .semibold, design: .serif))
-                .foregroundStyle(studioInk)
-
-            ATHLTHBasicActivityHero(
-                title: tr("Free strength training", "Fri styrketrening"),
-                subtitle: tr(
-                    "Add an open strength session. Exercises and sets can be added during training.",
-                    "Legg til en fri styrkeøkt. Du kan legge til øvelser og sett under treningen."
-                ),
-                symbol: "dumbbell",
-                isSelected: blocks.contains(where: {
-                    $0.exerciseSlug == "athlth-native-free-strength-training"
-                }),
-                actionTitle: tr("Choose free strength", "Velg fri styrketrening")
-            ) {
-                selectedPhase = .main
-                studioVisiblePhases.insert(.main)
-                if let existing = blocks.first(where: {
-                    $0.exerciseSlug == "athlth-native-free-strength-training"
-                }) {
-                    expandedBlockIndex = blocks.firstIndex(of: existing)
-                } else if let entry = exerciseLibrary.athlthCatalogExercises.first(where: {
-                    $0.sourceIdentifier == "athlth-native-free-strength-training"
-                }) {
-                    addExerciseBlock(entry)
-                } else {
-                    openExercisePicker()
-                }
-            }
-
-            Text(tr("Other ways to train", "Andre måter å trene styrke på"))
-                .font(.system(size: 17, weight: .semibold, design: .serif))
-                .foregroundStyle(studioInk)
-
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 10),
-                          GridItem(.flexible(), spacing: 10)],
-                spacing: 10
-            ) {
-                ATHLTHBasicActivityModeTile(
-                    title: tr("Training workout", "Treningsøkt"),
-                    subtitle: tr("Saved sessions and exercises",
-                                 "Lagrede økter og øvelser"),
-                    symbol: "list.bullet.clipboard", selected: false
-                ) {
-                    showingSavedWorkoutPicker = true
-                }
-
-                ForEach([
-                    WorkoutBlockGroupKind.superset, .circuit,
-                    .emom, .amrap, .dropSet
-                ], id: \.self) { kind in
-                    ATHLTHBasicActivityModeTile(
-                        title: kind.title,
-                        subtitle: strengthModeHint(kind),
-                        symbol: kind.symbol,
-                        selected: blocks.contains(where: {
-                            $0.groupKind == kind
-                        })
-                    ) {
-                        selectedPhase = .main
-                        studioVisiblePhases.insert(.main)
-                        switch kind {
-                        case .superset: createSuperset()
-                        case .circuit: createCircuit()
-                        case .emom, .amrap, .dropSet: createStrengthMode(kind)
-                        case .intervals: break
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func strengthModeHint(_ kind: WorkoutBlockGroupKind) -> String {
-        switch kind {
-        case .superset: return tr("Exercises back to back", "Øvelser etter hverandre")
-        case .circuit: return tr("Stations and rounds", "Stasjoner og runder")
-        case .emom: return tr("Every minute", "Hvert minutt")
-        case .amrap: return tr("Maximum rounds", "Flest mulig runder")
-        case .dropSet: return tr("Descending weights", "Reduser vekten")
-        case .intervals: return tr("Intervals", "Intervaller")
-        }
-    }
-
     private func replaceBasicRunningGoal() {
         guard !studioAdvanced, isPlannedWorkout,
               initialActivity == .running,
