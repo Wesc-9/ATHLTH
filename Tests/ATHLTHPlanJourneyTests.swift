@@ -247,15 +247,12 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
                     title: .constant(""),
                     startDate: .constant(Date()),
                     weekCount: .constant(4),
-                    linkedGoalIDs: .constant(Set<UUID>()),
                     varyWeekdays: .constant(false),
                     planningApproach: planningApproach,
                     onChooseApproach: { _ in },
                     selectedDays: Set([1, 3, 5]),
-                    goals: [],
                     suggestedName: "Løpeplan",
                     onToggleDay: { _ in },
-                    onCreateGoal: {},
                     onSelectSimple: {}
                 )
                 let host = UIHostingController(rootView: screen)
