@@ -9,7 +9,9 @@ enum ATHLTHWorkoutStepCopy {
 
     static func title(for block: WorkoutTemplateBlock, workoutTitle: String, compact: Bool) -> String {
         let block = ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
-        guard block.kind != .exercise else { return block.title }
+        guard block.kind != .exercise else {
+            return ATHLTHWorkoutNameSuggestion.displayStepTitle(block)
+        }
         let source = ATHLTHWorkoutSearch.normalized(block.title)
         if block.kind == .run && block.resolvedPhase == .warmup &&
             ["oppvarming", "warm up", "warmup"].contains(source) {
