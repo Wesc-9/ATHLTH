@@ -24,6 +24,7 @@ enum ATHLTHProfileMostTrainedSyncService {
         let display_value: String
         let supporting_detail: String
 
+        @MainActor
         var item: Item? {
             guard record_key.hasPrefix(ATHLTHProfileMostTrainedSyncService.keyPrefix),
                   let data = supporting_detail.data(using: .utf8),
