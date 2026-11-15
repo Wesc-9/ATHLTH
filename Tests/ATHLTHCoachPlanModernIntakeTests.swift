@@ -94,4 +94,70 @@ final class ATHLTHCoachPlanModernIntakeTests: XCTestCase {
         XCTAssertTrue(intake.isComplete)
         XCTAssertTrue(try XCTUnwrap(intake.sharedInjurySafetyNotes).contains("Knees"))
     }
+    func testUnansweredInjuryAndNoEquipmentSelectionsAreOptional() {
+        var intake = completeBase()
+        intake.injuryStatus = nil
+        intake.equipment = []
+        XCTAssertTrue(intake.isComplete, "\(intake.validationIssues)")
+        XCTAssertFalse(intake.validationIssues.contains("injuryStatus"))
+        XCTAssertFalse(intake.validationIssues.contains("equipment"))
+        XCTAssertTrue(intake.coachContext.contains("Injury status was not provided"))
+        XCTAssertTrue(intake.coachContext.contains(
+            "Assume all standard equipment is available"
+        ))
+        XCTAssertNil(intake.sharedInjurySafetyNotes)
+    }
+
+    func testCoachCanChooseFrequencyAndDurationWhenAthleteAllowsIt() {
+        var intake = completeBase()
+        intake.sessionsPerWeek = nil
+        intake.sessionDurationMinutes = nil
+        intake.coachChoosesFrequency = true
+        intake.coachChoosesDuration = true
+        XCTAssertTrue(intake.isComplete, "\(intake.validationIssues)")
+        XCTAssertTrue(intake.coachContext.contains(
+            "Coach chooses within available weekdays"
+        ))
+        XCTAssertTrue(intake.coachContext.contains(
+            "Coach chooses 10–180 minutes"
+        ))
+        intake.coachChoosesFrequency = false
+        XCTAssertTrue(intake.validationIssues.contains("sessionsPerWeek"))
+        intake.coachChoosesDuration = false
+        XCTAssertTrue(intake.validationIssues.contains("sessionDurationMinutes"))
+    }
+
+    func testCyclingAloneIsAValidCoachTrainingChoice() {
+        var intake = completeBase()
+        intake.trainingTypes = []
+        intake.includesCycling = true
+        XCTAssertEqual(intake.resolvedTrainingFocus, .generalFitness)
+        XCTAssertFalse(intake.validationIssues.contains("trainingTypes"))
+        XCTAssertTrue(intake.coachContext.contains("Cycling"))
+    }
+
+    func testUnavailableEquipmentIsIndependentOfAvailableEquipment() {
+        var intake = completeBase()
+        intake.equipment = []
+        intake.unavailableEquipment = ["Treadmill", "Squat rack"]
+        XCTAssertTrue(intake.isComplete, "\(intake.validationIssues)")
+        XCTAssertTrue(intake.coachContext.contains(
+            "Unavailable equipment (never prescribe): Squat rack, Treadmill"
+        ))
+        XCTAssertTrue(intake.coachContext.contains(
+            "Assume all standard equipment is available except explicitly excluded"
+        ))
+    }
+
+    func testStrongerOutcomeRequiresRealLiftAndWeight() {
+        var intake = completeBase()
+        intake.outcomes = [.stronger]
+        XCTAssertTrue(intake.validationIssues.contains("targetExerciseName"))
+        XCTAssertTrue(intake.validationIssues.contains("targetLiftKilograms"))
+        intake.targetExerciseName = "Benkpress"
+        intake.targetLiftKilograms = 100
+        XCTAssertTrue(intake.isComplete, "\(intake.validationIssues)")
+        XCTAssertTrue(intake.coachContext.contains("100 kg in Benkpress"))
+    }
+
 }
