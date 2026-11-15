@@ -92,6 +92,19 @@ enum ATHLTHStudioHomeRecommendation {
     }
 }
 
+/// A stable account-scoped projection is derived only when its source data
+/// changes. SwiftUI rendering, the live workout heartbeat and sidebar
+/// navigation can then reuse the same calendar/history/chart model.
+private struct ATHLTHStudioHomeProjection {
+    let accountID: UUID
+    let selectedWeekDate: Date
+    let analyticsPeriodDays: Int
+    let workouts: [WorkoutSummary]
+    let week: ATHLTHStudioHomeWeek.Snapshot
+    let upcoming: [ATHLTHStudioSchedule.Occurrence]
+    let analytics: ATHLTHStudioAnalytics.Snapshot
+}
+
 /// Remote Ghost updates own their SwiftUI state, so a four-second spectator
 /// refresh never invalidates the entire Studio Home calendar and charts.
 private struct ATHLTHStudioGhostHomeStatusView: View {
@@ -195,6 +208,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
     /// Auto-follow today unless the user explicitly browses a date.
     @State private var followsToday = true
     @State private var showingReadinessExplanation = false
+    @State private var homeProjection: ATHLTHStudioHomeProjection?
+    @State private var pendingProjectionTask: Task<Void, Never>?
 
     private let cream = Color(red: 0.984, green: 0.978, blue: 0.966)
     private let ink = Color(red: 0.18, green: 0.17, blue: 0.16)
@@ -291,6 +306,61 @@ struct ATHLTHStudioEditorialDashboardView: View {
         )
     }
 
+    private func makeHomeProjection() -> ATHLTHStudioHomeProjection {
+        let workouts = recordedWorkouts
+        let plans = session.trainingPlans
+        let windows = ATHLTHStudioSchedule.studioHomeWindows(
+            plans: plans,
+            standalone: session.standalonePlannedSessions,
+            pausedPlanIDs: session.pausedTrainingPlanIDs,
+            deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
+            selectedWeekDate: selectedDate
+        )
+        let week = ATHLTHStudioHomeWeek.make(
+            plans: plans,
+            standalone: session.standalonePlannedSessions,
+            recorded: workouts,
+            pausedPlanIDs: session.pausedTrainingPlanIDs,
+            deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
+            now: selectedDate,
+            plannedOverride: windows.week
+        )
+        return ATHLTHStudioHomeProjection(
+            accountID: session.profile.userID,
+            selectedWeekDate: selectedDate,
+            analyticsPeriodDays: periodDays,
+            workouts: workouts,
+            week: week,
+            upcoming: windows.upcoming,
+            analytics: ATHLTHStudioAnalytics.snapshot(
+                from: workouts, days: periodDays
+            )
+        )
+    }
+
+    private var currentHomeProjection: ATHLTHStudioHomeProjection {
+        if let cached = homeProjection,
+           cached.accountID == session.profile.userID,
+           cached.selectedWeekDate == selectedDate,
+           cached.analyticsPeriodDays == periodDays,
+           session.signedIn {
+            return cached
+        }
+        return makeHomeProjection()
+    }
+
+    private func scheduleProjectionRefresh() {
+        pendingProjectionTask?.cancel()
+        pendingProjectionTask = Task { @MainActor in
+            // Coalesce HealthKit and plan-store publications from one save.
+            // Avoid recalculating the calendar on every live heartbeat.
+            do { try await Task.sleep(for: .milliseconds(80)) }
+            catch { return }
+            guard !Task.isCancelled else { return }
+            homeProjection = makeHomeProjection()
+        }
+    }
+
     var body: some View {
         GeometryReader { geometry in
             if let focusedPlanningDate {
@@ -302,15 +372,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 // A single render pass shares one merged workout history and
                 // week projection across the calendar and summary/chart.
                 // New Health/local data automatically triggers a fresh pass.
-                let workouts = recordedWorkouts
-                let windows = ATHLTHStudioSchedule.studioHomeWindows(
-                    plans: session.trainingPlans,
-                    standalone: session.standalonePlannedSessions,
-                    pausedPlanIDs: session.pausedTrainingPlanIDs,
-                    deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
-                    selectedWeekDate: selectedDate
-                )
-                let week = calendarWeek(recorded: workouts, planned: windows.week)
+                let home = currentHomeProjection
+                let workouts = home.workouts
+                let week = home.week
                 let width = geometry.size.width
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
 
@@ -331,7 +395,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             // avoiding rebuilding the full training dashboard
                             // for every four-second spectator heartbeat.
                             ATHLTHiPadLiveWorkoutStatusCard()
-                            let upcoming = nextWorkout(from: windows.upcoming)
+                            let upcoming = nextWorkout(from: home.upcoming)
 
                             if split {
                                 HStack(alignment: .top, spacing: 18) {
@@ -351,7 +415,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                 onOpenTrainTogether: onOpenTrainTogether,
                                 onOpenNotifications: onOpenNotifications
                             )
-                            progressCard(wide: split, recorded: workouts, week: week)
+                            progressCard(wide: split, data: home.analytics, week: week)
                         }
                         .padding(.horizontal, split ? 22 : 14)
                         .padding(.vertical, 17)
@@ -383,6 +447,46 @@ struct ATHLTHStudioEditorialDashboardView: View {
             if followsToday, focusedPlanningDate == nil {
                 selectedDate = .now
             }
+        }
+        .task(id: session.profile.userID) {
+            scheduleProjectionRefresh()
+        }
+        .onReceive(health.$workouts) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(strength.$workoutHistory) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(session.$activePlan) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(session.$scheduledPlans) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(session.$standalonePlannedSessions) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(session.$pausedTrainingPlanIDs) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(session.$deactivatedTrainingPlanIDs) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onChange(of: selectedDate) { _, _ in
+            scheduleProjectionRefresh()
+        }
+        .onChange(of: periodDays) { _, _ in
+            scheduleProjectionRefresh()
+        }
+        .onChange(of: hasHealth) { _, _ in
+            scheduleProjectionRefresh()
+        }
+        .onChange(of: session.signedIn) { _, _ in
+            homeProjection = nil
+            scheduleProjectionRefresh()
+        }
+        .onDisappear {
+            pendingProjectionTask?.cancel()
         }
         .sheet(isPresented: $showingReadinessExplanation) {
             ATHLTHReadinessExplanationSheet(
@@ -1345,13 +1449,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
     /// the selected week's totals share a row; on narrow windows they stack.
     private func progressCard(
         wide: Bool,
-        recorded: [WorkoutSummary],
+        data: ATHLTHStudioAnalytics.Snapshot,
         week: ATHLTHStudioHomeWeek.Snapshot
     ) -> some View {
-        let data = ATHLTHStudioAnalytics.snapshot(
-            from: recorded,
-            days: periodDays
-        )
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(tr("Progress", "Fremgang"))
