@@ -400,11 +400,11 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 VStack(spacing: 0) {
                     mountainPlanHero
                         .frame(maxWidth: .infinity)
-                        .frame(height: split ? 344 : 308)
+                        .frame(height: program == nil ? 290 : (split ? 344 : 308))
 
                     ScrollViewReader { scrollProxy in
                     ScrollView {
-                        VStack(alignment: .leading, spacing: split ? 20 : 16) {
+                        LazyVStack(alignment: .leading, spacing: split ? 20 : 16) {
                             // This is the actual signed-in iPad Home, not the
                             // legacy dashboard. Keep cross-device discovery
                             // above the large next-workout and analytics cards.
@@ -427,12 +427,12 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             }
 
                             weekCard(week, width: width)
+                            progressCard(wide: split, data: home.analytics, week: week)
                             ATHLTHStudioHomeCommunitySummary(
                                 onOpenCommunity: onOpenCommunity,
                                 onOpenTrainTogether: onOpenTrainTogether,
                                 onOpenNotifications: onOpenNotifications
                             )
-                            progressCard(wide: split, data: home.analytics, week: week)
                         }
                         .padding(.horizontal, split ? 22 : 14)
                         .padding(.vertical, 17)
@@ -878,69 +878,61 @@ struct ATHLTHStudioEditorialDashboardView: View {
         _ next: ATHLTHStudioSchedule.Occurrence?
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(tr("Next workout", "Neste økt"))
-                .font(.system(size: 22, weight: .medium, design: .serif))
-                .foregroundStyle(ink)
-            if let item = next {
-                Label(item.workout.title, systemImage: item.workout.kind.systemImage)
-                    .font(.headline)
+            HStack(spacing: 10) {
+                Text(tr("Next workout", "Neste økt"))
+                    .font(.system(size: 22, weight: .medium, design: .serif))
                     .foregroundStyle(ink)
-                    .lineLimit(2)
-                HStack(spacing: 7) {
-                    Text(item.date.formatted(
+                Spacer(minLength: 8)
+                if let next {
+                    Text(next.date.formatted(
                         .dateTime.weekday(.abbreviated).day().month(.abbreviated)
                     ))
-                    if let scheduled = item.workout.scheduledStart {
-                        Text("·")
-                        Text(scheduled.formatted(.dateTime.hour().minute()))
-                            .fontWeight(.semibold)
-                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze)
                 }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    if let distance = item.workout.targetDistanceKilometers, distance > 0 {
-                        Text(distance.formatted(.number.precision(.fractionLength(1))) + " km")
-                    }
-                    if let minutes = item.workout.durationMinutes {
-                        Text("· \(minutes) min")
-                    }
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Button {
-                    openOrStart(item)
-                } label: {
-                    Label(
-                        canStart(item) ? tr("Start workout", "Start økt")
-                            : tr("Open workout", "Åpne økt"),
-                        systemImage: canStart(item) ? "play.fill" : "arrow.up.right"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ink)
-                .controlSize(.large)
+            }
+            if let item = next {
+                ATHLTHStudioPlannedWorkoutHeroCard(
+                    workout: item.workout,
+                    availableWidth: 650,
+                    isCompleted: completed(item),
+                    isSkipped: item.planID.map {
+                        session.isPlanSessionSkipped(
+                            planID: $0, sessionID: item.workout.id
+                        )
+                    } ?? false,
+                    canStart: canStart(item),
+                    onOpen: { onOpenWorkout(item) },
+                    onStart: { onStartWorkout(item) }
+                )
                 .contextMenu { workoutActions(item) }
             } else {
-                Text(tr("Your next planned workout will appear here.",
-                        "Neste planlagte økt vises her."))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(
+                    session.trainingPlans.isEmpty &&
+                    session.standalonePlannedSessions.isEmpty
+                        ? tr("Plan a workout to see it here.",
+                             "Planlegg en økt for å se den her.")
+                        : tr("No scheduled workouts in the next 14 days.",
+                             "Ingen planlagte økter de neste 14 dagene.")
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 Button {
                     focusedPlanningDate = Calendar.current.startOfDay(for: .now)
                 } label: {
                     Label(tr("Plan workout", "Planlegg økt"), systemImage: "plus")
+                        .frame(minHeight: 44)
                 }
                 .buttonStyle(.bordered)
             }
         }
-        .padding(20)
+        .padding(18)
         .frame(maxWidth: .infinity, minHeight: 246, alignment: .leading)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline.opacity(0.45), lineWidth: 0.6))
+        .overlay(RoundedRectangle(cornerRadius: 20)
+            .stroke(outline.opacity(0.45), lineWidth: 0.6))
+        .accessibilityIdentifier("athlth-ipad-next-workout")
     }
 
     private func weekCard(_ week: ATHLTHStudioHomeWeek.Snapshot,
