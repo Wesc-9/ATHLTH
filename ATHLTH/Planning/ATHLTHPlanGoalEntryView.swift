@@ -97,23 +97,29 @@ struct ATHLTHPlanGoalOption: Identifiable {
                 option("distance", "Løpe lenger", "Run farther",
                        "Bygg opp distanse og utholdenhet.", "Build running distance and endurance.",
                        "mountain.2", .endurance, .improveFitness),
-                option("power", "Bygge styrke", "Build strength",
-                       "Bli sterkere og mer robust.", "Become stronger and more resilient.",
-                       "figure.strengthtraining.traditional", .strength, .getStronger),
-                option("wellness", "Bedre helse og velvære", "Health and wellness",
-                       "Mer energi i hverdagen.", "More energy in everyday life.",
-                       "leaf", .generalFitness, .improveFitness)
+                option("power", "Løpe regelmessig", "Run consistently",
+                       "Få en fast løperutine.", "Develop a consistent running routine.",
+                       "calendar", .running, .maintain),
+                option("wellness", "Tilbake til løping", "Return to running",
+                       "Bygg opp løpingen gradvis etter pause.", "Build back gradually after time away.",
+                       "arrow.counterclockwise", .running, .returnAfterBreak)
             ]
         case .strength:
             return [
-                option("power", "Bli sterkere", "Get stronger",
-                       "Utvikle styrken i hovedøvelsene.", "Get stronger in main lifts.",
-                       "dumbbell", .strength, .getStronger),
+                // Keep the IDs stable so previously saved plan drafts decode.
+                // Muscle growth is a targeted hypertrophy goal; a weight
+                // target is an objectively measured single-exercise goal.
+                option("power", "Nå en målvekt i en øvelse", "Reach a lift target",
+                       "Velg en øvelse og en konkret vekt i kilo.",
+                       "Choose an exercise and a specific weight in kilograms.",
+                       "scalemass", .strength, .getStronger),
                 option("muscle", "Bygge muskler", "Build muscle",
-                       "Øk muskelmasse med progresjon.", "Build muscle with progression.",
+                       "Velg muskelgruppe eller øvelse du vil prioritere.",
+                       "Choose a muscle group or exercise to prioritize.",
                        "figure.strengthtraining.traditional", .hypertrophy, .buildMuscle),
-                option("fitness", "Bedre arbeidskapasitet", "Improve capacity",
-                       "Mer overskudd mellom øktene.", "Build better training capacity.",
+                option("fitness", "Øke styrkeutholdenheten", "Improve muscular endurance",
+                       "Jobb mot flere repetisjoner med god teknikk.",
+                       "Build capacity for more repetitions with good technique.",
                        "chart.bar.fill", .hybrid, .improveFitness),
                 option("maintain", "Beholde styrken", "Maintain strength",
                        "Ta vare på nivået du har.", "Maintain the strength you have.",
@@ -210,7 +216,13 @@ struct ATHLTHPlanGoalEntryView: View {
             .buttonStyle(.plain)
             .accessibilityAddTraits(selectedChoice == "none" ? .isSelected : [])
             categoryGrid
-            if !selectedChoice.isEmpty && selectedChoice != "none" { mainGoalList }
+            if !selectedChoice.isEmpty && selectedChoice != "none" {
+                mainGoalList
+                if let chosen = ATHLTHPlanGoalOption.options(for: area)
+                    .first(where: { $0.id == selectedChoice }) {
+                    goalSelectionPreview(chosen)
+                }
+            }
         }
         .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
     }
@@ -392,6 +404,53 @@ struct ATHLTHPlanGoalEntryView: View {
             english: "Select this training focus.",
             norwegian: "Velg dette treningsfokuset."
         ))
+    }
+
+    /// A read-only preview on step 1. Goal image, own name, exercise and
+    /// muscle targeting are edited on the next step, never in this selector.
+    private func goalSelectionPreview(_ option: ATHLTHPlanGoalOption) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .bottomLeading) {
+                Image(area.imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 136)
+                    .clipped()
+                    .overlay {
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.59)],
+                            startPoint: .center, endPoint: .bottom
+                        )
+                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "YOUR GOAL · PREVIEW", norwegian: "DITT MÅL · FORHÅNDSVISNING"
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.3)
+                    Text(option.title)
+                        .font(.system(size: 22, weight: .medium, design: .serif))
+                }
+                .foregroundStyle(.white)
+                .padding(16)
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Choose your own photo, name and target on the next page.",
+                norwegian: "Velg eget bilde, navn og målområde på neste side."
+            ))
+            .font(.system(size: 12))
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 13)
+        }
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(divider.opacity(0.40), lineWidth: 0.75)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var mainGoalList: some View {
