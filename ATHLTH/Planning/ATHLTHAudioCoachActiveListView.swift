@@ -781,6 +781,15 @@ struct ATHLTHAudioCoachActiveListView: View {
                                      interval: 60, beforeEndMinutes: 15)
                     }
                 }
+                Section(tr("HYDRATION", "DRIKKEPAUSE")) {
+                    triggerRow(tr("Drink reminder", "Drikkepåminnelse"),
+                               tr("Remind me every 15 minutes, or choose another interval",
+                                  "Minn meg på å drikke hvert 15. minutt, eller velg et annet intervall"),
+                               icon: "drop") {
+                        addGroupRule(metric: .hydrationReminder,
+                                     trigger: .time, interval: 15 * 60)
+                    }
+                }
                 Section(tr("HEART RATE AND INTENSITY", "PULS OG INTENSITET")) {
                     triggerRow(tr("Target zone", "Veiledning for pulssone"),
                                tr("Outside the target and back in", "Utenfor målsonen og tilbake"),
@@ -1505,10 +1514,12 @@ struct ATHLTHAudioCoachActiveListView: View {
                 ))
                 .tint(bronze)
 
-                ruleScopePicker(selection: Binding(
-                    get: { rule.wrappedValue.scope ?? .workout },
-                    set: { rule.wrappedValue.scope = $0 }
-                ))
+                if rule.wrappedValue.metric != .hydrationReminder {
+                    ruleScopePicker(selection: Binding(
+                        get: { rule.wrappedValue.scope ?? .workout },
+                        set: { rule.wrappedValue.scope = $0 }
+                    ))
+                }
                 Text(tr("1 · When should this message play?", "1 · Når skal beskjeden komme?"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ink)
@@ -1542,6 +1553,23 @@ struct ATHLTHAudioCoachActiveListView: View {
                         axis: .vertical
                     )
                     .lineLimit(2...4)
+                } else if rule.wrappedValue.metric == .hydrationReminder {
+                    Picker(tr("Remind every", "Minn meg på å drikke hvert"), selection: Binding(
+                        get: { rule.wrappedValue.validatedInterval / 60 },
+                        set: { minutes in
+                            rule.wrappedValue.trigger = .time
+                            rule.wrappedValue.scope = .workout
+                            rule.wrappedValue.interval = minutes * 60
+                        }
+                    )) {
+                        ForEach([5, 10, 15, 20, 30, 45, 60], id: \.self) { minutes in
+                            Text("\(minutes) min").tag(minutes)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text(tr("Coach reminds you without pausing the workout.",
+                            "Coachen minner deg på å drikke uten å sette økten på pause."))
+                        .font(.caption).foregroundStyle(dim)
                 } else {
                     Picker(tr("Trigger", "Utløser"), selection: rule.trigger) {
                     ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
