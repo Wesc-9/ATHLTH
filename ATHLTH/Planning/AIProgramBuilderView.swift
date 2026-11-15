@@ -258,7 +258,7 @@ struct AIProgramBuilderView: View {
             intake.experience != nil || intake.durationWeeks != nil ||
             intake.sessionsPerWeek != nil || intake.coachChoosesFrequency ||
             !intake.availableDays.isEmpty || intake.sessionDurationMinutes != nil ||
-            intake.coachChoosesDuration || !intake.locations.isEmpty ||
+            intake.coachChoosesDuration || !intake.varyWeeks || !intake.locations.isEmpty ||
             !intake.equipment.isEmpty || !intake.unavailableEquipment.isEmpty ||
             !intake.injuries.isEmpty || intake.injuryStatus != nil ||
             !intake.injuryNotes.isEmpty || !intake.excludedMovements.isEmpty ||
@@ -1233,6 +1233,25 @@ struct AIProgramBuilderView: View {
                     in: RoundedRectangle(cornerRadius: 14)
                 )
             }
+
+            // Optional, simple preference immediately before generating.
+            // Variations mean planned progression, not random extra workouts.
+            Toggle(isOn: $standaloneIntake.varyWeeks) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Vary the weeks", norwegian: "Varier ukene"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Adapt workouts and load between weeks while keeping progression and recovery.",
+                        norwegian: "La øktene og belastningen variere fra uke til uke, med god progresjon og restitusjon."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+            }
+            .tint(ATHLTHTrainDesign.bronze)
+            .accessibilityIdentifier("athlth-coach-vary-weeks")
 
             Button {
                 applyStandaloneIntakeToRequest()
@@ -2772,6 +2791,7 @@ struct AIProgramBuilderView: View {
             sessionDurationMinutes: sessionDurationMinutes,
             aiChoosesDuration: isStandaloneCoachJourney &&
                 standaloneIntake.coachChoosesDuration,
+            varyWeeks: isStandaloneCoachJourney && standaloneIntake.varyWeeks,
             userNotes: String(coachContext.prefix(2_200)) +
                 "\nAdditional preferences: " + String(userNotes.prefix(400)) +
                 "\nRecent training context: " + String(historyContext.prefix(400)),
