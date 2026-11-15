@@ -1349,16 +1349,23 @@ struct ExerciseLibraryView: View {
                 if value == "All" {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 12, weight: .medium))
+                } else if let muscle = ExerciseMuscleGroup(rawValue: value) {
+                    ATHLTHMuscleGroupIcon(
+                        group: muscle, size: 25,
+                        tint: selected ? Color.white :
+                            ATHLTHPlanDesign.accentInk
+                    )
+                    .frame(width: 25, height: 27)
+                    .accessibilityHidden(true)
                 } else {
                     Image(systemName:
                         ATHLTHExerciseMuscleFilterPresentation.icon(for: value)
                     )
                     .font(.system(size: 16, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(selected ? Color.white :
-                        ATHLTHPlanDesign.accentInk)
+                    .foregroundStyle(
+                        selected ? Color.white : ATHLTHPlanDesign.accentInk
+                    )
                     .frame(width: 25, height: 27)
-                    .accessibilityHidden(true)
                 }
                 Text(title)
                     .font(.caption.weight(selected ? .semibold : .medium))
@@ -2764,8 +2771,16 @@ struct CustomExerciseEditorView: View {
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 7) {
-                    Image(systemName: firstPrimaryMuscle?.iconName ?? "figure.strengthtraining.traditional")
-                        .frame(width: 21)
+                    if let firstPrimaryMuscle {
+                        ATHLTHMuscleGroupIcon(
+                            group: firstPrimaryMuscle, size: 25,
+                            tint: previewExerciseImage == nil
+                                ? ATHLTHPlanDesign.accentInk : Color.white
+                        )
+                    } else {
+                        Image(systemName: "figure.arms.open")
+                            .frame(width: 23)
+                    }
                     Text(firstPrimaryMuscle?.title ?? ATHLTHLocalization.choose(
                         english: "Choose a primary muscle",
                         norwegian: "Velg hovedmuskelgruppe"
