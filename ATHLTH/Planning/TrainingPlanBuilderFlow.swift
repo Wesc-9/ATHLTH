@@ -8325,6 +8325,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             Set(goalStore.activeGoals.filter { $0.status == .active }.map(\.id))
         )
         step = ATHLTHPlanJourney.restoredStep(draft.stage, advanced: draft.advanced)
+        // Older 2.2.1 drafts could contain an unfinished goal embedded inside
+        // the schedule step. Restore that work on the new dedicated goal page,
+        // otherwise the athlete would see a disabled Next button without
+        // access to the goal fields they had already started editing.
+        if step == .basics && selectedGoalChoice != "none" &&
+            (inlineGoalDraft != nil ||
+             (!selectedGoalChoice.isEmpty &&
+              selectedGoalChoice != "area" &&
+              selectedGoalIDs.isEmpty)) {
+            step = .goalDetails
+        }
         // The new advanced setup requires a method. Legacy incomplete drafts
         // without one return to setup instead of opening an empty week screen.
         if step == .week && mode == .advanced && weekPlanningApproach == nil {
