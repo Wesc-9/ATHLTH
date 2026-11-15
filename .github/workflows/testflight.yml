@@ -52,6 +52,7 @@ on:
       - release/v2.1.8
       - release/v2.1.9
       - release/v2.2.0
+      - release/v2.2.1
     paths:
       - .github/testflight-trigger
 
