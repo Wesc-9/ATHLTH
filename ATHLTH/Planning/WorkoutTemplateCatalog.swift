@@ -4283,7 +4283,9 @@ struct WorkoutTemplateBuilderView: View {
         // Ignore an activity-specific seed when the athlete explicitly
         // chose "Start from scratch"; existing/saved workouts are untouched.
         let initialRecipe: [WorkoutTemplateBlock] = startBlank
-            ? [] : ATHLTHWorkoutSetExpansion.collapsingLegacySets(in: initialBlocks)
+            ? [] : ATHLTHWorkoutSetExpansion.collapsingLegacySets(
+                in: initialBlocks
+            ).map(ATHLTHFreeStrengthRecipePolicy.normalized)
         let initialMinutes = startBlank ? nil : initialDurationOverrideMinutes
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialRecipe)
@@ -4452,7 +4454,9 @@ struct WorkoutTemplateBuilderView: View {
         )
         guard explicitlyResumedScratch || matchingSource else { return }
         title = stored.title
-        blocks = ATHLTHWorkoutSetExpansion.collapsingLegacySets(in: stored.blocks)
+        blocks = ATHLTHWorkoutSetExpansion.collapsingLegacySets(
+            in: stored.blocks
+        ).map(ATHLTHFreeStrengthRecipePolicy.normalized)
         selectedRouteID = stored.routeID
         selectedWorkoutGearIDs = Set(stored.gearIDs ?? [])
         gearSelectionTouched = stored.gearIDs != nil
@@ -5944,13 +5948,7 @@ struct WorkoutTemplateBuilderView: View {
             }
         case "strength":
             title = tr("Free strength training", "Fri styrketrening")
-            if let freeStrength = exerciseLibrary.athlthCatalogExercises.first(where: {
-                $0.sourceIdentifier == "athlth-native-free-strength-training"
-            }) {
-                addExerciseBlock(freeStrength)
-            } else {
-                openExercisePicker()
-            }
+            addFreeStrengthBlock(in: .main)
         case "cycling":
             title = tr("Cycling", "Sykling")
             addCyclingBlock()
@@ -6109,15 +6107,7 @@ struct WorkoutTemplateBuilderView: View {
                 guard mayInsertStrengthModes else { return }
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
-                // Reuse the exact ATHLTH-native exercise available in
-                // the library instead of creating a duplicate entry.
-                if let freeStrength = exerciseLibrary.athlthCatalogExercises.first(where: {
-                    $0.sourceIdentifier == "athlth-native-free-strength-training"
-                }) {
-                    addExerciseBlock(freeStrength)
-                } else {
-                    openExercisePicker()
-                }
+                addFreeStrengthBlock(in: phase)
             },
             onAddSuperset: { phase in
                 guard mayInsertStrengthModes else { return }
@@ -8113,7 +8103,26 @@ struct WorkoutTemplateBuilderView: View {
         insertBlock(ATHLTHActiveRecovery.convert(rest, active: true), toGroup: groupID)
     }
 
+    private func addFreeStrengthBlock(
+        in phase: WorkoutPhaseKind,
+        exerciseID: UUID? = nil
+    ) {
+        // A single canonical item is shared by Simple and Advanced.
+        // Do not infer sets, reps or rest from ordinary strength defaults.
+        let block = ATHLTHFreeStrengthRecipePolicy.make(
+            phase: phase, exerciseID: exerciseID
+        )
+        insertBlock(block, toGroup: nil)
+    }
+
     private func addExerciseBlock(_ entry: ExerciseLibraryEntry, toGroup groupID: UUID? = nil) {
+        // The native free-strength entry is a 45-minute activity, not the
+        // ordinary 3×10 set/repetition prescription below.
+        if entry.sourceIdentifier == ATHLTHFreeStrengthRecipePolicy.sourceSlug,
+           groupID == nil {
+            addFreeStrengthBlock(in: selectedPhase, exerciseID: entry.id)
+            return
+        }
         var block = WorkoutTemplateBlock(
             sequence: 0, kind: .exercise,
             title: entry.name,
