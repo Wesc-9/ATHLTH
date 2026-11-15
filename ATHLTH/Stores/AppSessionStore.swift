@@ -4323,11 +4323,25 @@ final class AppSessionStore: ObservableObject {
                   !session.isExplicitRestDay || daySessions.isEmpty
             else { return }
 
+            // Every occurrence must own its completion identity. Reusing
+            // one library template in two plan days may otherwise mark both
+            // dates complete after only one workout. Preserve the first
+            // occurrence, but clone subsequent uses (including set IDs).
+            let alreadyUsedInPlan = plan.weeks.contains { week in
+                week.days.contains { day in
+                    day.sessions.contains { $0.id == session.id }
+                }
+            }
+            let inserted = alreadyUsedInPlan
+                ? makeIndependentPlanStudioCopy(
+                    source: session, scheduled: session.scheduledStart
+                  )
+                : session
             plan.weeks[weekIndex]
                 .days[dayIndex]
                 .sessions
-                .append(session)
-            PlannedWorkoutReminderScheduler.sync(session)
+                .append(inserted)
+            PlannedWorkoutReminderScheduler.sync(inserted)
             plan.updatedAt = Date()
             plan.version += 1
             replaceTrainingPlan(plan)
