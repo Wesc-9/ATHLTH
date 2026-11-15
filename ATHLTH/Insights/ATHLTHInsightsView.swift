@@ -43,6 +43,15 @@ struct ATHLTHInsightsView: View {
     @State private var lastInsightsRefreshAccountID: UUID?
     @State private var lastInsightsWorkoutCount = -1
     @State private var lastInsightsWorkoutID: UUID?
+    // Derived workout/day and muscle models are expensive to rebuild during
+    // scrolling. Cache their source signatures instead of doing O(n)
+    // reductions for every @Published snapshot on the main thread.
+    @State private var renderedWorkoutsCount = -1
+    @State private var renderedFirstWorkoutID: UUID?
+    @State private var renderedLastWorkoutID: UUID?
+    @State private var renderedFirstWorkoutDuration: TimeInterval?
+    @State private var renderedStrengthHistoryCount = -1
+    @State private var renderedStrengthLatestDate: Date?
 
     var body: some View {
         NavigationStack {
@@ -143,17 +152,38 @@ struct ATHLTHInsightsView: View {
                 lastInsightsWorkoutID = newestID
             }
             .onReceive(health.$workouts) { workouts in
+                let count = workouts.count
+                let first = workouts.first
+                let last = workouts.last
+                guard renderedWorkoutsCount != count ||
+                    renderedFirstWorkoutID != first?.id ||
+                    renderedLastWorkoutID != last?.id ||
+                    renderedFirstWorkoutDuration != first?.duration else {
+                    return
+                }
+                renderedWorkoutsCount = count
+                renderedFirstWorkoutID = first?.id
+                renderedLastWorkoutID = last?.id
+                renderedFirstWorkoutDuration = first?.duration
+                let signpost = ATHLTHPerformance.begin("InsightsWorkoutDerivedData")
                 let updated = InsightsSessionBaselines.calculate(
-                    workouts: workouts,
-                    at: Date()
+                    workouts: workouts, at: Date()
                 )
                 if sessionBaselines != updated {
                     sessionBaselines = updated
                 }
                 trainingDays = ATHLTHInsightsTrainingDay.make(from: workouts)
+                ATHLTHPerformance.end("InsightsWorkoutDerivedData", id: signpost)
             }
             .onReceive(strength.$workoutHistory) { history in
+                let latest = history.first?.startedAt
+                guard renderedStrengthHistoryCount != history.count ||
+                    renderedStrengthLatestDate != latest else { return }
+                renderedStrengthHistoryCount = history.count
+                renderedStrengthLatestDate = latest
+                let signpost = ATHLTHPerformance.begin("InsightsMuscleDerivedData")
                 muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history)
+                ATHLTHPerformance.end("InsightsMuscleDerivedData", id: signpost)
             }
             .onReceive(NotificationCenter.default.publisher(
                 for: Notification.Name("athlth.dailyCheckInDidUpdate")
