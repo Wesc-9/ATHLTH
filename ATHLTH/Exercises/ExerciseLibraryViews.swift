@@ -2543,6 +2543,245 @@ struct CustomExerciseEditorView: View {
     @State private var aiErrorMessage: String?
     private let aiDraftService = ATHLTHAIExerciseDraftService()
 
+    private var equipmentSuggestions: [String] {
+        ATHLTHExerciseEquipmentSuggestions.suggestions(
+            for: equipmentQuery,
+            options: library.equipmentOptions.filter { option in
+                !selectedEquipment.contains(where: {
+                    ATHLTHExerciseEquipmentSuggestions.normalized($0) ==
+                    ATHLTHExerciseEquipmentSuggestions.normalized(option)
+                })
+            },
+            localizedTitle: library.localizedEquipmentTitle
+        )
+    }
+
+    private var resolvedEquipment: [String] {
+        var items = selectedEquipment
+        let typed = equipmentQuery
+            .split(separator: ",")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        for item in typed where !items.contains(where: {
+            ATHLTHExerciseEquipmentSuggestions.normalized($0) ==
+                ATHLTHExerciseEquipmentSuggestions.normalized(item)
+        }) {
+            items.append(item)
+        }
+        return items
+    }
+
+    private func addEquipment(_ raw: String) {
+        for part in raw.split(separator: ",") {
+            let clean = String(part).trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            guard !clean.isEmpty else { continue }
+            if !selectedEquipment.contains(where: {
+                ATHLTHExerciseEquipmentSuggestions.normalized($0) ==
+                    ATHLTHExerciseEquipmentSuggestions.normalized(clean)
+            }) {
+                selectedEquipment.append(clean)
+            }
+        }
+        equipmentQuery = ""
+    }
+
+    @ViewBuilder
+    private var equipmentEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Equipment", norwegian: "Utstyr"
+                    ),
+                    systemImage: "dumbbell"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer(minLength: 2)
+                Button {
+                    equipmentPickerQuery = ""
+                    showingEquipmentPicker = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Choose equipment", norwegian: "Velg utstyr"
+                    ), systemImage: "square.grid.2x2")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .buttonStyle(.plain)
+            }
+            if !selectedEquipment.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 7) {
+                        ForEach(selectedEquipment, id: \.self) { option in
+                            Button {
+                                selectedEquipment.removeAll { $0 == option }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text(library.localizedEquipmentTitle(option))
+                                        .lineLimit(1)
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 9, weight: .bold))
+                                }
+                                .font(.caption.weight(.medium))
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 9)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .background(ATHLTHPlanDesign.selectedSurface,
+                                            in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Remove", norwegian: "Fjern"
+                            ) + " " + library.localizedEquipmentTitle(option))
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english: "Search or type your equipment",
+                        norwegian: "Søk eller skriv inn utstyr"
+                    ),
+                    text: $equipmentQuery
+                )
+                .font(.subheadline)
+                .textInputAutocapitalization(.sentences)
+                .submitLabel(.done)
+                .onSubmit { addEquipment(equipmentQuery) }
+                .accessibilityIdentifier("exercise-equipment-free-text")
+                if !equipmentQuery.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty {
+                    Button {
+                        addEquipment(equipmentQuery)
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Add custom equipment",
+                        norwegian: "Legg til eget utstyr"
+                    ))
+                }
+            }
+            .padding(.horizontal, 13)
+            .frame(minHeight: 47)
+            .background(ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 13))
+            if !equipmentSuggestions.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(equipmentSuggestions, id: \.self) { option in
+                        Button {
+                            addEquipment(option)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "arrow.up.left")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                Text(library.localizedEquipmentTitle(option))
+                                    .font(.subheadline)
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Spacer()
+                                Image(systemName: "plus")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            }
+                            .frame(minHeight: 41)
+                            .padding(.horizontal, 11)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        if option != equipmentSuggestions.last {
+                            Divider().padding(.leading, 30)
+                        }
+                    }
+                }
+                .background(ATHLTHPlanDesign.canvas,
+                            in: RoundedRectangle(cornerRadius: 12))
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Suggestions appear while typing. Equipment not in the library can be entered freely.",
+                norwegian: "Forslag vises mens du skriver. Utstyr som ikke finnes i biblioteket, kan legges til fritt."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .padding(.vertical, 5)
+    }
+
+    private var equipmentSelectionSheet: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(spacing: 5) {
+                    ForEach(library.equipmentOptions.filter { option in
+                        let query = ATHLTHExerciseEquipmentSuggestions.normalized(
+                            equipmentPickerQuery
+                        )
+                        return query.isEmpty ||
+                            ATHLTHExerciseEquipmentSuggestions.normalized(
+                                option + " " + library.localizedEquipmentTitle(option)
+                            ).contains(query)
+                    }, id: \.self) { option in
+                        let selected = selectedEquipment.contains(option)
+                        Button {
+                            if selected {
+                                selectedEquipment.removeAll { $0 == option }
+                            } else {
+                                addEquipment(option)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "dumbbell")
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                Text(library.localizedEquipmentTitle(option))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Spacer()
+                                Image(systemName: selected
+                                      ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            }
+                            .padding(14)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
+            }
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Choose equipment", norwegian: "Velg utstyr"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(
+                text: $equipmentPickerQuery,
+                prompt: ATHLTHLocalization.choose(
+                    english: "Search equipment", norwegian: "Søk etter utstyr"
+                )
+            )
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) {
+                        showingEquipmentPicker = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
     private func muscleSelectionRow(
         _ role: MuscleSelectionRole,
         compact: Bool = false
