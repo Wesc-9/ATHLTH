@@ -135,9 +135,17 @@ enum ATHLTHExerciseReferenceResolver {
 
     /// Portable, deliberately bounded content. Do not share local files,
     /// expiring signed URLs, or private query tokens inside chat attachments.
-    static func shareableSnapshot(_ exercise: Exercise) -> ExerciseSnapshot? {
+    static func shareableSnapshot(
+        _ exercise: Exercise,
+        allowDirectFriendShare: Bool = false
+    ) -> ExerciseSnapshot? {
         guard exercise.origin == .custom &&
-              exercise.isVisibleOutsideOwnerLibrary else { return nil }
+              exercise.isVisibleOutsideOwnerLibrary &&
+              (exercise.resolvedVisibility == .publicListing ||
+                (allowDirectFriendShare &&
+                 exercise.resolvedVisibility == .friends)) else {
+            return nil
+        }
         let name = String(exercise.name.trimmingCharacters(
             in: .whitespacesAndNewlines).prefix(140))
         guard !name.isEmpty else { return nil }
