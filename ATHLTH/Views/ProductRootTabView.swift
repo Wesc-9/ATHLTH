@@ -11910,7 +11910,8 @@ struct ATHLTHProfileView: View {
     private var compactProfileTrophies: some View {
         ATHLTHProfileCompactTrophyCard(
             trophies: profileTrophySlots,
-            unlockedCount: trophyStore.trophies.filter(\.isUnlocked).count
+            unlockedCount: trophyStore.trophies.filter(\.isUnlocked).count,
+            syncWarning: trophyStore.lastCloudSyncIssue
         )
     }
 
