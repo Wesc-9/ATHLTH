@@ -48,4 +48,49 @@ final class ATHLTHWorkoutSetExpansionTests: XCTestCase {
         XCTAssertEqual(ATHLTHWorkoutSetExpansion.separateSets(in: original),
                        [original])
     }
+    func testFreeStrengthIsOneTimedWorkoutWithoutRepetitions() {
+        let block = ATHLTHFreeStrengthRecipePolicy.make()
+        XCTAssertTrue(ATHLTHFreeStrengthRecipePolicy.isFreeStrength(block))
+        XCTAssertEqual(block.setCount, 1)
+        XCTAssertNil(block.repetitions)
+        XCTAssertNil(block.restBetweenSetsSeconds)
+        XCTAssertNil(block.individualSetTargets)
+        XCTAssertEqual(block.durationSeconds, 45 * 60)
+        XCTAssertEqual(block.resolvedPhase, .main)
+        XCTAssertEqual(ATHLTHWorkoutSetExpansion.separateSets(in: block).count, 1)
+    }
+
+    func testLegacyFreeStrengthThreeSetsIsNormalizedNotDuplicated() {
+        var legacy = ATHLTHFreeStrengthRecipePolicy.make(phase: .warmup)
+        legacy.title = "Free Strength Training"
+        legacy.durationSeconds = nil
+        legacy.setCount = 3
+        legacy.repetitions = 10
+        legacy.restBetweenSetsSeconds = 90
+        let normalized = ATHLTHFreeStrengthRecipePolicy.normalized(legacy)
+        XCTAssertEqual(normalized.setCount, 1)
+        XCTAssertNil(normalized.repetitions)
+        XCTAssertEqual(normalized.durationSeconds, 2_700)
+        XCTAssertNil(normalized.restBetweenSetsSeconds)
+        XCTAssertEqual(normalized.resolvedPhase, .warmup)
+        XCTAssertEqual(normalized.editorDragID, legacy.editorDragID)
+        XCTAssertEqual(
+            ATHLTHWorkoutNameSuggestion.displayStepTitle(normalized),
+            ATHLTHLocalization.choose(
+                english: "Free strength training", norwegian: "Fri styrketrening"
+            )
+        )
+    }
+
+    func testRegularStrengthKeepsSetsAndRest() {
+        var squat = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Squat", exerciseSlug: "squat",
+            distanceMeters: nil, repetitions: 10, durationSeconds: nil,
+            targetWeightKilograms: 60, loadNote: nil, notes: nil, phase: .main
+        )
+        squat.setCount = 3
+        squat.restBetweenSetsSeconds = 90
+        XCTAssertEqual(ATHLTHFreeStrengthRecipePolicy.normalized(squat), squat)
+    }
+
 }
