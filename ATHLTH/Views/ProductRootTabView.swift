@@ -11106,6 +11106,7 @@ struct ATHLTHProfileView: View {
     @State private var profilePerformanceWorkoutHistory:
         [WorkoutSummary] = []
     @State private var mostTrainedItems: [ATHLTHProfileHighlights.TrainedItem] = []
+    @State private var mostTrainedSyncTask: Task<Void, Never>?
     @State private var loadingProfileData = false
     @State private var showingProfilePhotoPicker =
         false
@@ -11191,17 +11192,23 @@ struct ATHLTHProfileView: View {
                 )
         }
         .refreshable {
-            await refreshProfile(
-                forceRefresh: true
-            )
+            await refreshProfile(forceRefresh: true)
+            refreshMostTrained()
         }
         .task {
             refreshMostTrained()
             await refreshProfile()
+            refreshMostTrained()
             await pets.refresh()
         }
         .onChange(of: session.profile.userID) { _, _ in
             refreshMostTrained()
+        }
+        .onChange(of: session.signedIn) { _, _ in
+            refreshMostTrained()
+        }
+        .onDisappear {
+            mostTrainedSyncTask?.cancel()
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)
@@ -11914,11 +11921,30 @@ struct ATHLTHProfileView: View {
         let phone = AccountLocalStorage.read(
             [PhoneWorkout].self, name: "phoneHistory", userID: accountID
         ) ?? []
-        mostTrainedItems = ATHLTHProfileHighlights.mostTrained(
+        let localItems = ATHLTHProfileHighlights.mostTrained(
             strength: strengthWorkout.workoutHistory,
             running: running,
             phone: phone
         )
+        if mostTrainedItems != localItems {
+            mostTrainedItems = localItems
+        }
+        mostTrainedSyncTask?.cancel()
+        guard session.signedIn else { return }
+        mostTrainedSyncTask = Task { @MainActor in
+            // Coalesce repeated workout updates and never upload a blank
+            // HealthKit history as a replacement for the cloud preview.
+            do { try await Task.sleep(for: .milliseconds(650)) }
+            catch { return }
+            let merged = await ATHLTHProfileMostTrainedSyncService.synchronize(
+                userID: accountID, local: localItems
+            )
+            guard !Task.isCancelled, session.signedIn,
+                  session.profile.userID == accountID else { return }
+            if mostTrainedItems != merged {
+                mostTrainedItems = merged
+            }
+        }
     }
 
     private var personalRecordsSection: some View {
