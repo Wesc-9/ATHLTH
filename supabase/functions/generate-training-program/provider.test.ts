@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks, coachCompactProgramSchema, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText, coachBackfillSparseFinalWeek } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks, coachCompactProgramSchema, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText, coachBackfillSparseFinalWeek, coachGroundedProgramSummary, coachExecutableProgramIssues } from "./provider.ts";
 const check = (condition: boolean) => { if (!condition) throw new Error("Assertion failed"); };
 Deno.test("Coach sends structured goals and selected scope using the chat contract", () => {
   const constraints = { weekCount: 4, userNotes: "Adjust Tuesday only", goals: [{ title: "5K" }] };
@@ -327,4 +327,55 @@ Deno.test("Coach never fills recovery weeks from outside the user's allowed days
   check(normal.added === 0);
   const lowFrequency = coachBackfillSparseFinalWeek(program, weekdays, 1, true, true);
   check(lowFrequency.added === 0);
+});
+
+
+Deno.test("Coach summaries only describe the actual ATHLTH week sessions", () => {
+  const strength = { title:"Full Body",kind:"strength",durationMinutes:60,
+    exercises:[{name:"Squat",sets:3,reps:8}],blocks:[] };
+  const run = { title:"Easy Run",kind:"running",durationMinutes:40,
+    exercises:[],blocks:[] };
+  const week = (n:number, count:number) => ({
+    weekNumber:n,days:[{
+      dayIndex:1,sessions:Array.from({length:count},(_,i)=>i%2===0?strength:run),
+    }],
+  });
+  const plan = { title:"Coach",summary:"Incorrect: five 60-minute sessions per week",
+    weeks:[week(1,5),week(2,5),week(3,5),week(4,1)] };
+  const no = coachGroundedProgramSummary(plan,"no");
+  const en = coachGroundedProgramSummary(plan,"en");
+  check(no.includes("4 uker med 16 økter"));
+  check(no.includes("5 / 5 / 5 / 1"));
+  check(!no.includes("five 60-minute"));
+  check(en.includes("4 weeks with 16 sessions"));
+  check(en.includes("5 / 5 / 5 / 1"));
+  check(no.includes("planlagte minutter"));
+});
+
+Deno.test("Coach accepts real ATHLTH strength sets and steady runs", () => {
+  const valid = { weeks:[{days:[{sessions:[
+    { title:"Strength",kind:"strength",durationMinutes:60,
+      exercises:[{name:"Squat",sets:3,reps:8}],blocks:[] },
+    { title:"Easy Run",kind:"running",durationMinutes:40,blocks:[],exercises:[] },
+  ]}]}]};
+  check(coachExecutableProgramIssues(valid).length===0);
+});
+
+Deno.test("Coach rejects a text-only strength card or a fake interval", () => {
+  const invalid = { weeks:[{days:[{sessions:[
+    { title:"Full Body",kind:"strength",durationMinutes:60,
+      exercises:[],blocks:[] },
+    { title:"4x4 intervals",kind:"running",durationMinutes:45,blocks:[] },
+  ]}]}]};
+  const issues = coachExecutableProgramIssues(invalid);
+  check(issues.includes("week_1:strength_missing_sets"));
+  check(issues.includes("week_1:interval_without_drags"));
+  const validInterval = { weeks:[{days:[{sessions:[{
+    title:"4x4 interval",kind:"running",durationMinutes:30,blocks:[
+      {title:"Work 1",kind:"run",phase:"main",durationSeconds:240},
+      {title:"Recover",kind:"rest",phase:"recovery",durationSeconds:120},
+      {title:"Work 2",kind:"run",phase:"main",durationSeconds:240},
+    ],
+  }]}]}]};
+  check(coachExecutableProgramIssues(validInterval).length===0);
 });
