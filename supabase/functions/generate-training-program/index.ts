@@ -27,6 +27,7 @@ type ProgramRequest = {
   weekCount?: number;
   sessionsPerWeek?: number;
   aiChoosesFrequency?: boolean;
+  aiChoosesDuration?: boolean;
   preferredDays?: number[];
   sessionDurationMinutes?: number;
   userNotes?: string;
@@ -591,6 +592,7 @@ Deno.serve(async (req: Request) => {
     preferredDays.length,
   );
   const aiChoosesFrequency = mode === "generate" && body.aiChoosesFrequency === true;
+  const aiChoosesDuration = mode === "generate" && body.aiChoosesDuration === true;
   const sessionDurationMinutes = clampInteger(
     body.sessionDurationMinutes,
     20,
@@ -611,6 +613,7 @@ Deno.serve(async (req: Request) => {
     weekCount,
     sessionsPerWeek,
     aiChoosesFrequency,
+    aiChoosesDuration,
     preferredDays,
     preferredDayNames: preferredDays.map((day) => DAY_NAMES[day - 1]),
     sessionDurationMinutes,
@@ -641,6 +644,8 @@ Hard rules:
 - Schedule at most one workout on a day and no more than sessionsPerWeek workouts per week.
 - If aiChoosesFrequency is true, sessionsPerWeek is a strict MAXIMUM, not a required target. Select a sustainable weekly frequency yourself based on the stated experience, current training, goal, time and available days. Do not assume all available days should be training days. Explain the chosen frequency in the summary and leave recovery days.
 - If aiChoosesFrequency is false, aim for the requested sessionsPerWeek unless the user constraints make that unsafe or impossible.
+- If aiChoosesDuration is true, sessionDurationMinutes is only a fallback reference, NOT a fixed duration. Choose sensible durations separately for the workout type and the user's experience, recovery and schedule; keep each session 20–180 minutes and make its blocks fit the chosen duration. Do not prescribe the same duration on every day without a reason.
+- If aiChoosesDuration is false, respect the requested approximate duration within practical warmup and cooldown needs.
 - Schedule workouts only on preferredDays.
 - In complete mode, days that already contain existingSessions are locked: return zero generated sessions for those days.
 - Do not invent personal medical conditions, diagnoses, injuries, medications, or lab values.
