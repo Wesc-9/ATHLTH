@@ -2821,9 +2821,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     title: $title,
                     startDate: $startDate,
                     weekCount: $weekCount,
-                    linkedGoalIDs: $selectedGoalIDs,
                     selectedDays: selectedDays,
-                    goals: goalStore.activeGoals.filter { $0.status == .active },
                     suggestedName: defaultPlanTitle,
                     onToggleDay: { day in
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16)) {
@@ -2831,7 +2829,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             setSimpleKinds()
                         }
                     },
-                    onCreateGoal: openGoalCreationFromPlan,
                     onSelectAdvanced: { openModeStart(advanced: true) }
                 )
                 if selectedGoalChoice != "none" && selectedGoalChoice != "area" &&
@@ -3068,21 +3065,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     title: $title,
                     startDate: $startDate,
                     weekCount: $weekCount,
-                    linkedGoalIDs: $selectedGoalIDs,
                     varyWeekdays: $varyWeekdays,
                     planningApproach: weekPlanningApproach,
                     onChooseApproach: { choice in
                         selectBuildMethod(choice == .guided ? .dayByDay : .weekByWeek)
                     },
                     selectedDays: selectedDays,
-                    goals: goalStore.activeGoals.filter { $0.status == .active },
                     suggestedName: defaultPlanTitle,
                     onToggleDay: { day in
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16)) {
                             toggleAdvancedTrainingDay(day)
                         }
                     },
-                    onCreateGoal: openGoalCreationFromPlan,
                     onSelectSimple: { openModeStart(advanced: false) }
                 )
     }
