@@ -4187,6 +4187,8 @@ struct WorkoutTemplateBuilderView: View {
     @State private var studioBasicGhostMinutes = 40
     @State private var studioBasicRunEnvironment: RunEnvironment = .outdoor
     @State private var studioBasicDate = Date()
+    @State private var pendingBasicActivityReplacement: String?
+    @State private var confirmingBasicActivityReplacement = false
     @State private var studioBasicOwnedBlockIDs: Set<UUID> = []
     @State private var studioBasicWorkoutTitle: String?
     @State private var showingCopyPicker = false
@@ -5368,79 +5370,10 @@ struct WorkoutTemplateBuilderView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if isPlannedWorkout {
-                        if !studioAdvanced && initialActivity == .running {
-                            studioPlanHeader
-                            ATHLTHRunBasicSetupView(
-                                workoutName: $title,
-                                mode: $studioBasicRunMode,
-                                environment: $studioBasicRunEnvironment,
-                                date: $studioBasicDate,
-                                // Details, date and running environment now
-                                // live in the same card as Quick Run. Do not
-                                // render the old scheduling summary behind it.
-                                scheduleEditable: false,
-                                onEditWorkout: { studioAdvanced = true },
-                                selectedRouteTitle: session.savedRoutes.first {
-                                    $0.id == selectedRouteID
-                                }?.title,
-                                // A route may be selected before its block
-                                // has been reconciled. Never hide its map.
-                                selectedRoute: activeRoute ?? session.savedRoutes.first {
-                                    $0.id == selectedRouteID
-                                },
-                                structuredSteps: blocks,
-                                selectedWorkoutTitle: studioBasicWorkoutTitle,
-                                onChooseRoute: {
-                                    studioRoutePhase = .main
-                                    showingStudioRoutePicker = true
-                                },
-                                onChooseWorkout: {
-                                    selectedPhase = .main
-                                    showingSavedWorkoutPicker = true
-                                },
-                                onChooseGoal: {
-                                    let wasStructured = studioBasicRunMode == .structured
-                                    studioBasicGoalSelected = true
-                                    studioBasicGhostSelected = false
-                                    studioBasicRunMode = .structured
-                                    if wasStructured { replaceBasicRunningGoal() }
-                                },
-                                onChooseGhost: {
-                                    studioBasicGoalSelected = false
-                                    studioBasicGhostSelected = true
-                                    studioBasicRunEnvironment = .outdoor
-                                    studioBasicRunMode = .route
-                                    ghostDraft.enabled = true
-                                    ghostDraft.setTargetTimeText(
-                                        GhostTargetTimeFormatter.string(
-                                            TimeInterval(studioBasicGhostMinutes * 60)
-                                        ),
-                                        distanceKilometers: activeRoute?.distanceKilometers
-                                    )
-                                    studioRoutePhase = .main
-                                    showingStudioRoutePicker = true
-                                },
-                                onChooseStandardMode: {
-                                    studioBasicGoalSelected = false
-                                    studioBasicGhostSelected = false
-                                    ghostDraft.enabled = false
-                                },
-                                isGoalSelected: studioBasicGoalSelected,
-                                isGhostSelected: studioBasicGhostSelected
-                            )
-                            if studioBasicGoalSelected {
-                                studioBasicGoalEditor
-                            }
-                            if studioBasicGhostSelected {
-                                studioBasicGhostEditor
-                            }
-                        } else if !studioAdvanced && initialActivity == .strength {
-                            studioBasicStrengthModeSelector
-                            if !blocks.isEmpty {
-                                studioPlanWorkspace
-                            }
-                        } else {
+                        if studioAdvanced {
                             studioPlanWorkspace
+                        } else {
+                            simplePlannedWorkoutComposer
                         }
                         if let actionNotice {
                             Label(actionNotice, systemImage: "info.circle")
@@ -5519,6 +5452,27 @@ struct WorkoutTemplateBuilderView: View {
                     distanceKilometers: activeRoute?.distanceKilometers
                 )
             }
+            .confirmationDialog(
+                tr("Replace workout content?", "Erstatte øktinnholdet?"),
+                isPresented: $confirmingBasicActivityReplacement,
+                titleVisibility: .visible
+            ) {
+                Button(tr("Replace activity", "Bytt aktivitet"),
+                       role: .destructive) {
+                    if let choice = pendingBasicActivityReplacement {
+                        applyBasicQuickActivity(choice)
+                    }
+                    pendingBasicActivityReplacement = nil
+                }
+                Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                    pendingBasicActivityReplacement = nil
+                }
+            } message: {
+                Text(tr(
+                    "The existing workout steps will be replaced. Choose Advanced if you want to keep them.",
+                    "Dagens øktdeler blir erstattet. Velg Avansert hvis du vil beholde dem."
+                ))
+            }
             .sheet(isPresented: $showingBlockPicker, onDismiss: {
                 if pendingStandaloneExercise {
                     pendingStandaloneExercise = false
@@ -5555,7 +5509,7 @@ struct WorkoutTemplateBuilderView: View {
                             }
                             showingSavedWorkoutPicker = false
                         },
-                        initialCategory: initialActivity
+                        initialCategory: studioAdvanced ? initialActivity : nil
                     )
                 } else {
                     savedWorkoutPickerSheet
@@ -5803,6 +5757,158 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .presentationDetents([.large])
             }
+    }
+
+    /// Basic is intentionally a two-choice experience, not the Advanced
+    /// section/category builder with controls hidden behind a toggle.
+    /// Same canonical WorkoutTemplateBlock recipe and saving path as Advanced.
+    private var simplePlannedWorkoutComposer: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            studioPlanHeader
+
+            ATHLTHPlanSurface(density: .compact) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(tr("What would you like to do?", "Hva vil du gjøre?"))
+                        .font(.system(size: 21, weight: .medium, design: .serif))
+                        .foregroundStyle(studioInk)
+                    Text(tr(
+                        "Choose an activity, or select a ready-made workout.",
+                        "Velg en aktivitet, eller hent en ferdig treningsøkt."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                    LazyVGrid(columns: [
+                        GridItem(.adaptive(minimum: 104), spacing: 8)
+                    ], spacing: 8) {
+                        basicActivityButton("walking", icon: "figure.walk",
+                            title: tr("Walk", "Gå"))
+                        basicActivityButton("running", icon: "figure.run",
+                            title: tr("Run", "Løping"))
+                        basicActivityButton("strength", icon: "dumbbell",
+                            title: tr("Strength", "Styrke"))
+                        basicActivityButton("cycling", icon: "bicycle",
+                            title: tr("Cycling", "Sykling"))
+                        basicActivityButton("yoga", icon: "figure.yoga",
+                            title: "Yoga")
+                        basicActivityButton("meditation", icon: "leaf",
+                            title: tr("Meditation", "Meditasjon"))
+                    }
+
+                    Button {
+                        selectedPhase = .main
+                        showingSavedWorkoutPicker = true
+                    } label: {
+                        Label(tr("Choose workout from library",
+                                 "Velg treningsøkt fra biblioteket"),
+                              systemImage: "books.vertical")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 15))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if !blocks.isEmpty {
+                ATHLTHWorkoutRecipePreview(
+                    title: title, summary: "", category: category,
+                    symbol: initialActivity?.systemImage ?? "figure.run",
+                    difficulty: nil,
+                    durationMinutes: resolvedDurationMinutes,
+                    blocks: blocks, embeddedInDetails: true
+                )
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    studioAdvanced = true
+                } label: {
+                    Label(tr("Detailed editing", "Detaljert redigering"),
+                          systemImage: "slider.horizontal.3")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func basicActivityButton(
+        _ key: String, icon: String, title displayTitle: String
+    ) -> some View {
+        Button {
+            if !blocks.isEmpty {
+                pendingBasicActivityReplacement = key
+                confirmingBasicActivityReplacement = true
+            } else {
+                applyBasicQuickActivity(key)
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .regular))
+                Text(displayTitle)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            .frame(maxWidth: .infinity, minHeight: 70)
+            .background(ATHLTHPlanDesign.selectedSurface.opacity(0.54),
+                        in: RoundedRectangle(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.7),
+                                  lineWidth: 0.7)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func applyBasicQuickActivity(_ choice: String) {
+        blocks.removeAll()
+        studioBasicOwnedBlockIDs.removeAll()
+        studioVisiblePhases = [.main]
+        selectedPhase = .main
+        selectedRouteID = nil
+        manualDurationMinutes = nil
+        durationInputText = ""
+        switch choice {
+        case "walking", "running":
+            title = choice == "walking" ? tr("Walk", "Gå") : tr("Run", "Løping")
+            addRunBlock(activity: choice == "walking" ? .walking : .running)
+            if let index = blocks.indices.last {
+                blocks[index].distanceMeters = nil
+                blocks[index].durationSeconds =
+                    choice == "walking" ? 1_800 : 1_200
+            }
+        case "strength":
+            title = tr("Free strength training", "Fri styrketrening")
+            if let freeStrength = exerciseLibrary.athlthCatalogExercises.first(where: {
+                $0.sourceIdentifier == "athlth-native-free-strength-training"
+            }) {
+                addExerciseBlock(freeStrength)
+            } else {
+                openExercisePicker()
+            }
+        case "cycling":
+            title = tr("Cycling", "Sykling")
+            addCyclingBlock()
+        case "yoga":
+            title = "Yoga"
+            addWellnessBlock(.yoga)
+        case "meditation":
+            title = tr("Meditation", "Meditasjon")
+            addWellnessBlock(.meditation)
+        default:
+            return
+        }
+        resequence()
+        persistWorkoutDraft()
     }
 
     private var workoutOverview: some View {
