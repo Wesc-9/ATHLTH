@@ -2671,6 +2671,8 @@ struct AIProgramBuilderView: View {
             excludedMovements: isStandaloneCoachJourney &&
                 standaloneIntake.healthSharingAuthorized
                 ? standaloneIntake.excludedExerciseNames : nil,
+            unavailableEquipment: isStandaloneCoachJourney
+                ? standaloneIntake.unavailableEquipment.sorted() : nil,
             // A linked ATHLTH goal is optional. Direction and outcomes are
             // carried in the explicit Coach intake when this array is empty.
             coachStrengthContext: coachStrengthSnapshot,
