@@ -12,39 +12,70 @@ struct ATHLTHiPadSidebarPageView: View {
     private let canvas = ATHLTHStudioStyle.canvas
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 15) {
-                Button(action: onBack) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Back to Studio",
-                            norwegian: "Tilbake til Studio"
-                        ),
-                        systemImage: "chevron.left"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ink)
-                    .frame(minHeight: 44)
+        Group {
+            if destination == .profile {
+                // The profile photograph is the page background, not a card
+                // below a second navigation strip. Overlay Back without
+                // shrinking the hero or interfering with Studio's toolbar.
+                destinationContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea(.container, edges: .top)
+                    .overlay(alignment: .topLeading) {
+                        Button(action: onBack) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Back to Studio",
+                                    norwegian: "Tilbake til Studio"
+                                ),
+                                systemImage: "chevron.left"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(minHeight: 44)
+                            .padding(.horizontal, 14)
+                            .background(.black.opacity(0.34), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.leading, 22)
+                        .padding(.top, 82)
+                        .accessibilityIdentifier("athlth-ipad-profile-back")
+                    }
+            } else {
+                VStack(spacing: 0) {
+                    HStack(spacing: 15) {
+                        Button(action: onBack) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Back to Studio",
+                                    norwegian: "Tilbake til Studio"
+                                ),
+                                systemImage: "chevron.left"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                            .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer(minLength: 8)
+
+                        Label(title, systemImage: symbol)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(gold)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 9)
+                    .background(Color.white.opacity(0.72))
+
+                    Rectangle()
+                        .fill(ATHLTHStudioStyle.outline.opacity(0.55))
+                        .frame(height: 1)
+
+                    destinationContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .buttonStyle(.plain)
-
-                Spacer(minLength: 8)
-
-                Label(title, systemImage: symbol)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(gold)
-                    .lineLimit(1)
             }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 9)
-            .background(Color.white.opacity(0.72))
-
-            Rectangle()
-                .fill(ATHLTHStudioStyle.outline.opacity(0.55))
-                .frame(height: 1)
-
-            destinationContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(canvas.ignoresSafeArea())
         .accessibilityIdentifier(
