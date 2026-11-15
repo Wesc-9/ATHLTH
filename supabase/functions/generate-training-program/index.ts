@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks } from "./provider.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { conflictsWithInjuryRestrictions } from "../_shared/ai-training-injury-guard.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -647,7 +647,7 @@ Create a practical program from the user's explicit goals, selected outcomes and
 
 Hard rules:
 - Return exactly the requested number of weeks.
-- Every week must contain all seven days, dayIndex 1=Monday through 7=Sunday.
+- Each week should contain only selected preferredDays with dayIndex 1=Monday through 7=Sunday. The server will fill omitted rest days; represent a rest on a selected weekday with sessions: []. This keeps long plans compact without losing real schedule information.
 - Schedule at most one workout on a day and no more than sessionsPerWeek workouts per week.
 - If aiChoosesFrequency is true, sessionsPerWeek is a strict MAXIMUM, not a required target. Select a sustainable weekly frequency yourself based on the stated experience, current training, goal, time and available days. Do not assume all available days should be training days. Explain the chosen frequency in the summary and leave recovery days.
 - If aiChoosesFrequency is false, aim for the requested sessionsPerWeek unless the user constraints make that unsafe or impossible.
@@ -674,7 +674,7 @@ Hard rules:
 - Every session has a blocks array (which may be empty if no precise structure is justified). Blocks describe one chronological timeline: warmup, main effort, recovery between efforts, cooldown. If prescribing intervals, include EACH effort and EACH between-effort rest; never append an extra rest after the last repeat.
 - For an explicitly prescribed 4x4 interval session, provide warmup, four distinct 240-second main run blocks, three 120-second recovery blocks between them, and a cooldown. Use targetPaceSecondsPerKilometer, treadmillInclinePercent, targetHeartRateZone and targetEffortRPE only when justified by user input; otherwise use null.
 - For strength, include explicit exercise blocks with proper repetitions and recovery steps when helpful. Never invent a measured heart rate, completed workout, equipment access or target weight.
-- Keep arrays of blocks reasonably short (prefer fewer than 30), and do not generate workout details that were not requested or cannot be supported.
+- Keep arrays of blocks reasonably short (prefer fewer than 18), and do not generate workout details that were not requested or cannot be supported. Do not add redundant note blocks or unnecessary exercise metadata.
 - Use the user's goal deadlines and milestones as context, but do not exceed the explicit timeline.
 - The output is a draft the user will review before applying.
 `.trim();
@@ -684,47 +684,115 @@ Hard rules:
   }));
   if (budgetResponse) return budgetResponse;
 
-  const aiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${groqKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(coachProgramRequest(
-      Deno.env.get("GROQ_TRAINING_MODEL") ?? "openai/gpt-oss-120b",
-      instructions, constraints, schema,
-    )),
-  });
+  // The response may include private goals or consented injury notes.
+  // Never persist a provider response body, prompt, or athlete identifiers.
+  const requestId = crypto.randomUUID();
+  const model = Deno.env.get("GROQ_TRAINING_MODEL") ?? "openai/gpt-oss-120b";
+  const upstreamStart = Date.now();
 
-  await recordGroqQuota(aiResponse, "training-program");
+  const requestGroq = (fallback: boolean) => fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${groqKey}`,
+        "Content-Type": "application/json",
+      },
+      // Bound both attempts to remain under the Edge Function request limit.
+      signal: AbortSignal.timeout(45_000),
+      body: JSON.stringify(fallback
+        ? coachProgramFallbackRequest(model, instructions, constraints)
+        : coachProgramRequest(model, instructions, constraints, schema)),
+    },
+  );
+
+  let aiResponse: Response;
+  let fallbackUsed = false;
+  try {
+    aiResponse = await requestGroq(false);
+    await recordGroqQuota(aiResponse, "training-program");
+
+    if (!aiResponse.ok) {
+      // Parse only the allowlisted provider error code. Do not log raw bodies:
+      // they can include personal plan notes and injury restrictions.
+      const firstError = await aiResponse.json().catch(() => null);
+      const safeCode = coachProviderErrorCode(firstError);
+      console.error("Coach upstream request rejected", {
+        requestId, status: aiResponse.status, code: safeCode,
+        phase: "structured", elapsedMs: Date.now() - upstreamStart,
+      });
+      if (coachShouldRetryInvalidSchema(aiResponse.status, firstError)) {
+        fallbackUsed = true;
+        // The fallback has a different response format so it can recover
+        // from a Groq schema-validation failure. It is attempted at most once.
+        aiResponse = await requestGroq(true);
+        await recordGroqQuota(aiResponse, "training-program-fallback");
+      }
+    }
+  } catch (error) {
+    console.error("Coach upstream connection failed", {
+      requestId,
+      phase: fallbackUsed ? "json_fallback" : "structured",
+      failure: error instanceof DOMException && error.name === "TimeoutError"
+        ? "timeout" : "transport",
+      elapsedMs: Date.now() - upstreamStart,
+    });
+    return json({
+      error: "ATHLTH Coach is temporarily unavailable. Please try again.",
+      code: "AI_PROVIDER_UNAVAILABLE", requestId,
+    }, 503);
+  }
 
   if (!aiResponse.ok) {
-    // Provider response bodies can echo consented injury details.
-    // Keep health information out of persistent application logs.
     const providerError = await aiResponse.json().catch(() => null);
-    console.error("Groq program generation failed", {
-      status: aiResponse.status,
-      code: coachProviderErrorCode(providerError),
-      feature: "generate-training-program",
+    const code = coachProviderErrorCode(providerError);
+    console.error("Coach upstream response failed", {
+      requestId, phase: fallbackUsed ? "json_fallback" : "structured",
+      status: aiResponse.status, code,
+      elapsedMs: Date.now() - upstreamStart,
     });
-    return json({ error: "AI program generation failed. Please try again." }, 502);
+    // No infinite retries, and never retry rate limits or auth failures.
+    const throttled = aiResponse.status === 429;
+    return json({
+      error: throttled
+        ? "ATHLTH Coach is busy. Try again shortly."
+        : "ATHLTH Coach could not generate a program. Please try again.",
+      code: throttled ? "AI_PROVIDER_RATE_LIMIT" : "AI_PROVIDER_UNAVAILABLE",
+      requestId,
+    }, throttled ? 429 : 502);
   }
 
-  const payload = await aiResponse.json();
+  const payload = await aiResponse.json().catch(() => null);
   const outputText = coachProgramOutput(payload);
   if (!outputText) {
-    return json({ error: "AI returned an empty program." }, 502);
+    console.error("Coach returned empty response", { requestId, fallbackUsed });
+    return json({
+      error: "ATHLTH Coach could not complete the plan. Try again.",
+      code: "AI_INVALID_PROGRAM", requestId,
+    }, 502);
   }
 
-  let program: any;
+  let program: unknown;
   try {
     program = JSON.parse(outputText);
   } catch {
-    // Never log AI output: it can contain sensitive training limitations.
-    console.error("Unable to parse structured AI program", {
-      feature: "generate-training-program",
+    // AI output may echo private health and goal context, never log it.
+    console.error("Coach JSON parse failed", { requestId, fallbackUsed });
+    return json({
+      error: "ATHLTH Coach could not complete the plan. Try again.",
+      code: "AI_INVALID_PROGRAM", requestId,
+    }, 502);
+  }
+
+  if (!coachProgramHasUsableWeeks(program, weekCount)) {
+    // Do not silently fabricate missing weeks or approve an empty plan.
+    console.error("Coach plan completeness failed", {
+      requestId, fallbackUsed, expectedWeeks: weekCount,
     });
-    return json({ error: "AI returned an invalid program." }, 502);
+    return json({
+      error: "ATHLTH Coach returned an incomplete plan. No plan was saved.",
+      code: "AI_INVALID_PROGRAM", requestId,
+    }, 502);
   }
 
   const normalized = normalizeProgram(
