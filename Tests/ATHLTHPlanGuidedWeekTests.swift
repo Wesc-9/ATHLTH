@@ -152,4 +152,47 @@ final class ATHLTHPlanGuidedWeekTests: XCTestCase {
         XCTAssertNil(result.additionalDetailedWorkouts)
         XCTAssertEqual(result.detailedWorkout?.title, "Legacy")
     }
+    func testDeletingLastWorkoutKeepsDayEmptyWithoutBecomingRestDay() throws {
+        // A chosen training weekday may already have a generated default.
+        // Deleting its final visible workout must remove that default too.
+        let start = try XCTUnwrap(Calendar.current.date(
+            from: DateComponents(year: 2026, month: 10, day: 17)
+        ))
+        var weeks = makeWeeks()
+        weeks[0].days[0].sessions = [workout("Old session").applying(to: nil)]
+
+        var edit = ATHLTHPlanWeekDayEdit()
+        edit.isRestDay = false
+        edit.removeTemplateDetail = true
+        edit.removeAllWorkouts = true
+
+        XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(edit))
+        ATHLTHPlanWeekDayEdit.apply([6: edit], to: &weeks, startDate: start)
+        XCTAssertTrue(weeks[0].days[0].sessions.isEmpty)
+        XCTAssertNil(edit.detailedWorkout)
+
+        // Persisted checkpoints must never resurrect deleted sessions.
+        let data = try JSONEncoder().encode(edit)
+        let resumed = try JSONDecoder().decode(
+            ATHLTHPlanWeekDayEdit.self, from: data
+        )
+        XCTAssertEqual(resumed.removeAllWorkouts, true)
+        XCTAssertEqual(resumed.isRestDay, false)
+    }
+
+    func testQuickRestStepCanBeSavedAsSeparateShortWorkout() {
+        let pause = WorkoutTemplateBlock(
+            sequence: 1, kind: .rest, title: "Pause",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 90, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )
+        let session = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Pause", kind: .recovery, durationMinutes: 5,
+            routeID: nil, blocks: [pause]
+        )
+        XCTAssertTrue(session.isValid)
+    }
+
+
 }
