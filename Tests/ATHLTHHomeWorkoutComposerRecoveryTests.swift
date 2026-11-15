@@ -83,4 +83,25 @@ final class ATHLTHHomeWorkoutComposerRecoveryTests: XCTestCase {
             ))
         }
     }
+    func testEmptyCalendarSceneDateCannotBecomeJanuary2001() {
+        let fallback = Date(timeIntervalSince1970: 1_763_200_000)
+        let date = ATHLTHHomeWorkoutComposerRecoveryPolicy.validComposerDate(
+            referenceInterval: 0, fallback: fallback
+        )
+        XCTAssertTrue(Calendar.current.isDate(date, inSameDayAs: fallback))
+        let nonFinite = ATHLTHHomeWorkoutComposerRecoveryPolicy.validComposerDate(
+            referenceInterval: .nan, fallback: fallback
+        )
+        XCTAssertTrue(Calendar.current.isDate(nonFinite, inSameDayAs: fallback))
+    }
+
+    func testValidSelectedCalendarDateIsPreserved() {
+        let selected = Date(timeIntervalSince1970: 1_763_200_000)
+        let restored = ATHLTHHomeWorkoutComposerRecoveryPolicy.validComposerDate(
+            referenceInterval: selected.timeIntervalSinceReferenceDate,
+            fallback: Date()
+        )
+        XCTAssertEqual(restored, selected)
+    }
+
 }
