@@ -137,6 +137,9 @@ struct AIProgramBuilderView: View {
     @State private var coachDateEdited = false
     @State private var savedProfileInjuryNotes = ""
     @State private var savedProfileTrainingNotes = ""
+    // Compute the optional local strength preview once per presentation,
+    // not during every layout pass of the long, scrollable intake.
+    @State private var coachStrengthSummary: String?
 
     /// Intentional order and no recovery goal posing as an activity.
     /// Cycling is stored as a separate Coach choice because TrainingFocus
@@ -370,6 +373,9 @@ struct AIProgramBuilderView: View {
             }
             .task {
                 loadDefaultsIfNeeded()
+                if isStandaloneCoachJourney {
+                    coachStrengthSummary = coachStrengthSnapshot?.summary
+                }
             }
             .alert(
                 "AI Program",
@@ -488,7 +494,9 @@ struct AIProgramBuilderView: View {
     }
 
     private var coachPlanIntake: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        // The outer scroll view has only one intake child. Make the cards
+        // themselves lazy so off-screen sections do not all layout at once.
+        LazyVStack(alignment: .leading, spacing: 15) {
             HStack {
                 Text(ATHLTHLocalization.choose(
                     english: "PLAN FOUNDATION", norwegian: "GRUNNLAG FOR PLANEN"))
@@ -517,7 +525,7 @@ struct AIProgramBuilderView: View {
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
 
-            if let local = coachStrengthSnapshot {
+            if let strengthSummary = coachStrengthSummary {
                 VStack(alignment: .leading, spacing: 5) {
                     Label(
                         ATHLTHLocalization.choose(
@@ -529,7 +537,7 @@ struct AIProgramBuilderView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTrainDesign.ink)
 
-                    Text(local.summary)
+                    Text(strengthSummary)
                         .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
                     Text(ATHLTHLocalization.choose(
@@ -851,36 +859,36 @@ struct AIProgramBuilderView: View {
                     }
                 }
 
-                HStack(alignment: .center, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(ATHLTHLocalization.choose(
                         english: "Approximate time per session",
-                        norwegian: "Omtrentlig tid per økt"))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 5)
-                    if !standaloneIntake.coachChoosesDuration {
-                        ATHLTHCoachNumberInput(
-                            label: ATHLTHLocalization.choose(
-                                english: "Minutes per workout",
-                                norwegian: "Minutter per økt"),
-                            unit: "min",
-                            value: $standaloneIntake.sessionDurationMinutes,
-                            range: 10...180,
-                            step: 5
-                        )
-                    }
-                
-                }
-                coachChoiceGrid {
-                    coachToggleOption(
-                        ATHLTHLocalization.choose(
-                            english: "Let Coach decide",
-                            norwegian: "La Coach bestemme"
-                        ),
-                        selected: standaloneIntake.coachChoosesDuration
-                    ) {
+                        norwegian: "Omtrentlig tid per økt"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    Spacer(minLength: 4)
+                    Button {
                         standaloneIntake.coachChoosesDuration = true
                         standaloneIntake.sessionDurationMinutes = nil
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Let Coach decide", norwegian: "La Coach bestemme"
+                        ))
+                        .underline(standaloneIntake.coachChoosesDuration)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(
+                        standaloneIntake.coachChoosesDuration ? .isSelected : []
+                    )
+                    .accessibilityIdentifier("athlth-coach-duration-auto")
+                }
+
+                coachChoiceGrid {
                     ForEach([20, 30, 45, 60, 75, 90], id: \.self) { minutes in
                         coachToggleOption(
                             "\(minutes) min",
@@ -890,6 +898,27 @@ struct AIProgramBuilderView: View {
                             standaloneIntake.coachChoosesDuration = false
                             standaloneIntake.sessionDurationMinutes = minutes
                         }
+                    }
+                }
+
+                // Preserve the existing +/- control for custom durations.
+                if !standaloneIntake.coachChoosesDuration {
+                    HStack(spacing: 8) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Custom minutes", norwegian: "Egendefinert tid"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        Spacer(minLength: 8)
+                        ATHLTHCoachNumberInput(
+                            label: ATHLTHLocalization.choose(
+                                english: "Minutes per workout",
+                                norwegian: "Minutter per økt"),
+                            unit: "min",
+                            value: $standaloneIntake.sessionDurationMinutes,
+                            range: 10...180,
+                            step: 5
+                        )
                     }
                 }
             }
