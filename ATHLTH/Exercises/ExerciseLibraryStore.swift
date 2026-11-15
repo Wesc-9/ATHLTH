@@ -1043,7 +1043,8 @@ final class ExerciseLibraryStore: ObservableObject {
         imageData: Data? = nil,
         videoURL: URL? = nil,
         creatorUsername: String? = nil,
-        activityCategory: ATHLTHExerciseActivity = .strength
+        activityCategory: ATHLTHExerciseActivity = .strength,
+        visibility: ATHLTHExerciseVisibility? = nil
     ) -> ExerciseLibraryEntry {
         let exerciseID = UUID()
         let imageURL = imageData.flatMap {
@@ -1064,6 +1065,9 @@ final class ExerciseLibraryStore: ObservableObject {
             videoURL: videoURL
         )
         exercise.activityCategory = activityCategory
+        exercise.visibility = visibility ?? (
+            isVisibleOutsideOwnerLibrary ? .friends : .privateOnly
+        )
         exercise.originalCreatorID = ownerID
         exercise.originalExerciseID = exerciseID
         let name = creatorUsername?
