@@ -437,6 +437,153 @@ export function coachCompactValidatedProgram(
   };
 }
 
+
+/**
+ * A compact AI reply can contain all requested weeks but spend nearly all
+ * its output on the early weeks. E.g. 5/5/5/1 sessions in four weeks.
+ *
+ * We re-use ONLY actual sessions already generated for this same athlete
+ * and program. Never synthesize exercises, invent future training history,
+ * exceed available days or the weekly ceiling. Do not automatically
+ * backfill when health restrictions were supplied: a rest-heavy week may
+ * be intentional and must not be overridden without the athlete's input.
+ *
+ * A deload week still has training: reduce volume and effort on copied
+ * workouts. The existing injury-exclusion guard is re-run on the full
+ * normalized draft before it can be shown or saved.
+ */
+export function coachBackfillSparseFinalWeek(
+  program: Record<string, unknown>,
+  preferredDays: number[],
+  weeklyLimit: number,
+  allowReuse: boolean,
+  varyWeeks: boolean,
+): { program: Record<string, unknown>; added: number } {
+  const raw = program.weeks;
+  if (!allowReuse || !Array.isArray(raw) || raw.length < 3 ||
+      weeklyLimit < 2 || preferredDays.length < 2) {
+    return { program, added: 0 };
+  }
+  type Session = Record<string, unknown>;
+  type Day = { dayIndex: number; sessions: Session[] };
+  type Week = Record<string, unknown> & { days: Day[] };
+  const weeks = raw as Week[];
+  const previous = weeks.slice(0, -1);
+  const latest = weeks[weeks.length - 1];
+  if (!latest || !Array.isArray(latest.days)) return { program, added: 0 };
+
+  const count = (week: Week) => week.days.reduce(
+    (sum, day) => sum + (Array.isArray(day.sessions) ? day.sessions.length : 0), 0,
+  );
+  const previousCounts = previous.map(count);
+  const typical = Math.max(0, ...previousCounts);
+  // 1-2 prior workouts are too few to infer a meaningful "missing" week.
+  if (typical < 3) return { program, added: 0 };
+  const minimum = Math.min(weeklyLimit, Math.ceil(typical * 0.75));
+  const existingCount = count(latest);
+  if (existingCount >= minimum) return { program, added: 0 };
+
+  const workdays = [...new Set(preferredDays)].sort((a, b) => a - b);
+  const cloned = structuredClone(latest) as Week;
+  const daysByIndex = new Map(cloned.days.map(day => [day.dayIndex, day]));
+  const remaining = workdays.filter(day => {
+    const existing = daysByIndex.get(day);
+    return !existing || !Array.isArray(existing.sessions) ||
+      existing.sessions.length === 0;
+  });
+  const lastWeekNames = cloned.days.flatMap(day =>
+    (day.sessions ?? []).map(session => String(session.title ?? "")));
+  const isDeload = /deload|recovery week|restitusjonsuke|avlastning/i.test(
+    [String(cloned.title ?? ""), ...lastWeekNames].join(" "),
+  );
+
+  const reused = new Set<string>();
+  let added = 0;
+  for (const dayIndex of remaining) {
+    if (existingCount + added >= minimum) break;
+    // Prefer the same weekday across earlier weeks to retain the athlete's
+    // chosen training pattern, but rotate source weeks if variety was chosen.
+    const order = varyWeeks
+      ? [...previous.keys()].reverse().map((i, idx) =>
+          previous[(i + idx) % previous.length])
+      : [...previous].reverse();
+    const candidates: { session: Session; key: string; sameDay: boolean }[] = [];
+    for (const [sourceWeekIndex, week] of order.entries()) {
+      for (const day of week.days) {
+        const session = day.sessions?.[0];
+        if (!session || typeof session.title !== "string") continue;
+        candidates.push({
+          session,
+          key: [sourceWeekIndex, day.dayIndex, session.title].join(":"),
+          sameDay: day.dayIndex === dayIndex,
+        });
+      }
+    }
+    candidates.sort((a, b) =>
+      Number(b.sameDay) - Number(a.sameDay) ||
+      (isDeload
+        ? Number(a.session.kind === "running" &&
+            /easy|rolig|aerobic/i.test(String(a.session.title))) * -1 +
+          Number(b.session.kind === "running" &&
+            /easy|rolig|aerobic/i.test(String(b.session.title)))
+        : 0),
+    );
+    const choice = candidates.find(c => !reused.has(c.key));
+    if (!choice) break;
+    reused.add(choice.key);
+    const session = structuredClone(choice.session) as Session;
+    if (isDeload) {
+      if (typeof session.durationMinutes === "number") {
+        session.durationMinutes = Math.max(15,
+          Math.round(session.durationMinutes * 0.75 / 5) * 5);
+      }
+      if (typeof session.targetDistanceKilometers === "number") {
+        session.targetDistanceKilometers =
+          Math.round(session.targetDistanceKilometers * 0.75 * 10) / 10;
+      }
+      session.targetPaceSecondsPerKilometer = null;
+      if (Array.isArray(session.exercises)) {
+        session.exercises = session.exercises.map((exercise: Record<string, unknown>) => ({
+          ...exercise,
+          sets: typeof exercise.sets === "number"
+            ? Math.max(1, Math.ceil(exercise.sets * 0.75))
+            : exercise.sets,
+          targetRPE: typeof exercise.targetRPE === "number"
+            ? Math.min(exercise.targetRPE, 6) : exercise.targetRPE,
+        }));
+      }
+      if (Array.isArray(session.blocks)) {
+        session.blocks = session.blocks.map((block: Record<string, unknown>) => ({
+          ...block,
+          durationSeconds: typeof block.durationSeconds === "number"
+            ? Math.max(10, Math.round(block.durationSeconds * 0.75))
+            : block.durationSeconds,
+          targetHeartRateZone: typeof block.targetHeartRateZone === "number"
+            ? Math.min(3, block.targetHeartRateZone) : block.targetHeartRateZone,
+          targetEffortRPE: typeof block.targetEffortRPE === "number"
+            ? Math.min(6, block.targetEffortRPE) : block.targetEffortRPE,
+          targetPaceSecondsPerKilometer: null,
+        }));
+      }
+    }
+    const target = daysByIndex.get(dayIndex);
+    if (target) target.sessions = [session];
+    else {
+      const day = { dayIndex, sessions: [session] };
+      cloned.days.push(day);
+      daysByIndex.set(dayIndex, day);
+    }
+    added++;
+  }
+  if (added === 0) return { program, added: 0 };
+  cloned.days.sort((a, b) => a.dayIndex - b.dayIndex);
+  const amended = [...previous, cloned];
+  return {
+    program: { ...program, weeks: amended },
+    added,
+  };
+}
+
 /** Groq 429 responses include a Retry-After delay in seconds. */
 export function coachProviderRetryAfter(response: Response): number {
   const seconds = Number(response.headers.get("retry-after"));
