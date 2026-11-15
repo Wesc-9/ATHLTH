@@ -1069,6 +1069,9 @@ struct ATHLTHiPadStudioRootView: View {
                 onOpenTrainTogether: {
                     openSidebarPage(.trainTogether)
                 },
+                onOpenNotifications: {
+                    openSidebarPage(.notifications)
+                },
                 onOpenWorkout: { entry in
                     if let planID = entry.planID {
                         trainRequest = .workout(
