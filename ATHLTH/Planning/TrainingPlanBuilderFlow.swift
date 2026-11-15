@@ -1799,15 +1799,39 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var inlineGoalCategory: GoalCategory {
-        if selectedGoalArea == .specific { return .event }
-        if selectedGoalArea == .strength && selectedGoalChoice == "muscle" {
-            // Hypertrophy is a targeted, manually tracked goal, not a
-            // kilogram PR disguised as muscle growth.
-            return .custom
+        ATHLTHPlanGoalOption.linkedCategory(
+            for: selectedGoalArea, choice: selectedGoalChoice
+        )
+    }
+
+    /// Translate the detailed muscle atlas to the plan's priority IDs,
+    /// so the goal can guide workouts as well as the goal title.
+    private func applyPlanGoalMuscle(_ region: String?) {
+        guard let region else {
+            primaryMuscle = nil
+            selectedMuscles.removeAll()
+            return
         }
-        if focus == .strength || focus == .hypertrophy { return .strength }
-        if selectedGoalArea == .general { return .consistency }
-        return .endurance
+        let planMuscle: String
+        switch region {
+        case "frontDelts", "sideDelts", "rearDelts":
+            planMuscle = "shoulders"
+        case "traps", "lats", "upperBack", "lowerBack":
+            planMuscle = "back"
+        case "abs", "obliques", "serratus":
+            planMuscle = "core"
+        case "outerHip", "hipFlexors":
+            planMuscle = "glutes"
+        case "innerThigh", "shins":
+            planMuscle = "quads"
+        default:
+            planMuscle = region
+        }
+        guard Self.muscleOptions.contains(where: { $0.id == planMuscle }) else {
+            return
+        }
+        primaryMuscle = planMuscle
+        selectedMuscles = [planMuscle]
     }
 
     private var inlineGoalLinkFields: some View {
@@ -1832,6 +1856,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         initialTitle: ATHLTHPlanGoalOption.options(for: selectedGoalArea).first { $0.id == selectedGoalChoice }?.title ?? "",
                         embeddedInPlan: true,
                         planGoalChoice: selectedGoalChoice,
+                        onMuscleChanged: { region in
+                            applyPlanGoalMuscle(region)
+                        },
                         checkpoint: $inlineGoalDraft
                     ) { id in
                         selectedGoalIDs = [id]
@@ -1899,12 +1926,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         selectedGoalChoice = "area"
         selectedGoalIDs.removeAll()
         inlineGoalDraft = nil
+        primaryMuscle = nil
+        selectedMuscles.removeAll()
     }
 
     private func selectGoalOption(_ option: ATHLTHPlanGoalOption) {
         if selectedGoalChoice != option.id {
             inlineGoalDraft = nil
             selectedGoalIDs.removeAll()
+            primaryMuscle = nil
+            selectedMuscles.removeAll()
         }
         selectedGoalChoice = option.id
         focus = option.focus
