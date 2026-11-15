@@ -307,6 +307,37 @@ struct ExerciseSnapshot: Codable, Hashable {
     }
 }
 
+/// Owner-selected exercise visibility. Legacy shared-plan permissions
+/// migrate to friends-only, never silently to public discovery.
+enum ATHLTHExerciseVisibility: String, Codable, CaseIterable, Identifiable {
+    case privateOnly = "private"
+    case friends
+    case publicListing = "public"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .privateOnly:
+            return ATHLTHLocalization.choose(english: "Private", norwegian: "Privat")
+        case .friends:
+            return ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner")
+        case .publicListing:
+            return ATHLTHLocalization.choose(english: "Public", norwegian: "Offentlig")
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .privateOnly: return "lock.fill"
+        case .friends: return "person.2.fill"
+        case .publicListing: return "globe.europe.africa.fill"
+        }
+    }
+
+    var shareable: Bool { self != .privateOnly }
+}
+
 struct Exercise: Identifiable, Codable, Hashable {
     let id: UUID
     var origin: ExerciseOrigin
@@ -318,6 +349,12 @@ struct Exercise: Identifiable, Codable, Hashable {
     var equipment: [String]
     var imageURL: URL?
     var isVisibleOutsideOwnerLibrary: Bool
+    /// Optional for decoding existing account-local libraries.
+    /// Old opt-in shared-plan exercises are friends-only, not public.
+    var visibility: ATHLTHExerciseVisibility? = nil
+    var resolvedVisibility: ATHLTHExerciseVisibility {
+        visibility ?? (isVisibleOutsideOwnerLibrary ? .friends : .privateOnly)
+    }
     var videoURL: URL? = nil
     /// Optional to keep existing saved exercises decodable. Legacy custom
     /// exercises are shown under Strength until explicitly recategorized.
