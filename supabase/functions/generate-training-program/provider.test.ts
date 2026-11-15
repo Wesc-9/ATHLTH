@@ -160,7 +160,7 @@ Deno.test("Coach compact schema keeps strict JSON while reducing multiweek outpu
   check(fallback.response_format.type === "json_object");
 });
 
-Deno.test("Coach compact plan accepts safe selected days and rejects off-day workouts", () => {
+Deno.test("Coach compact plan safely normalizes generated days to allowed weekdays", () => {
   const week = (n: number) => ({
     weekNumber: n,
     days: [
@@ -181,12 +181,21 @@ Deno.test("Coach compact plan accepts safe selected days and rejects off-day wor
   offDayWorkout.weeks[0].days[1].sessions.push({
     title: "Off day run", kind: "running", exercises: [], blocks: [],
   });
-  check(coachCompactValidatedProgram(offDayWorkout, 4, [1,3], 2) === null);
+  const moved = coachCompactValidatedProgram(offDayWorkout, 4, [1,3], 2);
+  check(moved !== null);
+  const firstWeek = (moved?.weeks as {days: {dayIndex:number,sessions:{title:string}[]}[]}[])[0];
+  check(firstWeek.days.length === 2);
+  check(firstWeek.days[0].dayIndex === 1 && firstWeek.days[0].sessions.length === 1);
+  check(firstWeek.days[1].dayIndex === 3 && firstWeek.days[1].sessions.length === 1);
+  check(firstWeek.days[1].sessions[0].title === "Off day run");
   const tooMany = JSON.parse(JSON.stringify(source));
   tooMany.weeks[0].days[2].sessions.push({
     title: "A", kind: "strength", exercises: [], blocks: [],
   });
-  check(coachCompactValidatedProgram(tooMany, 4, [1,3], 1) === null);
+  const capped = coachCompactValidatedProgram(tooMany, 4, [1,3], 1);
+  check(capped !== null);
+  check((capped?.weeks as {days:{sessions:unknown[]}[]}[])[0].days
+    .reduce((n,day)=>n+day.sessions.length,0) === 1);
   const empty = JSON.parse(JSON.stringify(source));
   for (const w of empty.weeks) for (const day of w.days) day.sessions = [];
   check(coachCompactValidatedProgram(empty, 4, [1,3], 2) === null);
@@ -196,4 +205,26 @@ Deno.test("Groq 429 retry header is bounded and never includes private output", 
   check(coachProviderRetryAfter(new Response("", {status:429,headers:{"retry-after":"2.3"}}))===3);
   check(coachProviderRetryAfter(new Response("", {status:429,headers:{"retry-after":"invalid"}}))===60);
   check(coachProviderRetryAfter(new Response("", {status:429,headers:{"retry-after":"999999"}}))===86400);
+});
+
+
+Deno.test("Coach fills omitted selected rest weekdays but never invents workouts", () => {
+  const weeks = Array.from({length:4},(_,i)=>({
+    weekNumber:i+1,
+    days: i===2?[]:[{
+      dayIndex: 3,
+      sessions: [{title:"Walk",kind:"walking",durationMinutes:35}],
+    }],
+  }));
+  const program = coachCompactValidatedProgram({title:"Plan",weeks},4,[1,3,5],2);
+  check(program !== null);
+  const normalized = program?.weeks as {days:{dayIndex:number,sessions:unknown[]}[]}[];
+  check(normalized.length === 4);
+  check(normalized.every(w=>w.days.map(d=>d.dayIndex).join(",")==="1,3,5"));
+  check(normalized[2].days.every(d=>d.sessions.length===0));
+  check(normalized[1].days[1].sessions.length===1);
+  check(coachCompactValidatedProgram({title:"Plan",weeks:weeks.slice(0,3)},4,[1,3,5],2)===null);
+  const invalid = structuredClone(weeks);
+  invalid[0].days[0].dayIndex=8;
+  check(coachCompactValidatedProgram({title:"Plan",weeks:invalid},4,[1,3,5],2)===null);
 });
