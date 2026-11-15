@@ -52,6 +52,7 @@ struct ATHLTHInsightsView: View {
     @State private var renderedFirstWorkoutDuration: TimeInterval?
     @State private var renderedStrengthHistoryCount = -1
     @State private var renderedStrengthLatestDate: Date?
+    @State private var renderedStrengthOldestDate: Date?
 
     var body: some View {
         NavigationStack {
@@ -177,13 +178,23 @@ struct ATHLTHInsightsView: View {
             }
             .onReceive(strength.$workoutHistory) { history in
                 let latest = history.first?.startedAt
+                let oldest = history.last?.startedAt
                 guard renderedStrengthHistoryCount != history.count ||
-                    renderedStrengthLatestDate != latest else { return }
+                    renderedStrengthLatestDate != latest ||
+                    renderedStrengthOldestDate != oldest else { return }
                 renderedStrengthHistoryCount = history.count
                 renderedStrengthLatestDate = latest
+                renderedStrengthOldestDate = oldest
                 let signpost = ATHLTHPerformance.begin("InsightsMuscleDerivedData")
                 muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history)
                 ATHLTHPerformance.end("InsightsMuscleDerivedData", id: signpost)
+            }
+            .onChange(of: session.profile.userID) { _, _ in
+                // Different accounts can have identical workout counts.
+                renderedWorkoutsCount = -1
+                renderedStrengthHistoryCount = -1
+                trainingDays = []
+                muscleSummary = .empty
             }
             .onReceive(NotificationCenter.default.publisher(
                 for: Notification.Name("athlth.dailyCheckInDidUpdate")
