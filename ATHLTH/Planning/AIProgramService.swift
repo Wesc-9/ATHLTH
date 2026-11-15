@@ -415,23 +415,107 @@ final class AIProgramService {
     }
 
     func generate(_ request: AIProgramRequest) async throws -> AIProgramDraft {
-        try await client.functions.invoke(
-            "generate-training-program",
-            options: FunctionInvokeOptions(body: request)
-        )
+        // Only program *drafts* are generated here; no plan is saved until
+        // the athlete accepts it. One automatic retry on temporary 5xx is
+        // therefore safe and avoids asking the athlete to re-enter answers.
+        for attempt in 0..<2 {
+            do {
+                return try await client.functions.invoke(
+                    "generate-training-program",
+                    options: FunctionInvokeOptions(body: request, timeoutInterval: 120)
+                )
+            } catch FunctionsError.httpError(let status, let data) {
+                if [502, 503, 504].contains(status) && attempt == 0 {
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                    continue
+                }
+                throw Self.userFacingError(status: status, data: data)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // The underlying SDK may include raw transport details.
+                // Do not present those or potentially private responses.
+                throw AIProgramError.unavailable
+            }
+        }
+        throw AIProgramError.unavailable
+    }
+
+    static func userFacingError(status: Int, data: Data) -> AIProgramError {
+        let code = (try? JSONDecoder().decode(CoachServerError.self, from: data))?.code
+        switch status {
+        case 401: return .sessionExpired
+        case 403: return .premiumRequired
+        case 422 where code == "AI_COACH_INJURY_CONFLICT": return .unsafeProgram
+        case 429: return .rateLimited
+        case 502 where code == "AI_INVALID_PROGRAM": return .invalidProgram
+        case 502, 503, 504: return .unavailable
+        case 400: return .invalidRequest
+        default: return .unavailable
+        }
+    }
+
+    private struct CoachServerError: Decodable {
+        let code: String?
     }
 }
 
 enum AIProgramError: LocalizedError {
     case noGoals
     case unavailable
+    case rateLimited
+    case premiumRequired
+    case sessionExpired
+    case unsafeProgram
+    case invalidProgram
+    case invalidRequest
+
+    var canRetry: Bool {
+        self == .unavailable || self == .invalidProgram
+    }
 
     var errorDescription: String? {
         switch self {
         case .noGoals:
-            return "Choose at least one goal before generating a program."
+            return ATHLTHLocalization.choose(
+                english: "Choose at least one goal before generating a program.",
+                norwegian: "Velg minst ett mål før treningsplanen lages."
+            )
         case .unavailable:
-            return "AI program generation is temporarily unavailable."
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH Coach is temporarily unavailable. Your choices are saved in this form. Please try again.",
+                norwegian: "ATHLTH Coach er midlertidig utilgjengelig. Valgene dine er fortsatt her. Prøv igjen."
+            )
+        case .rateLimited:
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH Coach has reached its request limit. Please try again later.",
+                norwegian: "ATHLTH Coach har nådd forespørselsgrensen. Prøv igjen senere."
+            )
+        case .premiumRequired:
+            return ATHLTHLocalization.choose(
+                english: "An active ATHLTH+ subscription or trial is needed to use Coach.",
+                norwegian: "Du trenger aktivt ATHLTH+-abonnement eller prøveperiode for å bruke Coach."
+            )
+        case .sessionExpired:
+            return ATHLTHLocalization.choose(
+                english: "Your sign-in session has expired. Sign in again and retry.",
+                norwegian: "Innloggingen din har utløpt. Logg inn på nytt og prøv igjen."
+            )
+        case .unsafeProgram:
+            return ATHLTHLocalization.choose(
+                english: "Coach suggested an exercise you excluded. No plan was saved. Review the restrictions and try again.",
+                norwegian: "Coach foreslo en øvelse du har utelukket. Ingen plan ble lagret. Kontroller begrensningene og prøv igjen."
+            )
+        case .invalidProgram:
+            return ATHLTHLocalization.choose(
+                english: "Coach could not finish a valid plan. Your choices are preserved. Please try again.",
+                norwegian: "Coach klarte ikke å fullføre en gyldig treningsplan. Valgene dine er beholdt. Prøv igjen."
+            )
+        case .invalidRequest:
+            return ATHLTHLocalization.choose(
+                english: "Some plan choices need checking before Coach can continue.",
+                norwegian: "Kontroller planvalgene før Coach kan fortsette."
+            )
         }
     }
 }
