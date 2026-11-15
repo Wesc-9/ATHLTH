@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks } from "./provider.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { conflictsWithInjuryRestrictions } from "../_shared/ai-training-injury-guard.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -706,6 +706,89 @@ Hard rules:
     },
   );
 
+  let program: unknown;
+
+  if (weekCount >= 3 && weekCount <= 8) {
+    // Generating 4 rich weeks in one response exceeded Groq's JSON validation
+    // and the JSON-mode retry omitted weeks (observed 2026-11-15).
+    // Generate small, separately verified weeks instead. A bounded queue
+    // avoids concurrent provider floods and long Edge Function timeouts.
+    let rateLimited = false;
+    const generateWeek = async (weekNumber: number): Promise<unknown | null> => {
+      const started = Date.now();
+      try {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${groqKey}`,
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(25_000),
+          body: JSON.stringify(coachProgramSingleWeekRequest(
+            model, instructions, constraints, weekNumber, weekCount,
+          )),
+        });
+        await recordGroqQuota(response, "training-program-week");
+        if (!response.ok) {
+          rateLimited ||= response.status === 429;
+          const safeError = await response.json().catch(() => null);
+          console.error("Coach weekly provider rejected", {
+            requestId, weekNumber, status: response.status,
+            code: coachProviderErrorCode(safeError), elapsedMs: Date.now() - started,
+          });
+          return null;
+        }
+        const raw = coachProgramOutput(await response.json().catch(() => null));
+        if (!raw) {
+          console.error("Coach weekly response empty", { requestId, weekNumber });
+          return null;
+        }
+        // The AI output is intentionally never persisted to logs.
+        const parsed: unknown = JSON.parse(raw);
+        if (!coachProgramValidWeek(parsed, weekNumber, preferredDays, sessionsPerWeek)) {
+          console.error("Coach weekly output structurally incomplete", {
+            requestId, weekNumber,
+          });
+          return null;
+        }
+        return parsed;
+      } catch (error) {
+        console.error("Coach weekly request failed", {
+          requestId, weekNumber,
+          failure: error instanceof DOMException && error.name === "TimeoutError"
+            ? "timeout" : "provider_or_parse",
+          elapsedMs: Date.now() - started,
+        });
+        return null;
+      }
+    };
+
+    const weeks: unknown[] = [];
+    for (let index = 1; index <= weekCount; index += 2) {
+      const numbers = [index, index + 1].filter((n) => n <= weekCount);
+      const result = await Promise.all(numbers.map(generateWeek));
+      if (result.some((value) => value === null)) {
+        return json({
+          error: rateLimited
+            ? "ATHLTH Coach is busy. Please try again shortly."
+            : "ATHLTH Coach could not complete every plan week. No plan was saved.",
+          code: rateLimited ? "AI_PROVIDER_RATE_LIMIT" : "AI_INVALID_PROGRAM",
+          requestId,
+        }, rateLimited ? 429 : 502);
+      }
+      weeks.push(...result);
+    }
+    program = coachProgramMergeWeeks(weeks, weekCount, preferredDays, sessionsPerWeek);
+    if (!program) {
+      console.error("Coach verified weekly assembly failed", {
+        requestId, expectedWeeks: weekCount,
+      });
+      return json({
+        error: "ATHLTH Coach could not complete the plan. No plan was saved.",
+        code: "AI_INVALID_PROGRAM", requestId,
+      }, 502);
+    }
+  } else {
   let aiResponse: Response;
   let fallbackUsed = false;
   try {
@@ -772,7 +855,6 @@ Hard rules:
     }, 502);
   }
 
-  let program: unknown;
   try {
     program = JSON.parse(outputText);
   } catch {
@@ -793,6 +875,8 @@ Hard rules:
       error: "ATHLTH Coach returned an incomplete plan. No plan was saved.",
       code: "AI_INVALID_PROGRAM", requestId,
     }, 502);
+  }
+
   }
 
   const normalized = normalizeProgram(
