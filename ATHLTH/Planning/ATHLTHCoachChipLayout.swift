@@ -40,10 +40,12 @@ struct ATHLTHCoachChipLayout: Layout {
         var rowHeight: CGFloat = 0
         for subview in subviews {
             let natural = subview.sizeThatFits(.unspecified)
-            let w = min(natural.width, width)
-            let size = subview.sizeThatFits(
-                ProposedViewSize(width: w, height: nil)
-            )
+            // Most Coach chips fit naturally. Reuse that measurement instead
+            // of asking SwiftUI to measure every chip again at the same width
+            // during each layout pass; only oversized chips need a reflow.
+            let size = natural.width > width
+                ? subview.sizeThatFits(ProposedViewSize(width: width, height: nil))
+                : natural
             if x > 0, x + size.width > width {
                 x = 0
                 y += rowHeight + rowSpacing
