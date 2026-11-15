@@ -140,9 +140,9 @@ struct ATHLTHiPadStudioRootView: View {
     @SceneStorage("athlth.studio.selectedDestination")
     private var savedDestination = ATHLTHStudioDestination.overview.rawValue
     @State private var selection: ATHLTHStudioDestination = .overview
-    // Home can be selected twice in a row: the second tap must still return
-    // to a fresh, unobstructed dashboard rather than doing nothing.
-    @State private var homeNavigationRevision = 0
+    // A repeated Home tap scrolls to the top; it must NOT destroy the
+    // dashboard and restart its HealthKit, community and live child tasks.
+    @State private var homeScrollRequest = 0
     @State private var communityTab: ATHLTHCommunityMainTab = .overview
     @State private var selectedWorkout: WorkoutSummary?
     @State private var inspectedWeekDate: Date?
@@ -991,6 +991,11 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func resetDetailNavigation() {
+        // A previous implementation recreated the entire NavigationStack on
+        // every Home tap, which could leave SwiftUI briefly blank and trigger
+        // expensive Home reloads. Only rebuild the stack if something really
+        // has been pushed above its root.
+        guard !detailNavigationPath.isEmpty else { return }
         detailNavigationPath = NavigationPath()
         detailNavigationIdentity = UUID()
     }
@@ -1036,7 +1041,7 @@ struct ATHLTHiPadStudioRootView: View {
             // the dashboard to become the visible detail root again.
             focusedPlanningDate = nil
             showingInspector = false
-            homeNavigationRevision &+= 1
+            homeScrollRequest &+= 1
         }
         selection = destination
         savedDestination = destination.rawValue
@@ -1115,9 +1120,9 @@ struct ATHLTHiPadStudioRootView: View {
                     showingTrain = true
                 },
                 focusedPlanningDate: $focusedPlanningDate,
-                selectedDate: $selectedHomeWeekDate
+                selectedDate: $selectedHomeWeekDate,
+                scrollToTopRequest: homeScrollRequest
             )
-            .id(homeNavigationRevision)
         case .planner:
             ATHLTHStudioPlannerView(
                 onStartWorkout: { planID, workoutID in
