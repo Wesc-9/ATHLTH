@@ -201,53 +201,42 @@ struct ATHLTHiPadLiveWorkoutStatusCard: View {
             .onChange(of: live.remote?.id) { _, newID in
                 if newID != nil { showingAccess = false }
             }
-        } else if ATHLTHDeviceRole.isIPad && account.signedIn {
-            // A permanent, light-weight connection row belongs near the top
-            // of Studio so athletes can tell whether detection is working.
-            // Do not claim that the iPhone is idle when network reads fail.
+        } else if ATHLTHDeviceRole.isIPad && account.signedIn &&
+                    live.presenceConnectionIssue {
+            // A healthy idle phone does not need a permanent empty Home
+            // card. Preserve the explicit error/retry affordance only when
+            // remote activity detection cannot be verified.
             HStack(spacing: 12) {
-                Image(systemName: live.presenceConnectionIssue
-                    ? "wifi.exclamationmark" : "iphone.gen3.radiowaves.left.and.right")
+                Image(systemName: "wifi.exclamationmark")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .frame(width: 32, height: 32)
                     .background(ATHLTHPlanDesign.selectedSurface,
                                 in: RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(live.presenceConnectionIssue
-                        ? tr("Cannot update iPhone workout status",
-                             "Kan ikke oppdatere iPhone-status")
-                        : live.hasCheckedPresence
-                            ? tr("No workout detected on iPhone",
-                                 "Ingen pågående økt registrert")
-                            : tr("Checking iPhone workout status",
-                                 "Sjekker øktstatus på iPhone"))
+                    Text(tr("Cannot update iPhone workout status",
+                            "Kan ikke oppdatere iPhone-status"))
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
-                    Text(live.presenceConnectionIssue
-                        ? tr("Check connection and try again",
-                             "Sjekk tilkoblingen og prøv igjen")
-                        : tr("An active workout will appear here. Detailed viewing requires iPhone approval.",
-                             "Aktive økter vises her. Detaljer krever godkjenning på iPhone."))
+                    Text(tr("Check connection and try again",
+                            "Sjekk tilkoblingen og prøv igjen"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 4)
-                if live.presenceConnectionIssue {
-                    Button {
-                        Task {
-                            await live.refreshPresenceNow(
-                                accountID: account.profile.userID
-                            )
-                        }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .frame(width: 36, height: 36)
+                Button {
+                    Task {
+                        await live.refreshPresenceNow(
+                            accountID: account.profile.userID
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(tr("Retry connection", "Prøv igjen"))
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .frame(width: 44, height: 44)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Retry connection", "Prøv igjen"))
             }
             .padding(.horizontal, 15)
             .padding(.vertical, 11)
