@@ -1067,18 +1067,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         Label("ATHLTH Coach", systemImage: "sparkles")
                             .font(.title2.weight(.semibold))
                         Text(ATHLTHLocalization.choose(english: "Use your goal and current plan to prepare changes.", norwegian: "Ta utgangspunkt i målet ditt og planen du har laget."))
-                        Picker(ATHLTHLocalization.choose(english: "Scope", norwegian: "Omfang"), selection: $aiPlanAction) {
-                            Text(ATHLTHLocalization.choose(english: "Empty days", norwegian: "Tomme dager")).tag("fill")
-                            Text(ATHLTHLocalization.choose(english: "Selected day", norwegian: "Valgt dag")).tag("adjust")
-                            Text(ATHLTHLocalization.choose(english: "Entire plan", norwegian: "Hele planen")).tag("rebuild")
-                        }.pickerStyle(.segmented)
-                        if aiPlanAction == "adjust" {
-                            DatePicker(ATHLTHLocalization.choose(english: "Day", norwegian: "Dag"), selection: aiAdjustmentDateBinding, in: startDate...resolvedEndDate, displayedComponents: .date)
-                        }
-                        TextField(ATHLTHLocalization.choose(english: "What should Coach change or keep?", norwegian: "Hva skal Coach endre eller beholde?"), text: $aiAdjustmentInstruction, axis: .vertical)
-                            .lineLimit(3...6).padding(14)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
-                        Text(ATHLTHLocalization.choose(english: "Your goal, plan, equipment and instruction are shared with Coach. Review all suggestions before applying. Health history and injury notes are not included.", norwegian: "Mål, plan, utstyr og instruksjon deles med Coach. Du ser gjennom forslagene før de tas i bruk. Helsehistorikk og skadeopplysninger tas ikke med."))
+                        Label(ATHLTHLocalization.choose(
+                            english: "Coach suggests workouts for empty days only.",
+                            norwegian: "Coach foreslår økter kun på tomme dager."
+                        ), systemImage: "calendar.badge.plus")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        Text(ATHLTHLocalization.choose(english: "Your goal, plan and equipment are shared with Coach. Existing workouts and rest days are protected. Review all suggestions before applying. Health history and injury notes are not included.", norwegian: "Mål, plan og utstyr deles med Coach. Eksisterende økter og hviledager beskyttes. Du ser gjennom forslag før de tas i bruk. Helsehistorikk og skadeopplysninger tas ikke med."))
                             .font(.caption).foregroundStyle(.secondary)
                         Button {
                             showingGuidedAIConsent = false
@@ -1088,7 +1086,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .frame(maxWidth: .infinity, minHeight: 44)
                         }
                         .buttonStyle(.borderedProminent).tint(ATHLTHPlanDesign.accentInk)
-                        .disabled(isGuidedAIFilling || (aiPlanAction == "adjust" && aiAdjustmentInstruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+                        .disabled(isGuidedAIFilling)
                     }.padding(20)
                 }
                 .background(ATHLTHPlanDesign.canvas)
