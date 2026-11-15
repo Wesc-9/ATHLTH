@@ -555,12 +555,23 @@ struct AIProgramBuilderView: View {
             coachIntakeCard("figure.mixed.cardio", ATHLTHLocalization.choose(
                 english: "What do you want to train?", norwegian: "Hva ønsker du å trene?")) {
                 coachChoiceGrid {
-                    ForEach(TrainingFocus.profileSelectionCases) { focus in
+                    ForEach(coachTrainingFocusOptions) { focus in
                         coachToggleOption(
                             focus.title,
                             selected: standaloneIntake.trainingTypes.contains(focus)
                         ) {
                             toggleStandaloneTrainingType(focus)
+                        }
+                    }
+                    coachToggleOption(
+                        ATHLTHLocalization.choose(
+                            english: "Cycling", norwegian: "Sykling"
+                        ),
+                        selected: standaloneIntake.includesCycling
+                    ) {
+                        standaloneIntake.includesCycling.toggle()
+                        if standaloneIntake.includesCycling {
+                            standaloneIntake.trainingTypes.remove(.generalFitness)
                         }
                     }
                 }
@@ -581,6 +592,29 @@ struct AIProgramBuilderView: View {
                             toggle(outcome, in: &standaloneIntake.outcomes)
                         }
                     }
+                }
+
+                if standaloneIntake.outcomes.contains(.stronger) {
+                    Divider()
+                    Text(ATHLTHLocalization.choose(
+                        english: "Which lift and weight are you aiming for?",
+                        norwegian: "Hvilken øvelse og vekt vil du oppnå?"
+                    ))
+                    .font(.subheadline.bold())
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Exercise, e.g. bench press",
+                        norwegian: "Øvelse, f.eks. benkpress"
+                    ), text: $standaloneIntake.targetExerciseName)
+                    .textFieldStyle(.roundedBorder)
+                    ATHLTHCoachNumberInput(
+                        label: ATHLTHLocalization.choose(
+                            english: "Target weight", norwegian: "Målvekt"
+                        ),
+                        unit: "kg",
+                        value: $standaloneIntake.targetLiftKilograms,
+                        range: 1...600,
+                        step: 5
+                    )
                 }
 
                 if standaloneIntake.trainingTypes.contains(.strength) {
@@ -1059,6 +1093,7 @@ struct AIProgramBuilderView: View {
         } else {
             if focus == .generalFitness {
                 standaloneIntake.trainingTypes.removeAll()
+                standaloneIntake.includesCycling = false
             } else {
                 standaloneIntake.trainingTypes.remove(.generalFitness)
             }
