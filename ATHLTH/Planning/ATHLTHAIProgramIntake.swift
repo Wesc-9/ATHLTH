@@ -37,7 +37,8 @@ struct ATHLTHAIProgramIntake: Equatable {
         var title: String {
             switch self {
             case .stronger:
-                ATHLTHLocalization.choose(english: "Get stronger", norwegian: "Bli sterkere")
+                ATHLTHLocalization.choose(english: "Reach a weight in an exercise",
+                    norwegian: "Nå en vekt i en øvelse")
             case .betterFitness:
                 ATHLTHLocalization.choose(english: "Better fitness", norwegian: "Bedre form")
             case .buildMuscle:
@@ -198,6 +199,9 @@ struct ATHLTHAIProgramIntake: Equatable {
     /// enum has no cycling case; the request context carries this explicitly.
     var includesCycling = false
     var outcomes: Set<Outcome> = []
+    /// Only relevant when the athlete explicitly chooses a lift target.
+    var targetExerciseName = ""
+    var targetLiftKilograms: Int?
     var muscleGroups: Set<String> = []
     var experience: Experience?
     var durationWeeks: Int?
@@ -242,6 +246,14 @@ struct ATHLTHAIProgramIntake: Equatable {
             issues.append("trainingTypes")
         }
         if outcomes.isEmpty { issues.append("outcomes") }
+        if outcomes.contains(.stronger) {
+            if targetExerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                issues.append("targetExerciseName")
+            }
+            if targetLiftKilograms == nil || !(1...600).contains(targetLiftKilograms ?? 0) {
+                issues.append("targetLiftKilograms")
+            }
+        }
         if trainingTypes.contains(.strength) && muscleGroups.isEmpty {
             issues.append("muscleGroups")
         }
@@ -389,6 +401,9 @@ struct ATHLTHAIProgramIntake: Equatable {
         Explicit standalone Coach intake:
         Training types: \(types).
         Desired outcomes: \(outcomeText).
+        Specific lift target: \(outcomes.contains(.stronger)
+            ? "\(String(targetLiftKilograms ?? 0)) kg in \(targetExerciseName.trimmingCharacters(in: .whitespacesAndNewlines))"
+            : "Not selected").
         Strength muscle focus: \(muscles.isEmpty ? "Not applicable" : muscles).
         Experience: \(experience?.title ?? "Not specified").
         Plan duration: \(durationWeeks ?? 0) weeks.
