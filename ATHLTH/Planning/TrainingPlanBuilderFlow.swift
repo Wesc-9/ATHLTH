@@ -1269,6 +1269,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     guard proposed.isValid else { return false }
                     updateWeekDay(selection.id) { edit in
                         edit.isRestDay = false
+                        edit.removeAllWorkouts = false
                         if addingExtraWorkout {
                             if edit.detailedWorkout == nil {
                                 edit.detailedWorkout = proposed
@@ -4167,39 +4168,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .padding(16).background(.white, in: RoundedRectangle(cornerRadius: 18))
     }
 
-    private var planAITools: some View {
-        builderPanel {
-            VStack(alignment: .leading, spacing: 12) {
-                Label(ATHLTHLocalization.choose(english: "Adjust with ATHLTH Coach", norwegian: "Juster med ATHLTH Coach"), systemImage: "sparkles")
-                    .font(.headline)
-                TextField(ATHLTHLocalization.choose(english: "What would you like to change?", norwegian: "Hva ønsker du å endre?"), text: $aiAdjustmentInstruction, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                Button(ATHLTHLocalization.choose(english: "Fill empty days", norwegian: "Fyll tomme dager")) {
-                    aiPlanAction = "fill"
-                    showingGuidedAIConsent = true
-                }
-                DatePicker(
-                    ATHLTHLocalization.choose(english: "Day to adjust", norwegian: "Dag som skal justeres"),
-                    selection: aiAdjustmentDateBinding,
-                    in: startDate...resolvedEndDate, displayedComponents: .date)
-                Button(ATHLTHLocalization.choose(english: "Adjust selected day", norwegian: "Juster valgt dag")) {
-                    aiPlanAction = "adjust"
-                    showingGuidedAIConsent = true
-                }
-                .disabled(aiAdjustmentInstruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button(ATHLTHLocalization.choose(english: "Rebuild the entire plan", norwegian: "Lag hele planen på nytt")) {
-                    aiPlanAction = "rebuild"
-                    showingGuidedAIConsent = true
-                }
-                Text(ATHLTHLocalization.choose(english: "Review the suggestions before applying. Small changes affect only the selected day.", norwegian: "Se gjennom forslagene før du bruker dem. Små justeringer gjelder bare valgt dag."))
-                    .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
-                if isGuidedAIFilling { ProgressView() }
-            }
-            .buttonStyle(.bordered)
-            .disabled(isGuidedAIFilling)
-        }
-    }
-
     private func aiProposal(
         _ draft: AIProgramDraft, replacing keys: Set<Int>?, minutes: Int
     ) throws -> ATHLTHGuidedPlanAutofill.Proposal {
@@ -4748,9 +4716,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             },
             onAddWorkout: {
-                advancedAddDestination = AdvancedAddDestination(
-                    day: guidedCurrentWeekday, week: guidedCurrentWeek,
-                    phase: .main, kind: .workout)
+                // A new independent workout shares the selected date.
+                // Never overwrite another workout already planned today.
+                selectedPlanWeekIndex = guidedCurrentWeek
+                addingExtraWorkout = true
+                editingWorkoutIndex = 0
+                quickStudioOption = nil
+                studioInitialQuickAdd = nil
+                studioInitialPhase = .main
+                editingFocusedBlockIndex = nil
+                composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
             },
             onQuick: { quick in
                 addAdvancedQuickContent(quick)
@@ -4771,6 +4746,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     guidedCurrentWeekday, index: workoutIndex,
                     focusedBlockIndex: blockIndex
                 )
+            },
+            onDeleteWorkout: { index in
+                removeGuidedWorkout(day: guidedCurrentWeekday,
+                                    week: guidedCurrentWeek, index: index)
+            },
+            onCoachFill: {
+                aiPlanAction = "fill"
+                showingGuidedAIConsent = true
             },
             onRestDay: {
                 selectedPlanWeekIndex = guidedCurrentWeek
@@ -4959,53 +4942,172 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         saveResumableDraft()
     }
 
+    /// A quick chip inserts a real executable block immediately, without
+    /// presenting Workout Studio. Exercise and complete-workout library
+    /// selections remain pickers (never a second workout editing engine).
     private func addAdvancedQuickContent(_ choice: String) {
-        selectedPlanWeekIndex = guidedCurrentWeek
         let day = guidedCurrentWeekday
+        let week = guidedCurrentWeek
+        selectedPlanWeekIndex = week
         switch choice {
-        case "running": chooseQuickWorkout(.run, on: day)
-        case "walking": chooseQuickWorkout(.walk, on: day)
-        case "yoga": chooseQuickWorkout(.yoga, on: day)
-        case "meditation": chooseQuickWorkout(.meditation, on: day)
-        case "cycling":
-            quickStudioOption = nil
-            addingExtraWorkout = false
-            editingWorkoutIndex = 0
-            composingAdvancedDay = WeekDayEditorSelection(id: day)
-        case "interval", "superset":
-            // These are handled inline by ATHLTHPlanInlineGroupComposer.
-            break
-        case "restday":
-            setRestDay(day)
-        case "stretching":
+        case "workout":
             advancedAddDestination = AdvancedAddDestination(
-                day: day, week: guidedCurrentWeek,
-                phase: .cooldown, kind: .stretching)
-        case "rest":
-            let key = weekDayKey(day, weekIndex: guidedCurrentWeek)
-            if var edit = weekDayEdits[key],
-               var workout = edit.detailedWorkout, workout.isValid {
-                let rest = WorkoutTemplateBlock(
-                    sequence: (workout.blocks.map(\.sequence).max() ?? 0) + 1,
-                    kind: .rest,
-                    title: ATHLTHLocalization.choose(
-                        english: "Rest", norwegian: "Pause"),
-                    exerciseSlug: nil, distanceMeters: nil,
-                    repetitions: nil, durationSeconds: 90,
-                    targetWeightKilograms: nil, loadNote: nil,
-                    notes: nil, phase: .main
-                )
-                workout.blocks.append(rest)
-                edit.detailedWorkout = workout
-                weekDayEdits[key] = edit
-            } else {
-                setRestDay(day)
-            }
+                day: day, week: week, phase: .main, kind: .workout)
+        case "exercise":
+            advancedAddDestination = AdvancedAddDestination(
+                day: day, week: week, phase: .main, kind: .exercise)
         default:
-            advancedAddDestination = AdvancedAddDestination(
-                day: day, week: guidedCurrentWeek,
-                phase: .main, kind: .exercise)
+            guard let block = guidedQuickBlock(for: choice) else { return }
+            appendGuidedQuickBlock(block, on: day, week: week)
         }
+    }
+
+    private func guidedQuickBlock(for choice: String) -> WorkoutTemplateBlock? {
+        var block: WorkoutTemplateBlock
+        let title: String
+        let seconds: TimeInterval
+        switch choice {
+        case "walking", "running", "active-rest":
+            title = choice == "walking"
+                ? ATHLTHLocalization.choose(english: "Walk", norwegian: "Gå")
+                : choice == "running"
+                    ? ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+                    : ATHLTHLocalization.choose(english: "Active recovery", norwegian: "Aktiv pause")
+            seconds = choice == "walking" ? 1_800 : choice == "running" ? 1_200 : 120
+            block = WorkoutTemplateBlock(
+                sequence: 1, kind: .run, title: title,
+                exerciseSlug: nil, distanceMeters: nil,
+                repetitions: nil, durationSeconds: seconds,
+                targetWeightKilograms: nil, loadNote: nil, notes: nil,
+                phase: .main
+            )
+            block.cardioActivity = choice == "running" ? .running : .walking
+            block.isActiveRecovery = choice == "active-rest"
+            return block
+        case "strength":
+            title = ATHLTHLocalization.choose(
+                english: "Free strength training", norwegian: "Fri styrketrening"
+            )
+            // Same library exercise slug used by the native free-strength mode.
+            return WorkoutTemplateBlock(
+                sequence: 1, kind: .exercise, title: title,
+                exerciseSlug: "athlth-native-free-strength-training",
+                distanceMeters: nil, repetitions: nil, durationSeconds: nil,
+                targetWeightKilograms: nil, loadNote: nil, notes: nil,
+                phase: .main
+            )
+        case "cycling", "yoga", "meditation", "stretching":
+            title = choice == "cycling"
+                ? ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
+                : choice == "yoga" ? "Yoga"
+                : choice == "meditation"
+                    ? ATHLTHLocalization.choose(english: "Meditation", norwegian: "Meditasjon")
+                    : ATHLTHLocalization.choose(english: "Stretching", norwegian: "Uttøying")
+            seconds = choice == "cycling" ? 1_800 : choice == "yoga" ? 900
+                : choice == "meditation" ? 300 : 600
+            block = WorkoutTemplateBlock(
+                sequence: 1, kind: .note, title: title,
+                exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+                durationSeconds: seconds, targetWeightKilograms: nil,
+                loadNote: nil, notes: nil,
+                phase: choice == "stretching" ? .cooldown :
+                    choice == "meditation" ? .recovery : .main
+            )
+            switch choice {
+            case "cycling": block.activityTag = "cycling"
+            case "yoga": block.wellnessKind = .yoga
+            case "meditation": block.wellnessKind = .meditation
+            default: block.wellnessKind = .stretching
+            }
+            return block
+        case "rest":
+            return WorkoutTemplateBlock(
+                sequence: 1, kind: .rest,
+                title: ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"),
+                exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+                durationSeconds: 90, targetWeightKilograms: nil,
+                loadNote: nil, notes: nil, phase: .main
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// Every selected date owns an ordered list of separate workouts.
+    /// Quick chips append to its primary workout; the gold new-workout action
+    /// always creates a distinct entry. Unrelated entries are not touched.
+    private func appendGuidedQuickBlock(
+        _ block: WorkoutTemplateBlock, on day: Int, week: Int
+    ) {
+        let key = weekDayKey(day, weekIndex: week)
+        var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+        var current = edit.detailedWorkout ??
+            (edit.removeTemplateDetail || edit.removeAllWorkouts == true
+                ? nil : structuredWorkoutsByDay[day])
+        var next = block
+        next.sequence = (current?.blocks.map(\.sequence).max() ?? 0) + 1
+        if var workout = current {
+            guard workout.blocks.count < 200 else { return }
+            workout.blocks.append(next)
+            workout.kind = workoutKind(for: workout.blocks)
+            workout.durationMinutes = ATHLTHWorkoutDurationEstimator.minutes(
+                for: workout.blocks
+            ) ?? max(5, workout.durationMinutes)
+            current = workout
+        } else {
+            let blocks = [next]
+            current = ATHLTHPlanStructuredWorkoutBlueprint(
+                title: next.title, kind: workoutKind(for: blocks),
+                durationMinutes: ATHLTHWorkoutDurationEstimator.minutes(
+                    for: blocks
+                ) ?? max(5, Int((next.durationSeconds ?? 600) / 60)),
+                routeID: nil, blocks: blocks
+            )
+        }
+        guard let current, current.isValid else { return }
+        edit.detailedWorkout = current
+        edit.title = current.title
+        edit.kind = current.kind
+        edit.durationMinutes = current.durationMinutes
+        edit.isRestDay = false
+        edit.removeTemplateDetail = false
+        edit.removeAllWorkouts = false
+        weekDayEdits[key] = edit
+        selectedDays.insert(day)
+        sessionsPerWeek = selectedDays.count
+        saveResumableDraft()
+    }
+
+    /// Delete by the position in the visible day's workout list. Promoting
+    /// the next workout retains its full recipe, extras, and planned time.
+    private func removeGuidedWorkout(day: Int, week: Int, index: Int) {
+        selectedPlanWeekIndex = week
+        let key = weekDayKey(day, weekIndex: week)
+        let current = previewWorkouts(for: day)
+        guard current.indices.contains(index) else { return }
+        var remaining = current
+        remaining.remove(at: index)
+        var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+        if let first = remaining.first {
+            edit.detailedWorkout = first
+            edit.additionalDetailedWorkouts = Array(remaining.dropFirst())
+            edit.title = first.title
+            edit.kind = first.kind
+            edit.durationMinutes = first.durationMinutes
+            edit.removeAllWorkouts = false
+            edit.removeTemplateDetail = false
+        } else {
+            edit.detailedWorkout = nil
+            edit.additionalDetailedWorkouts = nil
+            edit.title = nil
+            edit.kind = nil
+            edit.durationMinutes = nil
+            edit.removeTemplateDetail = true
+            edit.removeAllWorkouts = true
+        }
+        edit.isRestDay = false
+        weekDayEdits[key] = edit
+        saveResumableDraft()
     }
 
     /// Calls the same Supabase Coach generator used by the full AI plan flow.
@@ -5560,6 +5662,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             edit.kind = nil
             edit.durationMinutes = nil
             edit.removeTemplateDetail = true
+            edit.removeAllWorkouts = false
             edit.additionalDetailedWorkouts = nil
             edit.trainingPlace = nil
         }
@@ -5578,6 +5681,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         if hasRunning { return .running }
         if hasWalking { return .walking }
+        if blocks.allSatisfy({ $0.kind == .rest }) { return .recovery }
         // Cycling has its own category, but WorkoutKind has no cycling case.
         // Never label a cycling-only session as strength.
         if blocks.contains(where: { $0.activityTag == "cycling" }) {
@@ -5608,6 +5712,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         updateWeekDay(day) { edit in
             edit.isRestDay = false
+            edit.removeAllWorkouts = false
             if asExtra {
                 edit.additionalDetailedWorkouts = (edit.additionalDetailedWorkouts ?? []) + [blueprint]
             } else {
@@ -6316,6 +6421,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private func effectiveDetailedWorkout(for day: Int) -> ATHLTHPlanStructuredWorkoutBlueprint? {
         if let edit = weekDayEdits[weekDayKey(day)] {
+            if edit.removeAllWorkouts == true { return nil }
             if let detailed = edit.detailedWorkout { return detailed }
             if edit.removeTemplateDetail { return nil }
         }
@@ -6439,7 +6545,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private func previewWorkouts(for day: Int) -> [ATHLTHPlanStructuredWorkoutBlueprint] {
         let edit = weekDayEdits[weekDayKey(day)]
-        guard edit?.isRestDay != true else { return [] }
+        guard edit?.isRestDay != true && edit?.removeAllWorkouts != true else {
+            return []
+        }
         let primary = effectiveDetailedWorkout(for: day)
         return (primary.map { [$0] } ?? []) + (edit?.additionalDetailedWorkouts ?? [])
     }
@@ -7696,52 +7804,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         VStack(spacing: 0) {
             Divider()
                 .opacity(0.35)
-
-            if step == .week && mode == .advanced &&
-               weekPlanningApproach == .guided {
-                Button {
-                    aiPlanAction = "fill"
-                    showingGuidedAIConsent = true
-                } label: {
-                    HStack(spacing: 11) {
-                        if isGuidedAIFilling {
-                            ProgressView()
-                                .tint(ATHLTHTrainDesign.bronze)
-                        } else {
-                            Image(systemName: "sparkles")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        Text(isGuidedAIFilling
-                             ? ATHLTHLocalization.choose(
-                                english: "ATHLTH Coach is preparing the plan...",
-                                norwegian: "ATHLTH Coach lager ukeplanen...")
-                             : ATHLTHLocalization.choose(
-                                english: "Fill empty days with Coach",
-                                norwegian: "Fyll tomme dager med Coach"))
-                            .font(.subheadline.weight(.semibold))
-                        Spacer(minLength: 0)
-                        if !isGuidedAIFilling {
-                            Image(systemName: "arrow.up.right")
-                                .font(.caption.weight(.medium))
-                        }
-                    }
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-                    .padding(.horizontal, 17)
-                    .frame(maxWidth: .infinity, minHeight: 46)
-                    .background(
-                        ATHLTHTrainDesign.canvas,
-                        in: RoundedRectangle(cornerRadius: 15)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 15)
-                            .strokeBorder(ATHLTHTrainDesign.bronze.opacity(0.38), lineWidth: 1)
-                    }
-                }
-                .buttonStyle(.plain)
-                .disabled(isGuidedAIFilling)
-                .padding(.horizontal, 18)
-                .padding(.top, 10)
-            }
 
             HStack(spacing: 10) {
                 if step != .mode &&
