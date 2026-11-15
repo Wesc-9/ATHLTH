@@ -989,22 +989,54 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var planPresentations: some View {
         AnyView(planSecondaryObservers)
-        .confirmationDialog(
-            ATHLTHLocalization.choose(english: "Leave plan builder?", norwegian: "Forlate planbyggeren?"),
-            isPresented: $showingPlanExitSheet, titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(english: "Save draft and close", norwegian: "Lagre utkast og lukk")) {
-                guard saveResumableDraft() else { return }
-                draftStore.setEditing(false, userID: session.profile.userID, draftID: draftID)
-                dismiss()
-            }
-            Button(ATHLTHLocalization.choose(english: "Discard draft", norwegian: "Forkast utkast"), role: .destructive) {
-                if draftStore.deleteDraft(userID: session.profile.userID, draftID: draftID) {
+        .sheet(isPresented: $showingPlanExitSheet) {
+            ATHLTHDiscardDraftSheet(
+                kind: .trainingPlan,
+                onKeepEditing: {
+                    planDiscardError = nil
+                    showingPlanExitSheet = false
+                },
+                onSaveDraftAndClose: {
+                    planDiscardError = nil
+                    guard saveResumableDraft() else {
+                        planDiscardError = creationError ??
+                            ATHLTHLocalization.choose(
+                                english: "Could not save the draft. Your plan is still open.",
+                                norwegian: "Kunne ikke lagre utkastet. Planen er fortsatt åpen."
+                            )
+                        return
+                    }
+                    // Explicitly close a saved draft. Merely backgrounding
+                    // the app must not clear the interrupted-editor marker.
+                    draftStore.setEditing(false,
+                        userID: session.profile.userID, draftID: draftID)
+                    showingPlanExitSheet = false
+                    Task { @MainActor in
+                        await Task.yield()
+                        dismiss()
+                    }
+                },
+                onDiscard: {
+                    planDiscardError = nil
+                    guard draftStore.deleteDraft(
+                        userID: session.profile.userID, draftID: draftID
+                    ) else {
+                        planDiscardError = ATHLTHLocalization.choose(
+                            english: "The draft could not be deleted. Nothing was discarded.",
+                            norwegian: "Utkastet kunne ikke slettes. Ingenting ble forkastet."
+                        )
+                        return
+                    }
                     deliberatelyDiscardedPlanDraft = true
-                    dismiss()
-                }
-            }
-            Button(ATHLTHLocalization.choose(english: "Keep editing", norwegian: "Fortsett å redigere"), role: .cancel) {}
+                    showingPlanExitSheet = false
+                    Task { @MainActor in
+                        await Task.yield()
+                        dismiss()
+                    }
+                },
+                errorMessage: planDiscardError
+            )
+            .presentationCompactAdaptation(.sheet)
         }
         .alert(
             ATHLTHLocalization.choose(
