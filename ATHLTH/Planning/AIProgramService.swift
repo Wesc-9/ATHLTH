@@ -297,10 +297,28 @@ struct AIProgramDraftSession: Codable, Hashable {
     let exercises: [AIProgramDraftExercise]
     /// Optional for older deployed Coach functions and stored drafts.
     var blocks: [AIProgramDraftStep]? = nil
+    /// Full ATHLTH engine recipe saved by the shared Basic/Advanced editor.
+    /// The AI proposal is still private until the whole plan is approved.
+    /// Keeping the real PlannedSession preserves groups, sets, audio, route
+    /// and exercise IDs that AIProgramDraftStep cannot represent losslessly.
+    var authoredWorkout: PlannedSession? = nil
+
+    var visibleExerciseCount: Int {
+        if let authoredWorkout {
+            let blocks = authoredWorkout.resolvedWorkoutBlocks
+            return Set(blocks.filter { $0.kind == .exercise }
+                .map { $0.exerciseID?.uuidString ??
+                    ATHLTHExerciseReferenceResolver.key($0.title) }).count
+        }
+        return exercises.count
+    }
 
     func makePlannedSession(
         exerciseLibrary: [ExerciseLibraryEntry] = []
     ) -> PlannedSession {
+        // User-authored Basic/Advanced edits are already a validated ATHLTH
+        // workout. Do not downgrade them through the compact AI contract.
+        if let authoredWorkout { return authoredWorkout }
         var workout = PlannedSession(
             id: UUID(),
             title: title,
