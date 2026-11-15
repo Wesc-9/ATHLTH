@@ -213,4 +213,88 @@ final class ATHLTHPlanDraftValidatorTests: XCTestCase {
         ).isEmpty)
     }
 
+
+    func testCoachStrengthProducesExecutableSetAndRestBlocks() {
+        let session = workout().makePlannedSession()
+        let blocks = session.resolvedWorkoutBlocks
+        XCTAssertEqual(blocks.filter { $0.kind == .exercise }.count, 3)
+        XCTAssertEqual(blocks.filter { $0.kind == .rest }.count, 2)
+        XCTAssertTrue(session.exercises.isEmpty,
+                      "A unified timeline must not execute exercises twice")
+        XCTAssertEqual(blocks.first(where: { $0.kind == .exercise })?
+            .targetEffortRPE, 7)
+        XCTAssertEqual(blocks.first(where: { $0.kind == .exercise })?
+            .repetitions, 8)
+    }
+
+    func testCoachSteadyRunCreatesRunnableATHLTHBlock() {
+        let draft = AIProgramDraftSession(
+            title: "Easy Aerobic Run", kind: "running",
+            durationMinutes: 45, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            notes: nil, exercises: []
+        )
+        let workout = draft.makePlannedSession()
+        XCTAssertEqual(workout.kind, .running)
+        XCTAssertEqual(workout.resolvedWorkoutBlocks.count, 1)
+        XCTAssertEqual(workout.resolvedWorkoutBlocks.first?.kind, .run)
+        XCTAssertEqual(workout.resolvedWorkoutBlocks.first?.durationSeconds, 2700)
+    }
+
+    func testCoachRejectsStrengthWithoutSetsAndIntervalsWithoutDrags() {
+        let unstructuredStrength = AIProgramDraftSession(
+            title: "Full Body Strength", kind: "strength",
+            durationMinutes: 60, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            notes: nil, exercises: []
+        )
+        let unstructuredInterval = AIProgramDraftSession(
+            title: "4x4 Interval Run", kind: "running",
+            durationMinutes: 45, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            notes: nil, exercises: []
+        )
+        let draft = AIProgramDraft(
+            title: "ATHLTH Coach", summary: "",
+            weeks: [AIProgramDraftWeek(
+                weekNumber: 1, title: "Week 1",
+                days: [AIProgramDraftDay(
+                    dayIndex: 1, title: "Monday",
+                    sessions: [unstructuredStrength, unstructuredInterval]
+                )]
+            )]
+        )
+        let issues = ATHLTHPlanDraftValidator.issues(
+            in: draft, expectedWeeks: 1,
+            requireExecutableWorkouts: true
+        )
+        XCTAssertTrue(issues.contains("strength_missing_structured_sets"))
+        XCTAssertTrue(issues.contains("interval_missing_drags"))
+    }
+
+    func testCoachAcceptsStructuredStrengthAndSteadyRun() {
+        let easyRun = AIProgramDraftSession(
+            title: "Easy Aerobic Run", kind: "running",
+            durationMinutes: 40, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            notes: nil, exercises: []
+        )
+        let draft = AIProgramDraft(
+            title: "ATHLTH Coach", summary: "",
+            weeks: [AIProgramDraftWeek(
+                weekNumber: 1, title: "Week 1",
+                days: [
+                    AIProgramDraftDay(dayIndex: 1, title: "Monday",
+                                      sessions: [workout()]),
+                    AIProgramDraftDay(dayIndex: 3, title: "Wednesday",
+                                      sessions: [easyRun])
+                ]
+            )]
+        )
+        XCTAssertTrue(ATHLTHPlanDraftValidator.issues(
+            in: draft, expectedWeeks: 1,
+            requireExecutableWorkouts: true
+        ).isEmpty)
+    }
+
 }
