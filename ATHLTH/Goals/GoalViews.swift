@@ -2331,14 +2331,6 @@ struct GoalCreationView: View {
                 }
             }
             compactGoalImagePicker
-            DisclosureGroup(ATHLTHLocalization.choose(english: "Why this matters and notes", norwegian: "Hvorfor dette er viktig og notater")) {
-                goalPersonalDetails
-            }
-            .tint(goalFlowGold)
-            DisclosureGroup(ATHLTHLocalization.choose(english: "Tracking and milestones", norwegian: "Sporing og delmål")) {
-                milestoneStep
-            }
-            .tint(goalFlowGold)
             if !embeddedInPlan {
                 goalInputCard(
                     icon: "text.cursor",
@@ -2753,6 +2745,23 @@ struct GoalCreationView: View {
                         )
                 )
             }
+
+            // Advanced notes and tracking are available but never interrupt
+            // the photo, target, exercise and muscle selection hierarchy.
+            DisclosureGroup(ATHLTHLocalization.choose(
+                english: "Why this matters and notes",
+                norwegian: "Hvorfor dette er viktig og notater"
+            )) {
+                goalPersonalDetails
+            }
+            .tint(goalFlowGold)
+            DisclosureGroup(ATHLTHLocalization.choose(
+                english: "Tracking and milestones",
+                norwegian: "Sporing og delmål"
+            )) {
+                milestoneStep
+            }
+            .tint(goalFlowGold)
         }
     }
 
