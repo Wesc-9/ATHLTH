@@ -78,7 +78,7 @@ enum ATHLTHExerciseMuscleFilterPresentation {
         if let group = ExerciseMuscleGroup(rawValue: part) {
             return group.iconName
         }
-        if part == "Legs" { return "figure.hiking" }
+        if part == "Legs" { return "figure.stairs" }
         return "figure.strengthtraining.traditional"
     }
 }
