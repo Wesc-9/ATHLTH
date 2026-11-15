@@ -24,8 +24,8 @@ struct ATHLTHDiscardDraftSheet: View {
                 )
             case .trainingPlan:
                 return ATHLTHLocalization.choose(
-                    english: "Leave plan creation?",
-                    norwegian: "Avslutte planleggingen?"
+                    english: "Keep your plan for later?",
+                    norwegian: "Ta vare på planen din?"
                 )
             case .savedTrainingPlanDraft:
                 return ATHLTHLocalization.choose(
@@ -49,8 +49,8 @@ struct ATHLTHDiscardDraftSheet: View {
                 )
             case .trainingPlan:
                 return ATHLTHLocalization.choose(
-                    english: "Your plan is not finished. Save the draft to continue building it later.",
-                    norwegian: "Treningsplanen er ikke ferdig. Behold utkastet for å fortsette senere."
+                    english: "Save your progress and return to the same day and workout whenever you like.",
+                    norwegian: "Lagre fremdriften og fortsett på samme dag og treningsøkt når du ønsker."
                 )
             case .savedTrainingPlanDraft:
                 return ATHLTHLocalization.choose(
@@ -91,82 +91,134 @@ struct ATHLTHDiscardDraftSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 13) {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(bronze)
-                    .frame(width: 48, height: 48)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 15))
-                    .accessibilityHidden(true)
-
-                VStack(spacing: 7) {
-                    Text(kind.title)
-                        .font(.system(size: 23, weight: .semibold, design: .rounded))
-                        .foregroundStyle(ink)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(kind.description)
-                        .font(.system(size: 14))
-                        .foregroundStyle(ink.opacity(0.64))
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 0) {
+                if kind == .trainingPlan {
+                    Text("A T H L T H   /   P L A N")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.3)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .padding(.bottom, 17)
                 }
+
+                Image(systemName: kind == .trainingPlan
+                    ? "square.and.arrow.down" : "square.and.pencil")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 50, height: 50)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 17))
+                    .accessibilityHidden(true)
+                    .padding(.bottom, 14)
+
+                Text(kind.title)
+                    .font(.system(size: kind == .trainingPlan ? 27 : 23,
+                                  weight: kind == .trainingPlan ? .medium : .semibold,
+                                  design: kind == .trainingPlan ? .serif : .rounded))
+                    .foregroundStyle(ink)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 8)
+
+                Text(kind.description)
+                    .font(.system(size: 14))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 20)
 
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
-                        .foregroundStyle(Color.red)
+                        .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
+                        .padding(.bottom, 12)
+                        .accessibilityAddTraits(.updatesFrequently)
                 }
 
-                VStack(spacing: 9) {
-                    Button {
-                        onKeepEditing()
-                        dismiss()
-                    } label: {
-                        Label(
-                            kind == .savedTrainingPlanDraft
-                                ? tr("Keep draft", "Behold utkast")
-                                : tr("Keep editing", "Fortsett å redigere"),
-                            systemImage: kind == .savedTrainingPlanDraft
-                                ? "checkmark" : "arrow.uturn.backward"
-                        )
+                VStack(spacing: 10) {
+                    if kind == .trainingPlan {
+                        if let onSaveDraftAndClose {
+                            Button(action: onSaveDraftAndClose) {
+                                Label(
+                                    tr("Save draft and close", "Lagre utkast og lukk"),
+                                    systemImage: "square.and.arrow.down"
+                                )
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                                .background(bronze.gradient,
+                                            in: RoundedRectangle(cornerRadius: 16))
+                            }
+                            .accessibilityIdentifier("athlth-plan-save-draft-and-close")
+                        }
+
+                        Button {
+                            onKeepEditing()
+                            dismiss()
+                        } label: {
+                            Text(tr("Continue editing", "Fortsett redigering"))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(ink)
+                                .frame(maxWidth: .infinity, minHeight: 49)
+                                .background(.white,
+                                            in: RoundedRectangle(cornerRadius: 16))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 1)
+                                }
+                        }
+                        .accessibilityIdentifier("athlth-plan-keep-editing")
+                    } else {
+                        Button {
+                            onKeepEditing()
+                            dismiss()
+                        } label: {
+                            Label(
+                                kind == .savedTrainingPlanDraft
+                                    ? tr("Keep draft", "Behold utkast")
+                                    : tr("Keep editing", "Fortsett å redigere"),
+                                systemImage: kind == .savedTrainingPlanDraft
+                                    ? "checkmark" : "arrow.uturn.backward"
+                            )
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 50)
                             .background(bronze.gradient,
                                         in: RoundedRectangle(cornerRadius: 16))
-                    }
+                        }
 
-                    if let onSaveDraftAndClose {
-                        Button {
-                            onSaveDraftAndClose()
-                        } label: {
-                            Label(tr("Save draft and close", "Lagre utkast og lukk"),
-                                  systemImage: "square.and.arrow.down")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(ink)
-                                .frame(maxWidth: .infinity, minHeight: 49)
-                                .background(ATHLTHPlanDesign.selectedSurface,
-                                            in: RoundedRectangle(cornerRadius: 16))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .strokeBorder(bronze.opacity(0.13), lineWidth: 0.7)
-                                }
+                        if let onSaveDraftAndClose {
+                            Button(action: onSaveDraftAndClose) {
+                                Label(tr("Save draft and close", "Lagre utkast og lukk"),
+                                      systemImage: "square.and.arrow.down")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(ink)
+                                    .frame(maxWidth: .infinity, minHeight: 49)
+                                    .background(ATHLTHPlanDesign.selectedSurface,
+                                                in: RoundedRectangle(cornerRadius: 16))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .strokeBorder(bronze.opacity(0.13), lineWidth: 0.7)
+                                    }
+                            }
                         }
                     }
+
+                    Divider()
+                        .overlay(ATHLTHPlanDesign.warmDivider.opacity(0.55))
+                        .padding(.vertical, 5)
 
                     Button(role: .destructive) {
                         onDiscard()
                     } label: {
                         Label(kind.destructiveTitle, systemImage: "trash")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(red: 0.74, green: 0.19, blue: 0.20))
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color(red: 0.66, green: 0.25, blue: 0.24))
+                            .frame(maxWidth: .infinity, minHeight: 42)
                             .contentShape(Rectangle())
                     }
+                    .accessibilityIdentifier("athlth-plan-discard-draft")
                     .accessibilityHint(tr(
                         "Permanently delete only this unfinished draft",
                         "Sletter kun dette uferdige utkastet permanent"
@@ -175,18 +227,21 @@ struct ATHLTHDiscardDraftSheet: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 24)
-            .padding(.top, 23)
+            .padding(.top, kind == .trainingPlan ? 29 : 23)
             .padding(.bottom, 22)
-            .frame(maxWidth: 470)
+            .frame(maxWidth: 440)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
-        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
-        .presentationDetents(onSaveDraftAndClose == nil
-            ? [.height(310), .medium, .large]
-            : [.height(383), .medium, .large])
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .presentationDetents(kind == .trainingPlan
+            ? [.height(435), .large]
+            : onSaveDraftAndClose == nil
+                ? [.height(310), .medium, .large]
+                : [.height(383), .medium, .large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(30)
         .accessibilityElement(children: .contain)
     }
+
 }
