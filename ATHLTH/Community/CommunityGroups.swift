@@ -2056,6 +2056,11 @@ final class CommunityGroupStore: ObservableObject {
     /// used by the inbox recent-conversations shortcuts.
     @Published private(set) var recentChatActivityByGroup: [UUID: Date] = [:]
     @Published private(set) var eventsByGroup: [UUID: [CommunityGroupEventRecord]] = [:]
+    // Home only needs a tiny future-events summary, not the entire
+    // club calendar (which can contain thousands of past RSVPs).
+    @Published private(set) var homeUpcomingEvents: [CommunityGroupEventRecord] = []
+    @Published private(set) var homeUpcomingEventsAccountID: UUID?
+    @Published private(set) var homeUpcomingEventsLoadFailed = false
     @Published private(set) var challengesByGroup: [UUID: [CommunityGroupChallengeRecord]] = [:]
     // Lightweight, cross-Club calendar snapshots do not overwrite any Club's
     // complete challenge history loaded on its detail screen.
@@ -2073,6 +2078,7 @@ final class CommunityGroupStore: ObservableObject {
 
     private let client: SupabaseClient
     private var lastRefreshAt: Date?
+    private var lastHomeEventsRefreshAt: Date?
     private var lastRecentChatRefreshAt: Date?
     private var recentChatActivityUserID: UUID?
     private var isRefreshingRecentChatActivity = false
@@ -2758,6 +2764,59 @@ final class CommunityGroupStore: ObservableObject {
             .filter { joinedIDs.contains($0.key) }
             .values
             .flatMap { $0 }
+    }
+
+    /// Lightweight account-scoped iPad Home summary. Never mutate the full
+    /// eventsByGroup calendar or fetch all RSVP history just for two cards.
+    func refreshHomeUpcomingEvents(force: Bool = false) async {
+        guard let userID = currentUserID else {
+            homeUpcomingEvents = []
+            homeUpcomingEventsAccountID = nil
+            lastHomeEventsRefreshAt = nil
+            homeUpcomingEventsLoadFailed = false
+            return
+        }
+        if homeUpcomingEventsAccountID != userID {
+            homeUpcomingEventsAccountID = userID
+            homeUpcomingEvents = []
+            lastHomeEventsRefreshAt = nil
+        }
+        if !force,
+           let lastHomeEventsRefreshAt,
+           Date().timeIntervalSince(lastHomeEventsRefreshAt) < 120 {
+            return
+        }
+        let groupIDs = Array(joinedGroupIDs)
+        guard !groupIDs.isEmpty else {
+            homeUpcomingEvents = []
+            homeUpcomingEventsLoadFailed = false
+            lastHomeEventsRefreshAt = Date()
+            return
+        }
+        do {
+            let since = ISO8601DateFormatter().string(from: .now)
+            let rows: [CommunityGroupEventRecord] = try await client
+                .from("community_group_events")
+                .select()
+                .in("group_id", values: groupIDs.map(\.uuidString))
+                .gte("starts_at", value: since)
+                .order("starts_at", ascending: true)
+                .limit(24)
+                .execute().value
+            guard !Task.isCancelled, currentUserID == userID else { return }
+            homeUpcomingEvents = rows
+                .filter { joinedGroupIDs.contains($0.groupID) }
+                .filter { !["cancelled", "draft", "completed"]
+                    .contains($0.status.lowercased()) }
+            homeUpcomingEventsLoadFailed = false
+            lastHomeEventsRefreshAt = Date()
+        } catch is CancellationError {
+            return
+        } catch {
+            guard currentUserID == userID else { return }
+            // Preserve the previously verified summary when offline.
+            homeUpcomingEventsLoadFailed = true
+        }
     }
 
     func refreshCalendarContent() async {
