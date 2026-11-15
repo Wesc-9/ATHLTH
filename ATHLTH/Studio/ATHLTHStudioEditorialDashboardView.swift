@@ -1218,12 +1218,17 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     onInspect(workout)
                 } label: {
                     HStack(spacing: 12) {
-                        Text(workout.startDate.formatted(
-                            date: .omitted, time: .shortened
-                        ))
-                        .font(.subheadline.weight(.semibold))
-                        .monospacedDigit()
-                        .frame(width: 84, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHStudioRecordedWorkouts.timeRange(workout))
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
+                            Text(tr("Start–finish", "Start–slutt"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(width: 125, alignment: .leading)
 
                         Rectangle()
                             .fill(outline.opacity(0.8))
