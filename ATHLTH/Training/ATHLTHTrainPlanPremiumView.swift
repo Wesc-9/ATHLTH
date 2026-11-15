@@ -5,6 +5,7 @@ import SwiftUI
 struct ATHLTHTrainPlanPremiumView: View {
     @EnvironmentObject private var session: AppSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -186,19 +187,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         .onAppear {
             refreshUnfinishedPlanDraft()
             session.refreshActivePlanForToday()
-            if let checkpoint = unfinishedPlanDrafts.first(where: {
-                unfinishedDraftStore.wasEditing(
-                    userID: session.profile.userID,
-                    draftID: $0.draftID
-                ) &&
-                Date().timeIntervalSince($0.draft.savedAt) < 24 * 60 * 60
-            }) {
-                Task { @MainActor in
-                    await Task.yield()
-                    guard !showingCreation else { return }
-                    openDraft(checkpoint)
-                }
-            }
+            resumeInterruptedDraftIfNeeded()
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced
             }
@@ -223,10 +212,41 @@ struct ATHLTHTrainPlanPremiumView: View {
         .onChange(of: showingCreation) { _, showing in
             if !showing { refreshUnfinishedPlanDraft() }
         }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            refreshUnfinishedPlanDraft()
+            resumeInterruptedDraftIfNeeded()
+        }
         .onChange(of: highlightedPlanID) { _, next in
             focusedPlanID = next
             if next != nil { browsingMyPlans = false }
         }
+    }
+
+    /// Reopen only the plan that was actually being edited when the app
+    /// left the foreground. Saved-but-closed drafts remain in My Plans.
+    /// This handles both cold launches and sheet loss on scene suspension.
+    private func resumeInterruptedDraftIfNeeded() {
+        guard !showingCreation, !completedPlanPendingDisplay else { return }
+        guard let checkpoint = unfinishedPlanDrafts.first(where: {
+            unfinishedDraftStore.wasEditing(
+                userID: session.profile.userID,
+                draftID: $0.draftID
+            ) && Date().timeIntervalSince($0.draft.savedAt) < 24 * 60 * 60
+        }) else { return }
+        Task { @MainActor in
+            await Task.yield()
+            guard !showingCreation,
+                  unfinishedDraftStore.wasEditing(
+                      userID: session.profile.userID,
+                      draftID: checkpoint.draftID
+                  ) else { return }
+            openDraft(checkpoint)
+        }
+    }
+
+    private var completedPlanPendingDisplay: Bool {
+        pendingCreatedPlanID != nil
     }
 
     private var studioEntryPoints: some View {
