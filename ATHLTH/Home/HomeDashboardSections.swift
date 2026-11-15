@@ -3132,6 +3132,9 @@ private struct HomeWeeklyProgressDaySheet: View {
     var canStartWithWatch = false
     var onStartStandaloneWorkout:
         ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
+    var onSendWorkoutToWatch: ((PlannedSession) -> Void)? = nil
+    var onDelayWorkoutStart: ((PlannedSession, TimeInterval) -> Void)? = nil
+    var onDelayWatchStart: ((PlannedSession) -> Void)? = nil
     let onOpenWorkout: () -> Void
     let onPlanWorkout: (Date) -> Void
 
