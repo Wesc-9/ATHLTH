@@ -504,8 +504,7 @@ export function coachBackfillSparseFinalWeek(
     // Prefer the same weekday across earlier weeks to retain the athlete's
     // chosen training pattern, but rotate source weeks if variety was chosen.
     const order = varyWeeks
-      ? [...previous.keys()].reverse().map((i, idx) =>
-          previous[(i + idx) % previous.length])
+      ? [...previous.slice(0, -1)].reverse().concat(previous[previous.length - 1])
       : [...previous].reverse();
     const candidates: { session: Session; key: string; sameDay: boolean }[] = [];
     for (const [sourceWeekIndex, week] of order.entries()) {
@@ -522,10 +521,8 @@ export function coachBackfillSparseFinalWeek(
     candidates.sort((a, b) =>
       Number(b.sameDay) - Number(a.sameDay) ||
       (isDeload
-        ? Number(a.session.kind === "running" &&
-            /easy|rolig|aerobic/i.test(String(a.session.title))) * -1 +
-          Number(b.session.kind === "running" &&
-            /easy|rolig|aerobic/i.test(String(b.session.title)))
+        ? Number(/easy|rolig|aerobic/i.test(String(b.session.title ?? ""))) -
+          Number(/easy|rolig|aerobic/i.test(String(a.session.title ?? "")))
         : 0),
     );
     const choice = candidates.find(c => !reused.has(c.key));
