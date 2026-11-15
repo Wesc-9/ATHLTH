@@ -105,31 +105,6 @@ private struct ATHLTHStudioInboxToolbarButton: View {
     }
 }
 
-private struct ATHLTHStudioInboxUnreadPill: View {
-    @EnvironmentObject private var messaging: MessagingStore
-    let ink: Color
-    let gold: Color
-
-    private var unread: Int {
-        max(0, messaging.unreadCount + messaging.messageRequestCount)
-    }
-
-    var body: some View {
-        if unread > 0 {
-            Text(unread > 99 ? "99+" : "\(unread)")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ink)
-                .padding(.horizontal, 9)
-                .frame(minHeight: 25)
-                .background(gold.opacity(0.12), in: Capsule())
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "\(unread) unread messages",
-                    norwegian: "\(unread) uleste meldinger"
-                ))
-        }
-    }
-}
-
 struct ATHLTHiPadStudioRootView: View {
     @EnvironmentObject private var session: AppSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMessagePanelMotion
@@ -492,56 +467,23 @@ struct ATHLTHiPadStudioRootView: View {
             // Opening a planning day changes only the detail/inspector.
         }
         .inspector(isPresented: $showingInspector) {
-            // Reuse the actual iPhone inbox and DirectMessageThreadView.
-            // Do not create a separate iPad conversation design or composer.
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Inbox panel", norwegian: "Innbokspanel"
-                        ),
-                        systemImage: "bubble.left.and.bubble.right"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ink)
-                    .labelStyle(.titleAndIcon)
-                    Spacer(minLength: 4)
-                    ATHLTHStudioInboxUnreadPill(ink: ink, gold: gold)
-                    inspectorCollapseButton
-                }
-                .padding(.horizontal, 17)
-                .padding(.top, 8)
-                .padding(.bottom, 7)
-                .contentShape(Rectangle())
-                // Only the panel chrome responds to a dismiss swipe. The
-                // unchanged iPhone conversation keeps its own gestures.
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 24)
-                        .onEnded { value in
-                            if ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
-                                translation: value.translation
-                            ) {
-                                withAnimation(messagePanelAnimation) {
-                                    showingInspector = false
-                                }
-                            }
+            // The message view now owns its back, search and compose controls.
+            // Removing the separate "Inbox panel" bar gives the messages
+            // their full height and prevents duplicate navigation chrome.
+            NavigationStack {
+                MessageInboxDestinationView(
+                    onBack: {
+                        withAnimation(messagePanelAnimation) {
+                            showingInspector = false
                         }
+                    }
                 )
-                Rectangle()
-                    .fill(gold.opacity(0.18))
-                    .frame(height: 1)
-                    .padding(.horizontal, 17)
-                NavigationStack {
-                    MessageInboxDestinationView()
-                }
-                // Ensure a previous account's open thread cannot be reused.
-                .id(session.profile.userID)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            // Ensure a previous account's open thread cannot be reused.
+            .id(session.profile.userID)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(canvas)
             .inspectorColumnWidth(min: 340, ideal: 420, max: 510)
-            // Deliberately no inspector-wide swipe recognizer: it would
-            // compete with gestures within the unchanged iPhone thread.
         }
         .sheet(isPresented: $showingWorkoutDetail, onDismiss: {
             inspectedWeekDate = nil
@@ -623,29 +565,6 @@ struct ATHLTHiPadStudioRootView: View {
         withAnimation(messagePanelAnimation) {
             showingInspector = true
         }
-    }
-
-    /// Compact collapse affordance; the header remains visible at all widths.
-    private var inspectorCollapseButton: some View {
-        Button {
-            withAnimation(messagePanelAnimation) {
-                showingInspector = false
-            }
-        } label: {
-            Image(systemName: "chevron.right")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ink)
-                .frame(width: 42, height: 42)
-                .background(.white, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(gold.opacity(0.22)))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Close messages",
-            norwegian: "Lukk meldinger"
-        ))
-        .accessibilityIdentifier("athlth-ipad-hide-inspector")
     }
 
     @ViewBuilder
