@@ -1059,15 +1059,10 @@ struct ATHLTHiPadStudioRootView: View {
         case .overview:
             ATHLTHStudioEditorialDashboardView(
                 onInspect: inspect,
-                onSelectWeekDay: showWeekDay,
                 onOpenPlanner: { openStudio(.planner) },
                 onOpenPlanSync: { showingPlanSync = true },
                 onOpenInsights: { openStudio(.insights) },
-                onOpenHistory: { openStudio(.history) },
                 onOpenSettings: { openStudio(.settings) },
-                onOpenLibrary: {
-                    openLibrary(.overview)
-                },
                 onOpenCommunity: { tab in
                     openCommunity(tab)
                 },
@@ -1089,10 +1084,6 @@ struct ATHLTHiPadStudioRootView: View {
                         // generic Train landing page.
                         selectedStandaloneWorkout = entry.workout
                     }
-                },
-                onStartQuick: {
-                    trainRequest = .customQuick
-                    showingTrain = true
                 },
                 onStartWorkout: { entry in
                     if let planID = entry.planID {
@@ -1166,13 +1157,6 @@ struct ATHLTHiPadStudioRootView: View {
         showingWorkoutDetail = false
         inspectedWeekDate = nil
         selectedWorkout = nil
-    }
-
-    private func showWeekDay(_ date: Date) {
-        selectedHomeWeekDate = date
-        selectedWorkout = nil
-        inspectedWeekDate = Calendar.current.startOfDay(for: date)
-        showingWorkoutDetail = true
     }
 
     private func inspectRecordedFromWeek(_ workout: WorkoutSummary) {
