@@ -2525,6 +2525,7 @@ struct CustomExerciseEditorView: View {
     @State private var visibility: ATHLTHExerciseVisibility = .privateOnly
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
+    @State private var renderedExerciseImage: UIImage?
     @State private var videoURLText = ""
     @State private var showingVideoImporter = false
     @State private var importedVideoURL: URL?
@@ -2677,13 +2678,7 @@ struct CustomExerciseEditorView: View {
     }
 
     private var previewExerciseImage: UIImage? {
-        if let selectedImageData {
-            return UIImage(data: selectedImageData)
-        }
-        guard let url = editing?.exercise.imageURL, url.isFileURL else {
-            return nil
-        }
-        return UIImage(contentsOfFile: url.path)
+        renderedExerciseImage
     }
 
     private var firstPrimaryMuscle: ExerciseMuscleGroup? {
@@ -3091,14 +3086,30 @@ struct CustomExerciseEditorView: View {
                     ExerciseStudioVideoStorage.discardOwnedVideo(importedVideoURL)
                 }
             }
+            .onAppear {
+                // Exercise artwork is decoded once per sheet rather than
+                // reloading the local file while every TextField updates.
+                guard renderedExerciseImage == nil,
+                      let url = editing?.exercise.imageURL,
+                      url.isFileURL else { return }
+                renderedExerciseImage = UIImage(contentsOfFile: url.path)
+            }
             .onChange(of: selectedPhoto) { _, item in
                 guard let item else {
                     selectedImageData = nil
+                    if let url = editing?.exercise.imageURL, url.isFileURL {
+                        renderedExerciseImage = UIImage(contentsOfFile: url.path)
+                    } else {
+                        renderedExerciseImage = nil
+                    }
                     return
                 }
 
                 Task {
-                    selectedImageData = try? await item.loadTransferable(type: Data.self)
+                    let data = try? await item.loadTransferable(type: Data.self)
+                    guard !Task.isCancelled else { return }
+                    selectedImageData = data
+                    renderedExerciseImage = data.flatMap(UIImage.init(data:))
                 }
             }
         }
