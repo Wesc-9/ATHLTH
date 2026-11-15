@@ -286,8 +286,9 @@ struct ATHLTHiPadStudioRootView: View {
                     // previously rendered as an empty translucent title tile.
                     .toolbarBackground(canvas, for: .navigationBar)
                     .toolbarBackground(
-                        selection == .overview && libraryPage == nil
-                            && sidebarPage == nil ? .hidden : .visible,
+                        (selection == .overview && libraryPage == nil
+                            && sidebarPage == nil) || sidebarPage == .profile
+                            ? .hidden : .visible,
                         for: .navigationBar
                     )
                     .toolbar(removing: .sidebarToggle)
