@@ -121,7 +121,7 @@ enum ExerciseMuscleGroup: String, CaseIterable, Identifiable, Hashable {
         case .triceps: return "figure.pushups"
         case .forearms: return "figure.climbing"
         case .core: return "figure.core.training"
-        case .glutes: return "figure.squat"
+        case .glutes: return "figure.hiking"
         case .quads: return "figure.stairs"
         case .hamstrings: return "figure.flexibility"
         case .calves: return "figure.run"
