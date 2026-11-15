@@ -70,6 +70,43 @@ struct ATHLTHPlanGoalOption: Identifiable {
     let focus: TrainingPlanFocus
     let goal: TrainingPlanGoalType
 
+    /// Each goal choice must resolve to a truthful tracking metric. Not
+    /// every objective is a weight PR or distance target; unsupported
+    /// measurements remain manual instead of inventing automatic progress.
+    static func linkedCategory(
+        for area: ATHLTHPlanGoalArea, choice: String
+    ) -> GoalCategory {
+        switch area {
+        case .running:
+            switch choice {
+            case "power", "wellness": return .consistency
+            case "speed": return .custom
+            default: return .endurance
+            }
+        case .strength:
+            switch choice {
+            case "power", "maintain": return .strength
+            case "return": return .consistency
+            case "muscle", "fitness": return .custom
+            default: return .custom
+            }
+        case .general:
+            switch choice {
+            case "fitness": return .endurance
+            case "wellness": return .recovery
+            default: return .consistency
+            }
+        case .specific:
+            switch choice {
+            case "event": return .event
+            case "distance": return .endurance
+            case "power": return .strength
+            case "speed", "fitness": return .custom
+            default: return .custom
+            }
+        }
+    }
+
     static func options(for area: ATHLTHPlanGoalArea) -> [Self] {
         func option(
             _ id: String, _ norwegian: String, _ english: String,
@@ -136,9 +173,10 @@ struct ATHLTHPlanGoalOption: Identifiable {
                 option("balance", "Variert trening", "Balanced training",
                        "Kombiner styrke og kondisjon.", "Combine strength and cardio.",
                        "figure.mixed.cardio", .hybrid, .improveFitness),
-                option("wellness", "Helse og velvære", "Health and wellness",
-                       "Bygg gode og varige vaner.", "Build sustainable habits.",
-                       "leaf", .generalFitness, .improveFitness),
+                option("wellness", "Bedre restitusjon", "Better recovery",
+                       "Prioriter søvn og restitusjon mellom øktene.",
+                       "Prioritize sleep and recovery between sessions.",
+                       "moon.stars", .generalFitness, .improveFitness),
                 option("maintain", "Holde meg i form", "Stay in shape",
                        "Vedlikehold formen over tid.", "Maintain your fitness.",
                        "heart", .generalFitness, .maintain),
