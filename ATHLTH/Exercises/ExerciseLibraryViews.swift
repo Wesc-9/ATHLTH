@@ -1971,7 +1971,9 @@ struct ExerciseDetailView: View {
                 if currentEntry.source == .custom &&
                    currentEntry.exercise.sharedSourceExerciseID == nil &&
                    (currentEntry.exercise.originalCreatorID == nil ||
-                    currentEntry.exercise.originalCreatorID == session.profile.userID) {
+                    currentEntry.exercise.originalCreatorID == session.profile.userID) &&
+                   (currentEntry.exercise.resolvedVisibility == .publicListing ||
+                    marketplace.isPublished(currentEntry.id)) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(ATHLTHLocalization.choose(
                             english: "Exercise Marketplace",
@@ -2000,6 +2002,14 @@ struct ExerciseDetailView: View {
                                     )
                                 }
                                 if success {
+                                    if currentEntry.exercise.resolvedVisibility ==
+                                        .publicListing &&
+                                        !marketplace.isPublished(currentEntry.id) {
+                                        var unpublished = currentEntry.exercise
+                                        unpublished.visibility = .privateOnly
+                                        unpublished.isVisibleOutsideOwnerLibrary = false
+                                        library.updateCustomExercise(unpublished)
+                                    }
                                     marketplaceFeedback = ATHLTHLocalization.choose(
                                         english: "Marketplace updated.",
                                         norwegian: "Øvelsesmarkedet er oppdatert."
@@ -2060,7 +2070,7 @@ struct ExerciseDetailView: View {
         .toolbar {
             if ATHLTHPersonalExerciseSharing.isEligible(
                 currentEntry, ownerID: session.profile.userID
-            ) {
+            ) && currentEntry.exercise.resolvedVisibility.shareable {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         do {
