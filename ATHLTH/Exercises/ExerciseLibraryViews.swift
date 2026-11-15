@@ -2438,7 +2438,10 @@ struct CustomExerciseEditorView: View {
         ))
         _equipment = State(initialValue: editing?.exercise.equipment.joined(separator: ", ") ?? "")
         _instructions = State(initialValue: editing?.exercise.instructions.joined(separator: "\n") ?? "")
-        _visibility = State(initialValue: editing?.exercise.resolvedVisibility ?? .privateOnly)
+        _visibility = State(initialValue:
+            editing?.exercise.sharedSourceExerciseID == nil
+                ? (editing?.exercise.resolvedVisibility ?? .privateOnly)
+                : .privateOnly)
         _videoURLText = State(initialValue: editing?.exercise.videoURL.flatMap {
             $0.isFileURL ? nil : $0.absoluteString
         } ?? "")
@@ -2922,6 +2925,8 @@ struct CustomExerciseEditorView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .disabled(editing?.exercise.sharedSourceExerciseID != nil &&
+                                      option != .privateOnly)
                             .accessibilityIdentifier(
                                 "exercise-visibility-\(option.rawValue)"
                             )
@@ -2970,6 +2975,9 @@ struct CustomExerciseEditorView: View {
                     )
                 }
             }
+            .sheet(item: $friendShareDraft, onDismiss: { dismiss() }) { draft in
+                ATHLTHDirectShareSheet(draft: draft)
+            }
             .fileImporter(
                 isPresented: $showingVideoImporter,
                 allowedContentTypes: [.movie, .mpeg4Movie],
@@ -3017,38 +3025,85 @@ struct CustomExerciseEditorView: View {
     }
 
     private func saveExercise() {
+        guard !savingExercise else { return }
+        Task { await saveExerciseWithVisibility() }
+    }
+
+    @MainActor
+    private func saveExerciseWithVisibility() async {
+        savingExercise = true
+        defer { savingExercise = false }
+        studioError = nil
+
         do {
             let savedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !savedName.isEmpty,
-                  savedName.count <= ATHLTHLibraryName.maximumCustomExerciseCharacters
-            else {
+                  savedName.count <= ATHLTHLibraryName.maximumCustomExerciseCharacters else {
                 studioError = ATHLTHLocalization.choose(
                     english: "Enter an exercise name of up to 40 characters.",
                     norwegian: "Skriv et øvelsesnavn på maks 40 tegn."
                 )
                 return
             }
-            // Only the shipped library's names are reserved. Two athletes
-            // may independently create custom exercises with identical names.
             guard !ATHLTHExerciseNamePolicy.collidesWithCatalog(
                 savedName, library: library
             ) else {
                 studioError = ATHLTHLocalization.choose(
-                    english: "The name is already used by a library exercise. Please choose another name.",
-                    norwegian: "Navnet finnes allerede i øvelsesbiblioteket. Velg et annet navn."
+                    english: "The name is reserved by the ATHLTH catalog.",
+                    norwegian: "Navnet er allerede brukt i ATHLTH-biblioteket."
                 )
                 return
             }
+
+            let scopedVisibility: ATHLTHExerciseVisibility =
+                editing?.exercise.sharedSourceExerciseID == nil
+                    ? visibility : .privateOnly
+            let oldRecord = editing ??
+                library.customExercises.first(where: {
+                    $0.id == pendingPublicExerciseID
+                })
+            let previouslyShareable = oldRecord?.exercise.isVisibleOutsideOwnerLibrary == true
+            var existingPublicListing = false
+            // Never demote an old publicly listed exercise locally while
+            // leaving the remotely visible copy behind. Private-only edits
+            // without any previous sharing need no network request.
+            if let oldRecord,
+               previouslyShareable || scopedVisibility == .publicListing {
+                guard let published = await marketplace.publicationExists(oldRecord.id) else {
+                    studioError = marketplace.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not check the current publication. Try again online.",
+                            norwegian: "Kunne ikke kontrollere publiseringen. Prøv igjen med nett."
+                        )
+                    return
+                }
+                existingPublicListing = published
+                if published {
+                    guard await marketplace.remove(
+                        oldRecord.id, ownerID: session.profile.userID
+                    ) else {
+                        studioError = marketplace.errorMessage ??
+                            ATHLTHLocalization.choose(
+                                english: "Could not revoke public access.",
+                                norwegian: "Kunne ikke trekke tilbake offentlig tilgang."
+                            )
+                        return
+                    }
+                }
+            }
+
             let video = previewVideoURL
-            if let editing {
-                var updated = editing.exercise
+            let saved: ExerciseLibraryEntry
+            if let oldRecord {
+                var updated = oldRecord.exercise
                 updated.name = savedName
                 updated.instructions = splitLines(instructions)
                 updated.primaryMuscles = selectedMuscleValues(primaryMuscles)
                 updated.secondaryMuscles = selectedMuscleValues(secondaryMuscles)
                 updated.equipment = splitCSV(equipment)
                 updated.activityCategory = activityCategory
-                updated.isVisibleOutsideOwnerLibrary = shareable
+                updated.visibility = scopedVisibility
+                updated.isVisibleOutsideOwnerLibrary = scopedVisibility.shareable
                 updated.videoURL = video
                 if updated.originalCreatorID == nil &&
                    updated.sharedSourceExerciseID == nil {
@@ -3058,34 +3113,76 @@ struct CustomExerciseEditorView: View {
                 }
                 if let selectedImageData {
                     updated.imageURL = try library.updateCustomImageData(
-                        selectedImageData, for: editing.id
+                        selectedImageData, for: oldRecord.id
                     )
                 }
                 library.updateCustomExercise(updated)
-                if let entry = library.customExercises.first(where: {
-                    $0.id == editing.id
-                }) {
-                    onSaved?(entry)
-                }
+                guard let stored = library.customExercises.first(where: {
+                    $0.id == oldRecord.id
+                }) else { return }
+                saved = stored
             } else {
-                let created = library.createCustomExercise(
+                saved = library.createCustomExercise(
                     ownerID: session.profile.userID,
                     name: savedName,
                     instructions: splitLines(instructions),
                     primaryMuscles: selectedMuscleValues(primaryMuscles),
                     secondaryMuscles: selectedMuscleValues(secondaryMuscles),
                     equipment: splitCSV(equipment),
-                    isVisibleOutsideOwnerLibrary: shareable,
+                    isVisibleOutsideOwnerLibrary: scopedVisibility.shareable,
                     imageData: selectedImageData,
                     videoURL: video,
                     creatorUsername: session.profile.username,
-                    activityCategory: activityCategory
+                    activityCategory: activityCategory,
+                    visibility: scopedVisibility
                 )
-                onSaved?(created)
             }
+
+            if scopedVisibility == .publicListing {
+                // Only the actual author's exercise metadata is published.
+                // Image files and locally imported videos never travel.
+                guard await marketplace.publish(
+                    saved, library: library,
+                    ownerID: session.profile.userID,
+                    username: session.profile.username
+                ) else {
+                    pendingPublicExerciseID = saved.id
+                    studioError = (marketplace.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not publish the exercise.",
+                            norwegian: "Kunne ikke publisere øvelsen."
+                        )) + ATHLTHLocalization.choose(
+                            english: " The exercise is saved locally; try again.",
+                            norwegian: " Øvelsen er lagret lokalt. Prøv igjen."
+                        )
+                    return
+                }
+            }
+
+            onSaved?(saved)
             didSaveExercise = true
             importedVideoURL = nil
-            dismiss()
+            pendingPublicExerciseID = nil
+
+            if scopedVisibility == .friends {
+                // Friends is explicit direct sharing, not an automatic post
+                // to every follower. Recipient controls remain in the
+                // existing privacy-aware messaging flow.
+                do {
+                    friendShareDraft = try ATHLTHShareDraftFactory.exercise(
+                        saved,
+                        ownerID: session.profile.userID,
+                        creatorUsername: session.profile.username,
+                        savedExercises: library.customExercises
+                    )
+                } catch {
+                    studioError = error.localizedDescription
+                    dismiss()
+                }
+            } else {
+                dismiss()
+            }
+            _ = existingPublicListing // Presence was checked before mutation.
         } catch {
             studioError = error.localizedDescription
         }
