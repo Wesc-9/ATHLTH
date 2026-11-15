@@ -7,24 +7,19 @@ struct ATHLTHPlanSimpleScheduleEntryView: View {
     @Binding var title: String
     @Binding var startDate: Date
     @Binding var weekCount: Int
-    @Binding var linkedGoalIDs: Set<UUID>
     let selectedDays: Set<Int>
-    let goals: [ATHLTHGoal]
     let suggestedName: String
     let onToggleDay: (Int) -> Void
-    let onCreateGoal: () -> Void
     let onSelectAdvanced: () -> Void
 
     var body: some View {
         ATHLTHPlanSetupFields(
             title: $title, startDate: $startDate, weekCount: $weekCount,
-            linkedGoalIDs: $linkedGoalIDs,
-            selectedDays: selectedDays, goals: goals,
+            selectedDays: selectedDays,
             suggestedName: suggestedName, advanced: false,
             planningApproach: nil,
             varyWeekdays: .constant(false),
             onToggleDay: onToggleDay,
-            onCreateGoal: onCreateGoal,
             onChooseApproach: { _ in },
             onModeChange: { isAdvanced in
                 if isAdvanced { onSelectAdvanced() }
@@ -40,20 +35,16 @@ struct ATHLTHPlanSetupFields: View {
     @Binding var title: String
     @Binding var startDate: Date
     @Binding var weekCount: Int
-    @Binding var linkedGoalIDs: Set<UUID>
     let selectedDays: Set<Int>
-    let goals: [ATHLTHGoal]
     let suggestedName: String
     let advanced: Bool
     let planningApproach: ATHLTHPlanWeekPlanningApproach?
     @Binding var varyWeekdays: Bool
     let onToggleDay: (Int) -> Void
-    let onCreateGoal: () -> Void
     let onChooseApproach: (ATHLTHPlanWeekPlanningApproach) -> Void
     let onModeChange: (Bool) -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var showingAllGoals = false
     @State private var customWeekCount = false
 
     private let canvas = ATHLTHTrainDesign.canvas
@@ -92,12 +83,10 @@ struct ATHLTHPlanSetupFields: View {
                     }
                 }
                 daysCard
-                goalsCard
                 // Choose day-by-day or weekly editing last, immediately
                 // before Next leads into the actual week editor.
                 planningApproachCard
             } else {
-                goalsCard
                 daysCard
                 startCard
             }
@@ -389,94 +378,6 @@ struct ATHLTHPlanSetupFields: View {
                     if value.count > 40 { title = String(value.prefix(40)) }
                 }
         }
-    }
-
-    private var goalsCard: some View {
-        card {
-            HStack {
-                cardHeading("target", advanced
-                            ? tr("Link to goal or event", "Koble til aktivt mål / konkurranse")
-                            : tr("Link to active goal", "Koble til aktivt mål"))
-                Button(tr("See all", "Se alle")) {
-                    showingAllGoals.toggle()
-                }
-                .font(.system(size: 10))
-                .foregroundStyle(bronze)
-                .disabled(goals.count <= 2)
-                .opacity(goals.count > 2 ? 1 : 0)
-            }
-            if goals.isEmpty {
-                HStack(spacing: 7) {
-                    Image(systemName: "target").foregroundStyle(bronze)
-                    Text(tr("You have no active goals yet.",
-                            "Du har ingen aktive mål ennå."))
-                        .foregroundStyle(muted)
-                        .font(.system(size: 11))
-                }
-                .padding(.vertical, 6)
-            } else {
-                ForEach(showingAllGoals ? goals : Array(goals.prefix(2))) { item in
-                    goalRow(item)
-                }
-            }
-            Button(action: onCreateGoal) {
-                HStack(spacing: 9) {
-                    Image(systemName: "plus.circle")
-                        .foregroundStyle(bronze)
-                    Text(tr("Create new goal", "Opprett nytt mål"))
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.caption2)
-                }
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(ink)
-                .padding(.horizontal, 10)
-                .frame(height: 36)
-                .background(canvas.opacity(0.67), in: RoundedRectangle(cornerRadius: 11))
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func goalRow(_ item: ATHLTHGoal) -> some View {
-        let chosen = linkedGoalIDs.contains(item.id)
-        return Button {
-            linkedGoalIDs = chosen ? [] : [item.id]
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: item.category.systemImage)
-                    .font(.system(size: 17))
-                    .foregroundStyle(bronze)
-                    .frame(width: 31, height: 31)
-                    .background(ATHLTHTrainDesign.paleGold.opacity(0.40),
-                                in: RoundedRectangle(cornerRadius: 9))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(ink)
-                        .lineLimit(2)
-                    if let deadline = item.deadline {
-                        Text(deadline.formatted(date: .abbreviated, time: .omitted))
-                            .font(.system(size: 10))
-                            .foregroundStyle(muted)
-                    }
-                }
-                Spacer(minLength: 0)
-                Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 19))
-                    .foregroundStyle(chosen ? bronze : border)
-            }
-            .padding(9)
-            .background(chosen ? ATHLTHTrainDesign.paleGold.opacity(0.20)
-                        : canvas.opacity(0.47),
-                        in: RoundedRectangle(cornerRadius: 11))
-            .overlay {
-                RoundedRectangle(cornerRadius: 11)
-                    .strokeBorder(chosen ? bronze.opacity(0.80) : border.opacity(0.26),
-                                  lineWidth: 0.8)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(chosen ? .isSelected : [])
     }
 
     private var daysCard: some View {
