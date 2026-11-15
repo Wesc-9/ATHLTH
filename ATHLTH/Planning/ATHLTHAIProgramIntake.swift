@@ -194,18 +194,26 @@ struct ATHLTHAIProgramIntake: Equatable {
     }
 
     var trainingTypes: Set<TrainingFocus> = []
+    /// Cycling has its own user-facing choice. The legacy TrainingFocus
+    /// enum has no cycling case; the request context carries this explicitly.
+    var includesCycling = false
     var outcomes: Set<Outcome> = []
     var muscleGroups: Set<String> = []
     var experience: Experience?
     var durationWeeks: Int?
     var sessionsPerWeek: Int?
+    var coachChoosesFrequency = false
     var availableDays: Set<Int> = []
     var sessionDurationMinutes: Int?
+    var coachChoosesDuration = false
     var locations: Set<Location> = []
     /// Required only when both gym and outdoor training are selected.
     /// Nil means the athlete has not chosen a balance yet.
     var outdoorSharePercent: Int?
     var equipment: Set<String> = []
+    /// Explicit exclusions win over availability. When neither set is
+    /// populated, Coach may assume standard equipment is accessible.
+    var unavailableEquipment: Set<String> = []
     var otherEquipment = ""
     var injuryStatus: InjuryStatus?
     /// Each injury independently identifies a body area and limitation.
@@ -224,12 +232,15 @@ struct ATHLTHAIProgramIntake: Equatable {
         if trainingTypes.contains(.running) && trainingTypes.contains(.strength) {
             return .hybrid
         }
-        return TrainingFocus.allCases.first { trainingTypes.contains($0) }
+        return TrainingFocus.allCases.first { trainingTypes.contains($0) } ??
+            (includesCycling ? .generalFitness : nil)
     }
 
     var validationIssues: [String] {
         var issues: [String] = []
-        if trainingTypes.isEmpty { issues.append("trainingTypes") }
+        if trainingTypes.isEmpty && !includesCycling {
+            issues.append("trainingTypes")
+        }
         if outcomes.isEmpty { issues.append("outcomes") }
         if trainingTypes.contains(.strength) && muscleGroups.isEmpty {
             issues.append("muscleGroups")
@@ -238,22 +249,29 @@ struct ATHLTHAIProgramIntake: Equatable {
         if durationWeeks == nil || !(1...52).contains(durationWeeks ?? 0) {
             issues.append("durationWeeks")
         }
-        if sessionsPerWeek == nil { issues.append("sessionsPerWeek") }
+        if sessionsPerWeek == nil && !coachChoosesFrequency {
+            issues.append("sessionsPerWeek")
+        }
         if availableDays.isEmpty { issues.append("availableDays") }
         if let sessionsPerWeek, availableDays.count < sessionsPerWeek {
             issues.append("availableDayCount")
         }
-        if sessionDurationMinutes == nil ||
-           !(10...180).contains(sessionDurationMinutes ?? 0) {
+        if !coachChoosesDuration &&
+           (sessionDurationMinutes == nil ||
+            !(10...180).contains(sessionDurationMinutes ?? 0)) {
             issues.append("sessionDurationMinutes")
         }
         if locations.isEmpty { issues.append("locations") }
-        if equipment.isEmpty { issues.append("equipment") }
+        // Both equipment lists are optional. Nothing chosen means that
+        // Coach assumes standard equipment is available, not bodyweight only.
+        // Exclusions can narrow that assumption independently.
         if locations.contains(.gym) && locations.contains(.outdoors) &&
             outdoorSharePercent == nil {
             issues.append("locationBalance")
         }
-        if injuryStatus == nil { issues.append("injuryStatus") }
+        // Unanswered injury questions are optional and must not be treated
+        // as either an explicit declaration of no injury or permission
+        // to share private health information.
         if injuryStatus == .considerations {
             if !injuries.isEmpty {
                 // A row is an independent selection: never apply one global
@@ -326,11 +344,21 @@ struct ATHLTHAIProgramIntake: Equatable {
     }
 
     var coachContext: String {
-        let types = trainingTypes.map(\.title).sorted().joined(separator: ", ")
+        let types = (trainingTypes.map(\.title) +
+            (includesCycling ? [
+                ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
+            ] : [])).sorted().joined(separator: ", ")
         let outcomeText = outcomes.map(\.title).sorted().joined(separator: ", ")
         let muscles = muscleGroups.sorted().joined(separator: ", ")
         let locationText = locations.map(\.title).sorted().joined(separator: ", ")
         let equipmentText = equipment.sorted().joined(separator: ", ")
+        let excludedEquipmentText = unavailableEquipment.sorted().joined(separator: ", ")
+        let equipmentRule: String
+        if equipment.isEmpty {
+            equipmentRule = "Assume all standard equipment is available except explicitly excluded equipment."
+        } else {
+            equipmentRule = "Use only explicitly available equipment, and never excluded equipment."
+        }
         let locationBalance: String
         if locations.contains(.gym) && locations.contains(.outdoors),
            let outdoorSharePercent {
@@ -351,8 +379,10 @@ struct ATHLTHAIProgramIntake: Equatable {
             before attempting potentially aggravating exercise. Never infer
             undisclosed injuries or present the plan as individually safe.
             """
-        } else {
+        } else if injuryStatus == .none {
             injuryText = "The athlete explicitly reported no injuries or training limitations."
+        } else {
+            injuryText = "Injury status was not provided. No inference about injury status or medical safety is permitted."
         }
 
         return """
@@ -362,16 +392,18 @@ struct ATHLTHAIProgramIntake: Equatable {
         Strength muscle focus: \(muscles.isEmpty ? "Not applicable" : muscles).
         Experience: \(experience?.title ?? "Not specified").
         Plan duration: \(durationWeeks ?? 0) weeks.
-        Requested sessions per week: \(sessionsPerWeek ?? 0).
+        Requested sessions per week: \(coachChoosesFrequency ? "Coach chooses within available weekdays" : String(sessionsPerWeek ?? 0)).
         Available weekday indexes: \(availableDays.sorted()).
-        Approximate session duration: \(sessionDurationMinutes ?? 0) minutes.
+        Approximate session duration: \(coachChoosesDuration ? "Coach chooses 10–180 minutes, appropriate to each workout" : "\(sessionDurationMinutes ?? 0) minutes").
         Training locations: \(locationText).
         Gym/outdoor plan balance: \(locationBalance).
-        Available equipment: \(equipmentText.isEmpty ? "No equipment selected" : equipmentText).
+        Available equipment: \(equipmentText.isEmpty ? "Assume standard equipment available" : equipmentText).
+        Unavailable equipment (never prescribe): \(excludedEquipmentText.isEmpty ? "No known exclusions" : excludedEquipmentText).
+        Equipment rule: \(equipmentRule)
         Other equipment: \(otherEquipment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "None" : String(otherEquipment.prefix(300))).
         Injury and limitation instructions:
         \(injuryText)
-        Use only the training types, locations and equipment the athlete explicitly selected. The linked main goal is optional and must not be invented.
+        Use only the selected training types and locations. Respect the equipment rule and never use excluded equipment. If training is cycling-focused, include cycling in the actual plan. The linked main goal is optional and must not be invented.
         """
     }
 }
