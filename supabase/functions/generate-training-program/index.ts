@@ -684,6 +684,49 @@ Hard rules:
 - The output is a draft the user will review before applying.
 `.trim();
 
+  // Global provider cooldown survives across requests and Edge Function
+  // instances. It stores only the provider name and expiry; no athlete data.
+  const { data: cooldown, error: cooldownError } = await admin
+    .from("athlth_ai_provider_cooldowns")
+    .select("retry_at")
+    .eq("provider", "groq")
+    .maybeSingle();
+
+  if (cooldownError) {
+    console.error("Coach provider cooldown unavailable", {
+      code: cooldownError.code ?? "query_failed",
+    });
+    // Fail closed: never consume a paid AI request if the limiter is offline.
+    return json({
+      error: "ATHLTH Coach is temporarily unavailable.",
+      code: "AI_PROVIDER_UNAVAILABLE",
+    }, 503);
+  }
+
+  const retryAt = typeof cooldown?.retry_at === "string"
+    ? Date.parse(cooldown.retry_at) : NaN;
+  const cooldownSeconds = Number.isFinite(retryAt)
+    ? Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)) : 0;
+  if (cooldownSeconds > 0) {
+    return json({
+      error: "ATHLTH Coach's AI capacity is refreshing. Please try later.",
+      code: "AI_PROVIDER_RATE_LIMIT",
+      retryAfterSeconds: cooldownSeconds,
+    }, 429, { "Retry-After": String(cooldownSeconds) });
+  }
+
+  const storeGroqCooldown = async (seconds: number): Promise<void> => {
+    const { error } = await admin.rpc("athlth_set_ai_provider_cooldown", {
+      p_provider: "groq",
+      p_seconds: Math.min(3600, Math.max(1, Math.ceil(seconds))),
+    });
+    if (error) {
+      console.error("Coach could not store provider cooldown", {
+        code: error.code ?? "rpc_failed",
+      });
+    }
+  };
+
   const budgetResponse = await enforceAIRequestBudget(() => admin.rpc("consume_ai_request_budget", {
     p_user_id: user.id, p_feature: "generate-training-program",
   }));
@@ -752,7 +795,8 @@ Hard rules:
       if (response.status === 429) {
         // Never automatically retry a rate limit; preserve Groq's reset
         // guidance so clients can display a real cooldown.
-        const seconds = coachProviderRetryAfter(response);
+        const seconds = Math.min(3600, coachProviderRetryAfter(response) + 3);
+        await storeGroqCooldown(seconds);
         console.warn("Coach provider rate limit", {
           requestId, retryAfterSeconds: seconds, phase: fallback ? "json" : "strict",
         });
@@ -774,6 +818,7 @@ Hard rules:
           // tokens remaining. Otherwise return a cooldown; do not flood.
           const remaining = Number(response.headers.get("x-ratelimit-remaining-tokens"));
           if (Number.isFinite(remaining) && remaining < 1500) {
+            await storeGroqCooldown(60);
             return json({
               error: "ATHLTH Coach's AI capacity is temporarily exhausted.",
               code: "AI_PROVIDER_RATE_LIMIT", retryAfterSeconds: 60, requestId,
@@ -859,6 +904,18 @@ Hard rules:
   }
 
   if (!aiResponse.ok) {
+    if (aiResponse.status === 429) {
+      const seconds = Math.min(3600, coachProviderRetryAfter(aiResponse) + 3);
+      await storeGroqCooldown(seconds);
+      console.warn("Coach provider rate limit", {
+        requestId, retryAfterSeconds: seconds,
+        phase: fallbackUsed ? "json" : "strict",
+      });
+      return json({
+        error: "ATHLTH Coach's AI capacity is refreshing. Try again later.",
+        code: "AI_PROVIDER_RATE_LIMIT", retryAfterSeconds: seconds, requestId,
+      }, 429, { "Retry-After": String(seconds) });
+    }
     const providerError = await aiResponse.json().catch(() => null);
     const code = coachProviderErrorCode(providerError);
     console.error("Coach upstream response failed", {
