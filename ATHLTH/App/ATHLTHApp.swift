@@ -234,6 +234,9 @@ private struct ATHLTHSceneRootView: View {
             notifications.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
+            messaging.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             studioPlanSync.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
@@ -260,6 +263,7 @@ private struct ATHLTHSceneRootView: View {
                 appSession.checkpointTrainingContent()
                 studioPlanSync.scheduleSync(session: appSession)
                 notifications.scheduleAccountSync()
+                Task { await messaging.refreshPreferences() }
             }
         }
         .onChange(of: pets.pets) { _, _ in
@@ -288,6 +292,9 @@ private struct ATHLTHSceneRootView: View {
                 watchConnection.sendAccountIdentity(nil)
             }
             notifications.switchAccount(
+                signedIn ? appSession.profile.userID : nil
+            )
+            messaging.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
             studioPlanSync.switchAccount(
@@ -322,6 +329,7 @@ private struct ATHLTHSceneRootView: View {
             while !Task.isCancelled {
                 studioPlanSync.scheduleSync(session: appSession)
                 await notifications.refreshAccountNotifications()
+                await messaging.refreshPreferences()
                 do { try await Task.sleep(for: .seconds(25)) } catch { return }
             }
         }
@@ -337,6 +345,9 @@ private struct ATHLTHSceneRootView: View {
         }
         .onChange(of: appSession.profile.userID) { _, _ in
             notifications.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
+            messaging.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
             studioPlanSync.switchAccount(appSession.signedIn ? appSession.profile.userID : nil)
@@ -357,6 +368,7 @@ private struct ATHLTHSceneRootView: View {
             // on these network operations.
             studioPlanSync.scheduleSync(session: appSession)
             notifications.scheduleAccountSync()
+            Task { await messaging.refreshPreferences() }
             let accountID = appSession.profile.userID
             Task {
                 await trainingBackups.backUp(userID: accountID)
