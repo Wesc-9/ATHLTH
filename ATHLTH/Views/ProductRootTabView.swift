@@ -3315,6 +3315,127 @@ struct ATHLTHHomeView: View {
         )
     }
 
+    /// Validates the live calendar record before offering any delayed start.
+    /// No HealthKit workout starts while backgrounded; the notification
+    /// brings the athlete back if the foreground countdown is interrupted.
+    private func deferHomeCalendarWorkoutOnPhone(
+        _ selected: PlannedSession, after seconds: TimeInterval
+    ) {
+        guard seconds >= 1, seconds <= 7_200,
+              let workout = session.standalonePlannedSessions.first(where: {
+                  $0.id == selected.id
+              }) ?? session.activePlan?.weeks.flatMap(\.days)
+                .flatMap(\.sessions).first(where: { $0.id == selected.id }),
+              !workout.isExplicitRestDay,
+              session.recordedTimes(for: workout.id)?.endedAt == nil,
+              phoneWorkout.active == nil,
+              strengthWorkout.activeWorkout == nil,
+              !watchConnection.hasActiveWatchWorkout
+        else { return }
+        let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: session.activePlan
+        )
+        if let planID, (
+            session.isPlanSessionSkipped(planID: planID, sessionID: workout.id) ||
+            session.isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory
+            )
+        ) { return }
+        selectedHomeStandaloneWorkout = nil
+        selectedHomeAllStandaloneWorkout = nil
+        PlannedWorkoutReminderScheduler.cancelDelayedStart(workout.id)
+        PlannedWorkoutReminderScheduler.scheduleDelayedStart(
+            workout, after: seconds
+        )
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(390))
+            homeDeferredPhoneDelaySeconds = seconds
+            homeDeferredPhoneWorkout = workout
+        }
+    }
+
+    /// A long press sends a prepared workout, never starts a Watch recording.
+    /// Running/walking reuse the existing Watch transfer path; strength uses
+    /// the same structured snapshot produced by PlannedWorkoutWatchBuilder.
+    private func prepareHomeCalendarWorkoutForWatch(
+        _ selected: PlannedSession, mode: WatchWorkoutStartMode
+    ) {
+        guard watchConnection.isReady,
+              let workout = session.standalonePlannedSessions.first(where: {
+                  $0.id == selected.id
+              }) ?? session.activePlan?.weeks.flatMap(\.days)
+                .flatMap(\.sessions).first(where: { $0.id == selected.id }),
+              let watchKind = PlannedWorkoutWatchBuilder.watchKind(
+                  for: workout.kind
+              ),
+              !workout.isExplicitRestDay,
+              session.recordedTimes(for: workout.id)?.endedAt == nil,
+              phoneWorkout.active == nil,
+              strengthWorkout.activeWorkout == nil,
+              !watchConnection.hasActiveWatchWorkout,
+              !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+        else {
+            homeWatchTransferError = ATHLTHLocalization.choose(
+                english: "This workout cannot be sent to Apple Watch right now.",
+                norwegian: "Denne økten kan ikke sendes til Apple Watch akkurat nå."
+            )
+            return
+        }
+        let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: session.activePlan
+        )
+        if let planID, (
+            session.isPlanSessionSkipped(planID: planID, sessionID: workout.id) ||
+            session.isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory
+            )
+        ) { return }
+        guard !ATHLTHHybridWorkoutLaunchPlan.isCandidate(workout) else {
+            homeWatchTransferError = ATHLTHLocalization.choose(
+                english: "Mixed workouts cannot yet be prepared on Watch.",
+                norwegian: "Kombinerte økter kan foreløpig ikke sendes til Watch."
+            )
+            return
+        }
+        if workout.kind == .running || workout.kind == .walking {
+            startHomeStandaloneWorkout(
+                workout, device: .appleWatch, watchStartMode: mode
+            )
+            return
+        }
+        guard watchKind == .strength else { return }
+        watchConnection.sendPreparedWorkout(
+            WatchPreparedWorkoutTransfer(
+                id: workout.id,
+                title: workout.title,
+                summary: workout.durationMinutes.map { "\($0) min" }
+                    ?? workout.kind.title,
+                kind: .strength,
+                routeID: nil,
+                runningWorkout: nil,
+                audioCoach: PlannedWorkoutWatchBuilder.audioCoachConfiguration(
+                    for: workout,
+                    selectedRoute: nil,
+                    defaultConfiguration: settings.audioCoachConfiguration(
+                        enabled: settings.audioCoachEnabledByDefault
+                    )
+                ),
+                indoor: true,
+                startMode: mode,
+                strengthWorkout: PlannedWorkoutWatchBuilder.strengthSnapshot(workout),
+                updatedAt: Date()
+            )
+        )
+        homeWatchTransferMessage = ATHLTHLocalization.choose(
+            english: "Sent to Apple Watch. Start the prepared workout there.",
+            norwegian: "Sendt til Apple Watch. Start den klargjorte økten på klokken."
+        )
+    }
+
     private func startCalendarPreview(_ workout: PlannedSession, planID: UUID?, device: WorkoutCaptureDevice) {
         selectedHomeStandaloneWorkout = nil
         selectedHomeAllStandaloneWorkout = nil
