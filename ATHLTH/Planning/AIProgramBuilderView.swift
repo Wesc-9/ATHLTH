@@ -748,9 +748,22 @@ struct AIProgramBuilderView: View {
                     )
                 }
 
-                Text(ATHLTHLocalization.choose(
-                    english: "Days you can train", norwegian: "Dager du kan trene"))
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Days you can train",
+                        norwegian: "Dager du kan trene"
+                    ))
                     .font(.subheadline.bold())
+                    Spacer(minLength: 8)
+                    Button(ATHLTHLocalization.choose(
+                        english: "All", norwegian: "Alle"
+                    )) {
+                        standaloneIntake.availableDays = Set(1...7)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .accessibilityIdentifier("athlth-coach-select-all-days")
+                }
                 HStack(spacing: 5) {
                     ForEach(1...7, id: \.self) { day in
                         Button {
@@ -784,12 +797,24 @@ struct AIProgramBuilderView: View {
                     english: "Sessions per week", norwegian: "Antall økter per uke"))
                     .font(.subheadline.weight(.semibold))
                 coachChoiceGrid {
+                    coachToggleOption(
+                        ATHLTHLocalization.choose(
+                            english: "Let Coach decide",
+                            norwegian: "La Coach bestemme"
+                        ),
+                        selected: standaloneIntake.coachChoosesFrequency
+                    ) {
+                        standaloneIntake.coachChoosesFrequency = true
+                        standaloneIntake.sessionsPerWeek = nil
+                    }
                     ForEach(1...7, id: \.self) { count in
                         coachToggleOption(
                             "\(count)",
-                            selected: standaloneIntake.sessionsPerWeek == count,
+                            selected: !standaloneIntake.coachChoosesFrequency &&
+                                standaloneIntake.sessionsPerWeek == count,
                             enabled: standaloneIntake.availableDays.count >= count
                         ) {
+                            standaloneIntake.coachChoosesFrequency = false
                             standaloneIntake.sessionsPerWeek = count
                         }
                     }
@@ -801,21 +826,37 @@ struct AIProgramBuilderView: View {
                         norwegian: "Omtrentlig tid per økt"))
                         .font(.subheadline.weight(.semibold))
                     Spacer(minLength: 5)
-                    ATHLTHCoachNumberInput(
-                        label: ATHLTHLocalization.choose(
-                            english: "Minutes per workout", norwegian: "Minutter per økt"),
-                        unit: "min",
-                        value: $standaloneIntake.sessionDurationMinutes,
-                        range: 10...180,
-                        step: 5
-                    )
+                    if !standaloneIntake.coachChoosesDuration {
+                        ATHLTHCoachNumberInput(
+                            label: ATHLTHLocalization.choose(
+                                english: "Minutes per workout",
+                                norwegian: "Minutter per økt"),
+                            unit: "min",
+                            value: $standaloneIntake.sessionDurationMinutes,
+                            range: 10...180,
+                            step: 5
+                        )
+                    }
+                
                 }
                 coachChoiceGrid {
+                    coachToggleOption(
+                        ATHLTHLocalization.choose(
+                            english: "Let Coach decide",
+                            norwegian: "La Coach bestemme"
+                        ),
+                        selected: standaloneIntake.coachChoosesDuration
+                    ) {
+                        standaloneIntake.coachChoosesDuration = true
+                        standaloneIntake.sessionDurationMinutes = nil
+                    }
                     ForEach([20, 30, 45, 60, 75, 90], id: \.self) { minutes in
                         coachToggleOption(
                             "\(minutes) min",
-                            selected: standaloneIntake.sessionDurationMinutes == minutes
+                            selected: !standaloneIntake.coachChoosesDuration &&
+                                standaloneIntake.sessionDurationMinutes == minutes
                         ) {
+                            standaloneIntake.coachChoosesDuration = false
                             standaloneIntake.sessionDurationMinutes = minutes
                         }
                     }
