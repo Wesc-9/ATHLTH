@@ -1268,13 +1268,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         edit.isRestDay = false
                         edit.removeAllWorkouts = false
                         if addingExtraWorkout {
-                            if edit.detailedWorkout == nil {
+                            // Keep a weekly blueprint as the first workout
+                            // even when it has not yet been copied into this
+                            // date's override. Adding another must append.
+                            let hasExistingTemplate = !edit.removeTemplateDetail &&
+                                structuredWorkoutsByDay[selection.id]?.isValid == true
+                            if edit.detailedWorkout != nil || hasExistingTemplate {
+                                edit.additionalDetailedWorkouts =
+                                    (edit.additionalDetailedWorkouts ?? []) + [proposed]
+                            } else {
                                 edit.detailedWorkout = proposed
                                 edit.kind = proposed.kind
                                 edit.title = proposed.title
                                 edit.durationMinutes = proposed.durationMinutes
-                            } else {
-                                edit.additionalDetailedWorkouts = (edit.additionalDetailedWorkouts ?? []) + [proposed]
                             }
                         } else if editingWorkoutIndex > 0,
                                   var extras = edit.additionalDetailedWorkouts,
@@ -4779,7 +4785,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let extras = edit.additionalDetailedWorkouts ?? []
         let editingExtra = workoutIndex > 0 && extras.indices.contains(workoutIndex - 1)
         let stretchingOnly = blocks.allSatisfy { $0.wellnessKind == .stretching }
-        var workout = (editingExtra ? extras[workoutIndex - 1] : edit.detailedWorkout) ??
+        let selectedPrimary = edit.detailedWorkout ??
+            (edit.removeTemplateDetail ? nil : structuredWorkoutsByDay[day])
+        var workout = (editingExtra ? extras[workoutIndex - 1] : selectedPrimary) ??
             ATHLTHPlanStructuredWorkoutBlueprint(
                 title: stretchingOnly
                     ? ATHLTHLocalization.choose(english: "Stretching", norwegian: "Uttøyning")
@@ -4839,7 +4847,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         selectedPlanWeekIndex = week
         let existing = weekDayEdits[weekDayKey(day, weekIndex: week)]
         let addAsExtra = existing?.isRestDay != true &&
-            existing?.detailedWorkout?.isValid == true
+            previewWorkouts(for: day).contains(where: \.isValid)
         assignLibraryWorkout(workout, to: day, asExtra: addAsExtra)
         if weekDayEdits[weekDayKey(day, weekIndex: week)]?.isRestDay == false {
             selectedDays.insert(day)
