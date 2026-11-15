@@ -5,6 +5,7 @@ import SwiftUI
 struct ATHLTHStudioHomeCommunitySummary: View {
     let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
     let onOpenTrainTogether: () -> Void
+    let onOpenNotifications: () -> Void
 
     @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var social: SocialStore
@@ -374,7 +375,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                     }
                     actionLink(tr("All invitations", "Alle invitasjoner"),
                                symbol: "arrow.up.right") {
-                        onOpenCommunity(clubInvites.isEmpty ? .arena : .clubs)
+                        onOpenNotifications()
                     }
                 }
                 VStack(spacing: 8) {
@@ -384,7 +385,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                     }
                     actionLink(tr("All invitations", "Alle invitasjoner"),
                                symbol: "arrow.up.right") {
-                        onOpenCommunity(clubInvites.isEmpty ? .arena : .clubs)
+                        onOpenNotifications()
                     }
                 }
             }
