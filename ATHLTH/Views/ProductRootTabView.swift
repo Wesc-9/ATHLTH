@@ -12,10 +12,19 @@ import UserNotifications
 private struct ATHLTHHomeDeferredPhoneStartSheet: View {
     let workoutTitle: String
     let onStart: () -> Void
+    let onCancel: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    @State private var startAt = Date().addingTimeInterval(30)
+    @State private var startAt: Date
+
+    init(workoutTitle: String, delaySeconds: TimeInterval,
+         onStart: @escaping () -> Void, onCancel: @escaping () -> Void) {
+        self.workoutTitle = workoutTitle
+        self.onStart = onStart
+        self.onCancel = onCancel
+        _startAt = State(initialValue: Date().addingTimeInterval(delaySeconds))
+    }
     @State private var started = false
     @State private var wasBackgrounded = false
 
@@ -62,6 +71,7 @@ private struct ATHLTHHomeDeferredPhoneStartSheet: View {
             .tint(ATHLTHTheme.accentDeep)
 
             Button {
+                onCancel()
                 dismiss()
             } label: {
                 Text(ATHLTHLocalization.choose(
@@ -1075,6 +1085,7 @@ struct ATHLTHHomeView: View {
     @State private var homeCalendarPendingCustom = false
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
     @State private var homeDeferredPhoneWorkout: PlannedSession?
+    @State private var homeDeferredPhoneDelaySeconds: TimeInterval = 30
     @State private var selectedHomeRecommendedWorkout: PlannedSession?
     @State private var selectedHomeRecommendationInfo: HomeDailyRecommendationInfo?
     @State private var homeRecommendedPlanID: UUID?
@@ -1213,6 +1224,17 @@ struct ATHLTHHomeView: View {
                         canStartWithWatch: watchConnection.isReady,
                         onStartStandaloneWorkout: { workout, device in
                             startHomeStandaloneWorkout(workout, device: device)
+                        },
+                        onSendWorkoutToWatch: { workout in
+                            prepareHomeCalendarWorkoutForWatch(workout, mode: .onWatch)
+                        },
+                        onDelayWorkoutStart: { workout, seconds in
+                            deferHomeCalendarWorkoutOnPhone(workout, after: seconds)
+                        },
+                        onDelayWatchStart: { workout in
+                            prepareHomeCalendarWorkoutForWatch(
+                                workout, mode: .afterThirtySeconds
+                            )
                         }
                     )
 
@@ -1590,9 +1612,15 @@ struct ATHLTHHomeView: View {
             .sheet(item: $homeDeferredPhoneWorkout) { workout in
                 ATHLTHHomeDeferredPhoneStartSheet(
                     workoutTitle: workout.title,
+                    delaySeconds: homeDeferredPhoneDelaySeconds,
                     onStart: {
+                        PlannedWorkoutReminderScheduler.cancelDelayedStart(workout.id)
                         homeDeferredPhoneWorkout = nil
                         startHomeStandaloneWorkout(workout, device: .iPhone)
+                    },
+                    onCancel: {
+                        PlannedWorkoutReminderScheduler.cancelDelayedStart(workout.id)
+                        homeDeferredPhoneWorkout = nil
                     }
                 )
             }
@@ -3265,6 +3293,21 @@ struct ATHLTHHomeView: View {
             onOpenPlannedWorkout: { startCalendarPreview(workout, planID: planID, device: .appleWatch) },
             onStartOnPhone: { startCalendarPreview(workout, planID: planID, device: .iPhone) },
             onStartOnWatch: { startCalendarPreview(workout, planID: planID, device: .appleWatch) },
+            onSendToWatch: {
+                selectedHomeStandaloneWorkout = nil
+                selectedHomeAllStandaloneWorkout = nil
+                prepareHomeCalendarWorkoutForWatch(workout, mode: .onWatch)
+            },
+            onDelayOnPhone: { seconds in
+                selectedHomeStandaloneWorkout = nil
+                selectedHomeAllStandaloneWorkout = nil
+                deferHomeCalendarWorkoutOnPhone(workout, after: seconds)
+            },
+            onDelayOnWatch: {
+                selectedHomeStandaloneWorkout = nil
+                selectedHomeAllStandaloneWorkout = nil
+                prepareHomeCalendarWorkoutForWatch(workout, mode: .afterThirtySeconds)
+            },
             isCalendarWorkout: true,
             canStart: !completed && !skipped && !workout.isExplicitRestDay
                 && session.recordedTimes(for: workout.id)?.endedAt == nil,
