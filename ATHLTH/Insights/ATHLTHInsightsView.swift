@@ -39,6 +39,7 @@ struct ATHLTHInsightsView: View {
     // Compute history aggregates only when the Health workout snapshot changes,
     // not every time SwiftUI recreates cards while the user scrolls.
     @State private var sessionBaselines = InsightsSessionBaselines.empty
+    @State private var cachedPersonalFindings: [ATHLTHPersonalInsight] = []
     @State private var lastInsightsRefreshAt: Date?
     @State private var lastInsightsRefreshAccountID: UUID?
     @State private var lastInsightsWorkoutCount = -1
@@ -200,6 +201,7 @@ struct ATHLTHInsightsView: View {
                 for: Notification.Name("athlth.dailyCheckInDidUpdate")
             )) { _ in
                 checkInStore.reloadFromStorage()
+                updatePersonalFindings()
             }
         }
     }
@@ -255,8 +257,11 @@ struct ATHLTHInsightsView: View {
 
     /// All observations are compared locally. No health data is sent to
     /// external services simply by browsing Insights.
-    private var personalFindings: [ATHLTHPersonalInsight] {
-        ATHLTHPersonalInsightEngine.findings(
+    /// Run local historical analysis when a source changes, never as a
+    /// computed property invoked repeatedly by SwiftUI scroll rendering.
+    @MainActor
+    private func updatePersonalFindings() {
+        cachedPersonalFindings = ATHLTHPersonalInsightEngine.findings(
             days: recoverySnapshot.days,
             checkIns: checkInStore.entries,
             stepsChangePercent: trendSnapshot?.stepsChangePercent,
@@ -267,7 +272,7 @@ struct ATHLTHInsightsView: View {
 
     private var personalInsightsHighlights: some View {
         ATHLTHPersonalInsightsView(
-            findings: personalFindings,
+            findings: cachedPersonalFindings,
             maxVisible: 2,
             onShowAll: {
                 selectedSection = .development
@@ -280,7 +285,7 @@ struct ATHLTHInsightsView: View {
 
     private var personalInsightsLibrary: some View {
         ATHLTHPersonalInsightsView(
-            findings: personalFindings,
+            findings: cachedPersonalFindings,
             onCheckIn: {
                 showingCheckIn = true
             }
@@ -293,11 +298,13 @@ struct ATHLTHInsightsView: View {
               health.hasRequestedAuthorization,
               !health.shouldDeferAutomaticHealthWork else {
             recoverySnapshot = .empty
+            updatePersonalFindings()
             return
         }
         // Need enough paired days for meaningful personal comparisons.
         // HealthKit caches each time range to avoid unnecessary repeat work.
         recoverySnapshot = await health.recoveryTrendSnapshot(days: 28)
+        updatePersonalFindings()
     }
 
     private var dailyRecommendationTitle: String {
@@ -770,12 +777,14 @@ struct ATHLTHInsightsView: View {
         guard health.healthDataAvailable else {
             trendSnapshot = nil
             trendError = "Apple Health is unavailable on this device."
+            updatePersonalFindings()
             return
         }
 
         guard health.hasRequestedAuthorization else {
             trendSnapshot = nil
             trendError = "Connect Apple Health to compare your recent trends."
+            updatePersonalFindings()
             return
         }
 
@@ -808,9 +817,11 @@ struct ATHLTHInsightsView: View {
                 previousEndDate: start,
                 grouping: .week
             )
+            updatePersonalFindings()
         } catch {
             trendSnapshot = nil
             trendError = error.localizedDescription
+            updatePersonalFindings()
         }
     }
 
