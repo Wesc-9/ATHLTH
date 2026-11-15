@@ -11085,6 +11085,7 @@ struct ATHLTHProfileView: View {
     var showsSideMenuCloseButton: Bool = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var profileRecords: ATHLTHProfileRecordSyncStore
     @EnvironmentObject private var accountService:
         SupabaseAccountService
     @EnvironmentObject private var trophyStore: TrophyStore
@@ -11136,8 +11137,12 @@ struct ATHLTHProfileView: View {
         false
     @State private var updatingProfileHeader =
         false
-    @AppStorage(ProfileFeaturedRecordKind.storageKey)
-    private var featuredRecordSelectionRaw = ""
+    // The account-backed selection is already synchronized by
+    // ATHLTHProfileRecordSyncStore. The old device-global AppStorage key
+    // is only a one-time migration fallback inside that store.
+    private var featuredRecordSelectionRaw: String {
+        profileRecords.selectionRaw
+    }
     @AppStorage(ProfileMomentFavorites.storageKey)
     private var favoriteMomentSelectionRaw = ""
 
@@ -12267,14 +12272,17 @@ struct ATHLTHProfileView: View {
                 )
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(kind.displayValue(
-                    healthRecords: personalRecords,
-                    stats: performanceStats,
-                    strengthRecords: strengthWorkout.personalRecords,
-                    strengthRepRecords: strengthWorkout.repPersonalRecords,
-                    performanceWorkouts: profilePerformanceWorkoutHistory.isEmpty
-                        ? health.workouts : profilePerformanceWorkoutHistory,
-                    strengthWorkouts: strengthWorkout.workoutHistory
+                Text(profileRecords.value(
+                    for: kind,
+                    local: kind.displayValue(
+                        healthRecords: personalRecords,
+                        stats: performanceStats,
+                        strengthRecords: strengthWorkout.personalRecords,
+                        strengthRepRecords: strengthWorkout.repPersonalRecords,
+                        performanceWorkouts: profilePerformanceWorkoutHistory.isEmpty
+                            ? health.workouts : profilePerformanceWorkoutHistory,
+                        strengthWorkouts: strengthWorkout.workoutHistory
+                    )
                 ))
                 .font(.system(size: 17, weight: .bold, design: .rounded))
                 .monospacedDigit()
