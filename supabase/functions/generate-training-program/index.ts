@@ -816,7 +816,8 @@ Hard rules:
         if (!fallback && coachShouldRetryInvalidSchema(response.status, providerError)) {
           // A second attempt is allowed only when Groq reports enough
           // tokens remaining. Otherwise return a cooldown; do not flood.
-          const remaining = Number(response.headers.get("x-ratelimit-remaining-tokens"));
+          const tokensHeader = response.headers.get("x-ratelimit-remaining-tokens");
+          const remaining = tokensHeader === null ? NaN : Number(tokensHeader);
           if (Number.isFinite(remaining) && remaining < 1500) {
             await storeGroqCooldown(60);
             return json({
@@ -832,7 +833,11 @@ Hard rules:
         }, 502);
       }
 
-      const resultText = coachProgramOutput(await response.json().catch(() => null));
+      const providerPayload = await response.json().catch(() => null);
+      const resultText = coachProgramOutput(providerPayload);
+      const rawFinishReason = providerPayload?.choices?.[0]?.finish_reason;
+      const finishReason = ["stop", "length", "content_filter", "tool_calls"]
+        .includes(rawFinishReason) ? rawFinishReason : "unknown";
       let parsed: unknown;
       try {
         parsed = resultText ? JSON.parse(resultText) : null;
@@ -847,8 +852,14 @@ Hard rules:
         accepted = true;
       } else {
         // Report only non-sensitive structure diagnostics, never plan text.
+        const foundWeeks = parsed && typeof parsed === "object" &&
+          Array.isArray((parsed as { weeks?: unknown }).weeks)
+          ? (parsed as { weeks: unknown[] }).weeks.length : 0;
+        // Only log non-sensitive structural counts and provider finish code.
+        // Never log generated text, injuries, athlete ID, or prompt data.
         console.error("Coach compact plan validation failed", {
-          requestId, fallback, expectedWeeks: weekCount,
+          requestId, fallback, expectedWeeks: weekCount, foundWeeks,
+          finishReason,
           elapsedMs: Date.now() - requestStarted,
         });
         // A retry with raw JSON rarely corrects missing weeks and may
