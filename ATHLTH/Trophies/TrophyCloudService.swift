@@ -66,7 +66,7 @@ private struct TrophyCloudUnlockWrite:
     let category: String
     let verificationSource: String
     let systemImage: String
-    let unlockedAt: Date
+    let unlockedAt: String
 
     enum CodingKeys:
         String,
@@ -97,8 +97,8 @@ private struct PrestigeRunEvidenceWrite:
     let activityType: String
     let distanceMeters: Double
     let durationSeconds: Double
-    let startedAt: Date
-    let endedAt: Date
+    let startedAt: String
+    let endedAt: String
     let sourceBundleIdentifier: String
     let sourceName: String
     let isIndoor: Bool?
@@ -116,9 +116,9 @@ private struct PrestigeRunEvidenceWrite:
         durationSeconds =
             evidence.durationSeconds
         startedAt =
-            evidence.startedAt
+            ATHLTHTrophyCloudTimestamp.encode(evidence.startedAt)
         endedAt =
-            evidence.endedAt
+            ATHLTHTrophyCloudTimestamp.encode(evidence.endedAt)
         sourceBundleIdentifier =
             evidence
                 .sourceBundleIdentifier
@@ -407,7 +407,7 @@ final class TrophyCloudService
                             ] ??
                             "medal.fill",
                         unlockedAt:
-                            $0.unlockedAt
+                            ATHLTHTrophyCloudTimestamp.encode($0.unlockedAt)
                     )
                 }
 
