@@ -82,4 +82,43 @@ final class ATHLTHStudioBlockReorderTests: XCTestCase {
         XCTAssertEqual(ATHLTHWorkoutNameSuggestion.displayStepTitle(run),
                        ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"))
     }
+    func testFreeStrengthCanMoveFromWarmupToMainWithoutGainingSets() {
+        let free = ATHLTHFreeStrengthRecipePolicy.make(phase: .warmup)
+        let warmup = step("Warmup", phase: .warmup)
+        let main = step("Main", phase: .main)
+        let moved = ATHLTHStudioBlockReorder.moving(
+            free.editorDragID, to: .main, over: nil, in: [warmup, free, main]
+        )
+        XCTAssertEqual(moved.map(\.title), [
+            "Warmup", "Main",
+            ATHLTHLocalization.choose(
+                english: "Free strength training", norwegian: "Fri styrketrening"
+            )
+        ])
+        let relocated = moved.last!
+        XCTAssertEqual(relocated.resolvedPhase, .main)
+        XCTAssertEqual(relocated.editorDragID, free.editorDragID)
+        XCTAssertEqual(relocated.durationSeconds, 2_700)
+        XCTAssertEqual(relocated.setCount, 1)
+        XCTAssertNil(relocated.repetitions)
+    }
+
+    func testGroupedStrengthExerciseRelocatesAsOneGroup() {
+        let group = UUID()
+        var a = step("Squat", phase: .warmup, groupID: group)
+        var b = step("Lunge", phase: .warmup, groupID: group)
+        a.groupKind = .superset
+        b.groupKind = .superset
+        let main = step("Main", phase: .main)
+        let reordered = ATHLTHStudioBlockReorder.moving(
+            b.editorDragID, to: .main, over: nil,
+            in: [a, b, main]
+        )
+        XCTAssertEqual(reordered.map(\.title), ["Main", "Squat", "Lunge"])
+        XCTAssertTrue(reordered.suffix(2).allSatisfy {
+            $0.resolvedPhase == .main && $0.groupID == group
+        })
+        XCTAssertEqual(reordered.map(\.sequence), [1, 2, 3])
+    }
+
 }
