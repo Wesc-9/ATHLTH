@@ -279,4 +279,35 @@ final class ATHLTHStudioScheduleTests: XCTestCase {
         XCTAssertEqual(repeatedImport.count, 2)
     }
 
+
+    @MainActor
+    func testAddingSameTemplateToTwoDaysCreatesSeparateCompletionIdentities() throws {
+        let suite = "ATHLTHStudioScheduleIdentity.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AppSessionStore(defaults: defaults)
+        let today = Calendar.current.startOfDay(for: .now)
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Independent repeats", summary: "", weekCount: 1, startDate: today
+        ))
+        let session = PlannedSession(
+            id: UUID(), title: "4×4", kind: .running, scheduledStart: nil,
+            durationMinutes: 45, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil, routeID: nil,
+            exercises: [], notes: nil
+        )
+        store.addSession(session, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.addSession(session, toDay: plan.weeks[0].days[2].id, inPlan: plan.id)
+        let stored = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let first = try XCTUnwrap(stored.weeks[0].days[0].sessions.first)
+        let second = try XCTUnwrap(stored.weeks[0].days[2].sessions.first)
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertEqual(first.title, second.title)
+        let upcoming = ATHLTHStudioSchedule.upcoming(
+            plans: [stored], standalone: [], now: today, days: 7
+        )
+        XCTAssertEqual(upcoming.count, 2)
+        XCTAssertEqual(Set(upcoming.map(\.id)).count, 2)
+    }
+
 }
