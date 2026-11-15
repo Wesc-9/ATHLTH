@@ -245,3 +245,4 @@ ATHLTH 2.2.0 build 128 — user-authorized overnight TestFlight upload 2026-11-1
 
 ATHLTH 2.2.0 build 128 — authorized retry 2026-11-14 after green exact-source XCTest and backend checks at 23d773e8474a1becf3722c6ea0a0e3194f8b659d; require green checks on new trigger commit, signed archive, App Store Connect upload and verified processing. Keep approved training plans and imagery unchanged.
 ATHLTH 2.2.1 build 129 TestFlight upload - user authorized 2026-11-15 after Audio Coach hydration and release build correction
+ATHLTH 2.2.1 build 129 authorized retry 2026-11-15 - fixed exercise catalog and distinct muscle icon XCTest failures; require same-commit green iOS/backend and signed TestFlight upload
