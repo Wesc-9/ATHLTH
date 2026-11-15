@@ -103,6 +103,7 @@ private struct ATHLTHStudioHomeProjection {
     let week: ATHLTHStudioHomeWeek.Snapshot
     let upcoming: [ATHLTHStudioSchedule.Occurrence]
     let analytics: ATHLTHStudioAnalytics.Snapshot
+    let completedByPlanSession: [String: Bool]
 }
 
 /// Remote Ghost updates own their SwiftUI state, so a four-second spectator
@@ -325,6 +326,21 @@ struct ATHLTHStudioEditorialDashboardView: View {
             now: selectedDate,
             plannedOverride: windows.week
         )
+        // A plan completion can inspect stored structured-workout progress.
+        // Resolve each plan/session only once per source update rather than
+        // once for each of its day tile, summary and featured workout.
+        var completedByPlanSession: [String: Bool] = [:]
+        for item in windows.week + windows.upcoming {
+            guard let planID = item.planID else { continue }
+            let key = "\(planID.uuidString):\(item.workout.id.uuidString)"
+            if completedByPlanSession[key] == nil {
+                completedByPlanSession[key] = session.isPlanSessionCompleted(
+                    planID: planID, sessionID: item.workout.id,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strength.workoutHistory
+                )
+            }
+        }
         return ATHLTHStudioHomeProjection(
             accountID: session.profile.userID,
             selectedWeekDate: selectedDate,
@@ -334,7 +350,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
             upcoming: windows.upcoming,
             analytics: ATHLTHStudioAnalytics.snapshot(
                 from: workouts, days: periodDays
-            )
+            ),
+            completedByPlanSession: completedByPlanSession
         )
     }
 
@@ -470,6 +487,15 @@ struct ATHLTHStudioEditorialDashboardView: View {
             scheduleProjectionRefresh()
         }
         .onReceive(session.$deactivatedTrainingPlanIDs) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(session.$manuallyCompletedPlanSessions) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(session.$skippedPlanSessions) { _ in
+            scheduleProjectionRefresh()
+        }
+        .onReceive(session.$linkedHealthWorkoutsByPlanSession) { _ in
             scheduleProjectionRefresh()
         }
         .onChange(of: selectedDate) { _, _ in
@@ -1384,9 +1410,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
     private func completed(_ item: ATHLTHStudioSchedule.Occurrence) -> Bool {
         guard let planID = item.planID else { return false }
+        let key = "\(planID.uuidString):\(item.workout.id.uuidString)"
+        if let projection = homeProjection,
+           projection.accountID == session.profile.userID,
+           let cached = projection.completedByPlanSession[key] {
+            return cached
+        }
         return session.isPlanSessionCompleted(
-            planID: planID,
-            sessionID: item.workout.id,
+            planID: planID, sessionID: item.workout.id,
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
