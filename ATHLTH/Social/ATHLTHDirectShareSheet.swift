@@ -8,6 +8,8 @@ struct ATHLTHDirectShareSheet: View {
     @EnvironmentObject private var messaging: MessagingStore
 
     let draft: MessageShareDraft
+    /// Set for exercises visible only to mutually following friends.
+    var mutualFollowsOnly = false
 
     @State private var username = ""
     @State private var recipient: SocialProfileCard?
@@ -28,7 +30,10 @@ struct ATHLTHDirectShareSheet: View {
     private var searchResults: [SocialProfileCard] {
         guard cleanUsername.count >= 2 else { return [] }
         var ids = Set<UUID>()
-        return (social.mutualFollows + social.discoverResults).filter { person in
+        let candidates = mutualFollowsOnly
+            ? social.mutualFollows
+            : (social.mutualFollows + social.discoverResults)
+        return candidates.filter { person in
             person.usernameLabel.localizedCaseInsensitiveContains(cleanUsername)
                 && ids.insert(person.userID).inserted
                 && social.relationshipState(with: person.userID) != .blocked
@@ -136,10 +141,18 @@ struct ATHLTHDirectShareSheet: View {
                                 .background(.white, in: RoundedRectangle(cornerRadius: 17))
                         }
 
-                        Label(tr(
-                            "One recipient only. Someone you don't follow receives a message request, which they can accept or decline.",
-                            "Kun én mottaker. En person du ikke følger, får en meldingsforespørsel som kan godtas eller avslås."
-                        ), systemImage: "lock.shield")
+                        Label(
+                            mutualFollowsOnly
+                                ? tr(
+                                    "Only mutual followers can receive this friends-only exercise.",
+                                    "Bare brukere som følger hverandre kan motta denne øvelsen."
+                                  )
+                                : tr(
+                                    "One recipient only. New contacts may receive a message request.",
+                                    "Kun én mottaker. Nye kontakter kan få meldingsforespørsel."
+                                  ),
+                            systemImage: "lock.shield"
+                        )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -195,8 +208,8 @@ struct ATHLTHDirectShareSheet: View {
                 recipient = nil
             }
             .task(id: cleanUsername) {
-                guard cleanUsername.count >= 2, !sent else {
-                    social.clearSearch()
+                guard cleanUsername.count >= 2, !sent, !mutualFollowsOnly else {
+                    if !mutualFollowsOnly { social.clearSearch() }
                     return
                 }
                 try? await Task.sleep(for: .milliseconds(260))
@@ -209,7 +222,10 @@ struct ATHLTHDirectShareSheet: View {
     private func send() async {
         guard let recipient, !sent, !sending,
               recipient.usernameLabel.localizedCaseInsensitiveContains(cleanUsername),
-              social.relationshipState(with: recipient.userID) != .blocked else {
+              social.relationshipState(with: recipient.userID) != .blocked,
+              (!mutualFollowsOnly || social.mutualFollows.contains {
+                  $0.userID == recipient.userID
+              }) else {
             return
         }
         sending = true
