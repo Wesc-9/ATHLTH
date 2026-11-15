@@ -516,7 +516,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 if !showingCreatedPlan {
                     if step == .mode {
                         EmptyView()
-                    } else if step == .goal {
+                    } else if step == .goal || step == .goalDetails {
                         AnyView(goalContinueBar)
                     } else if step == .basics && mode == .advanced {
                         AnyView(goalContinueBar)
@@ -752,13 +752,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(step == .source || step == .mode || step == .goal ||
-                     step == .basics || step == .approach ||
+                     step == .goalDetails || step == .basics || step == .approach ||
                      step == .week ? .hidden : .visible,
                      for: .navigationBar)
             .toolbar {
                 #if DEBUG
                 if step != .source && step != .mode && step != .goal &&
-                   step != .basics && step != .approach {
+                   step != .goalDetails && step != .basics && step != .approach {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingPlanDesignLab = true } label: {
                             Image(systemName: "paintpalette")
@@ -768,7 +768,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
                 #endif
                 if step != .source && step != .mode && step != .goal &&
-                    step != .basics && step != .approach && step != .week {
+                    step != .goalDetails && step != .basics && step != .approach && step != .week {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(backButtonTitle) {
                             goBack()
@@ -1472,6 +1472,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             AnyView(modeChoice)
         case .goal:
             AnyView(goalChoice)
+        case .goalDetails:
+            AnyView(goalDetailsStep)
         case .source:
             AnyView(sourceChoice)
         case .basics:
@@ -1719,12 +1721,61 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         goal = .improveFitness
                     }
                 )
-                // Goal creation belongs to the next plan step.
-                // This page only chooses direction and shows the preview.
+                // Direction is selected here. The following standalone
+                // step creates or links the goal before plan setup begins.
             }
             .padding(.horizontal, 18)
             .padding(.top, 10)
             .padding(.bottom, 26)
+            .frame(maxWidth: planContentWidth)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+
+    // Dedicated goal-creation page. The previous implementation embedded
+    // GoalCreationView in the schedule form, so goal and plan appeared as
+    // one long card on iPad. Keeping this in its own wizard step makes the
+    // title, cover, target date and metric decisions precede plan scheduling.
+    // GoalCreationView still checkpoints its draft and links the saved goal.
+    private var goalDetailsStep: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                sourceChoiceHeader
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Build your goal first",
+                        norwegian: "Opprett målet ditt først"
+                    ))
+                    .font(.system(size: 27, weight: .regular, design: .serif))
+                    .foregroundStyle(sourceInk)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Set the details of your goal before choosing dates and workouts for the training plan.",
+                        norwegian: "Gi målet et navn og tilpass detaljene før du setter opp treningsplanen."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(sourceMuted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 5)
+
+                if selectedGoalChoice == "none" {
+                    builderPanel {
+                        Label(ATHLTHLocalization.choose(
+                            english: "No specific goal is linked to this plan.",
+                            norwegian: "Ingen spesifikt mål er knyttet til denne planen."
+                        ), systemImage: "checkmark.circle")
+                        .font(.subheadline)
+                    }
+                } else {
+                    inlineGoalLinkFields
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
+            .padding(.bottom, 24)
             .frame(maxWidth: planContentWidth)
             .frame(maxWidth: .infinity)
         }
@@ -2754,6 +2805,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             return ATHLTHLocalization.choose(english: "Planning mode", norwegian: "Detaljnivå")
         case .goal:
             return ATHLTHLocalization.choose(english: "Your main goal", norwegian: "Hovedmålet ditt")
+        case .goalDetails:
+            return ATHLTHLocalization.choose(english: "Set up your goal", norwegian: "Opprett mål")
         case .source:
             return ATHLTHLocalization.choose(
                 english: "Choose a starting point",
@@ -2907,10 +2960,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     },
                     onSelectAdvanced: { openModeStart(advanced: true) }
                 )
-                if selectedGoalChoice != "none" && selectedGoalChoice != "area" &&
-                   !selectedGoalChoice.isEmpty {
-                    inlineGoalLinkFields
-                }
                 planLibrarySaveChoice
                 if let conflictingPlan, approvedPlanReplacementID != conflictingPlan.id {
                     conflictCard(conflictingPlan)
@@ -3165,10 +3214,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     adaptivePlanPair(AnyView(advancedScheduleFields), AnyView(scheduleWeekPreview))
                 } else {
                     advancedScheduleFields
-                }
-                if selectedGoalChoice != "none" && selectedGoalChoice != "area" &&
-                   !selectedGoalChoice.isEmpty {
-                    inlineGoalLinkFields
                 }
                 if let conflictingPlan, approvedPlanReplacementID != conflictingPlan.id {
                     conflictCard(conflictingPlan)
@@ -8071,6 +8116,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             return selectedGoalChoice == "none" ||
                 ATHLTHPlanGoalOption.options(for: selectedGoalArea)
                     .contains { $0.id == selectedGoalChoice }
+        case .goalDetails:
+            // The athlete must save or select an actual goal before the
+            // training-plan setup. Explicitly choosing no goal skips this.
+            return selectedGoalChoice == "none" || !selectedGoalIDs.isEmpty
         case .source:
             return true
         case .approach:
@@ -8366,6 +8415,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func goForward() {
+        // An explicit "No specific goal" goes straight to plan scheduling.
+        // Other choices must complete the separate goal-creation page.
+        if step == .goal && selectedGoalChoice == "none" {
+            withAnimation(.easeInOut(duration: 0.18)) { step = .basics }
+            return
+        }
         guard let next = ATHLTHPlanJourney.next(
             after: step, advanced: mode == .advanced
         ) else { return }
@@ -8391,8 +8446,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private func goBack() {
         if step == .basics {
-            // Go back to the goal (step 2), not the initial method selector.
-            withAnimation(.easeInOut(duration: 0.18)) { step = .goal }
+            // Return to the dedicated goal editor if a goal is linked.
+            // For "No goal" return directly to goal selection.
+            withAnimation(.easeInOut(duration: 0.18)) {
+                step = selectedGoalChoice == "none" ? .goal : .goalDetails
+            }
             return
         }
         if step == .approach {
