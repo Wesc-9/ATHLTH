@@ -184,6 +184,9 @@ struct MessageShareDraft: Hashable {
     let sourceObjectID: UUID?
     let sourceOwnerID: UUID?
     let shareVersion: Int
+    /// Friends-only exercises must never be sent through the normal
+    /// first-contact message-request path.
+    let requiresMutualFollow: Bool
 
     init<T: Encodable>(
         kind: MessageShareKind,
@@ -192,7 +195,8 @@ struct MessageShareDraft: Hashable {
         snapshot: T,
         sourceObjectID: UUID? = nil,
         sourceOwnerID: UUID? = nil,
-        shareVersion: Int = 1
+        shareVersion: Int = 1,
+        requiresMutualFollow: Bool = false
     ) throws {
         let data = try JSONEncoder().encode(snapshot)
 
@@ -211,6 +215,7 @@ struct MessageShareDraft: Hashable {
         self.sourceObjectID = sourceObjectID
         self.sourceOwnerID = sourceOwnerID
         self.shareVersion = shareVersion
+        self.requiresMutualFollow = requiresMutualFollow
     }
 }
 
