@@ -94,7 +94,9 @@ private struct ATHLTHAccountNotificationCloudRow: Codable {
     }
 
     static func stamp(_ date: Date) -> String {
-        ISO8601DateFormatter().string(from: date)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
     }
 
     private static func parse(_ raw: String?) -> Date? {
