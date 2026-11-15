@@ -15,9 +15,10 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
 
     private func entry(
         _ name: String, id: UUID, source: ExerciseLibrarySource,
-        sourceIdentifier: String? = nil, shareable: Bool = false
+        sourceIdentifier: String? = nil, shareable: Bool = false,
+        visibility: ATHLTHExerciseVisibility? = nil
     ) -> ExerciseLibraryEntry {
-        let exercise = Exercise(
+        var exercise = Exercise(
             id: id, origin: source == .custom ? .custom : .publicCatalog,
             ownerID: source == .custom ? UUID() : nil,
             name: name,
@@ -27,6 +28,7 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
             imageURL: nil,
             isVisibleOutsideOwnerLibrary: shareable
         )
+        exercise.visibility = visibility
         return ExerciseLibraryEntry(
             id: id, exercise: exercise, source: source,
             sourceIdentifier: sourceIdentifier, summary: nil, tips: [],
@@ -110,7 +112,7 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         linked.exerciseID = source.id
         let match = entry(
             source.name, id: source.id, source: .custom,
-            shareable: true
+            shareable: true, visibility: .publicListing
         )
         let withDetails = ATHLTHExerciseReferenceResolver.portableBlock(
             linked, from: [match]
@@ -121,6 +123,17 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         XCTAssertNil(withDetails.exerciseSnapshot?.imageURL)
         XCTAssertNil(withDetails.exerciseSnapshot?.videoURL)
         XCTAssertEqual(withDetails.exerciseID, source.id)
+
+        let friendOnly = entry(
+            source.name, id: source.id, source: .custom,
+            shareable: true, visibility: .friends
+        )
+        XCTAssertNil(
+            ATHLTHExerciseReferenceResolver.portableBlock(
+                linked, from: [friendOnly]
+            ).exerciseSnapshot,
+            "Friends-only exercise details must never enter a public plan"
+        )
 
         let notShared = entry(
             source.name, id: source.id, source: .custom,
