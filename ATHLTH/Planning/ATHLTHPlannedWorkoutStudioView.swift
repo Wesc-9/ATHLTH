@@ -846,6 +846,25 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         }
                         Divider()
                     }
+                    Menu {
+                        ForEach(WorkoutPhaseKind.allCases.filter {
+                            $0 != .recovery
+                        }) { target in
+                            Button {
+                                if let firstID = members.first?.editorDragID {
+                                    moveToPhase(firstID, target)
+                                }
+                            } label: {
+                                Label(target.title, systemImage: target.symbol)
+                            }
+                        }
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Move to section",
+                            norwegian: "Flytt til øktdel"
+                        ), systemImage: "arrow.up.arrow.down")
+                    }
+                    Divider()
                     Button {
                         onUngroupSuperset(id)
                         collapsedSupersetGroups.remove(id)
@@ -1076,6 +1095,25 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                             norwegian: "Kopier mål fra første drag til alle"
                         ), systemImage: "arrow.triangle.2.circlepath")
                     }
+                    Menu {
+                        ForEach(WorkoutPhaseKind.allCases.filter {
+                            $0 != .recovery
+                        }) { target in
+                            Button {
+                                if let firstID = members.first?.element.editorDragID {
+                                    moveToPhase(firstID, target)
+                                }
+                            } label: {
+                                Label(target.title, systemImage: target.symbol)
+                            }
+                        }
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Move to section",
+                            norwegian: "Flytt til øktdel"
+                        ), systemImage: "arrow.up.arrow.down")
+                    }
+                    Divider()
                     Button {
                         onUngroupIntervals(id)
                         expandedIntervalGroups.remove(id)
