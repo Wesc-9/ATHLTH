@@ -808,7 +808,8 @@ final class ExerciseLibraryStore: ObservableObject {
     /// search, AI candidate lists, and all library selection surfaces.
     static let featuredNativeExerciseSlugs: Set<String> = [
         "athlth-native-tabletop-sit-up",
-        "athlth-native-free-strength-training"
+        "athlth-native-free-strength-training",
+        "athlth-native-test-bodyweight-squat"
     ]
 
     /// Older workout plans may still reference these stable ATHLTH-native
@@ -1557,6 +1558,12 @@ final class ExerciseLibraryStore: ObservableObject {
                   primary: "Triceps", secondary: [], equipment: ["Dumbbells"],
                   englishInstruction: "Lower the weight behind the head by bending the elbows, then extend.",
                   norwegianInstruction: "Senk vekten bak hodet ved å bøye albuene, og strekk armene opp."),
+            // Isolated squat prototype: a distinct catalog ID for testing exercise
+            // presentation. Keep the existing squat variants and their IDs intact.
+            .init(slug: "test-bodyweight-squat", name: "test", norwegianName: "test",
+                  primary: "Quads", secondary: ["Glutes", "Core"], equipment: ["Bodyweight"],
+                  englishInstruction: "Stand with feet roughly shoulder-width apart, brace your trunk, bend your knees and hips to squat with control, then press through your feet to stand.",
+                  norwegianInstruction: "Stå med føttene omtrent i skulderbreddes avstand. Stram magen, bøy i hofter og knær og senk deg kontrollert ned. Press gjennom føttene og reis deg opp igjen."),
             .init(slug: "back-squat", name: "Barbell Back Squat", norwegianName: "Knebøy med stang",
                   primary: "Quads", secondary: ["Glutes", "Core"], equipment: ["Barbell", "Rack"],
                   englishInstruction: "Squat between your hips and knees with steady feet, then stand tall.",
