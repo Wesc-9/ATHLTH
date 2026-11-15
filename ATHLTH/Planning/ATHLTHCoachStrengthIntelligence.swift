@@ -35,9 +35,25 @@ enum ATHLTHCoachStrengthIntelligence {
                 norwegian: "\(completedStrengthSessions) styrkeøkter på åtte uker, \(strengthSessionsLastSevenDays) siste syv dager, \(completedWorkingSets) fullførte arbeidssett."
             )
             guard let notable = exerciseSignals.first else { return base }
+            let trendText: String
+            switch notable.trend {
+            case "improving":
+                trendText = ATHLTHLocalization.choose(
+                    english: "measurable progress", norwegian: "målbar fremgang"
+                )
+            case "plateau":
+                trendText = ATHLTHLocalization.choose(
+                    english: "no clear increase yet", norwegian: "ingen tydelig økning ennå"
+                )
+            default:
+                trendText = ATHLTHLocalization.choose(
+                    english: "more training data needed",
+                    norwegian: "trenger flere økter for å vurdere utviklingen"
+                )
+            }
             let more = ATHLTHLocalization.choose(
-                english: "Latest focus: \(notable.exercise) (\(notable.trend)).",
-                norwegian: "Siste analyse: \(notable.exercise) (\(notable.trend))."
+                english: "Latest focus: \(notable.exercise) – \(trendText).",
+                norwegian: "Siste analyse: \(notable.exercise) – \(trendText)."
             )
             return base + " " + more
         }
