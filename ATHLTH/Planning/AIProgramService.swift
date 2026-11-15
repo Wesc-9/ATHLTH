@@ -425,7 +425,15 @@ final class AIProgramService {
                     options: FunctionInvokeOptions(body: request, timeoutInterval: 120)
                 )
             } catch FunctionsError.httpError(let status, let data) {
-                if [502, 503, 504].contains(status) && attempt == 0 {
+                // Invalid AI plans are deterministic failures, not transport
+                // problems. Retrying their 502 immediately can exhaust Groq's
+                // token-per-minute quota and turn a 502 into a 429.
+                let code = (try? JSONDecoder().decode(
+                    CoachServerError.self, from: data
+                ))?.code
+                let transient = status == 503 || status == 504 ||
+                    (status == 502 && code == "AI_PROVIDER_UNAVAILABLE")
+                if transient && attempt == 0 {
                     try await Task.sleep(nanoseconds: 1_000_000_000)
                     continue
                 }
