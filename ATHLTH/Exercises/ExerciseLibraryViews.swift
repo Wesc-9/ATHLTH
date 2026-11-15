@@ -2484,6 +2484,127 @@ struct CustomExerciseEditorView: View {
     @State private var aiErrorMessage: String?
     private let aiDraftService = ATHLTHAIExerciseDraftService()
 
+    private var previewExerciseImage: UIImage? {
+        if let selectedImageData {
+            return UIImage(data: selectedImageData)
+        }
+        guard let url = editing?.exercise.imageURL, url.isFileURL else {
+            return nil
+        }
+        return UIImage(contentsOfFile: url.path)
+    }
+
+    private var firstPrimaryMuscle: ExerciseMuscleGroup? {
+        ExerciseMuscleGroup.allCases.first { primaryMuscles.contains($0) }
+    }
+
+    private var exerciseVisibilityExplanation: String {
+        switch visibility {
+        case .privateOnly:
+            return ATHLTHLocalization.choose(
+                english: "Visible only to you. Nothing is published or shared.",
+                norwegian: "Kun synlig for deg. Ingenting publiseres eller deles."
+            )
+        case .friends:
+            return ATHLTHLocalization.choose(
+                english: "Share directly with selected friends after saving. Not in the public catalog.",
+                norwegian: "Del direkte med utvalgte venner etter lagring. Ikke i offentlig bibliotek."
+            )
+        case .publicListing:
+            return ATHLTHLocalization.choose(
+                english: "Publish the exercise details in the public ATHLTH catalog. Photos and local videos stay private.",
+                norwegian: "Publiser øvelsens detaljer i ATHLTHs offentlige bibliotek. Bilder og lokale videoer forblir private."
+            )
+        }
+    }
+
+    private var exercisePreviewCard: some View {
+        ZStack(alignment: .bottomLeading) {
+            GeometryReader { bounds in
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            ATHLTHPlanDesign.selectedSurface,
+                            ATHLTHPlanDesign.canvas,
+                            ATHLTHPlanDesign.selectedSurface
+                        ],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    )
+                    if let picture = previewExerciseImage {
+                        Image(uiImage: picture)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: bounds.size.width,
+                                   height: bounds.size.height)
+                            .clipped()
+                    } else {
+                        Image(systemName: activityCategory.systemImage)
+                            .font(.system(size: 83, weight: .ultraLight))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk.opacity(0.12))
+                            .offset(x: bounds.size.width * 0.21, y: -8)
+                    }
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(previewExerciseImage == nil ? 0 : 0.06),
+                            Color.black.opacity(previewExerciseImage == nil ? 0 : 0.67)
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                }
+            }
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "EXERCISE PREVIEW", norwegian: "FORHÅNDSVISNING"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.8)
+                    Spacer(minLength: 0)
+                    Label(visibility.title, systemImage: visibility.iconName)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial,
+                                    in: Capsule())
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                Spacer(minLength: 2)
+                Text(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                     ? ATHLTHLocalization.choose(
+                         english: "Name your exercise",
+                         norwegian: "Navn på øvelsen"
+                       )
+                     : name)
+                    .font(.system(size: 23, weight: .semibold, design: .serif))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 7) {
+                    Image(systemName: firstPrimaryMuscle?.iconName ?? "figure.strengthtraining.traditional")
+                        .frame(width: 21)
+                    Text(firstPrimaryMuscle?.title ?? ATHLTHLocalization.choose(
+                        english: "Choose a primary muscle",
+                        norwegian: "Velg hovedmuskelgruppe"
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                }
+            }
+            .foregroundStyle(
+                previewExerciseImage == nil
+                    ? ATHLTHPlanDesign.ink : Color.white
+            )
+            .padding(18)
+        }
+        .frame(height: 185)
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.72),
+                              lineWidth: 0.75)
+        }
+        .accessibilityIdentifier("exercise-studio-preview-card")
+    }
+
     var body: some View {
         return NavigationStack {
             Form {
