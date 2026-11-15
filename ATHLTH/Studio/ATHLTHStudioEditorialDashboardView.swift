@@ -179,6 +179,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
     let onOpenHistory: () -> Void
     let onOpenSettings: () -> Void
     let onOpenLibrary: () -> Void
+    let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
+    let onOpenTrainTogether: () -> Void
     let onOpenWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onStartQuick: () -> Void
     let onStartWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
@@ -328,31 +330,23 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             ATHLTHiPadLiveWorkoutStatusCard()
                             let upcoming = nextWorkout(from: windows.upcoming)
 
-                            if split && width >= 1080 {
-                                HStack(alignment: .top, spacing: 18) {
-                                    nextWorkoutCard(upcoming)
-                                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                                    compactReadinessCard
-                                        .frame(width: min(390, max(310, width * 0.30)))
-                                    ATHLTHStudioHomeSocialHighlight()
-                                        .frame(width: min(285, max(230, width * 0.235)))
-                                }
-                            } else if split {
+                            if split {
                                 HStack(alignment: .top, spacing: 18) {
                                     nextWorkoutCard(upcoming)
                                         .frame(maxWidth: .infinity, alignment: .topLeading)
                                     compactReadinessCard
                                         .frame(width: min(390, max(310, width * 0.30)))
                                 }
-                                ATHLTHStudioHomeSocialHighlight()
                             } else {
                                 nextWorkoutCard(upcoming)
                                 compactReadinessCard
-                                ATHLTHStudioHomeSocialHighlight()
                             }
 
                             weekCard(week, width: width)
-                            ATHLTHStudioHomeCommunitySummary()
+                            ATHLTHStudioHomeCommunitySummary(
+                                onOpenCommunity: onOpenCommunity,
+                                onOpenTrainTogether: onOpenTrainTogether
+                            )
                             progressCard(wide: split, recorded: workouts, week: week)
                         }
                         .padding(.horizontal, split ? 22 : 14)
