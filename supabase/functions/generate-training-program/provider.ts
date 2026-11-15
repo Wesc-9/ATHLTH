@@ -96,3 +96,122 @@ export function coachProgramHasUsableWeeks(value: unknown, expectedWeeks: number
   }
   return scheduled > 0;
 }
+
+/** Small, bounded model outputs avoid Groq JSON schema validation failures
+ * on multiweek plans. Keep the whole original safety prompt and constraints:
+ * weekCount: 1 refers only to output size; totalWeekCount and weekNumber
+ * preserve the actual program phase and do not change athlete preferences. */
+export function coachProgramSingleWeekRequest(
+  model: string,
+  instructions: string,
+  constraints: Record<string, unknown>,
+  weekNumber: number,
+  totalWeekCount: number,
+) {
+  const scoped = {
+    ...constraints,
+    weekCount: 1,
+    totalWeekCount,
+    requestedWeekNumber: weekNumber,
+  };
+  return {
+    model,
+    reasoning_effort: "medium",
+    messages: [
+      {
+        role: "system",
+        content: instructions + "\nIMPORTANT WEEK-SCOPED OVERRIDE: " +
+          "Generate exactly ONE training week numbered " + weekNumber +
+          " in a total program of " + totalWeekCount + " weeks. " +
+          "This overrides only the global week count; every safety, " +
+          "training and equipment restriction remains unchanged. " +
+          "Use the original program's phase and realistic progression. " +
+          "Return a JSON object with title, summary, and weeks (exactly " +
+          "one item with weekNumber=" + weekNumber + "). " +
+          "That week has a days array, with entries only for chosen " +
+          "preferredDays. Each day has dayIndex, title and sessions " +
+          "(empty array for rest, otherwise at most one). " +
+          "Each session needs title, kind, durationMinutes, " +
+          "targetDistanceKilometers, targetPaceSecondsPerKilometer, " +
+          "notes, exercises and blocks. Use null for unknown scalar " +
+          "targets and [] when no blocks/exercises are justified. " +
+          "Provide a sensible mix of actual workouts and rest days " +
+          "when safe, matching the user's goals and limitations. " +
+          "Return ONLY JSON, no markdown.",
+      },
+      { role: "user", content: JSON.stringify(scoped) },
+    ],
+    response_format: { type: "json_object" },
+  };
+}
+
+/** Validate EACH AI week before stitching together a program. No invented
+ * workouts, missing weeks, invalid day indexes or duplicates are accepted.
+ * Selection of weekdays and maximum weekly frequency are checked here,
+ * while the existing injury guard still validates the final draft. */
+export function coachProgramValidWeek(
+  payload: unknown,
+  requestedWeek: number,
+  preferredDays: number[],
+  weeklyLimit: number,
+): Record<string, unknown> | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const weeks = (payload as { weeks?: unknown }).weeks;
+  if (!Array.isArray(weeks) || weeks.length !== 1) return null;
+  const week = weeks[0];
+  if (!week || typeof week !== "object" || Array.isArray(week) ||
+      week.weekNumber !== requestedWeek || !Array.isArray(week.days) ||
+      week.days.length < 1 || week.days.length > 7) return null;
+  const chosen = new Set(preferredDays);
+  const usedDays = new Set<number>();
+  const kinds = new Set(["running", "walking", "strength", "mobility", "recovery", "custom"]);
+  let sessions = 0;
+  for (const day of week.days) {
+    if (!day || typeof day !== "object" || Array.isArray(day) ||
+        !Number.isInteger(day.dayIndex) ||
+        !chosen.has(day.dayIndex) || usedDays.has(day.dayIndex) ||
+        !Array.isArray(day.sessions) || day.sessions.length > 1) return null;
+    usedDays.add(day.dayIndex);
+    for (const session of day.sessions) {
+      if (!session || typeof session !== "object" || Array.isArray(session) ||
+          typeof session.title !== "string" || !session.title.trim() ||
+          !kinds.has(session.kind) ||
+          (session.blocks !== undefined && !Array.isArray(session.blocks)) ||
+          (session.exercises !== undefined && !Array.isArray(session.exercises))) return null;
+      sessions += 1;
+    }
+  }
+  if (sessions > weeklyLimit) return null;
+  return week as Record<string, unknown>;
+}
+
+/** Compose only verified AI-generated weeks in chronological order.
+ * Never expand or silently invent missing plan weeks. */
+export function coachProgramMergeWeeks(
+  chunks: unknown[],
+  expectedWeeks: number,
+  preferredDays: number[],
+  weeklyLimit: number,
+): Record<string, unknown> | null {
+  if (chunks.length !== expectedWeeks || expectedWeeks < 1) return null;
+  const weeks: Record<string, unknown>[] = [];
+  const summaries: string[] = [];
+  let title = "";
+  for (let index = 0; index < chunks.length; index++) {
+    const chunk = chunks[index];
+    const week = coachProgramValidWeek(chunk, index + 1, preferredDays, weeklyLimit);
+    if (!week) return null;
+    weeks.push(week);
+    const obj = chunk as { title?: unknown; summary?: unknown };
+    if (!title && typeof obj.title === "string") title = obj.title.trim().slice(0, 160);
+    if (typeof obj.summary === "string" && obj.summary.trim()) {
+      summaries.push("Week " + (index + 1) + ": " + obj.summary.trim().slice(0, 350));
+    }
+  }
+  const result = {
+    title: title || "ATHLTH training plan",
+    summary: summaries.join("\n").slice(0, 1500),
+    weeks,
+  };
+  return coachProgramHasUsableWeeks(result, expectedWeeks) ? result : null;
+}
