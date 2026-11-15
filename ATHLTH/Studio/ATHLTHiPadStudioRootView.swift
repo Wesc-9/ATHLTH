@@ -139,6 +139,14 @@ struct ATHLTHiPadStudioRootView: View {
     @EnvironmentObject private var goalAccountSync: ATHLTHGoalAccountSyncStore
     @SceneStorage("athlth.studio.selectedDestination")
     private var savedDestination = ATHLTHStudioDestination.overview.rawValue
+    @SceneStorage("athlth.studio.selectedLibraryPage")
+    private var savedLibraryPage = ""
+    @SceneStorage("athlth.studio.selectedSidebarPage")
+    private var savedSidebarPage = ""
+    @SceneStorage("athlth.studio.selectedCommunityTab")
+    private var savedCommunityTab = ATHLTHCommunityMainTab.overview.rawValue
+    @SceneStorage("athlth.studio.selectedHomeDayEpoch")
+    private var savedHomeDayEpoch: Double = 0
     @State private var selection: ATHLTHStudioDestination = .overview
     // A repeated Home tap scrolls to the top; it must NOT destroy the
     // dashboard and restart its HealthKit, community and live child tasks.
@@ -368,9 +376,21 @@ struct ATHLTHiPadStudioRootView: View {
                         $0.hasPrefix("--athlth-compatibility-library=") ||
                         $0.hasPrefix("--athlth-compatibility-sidebar=")
                 }
-            if !compatibilityLaunch,
-               let restored = ATHLTHStudioDestination(rawValue: savedDestination) {
-                selection = restored
+            if !compatibilityLaunch {
+                if let restored = ATHLTHStudioDestination(rawValue: savedDestination) {
+                    selection = restored
+                }
+                libraryPage = ATHLTHStudioLibraryPage(rawValue: savedLibraryPage)
+                sidebarPage = ATHLTHSideMenuDestination(rawValue: savedSidebarPage)
+                communityTab = ATHLTHCommunityMainTab(rawValue: savedCommunityTab)
+                    ?? .overview
+                // Restore a user-selected week, but discard nonsensical
+                // timestamps (e.g. a corrupted or legacy scene value).
+                let restoredDate = Date(timeIntervalSince1970: savedHomeDayEpoch)
+                if savedHomeDayEpoch > 0,
+                   abs(restoredDate.timeIntervalSinceNow) < 366 * 86_400 {
+                    selectedHomeWeekDate = restoredDate
+                }
             }
             studioPlanSync.switchAccount(
                 session.signedIn ? session.profile.userID : nil
@@ -444,7 +464,19 @@ struct ATHLTHiPadStudioRootView: View {
             savedDestination = destination.rawValue
             if destination != .overview { focusedPlanningDate = nil }
         }
+        .onChange(of: libraryPage) { _, page in
+            savedLibraryPage = page?.rawValue ?? ""
+            if page != nil { savedSidebarPage = "" }
+        }
+        .onChange(of: sidebarPage) { _, page in
+            savedSidebarPage = page?.rawValue ?? ""
+            if page != nil { savedLibraryPage = "" }
+        }
+        .onChange(of: communityTab) { _, tab in
+            savedCommunityTab = tab.rawValue
+        }
         .onChange(of: selectedHomeWeekDate) { _, date in
+            savedHomeDayEpoch = date.timeIntervalSince1970
             // Keep the selected day accurate if the week changes while
             // its dedicated detail sheet is displayed.
             if inspectedWeekDate != nil && showingWorkoutDetail &&
