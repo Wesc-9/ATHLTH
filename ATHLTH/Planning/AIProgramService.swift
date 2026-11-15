@@ -94,6 +94,8 @@ struct AIProgramRequest: Encodable {
     let sessionDurationMinutes: Int
     /// Explicit permission for Coach to vary each session's length.
     var aiChoosesDuration: Bool = false
+    /// If true, Coach varies the weekly workout mix and progression.
+    var varyWeeks: Bool = false
     let userNotes: String
     // Defaults preserve existing non-injury plan-generation call sites.
     var injurySafetyNotes: String? = nil
