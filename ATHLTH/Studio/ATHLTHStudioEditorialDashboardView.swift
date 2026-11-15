@@ -860,7 +860,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
             if let activeDay,
                !activeDay.planned.isEmpty || !activeDay.recorded.isEmpty {
-                selectedDayWorkouts(activeDay)
+                selectedDayWorkouts(activeDay, availableWidth: width)
                     .accessibilityIdentifier("athlth-ipad-selected-week-day-details")
             } else if let activeDay, !activeDay.restDays.isEmpty {
                 Label(tr("Planned rest day", "Planlagt hviledag"),
@@ -901,7 +901,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
     /// Full planned workout details sit immediately below the selected-day
     /// count. Reuses the same occurrence and workout detail actions as Plan.
-    private func selectedDayWorkouts(_ day: ATHLTHStudioHomeWeek.Day) -> some View {
+    private func selectedDayWorkouts(
+        _ day: ATHLTHStudioHomeWeek.Day, availableWidth: CGFloat
+    ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(day.planned) { entry in
                 let isCompleted = completed(entry)
@@ -911,7 +913,23 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     )
                 } ?? false
 
-                HStack(spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    if day.planned.first?.id == entry.id {
+                        ATHLTHStudioPlannedWorkoutHeroCard(
+                            workout: entry.workout,
+                            availableWidth: availableWidth,
+                            isCompleted: isCompleted,
+                            isSkipped: isSkipped,
+                            canStart: canStart(entry, alreadyCompleted: isCompleted),
+                            onOpen: { onOpenWorkout(entry) },
+                            onStart: { onStartWorkout(entry) }
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier(
+                            "athlth-ipad-planned-workout-(entry.id)"
+                        )
+                        .contextMenu { workoutActions(entry) }
+                    } else {
                     Button {
                         onOpenWorkout(entry)
                     } label: {
@@ -998,6 +1016,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         "athlth-ipad-planned-workout-\(entry.id)"
                     )
                     .contextMenu { workoutActions(entry) }
+                    }
 
                     Menu {
                         workoutActions(entry)
