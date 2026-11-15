@@ -308,8 +308,8 @@ struct ATHLTHCoachPlanDraftScreen: View {
                                 .foregroundStyle(ink)
                             Text([
                                 workout.durationMinutes.map { "\($0) min" },
-                                workout.exercises.isEmpty ? nil :
-                                    "\(workout.exercises.count) " +
+                                workout.visibleExerciseCount == 0 ? nil :
+                                    "\(workout.visibleExerciseCount) " +
                                     tr("exercises", "øvelser")
                             ].compactMap { $0 }.joined(separator: " · "))
                                 .font(.system(size: 10))
