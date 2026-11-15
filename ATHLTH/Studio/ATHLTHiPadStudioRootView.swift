@@ -785,11 +785,11 @@ struct ATHLTHiPadStudioRootView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 8)
 
-            Divider().padding(.horizontal, 18)
-
+            // Profile stays pinned to the bottom without a surrounding
+            // card border or a divider that visually boxes it in.
             sidebarProfileRow
                 .padding(.horizontal, 11)
-                .padding(.top, 10)
+                .padding(.top, 6)
                 .padding(.bottom, 12)
         }
         .background(canvas)
@@ -873,16 +873,9 @@ struct ATHLTHiPadStudioRootView: View {
             .padding(.horizontal, 12)
             .frame(minHeight: 74)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                sidebarPage == .profile ? ATHLTHPlanDesign.selectedSurface : Color.white,
-                in: RoundedRectangle(cornerRadius: 17)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .strokeBorder(gold.opacity(0.19), lineWidth: 1)
-                    .allowsHitTesting(false)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 17))
+            // Use the same uninterrupted canvas as the sidebar. The full
+            // footer row remains one accessible, tappable button.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(ATHLTHLocalization.choose(
