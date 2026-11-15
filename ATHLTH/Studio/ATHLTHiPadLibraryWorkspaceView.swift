@@ -174,7 +174,8 @@ struct ATHLTHiPadLibraryWorkspaceView: View {
             }
         }
         .padding(.horizontal, 17)
-        .padding(.vertical, 7)
+        // Match the compact secondary-page header: controls retain their
+        // minimum 44pt hit area without a second band of vertical padding.
     }
 
     private var categoryCards: some View {
