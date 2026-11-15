@@ -37,7 +37,7 @@ struct ATHLTHiPadSidebarPageView: View {
                         }
                         .buttonStyle(.plain)
                         .padding(.leading, 22)
-                        .padding(.top, 82)
+                        .padding(.top, 72)
                         .accessibilityIdentifier("athlth-ipad-profile-back")
                     }
             } else {
@@ -65,7 +65,10 @@ struct ATHLTHiPadSidebarPageView: View {
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 22)
-                    .padding(.vertical, 9)
+                    // The native Studio toolbar already provides the top
+                    // inset. Keep a full 44pt tap target, but remove the
+                    // redundant vertical padding so both Back and the
+                    // destination title sit one step higher on every page.
                     .background(Color.white.opacity(0.72))
 
                     Rectangle()
