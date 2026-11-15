@@ -4,6 +4,8 @@ export function coachProgramRequest(model: string, instructions: string, constra
   return {
     model,
     reasoning_effort: "medium",
+    // Separate GPT-OSS reasoning from its JSON-only content channel.
+    reasoning_format: "parsed",
     messages: [
       { role: "system", content: instructions },
       { role: "user", content: JSON.stringify(constraints) },
@@ -23,6 +25,29 @@ export function coachProgramOutput(payload: unknown): string | null {
   return typeof message?.content === "string" && message.content.trim() ? message.content : null;
 }
 
+/** Parse a single complete AI JSON object. Raw Groq content can contain
+ * an optional code fence or a short introduction. Do not log or repair raw
+ * plan text, which could echo private goals or health restrictions. */
+export function coachParseProgramText(text: string | null): unknown | null {
+  if (!text || text.length > 300_000) return null;
+  const source = text.trim();
+  const fence = new RegExp("^\\x60{3}(?:json)?\\s*([\\s\\S]*?)\\s*\\x60{3}$", "i");
+  const match = fence.exec(source);
+  const candidate = match ? match[1].trim() : source;
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+    if (start < 0 || end <= start) return null;
+    try {
+      return JSON.parse(candidate.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+}
+
 /** Never persist provider prose or generated content: either may echo user notes. */
 export function coachProviderErrorCode(payload: unknown): string {
   const code = (payload as { error?: { code?: unknown } } | null)?.error?.code;
@@ -30,10 +55,9 @@ export function coachProviderErrorCode(payload: unknown): string {
   return typeof code === "string" && allowed.includes(code) ? code : "provider_rejected_request";
 }
 
-/** Groq can reject an oversized structured-output completion even with a
- * supported strict schema (json_validate_failed). Retry this *specific*
- * failure only once in JSON object mode; the server still validates every
- * returned week and every safety constraint before sending any draft. */
+/** Groq can reject JSON schema and JSON object modes with
+ * json_validate_failed. Only this error permits one plain-output fallback;
+ * recovered JSON must pass the same completeness and injury safety gates. */
 export function coachShouldRetryInvalidSchema(status: number, payload: unknown): boolean {
   return status === 400 && coachProviderErrorCode(payload) === "json_validate_failed";
 }
@@ -42,6 +66,7 @@ export function coachProgramFallbackRequest(model: string, instructions: string,
   return {
     model,
     reasoning_effort: "medium",
+    reasoning_format: "parsed",
     messages: [
       {
         role: "system",
@@ -58,7 +83,8 @@ export function coachProgramFallbackRequest(model: string, instructions: string,
       },
       { role: "user", content: JSON.stringify(constraints) },
     ],
-    response_format: { type: "json_object" },
+    // No response_format: Groq rejected both json_schema and json_object.
+    // The plain completion is still parsed and validated before use.
   };
 }
 
@@ -296,13 +322,18 @@ export function coachCompactProgramRequest(
     "No unnecessary blocks, note fields, or unrequested training. The athlete's " +
     "injury and equipment restrictions remain mandatory. Return JSON only.";
   return {
-    model, reasoning_effort: "low", max_completion_tokens: 5000,
+    model,
+    reasoning_effort: "low",
+    reasoning_format: "parsed",
+    max_completion_tokens: 5000,
     messages: [
       { role: "system", content: compactInstructions },
       { role: "user", content: JSON.stringify(constraints) },
     ],
+    // undefined is intentionally omitted by JSON.stringify for the raw
+    // fallback; it must not use the provider's failing JSON validation.
     response_format: jsonFallback
-      ? { type: "json_object" }
+      ? undefined
       : { type: "json_schema", json_schema: {
           name: "athlth_compact_program", strict: true,
           schema: coachCompactProgramSchema,
