@@ -926,7 +926,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         )
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier(
-                            "athlth-ipad-planned-workout-(entry.id)"
+                            "athlth-ipad-planned-workout-\(entry.id)"
                         )
                         .contextMenu { workoutActions(entry) }
                     } else {
