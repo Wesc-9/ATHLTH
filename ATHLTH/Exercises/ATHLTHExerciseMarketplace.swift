@@ -163,12 +163,13 @@ final class ATHLTHExerciseMarketplaceStore: ObservableObject {
         guard !isWorking else { return false }
         guard ATHLTHPersonalExerciseSharing.isEligible(
             entry, ownerID: ownerID
-        ), entry.exercise.sharedSourceExerciseID == nil,
+        ), entry.exercise.resolvedVisibility == .publicListing,
+           entry.exercise.sharedSourceExerciseID == nil,
            entry.exercise.originalCreatorID == nil ||
                 entry.exercise.originalCreatorID == ownerID else {
             errorMessage = ATHLTHLocalization.choose(
-                english: "Only the original creator can publish this exercise.",
-                norwegian: "Bare den opprinnelige skaperen kan publisere øvelsen."
+                english: "Only the original creator can publish an exercise marked Public.",
+                norwegian: "Bare den opprinnelige skaperen kan publisere en øvelse merket Offentlig."
             )
             return false
         }
