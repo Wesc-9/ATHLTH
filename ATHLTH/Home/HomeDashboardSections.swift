@@ -4875,11 +4875,21 @@ private struct HomeWeeklyProgressDaySheet: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 9) {
-                Text(workout.startDate.formatted(date: .omitted, time: .shortened))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Start", norwegian: "Start"
+                    ))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                    Text((strengthLog?.startedAt ?? workout.startDate).formatted(
+                        date: .omitted, time: .shortened
+                    ))
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .frame(width: 49, alignment: .leading)
+                }
+                .frame(width: 49, alignment: .leading)
 
                 Image(systemName: workout.activity.icon)
                     .font(.system(size: 17, weight: .semibold))
@@ -4912,9 +4922,10 @@ private struct HomeWeeklyProgressDaySheet: View {
                         for: workout,
                         strengthLog: strengthLog
                     ))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink.opacity(0.85))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 }
 
                 Spacer(minLength: 5)
@@ -5023,6 +5034,18 @@ enum HomeCompletedWorkoutPresentation {
         }
     }
 
+    /// Present an explicit finish time instead of an easily overlooked clock range.
+    /// Invalid or unavailable end times must never be shown as recorded finishes.
+    static func finishTimeLabel(
+        startDate: Date,
+        endDate: Date,
+        norwegian: Bool = ATHLTHLocalization.isNorwegian
+    ) -> String? {
+        guard endDate > startDate else { return nil }
+        let label = norwegian ? "Ferdig" : "Finished"
+        return "\(label) \(endDate.formatted(date: .omitted, time: .shortened))"
+    }
+
     static func timeAndLocation(
         for workout: WorkoutSummary,
         strengthLog: StrengthWorkoutLog? = nil,
@@ -5030,14 +5053,9 @@ enum HomeCompletedWorkoutPresentation {
     ) -> String {
         let startDate = strengthLog?.startedAt ?? workout.startDate
         let endDate = strengthLog?.endedAt ?? workout.endDate
-        let start = startDate.formatted(
-            date: .omitted, time: .shortened
-        )
-        let end = endDate.formatted(
-            date: .omitted, time: .shortened
-        )
-        let range = endDate > startDate
-            ? "\(start)–\(end)" : start
+        let finish = finishTimeLabel(
+            startDate: startDate, endDate: endDate, norwegian: norwegian
+        ) ?? (norwegian ? "Sluttid ukjent" : "Finish time unavailable")
 
         let location: String?
         switch strengthLog == nil ? workout.isIndoor : true {
@@ -5048,7 +5066,7 @@ enum HomeCompletedWorkoutPresentation {
         case .none:
             location = nil
         }
-        return [range, location].compactMap { $0 }.joined(separator: " · ")
+        return [finish, location].compactMap { $0 }.joined(separator: " · ")
     }
 
     static func metrics(
