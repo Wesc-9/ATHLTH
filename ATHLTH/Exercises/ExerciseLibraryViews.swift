@@ -2499,6 +2499,13 @@ struct CustomExerciseEditorView: View {
     @State private var friendShareDraft: MessageShareDraft?
     @State private var savingExercise = false
     @State private var pendingPublicExerciseID: UUID?
+    @State private var choosingMuscles: MuscleSelectionRole?
+
+    private enum MuscleSelectionRole: String, Identifiable {
+        case primary
+        case secondary
+        var id: String { rawValue }
+    }
 
     @State private var name = ""
     @State private var activityCategory: ATHLTHExerciseActivity = .strength
@@ -2524,6 +2531,143 @@ struct CustomExerciseEditorView: View {
     @State private var hasAIDraft = false
     @State private var aiErrorMessage: String?
     private let aiDraftService = ATHLTHAIExerciseDraftService()
+
+    private func muscleSelectionRow(_ role: MuscleSelectionRole) -> some View {
+        let selection = role == .primary ? primaryMuscles : secondaryMuscles
+        return Button {
+            choosingMuscles = role
+        } label: {
+            HStack(spacing: 11) {
+                if let first = ExerciseMuscleGroup.allCases.first(where: {
+                    selection.contains($0)
+                }) {
+                    ATHLTHMuscleGroupIcon(group: first, size: 31)
+                        .frame(width: 37, height: 38)
+                } else {
+                    Image(systemName: "figure.arms.open")
+                        .font(.system(size: 18))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 37, height: 38)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(role == .primary
+                         ? ATHLTHLocalization.choose(
+                            english: "Primary muscle groups",
+                            norwegian: "Primære muskelgrupper"
+                           )
+                         : ATHLTHLocalization.choose(
+                            english: "Secondary muscle groups",
+                            norwegian: "Sekundære muskelgrupper"
+                           ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(muscleSelectionSummary(
+                        selection,
+                        empty: role == .primary
+                            ? ATHLTHLocalization.choose(
+                                english: "Select at least one", norwegian: "Velg minst én"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "Optional", norwegian: "Valgfritt"
+                              )
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func muscleSelectionSheet(_ role: MuscleSelectionRole) -> some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    ForEach(ExerciseMuscleGroup.allCases.sorted {
+                        $0.title.localizedStandardCompare($1.title) ==
+                            .orderedAscending
+                    }) { muscle in
+                        let isPrimary = primaryMuscles.contains(muscle)
+                        let selected = role == .primary
+                            ? isPrimary : secondaryMuscles.contains(muscle)
+                        Button {
+                            if role == .primary {
+                                togglePrimary(muscle)
+                            } else {
+                                toggleSecondary(muscle)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                ATHLTHMuscleGroupIcon(
+                                    group: muscle,
+                                    size: 35,
+                                    tint: selected
+                                        ? Color.white : ATHLTHPlanDesign.accentInk
+                                )
+                                Text(muscle.title)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 0)
+                                if selected {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 13))
+                                }
+                            }
+                            .foregroundStyle(
+                                selected ? Color.white : ATHLTHPlanDesign.ink
+                            )
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 64)
+                            .background(
+                                selected
+                                    ? ATHLTHPlanDesign.accentInk
+                                    : ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 15)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(role == .secondary && isPrimary)
+                        .opacity(role == .secondary && isPrimary ? 0.45 : 1)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
+            }
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(role == .primary
+                ? ATHLTHLocalization.choose(
+                    english: "Primary muscle groups", norwegian: "Primære muskelgrupper"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Secondary muscle groups", norwegian: "Sekundære muskelgrupper"
+                ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) {
+                        choosingMuscles = nil
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
 
     private var previewExerciseImage: UIImage? {
         if let selectedImageData {
@@ -2705,130 +2849,8 @@ struct CustomExerciseEditorView: View {
                         }
                     }
 
-                    Menu {
-                        ForEach(
-                            ExerciseMuscleGroup.allCases.sorted {
-                                $0.title.localizedStandardCompare($1.title) == .orderedAscending
-                            }
-                        ) { group in
-                            Button {
-                                togglePrimary(group)
-                            } label: {
-                                Label(
-                                    group.title,
-                                    systemImage:
-                                        primaryMuscles
-                                            .contains(group)
-                                            ? "checkmark.circle.fill"
-                                            : ATHLTHExerciseMuscleFilterPresentation.icon(for: group.rawValue)
-                                )
-                            }
-                        }
-                    } label: {
-                        HStack {
-                            VStack(
-                                alignment: .leading,
-                                spacing: 2
-                            ) {
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english: "Primary muscle groups",
-                                        norwegian: "Primære muskelgrupper"
-                                    )
-                                )
-                                .foregroundStyle(.primary)
-
-                                Text(
-                                    muscleSelectionSummary(
-                                        primaryMuscles,
-                                        empty:
-                                            ATHLTHLocalization.choose(
-                                                english: "Choose at least one",
-                                                norwegian: "Velg minst én"
-                                            )
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    primaryMuscles.isEmpty
-                                        ? Color.red
-                                        : ATHLTHTheme
-                                            .mutedText
-                                )
-                            }
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    "chevron.up.chevron.down"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        }
-                    }
-
-                    Menu {
-                        ForEach(
-                            ExerciseMuscleGroup.allCases.sorted {
-                                $0.title.localizedStandardCompare($1.title) == .orderedAscending
-                            }
-                        ) { group in
-                            Button {
-                                toggleSecondary(group)
-                            } label: {
-                                Label(
-                                    group.title,
-                                    systemImage:
-                                        secondaryMuscles
-                                            .contains(group)
-                                            ? "checkmark.circle.fill"
-                                            : ATHLTHExerciseMuscleFilterPresentation.icon(for: group.rawValue)
-                                )
-                            }
-                            .disabled(
-                                primaryMuscles
-                                    .contains(group)
-                            )
-                        }
-                    } label: {
-                        HStack {
-                            VStack(
-                                alignment: .leading,
-                                spacing: 2
-                            ) {
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english: "Secondary muscle groups",
-                                        norwegian: "Sekundære muskelgrupper"
-                                    )
-                                )
-                                .foregroundStyle(.primary)
-
-                                Text(
-                                    muscleSelectionSummary(
-                                        secondaryMuscles,
-                                        empty:
-                                            ATHLTHLocalization.choose(
-                                                english: "Optional",
-                                                norwegian: "Valgfritt"
-                                            )
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    "chevron.up.chevron.down"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        }
-                    }
+                    muscleSelectionRow(.primary)
+                    muscleSelectionRow(.secondary)
 
                     TextField(
                         "Equipment, comma separated",
@@ -3012,6 +3034,9 @@ struct CustomExerciseEditorView: View {
                         isImportingVideo
                     )
                 }
+            }
+            .sheet(item: $choosingMuscles) { role in
+                muscleSelectionSheet(role)
             }
             .sheet(item: $friendShareDraft, onDismiss: { dismiss() }) { draft in
                 ATHLTHDirectShareSheet(
