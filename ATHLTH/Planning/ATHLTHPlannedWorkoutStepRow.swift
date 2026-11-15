@@ -13,6 +13,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onMoveBy: (Int) -> Void
+    let onMoveToPhase: (WorkoutPhaseKind) -> Void
     let onReorderMove: (CGPoint) -> Void
     let onReorderEnd: () -> Void
 
@@ -142,9 +143,9 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "line.3.horizontal")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.42))
-                .frame(width: 27, height: 49)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.31))
+                .frame(width: 21, height: 49)
                 .contentShape(Rectangle())
                 .gesture(reorderGesture)
                 .accessibilityLabel(ATHLTHLocalization.choose(
@@ -235,6 +236,20 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                             Label(ATHLTHLocalization.choose(
                                 english: "Edit step", norwegian: "Rediger deløkt"
                             ), systemImage: "pencil")
+                        }
+                        Menu {
+                            ForEach(WorkoutPhaseKind.allCases.filter { $0 != .recovery }) { phase in
+                                Button {
+                                    onMoveToPhase(phase)
+                                } label: {
+                                    Label(phase.title, systemImage: phase.symbol)
+                                }
+                            }
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Move to workout section",
+                                norwegian: "Flytt til øktdel"
+                            ), systemImage: "arrow.up.arrow.down")
                         }
                         Divider()
                         Button(role: .destructive, action: onDelete) {
