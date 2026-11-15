@@ -117,9 +117,20 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
 
     func sync(session: AppSessionStore) async {
         guard !isBusy, session.signedIn,
-              let userID = accountID, userID == session.profile.userID,
-              client.auth.currentUser?.id == userID
+              let userID = accountID, userID == session.profile.userID
         else { return }
+
+        // Offline restoration can display account-scoped local plans before
+        // Supabase finishes restoring its authenticated session. Do not
+        // silently claim those local plans are already in the cloud.
+        guard client.auth.currentUser?.id == userID else {
+            verifiedRemotePlanIDs = nil
+            status = ATHLTHLocalization.choose(
+                english: "Account plan sync is waiting for verified sign-in. Local plans are safe.",
+                norwegian: "Kontosynkronisering venter på bekreftet innlogging. Lokale planer er bevart."
+            )
+            return
+        }
 
         guard !Self.accountsWithNetworkMutation.contains(userID) else {
             status = ATHLTHLocalization.choose(
