@@ -210,6 +210,9 @@ struct ATHLTHAIProgramIntake: Equatable {
     var availableDays: Set<Int> = []
     var sessionDurationMinutes: Int?
     var coachChoosesDuration = false
+    /// On by default: plan weeks should progress and vary, not repeat the
+    /// same workouts verbatim. The athlete can disable this before generation.
+    var varyWeeks = true
     var locations: Set<Location> = []
     /// Required only when both gym and outdoor training are selected.
     /// Nil means the athlete has not chosen a balance yet.
