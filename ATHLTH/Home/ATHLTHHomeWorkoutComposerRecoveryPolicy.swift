@@ -2,6 +2,19 @@ import Foundation
 
 /// Restore only the signed-in athlete's recoverable day-workout editor.
 enum ATHLTHHomeWorkoutComposerRecoveryPolicy {
+    /// Zero is an empty SceneStorage sentinel, not January 1, 2001.
+    /// Never turn it into a visible planned workout date.
+    static func validComposerDate(
+        referenceInterval: TimeInterval,
+        fallback: Date,
+        calendar: Calendar = .current
+    ) -> Date {
+        guard referenceInterval.isFinite, referenceInterval > 0 else {
+            return calendar.startOfDay(for: fallback)
+        }
+        return Date(timeIntervalSinceReferenceDate: referenceInterval)
+    }
+
     static func canRestore(account: String, currentAccountID: UUID, day: TimeInterval) -> Bool {
         account == currentAccountID.uuidString && day.isFinite && day > 0
     }
