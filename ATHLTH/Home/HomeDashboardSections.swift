@@ -1744,6 +1744,9 @@ struct HomeWeeklyProgressStrip:
     var canStartWithWatch = false
     var onStartStandaloneWorkout:
         ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
+    var onSendWorkoutToWatch: ((PlannedSession) -> Void)? = nil
+    var onDelayWorkoutStart: ((PlannedSession, TimeInterval) -> Void)? = nil
+    var onDelayWatchStart: ((PlannedSession) -> Void)? = nil
 
     @State private var weekOffset = 0
     @State private var selectedDay:
@@ -1915,6 +1918,21 @@ struct HomeWeeklyProgressStrip:
                     selectedDay = nil
                     persistedOpenDay = 0
                     onStartStandaloneWorkout?(workout, device)
+                },
+                onSendWorkoutToWatch: { workout in
+                    selectedDay = nil
+                    persistedOpenDay = 0
+                    onSendWorkoutToWatch?(workout)
+                },
+                onDelayWorkoutStart: { workout, seconds in
+                    selectedDay = nil
+                    persistedOpenDay = 0
+                    onDelayWorkoutStart?(workout, seconds)
+                },
+                onDelayWatchStart: { workout in
+                    selectedDay = nil
+                    persistedOpenDay = 0
+                    onDelayWatchStart?(workout)
                 },
                 onOpenWorkout: {
                     daySheetDetent = .large
@@ -3594,6 +3612,21 @@ private struct HomeWeeklyProgressDaySheet: View {
                         guard canLaunchPlannedWorkout(workout), canStartWithWatch else { return }
                         selectedPlannedWorkout = nil
                         onStartStandaloneWorkout?(workout, .appleWatch)
+                    },
+                    onSendToWatch: onSendWorkoutToWatch == nil ? nil : {
+                        guard canLaunchPlannedWorkout(workout), canStartWithWatch else { return }
+                        selectedPlannedWorkout = nil
+                        onSendWorkoutToWatch?(workout)
+                    },
+                    onDelayOnPhone: onDelayWorkoutStart == nil ? nil : { seconds in
+                        guard canLaunchPlannedWorkout(workout) else { return }
+                        selectedPlannedWorkout = nil
+                        onDelayWorkoutStart?(workout, seconds)
+                    },
+                    onDelayOnWatch: onDelayWatchStart == nil ? nil : {
+                        guard canLaunchPlannedWorkout(workout), canStartWithWatch else { return }
+                        selectedPlannedWorkout = nil
+                        onDelayWatchStart?(workout)
                     },
                     isCalendarWorkout: true,
                     canStart: canLaunchPlannedWorkout(workout),
