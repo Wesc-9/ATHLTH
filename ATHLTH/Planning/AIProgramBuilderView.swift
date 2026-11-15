@@ -474,7 +474,9 @@ struct AIProgramBuilderView: View {
         .sheet(item: $editingDraftWorkout) { selection in
             if let draft = preview,
                let workout = ATHLTHPlanDraftEditing.workout(in: draft, selection: selection) {
-                ATHLTHPlanDraftWorkoutEditor(workout: workout) { modifiedWorkout in
+                ATHLTHPlanDraftWorkoutEditor(
+                    workout: workout, selection: selection
+                ) { modifiedWorkout in
                     guard let changed = ATHLTHPlanDraftEditing.replacing(
                         in: draft, selection: selection, with: modifiedWorkout
                     ), draftValidationIssues(changed).isEmpty else {
@@ -482,9 +484,10 @@ struct AIProgramBuilderView: View {
                             english: "This change is not valid. The draft was not modified.",
                             norwegian: "Endringen er ugyldig. Utkastet ble ikke endret."
                         )
-                        return
+                        return false
                     }
                     preview = changed
+                    return true
                 }
             }
         }
