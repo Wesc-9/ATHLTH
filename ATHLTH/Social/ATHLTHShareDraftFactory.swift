@@ -199,7 +199,8 @@ enum ATHLTHShareDraftFactory {
             ),
             snapshot: attachment,
             sourceObjectID: originalID,
-            sourceOwnerID: originalCreatorID
+            sourceOwnerID: originalCreatorID,
+            requiresMutualFollow: entry.exercise.resolvedVisibility == .friends
         )
     }
 }
