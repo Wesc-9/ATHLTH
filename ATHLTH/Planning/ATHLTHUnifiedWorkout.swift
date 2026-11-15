@@ -86,6 +86,12 @@ enum ATHLTHUnifiedWorkout {
                 )
                 work.exerciseID = exercise.exerciseID
                 work.exerciseSnapshot = exercise.embeddedExercise
+                // The single ATHLTH timeline must retain the AI strength
+                // effort target on every set, not only in discarded prose.
+                work.targetEffortRPE = (target.targetRPE ??
+                    exercise.targetRPE).flatMap {
+                        $0.isFinite && (1...10).contains($0) ? Int($0.rounded()) : nil
+                    }
                 blocks.append(work)
 
                 if index < targets.count - 1 {
