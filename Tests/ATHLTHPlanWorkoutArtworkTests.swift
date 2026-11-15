@@ -70,6 +70,26 @@ final class ATHLTHPlanWorkoutArtworkTests: XCTestCase {
         }
     }
 
+    func testBasicPlannedSessionsStillReceiveCorrectActivityImage() {
+        let strength = PlannedSession(
+            id: UUID(), title: "Styrke", kind: .strength,
+            scheduledStart: nil, durationMinutes: 45,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        let walking = PlannedSession(
+            id: UUID(), title: "Kveldstur", kind: .walking,
+            scheduledStart: nil, durationMinutes: 30,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+
+        XCTAssertEqual(ATHLTHPlanWorkoutArtwork.scene(for: strength), .strength)
+        XCTAssertEqual(ATHLTHPlanWorkoutArtwork.scene(for: walking), .walking)
+        XCTAssertNotNil(UIImage(named: ATHLTHPlanWorkoutArtwork.asset(for: strength)))
+        XCTAssertNotNil(UIImage(named: ATHLTHPlanWorkoutArtwork.asset(for: walking)))
+    }
+
     func testWeekSessionsUseRealWorkoutSignals() {
         let entry = entry(
             slug: "strength-full-body", category: "strength",
