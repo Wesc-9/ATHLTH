@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText } from "./provider.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { conflictsWithInjuryRestrictions } from "../_shared/ai-training-injury-guard.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -838,12 +838,8 @@ Hard rules:
       const rawFinishReason = providerPayload?.choices?.[0]?.finish_reason;
       const finishReason = ["stop", "length", "content_filter", "tool_calls"]
         .includes(rawFinishReason) ? rawFinishReason : "unknown";
-      let parsed: unknown;
-      try {
-        parsed = resultText ? JSON.parse(resultText) : null;
-      } catch {
-        parsed = null;
-      }
+      // Groq's plain output may have a code fence; JSON is never logged.
+      const parsed = coachParseProgramText(resultText);
       const validated = coachCompactValidatedProgram(
         parsed, weekCount, preferredDays, sessionsPerWeek,
       );
@@ -955,10 +951,9 @@ Hard rules:
     }, 502);
   }
 
-  try {
-    program = JSON.parse(outputText);
-  } catch {
-    // AI output may echo private health and goal context, never log it.
+  program = coachParseProgramText(outputText);
+  if (!program) {
+    // Never log raw AI output: it can echo goals or consented limitations.
     console.error("Coach JSON parse failed", { requestId, fallbackUsed });
     return json({
       error: "ATHLTH Coach could not complete the plan. Try again.",
