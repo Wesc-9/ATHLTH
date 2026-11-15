@@ -84,6 +84,8 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
         )
         XCTAssertEqual(draft.kind, .exercise)
         XCTAssertEqual(draft.sourceObjectID, mine.id)
+        XCTAssertTrue(draft.requiresMutualFollow,
+            "Legacy shared-plan permission must never enable first-contact sharing")
     }
 
     @MainActor
