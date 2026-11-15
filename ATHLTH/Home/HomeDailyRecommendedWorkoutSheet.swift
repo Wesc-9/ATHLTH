@@ -67,11 +67,21 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                         HomeDailyRecommendedWorkoutHero(workout: workout)
 
                         if !workout.resolvedWorkoutBlocks.isEmpty {
-                            ATHLTHWorkoutContentsPreview(
-                                workout: workout,
-                                maximumVisibleBlocks: nil
+                            // Use the same grouped phases as the Simple
+                            // workout details, never 26 flat repetitions.
+                            ATHLTHWorkoutRecipePreview(
+                                title: workout.title,
+                                summary: "",
+                                category: workout.workoutCategory ??
+                                    (workout.kind == .running ? "running" :
+                                     workout.kind == .walking ? "walking" : "hybrid"),
+                                symbol: workout.kind.systemImage,
+                                difficulty: nil,
+                                durationMinutes: workout.durationMinutes,
+                                blocks: workout.resolvedWorkoutBlocks,
+                                embeddedInDetails: true
                             )
-                            .padding(17)
+                            .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
                                 Color.white,
