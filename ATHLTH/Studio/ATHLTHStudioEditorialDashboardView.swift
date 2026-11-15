@@ -134,8 +134,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
     @Binding var selectedDate: Date
     let scrollToTopRequest: Int
     @State private var periodDays = 28
-    /// Auto-follow today unless the user explicitly browses a date.
-    @State private var followsToday = true
+    /// Each iPad scene remembers whether the athlete deliberately browsed
+    /// a different week; reopening must not silently jump back to today.
+    @SceneStorage("athlth.studio.homeFollowsToday") private var followsToday = true
     @State private var showingReadinessExplanation = false
     @State private var homeProjection: ATHLTHStudioHomeProjection?
     @State private var pendingProjectionTask: Task<Void, Never>?
