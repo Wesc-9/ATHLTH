@@ -861,14 +861,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             startDate = Calendar.current.startOfDay(for: .now)
         }
         .onDisappear {
-            // A confirmed discard must never be recreated by onDisappear.
+            // A sheet can disappear because iOS suspended or evicted the
+            // process, NOT because the athlete chose to leave. Always keep
+            // its editing marker until explicit Save Draft, Discard or Save.
+            // Clearing that marker here previously reopened the wizard at
+            // its first screen after returning to the app.
             if !deliberatelyDiscardedPlanDraft {
                 saveResumableDraft()
-            }
-            // A normal dismissal exits the editing session, while locking
-            // the phone leaves it recoverable after an OS process eviction.
-            if scenePhase == .active {
-                draftStore.setEditing(false, userID: session.profile.userID, draftID: draftID)
             }
         }
     }
