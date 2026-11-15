@@ -96,6 +96,8 @@ struct AIProgramRequest: Encodable {
     var aiChoosesDuration: Bool = false
     /// If true, Coach varies the weekly workout mix and progression.
     var varyWeeks: Bool = false
+    /// Only the language code is sent; no locale-specific personal data.
+    var language: String = Locale.current.language.languageCode?.identifier ?? "no"
     let userNotes: String
     // Defaults preserve existing non-injury plan-generation call sites.
     var injurySafetyNotes: String? = nil
