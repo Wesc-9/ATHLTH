@@ -11,6 +11,10 @@ struct ATHLTHDirectShareSheet: View {
     /// Set for exercises visible only to mutually following friends.
     var mutualFollowsOnly = false
 
+    private var requiresMutualFollow: Bool {
+        mutualFollowsOnly || draft.requiresMutualFollow
+    }
+
     @State private var username = ""
     @State private var recipient: SocialProfileCard?
     @State private var note = ""
@@ -30,7 +34,7 @@ struct ATHLTHDirectShareSheet: View {
     private var searchResults: [SocialProfileCard] {
         guard cleanUsername.count >= 2 else { return [] }
         var ids = Set<UUID>()
-        let candidates = mutualFollowsOnly
+        let candidates = requiresMutualFollow
             ? social.mutualFollows
             : (social.mutualFollows + social.discoverResults)
         return candidates.filter { person in
@@ -142,7 +146,7 @@ struct ATHLTHDirectShareSheet: View {
                         }
 
                         Label(
-                            mutualFollowsOnly
+                            requiresMutualFollow
                                 ? tr(
                                     "Only mutual followers can receive this friends-only exercise.",
                                     "Bare brukere som følger hverandre kan motta denne øvelsen."
@@ -208,8 +212,8 @@ struct ATHLTHDirectShareSheet: View {
                 recipient = nil
             }
             .task(id: cleanUsername) {
-                guard cleanUsername.count >= 2, !sent, !mutualFollowsOnly else {
-                    if !mutualFollowsOnly { social.clearSearch() }
+                guard cleanUsername.count >= 2, !sent, !requiresMutualFollow else {
+                    if !requiresMutualFollow { social.clearSearch() }
                     return
                 }
                 try? await Task.sleep(for: .milliseconds(260))
@@ -223,7 +227,7 @@ struct ATHLTHDirectShareSheet: View {
         guard let recipient, !sent, !sending,
               recipient.usernameLabel.localizedCaseInsensitiveContains(cleanUsername),
               social.relationshipState(with: recipient.userID) != .blocked,
-              (!mutualFollowsOnly || social.mutualFollows.contains {
+              (!requiresMutualFollow || social.mutualFollows.contains {
                   $0.userID == recipient.userID
               }) else {
             return
