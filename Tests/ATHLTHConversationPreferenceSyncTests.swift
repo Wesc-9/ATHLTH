@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 @testable import ATHLTH
 
+@MainActor
 final class ATHLTHConversationPreferenceSyncTests: XCTestCase {
     private let conversation = UUID()
     private let older = Date(timeIntervalSince1970: 10)
