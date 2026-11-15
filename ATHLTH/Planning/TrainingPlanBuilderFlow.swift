@@ -4481,7 +4481,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     guidedCurrentDayCard
                 }
             }
-            planAITools
         }
     }
 
@@ -6118,7 +6117,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
                 .buttonStyle(.bordered)
             }
-            planAITools
         }
     }
 
@@ -7592,7 +7590,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 conflictCard(conflict)
             }
 
-            planAITools
         }
     }
 
