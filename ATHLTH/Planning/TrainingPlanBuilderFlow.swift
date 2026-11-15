@@ -4497,10 +4497,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
             // Preferred weekdays may already contain a generated session even
             // before a specific day edit exists. Append rather than overwrite it.
-            let hasOriginal = selectedDays.contains(weekday) && edit.isRestDay != true
+            let hasOriginal = selectedDays.contains(weekday) &&
+                edit.isRestDay != true && edit.removeAllWorkouts != true
             let hasDetailedWorkout = edit.detailedWorkout != nil
             edit.isRestDay = false
             edit.removeTemplateDetail = false
+            edit.removeAllWorkouts = false
             if hasDetailedWorkout || hasOriginal {
                 edit.additionalDetailedWorkouts =
                     (edit.additionalDetailedWorkouts ?? []) + [proposed]
@@ -4825,6 +4827,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         edit.isRestDay = false
         edit.removeTemplateDetail = false
+        edit.removeAllWorkouts = false
         weekDayEdits[key] = edit
         selectedDays.insert(day)
         sessionsPerWeek = selectedDays.count
@@ -4914,6 +4917,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 (edit.additionalDetailedWorkouts ?? []) + [blueprint]
             edit.isRestDay = false
             edit.removeTemplateDetail = false
+            edit.removeAllWorkouts = false
             weekDayEdits[key] = edit
             selectedDays.insert(day)
             sessionsPerWeek = selectedDays.count
@@ -4927,6 +4931,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         edit.durationMinutes = blueprint.durationMinutes
         edit.isRestDay = false
         edit.removeTemplateDetail = false
+        edit.removeAllWorkouts = false
         weekDayEdits[key] = edit
         selectedDays.insert(day)
         sessionsPerWeek = selectedDays.count
