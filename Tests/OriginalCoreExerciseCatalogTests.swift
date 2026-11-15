@@ -77,7 +77,8 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         let featured = ExerciseLibraryStore.featuredNativeExerciseSlugs
         XCTAssertEqual(featured, Set([
             "athlth-native-tabletop-sit-up",
-            "athlth-native-free-strength-training"
+            "athlth-native-free-strength-training",
+            "athlth-native-test-bodyweight-squat"
         ]))
         XCTAssertEqual(ExerciseLibraryStore.retiredNativeDuplicateSlugs, Set([
             "athlth-native-weighted-russian-twist",
