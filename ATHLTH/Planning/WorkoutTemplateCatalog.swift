@@ -4851,13 +4851,18 @@ struct WorkoutTemplateBuilderView: View {
         guard let from = sections.firstIndex(where: { $0.id == draggedID }),
               let target = sections.firstIndex(where: { $0.id == targetID }),
               from != target else { return }
-        guard blocks.indices.contains(sections[target].start) else { return }
-        // Generic library/quick editor uses the exact same relocation policy
-        // as the planned Advanced editor. Dragging a warmup exercise to a
-        // main section changes the persisted phase AND chronological order.
-        let destinationPhase = blocks[sections[target].start].resolvedPhase
+        guard blocks.indices.contains(sections[from].start),
+              blocks.indices.contains(sections[target].start) else { return }
+        // Visual group IDs represent whole interval/superset sections, not
+        // the editorDragID of an individual block. Resolve both to the first
+        // canonical member before invoking the shared relocation policy.
+        let sourceBlock = blocks[sections[from].start]
+        let targetBlock = blocks[sections[target].start]
         let moved = ATHLTHStudioBlockReorder.moving(
-            draggedID, to: destinationPhase, over: targetID, in: blocks
+            sourceBlock.editorDragID,
+            to: targetBlock.resolvedPhase,
+            over: targetBlock.editorDragID,
+            in: blocks
         )
         guard moved != blocks else { return }
         withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
