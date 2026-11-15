@@ -52,6 +52,8 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
 
     @State private var zones: ATHLTHInsightZoneDistribution?
     @State private var runs: [ATHLTHInsightsRunPerformanceSession] = []
+    @State private var cachedRunComparison:
+        ATHLTHInsightsRunComparisonPolicy.Comparison?
     @State private var recoveryDays: [ATHLTHInsightHealthDay] = []
     @State private var isLoading = true
 
@@ -150,10 +152,7 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
     }
 
     private var runComparison: ATHLTHInsightsRunComparisonPolicy.Comparison? {
-        guard let latestRun else { return nil }
-        return ATHLTHInsightsRunComparisonPolicy.closestComparable(
-            to: latestRun, among: runs
-        )
+        cachedRunComparison
     }
 
     private func runDelta(_ isPower: Bool) -> String {
@@ -605,6 +604,7 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
               !health.shouldDeferAutomaticHealthWork else {
             zones = nil
             runs = []
+            cachedRunComparison = nil
             recoveryDays = []
             isLoading = false
             return
@@ -625,7 +625,16 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
         )
         guard !Task.isCancelled else { return }
         zones = distribution
-        runs = runValues.sorted { $0.endDate > $1.endDate }
+        let sortedRuns = runValues.sorted { $0.endDate > $1.endDate }
+        runs = sortedRuns
+        cachedRunComparison = sortedRuns.first(where: {
+            $0.averageRunningPowerWatts != nil ||
+                $0.averageSpeedKPH != nil
+        }).flatMap {
+            ATHLTHInsightsRunComparisonPolicy.closestComparable(
+                to: $0, among: sortedRuns
+            )
+        }
         recoveryDays = recoveryValues
         isLoading = false
     }
