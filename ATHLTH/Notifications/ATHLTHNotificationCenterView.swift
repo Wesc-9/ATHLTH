@@ -109,6 +109,12 @@ struct ATHLTHNotificationCenterView: View {
                 accent: ATHLTHTheme.accent.opacity(0.22)
             )
         )
+        .refreshable {
+            // A lightweight status refresh, not an entire social feed reload.
+            await social.refreshHomeSocialStatus(
+                challengeStore: challenges, force: true
+            )
+        }
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english: "Notifications",
@@ -163,11 +169,8 @@ struct ATHLTHNotificationCenterView: View {
             // Invitations are events, not their source of truth. Refresh
             // their current session state so withdrawn invitations do not
             // remain in "Needs attention" after the workout was cancelled.
-            await social.refreshIfStale(
-                maxAge: 60,
-                challengeStore: challenges,
-                notificationStore: notifications,
-                deliverSystemAlertsForImportedInbox: false
+            await social.refreshHomeSocialStatus(
+                challengeStore: challenges, force: true
             )
         }
     }
