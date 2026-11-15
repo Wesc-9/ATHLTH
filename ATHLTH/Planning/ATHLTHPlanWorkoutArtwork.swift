@@ -70,7 +70,8 @@ enum ATHLTHPlanWorkoutArtwork {
         if matches(phrase, ["recovery", "rest", "mobility", "yoga", "restitusjon"]) {
             return .recovery
         }
-        if matches(phrase, ["walk", "walking", "gåtur"]) {
+        if workout.kind == .walking ||
+           matches(phrase, ["walk", "walking", "gåtur"]) {
             return .walking
         }
         if matches(phrase, ["hill", "mountain", "trail", "bakke", "terreng"]) ||
@@ -85,7 +86,8 @@ enum ATHLTHPlanWorkoutArtwork {
             blocks.contains(where: { $0.kind == .run })) {
             return .hybrid
         }
-        if blocks.contains(where: { $0.kind == .exercise }) ||
+        if workout.kind == .strength ||
+           blocks.contains(where: { $0.kind == .exercise }) ||
            workout.workoutCategory == "strength" {
             return .strength
         }
