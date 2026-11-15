@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter, coachParseProgramText, coachBackfillSparseFinalWeek } from "./provider.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { conflictsWithInjuryRestrictions } from "../_shared/ai-training-injury-guard.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -28,6 +28,7 @@ type ProgramRequest = {
   sessionsPerWeek?: number;
   aiChoosesFrequency?: boolean;
   aiChoosesDuration?: boolean;
+  varyWeeks?: boolean;
   preferredDays?: number[];
   sessionDurationMinutes?: number;
   userNotes?: string;
@@ -599,6 +600,7 @@ Deno.serve(async (req: Request) => {
   );
   const aiChoosesFrequency = mode === "generate" && body.aiChoosesFrequency === true;
   const aiChoosesDuration = mode === "generate" && body.aiChoosesDuration === true;
+  const varyWeeks = mode === "generate" && body.varyWeeks === true;
   const sessionDurationMinutes = clampInteger(
     body.sessionDurationMinutes,
     20,
@@ -620,6 +622,7 @@ Deno.serve(async (req: Request) => {
     sessionsPerWeek,
     aiChoosesFrequency,
     aiChoosesDuration,
+    varyWeeks,
     preferredDays,
     preferredDayNames: preferredDays.map((day) => DAY_NAMES[day - 1]),
     sessionDurationMinutes,
@@ -656,6 +659,9 @@ Hard rules:
 - Schedule at most one workout on a day and no more than sessionsPerWeek workouts per week.
 - If aiChoosesFrequency is true, sessionsPerWeek is a strict MAXIMUM, not a required target. Select a sustainable weekly frequency yourself based on the stated experience, current training, goal, time and available days. Do not assume all available days should be training days. Explain the chosen frequency in the summary and leave recovery days.
 - If aiChoosesFrequency is false, aim for the requested sessionsPerWeek unless the user constraints make that unsafe or impossible.
+- If varyWeeks is true, make the WEEKS meaningfully different through changing the exercise mix, session structure and appropriate training progression. Do not duplicate the same workout list verbatim every week. Keep the user's selected weekdays, equipment and injury restrictions, and a consistent mix of strength/cardio for mixed goals. Do not vary at random or add unrequested high intensity.
+- If varyWeeks is false, a familiar weekly pattern is fine, but week-to-week progression and recovery must still be sensible.
+- A lighter final recovery (deload) week does NOT mean six rest days. Keep a meaningful training frequency, usually 70–80% of the preceding weeks, and reduce volume, duration, intensity or RPE instead. A truly rest-heavy week is appropriate only when the athlete's express limitations require it. Every week must have real workouts unless safety restrictions prevent exercise.
 - If aiChoosesDuration is true, sessionDurationMinutes is only a fallback reference, NOT a fixed duration. Choose sensible durations separately for the workout type and the user's experience, recovery and schedule; keep each session 20–180 minutes and make its blocks fit the chosen duration. Do not prescribe the same duration on every day without a reason.
 - If aiChoosesDuration is false, respect the requested approximate duration within practical warmup and cooldown needs.
 - Schedule workouts only on preferredDays.
@@ -844,7 +850,35 @@ Hard rules:
         parsed, weekCount, preferredDays, sessionsPerWeek,
       );
       if (validated) {
-        program = validated;
+        // The compact AI output sometimes exhausts its last-week token
+        // budget and emits only one workout in a previously full schedule.
+        // Complete that week using earlier AI-generated sessions ONLY when
+        // the athlete supplied no injury/exercise restrictions. No further
+        // Groq request is required, so this cannot amplify rate limits.
+        const allowReuse = !constraints.injurySafetyNotes &&
+          constraints.excludedMovements.length === 0;
+        const repaired = coachBackfillSparseFinalWeek(
+          validated, preferredDays, sessionsPerWeek, allowReuse, varyWeeks,
+        );
+        if (repaired.added > 0) {
+          const repairedWeeks = repaired.program.weeks as {
+            days: { sessions: unknown[] }[]
+          }[];
+          const finalCount = repairedWeeks.at(-1)?.days.reduce(
+            (total, day) => total + day.sessions.length, 0,
+          ) ?? 0;
+          console.warn("Coach sparse final week recovered", {
+            requestId, added: repaired.added, finalWeekSessions: finalCount,
+          });
+          const original = typeof repaired.program.summary === "string"
+            ? repaired.program.summary : "";
+          repaired.program.summary = (
+            original + "\nFinal recovery week: " + finalCount +
+            " sessions, with reduced volume where appropriate. " +
+            "Additional workouts reuse earlier program sessions."
+          ).trim().slice(0, 1500);
+        }
+        program = repaired.program;
         accepted = true;
       } else {
         // Report only non-sensitive structure diagnostics, never plan text.
