@@ -4,6 +4,22 @@ import Foundation
 /// locally before Apple Health has imported the same activity. Retain those
 /// recordings without double-counting linked HealthKit sessions.
 enum ATHLTHStudioRecordedWorkouts {
+    /// Only show a finish time when the recording actually contains one.
+    /// Crossing midnight also includes the finish date to avoid ambiguity.
+    static func timeRange(_ workout: WorkoutSummary) -> String {
+        let start = workout.startDate.formatted(date: .omitted, time: .shortened)
+        guard workout.duration.isFinite, workout.duration > 0,
+              workout.endDate > workout.startDate else { return start }
+
+        let sameDay = Calendar.current.isDate(
+            workout.startDate, inSameDayAs: workout.endDate
+        )
+        let finish = workout.endDate.formatted(
+            date: sameDay ? .omitted : .abbreviated, time: .shortened
+        )
+        return "\(start)–\(finish)"
+    }
+
     static func merged(
         health: [WorkoutSummary],
         localStrength: [StrengthWorkoutLog]
