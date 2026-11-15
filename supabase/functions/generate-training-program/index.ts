@@ -1,4 +1,4 @@
-import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachProgramSingleWeekRequest, coachProgramValidWeek, coachProgramMergeWeeks } from "./provider.ts";
+import { coachProgramRequest, coachProgramOutput, coachProviderErrorCode, coachShouldRetryInvalidSchema, coachProgramFallbackRequest, coachProgramHasUsableWeeks, coachCompactProgramRequest, coachCompactValidatedProgram, coachProviderRetryAfter } from "./provider.ts";
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { conflictsWithInjuryRestrictions } from "../_shared/ai-training-injury-guard.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -41,12 +41,17 @@ type ProgramRequest = {
   existingDays?: ExistingDay[];
 };
 
-const json = (body: Record<string, unknown>, status = 200) =>
+const json = (
+  body: Record<string, unknown>,
+  status = 200,
+  extraHeaders: Record<string, string> = {},
+) =>
   new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
+      ...extraHeaders,
     },
   });
 
@@ -709,82 +714,109 @@ Hard rules:
   let program: unknown;
 
   if (weekCount >= 3 && weekCount <= 8) {
-    // Generating 4 rich weeks in one response exceeded Groq's JSON validation
-    // and the JSON-mode retry omitted weeks (observed 2026-11-15).
-    // Generate small, separately verified weeks instead. A bounded queue
-    // avoids concurrent provider floods and long Edge Function timeouts.
-    let rateLimited = false;
-    const generateWeek = async (weekNumber: number): Promise<unknown | null> => {
-      const started = Date.now();
+    // The four-week rich schema caused Groq JSON validation failures.
+    // Per-week parallel requests then consumed the available provider TPM
+    // and triggered HTTP 429. Use ONE compact strict-schema call instead.
+    // This preserves actual workout details, not repeated template weeks.
+    let accepted = false;
+    for (let attempt = 0; attempt < 2 && !accepted; attempt++) {
+      const fallback = attempt === 1;
+      const requestStarted = Date.now();
+      let response: Response;
       try {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${groqKey}`,
             "Content-Type": "application/json",
           },
-          signal: AbortSignal.timeout(25_000),
-          body: JSON.stringify(coachProgramSingleWeekRequest(
-            model, instructions, constraints, weekNumber, weekCount,
+          signal: AbortSignal.timeout(45_000),
+          body: JSON.stringify(coachCompactProgramRequest(
+            model, instructions, constraints, fallback,
           )),
         });
-        await recordGroqQuota(response, "training-program-week");
-        if (!response.ok) {
-          rateLimited ||= response.status === 429;
-          const safeError = await response.json().catch(() => null);
-          console.error("Coach weekly provider rejected", {
-            requestId, weekNumber, status: response.status,
-            code: coachProviderErrorCode(safeError), elapsedMs: Date.now() - started,
-          });
-          return null;
-        }
-        const raw = coachProgramOutput(await response.json().catch(() => null));
-        if (!raw) {
-          console.error("Coach weekly response empty", { requestId, weekNumber });
-          return null;
-        }
-        // The AI output is intentionally never persisted to logs.
-        const parsed: unknown = JSON.parse(raw);
-        if (!coachProgramValidWeek(parsed, weekNumber, preferredDays, sessionsPerWeek)) {
-          console.error("Coach weekly output structurally incomplete", {
-            requestId, weekNumber,
-          });
-          return null;
-        }
-        return parsed;
+        await recordGroqQuota(response, "training-program-compact");
       } catch (error) {
-        console.error("Coach weekly request failed", {
-          requestId, weekNumber,
+        console.error("Coach compact provider transport failed", {
+          requestId, fallback,
           failure: error instanceof DOMException && error.name === "TimeoutError"
-            ? "timeout" : "provider_or_parse",
-          elapsedMs: Date.now() - started,
+            ? "timeout" : "transport",
+          elapsedMs: Date.now() - requestStarted,
         });
-        return null;
-      }
-    };
-
-    const weeks: unknown[] = [];
-    for (let index = 1; index <= weekCount; index += 2) {
-      const numbers = [index, index + 1].filter((n) => n <= weekCount);
-      const result = await Promise.all(numbers.map(generateWeek));
-      if (result.some((value) => value === null)) {
         return json({
-          error: rateLimited
-            ? "ATHLTH Coach is busy. Please try again shortly."
-            : "ATHLTH Coach could not complete every plan week. No plan was saved.",
-          code: rateLimited ? "AI_PROVIDER_RATE_LIMIT" : "AI_INVALID_PROGRAM",
-          requestId,
-        }, rateLimited ? 429 : 502);
+          error: "ATHLTH Coach is temporarily unavailable.",
+          code: "AI_PROVIDER_UNAVAILABLE", requestId,
+        }, 503);
       }
-      weeks.push(...result);
+
+      if (response.status === 429) {
+        // Never automatically retry a rate limit; preserve Groq's reset
+        // guidance so clients can display a real cooldown.
+        const seconds = coachProviderRetryAfter(response);
+        console.warn("Coach provider rate limit", {
+          requestId, retryAfterSeconds: seconds, phase: fallback ? "json" : "strict",
+        });
+        return json({
+          error: "ATHLTH Coach has reached the AI provider's limit. Please try later.",
+          code: "AI_PROVIDER_RATE_LIMIT", retryAfterSeconds: seconds, requestId,
+        }, 429, { "Retry-After": String(seconds) });
+      }
+
+      if (!response.ok) {
+        const providerError = await response.json().catch(() => null);
+        const code = coachProviderErrorCode(providerError);
+        console.error("Coach compact provider error", {
+          requestId, status: response.status, code,
+          fallback, elapsedMs: Date.now() - requestStarted,
+        });
+        if (!fallback && coachShouldRetryInvalidSchema(response.status, providerError)) {
+          // A second attempt is allowed only when Groq reports enough
+          // tokens remaining. Otherwise return a cooldown; do not flood.
+          const remaining = Number(response.headers.get("x-ratelimit-remaining-tokens"));
+          if (Number.isFinite(remaining) && remaining < 1500) {
+            return json({
+              error: "ATHLTH Coach's AI capacity is temporarily exhausted.",
+              code: "AI_PROVIDER_RATE_LIMIT", retryAfterSeconds: 60, requestId,
+            }, 429, { "Retry-After": "60" });
+          }
+          continue;
+        }
+        return json({
+          error: "ATHLTH Coach could not generate your plan.",
+          code: "AI_PROVIDER_UNAVAILABLE", requestId,
+        }, 502);
+      }
+
+      const resultText = coachProgramOutput(await response.json().catch(() => null));
+      let parsed: unknown;
+      try {
+        parsed = resultText ? JSON.parse(resultText) : null;
+      } catch {
+        parsed = null;
+      }
+      const validated = coachCompactValidatedProgram(
+        parsed, weekCount, preferredDays, sessionsPerWeek,
+      );
+      if (validated) {
+        program = validated;
+        accepted = true;
+      } else {
+        // Report only non-sensitive structure diagnostics, never plan text.
+        console.error("Coach compact plan validation failed", {
+          requestId, fallback, expectedWeeks: weekCount,
+          elapsedMs: Date.now() - requestStarted,
+        });
+        // A retry with raw JSON rarely corrects missing weeks and may
+        // consume the remaining TPM budget, so do not repeat it here.
+        return json({
+          error: "ATHLTH Coach returned an incomplete plan. No plan was saved.",
+          code: "AI_INVALID_PROGRAM", requestId,
+        }, 502);
+      }
     }
-    program = coachProgramMergeWeeks(weeks, weekCount, preferredDays, sessionsPerWeek);
-    if (!program) {
-      console.error("Coach verified weekly assembly failed", {
-        requestId, expectedWeeks: weekCount,
-      });
+    if (!accepted) {
       return json({
-        error: "ATHLTH Coach could not complete the plan. No plan was saved.",
+        error: "ATHLTH Coach could not finish a complete plan. No plan was saved.",
         code: "AI_INVALID_PROGRAM", requestId,
       }, 502);
     }
