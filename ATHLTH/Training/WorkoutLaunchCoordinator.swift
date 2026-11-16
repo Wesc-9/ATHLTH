@@ -968,6 +968,8 @@ enum WorkoutLaunchCoordinator {
                 treadmillInclinePercent:
                     configuration
                         .treadmillInclinePercent,
+                treadmillSpeedKilometersPerHour:
+                    configuration.treadmillInitialSpeedKilometersPerHour,
                 audioCoach:
                     resolvedAudioCoach,
                 structuredWorkout:
@@ -1176,6 +1178,16 @@ enum WorkoutLaunchCoordinator {
         ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
         if let catalog = ATHLTHPetStore.shared.makeWatchCatalog() {
             watchConnection.sendPetCatalog(catalog)
+        }
+
+        if configuration.watchCompetitionStart {
+            var display = ATHLTHLiveWorkoutPreferencesStore.load()
+            display.preferredRunPageRaw = "competition"
+            watchConnection.sendLiveSurfaceConfiguration(display)
+        } else {
+            var display = ATHLTHLiveWorkoutPreferencesStore.load()
+            display.preferredRunPageRaw = "metrics"
+            watchConnection.sendLiveSurfaceConfiguration(display)
         }
 
         watchConnection.sendPreparedWorkout(
