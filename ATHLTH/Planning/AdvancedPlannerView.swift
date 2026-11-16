@@ -6823,6 +6823,11 @@ struct SessionEditorView: View {
 
             if editorMode == .basic {
                 basicWorkoutChoiceSection
+                // A walking route is useful in Basic as well as Advanced.
+                // Persist through the same selectedRouteID and session model.
+                if kind == .walking {
+                    routeBuilder
+                }
             } else {
                 if kind == .running {
                     if !selectedRunningWorkouts.isEmpty ||
@@ -9589,9 +9594,12 @@ struct SessionEditorView: View {
 
 
     private var routeBuilder: some View {
-        Section("Route") {
-            Picker("Route", selection: $selectedRouteID) {
-                Text("No specific route")
+        Section(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute")) {
+            Picker(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
+                   selection: $selectedRouteID) {
+                Text(ATHLTHLocalization.choose(
+                    english: "No specific route", norwegian: "Ingen valgt rute"
+                ))
                     .tag(nil as UUID?)
 
                 ForEach(session.savedRoutes) { route in
