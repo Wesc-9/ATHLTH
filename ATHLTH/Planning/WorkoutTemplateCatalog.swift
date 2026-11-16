@@ -6661,11 +6661,11 @@ struct WorkoutTemplateBuilderView: View {
         selectedPhase = phase
         // A walking workout in a training plan may have no initialActivity:
         // its source category lives on the existing canonical walking block.
-        let isWalkingRoute = initialActivity == .walking ||
-            blocks.contains {
-                $0.kind == .run && $0.cardioActivity == .walking &&
-                    $0.resolvedPhase == phase
-            }
+        let isWalkingRoute = ATHLTHWalkingRouteAssignmentPolicy.isWalking(
+            initialActivity: initialActivity,
+            blocks: blocks,
+            phase: phase
+        )
         if isPlannedWorkout && !studioAdvanced &&
             (initialActivity == .running || isWalkingRoute) {
             removeBasicOwnedBlocks()
