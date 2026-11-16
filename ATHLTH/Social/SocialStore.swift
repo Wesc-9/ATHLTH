@@ -3306,7 +3306,8 @@ final class SocialStore: ObservableObject {
             .lowercased() {
         case "message",
              "message_request",
-             "message_request_accepted":
+             "message_request_accepted",
+             "workout_invite":
             return true
         default:
             return false
@@ -3356,6 +3357,14 @@ final class SocialStore: ObservableObject {
                         creator: current.creator
                     )
                 }
+            }
+            // Resolve only this invitation's backend inbox event, without
+            // marking unrelated messages, challenges or notifications read.
+            for event in inboxEvents where
+                event.kind == "workout_invite" &&
+                event.entityID == invite.session.id &&
+                event.readAt == nil {
+                try? await service.markInboxEventRead(event.id)
             }
             await refresh()
             return true
