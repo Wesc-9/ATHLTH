@@ -40,6 +40,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var selectedRule: SelectedRule?
     @State private var expandedCoachGroups: Set<UUID> = []
     @State private var creatingBlankTemplate = false
+    @State private var pendingGeneralOption: ATHLTHAudioCoachOption?
 
     private struct SelectedRule: Identifiable {
         let id: UUID
@@ -68,7 +69,7 @@ struct ATHLTHAudioCoachActiveListView: View {
         case delete(UUID)
     }
 
-    private enum TemplateDestination {
+    private enum TemplateDestination: Equatable {
         case standard
         case profile(UUID)
         case new
@@ -227,6 +228,10 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
         .sheet(isPresented: $showingGroupCommandBuilder, onDismiss: {
             pendingGroupCommandID = nil
+            if let pendingGeneralOption {
+                self.pendingGeneralOption = nil
+                editingOption = pendingGeneralOption
+            }
         }) {
             groupCommandSheet
         }
@@ -326,7 +331,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                 saveCurrentTemplate()
                 if !isNewEmptyTemplate {
                     if let destination = pendingTemplateDestination {
-                        applyTemplateDestination(destination)
+                        continueTemplateChange(destination)
                     }
                     pendingTemplateDestination = nil
                 } else {
@@ -336,7 +341,7 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             Button(tr("Discard changes", "Forkast endringer"), role: .destructive) {
                 if let destination = pendingTemplateDestination {
-                    applyTemplateDestination(destination)
+                    continueTemplateChange(destination)
                 }
                 pendingTemplateDestination = nil
             }
@@ -426,15 +431,51 @@ struct ATHLTHAudioCoachActiveListView: View {
             pendingTemplateDestination = destination
             showingDirtyTemplatePrompt = true
         } else {
+            continueTemplateChange(destination)
+        }
+    }
+
+    private func continueTemplateChange(_ destination: TemplateDestination) {
+        if destination == .new {
+            profileName = ""
+            creatingBlankTemplate = true
+            showingSaveNewProfile = true
+        } else {
             applyTemplateDestination(destination)
         }
     }
 
+    // Newest personal templates come first, with Standard on their right.
+    private var templateIDsInCircleOrder: [UUID] {
+        Array(settings.audioCoachProfiles.map(\.id).reversed())
+    }
+
+    private var currentTemplateCircleIndex: Int {
+        selectedTemplateID.flatMap(templateIDsInCircleOrder.firstIndex(of:))
+            ?? templateIDsInCircleOrder.count
+    }
+
+    private func titleForTemplate(at index: Int) -> String? {
+        guard index >= 0 && index <= templateIDsInCircleOrder.count else { return nil }
+        if index == templateIDsInCircleOrder.count { return "Standard" }
+        return settings.audioCoachProfiles.first {
+            $0.id == templateIDsInCircleOrder[index]
+        }?.name
+    }
+
+    private var previousTemplateName: String? {
+        titleForTemplate(at: currentTemplateCircleIndex - 1)
+    }
+
+    private var nextTemplateName: String? {
+        titleForTemplate(at: currentTemplateCircleIndex + 1)
+    }
+
     private func cycleSavedTemplates(_ step: Int) {
-        let ids = settings.audioCoachProfiles.map(\.id)
-        let current = selectedTemplateID.flatMap(ids.firstIndex(of:)).map { $0 + 1 } ?? 0
+        let ids = templateIDsInCircleOrder
+        let current = currentTemplateCircleIndex
         let next = (current + step + ids.count + 1) % (ids.count + 1)
-        requestTemplateChange(next == 0 ? .standard : .profile(ids[next - 1]))
+        requestTemplateChange(next == ids.count ? .standard : .profile(ids[next]))
     }
 
     private func applyTemplateDestination(_ destination: TemplateDestination) {
@@ -522,7 +563,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                         showingSaveNewProfile = false
                         if let destination = pendingTemplateDestination {
                             pendingTemplateDestination = nil
-                            applyTemplateDestination(destination)
+                            continueTemplateChange(destination)
                         }
                     } label: {
                         Label(tr("Save as new template", "Lagre som ny mal"),
