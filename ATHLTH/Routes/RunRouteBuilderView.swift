@@ -25,6 +25,9 @@ struct RunRouteBuilderView: View {
     @State private var mapPointMode: RunRouteMapPointMode = .automatic
     @State private var mapUndoStack: [RunRouteMapSnapshot] = []
     @State private var mapInitiallyCentered = false
+    // Fit the first calculated route once. Subsequent via edits must preserve
+    // the athlete's chosen pan and zoom instead of re-centering the map.
+    @State private var hasFittedCalculatedRoute = false
     @State private var routeCalculationID = UUID()
     @State private var returnOnSamePath = false
     @State private var alternatives: [RunRouteAlternative] = []
@@ -103,13 +106,17 @@ struct RunRouteBuilderView: View {
                 }
                 .buttonStyle(.plain)
                 routeNameCard
-                // Put the live summary where it is useful while editing points.
+                endpointsCard
+                // Keep all variable-height lists below the map. Adding a via
+                // point must never change the layout above the map viewport.
+                routeMap
+
+                if !viaPoints.isEmpty {
+                    viaPointsCard
+                }
                 if selectedAlternative != nil {
                     routeDetailsCard
                 }
-                endpointsCard
-                // Map-first planning must work with no address selection.
-                routeMap
 
                 if isCalculating {
                     HStack(spacing: 10) {
@@ -135,7 +142,11 @@ struct RunRouteBuilderView: View {
             .padding(.bottom, 10)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if selectedAlternative != nil {
+            // Keep the inset height stable during every route recalculation.
+            // Toggling it with selectedAlternative moves the map's scroll offset.
+            if RunRouteBuilderViewportPolicy.reserveSaveFooter(
+                hasStart: startItem != nil, hasFinish: endItem != nil
+            ) {
                 saveRouteFooter
             }
         }
@@ -418,6 +429,12 @@ struct RunRouteBuilderView: View {
                     .font(.headline.weight(.bold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                 Spacer()
+                Text(ATHLTHLocalization.choose(
+                    english: "\(viaPoints.count) via points",
+                    norwegian: "\(viaPoints.count) via-punkter"
+                ))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 Button {
                     rememberMapState()
                     let oldStart = startItem
@@ -456,11 +473,6 @@ struct RunRouteBuilderView: View {
             }
 
             routeConnector
-
-            ForEach(Array(viaPoints.enumerated()), id: \.element.id) { index, point in
-                viaPointRow(point, index: index)
-                routeConnector
-            }
 
             if showingViaSearch {
                 RunRouteSearchField(
@@ -637,6 +649,28 @@ struct RunRouteBuilderView: View {
                         .padding(.vertical, 8)
                         .background(.regularMaterial, in: Capsule())
                         .padding(12)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if let route = selectedAlternative {
+                    Button {
+                        // Explicit recentering only when the athlete requests it.
+                        updateMapRegion(for: route)
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Show full route",
+                                norwegian: "Vis hele ruten"
+                            ),
+                            systemImage: "arrow.up.left.and.arrow.down.right"
+                        )
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(12)
                 }
             }
             .overlay(alignment: .bottom) {
@@ -890,6 +924,7 @@ struct RunRouteBuilderView: View {
         endSearch.clear()
         viaSearch.clear()
         mapPointMode = .automatic
+        hasFittedCalculatedRoute = false
         invalidateCalculatedRoute()
     }
 
@@ -991,6 +1026,24 @@ struct RunRouteBuilderView: View {
         .routeBuilderCard()
     }
 
+    /// Via-point controls are deliberately below the map so editing points
+    /// cannot push the map vertically within its parent ScrollView.
+    private var viaPointsCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(ATHLTHLocalization.choose(
+                english: "Via points", norwegian: "Via-punkter"
+            ))
+            .font(.headline)
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            ForEach(Array(viaPoints.enumerated()), id: \.element.id) { index, point in
+                viaPointRow(point, index: index)
+            }
+        }
+        .padding(15)
+        .routeBuilderCard()
+    }
+
     private var routeDetailsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(ATHLTHLocalization.choose(
@@ -1075,6 +1128,8 @@ struct RunRouteBuilderView: View {
                 )
             }
             .buttonStyle(.plain)
+            .disabled(selectedAlternative == nil || isCalculating)
+            .opacity(selectedAlternative == nil || isCalculating ? 0.55 : 1)
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 8)
@@ -1173,7 +1228,11 @@ struct RunRouteBuilderView: View {
             selectedAlternativeID = mapped.first?.id
             lastCalculatedSignature = signature
 
-            if let first = mapped.first {
+            if let first = mapped.first,
+               RunRouteBuilderViewportPolicy.autoFitFirstRoute(
+                   hasAlreadyFitted: hasFittedCalculatedRoute
+               ) {
+                hasFittedCalculatedRoute = true
                 updateMapRegion(for: first)
             }
         } catch {
@@ -2000,6 +2059,18 @@ private struct RunRouteMapSnapshot {
     let start: MKMapItem?
     let finish: MKMapItem?
     let via: [RunRouteViaPoint]
+}
+
+/// Pure viewport policy. Keeps the save footer stable while MapKit rebuilds
+/// alternatives and prevents each new via pin from overriding manual zoom.
+enum RunRouteBuilderViewportPolicy {
+    static func reserveSaveFooter(hasStart: Bool, hasFinish: Bool) -> Bool {
+        hasStart && hasFinish
+    }
+
+    static func autoFitFirstRoute(hasAlreadyFitted: Bool) -> Bool {
+        !hasAlreadyFitted
+    }
 }
 
 private struct RunRouteViaPoint: Identifiable {
