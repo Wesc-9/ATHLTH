@@ -2583,8 +2583,8 @@ final class SocialStore: ObservableObject {
     ) async {
         guard let endedAt = workout.endedAt,
               endedAt >= activationDate,
-              UserDefaults.standard.bool(forKey: "settings.autoPublishCompletedWorkouts"),
-              UserDefaults.standard.bool(forKey: "settings.workoutSharingChoiceCompleted"),
+              let userID = currentUserID,
+              FriendFeedSharingPreference.isEnabled(userID: userID),
               privacy?.shareRecentActivity == true,
               let configuredVisibility = privacy.flatMap({
                   ProfileVisibility(rawValue: $0.recentActivityVisibility)
@@ -2715,8 +2715,8 @@ final class SocialStore: ObservableObject {
         visibility: ProfileVisibility = .friends
     ) async {
         guard result.endedAt >= activationDate,
-              UserDefaults.standard.bool(forKey: "settings.autoPublishCompletedWorkouts"),
-              UserDefaults.standard.bool(forKey: "settings.workoutSharingChoiceCompleted"),
+              let userID = currentUserID,
+              FriendFeedSharingPreference.isEnabled(userID: userID),
               privacy?.shareRecentActivity == true,
               let configuredVisibility = privacy.flatMap({
                   ProfileVisibility(rawValue: $0.recentActivityVisibility)
