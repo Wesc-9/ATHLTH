@@ -271,7 +271,9 @@ struct SavedRoutesView: View {
                     filteredEmptyState
                 } else {
                     LazyVGrid(
-                        columns: ATHLTHLibraryResponsiveLayout.columns(
+                        columns: viewMode == .largeCards
+                            ? [GridItem(.flexible())]
+                            : ATHLTHLibraryResponsiveLayout.columns(
                             mode: viewMode == .list || viewMode == .map ? .list : .grid,
                             width: libraryViewWidth,
                             accessibilityText: dynamicTypeSize.isAccessibilitySize,
@@ -282,9 +284,12 @@ struct SavedRoutesView: View {
                     ) {
                         ForEach(Array(visibleRoutes.prefix(visibleLimit)),
                                 id: \.route.id) { entry in
-                            if viewMode == .cards {
+                            switch viewMode {
+                            case .cards:
                                 compactSavedRouteTile(entry)
-                            } else {
+                            case .largeCards:
+                                routeCard(entry)
+                            case .list, .map:
                                 compactRouteRow(entry)
                             }
                         }
@@ -769,7 +774,12 @@ struct SavedRoutesView: View {
                 previewRoute = route
             } label: {
                 ZStack(alignment: .bottomTrailing) {
-                    RouteMapSnapshotThumbnail(route: route, height: 150)
+                    RouteMapSnapshotThumbnail(
+                        route: route,
+                        height: 190,
+                        allowsLiveSnapshot: !routeCardsScrolling
+                    )
+                        .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 15))
                     Label(tr("Explore", "Utforsk"), systemImage: "arrow.up.left.and.arrow.down.right")
                         .font(.caption2.weight(.semibold))
