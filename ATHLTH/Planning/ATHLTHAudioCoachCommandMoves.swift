@@ -9,10 +9,11 @@ enum ATHLTHAudioCoachCommandMoves {
         to destination: UUID?,
         draft: inout AudioCoachDraft
     ) -> Bool {
-        if let destination,
-           !draft.coachGroups.contains(where: { $0.id == destination }) {
-            return false
-        }
+        // A command always belongs to a trigger-bearing group. Dropping it
+        // outside a group is not a valid destination.
+        guard let destination,
+              draft.coachGroups.contains(where: { $0.id == destination })
+        else { return false }
 
         let parts = payload.split(separator: ":", omittingEmptySubsequences: false)
         if parts.count == 2, parts[0] == "option",
@@ -27,10 +28,9 @@ enum ATHLTHAudioCoachCommandMoves {
                     $0 == option.rawValue
                 }
             }
-            if let destination,
-               let index = draft.coachGroups.firstIndex(where: {
-                   $0.id == destination
-               }) {
+            if let index = draft.coachGroups.firstIndex(where: {
+                $0.id == destination
+            }) {
                 draft.coachGroups[index].optionIDs.append(option.rawValue)
             }
             return true
@@ -50,8 +50,7 @@ enum ATHLTHAudioCoachCommandMoves {
         })?.id
         guard destination != origin else { return false }
 
-        // Moving into a group adopts that group's trigger, but retains the
-        // standalone source cadence when dragging out of a group.
+        // A moved metric inherits the target group's schedule.
         let targetIndex = destination.flatMap { destination in
             draft.coachGroups.firstIndex { $0.id == destination }
         }
@@ -63,7 +62,7 @@ enum ATHLTHAudioCoachCommandMoves {
                 })
             })
         }
-        let createsRule = destination == nil || destinationRuleID == nil
+        let createsRule = destinationRuleID == nil
         if createsRule && draft.customRules.count >= 20 &&
            source.selectedMetrics.count > 1 {
             return false
@@ -79,6 +78,8 @@ enum ATHLTHAudioCoachCommandMoves {
            let index = draft.customRules.firstIndex(where: {
                $0.id == destinationRuleID
            }) {
+            draft.customRules[index].trigger = trigger
+            draft.customRules[index].interval = interval
             if !draft.customRules[index].selectedMetrics.contains(metric) {
                 draft.customRules[index].additionalMetrics =
                     (draft.customRules[index].additionalMetrics ?? []) + [metric]
