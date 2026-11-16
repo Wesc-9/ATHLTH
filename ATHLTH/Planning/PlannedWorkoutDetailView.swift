@@ -273,7 +273,8 @@ struct PlannedWorkoutDetailView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    if !isCompleted && !isSkipped {
+                    if !isCompleted && !isSkipped &&
+                        session.recordedTimes(for: currentWorkout.id) == nil {
                         Button(role: .destructive) {
                             showingRemovePlannedWorkoutConfirmation = true
                         } label: {
@@ -288,7 +289,9 @@ struct PlannedWorkoutDetailView: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    if !currentWorkout.isExplicitRestDay {
+                    if !currentWorkout.isExplicitRestDay && !isCompleted &&
+                        !isSkipped && currentWorkout.cancelledAt == nil &&
+                        session.recordedTimes(for: currentWorkout.id) == nil {
                         Button(ATHLTHLocalization.choose(english: "Edit", norwegian: "Rediger")) {
                             showingEditor = true
                         }
@@ -790,8 +793,15 @@ struct PlannedWorkoutDetailView: View {
                             norwegian: "Rediger"
                         )
                     ) {
+                        guard !isCompleted, !isSkipped,
+                              currentWorkout.cancelledAt == nil,
+                              session.recordedTimes(for: currentWorkout.id) == nil
+                        else { return }
                         showingEditor = true
                     }
+                    .disabled(isCompleted || isSkipped ||
+                              currentWorkout.cancelledAt != nil ||
+                              session.recordedTimes(for: currentWorkout.id) != nil)
                     .font(
                         .caption
                             .weight(.semibold)
