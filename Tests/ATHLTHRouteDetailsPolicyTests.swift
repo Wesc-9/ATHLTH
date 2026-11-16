@@ -26,6 +26,33 @@ final class ATHLTHRouteDetailsPolicyTests: XCTestCase {
                         altitude: elevation, sequence: sequence)
     }
 
+    func testRouteHeroDoesNotRepeatAnUninformativeStartAndFinish() {
+        XCTAssertNil(ATHLTHRouteHeroPresentation.endpointSubtitle(
+            start: "Min posisjon", finish: "Min posisjon"
+        ))
+        XCTAssertNil(ATHLTHRouteHeroPresentation.endpointSubtitle(
+            start: "  ", finish: "Mål"
+        ))
+        XCTAssertNil(ATHLTHRouteHeroPresentation.endpointSubtitle(
+            start: nil, finish: "Mål"
+        ))
+    }
+
+    func testRouteHeroKeepsUsefulStartAndFinishNames() {
+        XCTAssertEqual(
+            ATHLTHRouteHeroPresentation.endpointSubtitle(
+                start: "Bø", finish: "Pizzafjøset"
+            ),
+            "Bø → Pizzafjøset"
+        )
+        XCTAssertEqual(
+            ATHLTHRouteHeroPresentation.endpointSubtitle(
+                start: "  Lade  ", finish: "  Lademoen "
+            ),
+            "Lade → Lademoen"
+        )
+    }
+
     func testLegacyRouteJSONWithoutNewPropertiesDecodes() throws {
         let older = route(coordinates: [
             point(63.4, 10.4, nil, 0),
