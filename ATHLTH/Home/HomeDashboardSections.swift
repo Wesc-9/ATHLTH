@@ -4545,20 +4545,137 @@ private struct HomeWeeklyProgressDaySheet: View {
             .padding(.top, 4)
     }
 
+    private func isCancelledPlannedWorkout(_ workout: PlannedSession) -> Bool {
+        if workout.cancelledAt != nil { return true }
+        guard let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: plan
+        ) else { return false }
+        return session.isPlanSessionSkipped(
+            planID: planID, sessionID: workout.id
+        )
+    }
+
+    private func canModifyPlannedWorkout(_ workout: PlannedSession) -> Bool {
+        guard !workout.isExplicitRestDay,
+              workout.trainTogetherMode == nil,
+              workout.cancelledAt == nil,
+              session.recordedTimes(for: workout.id) == nil,
+              !selection.completedPlannedIDs.contains(workout.id),
+              !isCancelledPlannedWorkout(workout)
+        else { return false }
+        if let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: plan
+        ) {
+            return !session.isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: recentWorkouts,
+                strengthHistory: strength.workoutHistory
+            )
+        }
+        return session.standalonePlannedSessions.contains { $0.id == workout.id }
+    }
+
+    private func openWorkoutDetailsAfterSheet(_ workout: PlannedSession) {
+        let isPlan = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: plan
+        ) != nil
+        if selectedPlannedWorkout != nil {
+            if isPlan { pendingPlanTracking = workout }
+            else { pendingStandaloneTracking = workout }
+            selectedPlannedWorkout = nil
+        } else if isPlan {
+            selectedPlanTracking = workout
+        } else {
+            selectedStandaloneTracking = workout
+        }
+    }
+
+    private func editTimeOfWorkout(_ workout: PlannedSession) {
+        guard canModifyPlannedWorkout(workout) else { return }
+        editedWorkoutClock = workout.scheduledStart ??
+            HomeWorkoutSuggestionPlanner.defaultStart(
+                on: selection.date
+            ) ?? selection.date
+        editingWorkoutTime = workout
+    }
+
+    private func timeOnlyEditor(for workout: PlannedSession) -> some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 15) {
+                Text(workout.title)
+                    .font(.headline)
+                    .foregroundStyle(dayInk)
+                    .lineLimit(2)
+                Text(selection.date.formatted(
+                    .dateTime.weekday(.wide).day().month(.wide)
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                DatePicker(
+                    ATHLTHLocalization.choose(
+                        english: "New start time", norwegian: "Nytt klokkeslett"
+                    ),
+                    selection: $editedWorkoutClock,
+                    displayedComponents: .hourAndMinute
+                )
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .tint(ATHLTHPlanDesign.accentInk)
+
+                Button {
+                    let saved = session.changePlannedWorkoutClock(
+                        workout.id,
+                        on: workout.scheduledStart ?? selection.date,
+                        to: editedWorkoutClock,
+                        healthWorkouts: recentWorkouts,
+                        strengthHistory: strength.workoutHistory
+                    )
+                    editingWorkoutTime = nil
+                    if !saved { showingTimeEditFailure = true }
+                } label: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Save time", norwegian: "Lagre tidspunkt"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 47)
+                    .background(dayInk, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .background(dayCanvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Change time", norwegian: "Endre klokkeslett"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { editingWorkoutTime = nil }
+                }
+            }
+        }
+        .accessibilityIdentifier("athlth-home-edit-workout-time")
+    }
+
     /// Allow removing unfinished workouts from any calendar day, including
     /// dates in the past. Scheduling new workouts still requires a future day.
     /// Real activity history and completed plan results must remain intact.
     private func canRemovePlannedWorkout(_ workout: PlannedSession) -> Bool {
         guard workout.trainTogetherMode == nil,
+              session.recordedTimes(for: workout.id) == nil,
               !selection.completedPlannedIDs.contains(workout.id)
         else { return false }
 
         if let planID = HomeWeeklyProgressCalendar.containingPlanID(
             for: workout, in: plan
         ) {
-            return !session.isPlanSessionSkipped(
-                planID: planID, sessionID: workout.id
-            ) && !session.isPlanSessionCompleted(
+            return !session.isPlanSessionCompleted(
                 planID: planID, sessionID: workout.id,
                 healthWorkouts: recentWorkouts,
                 strengthHistory: strength.workoutHistory
