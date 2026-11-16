@@ -2543,10 +2543,30 @@ struct TrainingPlanCatalogDetailView: View {
                         Spacer(minLength: 0)
                     }
 
-                    Text(entry.summary)
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineSpacing(2)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "About this plan", norwegian: "Om treningsplanen"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(entry.summary)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineSpacing(2)
+                    }
+
+                    if entry.tags.contains("no equipment") {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "No equipment needed · bodyweight only",
+                                norwegian: "Ingen utstyr nødvendig · kun kroppsvekt"
+                            ),
+                            systemImage: "checkmark.circle"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    }
 
                     HStack(spacing: 7) {
                         Label(
