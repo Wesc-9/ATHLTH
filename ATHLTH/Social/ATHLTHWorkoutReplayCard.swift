@@ -846,7 +846,13 @@ struct ATHLTHWorkoutReplayCard: View {
             return "TreadmillRecentCardHero"
         }
         if isStrength { return "StrengthPostWorkoutHero" }
-        return "GoalRunning"
+        switch workout.activity {
+        case .walking: return "GoalWalking"
+        case .hiking: return "GoalMountain"
+        case .cycling: return "GoalEndurance"
+        case .yoga: return "GoalRelax"
+        default: return "GoalRunning"
+        }
     }
 
     private var replayFirstMetric: String {
