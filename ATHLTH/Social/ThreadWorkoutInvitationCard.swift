@@ -1,470 +1,475 @@
 import SwiftUI
 
-/// A private invitation surfaced directly in the message timeline.
-/// The workout is saved into the recipient's calendar only after acceptance.
+/// A small, inexpensive timeline preview. Workout details are only built when
+/// the user opens the sheet; no maps, workout blocks or exercise rows in chat.
 struct ThreadWorkoutInvitationCard: View {
     let workout: PlannedSession
     let response: PlannedWorkoutInviteResponse?
     let lifecycleUpdate: WorkoutInviteLifecycleUpdate?
     let isMine: Bool
     let isResponding: Bool
+    let organizerName: String
+    let inviteeName: String
     let onAccept: () -> Void
     let onDecline: () -> Void
     let onProposeChanges: () -> Void
 
     @State private var showingDetails = false
 
-    private var isPhysical: Bool {
-        workout.trainTogetherMode != .sameWorkout
+    private var state: PlannedWorkoutInvitationPresentationState {
+        PlannedWorkoutInvitationPresentationState.resolve(
+            start: workout.scheduledStart,
+            decision: response?.decision,
+            organizerCancelled: lifecycleUpdate?.kind == .cancelled
+        )
+    }
+
+    private var statusLabel: String {
+        switch state {
+        case .pending:
+            return isMine
+                ? ATHLTHLocalization.choose(english: "Awaiting reply", norwegian: "Venter på svar")
+                : ATHLTHLocalization.choose(english: "Invitation received", norwegian: "Venter på ditt svar")
+        case .accepted:
+            return ATHLTHLocalization.choose(english: "Accepted", norwegian: "Godtatt")
+        case .declined:
+            return ATHLTHLocalization.choose(english: "Declined", norwegian: "Avslått")
+        case .cancelled:
+            return ATHLTHLocalization.choose(english: "Cancelled", norwegian: "Avlyst")
+        }
+    }
+
+    private var statusColor: Color {
+        switch state {
+        case .cancelled, .declined: return .red
+        case .accepted: return ATHLTHTheme.accentDeep
+        case .pending: return ATHLTHTheme.mutedText
+        }
     }
 
     private var subtitle: String {
-        isPhysical
-            ? ATHLTHLocalization.choose(
-                english: "Train together in person",
-                norwegian: "Trene fysisk sammen"
-            )
-            : ATHLTHLocalization.choose(
-                english: "Do the same workout",
-                norwegian: "Trene samme økt"
-            )
-    }
-
-    private var responseStatus: (text: String, icon: String) {
-        switch response?.decision {
-        case .accepted:
-            return (
-                ATHLTHLocalization.choose(
-                    english: "Accepted", norwegian: "Godtatt"
-                ), "checkmark.circle.fill"
-            )
-        case .declined:
-            return (
-                ATHLTHLocalization.choose(
-                    english: "Declined", norwegian: "Avslått"
-                ), "xmark.circle.fill"
-            )
-        case .none:
-            return (
-                isMine
-                    ? ATHLTHLocalization.choose(
-                        english: "Waiting for a reply",
-                        norwegian: "Venter på svar"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "Invited · awaiting your reply",
-                        norwegian: "Invitert · venter på svar"
-                    ), "clock"
-            )
-        }
-    }
-
-    private var statusTint: Color {
-        switch response?.decision {
-        case .accepted: return ATHLTHTheme.vitality
-        case .declined: return ATHLTHTheme.mutedText
-        case .none: return ATHLTHTheme.accentDeep
-        }
+        workout.kind.title + " · " + (
+            workout.trainTogetherMode == .sameWorkout
+            ? ATHLTHLocalization.choose(english: "Same workout", norwegian: "Samme økt")
+            : ATHLTHLocalization.choose(english: "Train in person", norwegian: "Trene fysisk sammen")
+        )
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 10) {
             Button {
                 showingDetails = true
             } label: {
-                VStack(alignment: .leading, spacing: 13) {
-                    HStack {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "TRAINING INVITATION",
-                                norwegian: "INVITASJON TIL ØKT"
-                            ),
-                            systemImage: "person.2.fill"
-                        )
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.1)
+                HStack(alignment: .center, spacing: 11) {
+                    Image(systemName: workout.kind.systemImage)
+                        .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 43, height: 43)
+                        .background(ATHLTHTheme.accentSoft.opacity(0.55),
+                                    in: RoundedRectangle(cornerRadius: 14))
 
-                        Spacer()
-
-                        Image(systemName: "arrow.up.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(workout.title)
+                            .font(.system(size: 17, weight: .semibold, design: .serif))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Text(statusLabel)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(statusColor)
                     }
-
-                    HStack(alignment: .center, spacing: 12) {
-                        Image(systemName: workout.kind.systemImage)
-                            .font(.system(size: 23, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 54, height: 54)
-                            .background(
-                                Color.white.opacity(0.70),
-                                in: RoundedRectangle(cornerRadius: 17)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 17)
-                                    .stroke(Color.white.opacity(0.86), lineWidth: 1)
-                            }
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(workout.title)
-                                .font(.system(size: 22, weight: .semibold, design: .serif))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-
-                            Text(subtitle)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .multilineTextAlignment(.leading)
-                        }
-                        Spacer(minLength: 0)
-                    }
+                    Spacer(minLength: 2)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                 }
-                .padding(17)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background {
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.champagneSoft.opacity(0.75),
-                            Color.white.opacity(0.50),
-                            ATHLTHTheme.accentSoft.opacity(0.24)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 13) {
-                HStack(spacing: 7) {
+            if state == .cancelled {
+                // Deliberately just a title, red state and a quiet date for history.
+                if let start = workout.scheduledStart {
+                    Text(start.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            } else {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+
+                HStack(spacing: 10) {
                     if let start = workout.scheduledStart {
-                        inviteDetail(
-                            icon: "calendar",
-                            title: start.formatted(.dateTime.day().month(.abbreviated)),
-                            detail: start.formatted(.dateTime.hour().minute())
+                        Label(
+                            start.formatted(date: .abbreviated, time: .shortened),
+                            systemImage: "calendar"
                         )
+                        .lineLimit(1)
                     }
-                    if let duration = workout.durationMinutes {
-                        inviteDetail(
-                            icon: "clock",
-                            title: "\(duration) min",
-                            detail: ATHLTHLocalization.choose(
-                                english: "Duration", norwegian: "Varighet"
-                            )
-                        )
+                    if workout.trainTogetherMode != .sameWorkout,
+                       let point = workout.meetingPoint {
+                        Label(point.name, systemImage: "mappin")
+                            .lineLimit(1)
                     }
                 }
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.primaryText)
 
-                if isPhysical, let point = workout.meetingPoint {
+                if state.canRespond && !isMine {
                     HStack(spacing: 8) {
-                        Image(systemName: "mappin.and.ellipse")
+                        Button(
+                            ATHLTHLocalization.choose(english: "Decline", norwegian: "Avslå"),
+                            action: onDecline
+                        )
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity)
+
+                        Button(
+                            ATHLTHLocalization.choose(english: "Accept", norwegian: "Godta"),
+                            action: onAccept
+                        )
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .controlSize(.small)
+                    .disabled(isResponding)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: 310, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color.white, ATHLTHTheme.cardWarm.opacity(0.78)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(ATHLTHTheme.accentDeep.opacity(0.10), lineWidth: 0.8)
+        }
+        .sheet(isPresented: $showingDetails) {
+            ThreadWorkoutInvitationDetailsView(
+                workout: workout,
+                state: state,
+                organizerName: organizerName,
+                inviteeName: inviteeName,
+                isMine: isMine,
+                isResponding: isResponding,
+                onAccept: onAccept,
+                onDecline: onDecline,
+                onProposeChanges: onProposeChanges
+            )
+        }
+    }
+}
+
+/// Full premium invitation, kept out of the conversation cell's view tree.
+private struct ThreadWorkoutInvitationDetailsView: View {
+    @Environment(\.dismiss) private var dismiss
+    let workout: PlannedSession
+    let state: PlannedWorkoutInvitationPresentationState
+    let organizerName: String
+    let inviteeName: String
+    let isMine: Bool
+    let isResponding: Bool
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+    let onProposeChanges: () -> Void
+
+    @State private var showsExercises = false
+    @State private var showsStructure = false
+
+    private var statusLabel: String {
+        switch state {
+        case .pending: return ATHLTHLocalization.choose(english: "Awaiting reply", norwegian: "Venter på svar")
+        case .accepted: return ATHLTHLocalization.choose(english: "Accepted", norwegian: "Godtatt")
+        case .declined: return ATHLTHLocalization.choose(english: "Declined", norwegian: "Avslått")
+        case .cancelled: return ATHLTHLocalization.choose(english: "Cancelled", norwegian: "Avlyst")
+        }
+    }
+
+    private var statusColor: Color {
+        state == .cancelled || state == .declined ? .red : ATHLTHTheme.accentDeep
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "TRAINING INVITATION", norwegian: "TRENINGSINVITASJON"
+                            ))
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.6)
                             .foregroundStyle(ATHLTHTheme.accentDeep)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(point.name)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.primaryText)
-                            Text(point.address)
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .lineLimit(2)
+                            Spacer()
+                            Image(systemName: workout.kind.systemImage)
+                                .font(.title3)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 48, height: 48)
+                                .background(ATHLTHTheme.accentSoft,
+                                            in: RoundedRectangle(cornerRadius: 16))
                         }
-                        Spacer(minLength: 0)
-                        if let url = URL(string:
-                            "https://maps.apple.com/?ll=\(point.latitude),\(point.longitude)") {
-                            Link(destination: url) {
-                                Image(systemName: "arrow.up.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(workout.title)
+                            .font(.system(size: 30, weight: .semibold, design: .serif))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(workout.kind.title + " · " + (
+                            workout.trainTogetherMode == .sameWorkout
+                            ? ATHLTHLocalization.choose(english: "Same workout", norwegian: "Samme økt")
+                            : ATHLTHLocalization.choose(english: "Train in person", norwegian: "Trene fysisk sammen")
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Text(statusLabel)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(statusColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(statusColor.opacity(0.09), in: Capsule())
+                    }
+                    .padding(21)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.white, ATHLTHTheme.champagneSoft.opacity(0.65)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 24)
+                    )
+
+                    detailSection(ATHLTHLocalization.choose(
+                        english: "When and where", norwegian: "Tid og sted"
+                    )) {
+                        if let start = workout.scheduledStart {
+                            detailRow(
+                                icon: "calendar",
+                                label: ATHLTHLocalization.choose(english: "Start", norwegian: "Start"),
+                                value: start.formatted(date: .complete, time: .shortened)
+                            )
+                        }
+                        if let minutes = workout.durationMinutes {
+                            detailRow(
+                                icon: "clock",
+                                label: ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet"),
+                                value: "\(minutes) min"
+                            )
+                        }
+                        if workout.trainTogetherMode != .sameWorkout {
+                            if let point = workout.meetingPoint {
+                                detailRow(icon: "mappin.and.ellipse", label: point.name, value: point.address)
+                                if let url = URL(string:
+                                    "https://maps.apple.com/?ll=\(point.latitude),\(point.longitude)") {
+                                    Link(destination: url) {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Directions in Maps", norwegian: "Åpne i Kart"
+                                            ),
+                                            systemImage: "arrow.up.right"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    }
+                                }
+                            } else {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Meeting point not specified",
+                                        norwegian: "Møtested er ikke oppgitt"
+                                    ), systemImage: "mappin.slash"
+                                )
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
                             }
                         }
                     }
-                    .padding(11)
-                    .athlthTrainTogetherCard(radius: 13, subtle: true)
-                }
 
-                HStack(spacing: 7) {
-                    Image(systemName: responseStatus.icon)
-                        .foregroundStyle(statusTint)
-                    Text(responseStatus.text)
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                    Spacer(minLength: 0)
-                }
-                .font(.caption.weight(.semibold))
-                .padding(.horizontal, 11)
-                .padding(.vertical, 9)
-                .background(
-                    statusTint.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 11)
-                )
+                    detailSection(ATHLTHLocalization.choose(
+                        english: "Participants", norwegian: "Deltakere"
+                    )) {
+                        detailRow(
+                            icon: "person.crop.circle",
+                            label: ATHLTHLocalization.choose(english: "Organizer", norwegian: "Arrangør"),
+                            value: organizerName
+                        )
+                        detailRow(
+                            icon: "person.crop.circle",
+                            label: ATHLTHLocalization.choose(english: "Invited", norwegian: "Invitert"),
+                            value: inviteeName
+                        )
+                    }
 
-                if lifecycleUpdate?.kind == .cancelled {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Cancelled by organizer",
-                            norwegian: "Avlyst av arrangøren"
-                        ),
-                        systemImage: "xmark.circle.fill"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                } else if lifecycleUpdate?.kind == .updated {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Updated by organizer",
-                            norwegian: "Oppdatert av arrangøren"
-                        ),
-                        systemImage: "calendar.badge.clock"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
-                }
-
-                if !isMine && response == nil && lifecycleUpdate?.kind != .cancelled {
-                    HStack(spacing: 9) {
-                        Button(action: onDecline) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Decline", norwegian: "Avslå"
-                                ),
-                                systemImage: "xmark"
-                            )
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
+                    detailSection(ATHLTHLocalization.choose(
+                        english: "Workout", norwegian: "Økten"
+                    )) {
+                        HStack(spacing: 12) {
+                            Label("\(workout.exercises.count) " +
+                                ATHLTHLocalization.choose(english: "exercises", norwegian: "øvelser"),
+                                  systemImage: "dumbbell")
+                            if let km = workout.targetDistanceKilometers {
+                                Label(String(format: "%.1f km", km), systemImage: "figure.run")
+                            }
                         }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accentDeep)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        Button(action: onAccept) {
-                            HStack(spacing: 7) {
-                                if isResponding {
-                                    ProgressView().controlSize(.mini)
-                                } else {
-                                    Image(systemName: "checkmark")
+                        if !workout.exercises.isEmpty {
+                            DisclosureGroup(
+                                ATHLTHLocalization.choose(
+                                    english: "See all exercises", norwegian: "Vis øvelser"
+                                ),
+                                isExpanded: $showsExercises
+                            ) {
+                                LazyVStack(alignment: .leading, spacing: 10) {
+                                    ForEach(workout.exercises) { exercise in
+                                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                            Text(exercise.embeddedExercise.displayName)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                            Text("\(exercise.sets) " +
+                                                ATHLTHLocalization.choose(
+                                                    english: "sets", norwegian: "sett"
+                                                ))
+                                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                        }
+                                        .font(.subheadline)
+                                    }
                                 }
+                                .padding(.top, 10)
+                            }
+                            .tint(ATHLTHTheme.accentDeep)
+                        }
+
+                        if !workout.resolvedWorkoutBlocks.isEmpty {
+                            DisclosureGroup(
+                                ATHLTHLocalization.choose(
+                                    english: "Workout structure", norwegian: "Øktstruktur"
+                                ),
+                                isExpanded: $showsStructure
+                            ) {
+                                LazyVStack(alignment: .leading, spacing: 8) {
+                                    ForEach(workout.resolvedWorkoutBlocks) { block in
+                                        Text(block.title)
+                                            .font(.subheadline)
+                                    }
+                                }
+                                .padding(.top, 10)
+                            }
+                            .tint(ATHLTHTheme.accentDeep)
+                        }
+                    }
+
+                    if let notes = workout.notes, !notes.isEmpty {
+                        detailSection(ATHLTHLocalization.choose(
+                            english: "Notes", norwegian: "Notater"
+                        )) {
+                            Text(notes)
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
+                    if state.canRespond && !isMine {
+                        HStack(spacing: 10) {
+                            Button(action: onDecline) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Decline", norwegian: "Avslå"
+                                ))
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button(action: onAccept) {
                                 Text(ATHLTHLocalization.choose(
                                     english: "Accept", norwegian: "Godta"
                                 ))
+                                .frame(maxWidth: .infinity)
                             }
-                            .font(.subheadline.weight(.bold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
+                            .buttonStyle(.borderedProminent)
+                            .tint(ATHLTHTheme.accentDeep)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
+                        .disabled(isResponding)
                     }
-                    .disabled(isResponding)
 
-                } else if response?.decision == .accepted && lifecycleUpdate?.kind != .cancelled {
-                    Label(
-                        workout.scheduledStart != nil
-                            ? ATHLTHLocalization.choose(
-                                english: "Added to your workout calendar",
-                                norwegian: "Økten ligger nå i kalenderen din"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Workout saved to your shared workouts",
-                                norwegian: "Økten er lagret blant dine delte økter"
-                            ),
-                        systemImage: workout.scheduledStart != nil
-                            ? "calendar.badge.checkmark" : "checkmark.circle"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                } else if isMine && response == nil && lifecycleUpdate?.kind != .cancelled {
-                    Text(workout.scheduledStart != nil
-                        ? ATHLTHLocalization.choose(
-                            english: "Your own workout stays scheduled whether or not your friend joins.",
-                            norwegian: "Din økt blir stående i kalenderen selv om vennen ikke blir med."
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Your invitation is waiting for a reply.",
-                            norwegian: "Øktinvitasjonen venter på svar."
-                        ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-
-                // Acceptance schedules the workout; it does not close the
-                // negotiation window. Guests may suggest changes afterward.
-                if !isMine && response?.decision != .declined &&
-                    lifecycleUpdate?.kind != .cancelled {
-                    Button(action: onProposeChanges) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Suggest workout changes",
-                                norwegian: "Foreslå endringer i økten"
-                            ),
-                            systemImage: "square.and.pencil"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHTheme.accentDeep)
-                    .disabled(isResponding)
-                }
-
-                Button {
-                    showingDetails = true
-                } label: {
-                    HStack {
-                        Text(ATHLTHLocalization.choose(
-                            english: "View workout details",
-                            norwegian: "Vis hele økten"
-                        ))
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(15)
-        }
-        .frame(maxWidth: 340, alignment: .leading)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .athlthTrainTogetherCard(radius: 24)
-        .sheet(isPresented: $showingDetails) {
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 17) {
-                        HStack(spacing: 12) {
-                            Image(systemName: workout.kind.systemImage)
-                                .font(.title2)
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                                .frame(width: 52, height: 52)
-                                .background(
-                                    ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 15)
-                                )
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(workout.title)
-                                    .font(.title2.weight(.bold))
-                                Text(workout.kind.title + " · " + subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-                        }
-
-                        if let start = workout.scheduledStart {
-                            Label(start.formatted(date: .complete, time: .shortened),
-                                  systemImage: "calendar")
-                        }
-                        if let duration = workout.durationMinutes {
-                            Label("\(duration) min", systemImage: "clock")
-                        }
-                        if let km = workout.targetDistanceKilometers {
+                    if !isMine && (state == .pending || state == .accepted) {
+                        Button(action: onProposeChanges) {
                             Label(
-                                String(format: "%.1f km", km),
-                                systemImage: "figure.run"
+                                ATHLTHLocalization.choose(
+                                    english: "Suggest workout changes",
+                                    norwegian: "Foreslå endringer i økten"
+                                ),
+                                systemImage: "square.and.pencil"
                             )
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
                         }
-                        if isPhysical, let point = workout.meetingPoint {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Label(point.name, systemImage: "mappin.and.ellipse")
-                                    .font(.headline)
-                                Text(point.address)
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                                if let url = URL(string:
-                                    "https://maps.apple.com/?ll=\(point.latitude),\(point.longitude)") {
-                                    Link(
-                                        ATHLTHLocalization.choose(
-                                            english: "Open in Maps", norwegian: "Åpne i Kart"
-                                        ),
-                                        destination: url
-                                    )
-                                }
-                            }
-                        }
-                        if !workout.exercises.isEmpty {
-                            VStack(alignment: .leading, spacing: 9) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Exercises", norwegian: "Øvelser"
-                                ))
-                                .font(.headline)
-                                ForEach(workout.exercises) { exercise in
-                                    HStack {
-                                        Text(exercise.embeddedExercise.displayName)
-                                        Spacer()
-                                        Text("\(exercise.sets) sett")
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                    }
-                                    .font(.subheadline)
-                                }
-                            }
-                        }
-                        if !workout.resolvedWorkoutBlocks.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Workout structure",
-                                    norwegian: "Øktstruktur"
-                                ))
-                                .font(.headline)
-                                ForEach(workout.resolvedWorkoutBlocks) { block in
-                                    Text(block.title)
-                                        .font(.subheadline)
-                                }
-                            }
-                        }
-                        if let notes = workout.notes, !notes.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Notes", norwegian: "Notater"
-                                ))
-                                .font(.headline)
-                                Text(notes)
-                                    .font(.subheadline)
-                            }
-                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accentDeep)
+                        .disabled(isResponding)
                     }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
-                .navigationTitle(ATHLTHLocalization.choose(
-                    english: "Workout invitation",
-                    norwegian: "Treningsinvitasjon"
-                ))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Done", norwegian: "Ferdig"
-                        )) { showingDetails = false }
-                    }
+                .padding(17)
+                .frame(maxWidth: 640)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Invitation", norwegian: "Invitasjon"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) { dismiss() }
                 }
             }
         }
     }
-    private func inviteDetail(
-        icon: String,
-        title: String,
-        detail: String
+
+    @ViewBuilder
+    private func detailSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
     ) -> some View {
-        HStack(spacing: 7) {
+        VStack(alignment: .leading, spacing: 13) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            content()
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 21))
+    }
+
+    private func detailRow(icon: String, label: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.accentDeep)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption.weight(.bold))
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(label)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
-                Text(detail)
-                    .font(.caption2)
+                Text(value)
+                    .font(.subheadline)
                     .foregroundStyle(ATHLTHTheme.mutedText)
             }
             Spacer(minLength: 0)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .athlthTrainTogetherCard(radius: 12, subtle: true)
     }
-
 }
 
 
