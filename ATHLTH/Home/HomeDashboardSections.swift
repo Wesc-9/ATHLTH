@@ -4551,7 +4551,13 @@ private struct HomeWeeklyProgressDaySheet: View {
         if let planID = HomeWeeklyProgressCalendar.containingPlanID(
             for: workout, in: plan
         ) {
-            return !session.isPlanSessionCompleted(
+            return session.linkedHealthWorkoutID(
+                planID: planID, sessionID: workout.id
+            ) == nil &&
+            !session.isPlanSessionManuallyCompleted(
+                planID: planID, sessionID: workout.id
+            ) &&
+            !session.isPlanSessionCompleted(
                 planID: planID, sessionID: workout.id,
                 healthWorkouts: recentWorkouts,
                 strengthHistory: strength.workoutHistory
@@ -4660,7 +4666,13 @@ private struct HomeWeeklyProgressDaySheet: View {
         if let planID = HomeWeeklyProgressCalendar.containingPlanID(
             for: workout, in: plan
         ) {
-            return !session.isPlanSessionCompleted(
+            return session.linkedHealthWorkoutID(
+                planID: planID, sessionID: workout.id
+            ) == nil &&
+            !session.isPlanSessionManuallyCompleted(
+                planID: planID, sessionID: workout.id
+            ) &&
+            !session.isPlanSessionCompleted(
                 planID: planID, sessionID: workout.id,
                 healthWorkouts: recentWorkouts,
                 strengthHistory: strength.workoutHistory
