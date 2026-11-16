@@ -13,9 +13,9 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     // Every new workout opens the uncluttered Basic screen; the athlete's
     // actual Coach settings and profiles remain unchanged.
-    @State private var editorMode = "basic"
-    @State private var showingCatalogue = false
-    @State private var showingQuickMessage = false
+    @State private var showingCommandGroupPicker = false
+    @State private var showCommandAfterGroupPicker = false
+    @State private var showGroupBuilderAfterPicker = false
     @State private var showingGroupBuilder = false
     @State private var showingGroupCommandBuilder = false
     @State private var pendingGroupCommandID: UUID?
@@ -34,20 +34,16 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var editingGroupTriggerID: UUID?
     @State private var groupDraftTrigger: ATHLTHAudioCoachRule.Trigger = .distance
     @State private var groupDraftInterval = 1_000
-    @State private var openAdvancedAfterQuickMessage = false
-    @State private var quickTrigger: ATHLTHAudioCoachRule.Trigger = .time
-    @State private var quickMetric: ATHLTHAudioCoachRule.Metric = .heartRate
-    @State private var quickInterval = 60
     @State private var showingProfiles = false
     @State private var showingSaveNewProfile = false
     @State private var editingOption: ATHLTHAudioCoachOption?
     @State private var selectedRule: SelectedRule?
     @State private var expandedCoachGroups: Set<UUID> = []
+    @State private var creatingBlankTemplate = false
 
     private struct SelectedRule: Identifiable {
         let id: UUID
     }
-    @State private var nextEditor: ATHLTHAudioCoachOption?
     @State private var pendingRemoval: ATHLTHAudioCoachOption?
     @State private var confirmReplaceWithStandard = false
     @State private var profileName = ""
@@ -110,97 +106,6 @@ struct ATHLTHAudioCoachActiveListView: View {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
-    // Periodic triggers and their payload belong to one announcement group,
-    // not separate rows that appear to speak independently.
-    private var activeOptions: [ATHLTHAudioCoachOption] {
-        let bundled: Set<ATHLTHAudioCoachOption> = [
-            .distanceUpdates, .timedUpdates, .distance, .elapsedTime,
-            .averagePace, .clockTime, .heartRate
-        ]
-        return ATHLTHAudioCoachOption.allCases.filter { option in
-            option.isVisible(route: showRouteOptions, structured: showStructuredOptions)
-                && option.isActive(in: draft)
-                && !bundled.contains(option)
-                && option != .customAnnouncements
-                && option != .motivation
-        }
-    }
-
-    private var standardAnnouncementMetrics: [String] {
-        var metrics: [String] = []
-        if draft.announceDistance { metrics.append(tr("Distance", "Distanse")) }
-        if draft.announceElapsedTime { metrics.append(tr("Elapsed time", "Medgått tid")) }
-        if draft.announceAveragePace { metrics.append(tr("Average pace", "Gjennomsnittstempo")) }
-        if draft.announceClockTime { metrics.append(tr("Clock time", "Klokkeslett")) }
-        if draft.announceHeartRate { metrics.append(tr("Heart rate", "Puls")) }
-        return metrics
-    }
-
-    private var hasStandardAnnouncements: Bool {
-        draft.distanceTriggerEnabled || draft.timeTriggerEnabled
-    }
-
-    private var hasScheduledMotivation: Bool {
-        draft.customRules.contains {
-            $0.isEnabled && $0.selectedMetrics.contains(.motivation)
-        }
-    }
-
-    private var activeAnnouncementCount: Int {
-        activeOptions.count + draft.customRules.filter(\.isEnabled).count
-            + (draft.smartPrompts.motivationEnabled && !hasScheduledMotivation ? 1 : 0)
-            + (hasStandardAnnouncements ? (draft.distanceTriggerEnabled ? 1 : 0)
-                + (draft.timeTriggerEnabled ? 1 : 0) : 0)
-    }
-
-    private func announcementGroupRow(
-        title: String,
-        detail: String,
-        edit: @escaping () -> Void
-    ) -> some View {
-        Button(action: edit) {
-            HStack(spacing: 11) {
-                Image(systemName: "waveform.path")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(bronze)
-                    .frame(width: 29)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(ink)
-                    Text(detail).font(.caption).foregroundStyle(dim)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").foregroundStyle(dim)
-            }
-            .frame(minHeight: 52)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var hasAdvancedConfiguration: Bool {
-        draft.smartPrompts.intervalCountdownToRecoverySeconds != nil ||
-        draft.smartPrompts.intervalCountdownFromRecoverySeconds != nil ||
-        !(draft.smartPrompts.boundaryCountdownRules ?? []).isEmpty ||
-        !draft.customRules.isEmpty ||
-        draft.smartPrompts.coachingMode == .custom ||
-        draft.smartPrompts.preferredHeartRateZone != nil ||
-        draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds != nil ||
-        draft.smartPrompts.targetZoneVoiceAlertsEnabled != nil ||
-        draft.smartPrompts.pushWhenBelowTargetPace == true ||
-        draft.smartPrompts.pushWhenBelowTargetZone == true ||
-        draft.smartPrompts.pushOnUnexpectedPaceDrop == true ||
-        !draft.smartPrompts.customEncouragements.isEmpty ||
-        !draft.smartPrompts.landmarks.isEmpty
-    }
-
-    private var inactiveOptions: [ATHLTHAudioCoachOption] {
-        ATHLTHAudioCoachOption.allCases.filter {
-            $0.isVisible(route: showRouteOptions, structured: showStructuredOptions)
-                && !$0.isActive(in: draft)
-        }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
@@ -223,87 +128,58 @@ struct ATHLTHAudioCoachActiveListView: View {
             .padding(.horizontal, 3)
             .padding(.vertical, 5)
             if draft.enabled {
-                if editorMode == "basic" {
-                    ATHLTHAudioCoachCircleOverview(
-                        draft: $draft,
-                        selectedProfileName: $selectedProfileName,
-                        showStructuredOptions: showStructuredOptions,
-                        showRouteOptions: showRouteOptions,
-                        onEditRule: { id in
-                            selectedRule = SelectedRule(id: id)
-                        },
-                        onEditOption: { option in
-                            editingOption = option
-                        },
-                        onShowProfiles: {
-                            showingProfiles = true
-                        },
-                        onCreateTemplate: {
-                            requestTemplateChange(.new)
-                        },
-                        onSaveTemplate: {
-                            showingSaveChoices = true
-                        },
-                        onSwitchTemplate: { step in
-                            cycleSavedTemplates(step)
-                        },
-                        onResetStandard: {
-                            showingResetStandardPrompt = true
-                        },
-                        isDirty: hasUnsavedTemplateChanges,
-                        onAddCommand: { groupID in
-                            pendingGroupCommandID = groupID
-                            groupCommandMetric = .heartRate
-                            groupCommandPhrase = ""
+                ATHLTHAudioCoachCircleOverview(
+                    draft: $draft,
+                    selectedProfileName: $selectedProfileName,
+                    showStructuredOptions: showStructuredOptions,
+                    showRouteOptions: showRouteOptions,
+                    onEditRule: { id in selectedRule = SelectedRule(id: id) },
+                    onEditOption: { option in editingOption = option },
+                    onShowProfiles: { showingProfiles = true },
+                    onCreateTemplate: { requestTemplateChange(.new) },
+                    onSaveTemplate: { showingSaveChoices = true },
+                    onSwitchTemplate: { step in cycleSavedTemplates(step) },
+                    previousTemplateName: previousTemplateName,
+                    nextTemplateName: nextTemplateName,
+                    onResetStandard: { showingResetStandardPrompt = true },
+                    isDirty: hasUnsavedTemplateChanges,
+                    onAddCommand: { groupID in
+                        pendingGroupCommandID = groupID
+                        groupCommandMetric = .heartRate
+                        groupCommandPhrase = ""
+                        showingGroupCommandBuilder = true
+                    },
+                    onEditGroupTrigger: { groupID in
+                        guard let group = draft.coachGroups.first(where: { $0.id == groupID }) else { return }
+                        let rule = group.ruleIDs.compactMap { id in
+                            draft.customRules.first(where: { $0.id == id })
+                        }.first
+                        editingGroupTriggerID = groupID
+                        groupDraftName = group.name
+                        groupDraftTrigger = group.trigger ?? rule?.trigger ?? .time
+                        groupDraftInterval = group.interval ?? rule?.interval ?? 60
+                        showingGroupBuilder = true
+                    },
+                    onMoveCommand: { token, destination in
+                        ATHLTHAudioCoachCommandMoves.move(token, to: destination, draft: &draft)
+                    },
+                    onAddGroup: {
+                        prepareNewGroup()
+                        showingGroupBuilder = true
+                    },
+                    onAddGeneralCommand: {
+                        if draft.coachGroups.isEmpty {
+                            prepareNewGroup()
+                            showingGroupBuilder = true
+                        } else if draft.coachGroups.count == 1,
+                                  let group = draft.coachGroups.first {
+                            pendingGroupCommandID = group.id
                             showingGroupCommandBuilder = true
-                        },
-                        onEditGroupTrigger: { groupID in
-                            guard let group = draft.coachGroups.first(where: {
-                                $0.id == groupID
-                            }) else { return }
-                            let rule = group.ruleIDs.compactMap { id in
-                                draft.customRules.first(where: { $0.id == id })
-                            }.first
-                            editingGroupTriggerID = groupID
-                            groupDraftName = group.name
-                            groupDraftTrigger = group.trigger ?? rule?.trigger ?? .time
-                            groupDraftInterval = group.interval ?? rule?.interval ?? 60
-                            showingGroupBuilder = true
-                        },
-                        onMoveCommand: { token, destination in
-                            ATHLTHAudioCoachCommandMoves.move(
-                                token, to: destination, draft: &draft
-                            )
-                        },
-                        onAddGroup: {
-                            editingGroupTriggerID = nil
-                            groupDraftName = ""
-                            groupDraftTrigger = .distance
-                            groupDraftInterval = 1_000
-                            showingGroupBuilder = true
-                        },
-                        onAddSpeechCommand: {
-                            quickTrigger = .time
-                            quickInterval = 60
-                            quickMetric = .heartRate
-                            showingQuickMessage = true
-                        },
-                        onShowAdvanced: {
-                            editorMode = "advanced"
+                        } else {
+                            showingCommandGroupPicker = true
                         }
-                    )
-                } else {
-                    Button {
-                        editorMode = "basic"
-                    } label: {
-                        Label(tr("Back to my Coach", "Tilbake til min coach"),
-                              systemImage: "arrow.left")
-                            .font(.subheadline.weight(.semibold))
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(bronze)
-                    advancedCard
-                }
+                )
                 DisclosureGroup(isExpanded: $showingVoiceOptions) {
                     voiceAndMusicContent
                         .padding(.top, 12)
@@ -354,21 +230,16 @@ struct ATHLTHAudioCoachActiveListView: View {
         }) {
             groupCommandSheet
         }
-        .sheet(isPresented: $showingQuickMessage, onDismiss: {
-            if openAdvancedAfterQuickMessage {
-                openAdvancedAfterQuickMessage = false
-                showingCatalogue = true
+        .sheet(isPresented: $showingCommandGroupPicker, onDismiss: {
+            if showCommandAfterGroupPicker {
+                showCommandAfterGroupPicker = false
+                showingGroupCommandBuilder = true
+            } else if showGroupBuilderAfterPicker {
+                showGroupBuilderAfterPicker = false
+                showingGroupBuilder = true
             }
         }) {
-            quickMessageSheet
-        }
-        .sheet(isPresented: $showingCatalogue, onDismiss: {
-            if let nextEditor {
-                editingOption = nextEditor
-                self.nextEditor = nil
-            }
-        }) {
-            catalogueSheet
+            commandGroupPickerSheet
         }
         .sheet(isPresented: $showingSaveNewProfile) {
             saveNewProfileSheet
@@ -530,373 +401,6 @@ struct ATHLTHAudioCoachActiveListView: View {
             ))
         }
     }
-
-    private var basicCard: some View {
-        ATHLTHPlanSurface(ghost: false) {
-            Label(tr("Coach, ready to go", "Coachen er klar"),
-                  systemImage: "checkmark.circle")
-                .font(.headline)
-                .foregroundStyle(ink)
-            if let selectedProfileName {
-                Label(selectedProfileName, systemImage: "square.stack")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(bronze)
-            }
-            Text(hasAdvancedConfiguration
-                ? tr(
-                    "Your customized Coach setup is active. Open Advanced to see every rule, or choose the standard setup below.",
-                    "Det tilpassede coach-oppsettet ditt er aktivt. Åpne Avansert for å se alle reglene, eller velg standardoppsettet nedenfor."
-                )
-                : tr(
-                    "Start running with concise distance, time and pace updates, encouragement and a finish summary.",
-                    "Løp med enkle oppdateringer om distanse, tid og tempo, oppmuntring og oppsummering ved mål."
-                )
-            )
-            .font(.subheadline)
-            .foregroundStyle(dim)
-            VStack(alignment: .leading, spacing: 8) {
-                if draft.distanceTriggerEnabled && draft.customRules.isEmpty {
-                    Label(
-                        ATHLTHAudioCoachOption.distanceUpdates.detail(in: draft),
-                        systemImage: "point.bottomleft.forward.to.point.topright.scurvepath"
-                    )
-                }
-                if draft.smartPrompts.motivationEnabled {
-                    Label(tr("Motivational coaching", "Motivasjonssnakk"),
-                          systemImage: "sparkles")
-                }
-                if draft.announceWorkoutComplete {
-                    Label(tr("Finish summary", "Oppsummering ved mål"),
-                          systemImage: "flag.checkered")
-                }
-                if !draft.customRules.isEmpty {
-                    Label(tr("Custom rules are active", "Egne regler er aktive"),
-                          systemImage: "waveform.badge.plus")
-                }
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(ink)
-            .padding(.vertical, 5)
-
-            HStack(spacing: 10) {
-                Menu {
-                    ForEach(settings.audioCoachProfiles) { profile in
-                        Button(profile.name) {
-                            draft.load(profile: profile)
-                            selectedProfileName = profile.name
-                            editorMode = "basic"
-                        }
-                    }
-                } label: {
-                    Label(tr("Use a saved profile", "Bruk lagret profil"),
-                          systemImage: "square.stack")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .disabled(settings.audioCoachProfiles.isEmpty)
-                .buttonStyle(.bordered)
-                Button {
-                    editorMode = "advanced"
-                } label: {
-                    Label(tr("Edit Coach", "Rediger coach"),
-                          systemImage: "slider.horizontal.3")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-            }
-            Button {
-                if hasAdvancedConfiguration {
-                    confirmReplaceWithStandard = true
-                } else {
-                    draft.applySimpleAudioCoach()
-                    selectedProfileName = nil
-                }
-            } label: {
-                Label(tr("Use recommended basic setup", "Bruk anbefalt enkel oppsett"),
-                      systemImage: "checkmark.circle.fill")
-                    .frame(maxWidth: .infinity, minHeight: 45)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(bronze)
-
-            if activeOptions.count > 7 {
-                Button {
-                    editorMode = "advanced"
-                } label: {
-                    Label(tr("See all active choices", "Se alle aktive valg"),
-                          systemImage: "slider.horizontal.3")
-                }
-                .font(.caption.weight(.medium))
-            }
-        }
-    }
-
-    private var advancedCard: some View {
-        ATHLTHPlanSurface(ghost: false) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("ANNOUNCEMENTS", "VARSLINGSGRUPPER"))
-                        .font(.caption2.weight(.bold)).tracking(1.4)
-                        .foregroundStyle(bronze)
-                    Text(tr("Your Audio Coach", "Dine coach-varsler"))
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
-                        .foregroundStyle(ink)
-                }
-                Spacer()
-                Text("\(activeAnnouncementCount)")
-                    .font(.subheadline.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(bronze)
-            }
-
-            if activeAnnouncementCount == 0 {
-                Text(tr("Create a coach message or choose a preset to get started.",
-                        "Opprett en coach-beskjed eller velg et ferdig oppsett."))
-                    .font(.subheadline).foregroundStyle(dim)
-            }
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(tr("Choose what activates the coach", "Velg hva som aktiverer coachen"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ink)
-                Text(tr(
-                    "Distance and time are only two options. Use event alerts for heart-rate zones, pace, workout phases and interval transitions.",
-                    "Tid og distanse er bare to muligheter. Under hendelsesvarsler finner du pulssoner, tempo, øktfaser og intervalloverganger."
-                ))
-                .font(.caption)
-                .foregroundStyle(dim)
-            }
-
-            VStack(spacing: 0) {
-                if hasStandardAnnouncements {
-                    if draft.distanceTriggerEnabled {
-                        announcementGroupRow(
-                            title: tr("Every distance", "Etter distanse"),
-                            detail: "\(Int((draft.distanceIntervalKilometers * 1_000).rounded())) m · " +
-                                standardAnnouncementMetrics.joined(separator: ", ")
-                        ) { editingOption = .distanceUpdates }
-                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                    }
-                    if draft.timeTriggerEnabled {
-                        announcementGroupRow(
-                            title: tr("Every time interval", "Etter tidsintervall"),
-                            detail: "\(draft.timeIntervalSeconds) s · " +
-                                standardAnnouncementMetrics.joined(separator: ", ")
-                        ) { editingOption = .timedUpdates }
-                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                    }
-                }
-                if draft.smartPrompts.motivationEnabled && !hasScheduledMotivation {
-                    announcementGroupRow(
-                        title: tr("Automatic motivation", "Automatisk motivasjon"),
-                        detail: tr("Approximately every", "Omtrent hvert") +
-                            " \(draft.smartPrompts.motivationIntervalSeconds) s"
-                    ) { editingOption = .motivation }
-                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                }
-                ForEach(draft.customRules.filter(\.isEnabled)) { rule in
-                    VStack(alignment: .leading, spacing: 0) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.22)) {
-                                if expandedCoachGroups.contains(rule.id) {
-                                    expandedCoachGroups.remove(rule.id)
-                                } else {
-                                    expandedCoachGroups.insert(rule.id)
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "waveform")
-                                    .foregroundStyle(bronze)
-                                    .frame(width: 34, height: 34)
-                                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(rule.trigger == .distance
-                                         ? tr("Every \(rule.validatedInterval) m", "Hver \(rule.validatedInterval) m")
-                                         : tr("Every \(rule.validatedInterval) s", "Hvert \(rule.validatedInterval) s"))
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(ink)
-                                    Text(rule.selectedMetrics.map(\.title).joined(separator: " · "))
-                                        .font(.caption)
-                                        .foregroundStyle(dim)
-                                        .lineLimit(2)
-                                }
-                                Spacer(minLength: 0)
-                                Image(systemName: expandedCoachGroups.contains(rule.id)
-                                      ? "chevron.up" : "chevron.down")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(dim)
-                            }
-                            .frame(minHeight: 56)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-
-                        if expandedCoachGroups.contains(rule.id) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(tr("Coach will announce", "Coachen leser opp"))
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(dim)
-                                ForEach(Array(rule.selectedMetrics.enumerated()), id: \.offset) { index, metric in
-                                    HStack(spacing: 10) {
-                                        Text(String(format: "%02d", index + 1))
-                                            .font(.caption.monospacedDigit())
-                                            .foregroundStyle(bronze)
-                                        Text(metric.title)
-                                            .font(.subheadline)
-                                            .foregroundStyle(ink)
-                                        Spacer()
-                                    }
-                                }
-                                HStack {
-                                    Spacer()
-                                    Button {
-                                        selectedRule = SelectedRule(id: rule.id)
-                                    } label: {
-                                        Label(tr("Edit group", "Rediger gruppe"), systemImage: "pencil")
-                                            .font(.subheadline.weight(.medium))
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .tint(bronze)
-                                }
-                            }
-                            .padding(14)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 16))
-                            .padding(.bottom, 8)
-                        }
-                    }
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 6)
-                    .background(
-                        ATHLTHPlanDesign.selectedSurface.opacity(0.35),
-                        in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
-                    }
-                    .padding(.bottom, 7)
-                }
-                ForEach(activeOptions) { option in
-                    activeRow(option)
-                    if option != activeOptions.last {
-                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                    }
-                }
-            }
-            Button {
-                guard draft.customRules.count < 20 else { return }
-                let group = ATHLTHAudioCoachRule(
-                    trigger: .distance,
-                    metric: .distance,
-                    interval: 1_000,
-                    additionalMetrics: [.elapsedTime, .heartRateZone]
-                )
-                draft.customRules.append(group)
-                selectedRule = SelectedRule(id: group.id)
-            } label: {
-                Label(tr("Create coach message", "Opprett coach-beskjed"),
-                      systemImage: "plus.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 47)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(bronze)
-            .disabled(draft.customRules.count >= 20)
-
-            if !draft.customRules.contains(where: {
-                $0.trigger == .time && $0.validatedInterval == 60 &&
-                $0.selectedMetrics == [.motivation]
-            }) {
-                Button {
-                    guard draft.customRules.count < 20 else { return }
-                    let group = ATHLTHAudioCoachRule(
-                        trigger: .time, metric: .motivation, interval: 60
-                    )
-                    draft.customRules.append(group)
-                    selectedRule = SelectedRule(id: group.id)
-                } label: {
-                    Label(tr("Add every-minute motivation", "Legg til motivasjon hvert minutt"),
-                          systemImage: "sparkles")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-                .disabled(draft.customRules.count >= 20)
-            }
-
-            if !draft.smartPrompts.motivationEnabled && !hasScheduledMotivation {
-                Button {
-                    draft.smartPrompts.motivationEnabled = true
-                    editingOption = .motivation
-                } label: {
-                    Label(tr("Add automatic motivation", "Legg til automatisk motivasjon"),
-                          systemImage: "bolt.heart")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-            }
-
-            Button {
-                showingCatalogue = true
-            } label: {
-                Label(tr("Heart rate, pace, intervals and event alerts", "Puls, tempo, intervaller og hendelsesvarsler"),
-                      systemImage: "slider.horizontal.3")
-                    .font(.caption.weight(.medium))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("athlth-audio-coach-add-option")
-
-            if !draft.customRules.isEmpty {
-                Text(tr(
-                    "Custom groups and standard intervals are independent. Shared measurements are read only once when they trigger together.",
-                    "Egne grupper og standardintervaller virker uavhengig. Samme måleverdi leses bare én gang når de utløses samtidig."
-                ))
-                .font(.caption).foregroundStyle(dim)
-            }
-        }
-    }
-
-    private func activeRow(_ option: ATHLTHAudioCoachOption) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: option.symbol)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(bronze)
-                .frame(width: 29)
-            Button {
-                editingOption = option
-            } label: {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(option.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ink)
-                    Text(option.detail(in: draft))
-                        .font(.caption)
-                        .foregroundStyle(dim)
-                }
-                .frame(maxWidth: .infinity, minHeight: 45,
-                       alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            Button {
-                if option.isContentList {
-                    pendingRemoval = option
-                } else {
-                    option.setActive(false, in: &draft)
-                }
-            } label: {
-                Image(systemName: "minus.circle")
-                    .font(.title3)
-                    .foregroundStyle(dim)
-                    .frame(width: 43, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(tr("Remove", "Fjern") + " " + option.title)
-        }
-        .padding(.vertical, 4)
-    }
-
-    /// The everyday flow asks only when to speak and what to read.
-    /// Advanced editing still uses the SAME underlying custom-rule model.
 
     private func saveCurrentTemplate() {
         if let selectedTemplateID,
@@ -1283,154 +787,6 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
         groupCommandPhrase = ""
         // Keep this sheet open so the next command can be added immediately.
-    }
-
-    private var quickMessageSheet: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Picker(tr("When should Coach speak?", "Når skal Coach snakke?"),
-                           selection: $quickTrigger) {
-                        Text(tr("After time", "Etter tid"))
-                            .tag(ATHLTHAudioCoachRule.Trigger.time)
-                        Text(tr("After distance", "Etter distanse"))
-                            .tag(ATHLTHAudioCoachRule.Trigger.distance)
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: quickTrigger) { _, next in
-                        quickInterval = next == .time ? 60 : 1_000
-                    }
-
-                    Stepper(
-                        value: $quickInterval,
-                        in: quickTrigger == .time ? 15...7_200 : 100...42_000,
-                        step: quickTrigger == .time ? 15 : 100
-                    ) {
-                        HStack {
-                            Text(tr("Every", "Hvert"))
-                            Spacer()
-                            Text(quickTrigger == .time
-                                 ? tr("\(quickInterval) seconds", "\(quickInterval) sekunder")
-                                 : "\(quickInterval) m")
-                                .fontWeight(.semibold)
-                                .foregroundStyle(bronze)
-                        }
-                    }
-                } header: {
-                    Text(tr("1 · When?", "1 · Når?"))
-                }
-
-                Section {
-                    Picker(tr("What should Coach say?", "Hva skal Coach si?"),
-                           selection: $quickMetric) {
-                        ForEach([
-                            ATHLTHAudioCoachRule.Metric.heartRate,
-                            .elapsedTime,
-                            .distance,
-                            .pace,
-                            .motivation
-                        ], id: \.self) { metric in
-                            Text(metric.title).tag(metric)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                } header: {
-                    Text(tr("2 · What?", "2 · Hva?"))
-                }
-
-                Section {
-                    Button {
-                        guard draft.customRules.count < 20 else { return }
-                        draft.customRules.append(ATHLTHAudioCoachRule(
-                            trigger: quickTrigger,
-                            metric: quickMetric,
-                            interval: quickInterval,
-                            scope: .workout
-                        ))
-                        showingQuickMessage = false
-                    } label: {
-                        Label(tr("Add Coach message", "Legg til Coach-beskjed"),
-                              systemImage: "checkmark")
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(bronze)
-                    .disabled(draft.customRules.count >= 20)
-                    .accessibilityIdentifier("athlth-coach-quick-add-save")
-
-                    Button {
-                        openAdvancedAfterQuickMessage = true
-                        showingQuickMessage = false
-                    } label: {
-                        Label(tr("More message types", "Flere beskjedtyper"),
-                              systemImage: "slider.horizontal.3")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(bronze)
-                } footer: {
-                    Text(tr(
-                        "Your message belongs only to this workout. All advanced metrics and rules are still available.",
-                        "Beskjeden gjelder denne økten. Alle avanserte målinger og regler er fortsatt tilgjengelige."
-                    ))
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("New Coach message", "Ny Coach-beskjed"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Close", "Lukk")) { showingQuickMessage = false }
-                }
-            }
-        }
-        .presentationDetents([.large])
-    }
-
-    private var catalogueSheet: some View {
-        NavigationStack {
-            List {
-                ForEach([
-                    tr("Workout updates", "Øktoppdateringer"),
-                    tr("Heart rate", "Puls"),
-                    tr("Motivation", "Motivasjon"),
-                    tr("Events", "Hendelser"),
-                    tr("Workout guidance", "Rute og intervaller"),
-                    tr("My rules", "Egne regler")
-                ], id: \.self) { category in
-                    let options = inactiveOptions.filter { $0.category == category }
-                    if !options.isEmpty {
-                        Section(category) {
-                            ForEach(options) { option in
-                                Button {
-                                    if !option.isContentList {
-                                        option.setActive(true, in: &draft)
-                                    }
-                                    nextEditor = option.requiresConfiguration ? option : nil
-                                    showingCatalogue = false
-                                } label: {
-                                    Label(option.title, systemImage: option.symbol)
-                                        .foregroundStyle(ink)
-                                        .frame(minHeight: 39, alignment: .leading)
-                                }
-                                .accessibilityIdentifier("athlth-audio-add-\(option.rawValue)")
-                            }
-                        }
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("Add to Audio Coach", "Legg til i Audio Coach"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Done", "Ferdig")) { showingCatalogue = false }
-                }
-            }
-        }
-        .presentationDetents([.large])
     }
 
     private var standardMetricsEditor: some View {
