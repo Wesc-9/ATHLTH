@@ -837,94 +837,92 @@ struct RouteDetailView: View {
         }
     }
 
+    /// Compact directions without repeating the full route metrics above.
     private var startDirectionsCard: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Start and finish", norwegian: "Start og mål"
-                    ),
-                    systemImage: "mappin.and.ellipse"
-                )
-                .font(.headline)
-
-                HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "START", norwegian: "START"
-                        ))
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        Text(directedRoute.startName ?? ATHLTHLocalization.choose(
-                            english: "GPS start point", norwegian: "Startpunkt på kartet"
-                        ))
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Image(systemName: "arrow.right")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .padding(.top, 9)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "FINISH", norwegian: "MÅL"
-                        ))
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        Text(ATHLTHRouteDetailsPolicy.shape(currentRoute) == .loop
-                            ? (directedRoute.startName ?? "Start")
-                            : (directedRoute.endName ?? ATHLTHLocalization.choose(
-                                english: "Finish point on map",
-                                norwegian: "Målpunkt på kartet"
-                            )))
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                HStack(spacing: 12) {
-                    Image(systemName: "location")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(startDistanceLabel)
-                        .font(.subheadline.weight(.bold))
-                        Text(ATHLTHLocalization.choose(
-                            english: "Straight-line distance to route start",
-                            norwegian: "Avstand i luftlinje til rutens start"
-                        ))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 4)
-                }
-                .padding(11)
-                .background(
-                    ATHLTHTheme.accentSoft,
-                    in: RoundedRectangle(cornerRadius: 13)
-                )
-
-                Button(action: openDirectionsToStart) {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(spacing: 8) {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "Directions to start",
-                            norwegian: "Veibeskrivelse til start"
+                            english: "Start and finish", norwegian: "Start og mål"
                         ),
-                        systemImage: "arrow.up.right"
+                        systemImage: "mappin.and.ellipse"
                     )
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Spacer(minLength: 6)
+
+                    Button(action: openDirectionsToStart) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Directions", norwegian: "Veibeskrivelse"
+                            ),
+                            systemImage: "arrow.up.right"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(routeStartCoordinate.map(
+                        CLLocationCoordinate2DIsValid
+                    ) != true)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Open directions in Apple Maps",
+                        norwegian: "Åpner veibeskrivelse i Apple Kart"
+                    ))
                 }
-                .buttonStyle(.bordered)
-                .disabled(routeStartCoordinate.map(CLLocationCoordinate2DIsValid) != true)
-                .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Opens walking directions in Apple Maps",
-                    norwegian: "Åpner gangveibeskrivelse i Apple Kart"
-                ))
+
+                HStack(alignment: .center, spacing: 10) {
+                    routePointLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Start", norwegian: "Start"
+                        ),
+                        name: directedRoute.startName ??
+                            ATHLTHLocalization.choose(
+                                english: "Map position", norwegian: "Kartposisjon"
+                            )
+                    )
+                    Image(systemName: "arrow.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                    routePointLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Finish", norwegian: "Mål"
+                        ),
+                        name: ATHLTHRouteDetailsPolicy.shape(currentRoute) == .loop
+                            ? (directedRoute.startName ??
+                                ATHLTHLocalization.choose(
+                                    english: "Start", norwegian: "Start"
+                                ))
+                            : (directedRoute.endName ??
+                                ATHLTHLocalization.choose(
+                                    english: "Map position", norwegian: "Kartposisjon"
+                                ))
+                    )
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
             }
         }
+    }
+
+    private func routePointLabel(_ label: String, name: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            Text(name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var elevationCard: some View {
@@ -1170,7 +1168,7 @@ struct RouteDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let endpoints = ATHLTHRouteHeroPresentation.endpointSubtitle(
-                        start: currentRoute.startName, finish: currentRoute.endName
+                        start: directedRoute.startName, finish: directedRoute.endName
                     ) {
                         Text(endpoints)
                             .font(.subheadline)
@@ -1392,38 +1390,6 @@ struct RouteDetailView: View {
                 partialResult.append(value)
             }
         }
-    }
-
-    private var premiumMetricDivider: some View {
-        Rectangle()
-            .fill(ATHLTHTheme.divider)
-            .frame(width: 1, height: 46)
-            .padding(.horizontal, 8)
-    }
-
-    private func premiumRouteMetric(
-        value: String,
-        label: String,
-        icon: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.vitality)
-
-                Text(value)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-
-            Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var trailIntelligenceCard: some View {
