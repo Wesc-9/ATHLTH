@@ -1186,6 +1186,23 @@ enum ATHLTHRunningStepEngine {
     }
 }
 
+/// User-entered belt speed at an active elapsed second, not Watch sensor data.
+struct WatchBeltSpeedPoint: Codable, Hashable {
+    var activeElapsedSeconds: TimeInterval
+    var kilometersPerHour: Double
+}
+
+enum ATHLTHBeltSpeedPolicy {
+    static func speed(forPace secondsPerKilometer: Double?) -> Double? {
+        guard let pace = secondsPerKilometer, pace.isFinite, pace > 0 else {
+            return nil
+        }
+        let speed = 3_600 / pace
+        guard (0.1...30).contains(speed) else { return nil }
+        return (speed * 10).rounded() / 10
+    }
+}
+
 struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var title: String
     var steps: [WatchRunningWorkoutStep]
@@ -1826,6 +1843,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     // Non-nil identifies a treadmill run and carries the user-selected incline.
     var treadmillInclinePercent: Double? = nil
     var treadmillTargetPaceSecondsPerKilometer: Double? = nil // user goal, not sensor data
+    var manualBeltSpeedKilometersPerHour: Double? = nil
+    var manualBeltSpeedTimeline: [WatchBeltSpeedPoint]? = nil
     var routeRemainingMeters: Double? = nil
     var routeDeviationMeters: Double? = nil
     var routeDeviationThresholdMeters: Double? = nil
