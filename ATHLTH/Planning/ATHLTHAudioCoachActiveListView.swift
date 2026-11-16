@@ -16,6 +16,11 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var editorMode = "basic"
     @State private var showingCatalogue = false
     @State private var showingQuickMessage = false
+    @State private var showingGroupBuilder = false
+    @State private var groupDraftName = ""
+    @State private var groupDraftTrigger: ATHLTHAudioCoachRule.Trigger = .distance
+    @State private var groupDraftInterval = 1_000
+    @State private var groupDraftContents: Set<ATHLTHAudioCoachRule.Metric> = [.distance]
     @State private var openAdvancedAfterQuickMessage = false
     @State private var quickTrigger: ATHLTHAudioCoachRule.Trigger = .time
     @State private var quickMetric: ATHLTHAudioCoachRule.Metric = .heartRate
@@ -213,6 +218,19 @@ struct ATHLTHAudioCoachActiveListView: View {
                             targetCoachGroupID = groupID
                             showingGroupTriggerCatalogue = true
                         },
+                        onAddGroup: {
+                            groupDraftName = ""
+                            groupDraftTrigger = .distance
+                            groupDraftInterval = 1_000
+                            groupDraftContents = [.distance]
+                            showingGroupBuilder = true
+                        },
+                        onAddSpeechCommand: {
+                            quickTrigger = .time
+                            quickInterval = 60
+                            quickMetric = .heartRate
+                            showingQuickMessage = true
+                        },
                         onShowAdvanced: {
                             editorMode = "advanced"
                         }
@@ -241,6 +259,9 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .padding(.horizontal, 4)
         }
         .tint(bronze)
+        .sheet(isPresented: $showingGroupBuilder) {
+            groupBuilderSheet
+        }
         .sheet(isPresented: $showingQuickMessage, onDismiss: {
             if openAdvancedAfterQuickMessage {
                 openAdvancedAfterQuickMessage = false
@@ -983,6 +1004,164 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    private var availableGroupContents: [ATHLTHAudioCoachRule.Metric] {
+        ATHLTHAudioCoachRule.Metric.allCases.filter { metric in
+            switch metric {
+            case .stepName, .stepRemainingTime, .groupRemainingTime:
+                return showStructuredOptions
+            case .routeRemainingDistance, .estimatedRouteTime:
+                return showRouteOptions
+            default:
+                return true
+            }
+        }
+    }
+
+    /// A new group owns one rule with multiple readouts on one trigger.
+    /// No empty or duplicate speech rules are created before Save.
+    private var groupBuilderSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(
+                        tr("Group name (optional)", "Gruppenavn (valgfritt)"),
+                        text: $groupDraftName
+                    )
+                    .textInputAutocapitalization(.sentences)
+                } header: {
+                    Text(tr("NAME", "NAVN"))
+                }
+
+                Section {
+                    Picker(
+                        tr("Choose trigger", "Velg trigger"),
+                        selection: $groupDraftTrigger
+                    ) {
+                        ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
+                            Text(trigger.title).tag(trigger)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: groupDraftTrigger) { _, trigger in
+                        groupDraftInterval = trigger == .time ? 60 : 1_000
+                    }
+
+                    Stepper(
+                        value: $groupDraftInterval,
+                        in: groupDraftTrigger == .time ? 15...7_200 : 100...42_000,
+                        step: groupDraftTrigger == .time ? 15 : 100
+                    ) {
+                        Text(groupDraftTrigger == .time
+                            ? tr("Every \\(groupDraftInterval) seconds",
+                                 "Hvert \\(groupDraftInterval) sekund")
+                            : tr("Every \\(groupDraftInterval) metres",
+                                 "Hver \\(groupDraftInterval) meter"))
+                    }
+                } header: {
+                    Text(tr("1 · When should Coach speak?", "1 · Når skal Coach snakke?"))
+                } footer: {
+                    Text(tr(
+                        "All selected readouts will be spoken together when this one trigger fires.",
+                        "Alt valgt innhold leses samlet når denne ene triggeren utløses."
+                    ))
+                }
+
+                Section {
+                    ForEach(availableGroupContents) { metric in
+                        Button {
+                            if groupDraftContents.contains(metric) {
+                                groupDraftContents.remove(metric)
+                            } else {
+                                groupDraftContents.insert(metric)
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(metric.title)
+                                    .foregroundStyle(ink)
+                                Spacer()
+                                Image(systemName: groupDraftContents.contains(metric)
+                                      ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(bronze)
+                            }
+                            .frame(minHeight: 34)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            groupDraftContents.contains(metric) ? .isSelected : []
+                        )
+                    }
+                } header: {
+                    Text(tr("2 · What should Coach say?", "2 · Hva skal Coach si?"))
+                } footer: {
+                    Text(tr(
+                        "Choose one or more values. Missing sensor values are skipped.",
+                        "Velg én eller flere verdier. Utilgjengelige sensordata hoppes over."
+                    ))
+                }
+
+                Section {
+                    Button {
+                        createCoachGroup()
+                    } label: {
+                        Label(
+                            tr("Create coach group", "Opprett coach-gruppe"),
+                            systemImage: "checkmark"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(bronze)
+                    .disabled(groupDraftContents.isEmpty ||
+                              draft.customRules.count >= 20)
+                    .accessibilityIdentifier("athlth-coach-save-group")
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("New coach group", "Ny coach-gruppe"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Cancel", "Avbryt")) { showingGroupBuilder = false }
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .accessibilityIdentifier("athlth-coach-group-builder")
+    }
+
+    private func createCoachGroup() {
+        guard draft.customRules.count < 20 else { return }
+        let metrics = availableGroupContents.filter {
+            groupDraftContents.contains($0)
+        }
+        guard let primary = metrics.first else { return }
+
+        let name = String(
+            groupDraftName.trimmingCharacters(in: .whitespacesAndNewlines)
+                .prefix(60)
+        )
+        let defaultName = groupDraftTrigger == .time
+            ? tr("Time updates", "Tidsoppdateringer")
+            : tr("Distance updates", "Distanseoppdateringer")
+
+        let rule = ATHLTHAudioCoachRule(
+            trigger: groupDraftTrigger,
+            metric: primary,
+            interval: groupDraftInterval,
+            additionalMetrics: Array(metrics.dropFirst()),
+            scope: .workout
+        )
+        var group = ATHLTHAudioCoachGroup(
+            name: name.isEmpty ? defaultName : name
+        )
+        group.ruleIDs = [rule.id]
+        draft.customRules.append(rule)
+        draft.coachGroups.append(group)
+        showingGroupBuilder = false
     }
 
     private var quickMessageSheet: some View {
