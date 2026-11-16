@@ -394,6 +394,9 @@ struct ATHLTHExerciseMarketplaceView: View {
             english: "Search exercises or creators",
             norwegian: "Søk øvelser eller skapere"
         ))
+        // This screen has its own scrollable results; the parent exercise
+        // source tabs remain fixed when the user pulls to refresh.
+        .refreshable { await market.refresh() }
         .task { await market.refresh() }
         .alert(
             ATHLTHLocalization.choose(
