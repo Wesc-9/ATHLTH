@@ -284,7 +284,7 @@ enum ATHLTHCuratedStrengthWorkouts {
                   "Short trunk-strength workout with movement control.",
                   "Kort økt med fokus på stabilitet og kontroll.",
                   minutes: 30, difficulty: "Beginner",
-                  tags: ["core", "kjerne", "abs", "mage"],
+                  tags: ["core", "kjerne", "abs", "mage", "no equipment", "uten utstyr"],
                   moves: [
                     exercise("Dead Bug", 3, 10, 45),
                     exercise("Bird Dog", 3, 10, 45),
