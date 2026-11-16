@@ -27,6 +27,11 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         } ?? workout
     }
 
+    private var isLocked: Bool {
+        currentWorkout.cancelledAt != nil ||
+            session.recordedTimes(for: currentWorkout.id) != nil
+    }
+
     private var workoutNotes: String? {
         guard let notes = currentWorkout.notes?
             .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -89,6 +94,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                         blocks: detailedBlocks,
                         embeddedInDetails: true,
                         onUpdateBlock: { index, block in
+                            guard !isLocked else { return }
                             var updated = currentWorkout
                             var steps = detailedBlocks
                             guard steps.indices.contains(index) else { return }
@@ -145,7 +151,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                     .padding(.vertical, 12)
                 }
                 .background(ATHLTHPlanDesign.canvas)
-            } else if onStartWorkout != nil &&
+            } else if !isLocked && onStartWorkout != nil &&
                         (currentWorkout.kind == .running ||
                          currentWorkout.kind == .walking ||
                          currentWorkout.kind == .strength) {
@@ -247,6 +253,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
     private var workoutTextActions: some View {
         HStack(spacing: 10) {
             Button {
+                guard !isLocked else { return }
                 draftWorkoutTitle = currentWorkout.title
                 draftWorkoutNotes = currentWorkout.notes ?? ""
                 showingWorkoutTextEditor = true
@@ -260,6 +267,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
             }
             .buttonStyle(.plain)
+            .disabled(isLocked)
             Spacer(minLength: 0)
             Button {
                 showingSaveToLibraryOptions = true
@@ -318,6 +326,10 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                     Button(ATHLTHLocalization.choose(
                         english: "Save", norwegian: "Lagre"
                     )) {
+                        guard !isLocked else {
+                            showingWorkoutTextEditor = false
+                            return
+                        }
                         var updated = currentWorkout
                         updated.title = draftWorkoutTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                         let notes = draftWorkoutNotes.trimmingCharacters(in: .whitespacesAndNewlines)
