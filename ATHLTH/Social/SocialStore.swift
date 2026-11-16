@@ -2109,7 +2109,8 @@ final class SocialStore: ObservableObject {
         creatorName: String,
         creatorUsername: String?,
         includeHealthData: Bool = true,
-        pulseSamples: [ATHLTHRunningHeartRatePoint] = []
+        pulseSamples: [ATHLTHRunningHeartRatePoint] = [],
+        maximumHeartRateBPM: Double? = nil
     ) async -> Bool {
         guard let currentUserID else { return false }
 
@@ -2186,6 +2187,11 @@ final class SocialStore: ObservableObject {
                     pulseSamples, from: workout.startDate, through: workout.endDate
                ) {
                 metadata["heart_rate_curve"] = curve
+                if let zones = ATHLTHSharedPulseSeries.encodeZoneSeconds(
+                    pulseSamples, maximumBPM: maximumHeartRateBPM
+                ) {
+                    metadata["heart_rate_zone_seconds"] = zones
+                }
                 let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
                     pulseSamples, from: workout.startDate, through: workout.endDate
                 )
@@ -2241,7 +2247,8 @@ final class SocialStore: ObservableObject {
         routePreview: [RouteCoordinate] = [],
         hideRouteStartAndEnd: Bool = true,
         includeHealthData: Bool = true,
-        pulseSamples: [ATHLTHRunningHeartRatePoint] = []
+        pulseSamples: [ATHLTHRunningHeartRatePoint] = [],
+        maximumHeartRateBPM: Double? = nil
     ) async -> Bool {
         errorMessage = nil
 
@@ -2278,6 +2285,11 @@ final class SocialStore: ObservableObject {
                     pulseSamples, from: workout.startDate, through: workout.endDate
                ) {
                 metadata["heart_rate_curve"] = curve
+                if let zones = ATHLTHSharedPulseSeries.encodeZoneSeconds(
+                    pulseSamples, maximumBPM: maximumHeartRateBPM
+                ) {
+                    metadata["heart_rate_zone_seconds"] = zones
+                }
                 let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
                     pulseSamples, from: workout.startDate, through: workout.endDate
                 )
