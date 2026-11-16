@@ -218,4 +218,53 @@ final class PlannedWorkoutInviteTests: XCTestCase {
         XCTAssertTrue(started.isTraining)
     }
 
+    func testPastUnansweredInvitationDisplaysCancelled() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let now = Date(timeIntervalSince1970: 2_000)
+        XCTAssertEqual(
+            PlannedWorkoutInvitationPresentationState.resolve(
+                start: start, decision: nil, organizerCancelled: false, now: now
+            ), .cancelled
+        )
+        XCTAssertFalse(
+            PlannedWorkoutInvitationPresentationState.resolve(
+                start: start, decision: nil, organizerCancelled: false, now: now
+            ).canRespond
+        )
+    }
+
+    func testFutureInviteCanBeAcceptedAndPastAcceptanceIsPreserved() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let now = Date(timeIntervalSince1970: 2_000)
+        XCTAssertEqual(
+            PlannedWorkoutInvitationPresentationState.resolve(
+                start: Date(timeIntervalSince1970: 3_000),
+                decision: nil, organizerCancelled: false, now: now
+            ), .pending
+        )
+        XCTAssertEqual(
+            PlannedWorkoutInvitationPresentationState.resolve(
+                start: start, decision: .accepted, organizerCancelled: false, now: now
+            ), .accepted
+        )
+        XCTAssertEqual(
+            PlannedWorkoutInvitationPresentationState.resolve(
+                start: start, decision: .declined, organizerCancelled: false, now: now
+            ), .declined
+        )
+        XCTAssertEqual(
+            PlannedWorkoutInvitationPresentationState.resolve(
+                start: start, decision: .accepted, organizerCancelled: true, now: now
+            ), .cancelled
+        )
+    }
+
+    func testUnscheduledInvitationIsStillPendingWithoutExplicitCancellation() {
+        XCTAssertEqual(
+            PlannedWorkoutInvitationPresentationState.resolve(
+                start: nil, decision: nil, organizerCancelled: false
+            ), .pending
+        )
+    }
+
 }
