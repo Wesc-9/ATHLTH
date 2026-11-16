@@ -4668,18 +4668,25 @@ final class AppSessionStore: ObservableObject {
               let location = planStudioDayLocation(in: plan, dayID: dayID),
               let workoutIndex = plan.weeks[location.week].days[location.day]
                   .sessions.firstIndex(where: { $0.id == workoutID }),
-              !isPlanSessionSkipped(planID: planID, sessionID: workoutID),
+              recordedTimes(for: workoutID) == nil,
               !isPlanSessionCompleted(
                   planID: planID, sessionID: workoutID,
                   healthWorkouts: healthWorkouts,
                   strengthHistory: strengthHistory
               ) else { return false }
+        // Cancelled and skipped sessions may still be explicitly deleted.
+        // The operation cannot erase a real started/completed workout.
         plan.weeks[location.week].days[location.day]
             .sessions.remove(at: workoutIndex)
         PlannedWorkoutReminderScheduler.cancel(workoutID)
         plan.version += 1
         plan.updatedAt = Date()
         replaceTrainingPlan(plan)
+        if isPlanSessionSkipped(planID: planID, sessionID: workoutID) {
+            setPlanSessionSkipped(
+                planID: planID, sessionID: workoutID, skipped: false
+            )
+        }
         return true
     }
 
