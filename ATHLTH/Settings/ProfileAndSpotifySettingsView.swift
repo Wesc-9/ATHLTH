@@ -3108,6 +3108,12 @@ struct ATHLTHPrivacyCenterView: View {
                                 }
                                 settings.autoPublishCompletedWorkouts = false
                                 settings.workoutSharingChoiceCompleted = true
+                                if var updated = draft {
+                                    updated.shareRecentActivity = false
+                                    updated.recentActivityVisibility = "private"
+                                    draft = updated
+                                    schedulePrivacySave()
+                                }
                             }
                         }
                     )
@@ -3115,8 +3121,8 @@ struct ATHLTHPrivacyCenterView: View {
                 .disabled(enablingAutoShare || saving || draft == nil)
 
                 Text(ATHLTHLocalization.choose(
-                    english: "After you agree, new completed workouts appear in your friends' feed. You can hide an individual workout in its summary or turn this off here. Heart rate, zones, calories and raw HealthKit data are never posted.",
-                    norwegian: "Etter at du samtykker vises nye fullførte økter i vennefeeden. Du kan skjule hver økt i oppsummeringen eller slå av delingen her. Puls, pulssoner, kalorier og rå Apple Helse-data publiseres aldri."
+                    english: "After you agree, completed workout summaries appear in your friends' feed. Turning this off hides your existing shared workouts from friends; you can also make individual workouts private. HealthKit metrics are never posted.",
+                    norwegian: "Etter at du samtykker vises øktoppsummeringer i vennefeeden. Slår du av, skjules også tidligere delte økter for venner. Du kan skjule enkeltøkter. Apple Helse-målinger publiseres aldri."
                 ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -3125,16 +3131,6 @@ struct ATHLTHPrivacyCenterView: View {
                     Text(autoShareError)
                         .font(.caption)
                         .foregroundStyle(.red)
-                }
-
-                if let binding = draftBinding {
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Show shared workouts on my profile",
-                            norwegian: "Vis delte økter på profilen min"
-                        ),
-                        isOn: binding.shareRecentActivity
-                    )
                 }
 
                 Label(ATHLTHLocalization.choose(
@@ -3269,6 +3265,7 @@ struct ATHLTHPrivacyCenterView: View {
         updated.showOnlineStatus = true
         updated.shareTrainingPresence = true
         updated.trainingPresenceVisibility = "friends"
+        updated.trainingFocusVisibility = "friends"
         updated.sharePerformanceStats = true
         updated.performanceStatsVisibility = "friends"
         updated.shareTrophyCabinet = true
