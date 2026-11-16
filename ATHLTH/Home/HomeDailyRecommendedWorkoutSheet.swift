@@ -47,7 +47,11 @@ struct HomeDailyRecommendedWorkoutSheet: View {
 
                     Spacer(minLength: 0)
 
-                    Text(isCalendarWorkout ? tr("Planned workout", "Planlagt treningsøkt") : tr("Recommended workout", "Anbefalt treningsøkt"))
+                    Text(isCancelled
+                        ? tr("Cancelled workout", "Avlyst treningsøkt")
+                        : isCalendarWorkout
+                            ? tr("Planned workout", "Planlagt treningsøkt")
+                            : tr("Recommended workout", "Anbefalt treningsøkt"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                         .lineLimit(1)
@@ -186,7 +190,8 @@ struct HomeDailyRecommendedWorkoutSheet: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                HomeDailyRecommendedWorkoutActions(
+                if canStart {
+                    HomeDailyRecommendedWorkoutActions(
                     // Calendar plan sessions can start directly on either
                     // device; only Coach recommendations open plan details.
                     isPlanWorkout: isPlanWorkout && !isCalendarWorkout,
@@ -211,6 +216,7 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                 .overlay(alignment: .top) {
                     ATHLTHPlanDesign.outline.opacity(0.55)
                         .frame(height: 0.75)
+                }
                 }
             }
         }
