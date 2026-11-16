@@ -98,7 +98,11 @@ enum ATHLTHSpokenAudioSession {
     // workout, strength coach and Azure fallback. One speaker must never
     // unduck another speaker's active cue. Owners identify an active voice,
     // not a workout; only release your own lease.
-    private static var owners: [String: Bool] = [:]
+    private struct AudioChoice {
+        let duck: Bool
+        let mute: Bool
+    }
+    private static var owners: [String: AudioChoice] = [:]
     private static var revision = 0
     private static var delayedRestoreTask: Task<Void, Never>?
     private static var ownerExpiryTasks: [String: Task<Void, Never>] = [:]
@@ -141,6 +145,7 @@ enum ATHLTHSpokenAudioSession {
 
     static func activate(
         duckOtherAudio: Bool,
+        muteOtherAudio: Bool = false,
         owner: String = "legacy"
     ) throws {
         installRestorationObserversIfNeeded()
@@ -149,7 +154,10 @@ enum ATHLTHSpokenAudioSession {
         delayedRestoreTask = nil
 
         let previous = owners[owner]
-        owners[owner] = duckOtherAudio
+        owners[owner] = AudioChoice(
+            duck: duckOtherAudio,
+            mute: muteOtherAudio
+        )
 
         do {
             try configure(session)
@@ -183,11 +191,13 @@ enum ATHLTHSpokenAudioSession {
     }
 
     private static func configure(_ session: AVAudioSession) throws {
-        var options: AVAudioSession.CategoryOptions = [.mixWithOthers]
-        if owners.values.contains(true) {
-            // Duck music rather than treating Spotify like spoken-audio content.
-            // The interruption option can leave the Spotify player paused
-            // after a cue even if playback continued while the cue played.
+        // "Pause other audio" is a deliberate alternative to ducking.
+        // Removing mixWithOthers lets iOS interrupt music while Coach speaks.
+        // On release, notifyOthersOnDeactivation invites music to resume.
+        let hasMute = owners.values.contains { $0.mute }
+        var options: AVAudioSession.CategoryOptions =
+            hasMute ? [] : [.mixWithOthers]
+        if !hasMute && owners.values.contains(where: { $0.duck }) {
             options.insert(.duckOthers)
         }
 
