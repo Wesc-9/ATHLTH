@@ -21,6 +21,9 @@ extension AppSessionStore {
                 let recordedHealth = linkedHealthWorkoutID(
                     planID: plan.id, sessionID: workout.id
                 ).flatMap { healthByID[$0] }
+                let recordedStrength = strengthHistory.first {
+                    $0.plannedSessionID == workout.id && $0.isFinished
+                }
                 let completed = isPlanSessionCompleted(
                     planID: plan.id, sessionID: workout.id,
                     healthWorkouts: healthWorkouts,
@@ -32,8 +35,10 @@ extension AppSessionStore {
                         planID: plan.id, sessionID: workout.id
                     ) || workout.cancelledAt != nil,
                     actualStart: timing?.endedAt != nil
-                        ? timing?.startedAt : recordedHealth?.startDate,
-                    actualEnd: timing?.endedAt ?? recordedHealth?.endDate
+                        ? timing?.startedAt :
+                        (recordedHealth?.startDate ?? recordedStrength?.startedAt),
+                    actualEnd: timing?.endedAt ??
+                        recordedHealth?.endDate ?? recordedStrength?.endedAt
                 )
             }
         }
