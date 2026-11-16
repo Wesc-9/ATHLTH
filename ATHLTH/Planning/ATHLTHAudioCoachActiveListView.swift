@@ -28,6 +28,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var baselineConfiguration: WatchAudioCoachConfiguration?
     @State private var selectedTemplateID: UUID?
     @State private var pendingTemplateDestination: TemplateDestination?
+    @State private var selectedFromProfiles: TemplateDestination?
     @State private var isNewEmptyTemplate = false
     @State private var groupDraftName = ""
     @State private var groupDraftTrigger: ATHLTHAudioCoachRule.Trigger = .distance
@@ -425,7 +426,12 @@ struct ATHLTHAudioCoachActiveListView: View {
             ))
         }
         .sheet(isPresented: $showingVoice) { voiceSheet }
-        .sheet(isPresented: $showingProfiles) { profilesSheet }
+        .sheet(isPresented: $showingProfiles, onDismiss: {
+            if let selectedFromProfiles {
+                self.selectedFromProfiles = nil
+                requestTemplateChange(selectedFromProfiles)
+            }
+        }) { profilesSheet }
         .confirmationDialog(
             tr("Save this template?", "Lagre denne malen?"),
             isPresented: $showingSaveChoices,
@@ -2389,138 +2395,103 @@ struct ATHLTHAudioCoachActiveListView: View {
     private var profilesSheet: some View {
         NavigationStack {
             ScrollView {
-                editorCard {
-                    Text(tr("Saved Coach profiles", "Lagrede coach-profiler"))
-                        .font(.headline)
-                    if !settings.audioCoachProfiles.isEmpty {
-                        ForEach(settings.audioCoachProfiles) { profile in
-                            HStack(spacing: 12) {
-                                Button {
-                                    draft.load(profile: profile)
-                                    selectedProfileName = profile.name
-                                    showingProfiles = false
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(profile.name).font(.subheadline.weight(.semibold))
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("Your saved templates", "Dine lagrede maler"))
+                        .font(.system(size: 25, weight: .regular, design: .serif))
+                        .foregroundStyle(ink)
+                    Text(tr(
+                        "Choose a template. Changes are not lost when switching.",
+                        "Velg en mal. Ulagrede endringer beskyttes ved bytte."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(dim)
+
+                    Button {
+                        selectedFromProfiles = .standard
+                        showingProfiles = false
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "waveform")
+                                .foregroundStyle(bronze)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Standard")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                Text(tr("Always available · can be reset",
+                                        "Alltid tilgjengelig · kan tilbakestilles"))
+                                    .font(.caption)
+                                    .foregroundStyle(dim)
+                            }
+                            Spacer(minLength: 0)
+                            if selectedTemplateID == nil && !isNewEmptyTemplate {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(bronze)
+                            }
+                        }
+                        .padding(14)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-coach-select-standard")
+
+                    ForEach(settings.audioCoachProfiles) { profile in
+                        HStack(spacing: 9) {
+                            Button {
+                                selectedFromProfiles = .profile(profile.id)
+                                showingProfiles = false
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "square.stack")
+                                        .foregroundStyle(bronze)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(profile.name)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ink)
                                         Text(profile.configurationSummary)
                                             .font(.caption)
                                             .foregroundStyle(dim)
+                                            .lineLimit(2)
                                     }
-                                    .frame(maxWidth: .infinity, minHeight: 47,
-                                           alignment: .leading)
+                                    Spacer()
+                                    if selectedTemplateID == profile.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(bronze)
+                                    }
                                 }
-                                .buttonStyle(.plain)
-                                Menu {
-                                    Button(tr("Use profile", "Bruk profil")) {
-                                        draft.load(profile: profile)
-                                        selectedProfileName = profile.name
-                                        showingProfiles = false
-                                    }
-                                    Button(tr("Update from current setup",
-                                              "Oppdater fra nåværende oppsett")) {
-                                        pendingProfileAction = .replace(profile.id)
-                                    }
-                                    Button(tr("Delete profile", "Slett profil"),
-                                           role: .destructive) {
-                                        pendingProfileAction = .delete(profile.id)
-                                    }
-                                } label: {
-                                    Image(systemName: "ellipsis")
-                                        .frame(width: 44, height: 44)
-                                }
-                                .accessibilityLabel(tr("Profile options", "Profilvalg"))
+                                .padding(14)
+                                .contentShape(Rectangle())
                             }
-                        }
-                    }
-                    TextField(tr("Profile name", "Navn på oppsett"),
-                              text: $profileName)
-                        .textFieldStyle(.roundedBorder)
-                    Button {
-                        let name = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !name.isEmpty, settings.audioCoachProfiles.count < 30 else {
-                            return
-                        }
-                        settings.audioCoachProfiles.append(ATHLTHAudioCoachProfile(
-                            name: String(name.prefix(60)), configuration: draft.configuration()
-                        ))
-                        profileName = ""
-                        showingProfiles = false
-                    } label: {
-                        Label(tr("Save current setup", "Lagre aktivt oppsett"),
-                              systemImage: "square.and.arrow.down")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(profileName.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty || settings.audioCoachProfiles.count >= 30)
-
-                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                    Text(tr("Saved announcement lists", "Lagrede beskjedlister"))
-                        .font(.headline)
-                    if !settings.audioCoachSavedRuleSets.isEmpty {
-                        ForEach(settings.audioCoachSavedRuleSets) { saved in
-                            HStack {
-                                Button {
-                                    draft.customRules = Array(saved.rules.prefix(20))
+                            .buttonStyle(.plain)
+                            Menu {
+                                Button(tr("Use template", "Bruk mal")) {
+                                    selectedFromProfiles = .profile(profile.id)
                                     showingProfiles = false
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(saved.title).font(.subheadline.weight(.medium))
-                                        Text("\(saved.rules.count) " +
-                                             tr("rules", "regler"))
-                                            .font(.caption)
-                                            .foregroundStyle(dim)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
-                                Button(role: .destructive) {
-                                    settings.audioCoachSavedRuleSets.removeAll {
-                                        $0.id == saved.id
-                                    }
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .frame(width: 44, height: 44)
+                                Button(tr("Delete saved template", "Slett lagret mal"),
+                                       systemImage: "trash", role: .destructive) {
+                                    pendingProfileAction = .delete(profile.id)
                                 }
-                                .buttonStyle(.plain)
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .foregroundStyle(dim)
+                                    .frame(width: 40, height: 42)
                             }
                         }
+                        .background(.white, in: RoundedRectangle(cornerRadius: 15))
                     }
-                    TextField(tr("Rule list name", "Navn på beskjedliste"),
-                              text: $ruleSetName)
-                        .textFieldStyle(.roundedBorder)
-                    Button {
-                        let title = ruleSetName.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        )
-                        guard !title.isEmpty,
-                              !draft.customRules.isEmpty,
-                              settings.audioCoachSavedRuleSets.count < 30
-                        else { return }
-                        settings.audioCoachSavedRuleSets.append(
-                            ATHLTHAudioCoachRuleSet(
-                                title: String(title.prefix(60)),
-                                rules: draft.customRules
-                            )
-                        )
-                        ruleSetName = ""
-                    } label: {
-                        Label(tr("Save current rule list", "Lagre aktiv beskjedliste"),
-                              systemImage: "square.and.arrow.down")
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                    if settings.audioCoachProfiles.isEmpty {
+                        Text(tr("No saved personal templates yet.",
+                                "Du har ingen lagrede personlige maler ennå."))
+                            .font(.caption)
+                            .foregroundStyle(dim)
+                            .padding(.vertical, 12)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(ruleSetName.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty || draft.customRules.isEmpty ||
-                    settings.audioCoachSavedRuleSets.count >= 30)
                 }
-                .padding(16)
+                .padding(18)
             }
+            .scrollIndicators(.hidden)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("Coach profiles", "Coach-profiler"))
+            .navigationTitle(tr("Saved templates", "Lagrede maler"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -2528,37 +2499,26 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
             }
         }
+        .presentationDetents([.medium, .large])
         .confirmationDialog(
-            tr("Manage Coach profile", "Behandle coach-profil"),
+            tr("Delete saved template?", "Slette lagret mal?"),
             isPresented: Binding(
                 get: { pendingProfileAction != nil },
                 set: { if !$0 { pendingProfileAction = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button(
-                {
-                    switch pendingProfileAction {
-                    case .delete: return tr("Delete saved profile", "Slett lagret profil")
-                    case .replace: return tr("Replace saved profile", "Erstatt lagret profil")
-                    case nil: return tr("Confirm", "Bekreft")
-                    }
-                }(),
-                role: .destructive
-            ) {
-                switch pendingProfileAction {
-                case let .delete(id):
+            Button(tr("Delete template", "Slett mal"), role: .destructive) {
+                if case let .delete(id) = pendingProfileAction {
                     settings.audioCoachProfiles.removeAll { $0.id == id }
                     if settings.activeAudioCoachProfileID == id {
                         settings.activeAudioCoachProfileID = nil
                     }
-                case let .replace(id):
-                    if let index = settings.audioCoachProfiles.firstIndex(where: {
-                        $0.id == id
-                    }) {
-                        settings.audioCoachProfiles[index].configuration = draft.configuration()
+                    if selectedTemplateID == id {
+                        selectedTemplateID = nil
+                        selectedProfileName = tr("New template", "Ny mal")
+                        isNewEmptyTemplate = true
                     }
-                case nil: break
                 }
                 pendingProfileAction = nil
             }
@@ -2566,10 +2526,8 @@ struct ATHLTHAudioCoachActiveListView: View {
                 pendingProfileAction = nil
             }
         } message: {
-            Text(tr(
-                "Changes to saved profiles are only made after you confirm.",
-                "Lagrede profiler endres først når du bekrefter."
-            ))
+            Text(tr("Only this saved template is deleted. Standard remains available.",
+                    "Bare denne lagrede malen slettes. Standard beholdes."))
         }
     }
 
