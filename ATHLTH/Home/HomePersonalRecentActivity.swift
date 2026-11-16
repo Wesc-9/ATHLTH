@@ -1406,8 +1406,9 @@ struct HomePersonalRecentActivitySection:
                                       )
                                     : session.profile.displayName)
                                 : "@\(session.profile.username)",
-                            displayName: session.profile.username.isEmpty
-                                ? nil : session.profile.displayName,
+                            displayName: session.profile.displayName,
+                            partnerNames: social.acceptedTrainingPartnerNames(for: workout.id)
+                                .joined(separator: ", "),
                             date: workout.endDate
                         )
                     }
@@ -1459,8 +1460,8 @@ struct HomePersonalRecentActivitySection:
                             username: feedItem.actor.usernameLabel.isEmpty
                                 ? feedItem.actor.resolvedName
                                 : feedItem.actor.usernameLabel,
-                            displayName: feedItem.actor.usernameLabel.isEmpty
-                                ? nil : feedItem.actor.resolvedName,
+                            displayName: feedItem.actor.resolvedName,
+                            partnerNames: feedItem.activity.metadata?["with_names"],
                             date: feedItem.activity.createdAt
                         )
                     }
@@ -1532,21 +1533,26 @@ struct HomePersonalRecentActivitySection:
         let avatar: Avatar
         let username: String
         let displayName: String?
+        let partnerNames: String?
         let date: Date
 
         var body: some View {
             HStack(alignment: .center, spacing: 9) {
                 avatar
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(username)
+                    Text(
+                        (displayName?.isEmpty == false ? displayName! : username) +
+                        (partnerNames?.isEmpty == false
+                            ? ATHLTHLocalization.choose(english: " with ", norwegian: " sammen med ") + partnerNames!
+                            : "")
+                    )
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.79)
 
-                    if let displayName, !displayName.isEmpty,
-                       displayName != username {
-                        Text(displayName)
+                    if displayName != username && !username.isEmpty {
+                        Text(username)
                             .font(.system(size: 10.5, weight: .medium))
                             .foregroundStyle(ATHLTHTheme.mutedText)
                             .lineLimit(1)
