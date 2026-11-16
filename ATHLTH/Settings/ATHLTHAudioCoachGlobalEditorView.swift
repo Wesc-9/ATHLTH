@@ -31,15 +31,17 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
 
     var body: some View {
         ScrollView {
-            ATHLTHAudioCoachActiveListView(
-                draft: liveDraft,
-                showRouteOptions: true,
-                showStructuredOptions: true,
-                globalScope: true
-            )
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 110)
+            if loaded {
+                ATHLTHAudioCoachActiveListView(
+                    draft: liveDraft,
+                    showRouteOptions: true,
+                    showStructuredOptions: true,
+                    globalScope: true
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 110)
+            }
         }
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .scrollIndicators(.hidden)
