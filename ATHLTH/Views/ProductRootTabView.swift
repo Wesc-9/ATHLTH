@@ -1120,6 +1120,7 @@ struct ATHLTHHomeView: View {
     @State private var homeCalendarPendingKind: WorkoutKind?
     @State private var homeCalendarPendingCustom = false
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
+    @State private var selectedHomeCompletedWorkout: SocialPublishableWorkout?
     @State private var homeDeferredPhoneWorkout: PlannedSession?
     @State private var homeDeferredPhoneDelaySeconds: TimeInterval = 30
     @State private var selectedHomeRecommendedWorkout: PlannedSession?
@@ -1663,6 +1664,25 @@ struct ATHLTHHomeView: View {
             .sheet(item: $selectedHomeStandaloneWorkout) { workout in
                 homeCalendarWorkoutSheet(workout)
                 .presentationDetents([.fraction(0.76), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+            }
+            .sheet(item: $selectedHomeCompletedWorkout) { workout in
+                NavigationStack {
+                    WorkoutHistoryDetailView(workout: workout)
+                        .navigationTitle(ATHLTHLocalization.choose(
+                            english: "Completed workout", norwegian: "Fullført økt"
+                        ))
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Done", norwegian: "Ferdig"
+                                )) { selectedHomeCompletedWorkout = nil }
+                            }
+                        }
+                }
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
             }
@@ -2712,6 +2732,63 @@ struct ATHLTHHomeView: View {
         }
     }
 
+    /// HealthKit, completed iPhone workouts and finished ATHLTH strength logs
+    /// are all private to the signed-in athlete. This list is not a social feed.
+    /// Planned sessions already shown with an actual start must not be repeated.
+    private var homeCompletedWorkoutsToday: [SocialPublishableWorkout] {
+        let planned = HomeTodayCalendarSchedule.workouts(
+            plan: session.activePlan,
+            standalone: session.standalonePlannedSessions
+        )
+        let plannedStarts = planned.compactMap {
+            session.recordedTimes(for: $0.id)?.startedAt
+        }
+        let merged = HomePersonalWorkoutCatalog.mergeRecent(
+            healthSummaries: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory,
+            phoneHistory: phoneWorkout.history
+        )
+        let today = Date()
+        let filtered = merged.filter {
+            HomeTodayRecordedWorkoutPolicy.shouldShow(
+                startedAt: $0.startDate,
+                endedAt: $0.endDate,
+                plannedRecordedStarts: plannedStarts,
+                today: today
+            )
+        }
+        var seen = Set<UUID>()
+        return filtered.filter { seen.insert($0.id).inserted }
+            .sorted { $0.startDate > $1.startDate }
+    }
+
+    private func completedWorkoutCalendarTitle(
+        _ workout: SocialPublishableWorkout
+    ) -> String {
+        let raw = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !raw.isEmpty && raw.lowercased() != workout.activity.rawValue.lowercased() {
+            return raw
+        }
+        switch workout.activity {
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Run completed", norwegian: "Løpeøkt fullført"
+            )
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Walk completed", norwegian: "Gåøkt fullført"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength workout completed", norwegian: "Styrkeøkt fullført"
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Workout completed", norwegian: "Treningsøkt fullført"
+            )
+        }
+    }
+
     private var homeTodayCalendarCard:
         some View {
         let plan =
@@ -2720,6 +2797,7 @@ struct ATHLTHHomeView: View {
             plan: plan,
             standalone: session.standalonePlannedSessions
         )
+        let completedToday = homeCompletedWorkoutsToday
         let personalEvents =
             homeTodayCommunityEvents
         let clubEvents =
@@ -2730,11 +2808,14 @@ struct ATHLTHHomeView: View {
         let visibleWorkoutCount = tournamentItems.isEmpty
             ? min(todayWorkouts.count, 2)
             : min(todayWorkouts.count, 1)
+        let visibleCompletedCount = min(
+            completedToday.count, max(0, 2 - visibleWorkoutCount)
+        )
         let visibleTournamentCount = min(
-            tournamentItems.count, max(0, 2 - visibleWorkoutCount)
+            tournamentItems.count, max(0, 2 - visibleWorkoutCount - visibleCompletedCount)
         )
         let availableAfterPlan =
-            max(2 - visibleWorkoutCount - visibleTournamentCount, 0)
+            max(2 - visibleWorkoutCount - visibleCompletedCount - visibleTournamentCount, 0)
         let visiblePersonalCount =
             min(
                 personalEvents.count,
@@ -2797,6 +2878,7 @@ struct ATHLTHHomeView: View {
             .buttonStyle(.plain)
 
             if !todayWorkouts.isEmpty ||
+                !completedToday.isEmpty ||
                 !personalEvents.isEmpty ||
                 !clubEvents.isEmpty ||
                 !tournamentItems.isEmpty {
@@ -2819,6 +2901,22 @@ struct ATHLTHHomeView: View {
                             .buttonStyle(.plain)
 
                         }
+                    }
+
+                    ForEach(Array(completedToday.prefix(visibleCompletedCount))) { workout in
+                        Button {
+                            selectedHomeCompletedWorkout = workout
+                        } label: {
+                            homeCompactCalendarRow(
+                                time: workout.startDate,
+                                endTime: workout.endDate,
+                                title: completedWorkoutCalendarTitle(workout),
+                                icon: workout.activity == .strength
+                                    ? "dumbbell.fill" : "checkmark.circle.fill"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-home-calendar-completed-\(workout.id)")
                     }
 
                     ForEach(Array(
@@ -3141,6 +3239,7 @@ struct ATHLTHHomeView: View {
             plan: activePlan,
             standalone: session.standalonePlannedSessions
         )
+        let completedToday = homeCompletedWorkoutsToday
         let personalEvents = homeTodayCommunityEvents
         let clubEvents = homeTodayGroupEvents
         let tournamentItems = tournamentCalendar.events(on: Date())
@@ -3148,8 +3247,9 @@ struct ATHLTHHomeView: View {
         return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 11) {
-                    if workouts.isEmpty && tournamentItems.isEmpty &&
-                       personalEvents.isEmpty && clubEvents.isEmpty {
+                    if workouts.isEmpty && completedToday.isEmpty &&
+                       tournamentItems.isEmpty && personalEvents.isEmpty &&
+                       clubEvents.isEmpty {
                         ContentUnavailableView(
                             ATHLTHLocalization.choose(
                                 english: "Nothing scheduled today",
@@ -3179,6 +3279,31 @@ struct ATHLTHHomeView: View {
                             .buttonStyle(.plain)
 
                         }
+                    }
+
+                    ForEach(completedToday) { workout in
+                        Button {
+                            showingHomeTodayCalendarAll = false
+                            selectedHomeCompletedWorkout = workout
+                        } label: {
+                            homeCalendarEventRow(
+                                time: workout.startDate,
+                                title: completedWorkoutCalendarTitle(workout),
+                                systemImage: "checkmark.circle.fill",
+                                detail: ATHLTHLocalization.choose(
+                                    english: "Completed", norwegian: "Fullført"
+                                ) + " · " + workout.endDate.formatted(
+                                    date: .omitted, time: .shortened
+                                )
+                            )
+                            .padding(13)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                ATHLTHPlanDesign.surface,
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     ForEach(tournamentItems) { item in
