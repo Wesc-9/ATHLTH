@@ -2,6 +2,29 @@ import XCTest
 @testable import ATHLTH
 
 final class RunRouteMapPointModeTests: XCTestCase {
+    func testViaPointRecalculationKeepsFooterReserved() {
+        // No route geometry is needed to hold the inset in place while the
+        // route temporarily disappears during MKDirections recalculation.
+        XCTAssertFalse(RunRouteBuilderViewportPolicy.reserveSaveFooter(
+            hasStart: false, hasFinish: false
+        ))
+        XCTAssertFalse(RunRouteBuilderViewportPolicy.reserveSaveFooter(
+            hasStart: true, hasFinish: false
+        ))
+        XCTAssertTrue(RunRouteBuilderViewportPolicy.reserveSaveFooter(
+            hasStart: true, hasFinish: true
+        ))
+    }
+
+    func testOnlyFirstCalculatedRouteAutomaticallyFitsMap() {
+        XCTAssertTrue(RunRouteBuilderViewportPolicy.autoFitFirstRoute(
+            hasAlreadyFitted: false
+        ))
+        XCTAssertFalse(RunRouteBuilderViewportPolicy.autoFitFirstRoute(
+            hasAlreadyFitted: true
+        ))
+    }
+
     func testAutomaticTapUsesStartThenFinishThenVia() {
         XCTAssertEqual(
             RunRouteMapPointMode.resolve(mode: .automatic, hasStart: false, hasFinish: false),
