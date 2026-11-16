@@ -54,6 +54,7 @@ enum ATHLTHExerciseReferenceResolver {
         "hip thrust": "hip-thrust",
         "barbell hip thrust": "hip-thrust",
         "plank": "plank",
+        "hollow body hold": "hollow-body-hold",
         "side plank": "side-plank",
         "dead bug": "dead-bug",
         "pallof press": "pallof-press",
