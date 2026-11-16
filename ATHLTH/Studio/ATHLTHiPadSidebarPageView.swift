@@ -14,32 +14,12 @@ struct ATHLTHiPadSidebarPageView: View {
     var body: some View {
         Group {
             if destination == .profile {
-                // The profile photograph is the page background, not a card
-                // below a second navigation strip. Overlay Back without
-                // shrinking the hero or interfering with Studio's toolbar.
+                // The profile hero fills the detail column without a
+                // redundant "Back to Studio" overlay. Navigation remains
+                // available through the persistent Studio sidebar.
                 destinationContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .ignoresSafeArea(.container, edges: .top)
-                    .overlay(alignment: .topLeading) {
-                        Button(action: onBack) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Back to Studio",
-                                    norwegian: "Tilbake til Studio"
-                                ),
-                                systemImage: "chevron.left"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(minHeight: 44)
-                            .padding(.horizontal, 14)
-                            .background(.black.opacity(0.34), in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.leading, 22)
-                        .padding(.top, 72)
-                        .accessibilityIdentifier("athlth-ipad-profile-back")
-                    }
             } else {
                 VStack(spacing: 0) {
                     HStack(spacing: 15) {
