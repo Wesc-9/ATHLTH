@@ -185,8 +185,10 @@ enum ATHLTHSpokenAudioSession {
     private static func configure(_ session: AVAudioSession) throws {
         var options: AVAudioSession.CategoryOptions = [.mixWithOthers]
         if owners.values.contains(true) {
+            // Duck music rather than treating Spotify like spoken-audio content.
+            // The interruption option can leave the Spotify player paused
+            // after a cue even if playback continued while the cue played.
             options.insert(.duckOthers)
-            options.insert(.interruptSpokenAudioAndMixWithOthers)
         }
 
         // Spotify/AirPods can reject spokenAudio during handoff. Retry
@@ -275,25 +277,9 @@ enum ATHLTHSpokenAudioSession {
         // retry both operations, without racing a new speaker.
         do {
             try restoreMusicAudio(session)
-            // A successful iOS audio-session call is not a guarantee that
-            // Spotify / Bluetooth has finished recovering its original volume.
-            // Verify restoration again after the voice relinquishes its lease.
-            // Never touch audio if a newer spoken cue has started meanwhile.
-            delayedRestoreTask = Task { @MainActor in
-                for delay in [Duration.milliseconds(350), .seconds(1)] {
-                    do { try await Task.sleep(for: delay) }
-                    catch { return }
-                    guard !Task.isCancelled,
-                          owners.isEmpty, revision == generation else { return }
-                    do { try restoreMusicAudio(AVAudioSession.sharedInstance()) }
-                    catch {
-                        // Re-enter the existing bounded / periodic retry path.
-                        restoreIfIdle(generation: generation)
-                        return
-                    }
-                }
-                delayedRestoreTask = nil
-            }
+            // A single notifyOthersOnDeactivation is the correct handoff.
+            // Repeated deactivation after success can interrupt playback again.
+            delayedRestoreTask = nil
         } catch {
             // Keep retrying deactivation after route transitions. No retry
             // can remove a new cue's mixing/duck policy: it re-checks revision.
