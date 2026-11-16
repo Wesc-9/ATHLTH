@@ -75,6 +75,43 @@ final class ATHLTHRunningPaceTests: XCTestCase {
         ) ?? 0, 5000, accuracy: 0.0001)
     }
 
+    func testIndoorRunningLivePaceUsesRealMeasuredDistanceAndActiveTime() {
+        // Screenshot case: treadmill, ~15 minutes and 1.93 km with no GPS.
+        let average = ATHLTHRunningPace.average(
+            elapsedSeconds: 900, distanceMeters: 1_930
+        )
+        let display = ATHLTHRunningPace.displayPace(
+            current: nil, average: average
+        )
+        XCTAssertEqual(display.secondsPerKilometer ?? 0,
+                       466.32, accuracy: 0.1)
+        XCTAssertTrue(display.isAverage)
+    }
+
+    func testOutdoorGpsPaceTakesPrecedenceOverRecordedAverage() {
+        let display = ATHLTHRunningPace.displayPace(
+            current: 310, average: 480
+        )
+        XCTAssertEqual(display.secondsPerKilometer, 310)
+        XCTAssertFalse(display.isAverage)
+    }
+
+    func testInvalidGpsPaceFallsBackAndNeverUsesTreadmillTargetAsMeasurement() {
+        let display = ATHLTHRunningPace.displayPace(
+            current: .nan, average: 465
+        )
+        XCTAssertEqual(display.secondsPerKilometer, 465)
+        XCTAssertTrue(display.isAverage)
+        let unknown = ATHLTHRunningPace.displayPace(
+            current: nil,
+            average: ATHLTHRunningPace.average(
+                elapsedSeconds: 180, distanceMeters: 0
+            )
+        )
+        XCTAssertNil(unknown.secondsPerKilometer)
+        XCTAssertFalse(unknown.isAverage)
+    }
+
     func testMetricAndImperialTreadmillModesConvertWithoutChangingSavedPace() {
         let saved = ATHLTHPlannedTreadmillTargets.pace(forSpeed: 10)
         let mph = ATHLTHPlannedTreadmillTargets.displaySpeed(10, measurement: .imperial)
