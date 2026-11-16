@@ -255,67 +255,18 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                 .foregroundStyle(ATHLTHTheme.mutedText)
             }
             ForEach(voices) { voice in
-                HStack(spacing: 10) {
-                    Button {
-                        select(voice)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName:
-                                selectedIdentifier ==
-                                ATHLTHAzureCoachVoice.prefix + voice.id
-                                    ? "checkmark.circle.fill" : "circle"
-                            )
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(voice.name)
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-                                Text(voice.detail)
-                                    .font(.caption2)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .contentShape(Rectangle())
+                ATHLTHCoachVoiceRow(
+                    title: voice.name,
+                    subtitle: voice.detail,
+                    selected: selectedIdentifier == ATHLTHAzureCoachVoice.prefix + voice.id,
+                    locked: !session.hasPaidAccess,
+                    busy: preview.loadingVoice == voice.id,
+                    onSelect: { select(voice) },
+                    onPreview: {
+                        preview.preview(voice.id, duckMusic: duckOtherAudio)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(
-                        selectedIdentifier ==
-                        ATHLTHAzureCoachVoice.prefix + voice.id
-                            ? .isSelected : []
-                    )
-                    .accessibilityLabel(tr(
-                        "Choose \(voice.name)", "Velg \(voice.name)"
-                    ))
-
-                    Button {
-                        preview.preview(
-                            voice.id,
-                            duckMusic: duckOtherAudio
-                        )
-                    } label: {
-                        if preview.loadingVoice == voice.id {
-                            ProgressView()
-                                .frame(width: 40, height: 40)
-                        } else {
-                            Image(systemName: "play.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                                .frame(width: 40, height: 40)
-                        }
-                    }
-                    .disabled(preview.loadingVoice != nil)
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(tr(
-                        "Preview \(voice.name)", "Forhåndslytt på \(voice.name)"
-                    ))
-                }
-                .padding(10)
-                .background(ATHLTHTheme.accentSoft.opacity(0.65),
-                            in: RoundedRectangle(cornerRadius: 14))
-                .opacity(session.hasPaidAccess ? 1 : 0.38)
-                .disabled(!session.hasPaidAccess)
+                )
+                .accessibilityIdentifier("athlth-coach-voice-azure")
             }
 
             if !session.hasPaidAccess {
