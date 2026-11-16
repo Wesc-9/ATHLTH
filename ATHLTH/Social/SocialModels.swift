@@ -1404,6 +1404,47 @@ struct SocialWorkoutStartSelection: Hashable {
     }
 }
 
+/// Small, explicitly shared heart-rate timeline. It contains no location,
+/// timestamps or health record identifiers; the private full-resolution
+/// HealthKit recording never leaves its normal storage.
+enum ATHLTHSharedPulseSeries {
+    struct Sample: Identifiable, Hashable {
+        let progress: Double
+        let bpm: Double
+        var id: Int { Int((progress * 10_000).rounded()) }
+    }
+
+    static func encode(
+        _ samples: [ATHLTHRunningHeartRatePoint],
+        from start: Date, through end: Date
+    ) -> String? {
+        guard end > start else { return nil }
+        let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
+            samples, from: start, through: end
+        )
+        guard valid.count >= 2 else { return nil }
+        let reduced = ATHLTHRunningHeartRateAnalysis.chartPoints(valid, limit: 64)
+        let total = end.timeIntervalSince(start)
+        return reduced.map { sample in
+            let portion = min(1, max(0, sample.date.timeIntervalSince(start) / total))
+            return "\(Int((portion * 1_000).rounded())):\(Int(sample.bpm.rounded()))"
+        }
+        .joined(separator: "|")
+    }
+
+    static func decode(_ value: String?) -> [Sample] {
+        guard let value, value.count <= 1_024 else { return [] }
+        return value.split(separator: "|").prefix(64).compactMap { entry in
+            let parts = entry.split(separator: ":")
+            guard parts.count == 2,
+                  let millesimal = Int(parts[0]), (0...1_000).contains(millesimal),
+                  let beats = Int(parts[1]), (30...240).contains(beats)
+            else { return nil }
+            return Sample(progress: Double(millesimal) / 1_000, bpm: Double(beats))
+        }
+    }
+}
+
 struct SocialPublishableWorkout: Identifiable, Hashable {
     let id: UUID
     let title: String
