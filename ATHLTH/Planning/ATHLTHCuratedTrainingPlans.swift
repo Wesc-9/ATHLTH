@@ -145,8 +145,8 @@ enum ATHLTHCuratedTrainingPlans {
 
             plan(12, "home-bodyweight-8w",
                  "Home Strength · No Gym", "Hjemmetrening · uten treningssenter",
-                 "Accessible bodyweight training with short sessions and simple progression.",
-                 "Tilgjengelig styrketrening hjemme, med korte økter og enkel progresjon.",
+                 "Equipment-free strength plan. Every strength session uses bodyweight only, with short sessions and simple progression.",
+                 "Treningsplan helt uten utstyr. Alle styrkeøktene bruker kun egen kroppsvekt, med korte økter og enkel progresjon.",
                  category: "strength", goal: "Strength without gym equipment",
                  norwegianGoal: "Styrke uten treningsapparater",
                  level: "Beginner", weeks: 8,
@@ -265,13 +265,14 @@ enum ATHLTHCuratedTrainingPlans {
 
             plan(24, "walking-strength-foundation",
                  "Walking & Strength", "Gåing og styrke",
-                 "Low-barrier walking and resistance sessions for developing a training habit.",
-                 "Rolige gåturer og tilpasset styrke for gode treningsvaner.",
+                 "Easy walks and equipment-free bodyweight strength sessions for building a training habit.",
+                 "Rolige gåturer og styrkeøkter med egen kroppsvekt, uten behov for treningsutstyr.",
                  category: "general_fitness", goal: "Everyday activity and strength",
                  norwegianGoal: "Aktiv hverdag og grunnstyrke",
                  level: "Beginner", weeks: 8,
                  pattern: ["walking", "home", "walking"],
-                 tags: ["walking", "gåing", "beginner", "hverdagsaktivitet"])
+                 tags: ["walking", "gåing", "beginner", "hverdagsaktivitet",
+                        "no equipment", "uten utstyr"])
         ]
     }
 }
