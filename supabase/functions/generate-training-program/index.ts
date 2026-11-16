@@ -40,6 +40,8 @@ type ProgramRequest = {
   unavailableEquipment?: string[] | null;
   // Explicitly consented strength signal summary from on-device Coach History.
   coachStrengthContext?: unknown;
+  // Public, bundled exercise names only; no personal library records.
+  allowedExerciseNames?: string[] | null;
   goals?: GoalInput[];
   existingDays?: ExistingDay[];
 };
@@ -638,6 +640,19 @@ Deno.serve(async (req: Request) => {
     ? body.existingDays.slice(0, 52 * 7)
     : [];
 
+  // ATHLTH sends only names of public, preinstalled exercises. Defensively
+  // bound and sanitize this untrusted client field before prompt inclusion.
+  const allowedExerciseNames = Array.isArray(body.allowedExerciseNames)
+    ? Array.from(new Set(
+        body.allowedExerciseNames
+          .filter((name): name is string =>
+            typeof name === "string" &&
+            /^[A-Za-z0-9 .()'/-]{2,85}$/.test(name))
+          .map((name) => name.trim())
+          .filter(Boolean),
+      )).slice(0, 100)
+    : [];
+
   const constraints = {
     mode,
     startDate: body.startDate ?? null,
@@ -655,6 +670,7 @@ Deno.serve(async (req: Request) => {
     injurySafetyNotes: typeof body.injurySafetyNotes === "string"
       ? body.injurySafetyNotes.slice(0, 3_000) : null,
     coachStrengthContext: normalizeCoachStrengthContext(body.coachStrengthContext),
+    allowedExerciseNames,
     excludedMovements: Array.isArray(body.excludedMovements)
       ? body.excludedMovements
           .filter((name): name is string => typeof name === "string")
@@ -704,6 +720,8 @@ Hard rules:
 - Never extrapolate from an estimated 1RM to an automatic prescription or invent a personal max. Suggest incremental load review only when two separate verified completed sessions met their prescribed sets/reps/loads. Do not copy current weights into every future session. Apply conservative progression and deload weeks when indicated, always as an editable draft.
 - coachStrengthContext is absent if the athlete has not enabled Coach History. Never request or invent those records or infer injury details from training load.
 - Strength work should use exercise names, sets, reps, sensible RPE, and rest, but never invent target weights.
+- When allowedExerciseNames is provided and nonempty, ALL strength exercise names in sessions.exercises and all blocks of kind "exercise" MUST be selected verbatim from that approved list. Never invent an exercise name, rename an approved movement, or substitute a different equipment variant. User requests for custom movements must be reviewed in ATHLTH's exercise library, not generated as arbitrary text. This restriction does not apply to running/walking activity and recovery blocks.
+- If equipment or safety restrictions eliminate the available strength exercises, leave out that strength session or propose a non-strength session consistent with the athlete's stated activities, rather than inventing an unlisted strength exercise.
 - Running/walking sessions can include duration and/or distance. Only include a target pace when the provided goal genuinely supports one.
 - Every session has a blocks array (which may be empty if no precise structure is justified). Blocks describe one chronological timeline: warmup, main effort, recovery between efforts, cooldown. If prescribing intervals, include EACH effort and EACH between-effort rest; never append an extra rest after the last repeat.
 - For an explicitly prescribed 4x4 interval session, provide warmup, four distinct 240-second main run blocks, three 120-second recovery blocks between them, and a cooldown. Use targetPaceSecondsPerKilometer, treadmillInclinePercent, targetHeartRateZone and targetEffortRPE only when justified by user input; otherwise use null.
