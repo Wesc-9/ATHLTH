@@ -17,6 +17,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
     let onResetStandard: () -> Void
     let isDirty: Bool
     let onAddCommand: (UUID) -> Void
+    let onEditGroupTrigger: (UUID) -> Void
     let onMoveCommand: (String, UUID?) -> Bool
     let onAddGroup: () -> Void
     let onAddSpeechCommand: () -> Void
@@ -210,6 +211,22 @@ struct ATHLTHAudioCoachCircleOverview: View {
             VStack(spacing: 9) {
                 if !legacyOptions.isEmpty || !ungroupedRules.isEmpty {
                     builtInCoachGroupCard
+                } else if !draft.coachGroups.isEmpty {
+                    HStack(spacing: 9) {
+                        Image(systemName: "arrow.down.to.line")
+                            .foregroundStyle(gold)
+                        Text(tr("Drop here to move a command out of its group",
+                                "Dra hit for å flytte kommandoen ut av gruppen"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(dim)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .background(.white.opacity(0.85),
+                                in: RoundedRectangle(cornerRadius: 16))
+                    .dropDestination(for: String.self) { items, _ in
+                        guard let item = items.first else { return false }
+                        return onMoveCommand(item, nil)
+                    }
                 }
                 ForEach(draft.coachGroups) { group in
                     coachGroupCard(group)
@@ -351,6 +368,8 @@ struct ATHLTHAudioCoachCircleOverview: View {
         let options = group.optionIDs.compactMap(ATHLTHAudioCoachOption.init(rawValue:))
         let spokenValues = rules.reduce(0) { $0 + $1.selectedMetrics.count }
         let expanded = expandedGroups.contains(group.id)
+        let displayTrigger = group.trigger ?? rules.first?.trigger
+        let displayInterval = group.interval ?? rules.first?.interval
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 Button {
@@ -368,10 +387,14 @@ struct ATHLTHAudioCoachCircleOverview: View {
                             Text(group.name)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ink)
-                            Text(tr(
-                                "\(rules.count + options.count) triggers · \(spokenValues) values",
-                                "\(rules.count + options.count) triggere · \(spokenValues) innhold"
-                            ))
+                            Text(displayTrigger == .time
+                                 ? tr("Every \(displayInterval ?? 60) seconds · \(spokenValues + options.count) commands",
+                                      "Hvert \(displayInterval ?? 60) sekund · \(spokenValues + options.count) kommandoer")
+                                 : displayTrigger == .distance
+                                 ? tr("Every \(displayInterval ?? 1_000) metres · \(spokenValues + options.count) commands",
+                                      "Hver \(displayInterval ?? 1_000) meter · \(spokenValues + options.count) kommandoer")
+                                 : tr("\(spokenValues + options.count) commands",
+                                      "\(spokenValues + options.count) kommandoer"))
                             .font(.caption)
                             .foregroundStyle(dim)
                         }
@@ -385,6 +408,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 }
                 .buttonStyle(.plain)
                 Menu {
+                    Button(tr("Edit group trigger", "Endre gruppens trigger"),
+                           systemImage: "clock.arrow.circlepath") {
+                        onEditGroupTrigger(group.id)
+                    }
                     Button(tr("Rename", "Endre navn"), systemImage: "pencil") {
                         editingGroupID = group.id
                         groupNameInput = group.name
