@@ -240,6 +240,12 @@ struct WatchActiveWorkoutView: View {
             }
             .ignoresSafeArea()
         )
+        // Never expose the system's ambiguous X/back affordance while
+        // HealthKit is recording. Finish is an explicit, confirmed action
+        // on the metrics and controls pages instead.
+        .navigationBarBackButtonHidden(workoutManager.state != .completed)
+        .toolbar(workoutManager.state == .completed ? .visible : .hidden,
+                 for: .navigationBar)
         .interactiveDismissDisabled(workoutManager.state != .completed)
         .onAppear {
             // A resumed Watch screen may have an older cached queue after
