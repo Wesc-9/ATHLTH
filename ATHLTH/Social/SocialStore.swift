@@ -2004,10 +2004,11 @@ final class SocialStore: ObservableObject {
         )
     }
 
+    @discardableResult
     func declineWorkoutInvite(
         _ invite: SocialWorkoutInviteDisplay
-    ) async {
-        _ = await resolveWorkoutInvite(
+    ) async -> Bool {
+        await resolveWorkoutInvite(
             invite,
             state: .declined
         )
@@ -3326,10 +3327,36 @@ final class SocialStore: ObservableObject {
         errorMessage = nil
 
         do {
+            // Update both Inbox and Train Together as soon as the backend
+            // confirms the same participant ID. Never create another invite.
             try await service.respondToWorkoutInvite(
                 participantID: invite.participant.id,
                 state: state
             )
+            workoutParticipants = workoutParticipants.map { record in
+                guard record.id == invite.participant.id else { return record }
+                var updated = record
+                updated.state = state
+                return updated
+            }
+            if state == .declined {
+                workoutInvites.removeAll {
+                    $0.participant.id == invite.participant.id
+                }
+            } else {
+                workoutInvites = workoutInvites.map { current in
+                    guard current.participant.id == invite.participant.id else {
+                        return current
+                    }
+                    var updated = current.participant
+                    updated.state = state
+                    return SocialWorkoutInviteDisplay(
+                        session: current.session,
+                        participant: updated,
+                        creator: current.creator
+                    )
+                }
+            }
             await refresh()
             return true
         } catch {
