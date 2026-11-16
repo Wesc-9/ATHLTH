@@ -64,6 +64,13 @@ struct TrainTogetherMarketplaceView:
                 spacing: 18
             ) {
                 hero
+
+                // This is the same accepted/pending session model as Inbox.
+                // A workout is not recreated when opened from here.
+                if !social.workoutInvites.isEmpty {
+                    ATHLTHWorkoutInvitationSection(searchText: searchText)
+                }
+
                 filterBar
 
                 if !ownUpcomingPosts.isEmpty {
