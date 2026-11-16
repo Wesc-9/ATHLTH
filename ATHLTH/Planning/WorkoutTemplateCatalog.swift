@@ -5374,55 +5374,67 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
-    @ViewBuilder
-    private var studioPlanWorkspace: some View {
+    // The editor previously passed the full nested ViewThatFits / planned
+    // workout tree into the enclosing ScrollView's generic type. On iPad
+    // (build 130) that made Swift type metadata resolution recurse until the
+    // main thread hit its stack guard while presenting a step editor.
+    // Erase the workbench boundary, not the workout state or bindings.
+    private var studioPlanWorkspace: AnyView {
         if studioFullscreenEditing {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
-                    Label(tr("WORKOUT BUILDER", "ØKTBYGGER"),
-                          systemImage: "slider.horizontal.3")
-                        .font(.caption.weight(.semibold))
-                        .tracking(1.0)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    Spacer(minLength: 8)
-                    ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
-                        .accessibilityIdentifier("athlth-ipad-workout-mode")
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
+            return AnyView(
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Label(tr("WORKOUT BUILDER", "ØKTBYGGER"),
+                              systemImage: "slider.horizontal.3")
+                            .font(.caption.weight(.semibold))
+                            .tracking(1.0)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Spacer(minLength: 8)
+                        ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
+                            .accessibilityIdentifier("athlth-ipad-workout-mode")
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
 
-            // A landscape iPad gets a genuine two-column workbench;
-            // Stage Manager's narrow windows keep the same stacked editor.
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 20) {
-                    studioPlanHeader
-                        .frame(minWidth: 330, idealWidth: 370, maxWidth: 415,
-                               alignment: .topLeading)
-                    plannedStudio
-                        .frame(minWidth: 490, maxWidth: .infinity,
-                               alignment: .topLeading)
+                    // Preserve the original adaptive two-column workspace.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 20) {
+                            AnyView(studioPlanHeader)
+                                .frame(minWidth: 330, idealWidth: 370, maxWidth: 415,
+                                       alignment: .topLeading)
+                            AnyView(plannedStudio)
+                                .frame(minWidth: 490, maxWidth: .infinity,
+                                       alignment: .topLeading)
+                        }
+                        VStack(alignment: .leading, spacing: 16) {
+                            AnyView(studioPlanHeader)
+                            AnyView(plannedStudio)
+                        }
+                    }
                 }
-
-                VStack(alignment: .leading, spacing: 16) {
-                    studioPlanHeader
-                    plannedStudio
-                }
-            }
-            }
-        } else {
-            studioPlanHeader
-            plannedStudio
+            )
         }
+        // Group remains layout-transparent, as the original ViewBuilder was
+        // on iPhone. Do not introduce an extra VStack or change spacing.
+        return AnyView(
+            Group {
+                AnyView(studioPlanHeader)
+                AnyView(plannedStudio)
+            }
+        )
     }
 
-    private var editorWithPresentation: some View {
+    // Isolate the heavyweight ScrollView content from the many sheet and
+    // onChange modifiers. Avoid a single extremely deep SwiftUI generic type.
+    private var editorScrollContent: AnyView {
+        AnyView(
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if isPlannedWorkout {
                         if studioAdvanced {
                             studioPlanWorkspace
                         } else {
-                            simplePlannedWorkoutComposer
+                            AnyView(simplePlannedWorkoutComposer)
                         }
                         if let actionNotice {
                             Label(actionNotice, systemImage: "info.circle")
@@ -5459,6 +5471,11 @@ struct WorkoutTemplateBuilderView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(studioBackground.ignoresSafeArea())
+        )
+    }
+
+    private var editorWithPresentation: some View {
+            editorScrollContent
             .onChange(of: studioBasicDate) { _, value in
                 // Date/time in the shared details card is authoritative for
                 // both Basic and Advanced, and the scheduled session is
@@ -5686,53 +5703,7 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
             .sheet(item: $studioStepEditorSelection) { selection in
-                NavigationStack {
-                    ScrollView {
-                        if let index = selection.index(in: blocks) {
-                            VStack(alignment: .leading, spacing: 15) {
-                                Text(ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]))
-                                    .font(.title2.weight(.semibold))
-                                    .foregroundStyle(studioInk)
-                                blockDetails(index)
-                            }
-                            .padding(18)
-                            .onAppear {
-                                // The selection always identifies an existing
-                                // step; the editor receives live bindings so
-                                // changes are reflected in the underlying plan.
-                                guard let liveIndex = selection.index(in: blocks) else {
-                                    return
-                                }
-                                let original = blocks[liveIndex]
-                                let adapted = ATHLTHRunningLibraryExerciseAdapter.adapt(original)
-                                if original.kind != adapted.kind {
-                                    blocks[liveIndex] = adapted
-                                }
-                                updateRouteStepIfNeeded(original.editorDragID)
-                            }
-                        } else {
-                            ContentUnavailableView(
-                                tr("Step unavailable", "Deløkten er ikke tilgjengelig"),
-                                systemImage: "exclamationmark.triangle",
-                                description: Text(tr(
-                                    "Return to the workout and select the step again.",
-                                    "Gå tilbake til økten og velg deløkten på nytt."
-                                ))
-                            )
-                        }
-                    }
-                    .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-                    .navigationTitle(tr("Edit step", "Rediger deløkt"))
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(tr("Done", "Ferdig")) {
-                                studioStepEditorSelection = nil
-                            }
-                        }
-                    }
-                }
-                .presentationDetents([.large])
+                studioStepEditorSheet(selection)
             }
             .sheet(isPresented: $showingCopyPicker) {
                 copyPickerSheet
@@ -5839,6 +5810,64 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .presentationDetents([.large])
             }
+    }
+
+    // The step editor is created only when a step is selected. Erasing its
+    // distinct NavigationStack prevents giant nested metadata types from
+    // propagating into the root WorkoutTemplateBuilderView.
+    private func studioStepEditorSheet(
+        _ selection: ATHLTHWorkoutStudioStepEditorSelection
+    ) -> AnyView {
+        AnyView(
+                NavigationStack {
+                    ScrollView {
+                        if let index = selection.index(in: blocks) {
+                            VStack(alignment: .leading, spacing: 15) {
+                                Text(ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]))
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundStyle(studioInk)
+                                blockDetails(index)
+                            }
+                            .padding(18)
+                            .onAppear {
+                                // The selection always identifies an existing
+                                // step; the editor receives live bindings so
+                                // changes are reflected in the underlying plan.
+                                guard let liveIndex = selection.index(in: blocks) else {
+                                    return
+                                }
+                                let original = blocks[liveIndex]
+                                let adapted = ATHLTHRunningLibraryExerciseAdapter.adapt(original)
+                                if original.kind != adapted.kind {
+                                    blocks[liveIndex] = adapted
+                                }
+                                updateRouteStepIfNeeded(original.editorDragID)
+                            }
+                        } else {
+                            ContentUnavailableView(
+                                tr("Step unavailable", "Deløkten er ikke tilgjengelig"),
+                                systemImage: "exclamationmark.triangle",
+                                description: Text(tr(
+                                    "Return to the workout and select the step again.",
+                                    "Gå tilbake til økten og velg deløkten på nytt."
+                                ))
+                            )
+                        }
+                    }
+                    .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+                    .navigationTitle(tr("Edit step", "Rediger deløkt"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(tr("Done", "Ferdig")) {
+                                studioStepEditorSelection = nil
+                            }
+                        }
+                    }
+                }
+
+                .presentationDetents([.large])
+        )
     }
 
     /// Basic is intentionally a two-choice experience, not the Advanced
