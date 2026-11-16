@@ -635,6 +635,79 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
     }
 
+    private func prepareNewGroup() {
+        editingGroupTriggerID = nil
+        groupDraftName = ""
+        groupDraftTrigger = .distance
+        groupDraftInterval = 1_000
+        pendingGroupCommandID = nil
+    }
+
+    private var commandGroupPickerSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    Text(tr("Where should the command go?", "Hvor skal kommandoen legges?"))
+                        .font(.system(size: 24, weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+                    Text(tr("Choose an existing trigger group, or make a new one.",
+                            "Velg en gruppe med trigger, eller opprett en ny."))
+                        .font(.subheadline)
+                        .foregroundStyle(dim)
+
+                    ForEach(draft.coachGroups) { group in
+                        Button {
+                            pendingGroupCommandID = group.id
+                            showCommandAfterGroupPicker = true
+                            showingCommandGroupPicker = false
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: group.trigger == .time ? "clock" : "figure.run")
+                                    .foregroundStyle(bronze)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(group.name).font(.subheadline.weight(.semibold))
+                                    Text(group.trigger == .time
+                                         ? tr("Every ", "Hvert ") + String(group.interval ?? 60) + tr(" seconds", " sekund")
+                                         : tr("Every ", "Hver ") + String(group.interval ?? 1_000) + tr(" metres", " meter"))
+                                        .font(.caption)
+                                        .foregroundStyle(dim)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .padding(16)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Button {
+                        prepareNewGroup()
+                        showGroupBuilderAfterPicker = true
+                        showingCommandGroupPicker = false
+                    } label: {
+                        Label(tr("Create new trigger group", "Opprett ny triggergruppe"),
+                              systemImage: "plus.circle.fill")
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(bronze)
+                }
+                .padding(18)
+            }
+            .scrollIndicators(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("Add command", "Legg til kommando"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Close", "Lukk")) { showingCommandGroupPicker = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
     /// First establish the one shared group trigger. Spoken values are
     /// added afterwards so the group never schedules multiple overlapping cues.
     private var groupBuilderSheet: some View {
