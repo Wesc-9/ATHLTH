@@ -349,7 +349,9 @@ struct ATHLTHAudioCoachActiveListView: View {
         }) {
             groupBuilderSheet
         }
-        .sheet(isPresented: $showingGroupCommandBuilder) {
+        .sheet(isPresented: $showingGroupCommandBuilder, onDismiss: {
+            pendingGroupCommandID = nil
+        }) {
             groupCommandSheet
         }
         .sheet(isPresented: $showingQuickMessage, onDismiss: {
@@ -491,10 +493,16 @@ struct ATHLTHAudioCoachActiveListView: View {
         .onAppear {
             if baselineConfiguration == nil {
                 baselineConfiguration = draft.configuration()
-                selectedTemplateID = settings.activeAudioCoachProfileID
-                if let selectedTemplateID,
-                   let profile = settings.audioCoachProfiles.first(where: { $0.id == selectedTemplateID }) {
+                // A workout-specific override must never be labelled as,
+                // or saved over, an unrelated global profile by accident.
+                if let id = settings.activeAudioCoachProfileID,
+                   let profile = settings.audioCoachProfiles.first(where: { $0.id == id }),
+                   profile.configuration == draft.configuration() {
+                    selectedTemplateID = id
                     selectedProfileName = profile.name
+                } else {
+                    selectedTemplateID = nil
+                    selectedProfileName = nil
                 }
             }
         }
