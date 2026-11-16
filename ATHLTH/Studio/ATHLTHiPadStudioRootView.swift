@@ -57,76 +57,74 @@ enum ATHLTHStudioInboxPanelGesturePolicy {
     }
 }
 
-/// Only the inbox controls observe MessagingStore. A message arriving should
-/// not cause Studio's entire navigation tree to observe messaging changes.
-private struct ATHLTHStudioInboxToolbarButton: View {
+/// Owns the unread badge so incoming messages do not invalidate the
+/// entire iPad Studio navigation tree.
+private struct ATHLTHStudioInboxSidebarButton: View {
     @EnvironmentObject private var messaging: MessagingStore
-    let toggle: () -> Void
+
+    let selected: Bool
+    let ink: Color
+    let action: () -> Void
 
     private var unread: Int {
         max(0, messaging.unreadCount + messaging.messageRequestCount)
     }
 
     var body: some View {
-        Button(action: toggle) {
-            ZStack(alignment: .topTrailing) {
+        Button(action: action) {
+            HStack(spacing: 12) {
                 Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.system(size: 18, weight: .medium))
-                    .frame(width: 42, height: 42)
+                    .font(.system(size: 17))
+                    .frame(width: 24)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Inbox",
+                    norwegian: "Innboks"
+                ))
+                .font(.subheadline.weight(selected ? .semibold : .regular))
+                .lineLimit(1)
+
+                Spacer(minLength: 0)
+
                 if unread > 0 {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 9, height: 9)
-                        .overlay(Circle().stroke(.white, lineWidth: 1.5))
-                        .offset(x: -3, y: 3)
+                    Text(unread > 99 ? "99+" : "\(unread)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ink)
+                        .padding(.horizontal, 8)
+                        .frame(minHeight: 23)
+                        .background(
+                            ATHLTHTheme.premiumGoldSoft,
+                            in: Capsule()
+                        )
                         .accessibilityHidden(true)
+                }
+            }
+            .foregroundStyle(selected ? ink : ink.opacity(0.78))
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 11)
+                        .fill(Color.white)
                 }
             }
             .contentShape(Rectangle())
         }
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Inbox", norwegian: "Innboks"
-        ))
-        .accessibilityValue(unread > 0
-            ? ATHLTHLocalization.choose(
-                english: "\(unread) unread",
-                norwegian: "\(unread) uleste"
-            )
-            : ATHLTHLocalization.choose(
-                english: "No unread messages",
-                norwegian: "Ingen uleste meldinger"
-            )
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityValue(
+            unread > 0
+                ? ATHLTHLocalization.choose(
+                    english: "\(unread) unread",
+                    norwegian: "\(unread) uleste"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "No unread messages",
+                    norwegian: "Ingen uleste meldinger"
+                )
         )
-        .help(ATHLTHLocalization.choose(
-            english: "Open or close Inbox", norwegian: "Åpne eller lukk innboksen"
-        ))
-        .accessibilityIdentifier("athlth-ipad-inbox-panel")
+        .accessibilityIdentifier("athlth-ipad-sidebar-inbox")
         .keyboardShortcut("m", modifiers: [.command, .shift])
-    }
-}
-
-private struct ATHLTHStudioInboxUnreadPill: View {
-    @EnvironmentObject private var messaging: MessagingStore
-    let ink: Color
-    let gold: Color
-
-    private var unread: Int {
-        max(0, messaging.unreadCount + messaging.messageRequestCount)
-    }
-
-    var body: some View {
-        if unread > 0 {
-            Text(unread > 99 ? "99+" : "\(unread)")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ink)
-                .padding(.horizontal, 9)
-                .frame(minHeight: 25)
-                .background(gold.opacity(0.12), in: Capsule())
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "\(unread) unread messages",
-                    norwegian: "\(unread) uleste meldinger"
-                ))
-        }
     }
 }
 
@@ -243,22 +241,23 @@ struct ATHLTHiPadStudioRootView: View {
                 studioDetail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(canvas.ignoresSafeArea())
-                    .overlay(alignment: .trailing) {
-                        if selection == .overview && !showingInspector &&
-                            libraryPage == nil && sidebarPage == nil {
+                    .overlay(alignment: .topTrailing) {
+                        // Keep the same panel-edge handle available whenever
+                        // the inbox is collapsed, on every Studio destination.
+                        if !showingInspector {
                             Button {
                                 openMessageHub()
                             } label: {
                                 Image(systemName: "chevron.left")
                                     .font(.caption.weight(.bold))
                                     .foregroundStyle(gold)
-                                    .frame(width: 26, height: 64)
+                                    .frame(width: 26, height: 44)
                                     .background(canvas, in: RoundedRectangle(cornerRadius: 12))
                                     .overlay(RoundedRectangle(cornerRadius: 12)
                                         .stroke(gold.opacity(0.3)))
-                                    // Preserve the slim visual grip while
-                                    // offering a full-size touch target.
-                                    .frame(width: 44, height: 72)
+                                    // Preserve the slim visual grip with a
+                                    // comfortable 44pt touch target.
+                                    .frame(width: 44, height: 48)
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -273,6 +272,7 @@ struct ATHLTHiPadStudioRootView: View {
                                 english: "Tap or swipe left on this handle to open Inbox",
                                 norwegian: "Trykk eller sveip mot venstre på håndtaket for å åpne Innboks"
                             ))
+                            .padding(.top, 14)
                             .simultaneousGesture(
                                 DragGesture(minimumDistance: 15)
                                     .onEnded { value in
@@ -316,20 +316,8 @@ struct ATHLTHiPadStudioRootView: View {
                             .accessibilityLabel(ATHLTHLocalization.choose(english: "Side menu", norwegian: "Sidemeny"))
                             .accessibilityIdentifier("athlth-ipad-sidebar-toggle")
                         }
-                        // NavigationSplitView supplies the native sidebar
-                        // visibility control. Do not draw a second identical
-                        // leading button in the detail NavigationStack.
-                        ToolbarItem(placement: .topBarTrailing) {
-                            ATHLTHStudioInboxToolbarButton {
-                                if showingInspector {
-                                    withAnimation(messagePanelAnimation) {
-                                        showingInspector = false
-                                    }
-                                } else {
-                                    openMessageHub()
-                                }
-                            }
-                        }
+                        // Inbox is available from the persistent edge handle
+                        // and the iPad sidebar, not a duplicate toolbar icon.
                     }
             }
             .id(detailNavigationIdentity)
@@ -492,56 +480,24 @@ struct ATHLTHiPadStudioRootView: View {
             // Opening a planning day changes only the detail/inspector.
         }
         .inspector(isPresented: $showingInspector) {
-            // Reuse the actual iPhone inbox and DirectMessageThreadView.
-            // Do not create a separate iPad conversation design or composer.
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Inbox panel", norwegian: "Innbokspanel"
-                        ),
-                        systemImage: "bubble.left.and.bubble.right"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ink)
-                    .labelStyle(.titleAndIcon)
-                    Spacer(minLength: 4)
-                    ATHLTHStudioInboxUnreadPill(ink: ink, gold: gold)
-                    inspectorCollapseButton
-                }
-                .padding(.horizontal, 17)
-                .padding(.top, 8)
-                .padding(.bottom, 7)
-                .contentShape(Rectangle())
-                // Only the panel chrome responds to a dismiss swipe. The
-                // unchanged iPhone conversation keeps its own gestures.
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 24)
-                        .onEnded { value in
-                            if ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
-                                translation: value.translation
-                            ) {
-                                withAnimation(messagePanelAnimation) {
-                                    showingInspector = false
-                                }
-                            }
+            // The message view now owns its back, search and compose controls.
+            // Removing the separate "Inbox panel" bar gives the messages
+            // their full height and prevents duplicate navigation chrome.
+            NavigationStack {
+                MessageInboxDestinationView(
+                    onBack: {
+                        withAnimation(messagePanelAnimation) {
+                            showingInspector = false
                         }
+                    },
+                    isInspectorPanel: true
                 )
-                Rectangle()
-                    .fill(gold.opacity(0.18))
-                    .frame(height: 1)
-                    .padding(.horizontal, 17)
-                NavigationStack {
-                    MessageInboxDestinationView()
-                }
-                // Ensure a previous account's open thread cannot be reused.
-                .id(session.profile.userID)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            // Ensure a previous account's open thread cannot be reused.
+            .id(session.profile.userID)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(canvas)
             .inspectorColumnWidth(min: 340, ideal: 420, max: 510)
-            // Deliberately no inspector-wide swipe recognizer: it would
-            // compete with gestures within the unchanged iPhone thread.
         }
         .sheet(isPresented: $showingWorkoutDetail, onDismiss: {
             inspectedWeekDate = nil
@@ -625,29 +581,6 @@ struct ATHLTHiPadStudioRootView: View {
         }
     }
 
-    /// Compact collapse affordance; the header remains visible at all widths.
-    private var inspectorCollapseButton: some View {
-        Button {
-            withAnimation(messagePanelAnimation) {
-                showingInspector = false
-            }
-        } label: {
-            Image(systemName: "chevron.right")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ink)
-                .frame(width: 42, height: 42)
-                .background(.white, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(gold.opacity(0.22)))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Close messages",
-            norwegian: "Lukk meldinger"
-        ))
-        .accessibilityIdentifier("athlth-ipad-hide-inspector")
-    }
-
     @ViewBuilder
     private var studioDetail: some View {
         if let libraryPage {
@@ -703,6 +636,12 @@ struct ATHLTHiPadStudioRootView: View {
                             sidebarPage == nil
                     ) { openStudio(.overview) }
                     .accessibilityIdentifier("athlth-ipad-sidebar-home")
+
+                    ATHLTHStudioInboxSidebarButton(
+                        selected: showingInspector,
+                        ink: ink,
+                        action: openMessageHub
+                    )
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Notifications", norwegian: "Varsler"),
