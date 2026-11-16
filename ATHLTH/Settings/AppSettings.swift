@@ -561,6 +561,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachAnnounceRemainingStepTime: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceRemainingStepDistance: Bool { didSet { persist() } }
     @Published var audioCoachDuckOtherAudio: Bool { didSet { persist() } }
+    @Published var audioCoachMuteOtherAudio: Bool { didSet { persist() } }
     @Published var audioCoachVoiceIdentifier: String? { didSet { persist() } }
     @Published var audioCoachSpeechRate: Double { didSet { persist() } }
     @Published var audioCoachSpeechStyle: ATHLTHCoachSpeechStyle {
@@ -1018,6 +1019,10 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.audioCoach.duckOtherAudio"
             ) as? Bool ?? true
+        audioCoachMuteOtherAudio =
+            defaults.object(
+                forKey: "settings.audioCoach.muteOtherAudio"
+            ) as? Bool ?? false
         audioCoachVoiceIdentifier =
             defaults.string(
                 forKey: "settings.audioCoach.voiceIdentifier"
@@ -1375,6 +1380,10 @@ final class AppSettingsStore: ObservableObject {
             audioCoachDuckOtherAudio,
             forKey: "settings.audioCoach.duckOtherAudio"
         )
+        defaults.set(
+            audioCoachMuteOtherAudio,
+            forKey: "settings.audioCoach.muteOtherAudio"
+        )
         if let audioCoachVoiceIdentifier {
             defaults.set(
                 audioCoachVoiceIdentifier,
@@ -1631,6 +1640,8 @@ final class AppSettingsStore: ObservableObject {
                 audioCoachAnnounceRemainingStepDistance,
             duckOtherAudio:
                 audioCoachDuckOtherAudio,
+            muteOtherAudio:
+                audioCoachMuteOtherAudio,
             guidanceQuietPeriodSeconds:
                 TimeInterval(
                     min(
@@ -1708,6 +1719,7 @@ final class AppSettingsStore: ObservableObject {
         if audioCoachSpeechVolume != draft.speechVolume { audioCoachSpeechVolume = draft.speechVolume }
         if audioCoachSpeechStyle != draft.speechStyle { audioCoachSpeechStyle = draft.speechStyle }
         if audioCoachDuckOtherAudio != draft.duckOtherAudio { audioCoachDuckOtherAudio = draft.duckOtherAudio }
+        if audioCoachMuteOtherAudio != draft.muteOtherAudio { audioCoachMuteOtherAudio = draft.muteOtherAudio }
         if guidanceQuietPeriodSeconds != Int(draft.guidanceQuietPeriodSeconds) { guidanceQuietPeriodSeconds = Int(draft.guidanceQuietPeriodSeconds) }
     }
 
@@ -1755,6 +1767,7 @@ final class AppSettingsStore: ObservableObject {
         audioCoachAnnounceRemainingStepDistance =
             config.announceRemainingStepDistance
         audioCoachDuckOtherAudio = config.shouldDuckOtherAudio
+        audioCoachMuteOtherAudio = config.shouldMuteOtherAudio
         guidanceQuietPeriodSeconds = Int(config.resolvedGuidanceQuietPeriodSeconds)
         audioCoachLanguage = config.language
         audioCoachVoiceIdentifier = config.voiceIdentifier
