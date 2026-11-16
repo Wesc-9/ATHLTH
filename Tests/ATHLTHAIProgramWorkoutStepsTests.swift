@@ -58,8 +58,14 @@ final class ATHLTHAIProgramWorkoutStepsTests: XCTestCase {
         )
         XCTAssertNil(parsed.blocks)
         let planned = parsed.makePlannedSession()
-        XCTAssertEqual(planned.targetDistanceKilometers, 6)
+        // Unified workouts store the execution target on the runnable
+        // block, not on the parallel legacy session fields.
+        XCTAssertNil(planned.targetDistanceKilometers)
         XCTAssertEqual(planned.durationMinutes, 40)
+        let runBlocks = planned.resolvedWorkoutBlocks.filter { $0.kind == .run }
+        XCTAssertEqual(runBlocks.count, 1)
+        XCTAssertEqual(runBlocks.first?.distanceMeters, 6_000)
+        XCTAssertEqual(runBlocks.first?.targetPaceSecondsPerKilometer, 360)
     }
 
     func testInvalidAIStepDoesNotBecomeWorkoutExecutionTarget() {
