@@ -37,7 +37,10 @@ final class TrainingPlanWeekEditorTests: XCTestCase {
 
     func testAdvancedPlanJourneyKeepsBuildMethodWithinBasicsAndMigratesLegacyProfile() {
         let stages = ATHLTHPlanJourney.sequence(advanced: true)
-        XCTAssertEqual(stages, [.mode, .goal, .basics, .week, .review])
+        XCTAssertEqual(stages, [.mode, .goal, .goalDetails, .basics, .week, .review])
+        XCTAssertEqual(ATHLTHPlanJourney.next(after: .goal, advanced: true), .goalDetails)
+        XCTAssertEqual(ATHLTHPlanJourney.previous(before: .basics, advanced: true), .goalDetails)
+        XCTAssertEqual(ATHLTHPlanJourney.position(of: .goalDetails, advanced: true), 3)
         XCTAssertFalse(stages.contains(.profile))
         XCTAssertFalse(stages.contains(.approach))
         XCTAssertEqual(
@@ -49,6 +52,6 @@ final class TrainingPlanWeekEditorTests: XCTestCase {
         XCTAssertEqual(
             ATHLTHPlanJourney.restoredStep("approach", advanced: true), .basics
         )
-        XCTAssertEqual(ATHLTHPlanJourney.displayedCount(advanced: true), 5)
+        XCTAssertEqual(ATHLTHPlanJourney.displayedCount(advanced: true), 6)
     }
 }
