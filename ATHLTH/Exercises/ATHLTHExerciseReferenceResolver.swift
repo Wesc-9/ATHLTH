@@ -55,7 +55,6 @@ enum ATHLTHExerciseReferenceResolver {
         "side plank": "side-plank",
         "dead bug": "dead-bug",
         "pallof press": "pallof-press",
-        "lateral raise": "lateral-raise",
         "kettlebell swing": "kettlebell-swing",
         "step up": "step-up",
         "burpee": "burpee",
