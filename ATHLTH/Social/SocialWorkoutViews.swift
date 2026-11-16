@@ -5047,6 +5047,7 @@ struct WorkoutPublishView: View {
     @State private var caption = ""
     @State private var publishing = false
     @State private var selectedAlreadyPublished = false
+    @State private var includeHealthData = true
     @State private var includeRoute = false
     @State private var hideRouteStartAndEnd = true
     @State private var sharingRoute: [CLLocation] = []
@@ -5202,6 +5203,24 @@ struct WorkoutPublishView: View {
                         }
                     }
 
+                    Section(ATHLTHLocalization.choose(
+                        english: "Health data", norwegian: "Helsedata"
+                    )) {
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Share heart rate, zones and calories",
+                                norwegian: "Del puls, pulssoner og kalorier"
+                            ),
+                            isOn: $includeHealthData
+                        )
+                        Text(ATHLTHLocalization.choose(
+                            english: "You can override your default for every workout.",
+                            norwegian: "Du kan overstyre standardvalget for hver økt."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+
                     Section("Post") {
                         TextField(
                             "Add a caption (optional)",
@@ -5256,6 +5275,7 @@ struct WorkoutPublishView: View {
             }
             .task {
                 visibility = initialVisibility ?? settings.defaultActivityVisibility
+                includeHealthData = settings.includeWorkoutHealthDataByDefault
 
                 if health.hasRequestedAuthorization && health.workouts.isEmpty {
                     await health.refreshAll()
@@ -5269,6 +5289,7 @@ struct WorkoutPublishView: View {
             }
             .task(id: selectedWorkoutID) {
                 includeRoute = false
+                includeHealthData = settings.includeWorkoutHealthDataByDefault
                 sharingRoute = []
                 loadingRoute = false
                 // Publishing from a completed-result card starts with safe
@@ -5287,6 +5308,7 @@ struct WorkoutPublishView: View {
                     for: selectedWorkoutID
                 ) {
                     selectedAlreadyPublished = true
+                    includeHealthData = activity.metadata?["share_health_data"] == "true"
                     caption = activity.metadata?["caption"] ?? ""
                     visibility =
                         ProfileVisibility(
@@ -5321,7 +5343,8 @@ struct WorkoutPublishView: View {
             visibility: visibility,
             caption: caption,
             routePreview: includeRoute ? WorkoutRouteSharing.preview(sharingRoute, hideStartAndEnd: hideRouteStartAndEnd) : [],
-            hideRouteStartAndEnd: hideRouteStartAndEnd
+            hideRouteStartAndEnd: hideRouteStartAndEnd,
+            includeHealthData: includeHealthData
         )
 
         if success {
