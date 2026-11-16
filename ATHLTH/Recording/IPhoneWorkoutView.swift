@@ -4460,23 +4460,22 @@ struct TreadmillInclineEditorView: View {
 }
 
 
-/// One-tap user-reported belt speed. No treadmill remote control or GPS.
+/// Quickly log the belt speed actually displayed on a treadmill. This
+/// sheet intentionally has no nested scroll view: large one-tap presets
+/// remain usable while running, with a separate pre-workout setup sheet.
 struct TreadmillSpeedEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("athlth.treadmill.presetCount") private var presetCount = 4
     @AppStorage("athlth.treadmill.presetSpeeds") private var presetSpeeds = "6,8,10,12,14,16"
     @State private var customSpeedText: String
-    @State private var editingPresets = false
+    @State private var showingPresetSetup = false
     let onSave: (Double) -> Void
     let onHistorySave: (Double) -> Void
     let allowsHistoryOnly: Bool
 
-    init(
-        initialValue: Double,
-        allowsHistoryOnly: Bool = false,
-        onSave: @escaping (Double) -> Void,
-        onHistorySave: @escaping (Double) -> Void
-    ) {
+    init(initialValue: Double, allowsHistoryOnly: Bool = false,
+         onSave: @escaping (Double) -> Void,
+         onHistorySave: @escaping (Double) -> Void) {
         _customSpeedText = State(initialValue: initialValue > 0
             ? String(format: "%.1f", initialValue) : "")
         self.allowsHistoryOnly = allowsHistoryOnly
@@ -4485,18 +4484,13 @@ struct TreadmillSpeedEditorView: View {
     }
 
     private var speeds: [Double] {
-        let values = presetSpeeds.split(separator: ",")
-            .compactMap { Double($0) }
-            .filter { $0.isFinite && (0.1...30).contains($0) }
-        return values.count == 6 ? values : [6, 8, 10, 12, 14, 16]
+        ATHLTHTreadmillQuickSpeedPresets.parse(presetSpeeds)
     }
 
     private var manualSpeed: Double? {
-        guard let number = Double(customSpeedText
-            .replacingOccurrences(of: ",", with: ".")),
-            number.isFinite, (0.1...30).contains(number)
-        else { return nil }
-        return (number * 10).rounded() / 10
+        guard let speed = Double(customSpeedText.replacingOccurrences(of: ",", with: ".")),
+              speed.isFinite, (0.1...30).contains(speed) else { return nil }
+        return (speed * 10).rounded() / 10
     }
 
     private func apply(_ speed: Double, historyOnly: Bool = false) {
@@ -4506,45 +4500,50 @@ struct TreadmillSpeedEditorView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Tap your treadmill's current speed",
-                            norwegian: "Trykk på farten mølla viser"
-                        ))
-                        .font(.headline)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Each tap takes effect at that second in the workout log.",
-                            norwegian: "Hvert trykk lagres fra det sekundet du endrer farten."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
+            GeometryReader { area in
+                let tight = area.size.height < 345
+                VStack(alignment: .leading, spacing: tight ? 7 : 12) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Tap the treadmill's current speed",
+                        norwegian: "Trykk på farten mølla viser"
+                    ))
+                    .font(.headline)
+                    .lineLimit(2)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Logged from the second you tap, not sent to the machine.",
+                        norwegian: "Lagres fra sekundet du trykker – styrer ikke mølla."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                     LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ], spacing: 10) {
-                        ForEach(Array(speeds.prefix(min(max(presetCount, 2), 6)).enumerated()),
-                                id: \.offset) { entry in
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8)
+                    ], spacing: tight ? 5 : 8) {
+                        ForEach(Array(speeds.prefix(
+                            ATHLTHTreadmillQuickSpeedPresets.count(presetCount)
+                        ).enumerated()), id: \.offset) { item in
                             Button {
-                                apply(entry.element)
+                                apply(item.element)
                             } label: {
-                                Text(String(format: "%.1f km/t", entry.element))
-                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                Text(String(format: "%.1f km/t", item.element))
+                                    .font(.system(size: tight ? 15 : 19,
+                                                  weight: .bold, design: .rounded))
                                     .monospacedDigit()
-                                    .frame(maxWidth: .infinity, minHeight: 55)
+                                    .frame(maxWidth: .infinity,
+                                           minHeight: tight ? 35 : 43)
                             }
                             .buttonStyle(.bordered)
                             .tint(ATHLTHTheme.accentDeep)
+                            .accessibilityIdentifier("athlth-treadmill-preset-\(item.offset)")
                         }
                     }
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         TextField(
                             ATHLTHLocalization.choose(
-                                english: "Custom km/h", norwegian: "Egen fart (km/t)"
+                                english: "Custom km/h", norwegian: "Egen fart km/t"
                             ),
                             text: $customSpeedText
                         )
@@ -4552,7 +4551,7 @@ struct TreadmillSpeedEditorView: View {
                         .textFieldStyle(.roundedBorder)
                         .accessibilityIdentifier("athlth-treadmill-custom-speed")
                         Button(ATHLTHLocalization.choose(
-                            english: "Use speed", norwegian: "Bruk fart"
+                            english: "Apply", norwegian: "Bruk"
                         )) {
                             if let manualSpeed { apply(manualSpeed) }
                         }
@@ -4561,54 +4560,118 @@ struct TreadmillSpeedEditorView: View {
                         .disabled(manualSpeed == nil)
                     }
 
-                    DisclosureGroup(
-                        ATHLTHLocalization.choose(
-                            english: "Customize quick speeds",
-                            norwegian: "Tilpass hurtigfarter"
-                        ),
-                        isExpanded: $editingPresets
-                    ) {
-                        Stepper(
-                            ATHLTHLocalization.format(
-                                english: "%d quick speeds", norwegian: "%d hurtigfarter",
-                                presetCount
-                            ),
-                            value: $presetCount, in: 2...6
-                        )
-                        ForEach(0..<min(max(presetCount, 2), 6), id: \.self) { i in
-                            Stepper(
-                                String(format: "%.1f km/t", speeds[i]),
-                                value: Binding(
-                                    get: { speeds[i] },
-                                    set: { value in
-                                        var updated = speeds
-                                        updated[i] = min(max((value * 10).rounded() / 10, 0.1), 30)
-                                        presetSpeeds = updated.map {
-                                            String(format: "%.1f", $0)
-                                        }.joined(separator: ",")
-                                    }
-                                ),
-                                in: 0.1...30, step: 0.5
-                            )
-                        }
-                    }
-                    .tint(ATHLTHTheme.accentDeep)
-
                     if allowsHistoryOnly, let manualSpeed {
                         Button(ATHLTHLocalization.choose(
-                            english: "Save reference only (no distance change)",
-                            norwegian: "Lagre kun som referanse (ingen distanseendring)"
+                            english: "Save as reference (no distance change)",
+                            norwegian: "Lagre som referanse (ingen distanseendring)"
                         )) { apply(manualSpeed, historyOnly: true) }
-                        .font(.footnote)
+                        .font(.caption2)
                     }
+                    Spacer(minLength: 0)
+                    Button {
+                        showingPresetSetup = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Configure quick speeds before your run",
+                            norwegian: "Tilpass hurtigfartene før økten"
+                        ), systemImage: "slider.horizontal.3")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.vertical, 5)
                 }
-                .padding(18)
+                .padding(.horizontal, 16)
+                .padding(.top, tight ? 4 : 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: .topLeading)
             }
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .navigationTitle(ATHLTHLocalization.choose(
                 english: "Treadmill speed", norwegian: "Møllefart"
             ))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showingPresetSetup) {
+                TreadmillQuickSpeedPresetSetupView()
+                    .presentationDetents([.large])
+            }
+        }
+    }
+}
+
+enum ATHLTHTreadmillQuickSpeedPresets {
+    static func count(_ requested: Int) -> Int { min(max(requested, 2), 6) }
+
+    static func parse(_ saved: String) -> [Double] {
+        let values = saved.split(separator: ",").compactMap { Double($0) }
+            .filter { $0.isFinite && (0.1...30).contains($0) }
+        return values.count == 6 ? values : [6, 8, 10, 12, 14, 16]
+    }
+}
+
+/// Adjust preset count and values *before* training. Separating settings
+/// keeps the live speed picker one screen high, even on smaller iPhones.
+struct TreadmillQuickSpeedPresetSetupView: View {
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("athlth.treadmill.presetCount") private var presetCount = 4
+    @AppStorage("athlth.treadmill.presetSpeeds") private var presetSpeeds = "6,8,10,12,14,16"
+
+    private var speeds: [Double] {
+        ATHLTHTreadmillQuickSpeedPresets.parse(presetSpeeds)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Stepper(
+                        ATHLTHLocalization.format(
+                            english: "%d quick speeds", norwegian: "%d hurtigfarter",
+                            ATHLTHTreadmillQuickSpeedPresets.count(presetCount)
+                        ),
+                        value: $presetCount, in: 2...6
+                    )
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Pick the buttons you want available while running.",
+                        norwegian: "Velg knappene du vil ha tilgjengelig mens du løper."
+                    ))
+                }
+                Section(ATHLTHLocalization.choose(
+                    english: "Preset speeds", norwegian: "Forhåndsvalgte hastigheter"
+                )) {
+                    ForEach(0..<ATHLTHTreadmillQuickSpeedPresets.count(presetCount),
+                            id: \.self) { i in
+                        Stepper(
+                            String(format: "%.1f km/t", speeds[i]),
+                            value: Binding(
+                                get: { speeds[i] },
+                                set: { newValue in
+                                    var updated = speeds
+                                    updated[i] = min(max(
+                                        (newValue * 10).rounded() / 10, 0.1
+                                    ), 30)
+                                    presetSpeeds = updated.map {
+                                        String(format: "%.1f", $0)
+                                    }.joined(separator: ",")
+                                }
+                            ),
+                            in: 0.1...30, step: 0.5
+                        )
+                    }
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Quick speeds", norwegian: "Hurtigfarter"
+            ))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(ATHLTHLocalization.choose(
