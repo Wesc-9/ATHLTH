@@ -483,6 +483,37 @@ private enum HomePersonalWorkoutCatalog {
 
 @MainActor
 private enum HomeActivityStreamBuilder {
+    /// Group by the authoritative shared session ID, never by approximate
+    /// start times or matching GPS positions. One invitation = one feed tile.
+    /// The underlying athlete recordings remain separate and unchanged.
+    private static func uniqueFollowingFeed(
+        mine: [SocialPublishableWorkout],
+        social: SocialStore
+    ) -> [SocialFeedItem] {
+        let localWorkoutIDs = Set(mine.map(\.id))
+        let ownSessionIDs = Set(
+            social.workoutSessions.compactMap { session -> UUID? in
+                guard session.creatorID == social.currentUserID,
+                      let workoutID = session.sourceWorkoutID,
+                      localWorkoutIDs.contains(workoutID)
+                else { return nil }
+                return session.id
+            }
+        )
+        var seenSessions = ownSessionIDs
+        return social.feed
+            .filter {
+                $0.activity.kind == "workout" &&
+                $0.actor.userID != social.currentUserID
+            }
+            .sorted { $0.activity.createdAt > $1.activity.createdAt }
+            .filter { item in
+                guard let sharedID = item.activity.workoutSessionID else {
+                    return true
+                }
+                return seenSessions.insert(sharedID).inserted
+            }
+    }
     /// Bounded newest-first insertion. Home needs only six rows (plus the
     /// newest opposite-scope item); never sort the complete social feed just
     /// because a like, a Health sample or a Home metric changes.
@@ -517,8 +548,7 @@ private enum HomeActivityStreamBuilder {
         for workout in mine {
             consider(HomeActivityStreamItem(source: .mine(workout)))
         }
-        for item in social.feed where item.activity.kind == "workout" &&
-            item.actor.userID != social.currentUserID {
+        for item in uniqueFollowingFeed(mine: mine, social: social) {
             consider(HomeActivityStreamItem(source: .following(item)))
         }
 
@@ -551,17 +581,10 @@ private enum HomeActivityStreamBuilder {
             }
 
         let followingItems =
-            social.feed
-                .filter {
-                    $0.activity.kind ==
-                        "workout" &&
-                    $0.actor.userID !=
-                        social.currentUserID
-                }
+            uniqueFollowingFeed(mine: mine, social: social)
                 .map {
                     HomeActivityStreamItem(
-                        source:
-                            .following($0)
+                        source: .following($0)
                     )
                 }
 
