@@ -1252,10 +1252,8 @@ struct WatchRunWorkoutExperienceView: View {
                     spacing: 4
                 ) {
                     Text(
-                        paceText(
-                            workoutManager
-                                .currentPaceSecondsPerKilometer
-                        )
+                        liveDisplayedPace.map(paceText) ??
+                            durationTextForAlwaysOn
                     )
                     .font(
                         .system(
@@ -1271,7 +1269,7 @@ struct WatchRunWorkoutExperienceView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.80)
 
-                    Text("/km")
+                    Text(liveDisplayedPace == nil ? "" : "/km")
                         .font(
                             .system(
                                 size:
@@ -1289,7 +1287,17 @@ struct WatchRunWorkoutExperienceView: View {
                         )
                 }
 
-                Text("PACE")
+                Text(liveDisplayedPace == nil
+                    ? ATHLTHLocalization.choose(
+                        english: "WORKOUT TIME", norwegian: "ØKTTID"
+                    )
+                    : livePaceIsAverage
+                        ? ATHLTHLocalization.choose(
+                            english: "AVG PACE", norwegian: "SNITTEMPO"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "PACE", norwegian: "TEMPO"
+                        ))
                     .font(
                         .system(
                             size: 7.5,
@@ -1904,7 +1912,8 @@ struct WatchRunWorkoutExperienceView: View {
 
             VStack(alignment: .leading, spacing: compact ? 4 : 7) {
                 HStack(spacing: 5) {
-                    Image(systemName: "figure.run")
+                    Image(systemName: workoutManager.kind == .walking
+                        ? "figure.walk" : "figure.run")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(WatchTheme.premiumGold)
 
@@ -1985,22 +1994,28 @@ struct WatchRunWorkoutExperienceView: View {
                     )
 
                     liveHeroMetric(
-                        title: livePaceIsAverage
-                            ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
-                            : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
-                        value: paceText(liveDisplayedPace),
-                        unit: "/km",
+                        title: liveDisplayedPace == nil
+                            ? ATHLTHLocalization.choose(english: "WORKOUT TIME", norwegian: "ØKTTID")
+                            : livePaceIsAverage
+                                ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
+                                : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
+                        value: liveDisplayedPace.map(paceText) ??
+                            liveWorkoutElapsedLabel,
+                        unit: liveDisplayedPace == nil ? "" : "/km",
                         tint: WatchTheme.premiumGold,
                         fontSize: compact ? 31 : 37
                     )
                 } else {
                     // Running: pace first, then distance.
                     liveHeroMetric(
-                        title: livePaceIsAverage
-                            ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
-                            : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
-                        value: paceText(liveDisplayedPace),
-                        unit: "/km",
+                        title: liveDisplayedPace == nil
+                            ? ATHLTHLocalization.choose(english: "WORKOUT TIME", norwegian: "ØKTTID")
+                            : livePaceIsAverage
+                                ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
+                                : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
+                        value: liveDisplayedPace.map(paceText) ??
+                            liveWorkoutElapsedLabel,
+                        unit: liveDisplayedPace == nil ? "" : "/km",
                         tint: WatchTheme.premiumGold,
                         fontSize: compact ? 35 : 42
                     )
@@ -2165,14 +2180,31 @@ struct WatchRunWorkoutExperienceView: View {
         }
     }
 
+    private var livePaceReadout: (
+        secondsPerKilometer: TimeInterval?, isAverage: Bool
+    ) {
+        ATHLTHRunningPace.displayPace(
+            current: workoutManager.usesOutdoorGPS
+                ? workoutManager.currentPaceSecondsPerKilometer : nil,
+            average: workoutManager.averagePaceSecondsPerKilometer
+        )
+    }
+
     private var liveDisplayedPace: TimeInterval? {
-        workoutManager.currentPaceSecondsPerKilometer ??
-            workoutManager.averagePaceSecondsPerKilometer
+        livePaceReadout.secondsPerKilometer
     }
 
     private var livePaceIsAverage: Bool {
-        workoutManager.currentPaceSecondsPerKilometer == nil &&
-            workoutManager.averagePaceSecondsPerKilometer != nil
+        livePaceReadout.isAverage
+    }
+
+    private var liveWorkoutElapsedLabel: String {
+        let total = max(0, Int(workoutManager.elapsedTime))
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    private var durationTextForAlwaysOn: String {
+        liveWorkoutElapsedLabel
     }
 
     private var liveWorkoutStepTitle: String {
