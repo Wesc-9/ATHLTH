@@ -773,10 +773,12 @@ struct HomeActivitySection: View {
 
     private var circleFeed: [SocialFeedItem] {
         guard let currentUserID = social.currentUserID else {
-            return social.feed
+            return social.collapsedWorkoutFeed
         }
 
-        return social.feed.filter { $0.actor.userID != currentUserID }
+        return social.collapsedWorkoutFeed.filter {
+            $0.actor.userID != currentUserID
+        }
     }
 
     private var detailLoadKey: String {
