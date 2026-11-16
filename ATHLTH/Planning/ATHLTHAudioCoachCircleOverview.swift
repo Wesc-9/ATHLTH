@@ -4,18 +4,20 @@ import SwiftUI
 /// by their creator, never inferred from workout phases. They are presentation
 /// containers for the existing Watch/iPhone triggers, not a second cue engine.
 struct ATHLTHAudioCoachCircleOverview: View {
-    @EnvironmentObject private var settings: AppSettingsStore
-
-    @Binding var draft: AudioCoachDraft
+     @Binding var draft: AudioCoachDraft
     @Binding var selectedProfileName: String?
     let showStructuredOptions: Bool
     let showRouteOptions: Bool
     let onEditRule: (UUID) -> Void
     let onEditOption: (ATHLTHAudioCoachOption) -> Void
     let onShowProfiles: () -> Void
-    let onSaveAsNew: () -> Void
-    let onUseStandard: () -> Void
-    let onAddTrigger: (UUID) -> Void
+    let onCreateTemplate: () -> Void
+    let onSaveTemplate: () -> Void
+    let onSwitchTemplate: (Int) -> Void
+    let onResetStandard: () -> Void
+    let isDirty: Bool
+    let onAddCommand: (UUID) -> Void
+    let onMoveCommand: (String, UUID?) -> Bool
     let onAddGroup: () -> Void
     let onAddSpeechCommand: () -> Void
     let onShowAdvanced: () -> Void
@@ -74,21 +76,6 @@ struct ATHLTHAudioCoachCircleOverview: View {
         }
     }
 
-    private func cycleTemplate(_ step: Int) {
-        let profiles = settings.audioCoachProfiles
-        let current = selectedProfileName.flatMap { name in
-            profiles.firstIndex(where: { $0.name == name })
-        }.map { $0 + 1 } ?? 0
-        let next = (current + step + profiles.count + 1) % (profiles.count + 1)
-        if next == 0 {
-            onUseStandard()
-        } else {
-            let profile = profiles[next - 1]
-            draft.load(profile: profile)
-            selectedProfileName = profile.name
-        }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 10) {
@@ -110,18 +97,26 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 }
                 .accessibilityLabel(tr("Coach templates", "Coach-maler"))
                 .accessibilityIdentifier("athlth-coach-templates-icon")
-                Button(action: onSaveAsNew) {
-                    Image(systemName: "bookmark.badge.plus")
+                Button(action: onCreateTemplate) {
+                    Image(systemName: "plus.square.on.square")
                         .font(.title3)
                         .frame(width: 44, height: 44)
                         .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
                 }
-                .accessibilityLabel(tr("Save new template", "Lagre som ny mal"))
+                .accessibilityLabel(tr("New empty template", "Lag ny tom mal"))
+                .accessibilityIdentifier("athlth-coach-new-template-icon")
+                Button(action: onSaveTemplate) {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.title3)
+                        .frame(width: 44, height: 44)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                }
+                .accessibilityLabel(tr("Save template", "Lagre mal"))
                 .accessibilityIdentifier("athlth-coach-save-template-icon")
             }
 
             HStack(spacing: 8) {
-                Button { cycleTemplate(-1) } label: {
+                Button { onSwitchTemplate(-1) } label: {
                     Image(systemName: "chevron.left")
                         .font(.title3.weight(.semibold))
                         .frame(width: 40, height: 56)
@@ -165,8 +160,17 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 }
                 .frame(width: 210, height: 210)
                 .accessibilityIdentifier("athlth-coach-template-circle")
+                .overlay(alignment: .topTrailing) {
+                    if isDirty {
+                        Circle()
+                            .fill(gold)
+                            .frame(width: 9, height: 9)
+                            .padding(17)
+                            .accessibilityLabel(tr("Unsaved changes", "Ulagrede endringer"))
+                    }
+                }
                 Spacer(minLength: 0)
-                Button { cycleTemplate(1) } label: {
+                Button { onSwitchTemplate(1) } label: {
                     Image(systemName: "chevron.right")
                         .font(.title3.weight(.semibold))
                         .frame(width: 40, height: 56)
@@ -238,14 +242,26 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 .accessibilityIdentifier("athlth-coach-add-speech-command")
             }
 
+            // Advanced triggers remain available, but voice and music have a
+            // separate expandable card in the parent editor.
             Button(action: onShowAdvanced) {
-                Label(tr("Voice, music and advanced settings", "Stemme, musikk og avanserte valg"),
+                Label(tr("Advanced trigger settings", "Avanserte triggerinnstillinger"),
                       systemImage: "slider.horizontal.3")
                     .font(.subheadline)
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .frame(maxWidth: .infinity, minHeight: 42)
             }
             .buttonStyle(.plain)
             .foregroundStyle(gold)
+
+            if selectedProfileName == nil {
+                Button(action: onResetStandard) {
+                    Label(tr("Restore original Standard", "Tilbakestill til opprinnelig Standard"),
+                          systemImage: "arrow.counterclockwise")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(dim)
+            }
         }
         .alert(
             tr("Rename coach group", "Endre navn på coach-gruppe"),
@@ -274,20 +290,23 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                  detail: option.detail(in: draft))
                     }
                     .buttonStyle(.plain)
+                    .draggable("option:\(option.rawValue)")
                 }
                 ForEach(ungroupedRules) { rule in
-                    Button { onEditRule(rule.id) } label: {
-                        rowLabel(
-                            rule.selectedMetrics.map(\.title).joined(separator: " · "),
-                            symbol: "waveform",
-                            detail: rule.trigger == .time
-                                ? tr("Every \(rule.validatedInterval) seconds",
-                                     "Hvert \(rule.validatedInterval) sekund")
-                                : tr("Every \(rule.validatedInterval) metres",
-                                     "Hver \(rule.validatedInterval) meter")
-                        )
+                    ForEach(rule.selectedMetrics) { metric in
+                        Button { onEditRule(rule.id) } label: {
+                            rowLabel(
+                                metric.title, symbol: "waveform",
+                                detail: rule.trigger == .time
+                                    ? tr("Every \(rule.validatedInterval) seconds",
+                                         "Hvert \(rule.validatedInterval) sekund")
+                                    : tr("Every \(rule.validatedInterval) metres",
+                                         "Hver \(rule.validatedInterval) meter")
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .draggable("metric:\(rule.id.uuidString):\(metric.rawValue)")
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.top, 10)
@@ -319,6 +338,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
         }
         .accessibilityIdentifier("athlth-coach-standard-group")
+        .dropDestination(for: String.self) { items, _ in
+            guard let item = items.first else { return false }
+            return onMoveCommand(item, nil)
+        }
     }
 
     private func coachGroupCard(_ group: ATHLTHAudioCoachGroup) -> some View {
@@ -392,23 +415,21 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(rules) { rule in
-                        Button { onEditRule(rule.id) } label: {
-                            rowLabel(
-                                rule.beforeEndSeconds.map {
-                                    tr("\($0 / 60) min before finish", "\($0 / 60) min før slutt")
-                                } ?? (rule.metric == .hydrationReminder && rule.trigger == .time
-                                      ? tr("Every \(rule.validatedInterval / 60) minutes",
-                                           "Hvert \(rule.validatedInterval / 60). minutt")
-                                      : rule.trigger == .time
-                                      ? tr("Every \(rule.validatedInterval) seconds",
-                                           "Hvert \(rule.validatedInterval) sekund")
-                                      : tr("Every \(rule.validatedInterval) m",
-                                           "Hver \(rule.validatedInterval) m")),
-                                symbol: rule.beforeEndSeconds == nil ? "waveform" : "flag",
-                                detail: rule.selectedMetrics.map(\.title).joined(separator: " · ")
-                            )
+                        ForEach(rule.selectedMetrics) { metric in
+                            Button { onEditRule(rule.id) } label: {
+                                rowLabel(
+                                    metric.title,
+                                    symbol: rule.beforeEndSeconds == nil ? "waveform" : "flag",
+                                    detail: rule.trigger == .time
+                                        ? tr("Every \(rule.validatedInterval) seconds",
+                                             "Hvert \(rule.validatedInterval) sekund")
+                                        : tr("Every \(rule.validatedInterval) metres",
+                                             "Hver \(rule.validatedInterval) meter")
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .draggable("metric:\(rule.id.uuidString):\(metric.rawValue)")
                         }
-                        .buttonStyle(.plain)
                     }
                     ForEach(options) { option in
                         Button { onEditOption(option) } label: {
@@ -416,10 +437,11 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                      detail: option.detail(in: draft))
                         }
                         .buttonStyle(.plain)
+                        .draggable("option:\(option.rawValue)")
                     }
 
-                    Button { onAddTrigger(group.id) } label: {
-                        Label(tr("Add trigger", "Legg til trigger"),
+                    Button { onAddCommand(group.id) } label: {
+                        Label(tr("Add command", "Legg til kommando"),
                               systemImage: "plus.circle")
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 44)
@@ -428,7 +450,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     .tint(gold)
                     .disabled(draft.customRules.count >= 20 &&
                               group.optionIDs.count >= ATHLTHAudioCoachOption.allCases.count)
-                    .accessibilityIdentifier("athlth-coach-add-trigger")
+                    .accessibilityIdentifier("athlth-coach-add-command")
                 }
                 .padding(.top, 11)
             }
@@ -439,6 +461,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20)
             .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1))
+        .dropDestination(for: String.self) { items, _ in
+            guard let item = items.first else { return false }
+            return onMoveCommand(item, group.id)
+        }
     }
 
     private func rowLabel(_ title: String, symbol: String, detail: String? = nil) -> some View {
@@ -479,8 +505,8 @@ struct ATHLTHAudioCoachCircleOverview: View {
     }
 
     private func removeGroup(_ group: ATHLTHAudioCoachGroup) {
-        let ids = Set(group.ruleIDs)
-        draft.customRules.removeAll { ids.contains($0.id) }
+        // Removing a container must not silently delete the user's
+        // commands. Rules and built-in options become ungrouped instead.
         draft.coachGroups.removeAll { $0.id == group.id }
         expandedGroups.remove(group.id)
     }
@@ -496,7 +522,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
             draft.customRules.append(rule)
             copy.ruleIDs.append(rule.id)
         }
-        copy.optionIDs = group.optionIDs
+        // Built-in options have a single owner. Do not silently attach
+        // them to two groups when duplicating an ordinary container.
+        copy.trigger = group.trigger
+        copy.interval = group.interval
         draft.coachGroups.append(copy)
         expandedGroups.insert(copy.id)
     }
