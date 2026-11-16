@@ -1730,7 +1730,38 @@ final class ExerciseLibraryStore: ObservableObject {
             .init(slug: "seated-dumbbell-press", name: "Seated Dumbbell Press", norwegianName: "Sittende skulderpress",
                   primary: "Shoulders", secondary: ["Triceps"], equipment: ["Dumbbells", "Bench"],
                   englishInstruction: "Sit upright and press dumbbells overhead without excessive back arch.",
-                  norwegianInstruction: "Sitt oppreist og press manualene over hodet uten stor svai i ryggen.")
+                  norwegianInstruction: "Sitt oppreist og press manualene over hodet uten stor svai i ryggen."),
+            // Canonical exercise variants used by imported programs. A
+            // general movement is not silently identified as a more specific
+            // implement/position, e.g. leg curl is not always lying.
+            .init(slug: "cable-curl", name: "Cable Curl", norwegianName: "Bicepscurl i kabel",
+                  primary: "Biceps", secondary: ["Forearms"], equipment: ["Cable"],
+                  englishInstruction: "Keep your elbows stable and curl the cable handle with controlled movement.",
+                  norwegianInstruction: "Hold albuene stabile og bøy armene kontrollert mot kabelmotstanden."),
+            .init(slug: "chin-up", name: "Chin-Up", norwegianName: "Chin-ups med underhåndsgrep",
+                  primary: "Back", secondary: ["Biceps"], equipment: ["Pull-up Bar"],
+                  englishInstruction: "Use an underhand grip, pull upward without swinging and lower under control.",
+                  norwegianInstruction: "Bruk underhåndsgrep, trekk deg opp uten å svinge og senk kontrollert."),
+            .init(slug: "dumbbell-row", name: "Dumbbell Row", norwegianName: "Roing med manual",
+                  primary: "Back", secondary: ["Biceps", "Core"], equipment: ["Dumbbells"],
+                  englishInstruction: "Keep a stable hinged torso, row the dumbbell toward the hip and return slowly. Choose the supported or unsupported variation that suits your session.",
+                  norwegianInstruction: "Hold overkroppen stabil, trekk manualen mot hoften og senk rolig. Velg støttet eller ustøttet variant etter økten."),
+            .init(slug: "leg-curl", name: "Leg Curl", norwegianName: "Lårcurl",
+                  primary: "Hamstrings", secondary: [], equipment: ["Leg Curl Machine"],
+                  englishInstruction: "Adjust the machine to your body and bend the knees with control. Follow the selected machine's seated or lying setup.",
+                  norwegianInstruction: "Tilpass apparatet og bøy knærne kontrollert. Følg oppsettet for sittende eller liggende variant."),
+            .init(slug: "lateral-raise-unspecified", name: "Lateral Raise", norwegianName: "Sidehev",
+                  primary: "Shoulders", secondary: [], equipment: [],
+                  englishInstruction: "Raise the arms to the sides with a controlled range of motion. Use the resistance specified by your session.",
+                  norwegianInstruction: "Løft armene kontrollert ut til siden. Bruk motstanden som er angitt for økten."),
+            .init(slug: "power-clean", name: "Power Clean", norwegianName: "Styrkevending",
+                  primary: "Glutes", secondary: ["Quads", "Back", "Shoulders"], equipment: ["Barbell"],
+                  englishInstruction: "Drive from the floor, extend the hips explosively and receive the bar in a stable partial squat. Practice technique with qualified coaching.",
+                  norwegianInstruction: "Løft fra gulvet, strekk hoften eksplosivt og ta imot stangen i en stabil halvknebøy. Øv på teknikk med veiledning."),
+            .init(slug: "skullcrusher", name: "Skullcrusher", norwegianName: "Liggende tricepspress",
+                  primary: "Triceps", secondary: [], equipment: ["Barbell", "Bench"],
+                  englishInstruction: "Bend the elbows to lower the weight toward the head, then extend without moving the upper arms excessively.",
+                  norwegianInstruction: "Bøy albuene og senk vekten kontrollert mot hodet. Strekk ut armene uten å flytte overarmene unødvendig.")
     ]
 
     private static let nativeNorwegianNames: [String: String] =
