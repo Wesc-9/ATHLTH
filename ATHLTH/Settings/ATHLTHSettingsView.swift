@@ -3770,49 +3770,6 @@ private struct ATHLTHTrainingSettingsView: View {
                 )
             }
 
-            Section {
-                NavigationLink {
-                    ATHLTHWorkoutGuidanceSettingsView()
-                } label: {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text("Workout Guidance")
-                            .font(
-                                .subheadline
-                                    .weight(.semibold)
-                            )
-
-                        Text(
-                            "Audio Coach, Ghost Race, Navigation and alert priority"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                NavigationLink {
-                    ATHLTHRouteGuardianSettingsView()
-                } label: {
-                    HStack {
-                        Text(ATHLTHLocalization.choose(english: "Navigation", norwegian: "Navigasjon"))
-                        Spacer()
-                        Text(
-                            settings.routeAlertsEnabled
-                                ? "\(Int(settings.routeAlertDeviationMeters.rounded())) m"
-                                : "Off"
-                        )
-                        .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Guidance & alerts")
-            } footer: {
-                Text(
-                    "Open a guidance category to adjust it. Training no longer expands all route and audio controls into one long page."
-                )
-            }
 
         }
         .athlthBrandedForm()
