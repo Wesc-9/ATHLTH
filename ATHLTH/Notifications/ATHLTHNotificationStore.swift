@@ -235,6 +235,7 @@ final class ATHLTHNotificationStore: ObservableObject {
         case "message",
              "message_request",
              "message_request_accepted",
+             "workout_invite",
              "arena_invite",
              "arena_chat",
              "arena_replacement",
@@ -283,6 +284,10 @@ final class ATHLTHNotificationStore: ObservableObject {
             // per-group All / Important / Muted preference allows them.
             if eventKind.hasPrefix("group_") {
                 return true
+            }
+
+            if eventKind == "workout_invite" {
+                return preferenceEnabled("settings.messageNotifications")
             }
 
             if eventKind.contains("message") || eventKind.contains("dm") {
