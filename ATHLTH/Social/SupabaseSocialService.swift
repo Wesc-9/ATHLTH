@@ -847,7 +847,7 @@ final class SupabaseSocialService: Sendable {
                     kind: kind,
                     title: title,
                     subtitle: subtitle,
-                    metadata: metadata,
+                    metadata: kind == "workout" ? WorkoutFeedSafety.sanitizedMetadata(metadata) : metadata,
                     visibility: visibility.rawValue,
                     eventKey: eventKey
                 )
