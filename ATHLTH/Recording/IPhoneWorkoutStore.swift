@@ -47,6 +47,17 @@ enum ATHLTHPhoneRunEnvironmentPolicy {
     }
 }
 
+/// Converts a plan's target pace into a user-reported belt-speed selection.
+/// This never controls treadmill hardware or claims sensor measurement.
+enum ATHLTHTreadmillSpeedPolicy {
+    static func kilometersPerHour(forPace secondsPerKilometer: Double) -> Double? {
+        guard secondsPerKilometer.isFinite, secondsPerKilometer > 0 else { return nil }
+        let speed = 3_600 / secondsPerKilometer
+        guard speed.isFinite, (0.1...30).contains(speed) else { return nil }
+        return (speed * 10).rounded() / 10
+    }
+}
+
 struct PhoneTreadmillSpeedEntry: Codable, Hashable {
     let activeElapsedSeconds: TimeInterval
     let kilometersPerHour: Double
@@ -410,6 +421,7 @@ final class IPhoneWorkoutStore:
     private var pendingPlannedSessionID: UUID?
     private var pendingRunEnvironment: RunEnvironment = .outdoor
     private var pendingTreadmillInclinePercent: Double?
+    private var pendingTreadmillSpeedKilometersPerHour: Double?
     private var pendingRoute: TrainingRoute?
     private var pendingWorkoutTitle: String?
     private var pendingAudioCoach:
@@ -499,6 +511,7 @@ final class IPhoneWorkoutStore:
         pendingPlannedSessionID = nil
         pendingRunEnvironment = .outdoor
         pendingTreadmillInclinePercent = nil
+        pendingTreadmillSpeedKilometersPerHour = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
         pendingAudioCoach = nil
@@ -662,6 +675,7 @@ final class IPhoneWorkoutStore:
         title: String? = nil,
         environment: RunEnvironment = .outdoor,
         treadmillInclinePercent: Double? = nil,
+        treadmillSpeedKilometersPerHour: Double? = nil,
         audioCoach:
             WatchAudioCoachConfiguration? = nil,
         structuredWorkout:
@@ -698,6 +712,10 @@ final class IPhoneWorkoutStore:
                     20
                 )
                 : nil
+        pendingTreadmillSpeedKilometersPerHour =
+            environment == .treadmill &&
+            (treadmillSpeedKilometersPerHour ?? 0) > 0
+                ? treadmillSpeedKilometersPerHour : nil
         pendingRoute =
             environment == .outdoor
                 ? route
@@ -733,6 +751,7 @@ final class IPhoneWorkoutStore:
 
         let treadmillInclinePercent =
             pendingTreadmillInclinePercent
+        let initialTreadmillSpeed = pendingTreadmillSpeedKilometersPerHour
         let route =
             environment == .outdoor
                 ? pendingRoute
@@ -756,6 +775,7 @@ final class IPhoneWorkoutStore:
         pendingPlannedSessionID = nil
         pendingRunEnvironment = .outdoor
         pendingTreadmillInclinePercent = nil
+        pendingTreadmillSpeedKilometersPerHour = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
         pendingAudioCoach = nil
@@ -822,6 +842,19 @@ final class IPhoneWorkoutStore:
             ghostAudioConfiguration:
                 ghostUpdates
         )
+
+        if environment == .treadmill, var started = active {
+            // Planned speed applies at the start of a structured session.
+            let firstTarget = started.structuredRunningWorkout?.steps.first
+                .flatMap { $0.targetPaceMinSecondsPerKilometer }
+            let speed = firstTarget.flatMap {
+                ATHLTHTreadmillSpeedPolicy.kilometersPerHour(forPace: $0)
+            } ?? initialTreadmillSpeed
+            if let speed {
+                started.setTreadmillSpeed(speed, at: now)
+                active = started
+            }
+        }
 
         requestLiveWorkoutPresentationAfterLaunch()
 
@@ -4272,6 +4305,15 @@ final class IPhoneWorkoutStore:
         workout.structuredStepStartElapsedTime = endElapsed
         workout.structuredStepStartDistanceMeters =
             workout.distanceMeters
+        if workout.runEnvironment == .treadmill,
+           let targetPace = plan.steps[nextIndex].targetPaceMinSecondsPerKilometer,
+           let speed = ATHLTHTreadmillSpeedPolicy.kilometersPerHour(
+               forPace: targetPace
+           ) {
+            // At an interval boundary the new prescribed belt speed becomes
+            // active. Manual changes remain effective until another boundary.
+            workout.setTreadmillSpeed(speed, at: now)
+        }
 
         UINotificationFeedbackGenerator()
             .notificationOccurred(.success)
