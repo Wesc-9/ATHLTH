@@ -492,6 +492,8 @@ final class AppSettingsStore: ObservableObject {
     @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
     @Published var externalWorkoutImportMode: ExternalWorkoutImportMode { didSet { persist() } }
     @Published var autoPublishCompletedWorkouts: Bool { didSet { persist() } }
+    /// Default for the explicit per-workout health-data sharing switch.
+    @Published var includeWorkoutHealthDataByDefault: Bool { didSet { persist() } }
     @Published var workoutSharingChoiceCompleted: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
@@ -847,6 +849,7 @@ final class AppSettingsStore: ObservableObject {
             rawValue: defaults.string(forKey: "settings.externalWorkoutImportMode") ?? ""
         ) ?? .ask
         autoPublishCompletedWorkouts = defaults.object(forKey: "settings.autoPublishCompletedWorkouts") as? Bool ?? false
+        includeWorkoutHealthDataByDefault = defaults.object(forKey: "settings.includeWorkoutHealthDataByDefault") as? Bool ?? true
         workoutSharingChoiceCompleted = defaults.object(
             forKey: "settings.workoutSharingChoiceCompleted"
         ) as? Bool ?? false
@@ -1220,6 +1223,7 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(backgroundHealthSyncEnabled, forKey: "settings.backgroundHealthSyncEnabled")
         defaults.set(externalWorkoutImportMode.rawValue, forKey: "settings.externalWorkoutImportMode")
         defaults.set(autoPublishCompletedWorkouts, forKey: "settings.autoPublishCompletedWorkouts")
+        defaults.set(includeWorkoutHealthDataByDefault, forKey: "settings.includeWorkoutHealthDataByDefault")
         defaults.set(
             workoutSharingChoiceCompleted,
             forKey: "settings.workoutSharingChoiceCompleted"
