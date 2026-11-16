@@ -112,6 +112,35 @@ final class ATHLTHRunningPaceTests: XCTestCase {
         XCTAssertFalse(unknown.isAverage)
     }
 
+    func testPrescribedTreadmillIntervalPaceConvertsToActualBeltSelection() {
+        XCTAssertEqual(ATHLTHTreadmillSpeedPolicy.kilometersPerHour(
+            forPace: 300
+        ), 12.0)
+        XCTAssertEqual(ATHLTHBeltSpeedPolicy.speed(forPace: 300), 12.0)
+        XCTAssertNil(ATHLTHTreadmillSpeedPolicy.kilometersPerHour(forPace: 0))
+        XCTAssertNil(ATHLTHBeltSpeedPolicy.speed(forPace: .nan))
+        XCTAssertNil(ATHLTHBeltSpeedPolicy.speed(forPace: 30))
+    }
+
+    func testActualBeltSpeedChangesAccumulateDistanceFromActiveSecond() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        var workout = PhoneWorkout(
+            walking: false, start: start,
+            resumedAt: start, lastCheckpoint: start,
+            runEnvironment: .treadmill
+        )
+        workout.setTreadmillSpeed(6, at: start)
+        workout.setTreadmillSpeed(12, at: start.addingTimeInterval(60))
+        workout.advanceTreadmillDistance(at: start.addingTimeInterval(120))
+
+        XCTAssertEqual(workout.treadmillSpeedHistory?.count, 2)
+        XCTAssertEqual(workout.treadmillSpeedHistory?.first?.activeElapsedSeconds ?? -1,
+                       0, accuracy: 0.01)
+        XCTAssertEqual(workout.treadmillSpeedHistory?.last?.activeElapsedSeconds ?? -1,
+                       60, accuracy: 0.01)
+        XCTAssertEqual(workout.distanceMeters, 300, accuracy: 0.01)
+    }
+
     func testMetricAndImperialTreadmillModesConvertWithoutChangingSavedPace() {
         let saved = ATHLTHPlannedTreadmillTargets.pace(forSpeed: 10)
         let mph = ATHLTHPlannedTreadmillTargets.displaySpeed(10, measurement: .imperial)
