@@ -329,14 +329,6 @@ struct MirroredWorkoutLiveView: View {
         }
     }
 
-    private var targetPaceEditorLabel: String {
-        let value = targetPaceDraftSeconds
-        return String(
-            format: "%.1f km/t · %d:%02d/km",
-            3_600 / value, Int(value) / 60, Int(value) % 60
-        )
-    }
-
     /// Split the navigation tree from the sheet/dialog modifiers so SwiftUI
     /// does not have to infer the entire live screen in one expression.
     private var workoutNavigation: some View {
@@ -1962,7 +1954,6 @@ struct MirroredWorkoutLiveView: View {
             paceWorkoutStart = snapshot.startedAt
             paceSamples = []
             rollingPaceSeconds = nil
-            enteredTargetPaceSeconds = nil
         }
         guard snapshot.state == .running,
               snapshot.elapsedTime.isFinite,
