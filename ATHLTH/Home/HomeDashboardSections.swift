@@ -3168,7 +3168,6 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var editedWorkoutClock = Date()
     @State private var showingTimeEditFailure = false
     @State private var workoutPendingCancellation: PlannedSession?
-    @State private var deferredCancellation: PlannedSession?
     @State private var workoutPendingRemoval: PlannedSession?
     @State private var showingRemoveConfirmation = false
     @State private var showingRemovalFailure = false
@@ -3676,8 +3675,6 @@ private struct HomeWeeklyProgressDaySheet: View {
                 pendingPlanTracking = nil
                 selectedStandaloneTracking = pendingStandaloneTracking
                 pendingStandaloneTracking = nil
-                workoutPendingCancellation = deferredCancellation
-                deferredCancellation = nil
             }) { workout in
                 let isPlanWorkout = HomeWeeklyProgressCalendar.containingPlanID(
                     for: workout, in: plan
@@ -3721,7 +3718,11 @@ private struct HomeWeeklyProgressDaySheet: View {
                         ? { openWorkoutDetailsAfterSheet(workout) } : nil,
                     onCancel: canModifyPlannedWorkout(workout)
                         ? {
-                            deferredCancellation = workout
+                            _ = session.cancelPlannedWorkout(
+                                workout.id,
+                                healthWorkouts: recentWorkouts,
+                                strengthHistory: strength.workoutHistory
+                            )
                             selectedPlannedWorkout = nil
                         } : nil,
                     onDelete: canRemovePlannedWorkout(workout)
