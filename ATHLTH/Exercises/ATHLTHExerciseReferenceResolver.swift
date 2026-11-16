@@ -63,7 +63,6 @@ enum ATHLTHExerciseReferenceResolver {
         // Exact reviewed GymCoach program names. Similar-looking variations
         // must remain separate; for example Leg Curl is not always lying.
         "overhead press": "overhead-press",
-        "skulderpress": "overhead-press",
         "barbell row": "barbell-row",
         "front squat": "front-squat",
         "incline bench press": "incline-bench-press",
