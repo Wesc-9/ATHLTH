@@ -148,7 +148,7 @@ struct ProductRootTabView: View {
     private func openPendingWorkoutInviteIfNeeded() {
         guard session.signedIn,
               let route = pushManager.pendingWorkoutInviteNotification,
-              route.recipientID == nil || route.recipientID == session.profile.userID
+              route.isForAccount(session.profile.userID)
         else { return }
 
         pushedWorkoutInviteID = route.workoutSessionID
