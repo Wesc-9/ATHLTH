@@ -7238,8 +7238,11 @@ private struct MessageBubble: View {
                     }
                 }
 
+                // Invitation metadata already lives in the compact card.
+                // Keep the message body for push previews, but never duplicate
+                // a long invitation as a second chat bubble (also for history).
                 if let body = message.body,
-                   !body.isEmpty {
+                   !body.isEmpty && !isPlannedInvitation {
                     Text(body)
                         .font(.body)
                         .foregroundStyle(
