@@ -95,6 +95,9 @@ struct WatchRunWorkoutExperienceView: View {
 
                     controlsPage
                         .tag(5)
+
+                    workoutOptionsPage
+                        .tag(11)
                 }
                 .tabViewStyle(
                     .verticalPage
@@ -114,6 +117,9 @@ struct WatchRunWorkoutExperienceView: View {
         .foregroundStyle(
             WatchTheme.textPrimary
         )
+        // Hide the system's ambiguous close/back control during a workout;
+        // the primary page and Controls page both require End confirmation.
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             selectedPage =
                 workoutManager.structuredRunningWorkout?.deferRouteUntilMain == true &&
@@ -3883,304 +3889,138 @@ struct WatchRunWorkoutExperienceView: View {
 
     // MARK: - Page 5: controls
 
+    /// Entire page fits the Watch viewport. Vertical swipes change pages,
+    /// not an inner scroll position.
     private var controlsPage: some View {
-        ScrollView {
-            VStack(spacing: 9) {
-            pageLabel(
-                "CONTROLS",
-                icon: "slider.horizontal.3"
-            )
-            WatchPetSelectionButton()
-
-            if workoutManager.usesOutdoorGPS ||
-               workoutManager.switchedIndoorVenue != nil {
-                Button {
-                    showingManualIndoorChoice = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "location.circle")
-                        Text(ATHLTHLocalization.choose(
-                            english: "Running environment",
-                            norwegian: "Treningsmiljø"
-                        ))
-                        Spacer()
-                        Image(systemName: "chevron.right")
+        GeometryReader { proxy in
+            let compact = proxy.size.height < 200
+            VStack(spacing: compact ? 7 : 10) {
+                pageLabel(
+                    ATHLTHLocalization.choose(
+                        english: "CONTROLS", norwegian: "KONTROLLER"
+                    ), icon: "slider.horizontal.3"
+                )
+                HStack(spacing: 8) {
+                    controlButton(
+                        title: workoutManager.state == .paused
+                            ? ATHLTHLocalization.choose(
+                                english: "Resume", norwegian: "Fortsett"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "Pause", norwegian: "Pause"
+                              ),
+                        icon: workoutManager.state == .paused
+                            ? "play.fill" : "pause.fill",
+                        accent: true
+                    ) {
+                        if workoutManager.state == .paused {
+                            workoutManager.resume()
+                        } else {
+                            workoutManager.pause()
+                        }
                     }
+                    controlButton(
+                        title: ATHLTHLocalization.choose(
+                            english: "Lap", norwegian: "Runde"
+                        ),
+                        icon: "flag.fill",
+                        accent: false
+                    ) { workoutManager.markLap() }
+                    .disabled(workoutManager.state != .running)
+                }
+
+                Button {
+                    showingQuickActions = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "More actions", norwegian: "Flere valg"
+                    ), systemImage: "ellipsis.circle")
                     .font(.system(size: 11, weight: .semibold))
-                    .padding(10)
-                    .watchSurface(radius: 14)
+                    .frame(maxWidth: .infinity, minHeight: compact ? 33 : 39)
+                    .watchSurface(radius: 12)
                 }
                 .buttonStyle(.plain)
-            }
 
-            HStack(spacing: 8) {
-                controlButton(
-                    title:
-                        workoutManager
-                            .state == .paused
-                        ? "Resume"
-                        : "Pause",
-                    icon:
-                        workoutManager
-                            .state == .paused
-                        ? "play.fill"
-                        : "pause.fill",
-                    accent: true
-                ) {
-                    if workoutManager
-                            .state == .paused {
-                        workoutManager.resume()
-                    } else {
-                        workoutManager.pause()
-                    }
-                }
-
-                controlButton(
-                    title: "Lap",
-                    icon: "flag.fill",
-                    accent: false
-                ) {
-                    workoutManager.markLap()
-                }
-                .disabled(
-                    workoutManager.state !=
-                        .running
-                )
-                .opacity(
-                    workoutManager.state ==
-                        .running
-                        ? 1
-                        : 0.45
-                )
-            }
-
-            if workoutManager
-                    .audioCoachConfigured {
+                Spacer(minLength: 0)
                 Button {
-                    workoutManager
-                        .setAudioCoachEnabled(
-                            !workoutManager
-                                .audioCoachConfiguration
-                                .enabled
-                        )
+                    confirmingEnd = true
                 } label: {
-                    HStack {
-                        Image(
-                            systemName:
-                                workoutManager
-                                    .audioCoachConfiguration
-                                    .enabled
-                                ? "speaker.wave.2.fill"
-                                : "speaker.slash.fill"
-                        )
-
-                        Text("Audio Coach")
-                            .font(
-                                .system(
-                                    size: 12,
-                                    weight: .semibold
-                                )
-                            )
-
-                        Spacer()
-
-                        Text(
-                            workoutManager
-                                .audioCoachConfiguration
-                                .enabled
-                                ? "ON"
-                                : "OFF"
-                        )
-                        .font(
-                            .system(
-                                size: 9,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            workoutManager
-                                .audioCoachConfiguration
-                                .enabled
-                                ? WatchTheme.accent
-                                : WatchTheme.muted
-                        )
-                    }
-                    .padding(11)
-                    .watchSurface(radius: 17)
+                    Label(ATHLTHLocalization.choose(
+                        english: "End workout", norwegian: "Avslutt økt"
+                    ), systemImage: "stop.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: compact ? 42 : 48)
+                    .background(WatchTheme.danger,
+                                in: RoundedRectangle(cornerRadius: 15))
                 }
                 .buttonStyle(.plain)
-
-                if workoutManager.audioCoachConfiguration.enabled {
-                    NavigationLink {
-                        WatchAudioCoachLiveSettingsView(
-                            workoutManager: workoutManager
-                        )
-                    } label: {
-                        HStack {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Audio Coach settings",
-                                    norwegian: "Audio Coach-innstillinger"
-                                ),
-                                systemImage: "slider.horizontal.3"
-                            )
-                            .font(.system(size: 11, weight: .semibold))
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption2)
-                        }
-                        .padding(10)
-                        .watchSurface(radius: 14)
-                    }
-                    .buttonStyle(.plain)
-
-                    HStack(spacing: 8) {
-                        controlButton(
-                            title: workoutManager.coachSpeechPaused
-                                ? ATHLTHLocalization.choose(
-                                    english: "Resume voice", norwegian: "Tale på"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Pause voice", norwegian: "Pause tale"
-                                ),
-                            icon: workoutManager.coachSpeechPaused
-                                ? "play.fill"
-                                : "speaker.slash.fill",
-                            accent: false
-                        ) {
-                            workoutManager.setCoachSpeechPaused(
-                                !workoutManager.coachSpeechPaused
-                            )
-                        }
-
-                        controlButton(
-                            title: ATHLTHLocalization.choose(
-                                english: "Status now", norwegian: "Status nå"
-                            ),
-                            icon: "waveform",
-                            accent: true
-                        ) {
-                            workoutManager.announceCoachStatusNow()
-                        }
-                        .disabled(workoutManager.coachSpeechPaused)
-                        .opacity(workoutManager.coachSpeechPaused ? 0.45 : 1)
-                    }
-
-                    if let lastMessage = workoutManager.lastCoachMessage {
-                        Text(lastMessage)
-                            .font(.system(size: 10))
-                            .foregroundStyle(WatchTheme.muted)
-                            .lineLimit(2)
-                    }
-
-                    TimelineView(.periodic(from: .now, by: 5)) { _ in
-                        Button {
-                            workoutManager.replayLastCoachMessage()
-                        } label: {
-                            HStack {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Listen again",
-                                        norwegian: "Hør igjen"
-                                    ),
-                                    systemImage: "arrow.counterclockwise"
-                                )
-                                .font(.system(size: 11, weight: .semibold))
-                                Spacer(minLength: 2)
-                                Text("45 s")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(WatchTheme.muted)
-                            }
-                            .padding(10)
-                            .watchSurface(radius: 14)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!workoutManager.canReplayLastCoachMessage)
-                        .opacity(workoutManager.canReplayLastCoachMessage ? 1 : 0.45)
-                    }
-
-                    HStack(spacing: 6) {
-                        Image(systemName: "speaker.wave.2")
-                        Text(coachOutputName ??
-                            ATHLTHLocalization.choose(
-                                english: "System audio",
-                                norwegian: "Systemlyd"
-                            )
-                        )
-                        .lineLimit(1)
-                    }
-                    .font(.system(size: 10))
-                    .foregroundStyle(WatchTheme.muted)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose output in Watch Control Center",
-                        norwegian: "Velg lydutgang i Kontrollsenter"
-                    ))
-                    .font(.system(size: 9))
-                    .foregroundStyle(WatchTheme.muted)
-                    .lineLimit(2)
-                }
-            }
-
-            Button {
-                confirmingEnd = true
-            } label: {
-                HStack {
-                    Image(
-                        systemName:
-                            "stop.fill"
-                    )
-
-                    Text("End Workout")
-                        .font(
-                            .system(
-                                size: 13,
-                                weight: .bold
-                            )
-                        )
-                }
-                .foregroundStyle(.white)
-                .frame(
-                    maxWidth: .infinity
-                )
-                .frame(height: 44)
-                .background(
-                    WatchTheme.danger,
-                    in: RoundedRectangle(
-                        cornerRadius: 17,
-                        style: .continuous
-                    )
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(
-                workoutManager.state ==
-                    .ending
-            )
-            .opacity(
-                workoutManager.state ==
-                    .ending
-                    ? 0.5
-                    : 1
-            )
-
-            Text(
-                "Swipe up/down between live metrics, workout, route and controls."
-            )
-            .font(
-                .system(size: 8)
-            )
-            .foregroundStyle(
-                WatchTheme.muted
-            )
-            .multilineTextAlignment(
-                .center
-            )
+                .disabled(workoutManager.state == .ending)
+                .accessibilityIdentifier("athlth-watch-end-workout-controls")
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .scrollIndicators(.hidden)
+    }
+
+    /// The optional settings are a distinct Watch page, not a scrollable
+    /// extension of the critical pause/end controls.
+    private var workoutOptionsPage: some View {
+        GeometryReader { proxy in
+            let compact = proxy.size.height < 200
+            VStack(spacing: compact ? 6 : 9) {
+                pageLabel(ATHLTHLocalization.choose(
+                    english: "OPTIONS", norwegian: "VALG"
+                ), icon: "gearshape")
+                WatchPetSelectionButton()
+                if workoutManager.usesOutdoorGPS ||
+                   workoutManager.switchedIndoorVenue != nil {
+                    Button {
+                        showingManualIndoorChoice = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Running environment",
+                            norwegian: "Treningsmiljø"
+                        ), systemImage: "location.circle")
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                        .watchSurface(radius: 12)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if workoutManager.audioCoachConfigured {
+                    Button {
+                        workoutManager.setAudioCoachEnabled(
+                            !workoutManager.audioCoachConfiguration.enabled
+                        )
+                    } label: {
+                        Label(
+                            workoutManager.audioCoachConfiguration.enabled
+                                ? ATHLTHLocalization.choose(
+                                    english: "Audio Coach on", norwegian: "Audio Coach på")
+                                : ATHLTHLocalization.choose(
+                                    english: "Audio Coach off", norwegian: "Audio Coach av"),
+                            systemImage: "waveform"
+                        )
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                        .watchSurface(radius: 12)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer(minLength: 0)
+                Text(ATHLTHLocalization.choose(
+                    english: "Swipe to move between screens",
+                    norwegian: "Sveip for å bytte skjerm"
+                ))
+                .font(.system(size: 8))
+                .foregroundStyle(WatchTheme.muted)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 
     // MARK: - Components
