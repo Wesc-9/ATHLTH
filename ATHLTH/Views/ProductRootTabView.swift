@@ -3282,9 +3282,12 @@ struct ATHLTHHomeView: View {
                     }
 
                     ForEach(completedToday) { workout in
-                        Button {
-                            showingHomeTodayCalendarAll = false
-                            selectedHomeCompletedWorkout = workout
+                        NavigationLink {
+                            WorkoutHistoryDetailView(workout: workout)
+                                .navigationTitle(ATHLTHLocalization.choose(
+                                    english: "Completed workout", norwegian: "Fullført økt"
+                                ))
+                                .navigationBarTitleDisplayMode(.inline)
                         } label: {
                             homeCalendarEventRow(
                                 time: workout.startDate,
