@@ -131,6 +131,12 @@ extension AppSessionStore {
             guard let existing = plan.weeks.flatMap(\.days).flatMap(\.sessions)
                 .first(where: { $0.id == workoutID }) else { continue }
             guard !existing.isExplicitRestDay, existing.cancelledAt == nil,
+                  linkedHealthWorkoutID(
+                      planID: plan.id, sessionID: workoutID
+                  ) == nil,
+                  !isPlanSessionManuallyCompleted(
+                      planID: plan.id, sessionID: workoutID
+                  ),
                   !isPlanSessionSkipped(planID: plan.id, sessionID: workoutID),
                   !isPlanSessionCompleted(
                       planID: plan.id, sessionID: workoutID,
@@ -175,7 +181,13 @@ extension AppSessionStore {
                 if ATHLTHPlannedWorkoutLifecycle.shouldCancel(
                     scheduled: workout.scheduledStart, now: now,
                     hasStarted: recordedTimes(for: workout.id) != nil,
-                    isCompleted: isPlanSessionCompleted(
+                    isCompleted: linkedHealthWorkoutID(
+                        planID: plan.id, sessionID: workout.id
+                    ) != nil ||
+                    isPlanSessionManuallyCompleted(
+                        planID: plan.id, sessionID: workout.id
+                    ) ||
+                    isPlanSessionCompleted(
                         planID: plan.id, sessionID: workout.id,
                         healthWorkouts: healthWorkouts,
                         strengthHistory: strengthHistory
