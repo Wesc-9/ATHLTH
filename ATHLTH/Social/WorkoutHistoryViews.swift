@@ -1267,7 +1267,7 @@ struct PostWorkoutReviewView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 saveBar
             }
-            .interactiveDismissDisabled(saving)
+            .interactiveDismissDisabled()
             .task {
                 async let reviewLoad: Void =
                     loadExistingReview()
