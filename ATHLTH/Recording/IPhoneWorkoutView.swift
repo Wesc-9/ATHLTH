@@ -1467,6 +1467,7 @@ struct IPhoneWorkoutView: View {
     @State private var showingLiveAudioCoach = false
     @State private var showingAIConversation = false
     @State private var showingTreadmillSpeedEditor = false
+    @State private var completedTreadmillSpeedWorkout: PhoneWorkout?
     @State private var showingAddRunningWorkout = false
     @State private var showingWorkoutOverview = false
     @State private var showingManualEnvironmentChoice = false
@@ -2034,6 +2035,16 @@ struct IPhoneWorkoutView: View {
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                     }
+                                    if workout.end != nil {
+                                        Button(ATHLTHLocalization.choose(
+                                            english: "Edit treadmill speed timeline",
+                                            norwegian: "Juster møllefart i etterkant"
+                                        )) {
+                                            completedTreadmillSpeedWorkout = workout
+                                        }
+                                        .font(.caption.weight(.semibold))
+                                        .tint(ATHLTHTheme.accentDeep)
+                                    }
                                     HStack(spacing: 8) {
                                         Label(
                                             ATHLTHLocalization.format(
@@ -2335,6 +2346,14 @@ struct IPhoneWorkoutView: View {
                     )
                 }
                 .environmentObject(runningLibrary)
+            }
+            .sheet(item: $completedTreadmillSpeedWorkout) { workout in
+                TreadmillSpeedHistoryCorrectionView(workout: workout) { entries in
+                    recorder.correctCompletedTreadmillSpeeds(
+                        entries, workoutID: workout.id
+                    )
+                }
+                .presentationDetents([.large])
             }
             .sheet(isPresented: $showingTreadmillSpeedEditor) {
                 TreadmillSpeedEditorView(
@@ -4595,6 +4614,136 @@ struct TreadmillSpeedEditorView: View {
                     Button(ATHLTHLocalization.choose(
                         english: "Done", norwegian: "Ferdig"
                     )) { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+
+/// Historical correction edits user-reported segments, not HealthKit sensor
+/// readings. All timestamps are active workout seconds, excluding pauses.
+private struct TreadmillSpeedHistoryCorrectionView: View {
+    @Environment(\.dismiss) private var dismiss
+    let workout: PhoneWorkout
+    let onSave: ([PhoneTreadmillSpeedEntry]) -> Void
+
+    @State private var entries: [PhoneTreadmillSpeedEntry]
+
+    init(workout: PhoneWorkout,
+         onSave: @escaping ([PhoneTreadmillSpeedEntry]) -> Void) {
+        self.workout = workout
+        self.onSave = onSave
+        let total = max(workout.elapsed(at: workout.end ?? Date()), 1)
+        let estimated = min(max(
+            workout.treadmillSpeedKilometersPerHour ??
+            workout.distanceMeters / total * 3.6, 0), 30)
+        _entries = State(initialValue:
+            (workout.treadmillSpeedHistory?.isEmpty == false
+                ? workout.treadmillSpeedHistory!
+                : [PhoneTreadmillSpeedEntry(
+                    activeElapsedSeconds: 0,
+                    kilometersPerHour: estimated
+                  )])
+        )
+    }
+
+    private var duration: Double {
+        max(1, workout.elapsed(at: workout.end ?? Date()))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    ForEach(entries.indices, id: \.self) { index in
+                        VStack(alignment: .leading, spacing: 9) {
+                            HStack {
+                                Text(ATHLTHLocalization.format(
+                                    english: "From %.0f s", norwegian: "Fra %.0f sek",
+                                    entries[index].activeElapsedSeconds
+                                ))
+                                .font(.caption.weight(.semibold))
+                                Spacer()
+                                if entries.count > 1 {
+                                    Button(role: .destructive) {
+                                        entries.remove(at: index)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            Stepper(
+                                ATHLTHLocalization.format(
+                                    english: "%.1f km/h", norwegian: "%.1f km/t",
+                                    entries[index].kilometersPerHour
+                                ),
+                                value: Binding(
+                                    get: { entries[index].kilometersPerHour },
+                                    set: { speed in
+                                        entries[index] = PhoneTreadmillSpeedEntry(
+                                            activeElapsedSeconds:
+                                                entries[index].activeElapsedSeconds,
+                                            kilometersPerHour: speed
+                                        )
+                                    }
+                                ), in: 0...30, step: 0.1
+                            )
+                            Stepper(
+                                ATHLTHLocalization.format(
+                                    english: "Start %.0f s", norwegian: "Start %.0f sek",
+                                    entries[index].activeElapsedSeconds
+                                ),
+                                value: Binding(
+                                    get: { entries[index].activeElapsedSeconds },
+                                    set: { seconds in
+                                        entries[index] = PhoneTreadmillSpeedEntry(
+                                            activeElapsedSeconds: seconds,
+                                            kilometersPerHour:
+                                                entries[index].kilometersPerHour
+                                        )
+                                    }
+                                ), in: 0...duration, step: 5
+                            )
+                            .font(.caption)
+                        }
+                    }
+                    Button {
+                        entries.append(PhoneTreadmillSpeedEntry(
+                            activeElapsedSeconds: duration / 2,
+                            kilometersPerHour:
+                                entries.last?.kilometersPerHour ?? 0
+                        ))
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Add a speed change", norwegian: "Legg til fartsendring"
+                        ), systemImage: "plus")
+                    }
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Changes recalculate estimated treadmill distance in ATHLTH. They do not silently rewrite Apple Health.",
+                        norwegian: "Endringer beregner anslått mølledistanse på nytt i ATHLTH. Apple Health endres ikke automatisk."
+                    ))
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Correct treadmill speed", norwegian: "Korriger møllefart"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Save", norwegian: "Lagre"
+                    )) {
+                        onSave(entries)
+                        dismiss()
+                    }
                 }
             }
         }
