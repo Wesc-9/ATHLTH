@@ -3815,9 +3815,17 @@ private struct ATHLTHTrainingSettingsView: View {
                     settings.workoutSharingChoiceCompleted = true
                 }
 
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Include health data in shared workouts",
+                        norwegian: "Vis helsedata i delte økter"
+                    ),
+                    isOn: $settings.includeWorkoutHealthDataByDefault
+                )
+
                 Text(ATHLTHLocalization.choose(
-                    english: "New workouts use this visibility when you choose to share them. You can change it for each workout. Workout Complete opens before publishing; existing posts are unchanged. Maps and health details are not shared automatically.",
-                    norwegian: "Nye økter får denne synligheten når du velger å dele dem. Du kan endre den for hver økt. Øktoppsummeringen åpnes før publisering, og eksisterende innlegg endres ikke. Kart og helsedetaljer deles ikke automatisk."
+                    english: "New workouts use these defaults, but you confirm each post and can always hide heart rate, zones and calories before sharing. Existing posts are unchanged.",
+                    norwegian: "Nye økter bruker disse standardvalgene, men du bekrefter hvert innlegg og kan alltid skjule puls, pulssoner og kalorier før deling. Eksisterende innlegg endres ikke."
                 ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
