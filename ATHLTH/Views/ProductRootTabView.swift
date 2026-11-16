@@ -6072,7 +6072,8 @@ struct ATHLTHTrainView: View {
                             ghostRace: ghostRace,
                             workoutMirroring: workoutMirroring,
                             plannedPlanID: planOrigin?.planID,
-                            plannedSessionID: planOrigin?.workout.id
+                            plannedSessionID: planOrigin?.workout.id,
+                            session: session
                         )
                         if needsSocialLobby {
                             _ = await social.confirmCurrentJoinedWorkoutStarted()
@@ -6106,7 +6107,8 @@ struct ATHLTHTrainView: View {
                     let lobbyReady: Bool
                     if needsSocialLobby {
                         lobbyReady = await social.beginWorkoutWithFriends(
-                            title: "Walk",
+                            title: configuration.route?.title ??
+                                ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
                             kind: .walking,
                             friends: configuration.friends,
                             creatorName: session.profile.displayName,
