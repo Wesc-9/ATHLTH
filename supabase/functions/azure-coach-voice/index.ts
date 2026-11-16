@@ -5,6 +5,8 @@ import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 // messages may include workout metrics; opt-in is enforced by the iOS UI.
 // The server never persists, caches or logs spoken text.
 const sample = "Du er godt i gang. Hold et jevnt tempo, og fokuser på neste drag.";
+const englishSample = "You're doing well. Keep a steady pace and focus on the next interval.";
+const allowedVoicePattern = /^(nb-NO|en-US|en-GB)-[A-Za-z0-9]+Neural$/;
 const voiceIDs: Record<string, string> = {
   finn: "nb-NO-FinnNeural",
   iselin: "nb-NO-IselinNeural",
@@ -13,9 +15,10 @@ const voiceIDs: Record<string, string> = {
 
 // Query the voices supported by the configured Azure resource instead of
 // hardcoding the three original voices in the iOS client. No secret or URL
-// is ever supplied by the client. Only Norwegian neural ShortNames are used.
+// is ever supplied by the client. Only Norwegian and selected English
+// neural ShortNames are allowed, and every voice is verified server-side.
 type AzureVoice = { ShortName?: string; Locale?: string; Gender?: string };
-type CoachVoice = { id: string; name: string; detail: string; shortName: string };
+type CoachVoice = { id: string; name: string; detail: string; shortName: string; locale: string };
 let cachedDirectory: { region: string; expires: number; voices: CoachVoice[] } | null = null;
 async function voiceDirectory(key: string, region: string): Promise<CoachVoice[]> {
   if (cachedDirectory && cachedDirectory.region === region &&
@@ -30,19 +33,24 @@ async function voiceDirectory(key: string, region: string): Promise<CoachVoice[]
   if (!Array.isArray(records) || records.length > 1500)
     throw new Error("Invalid Azure voice catalog");
   const voices = (records as AzureVoice[])
-    .filter((voice) => voice.Locale === "nb-NO" &&
+    .filter((voice) => (voice.Locale === "nb-NO" ||
+      voice.Locale === "en-US" || voice.Locale === "en-GB") &&
       typeof voice.ShortName === "string" &&
-      /^nb-NO-[A-Za-z0-9]+Neural$/.test(voice.ShortName))
+      allowedVoicePattern.test(voice.ShortName) &&
+      voice.ShortName.startsWith(voice.Locale + "-"))
     .map((voice) => {
       const shortName = voice.ShortName!;
       const legacy = Object.entries(voiceIDs).find(([, value]) => value === shortName);
-      const name = shortName.slice("nb-NO-".length, -"Neural".length);
+      const locale = voice.Locale!;
+      const name = shortName.slice((locale + "-").length, -"Neural".length);
+      const language = locale === "nb-NO" ? "Norsk" : "English";
       return {
         id: legacy?.[0] ?? shortName,
         name,
-        detail: voice.Gender === "Male" ? "Norsk · mannlig" :
-          voice.Gender === "Female" ? "Norsk · kvinnelig" : "Norsk",
+        detail: voice.Gender === "Male" ? language + " · male" :
+          voice.Gender === "Female" ? language + " · female" : language,
         shortName,
+        locale,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "nb"));
@@ -82,7 +90,7 @@ Deno.serve(async (req: Request) => {
   const requestedVoice = requestBody.voice;
   if (!isCatalog && (typeof requestedVoice !== "string" ||
       !(/^[a-z]{3,20}$/.test(requestedVoice) ||
-        /^nb-NO-[A-Za-z0-9]+Neural$/.test(requestedVoice))))
+        allowedVoicePattern.test(requestedVoice))))
     return json({ error: "Unsupported voice", code: "UNSUPPORTED_VOICE" }, 400);
   // No arbitrary URL or SSML can be provided by the client.
   const liveText = requestBody.text;
@@ -114,8 +122,8 @@ Deno.serve(async (req: Request) => {
   if (isCatalog) {
     try {
       const voices = await voiceDirectory(key, region);
-      return json({ voices: voices.map(({ id, name, detail }) => ({
-        id, name, detail,
+      return json({ voices: voices.map(({ id, name, detail, locale }) => ({
+        id, name, detail, locale,
       })) });
     } catch {
       return json({ error: "Could not load Azure voice catalog",
@@ -123,7 +131,7 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // The client may select a newer Norwegian voice discovered from Azure.
+  // The client may select a newer approved voice discovered from Azure.
   // Resolve only against Azure's server-fetched list, never raw client SSML.
   let azureShortName = typeof requestedVoice === "string"
     ? voiceIDs[requestedVoice] : undefined;
@@ -168,8 +176,12 @@ Deno.serve(async (req: Request) => {
                     code: "FREE_BUDGET_EXHAUSTED" }, 429);
   }
 
-  const ssml = '<speak version="1.0" xml:lang="nb-NO"><voice name="' +
-    azureShortName + '">' + escapeXML(speech) + '</voice></speak>';
+  const selectedLocale = azureShortName.slice(0, 5);
+  const spokenText = typeof liveText === "string" ? speech :
+    selectedLocale.startsWith("en-") ? englishSample : sample;
+  const ssml = '<speak version="1.0" xml:lang="' + selectedLocale +
+    '"><voice name="' + azureShortName + '">' +
+    escapeXML(spokenText) + '</voice></speak>';
   let azure: Response;
   try {
     azure = await fetch("https://" + region + ".tts.speech.microsoft.com/cognitiveservices/v1", {
