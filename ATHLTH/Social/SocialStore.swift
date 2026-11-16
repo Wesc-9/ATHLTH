@@ -72,6 +72,35 @@ final class SocialStore: ObservableObject {
         service.currentUserID
     }
 
+    /// One visible feed tile per shared workout session, while keeping the
+    /// underlying athlete posts available for individual stats and consent.
+    /// This does not merge private journals or rewrite reactions in the DB.
+    var collapsedWorkoutFeed: [SocialFeedItem] {
+        let ordered = feed.sorted {
+            $0.activity.createdAt > $1.activity.createdAt
+        }
+        let visibleCreatorBySession: [UUID: UUID] = Dictionary(
+            uniqueKeysWithValues: workoutSessions.compactMap { session in
+                guard ordered.contains(where: {
+                    $0.activity.workoutSessionID == session.id &&
+                    $0.activity.actorID == session.creatorID
+                }) else { return nil }
+                return (session.id, session.creatorID)
+            }
+        )
+        var seenSessions = Set<UUID>()
+        return ordered.filter { item in
+            guard item.activity.kind == "workout",
+                  let sessionID = item.activity.workoutSessionID
+            else { return true }
+            if let creatorID = visibleCreatorBySession[sessionID],
+               item.activity.actorID != creatorID {
+                return false
+            }
+            return seenSessions.insert(sessionID).inserted
+        }
+    }
+
     var pendingRequestCount: Int {
         incomingRequests.count + workoutInvites.count
     }
