@@ -7,6 +7,9 @@ enum ATHLTHRouteBrowseMode: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Large cards deliberately ignore saved grid density on iPhone and iPad.
+    var forcesSingleColumn: Bool { self == .largeCards }
+
     var title: String {
         switch self {
         case .cards:
