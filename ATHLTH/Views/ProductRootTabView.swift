@@ -138,9 +138,27 @@ struct ProductRootTabView: View {
     // have their own edge-to-edge presentations, not 90% detent sheets.
     @State private var sideMenuSearchDestination: ATHLTHSideMenuDestination?
     @State private var sideMenuUtilityDestination: ATHLTHSideMenuDestination?
+    @State private var pushedWorkoutInviteID: UUID?
     @State private var sideMenuFullScreenDestination: ATHLTHSideMenuDestination?
     @State private var friendShareToast: ATHLTHFriendQuickShareKind?
     @State private var friendShareToastDismissTask: Task<Void, Never>?
+
+    /// The push delegate can fire before sign-in or before the tab hierarchy
+    /// is mounted. Never consume the route until the intended account is ready.
+    private func openPendingWorkoutInviteIfNeeded() {
+        guard session.signedIn,
+              let route = pushManager.pendingWorkoutInviteNotification,
+              route.recipientID == nil || route.recipientID == session.profile.userID
+        else { return }
+
+        pushedWorkoutInviteID = route.workoutSessionID
+        showingSideMenu = false
+        sideMenuModalDestination = nil
+        sideMenuSearchDestination = nil
+        sideMenuFullScreenDestination = nil
+        sideMenuUtilityDestination = .inbox
+        pushManager.clearPendingWorkoutInviteNotification()
+    }
 
     private func openPendingDailyCheckInIfNeeded() {
         guard pushManager.pendingDailyCheckInAccountID ==
@@ -178,6 +196,13 @@ struct ProductRootTabView: View {
                 info, accountID: session.profile.userID
             ) {
                 openPendingDailyCheckInIfNeeded()
+                return
+            }
+
+            // Workout invitations belong to the actionable Inbox, not to
+            // Community or the generic notifications page.
+            if ATHLTHWorkoutInviteNotificationRoute.resolve(userInfo: info) != nil {
+                openPendingWorkoutInviteIfNeeded()
                 return
             }
 
@@ -385,12 +410,16 @@ struct ProductRootTabView: View {
             updateDailyCheckInReminder()
             updateBodyGoalCheckInReminders()
             openPendingDailyCheckInIfNeeded()
+            openPendingWorkoutInviteIfNeeded()
             goalAccountSync.switchAccount(session.signedIn ? session.profile.userID : nil)
             goalAccountSync.scheduleSync(session: session, goals: goalStore)
             await syncApplicationIconBadge()
         }
         .onChange(of: pushManager.pendingDailyCheckInAccountID) { _, _ in
             openPendingDailyCheckInIfNeeded()
+        }
+        .onChange(of: pushManager.pendingWorkoutInviteNotification) { _, _ in
+            openPendingWorkoutInviteIfNeeded()
         }
         .onChange(of: selectedTab) { previous, next in
             if session.signedIn {
@@ -448,6 +477,7 @@ struct ProductRootTabView: View {
             goalAccountSync.switchAccount(signedIn ? session.profile.userID : nil)
             if signedIn {
                 goalAccountSync.scheduleSync(session: session, goals: goalStore)
+                openPendingWorkoutInviteIfNeeded()
             }
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -462,6 +492,7 @@ struct ProductRootTabView: View {
             updateDailyCheckInReminder()
             updateBodyGoalCheckInReminders()
             openPendingDailyCheckInIfNeeded()
+            openPendingWorkoutInviteIfNeeded()
         }
         .onChange(
             of: visibleAppBadgeCount
@@ -481,6 +512,7 @@ struct ProductRootTabView: View {
             updateDailyCheckInReminder()
             updateBodyGoalCheckInReminders()
             openPendingDailyCheckInIfNeeded()
+            openPendingWorkoutInviteIfNeeded()
             goalAccountSync.scheduleSync(session: session, goals: goalStore)
             Task {
                 await syncApplicationIconBadge()
@@ -795,7 +827,10 @@ struct ProductRootTabView: View {
         .fullScreenCover(item: $sideMenuUtilityDestination) { destination in
             // Reuse the exact same Inbox / Notifications screens; only the
             // host presentation changes, so Home never peeks above the card.
-            ATHLTHSideMenuUtilitiesView(destination: destination)
+            ATHLTHSideMenuUtilitiesView(
+                destination: destination,
+                workoutInviteID: destination == .inbox ? pushedWorkoutInviteID : nil
+            )
                 .accessibilityIdentifier("athlth-home-utility-fullscreen")
         }
         // Unlike the former 90% sheet, profile and deeper destinations
@@ -821,6 +856,7 @@ struct ProductRootTabView: View {
             sideMenuSearchDestination = destination
 
         case .inbox, .notifications:
+            pushedWorkoutInviteID = nil
             sideMenuUtilityDestination = destination
 
         case .trainingLibrary:
