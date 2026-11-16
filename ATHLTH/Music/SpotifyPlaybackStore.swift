@@ -102,10 +102,26 @@ private struct SpotifyTokenErrorResponse: Decodable {
 private struct SpotifyCurrentPlaybackResponse: Decodable {
     let isPlaying: Bool
     let item: Track?
+    let device: Device?
 
     enum CodingKeys: String, CodingKey {
         case isPlaying = "is_playing"
         case item
+        case device
+    }
+
+    struct Device: Decodable {
+        let id: String?
+        let name: String?
+        let type: String?
+        let isRestricted: Bool?
+        let supportsVolume: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case id, name, type
+            case isRestricted = "is_restricted"
+            case supportsVolume = "supports_volume"
+        }
     }
 
     struct Track: Decodable {
@@ -164,6 +180,9 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     @Published private(set) var isPlaying = false
     @Published private(set) var watchTrackTitle: String?
     @Published private(set) var watchArtistName: String?
+    @Published private(set) var playbackDeviceName: String?
+    @Published private(set) var playbackDeviceSupportsVolume = false
+    private var activePlaybackIsWatch = false
     @Published private(set) var lastStartedAt: Date?
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var isRefreshingPlaylists = false
@@ -415,6 +434,9 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         isPlaying = false
         watchTrackTitle = nil
         watchArtistName = nil
+        playbackDeviceName = nil
+        playbackDeviceSupportsVolume = false
+        activePlaybackIsWatch = false
         pendingPlaybackURI = nil
         pendingPlaybackPlaylist = nil
         lastStartedAt = nil
@@ -815,6 +837,17 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             return
         }
 
+        // Read the active Spotify Connect device before choosing a transport.
+        // App Remote controls the local iPhone player, and must not take over
+        // a workout streaming directly from Apple Watch.
+        if let token = await accessTokenForRequest() {
+            try? await refreshWatchPlaybackState(accessToken: token)
+        }
+        if activePlaybackIsWatch {
+            await handleWatchRemoteCommand(kind)
+            return
+        }
+
         if await connectAppRemoteForControls(),
            let playerAPI = appRemote?.playerAPI {
             switch kind {
@@ -1071,6 +1104,9 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             isPlaying = false
             watchTrackTitle = nil
             watchArtistName = nil
+            playbackDeviceName = nil
+            playbackDeviceSupportsVolume = false
+            activePlaybackIsWatch = false
             return
         }
 
@@ -1092,6 +1128,9 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         )
 
         isPlaying = playback.isPlaying
+        playbackDeviceName = playback.device?.name
+        playbackDeviceSupportsVolume = playback.device?.supportsVolume == true
+        activePlaybackIsWatch = playback.device?.name?.localizedCaseInsensitiveContains("watch") == true
         watchTrackTitle =
             playback.item?.name
         watchArtistName =
