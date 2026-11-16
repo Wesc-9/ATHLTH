@@ -17,6 +17,23 @@ enum ATHLTHRunningPace {
         return pace.isFinite && pace > 0 ? pace : nil
     }
 
+    /// One honest, shared pace readout for GPS-free treadmill sessions.
+    /// Never display a prescribed treadmill target as measured pace.
+    /// Indoor HealthKit distance + active elapsed time yields a measured
+    /// average, not instantaneous pace.
+    static func displayPace(
+        current: TimeInterval?,
+        average: TimeInterval?
+    ) -> (secondsPerKilometer: TimeInterval?, isAverage: Bool) {
+        if let current, current.isFinite, (120...1_800).contains(current) {
+            return (current, false)
+        }
+        if let average, average.isFinite, (120...1_800).contains(average) {
+            return (average, true)
+        }
+        return (nil, false)
+    }
+
     /// A treadmill speed entered by the athlete is an estimate, not Watch
     /// distance or outdoor GPS. Reuse the running unit conversion in Strength.
     static func manuallyEstimatedTreadmillDistance(
