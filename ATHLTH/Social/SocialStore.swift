@@ -2107,7 +2107,8 @@ final class SocialStore: ObservableObject {
         effort: Int,
         friendIDs: Set<UUID>,
         creatorName: String,
-        creatorUsername: String?
+        creatorUsername: String?,
+        includeHealthData: Bool = true
     ) async -> Bool {
         guard let currentUserID else { return false }
 
@@ -2175,8 +2176,10 @@ final class SocialStore: ObservableObject {
             ]
             Self.enrichWorkoutActivityMetadata(
                 &metadata,
-                workout: workout
+                workout: workout,
+                includeHealthData: includeHealthData
             )
+            metadata["share_health_data"] = String(includeHealthData)
 
             let cleanDescription = description
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2221,7 +2224,8 @@ final class SocialStore: ObservableObject {
         visibility: ProfileVisibility,
         caption: String? = nil,
         routePreview: [RouteCoordinate] = [],
-        hideRouteStartAndEnd: Bool = true
+        hideRouteStartAndEnd: Bool = true,
+        includeHealthData: Bool = true
     ) async -> Bool {
         errorMessage = nil
 
@@ -2249,8 +2253,10 @@ final class SocialStore: ObservableObject {
             ]
             Self.enrichWorkoutActivityMetadata(
                 &metadata,
-                workout: workout
+                workout: workout,
+                includeHealthData: includeHealthData
             )
+            metadata["share_health_data"] = String(includeHealthData)
             metadata["hide_route_start_end"] = String(hideRouteStartAndEnd)
             if let preview = WorkoutRouteSharing.encode(routePreview) {
                 metadata["route_preview"] = preview
@@ -3598,7 +3604,8 @@ final class SocialStore: ObservableObject {
 
     private static func enrichWorkoutActivityMetadata(
         _ metadata: inout [String: String],
-        workout: SocialPublishableWorkout
+        workout: SocialPublishableWorkout,
+        includeHealthData: Bool
     ) {
         metadata["duration_seconds"] =
             String(
@@ -3615,11 +3622,17 @@ final class SocialStore: ObservableObject {
                 String(distance)
         }
 
-        if let calories =
-                workout.activeEnergyKilocalories,
+        if includeHealthData,
+           let calories = workout.activeEnergyKilocalories,
            calories > 0 {
             metadata["active_kcal"] =
                 String(calories)
+        }
+
+        if includeHealthData,
+           let heartRate = workout.strengthWorkoutAverageHeartRateBPM,
+           heartRate.isFinite, heartRate > 0 {
+            metadata["average_heart_rate_bpm"] = String(heartRate)
         }
 
         if let count =
