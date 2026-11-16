@@ -5041,6 +5041,7 @@ struct WorkoutPublishView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var session: AppSessionStore
 
     @State private var selectedWorkoutID: UUID?
     @State private var visibility: ProfileVisibility = .publicProfile
