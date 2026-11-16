@@ -147,6 +147,35 @@ enum PlannedWorkoutInviteDecision: String, Codable, Hashable {
     case declined
 }
 
+/// A message is immutable, so a pending invitation whose scheduled workout
+/// has already started is presented as cancelled on every device, including
+/// for older conversations that have no explicit cancellation event.
+/// An accepted/declined answer remains historical evidence of that decision.
+enum PlannedWorkoutInvitationPresentationState: Equatable {
+    case pending
+    case accepted
+    case declined
+    case cancelled
+
+    static func resolve(
+        start: Date?,
+        decision: PlannedWorkoutInviteDecision?,
+        organizerCancelled: Bool,
+        now: Date = Date()
+    ) -> Self {
+        if organizerCancelled { return .cancelled }
+        switch decision {
+        case .accepted: return .accepted
+        case .declined: return .declined
+        case .none:
+            if let start, start <= now { return .cancelled }
+            return .pending
+        }
+    }
+
+    var canRespond: Bool { self == .pending }
+}
+
 struct PlannedWorkoutInviteResponse: Codable, Hashable {
     let sourceWorkoutID: UUID
     let decision: PlannedWorkoutInviteDecision
