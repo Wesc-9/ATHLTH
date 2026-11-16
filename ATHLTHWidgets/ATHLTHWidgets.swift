@@ -2206,6 +2206,13 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                        context.state.distanceMeters > 0 {
                         Text(distance(context.state.distanceMeters))
                     }
+                    if context.state.heartRate.isFinite,
+                       context.state.heartRate > 0 {
+                        Label(
+                            "\(Int(context.state.heartRate.rounded()))",
+                            systemImage: "heart.fill"
+                        )
+                    }
                 } else {
                     Label(
                         localized(
