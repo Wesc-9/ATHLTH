@@ -4441,65 +4441,160 @@ struct TreadmillInclineEditorView: View {
 }
 
 
+/// One-tap user-reported belt speed. No treadmill remote control or GPS.
 struct TreadmillSpeedEditorView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var speed: Double
-    @State private var historyOnly = true
+    @AppStorage("athlth.treadmill.presetCount") private var presetCount = 4
+    @AppStorage("athlth.treadmill.presetSpeeds") private var presetSpeeds = "6,8,10,12,14,16"
+    @State private var customSpeedText: String
+    @State private var editingPresets = false
     let onSave: (Double) -> Void
     let onHistorySave: (Double) -> Void
+    let allowsHistoryOnly: Bool
 
-    init(initialValue: Double,
-         onSave: @escaping (Double) -> Void,
-         onHistorySave: @escaping (Double) -> Void) {
-        _speed = State(initialValue: initialValue.isFinite ? min(max(initialValue, 0), 30) : 0)
+    init(
+        initialValue: Double,
+        allowsHistoryOnly: Bool = false,
+        onSave: @escaping (Double) -> Void,
+        onHistorySave: @escaping (Double) -> Void
+    ) {
+        _customSpeedText = State(initialValue: initialValue > 0
+            ? String(format: "%.1f", initialValue) : "")
+        self.allowsHistoryOnly = allowsHistoryOnly
         self.onSave = onSave
         self.onHistorySave = onHistorySave
     }
 
+    private var speeds: [Double] {
+        let values = presetSpeeds.split(separator: ",")
+            .compactMap { Double($0) }
+            .filter { $0.isFinite && (0.1...30).contains($0) }
+        return values.count == 6 ? values : [6, 8, 10, 12, 14, 16]
+    }
+
+    private var manualSpeed: Double? {
+        guard let number = Double(customSpeedText
+            .replacingOccurrences(of: ",", with: ".")),
+            number.isFinite, (0.1...30).contains(number)
+        else { return nil }
+        return (number * 10).rounded() / 10
+    }
+
+    private func apply(_ speed: Double, historyOnly: Bool = false) {
+        if historyOnly { onHistorySave(speed) } else { onSave(speed) }
+        dismiss()
+    }
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Stepper(value: $speed, in: 0...30, step: 0.1) {
-                        Text(ATHLTHLocalization.format(
-                            english: "Belt speed: %.1f km/h",
-                            norwegian: "Møllehastighet: %.1f km/t", speed
-                        )).monospacedDigit()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Tap your treadmill's current speed",
+                            norwegian: "Trykk på farten mølla viser"
+                        ))
+                        .font(.headline)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Each tap takes effect at that second in the workout log.",
+                            norwegian: "Hvert trykk lagres fra det sekundet du endrer farten."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
-                    Slider(value: $speed, in: 0...30, step: 0.1)
-                    Toggle(
+
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ], spacing: 10) {
+                        ForEach(Array(speeds.prefix(min(max(presetCount, 2), 6)).enumerated()),
+                                id: \.offset) { _, speed in
+                            Button {
+                                apply(speed)
+                            } label: {
+                                Text(String(format: "%.1f km/t", speed))
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                                    .frame(maxWidth: .infinity, minHeight: 55)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accentDeep)
+                        }
+                    }
+
+                    HStack(spacing: 10) {
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Custom km/h", norwegian: "Egen fart (km/t)"
+                            ),
+                            text: $customSpeedText
+                        )
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("athlth-treadmill-custom-speed")
+                        Button(ATHLTHLocalization.choose(
+                            english: "Use speed", norwegian: "Bruk fart"
+                        )) {
+                            if let manualSpeed { apply(manualSpeed) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                        .disabled(manualSpeed == nil)
+                    }
+
+                    DisclosureGroup(
                         ATHLTHLocalization.choose(
-                            english: "For history and future coaching only",
-                            norwegian: "Kun for historikk og fremtidig coaching"
+                            english: "Customize quick speeds",
+                            norwegian: "Tilpass hurtigfarter"
                         ),
-                        isOn: $historyOnly
-                    )
-                } footer: {
-                    Text(ATHLTHLocalization.choose(
-                        english: historyOnly
-                            ? "Stored with your workout and available to the next Audio Coach session. Does not modify live pace or distance."
-                            : "Also used to estimate treadmill distance while running. The iPhone does not read treadmill speed automatically.",
-                        norwegian: historyOnly
-                            ? "Lagres med økten og brukes som historikk for neste Audio Coach. Endrer ikke dagens tempo- eller distanseberegning."
-                            : "Brukes også til å anslå distansen mens du løper. iPhone leser ikke møllehastigheten automatisk."
-                    ))
+                        isExpanded: $editingPresets
+                    ) {
+                        Stepper(
+                            ATHLTHLocalization.format(
+                                english: "%d quick speeds", norwegian: "%d hurtigfarter",
+                                presetCount
+                            ),
+                            value: $presetCount, in: 2...6
+                        )
+                        ForEach(0..<min(max(presetCount, 2), 6), id: \.self) { i in
+                            Stepper(
+                                String(format: "%.1f km/t", speeds[i]),
+                                value: Binding(
+                                    get: { speeds[i] },
+                                    set: { value in
+                                        var updated = speeds
+                                        updated[i] = min(max((value * 10).rounded() / 10, 0.1), 30)
+                                        presetSpeeds = updated.map {
+                                            String(format: "%.1f", $0)
+                                        }.joined(separator: ",")
+                                    }
+                                ),
+                                in: 0.1...30, step: 0.5
+                            )
+                        }
+                    }
+                    .tint(ATHLTHTheme.accentDeep)
+
+                    if allowsHistoryOnly, let manualSpeed {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Save reference only (no distance change)",
+                            norwegian: "Lagre kun som referanse (ingen distanseendring)"
+                        )) { apply(manualSpeed, historyOnly: true) }
+                        .font(.footnote)
+                    }
                 }
+                .padding(18)
             }
-            .navigationTitle(ATHLTHLocalization.choose(english: "Belt speed", norwegian: "Møllehastighet"))
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Treadmill speed", norwegian: "Møllefart"
+            ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) { dismiss() }
-                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) {
-                        if historyOnly {
-                            onHistorySave(speed)
-                        } else {
-                            onSave(speed)
-                        }
-                        dismiss()
-                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) { dismiss() }
                 }
             }
         }
