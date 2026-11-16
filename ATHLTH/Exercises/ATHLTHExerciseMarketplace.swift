@@ -394,7 +394,6 @@ struct ATHLTHExerciseMarketplaceView: View {
             english: "Search exercises or creators",
             norwegian: "Søk øvelser eller skapere"
         ))
-        .refreshable { await market.refresh() }
         .task { await market.refresh() }
         .alert(
             ATHLTHLocalization.choose(
