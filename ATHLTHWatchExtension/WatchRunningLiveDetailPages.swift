@@ -94,137 +94,103 @@ struct WatchRunHeartRateDetailPage: View {
         .accessibilityIdentifier("athlth-watch-five-zone-live-pulse")
     }
 
+    /// One Watch screen; never intercept the pager's vertical swipe.
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "HEART RATE", norwegian: "PULS"
-                    ),
-                    systemImage: "heart.fill"
-                )
+        GeometryReader { viewport in
+            let compact = viewport.size.height < 205
+            VStack(alignment: .leading, spacing: compact ? 5 : 8) {
+                Label(ATHLTHLocalization.choose(
+                    english: "HEART RATE", norwegian: "PULS"
+                ), systemImage: "heart.fill")
                 .font(.system(size: 10, weight: .heavy))
                 .foregroundStyle(WatchTheme.liveHeart)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(bpm(workout.hasFreshHeartRate ? workout.heartRate : nil))
-                            .font(.system(
-                                size: pulseSize, weight: .bold, design: .rounded
-                            ))
-                            .monospacedDigit()
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                        Text("bpm")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(WatchTheme.muted)
-                    }
-
-                    Text(workout.hasFreshHeartRate
-                         ? ATHLTHLocalization.choose(
-                            english: "CURRENT PULSE",
-                            norwegian: "NÅVÆRENDE PULS"
-                         )
-                         : ATHLTHLocalization.choose(
-                            english: "WAITING FOR SENSOR",
-                            norwegian: "VENTER PÅ SENSOR"
-                         ))
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(WatchTheme.textSecondary)
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(bpm(workout.hasFreshHeartRate ? workout.heartRate : nil))
+                        .font(.system(size: compact ? 40 : 49,
+                                      weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text("bpm").font(.system(size: 10, weight: .bold))
+                    Spacer(minLength: 0)
+                    Text(liveZone.map { "Z\($0)" } ?? "—")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(WatchTheme.premiumGold)
                 }
-                .padding(11)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .watchSurface(radius: 17)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(ATHLTHLocalization.choose(
                     english: "Current heart rate", norwegian: "Nåværende puls"
                 ))
-                .accessibilityValue(
-                    ATHLTHWorkoutAccessibleMetric.pulse(
-                        workout.heartRate,
-                        isFresh: workout.hasFreshHeartRate,
-                        norwegian: spokenNorwegian
-                    )
-                )
+                .accessibilityValue(ATHLTHWorkoutAccessibleMetric.pulse(
+                    workout.heartRate,
+                    isFresh: workout.hasFreshHeartRate,
+                    norwegian: spokenNorwegian
+                ))
+                .accessibilityIdentifier("athlth-watch-five-zone-live-pulse")
 
-                fiveZoneGuide
-
-                HStack(spacing: 7) {
-                    readout(
-                        label: ATHLTHLocalization.choose(
-                            english: "AVERAGE", norwegian: "SNITT"
-                        ),
-                        value: bpm(workout.averageHeartRate)
-                    )
-                    readout(
-                        label: ATHLTHLocalization.choose(
-                            english: "MAXIMUM", norwegian: "MAKS"
-                        ),
-                        value: bpm(workout.maxHeartRate)
-                    )
-                }
-
-                if let target {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "target")
-                            Text(ATHLTHLocalization.choose(
-                                english: "HEART-RATE TARGET",
-                                norwegian: "PULSMÅL"
-                            ))
+                HStack(spacing: 3) {
+                    ForEach(1...5, id: \.self) { zone in
+                        VStack(spacing: 3) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(highlightedZones.contains(zone)
+                                      ? WatchTheme.premiumGold
+                                      : WatchTheme.planSelected)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .stroke(liveZone == zone
+                                                ? WatchTheme.textPrimary : .clear,
+                                                lineWidth: 2)
+                                }
+                                .frame(height: compact ? 10 : 13)
+                            Text("Z\(zone)")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(WatchTheme.textSecondary)
                         }
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(WatchTheme.accentDeep)
-
-                        if let zone = target.heartRateZone {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Zone \(zone)",
-                                norwegian: "Sone \(zone)"
-                            ))
-                            .font(.system(size: 18, weight: .bold))
-                        }
-
-                        if let low = target.heartRateMinimumBPM,
-                           let high = target.heartRateMaximumBPM {
-                            Text("\(Int(low.rounded()))–\(Int(high.rounded())) bpm")
-                                .font(.system(size: 13, weight: .semibold))
-                                .monospacedDigit()
-                        }
-
-                        let guidance = ATHLTHRunPulseTargetStatus.resolve(
-                            heartRate: workout.hasFreshHeartRate
-                                ? workout.heartRate : nil,
-                            minimum: target.heartRateMinimumBPM,
-                            maximum: target.heartRateMaximumBPM
-                        )
-                        Label(
-                            guidanceText(guidance),
-                            systemImage: guidance == .within
-                                ? "checkmark.circle.fill"
-                                : guidance == .below || guidance == .above
-                                    ? "exclamationmark.circle.fill"
-                                    : "waveform.path.ecg"
-                        )
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(
-                            guidance == .within
-                                ? WatchTheme.liveAction
-                                : guidance == .below || guidance == .above
-                                    ? WatchTheme.warning
-                                    : WatchTheme.muted
-                        )
-                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .watchSurface(radius: 17)
                 }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "AVERAGE", norwegian: "SNITT"
+                        )).font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(WatchTheme.muted)
+                        Text(bpm(workout.averageHeartRate))
+                            .font(.system(size: 19, weight: .bold, design: .rounded))
+                    }
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "MAX", norwegian: "MAKS"
+                        )).font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(WatchTheme.muted)
+                        Text(bpm(workout.maxHeartRate))
+                            .font(.system(size: 19, weight: .bold, design: .rounded))
+                    }
+                }
+
+                if let targetBand {
+                    Label("\(targetBand.lowerBound)–\(targetBand.upperBound) bpm",
+                          systemImage: "target")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(WatchTheme.premiumGold)
+                        .lineLimit(1)
+                } else if !workout.hasFreshHeartRate {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Waiting for sensor", norwegian: "Venter på sensor"
+                    ))
+                    .font(.system(size: 10))
+                    .foregroundStyle(WatchTheme.muted)
+                }
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 9)
-            .padding(.top, 6)
-            .padding(.bottom, 14)
+            .padding(.horizontal, 8)
+            .padding(.vertical, compact ? 2 : 5)
+            .frame(maxWidth: .infinity, maxHeight: .infinity,
+                   alignment: .topLeading)
         }
-        .scrollIndicators(.hidden)
         .background(WatchTheme.canvas.ignoresSafeArea())
     }
 
@@ -288,62 +254,42 @@ struct WatchRunHeartRateDetailPage: View {
 struct WatchRunAudioCoachDetailPage: View {
     @EnvironmentObject private var workout: WatchWorkoutManager
 
+    /// Live audio controls remain on one page. Vertical swipe belongs to
+    /// the parent TabView, never an inner ScrollView.
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 9) {
-                Label(
-                    "AUDIO COACH",
-                    systemImage: "waveform"
-                )
-                .font(.system(size: 10, weight: .heavy))
-                .foregroundStyle(WatchTheme.accentDeep)
-
-                HStack(spacing: 9) {
-                    Image(systemName:
-                        workout.audioCoachConfiguration.enabled
-                            ? "speaker.wave.2.fill" : "speaker.slash.fill"
-                    )
-                    .font(.system(size: 23))
-                    .foregroundStyle(WatchTheme.liveAction)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(workout.audioCoachConfiguration.enabled
-                            ? ATHLTHLocalization.choose(
-                                english: "Coach active",
-                                norwegian: "Coach aktiv"
-                              )
-                            : ATHLTHLocalization.choose(
-                                english: "Coach off",
-                                norwegian: "Coach av"
-                              ))
-                            .font(.system(size: 15, weight: .bold))
-                        Text(ATHLTHLocalization.choose(
-                            english: "Voice guidance during training",
-                            norwegian: "Stemmeveiledning under trening"
-                        ))
-                        .font(.system(size: 10))
-                        .foregroundStyle(WatchTheme.muted)
-                        .lineLimit(2)
-                    }
+        GeometryReader { viewport in
+            let compact = viewport.size.height < 205
+            VStack(alignment: .leading, spacing: compact ? 5 : 8) {
+                Label("AUDIO COACH", systemImage: "waveform")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(WatchTheme.accentDeep)
+                HStack(spacing: 8) {
+                    Image(systemName: workout.audioCoachConfiguration.enabled
+                          ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                        .font(.system(size: 25))
+                        .foregroundStyle(WatchTheme.liveAction)
+                    Text(workout.audioCoachConfiguration.enabled
+                        ? ATHLTHLocalization.choose(
+                            english: "Coach active", norwegian: "Coach aktiv")
+                        : ATHLTHLocalization.choose(
+                            english: "Coach off", norwegian: "Coach av"))
+                        .font(.system(size: 14, weight: .bold))
                     Spacer(minLength: 0)
                 }
-                .padding(11)
-                .watchSurface(radius: 17)
 
                 Button {
                     workout.setAudioCoachEnabled(
                         !workout.audioCoachConfiguration.enabled
                     )
                 } label: {
-                    Label(workout.audioCoachConfiguration.enabled
+                    Text(workout.audioCoachConfiguration.enabled
                         ? ATHLTHLocalization.choose(
-                            english: "Disable coach", norwegian: "Slå av coach")
+                            english: "Turn coach off", norwegian: "Slå av coach")
                         : ATHLTHLocalization.choose(
-                            english: "Enable coach", norwegian: "Slå på coach"),
-                        systemImage: "waveform"
-                    )
-                    .font(.system(size: 12, weight: .bold))
-                    .frame(maxWidth: .infinity, minHeight: 36)
+                            english: "Turn coach on", norwegian: "Slå på coach"))
+                    .font(.system(size: 11, weight: .bold))
+                    .frame(maxWidth: .infinity,
+                           minHeight: compact ? 31 : 38)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(WatchTheme.liveAction)
@@ -355,77 +301,52 @@ struct WatchRunAudioCoachDetailPage: View {
                                 !workout.coachSpeechPaused
                             )
                         } label: {
-                            Label(
-                                workout.coachSpeechPaused
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Resume voice",
-                                        norwegian: "Tale på")
-                                    : ATHLTHLocalization.choose(
-                                        english: "Pause voice",
-                                        norwegian: "Pause tale"),
-                                systemImage:
-                                    workout.coachSpeechPaused
-                                        ? "play.fill" : "pause.fill"
-                            )
-                            .font(.system(size: 10, weight: .bold))
-                            .frame(maxWidth: .infinity, minHeight: 32)
+                            Label(workout.coachSpeechPaused
+                                ? ATHLTHLocalization.choose(
+                                    english: "Voice on", norwegian: "Tale på")
+                                : ATHLTHLocalization.choose(
+                                    english: "Voice off", norwegian: "Tale av"),
+                                  systemImage: workout.coachSpeechPaused
+                                    ? "play.fill" : "pause.fill")
+                            .font(.system(size: 9, weight: .semibold))
                         }
                         .buttonStyle(.bordered)
 
                         Button {
                             workout.announceCoachStatusNow()
                         } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Status", norwegian: "Status"
-                                ),
-                                systemImage: "waveform"
-                            )
-                            .font(.system(size: 10, weight: .bold))
-                            .frame(maxWidth: .infinity, minHeight: 32)
+                            Label(ATHLTHLocalization.choose(
+                                english: "Status", norwegian: "Status"
+                            ), systemImage: "waveform")
+                            .font(.system(size: 9, weight: .semibold))
                         }
                         .buttonStyle(.bordered)
                         .disabled(workout.coachSpeechPaused)
                     }
-
                     if let message = workout.lastCoachMessage,
                        !message.isEmpty {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "LAST MESSAGE",
-                                norwegian: "SISTE BESKJED"
-                            ))
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(WatchTheme.muted)
+                        HStack(spacing: 6) {
                             Text(message)
-                                .font(.system(size: 11))
-                                .fixedSize(horizontal: false, vertical: true)
+                                .font(.system(size: 10))
+                                .foregroundStyle(WatchTheme.muted)
+                                .lineLimit(2)
+                            Spacer(minLength: 0)
                             Button {
                                 workout.replayLastCoachMessage()
                             } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Play again",
-                                        norwegian: "Spill av igjen"
-                                    ),
-                                    systemImage: "arrow.counterclockwise"
-                                )
-                                .font(.system(size: 10, weight: .semibold))
+                                Image(systemName: "arrow.counterclockwise")
                             }
-                            .buttonStyle(.bordered)
                             .disabled(!workout.canReplayLastCoachMessage)
                         }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .watchSurface(radius: 16)
                     }
                 }
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 9)
-            .padding(.top, 6)
-            .padding(.bottom, 14)
+            .padding(.horizontal, 8)
+            .padding(.vertical, compact ? 2 : 5)
+            .frame(maxWidth: .infinity, maxHeight: .infinity,
+                   alignment: .topLeading)
         }
-        .scrollIndicators(.hidden)
         .background(WatchTheme.canvas.ignoresSafeArea())
     }
 }
