@@ -16,6 +16,8 @@ struct ATHLTHAudioCoachCircleOverview: View {
     let onSaveAsNew: () -> Void
     let onUseStandard: () -> Void
     let onAddTrigger: (UUID) -> Void
+    let onAddGroup: () -> Void
+    let onAddSpeechCommand: () -> Void
     let onShowAdvanced: () -> Void
 
     @State private var expandedGroups: Set<UUID> = []
@@ -41,9 +43,18 @@ struct ATHLTHAudioCoachCircleOverview: View {
 
     private var activeMessageCount: Int {
         draft.customRules.filter(\.isEnabled).count +
-        ATHLTHAudioCoachOption.allCases.filter { $0.isActive(in: draft) &&
+        ATHLTHAudioCoachOption.allCases.filter {
+            $0 != .customAnnouncements &&
+            $0.isActive(in: draft) &&
             $0.isVisible(route: showRouteOptions, structured: showStructuredOptions)
         }.count
+    }
+
+    // Built-in messages predate named groups. Present them as one virtual
+    // group without rewriting the Watch payload or duplicating spoken cues.
+    private var visibleGroupCount: Int {
+        draft.coachGroups.count +
+            ((!legacyOptions.isEmpty || !ungroupedRules.isEmpty) ? 1 : 0)
     }
 
     private var ungroupedRules: [ATHLTHAudioCoachRule] {
@@ -53,12 +64,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
 
     private var legacyOptions: [ATHLTHAudioCoachOption] {
         let assigned = Set(draft.coachGroups.flatMap(\.optionIDs))
-        let primary: [ATHLTHAudioCoachOption] = [
-            .distanceUpdates, .timedUpdates, .motivation, .targetZoneCoach,
-            .randomEncouragement, .scopedCountdowns, .workoutStart,
-            .pauseResume, .workoutFinish, .currentStep
-        ]
-        return primary.filter {
+        // Include every enabled built-in option, including the individual
+        // spoken values used by Standard (distance, elapsed time, pace, etc.).
+        return ATHLTHAudioCoachOption.allCases.filter {
+            $0 != .customAnnouncements &&
             !assigned.contains($0.rawValue) &&
             $0.isVisible(route: showRouteOptions, structured: showStructuredOptions) &&
             $0.isActive(in: draft)
@@ -149,7 +158,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
                             .minimumScaleFactor(0.72)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 16)
-                        Text(tr("\(draft.coachGroups.count) groups", "\(draft.coachGroups.count) grupper"))
+                        Text(tr("\(visibleGroupCount) groups", "\(visibleGroupCount) grupper"))
                             .font(.caption)
                             .foregroundStyle(dim)
                     }
@@ -178,13 +187,14 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     .foregroundStyle(dim)
             }
 
-            if draft.coachGroups.isEmpty {
+            if draft.coachGroups.isEmpty && legacyOptions.isEmpty &&
+                ungroupedRules.isEmpty {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(tr("Make your Coach your own", "Lag din personlige coach"))
                         .font(.headline)
                         .foregroundStyle(ink)
-                    Text(tr("Create a group, choose its name and add as many triggers as you need.",
-                            "Opprett en gruppe, gi den et eget navn og legg til triggerne du ønsker."))
+                    Text(tr("Choose a trigger and select what Coach will say together.",
+                            "Velg en trigger og hva coachen skal si samlet."))
                         .font(.subheadline)
                         .foregroundStyle(dim)
                 }
@@ -194,60 +204,38 @@ struct ATHLTHAudioCoachCircleOverview: View {
             }
 
             VStack(spacing: 9) {
+                if !legacyOptions.isEmpty || !ungroupedRules.isEmpty {
+                    builtInCoachGroupCard
+                }
                 ForEach(draft.coachGroups) { group in
                     coachGroupCard(group)
                 }
             }
 
-            Button {
-                editingGroupID = nil
-                groupNameInput = ""
-                showingGroupNameEditor = true
-            } label: {
-                Label(tr("Add coach group", "Legg til coach-gruppe"),
-                      systemImage: "plus.circle")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 50)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(gold)
-            .accessibilityIdentifier("athlth-coach-add-group")
-
-            if !ungroupedRules.isEmpty || !legacyOptions.isEmpty {
-                DisclosureGroup(isExpanded: $showingLegacyOptions) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr(
-                            "Existing settings keep working. Add new triggers inside the named groups above.",
-                            "Eksisterende varsler fungerer fortsatt. Legg til nye triggere i de navngitte gruppene over."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(dim)
-                        ForEach(ungroupedRules) { rule in
-                            Button {
-                                onEditRule(rule.id)
-                            } label: {
-                                rowLabel(rule.beforeEndSeconds.map {
-                                    tr("\($0 / 60) min before finish", "\($0 / 60) min før slutt")
-                                } ?? rule.selectedMetrics.map(\.title).joined(separator: " · "),
-                                symbol: "waveform")
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        ForEach(legacyOptions) { option in
-                            Button { onEditOption(option) } label: {
-                                rowLabel(option.title, symbol: option.symbol)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.top, 9)
-                } label: {
-                    Text(tr("Other active messages", "Andre aktive beskjeder"))
+            HStack(spacing: 10) {
+                Button(action: onAddGroup) {
+                    Label(tr("Add coach group", "Legg til coach-gruppe"),
+                          systemImage: "plus.circle")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity, minHeight: 56)
                 }
-                .padding(16)
-                .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                .buttonStyle(.borderedProminent)
+                .tint(gold)
+                .accessibilityIdentifier("athlth-coach-add-group")
+
+                Button(action: onAddSpeechCommand) {
+                    Label(tr("Add speech command", "Legg til snakkekommando"),
+                          systemImage: "waveform.badge.plus")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.80)
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                }
+                .buttonStyle(.bordered)
+                .tint(gold)
+                .accessibilityIdentifier("athlth-coach-add-speech-command")
             }
 
             Button(action: onShowAdvanced) {
@@ -260,9 +248,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
             .foregroundStyle(gold)
         }
         .alert(
-            editingGroupID == nil
-                ? tr("New coach group", "Ny coach-gruppe")
-                : tr("Rename coach group", "Endre navn på coach-gruppe"),
+            tr("Rename coach group", "Endre navn på coach-gruppe"),
             isPresented: $showingGroupNameEditor
         ) {
             TextField(tr("Group name", "Gruppenavn"), text: $groupNameInput)
@@ -275,6 +261,64 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     "Du bestemmer selv hva gruppen skal hete."))
         }
         .accessibilityIdentifier("athlth-audio-coach-circle-overview")
+    }
+
+    /// The standard template has enabled commands but no stored named
+    /// groups. Keep all of them visible under COACH-GRUPPER, editable in place.
+    private var builtInCoachGroupCard: some View {
+        DisclosureGroup(isExpanded: $showingLegacyOptions) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(legacyOptions) { option in
+                    Button { onEditOption(option) } label: {
+                        rowLabel(option.title, symbol: option.symbol,
+                                 detail: option.detail(in: draft))
+                    }
+                    .buttonStyle(.plain)
+                }
+                ForEach(ungroupedRules) { rule in
+                    Button { onEditRule(rule.id) } label: {
+                        rowLabel(
+                            rule.selectedMetrics.map(\.title).joined(separator: " · "),
+                            symbol: "waveform",
+                            detail: rule.trigger == .time
+                                ? tr("Every \(rule.validatedInterval) seconds",
+                                     "Hvert \(rule.validatedInterval) sekund")
+                                : tr("Every \(rule.validatedInterval) metres",
+                                     "Hver \(rule.validatedInterval) meter")
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 10)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "waveform")
+                    .foregroundStyle(gold)
+                    .frame(width: 34, height: 34)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("Active messages", "Aktive beskjeder"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(tr(
+                        "\(legacyOptions.count + ungroupedRules.count) settings",
+                        "\(legacyOptions.count + ungroupedRules.count) innstillinger"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(dim)
+                }
+            }
+        }
+        .tint(gold)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+        }
+        .accessibilityIdentifier("athlth-coach-standard-group")
     }
 
     private func coachGroupCard(_ group: ATHLTHAudioCoachGroup) -> some View {
@@ -301,8 +345,8 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ink)
                             Text(tr(
-                                "\(rules.count + options.count) triggers",
-                                "\(rules.count + options.count) triggere"
+                                "\(rules.count + options.count) triggers · \(rules.reduce(0) { $0 + $1.selectedMetrics.count }) values",
+                                "\(rules.count + options.count) triggere · \(rules.reduce(0) { $0 + $1.selectedMetrics.count }) innhold"
                             ))
                             .font(.caption)
                             .foregroundStyle(dim)
@@ -425,14 +469,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
         let name = String(groupNameInput.trimmingCharacters(
             in: .whitespacesAndNewlines).prefix(60))
         guard !name.isEmpty else { return }
-        if let editingGroupID,
-           let index = draft.coachGroups.firstIndex(where: { $0.id == editingGroupID }) {
-            draft.coachGroups[index].name = name
-        } else {
-            let group = ATHLTHAudioCoachGroup(name: name)
-            draft.coachGroups.append(group)
-            expandedGroups.insert(group.id)
-        }
+        guard let editingGroupID,
+              let index = draft.coachGroups.firstIndex(where: { $0.id == editingGroupID })
+        else { return }
+        draft.coachGroups[index].name = name
         groupNameInput = ""
         editingGroupID = nil
     }
