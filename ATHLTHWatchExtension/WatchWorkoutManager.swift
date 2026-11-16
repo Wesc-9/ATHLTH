@@ -7926,7 +7926,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // starts.
             try session.setCategory(
                 .playback,
-                mode: .spokenAudio,
+                // Do not use spokenAudio: it can pause Spotify after TTS
+                // completes even while playback sounded normal during speech.
+                mode: .default,
                 options: options
             )
 
@@ -7949,7 +7951,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // WatchOS may select the built-in speaker or request another route.
             try session.setCategory(
                 .playback,
-                mode: .spokenAudio,
+                mode: .default,
                 policy: .longFormAudio,
                 options: options
             )
