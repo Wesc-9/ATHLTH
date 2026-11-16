@@ -14,14 +14,15 @@ struct ATHLTHAudioCoachCircleOverview: View {
     let onCreateTemplate: () -> Void
     let onSaveTemplate: () -> Void
     let onSwitchTemplate: (Int) -> Void
+    let previousTemplateName: String?
+    let nextTemplateName: String?
     let onResetStandard: () -> Void
     let isDirty: Bool
     let onAddCommand: (UUID) -> Void
     let onEditGroupTrigger: (UUID) -> Void
     let onMoveCommand: (String, UUID?) -> Bool
     let onAddGroup: () -> Void
-    let onAddSpeechCommand: () -> Void
-    let onShowAdvanced: () -> Void
+    let onAddGeneralCommand: () -> Void
 
     @State private var expandedGroups: Set<UUID> = []
     @State private var showingGroupNameEditor = false
@@ -99,7 +100,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 .accessibilityLabel(tr("Coach templates", "Coach-maler"))
                 .accessibilityIdentifier("athlth-coach-templates-icon")
                 Button(action: onCreateTemplate) {
-                    Image(systemName: "plus.square.on.square")
+                    Image(systemName: "plus")
                         .font(.title3)
                         .frame(width: 44, height: 44)
                         .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
@@ -118,12 +119,21 @@ struct ATHLTHAudioCoachCircleOverview: View {
 
             HStack(spacing: 8) {
                 Button { onSwitchTemplate(-1) } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.title3.weight(.semibold))
-                        .frame(width: 40, height: 56)
-                        .contentShape(Rectangle())
+                    VStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                            .font(.headline.weight(.semibold))
+                        Text(previousTemplateName ?? " ")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(dim)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .frame(width: 49, height: 78)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel(tr("Previous template", "Forrige mal"))
+                .disabled(previousTemplateName == nil)
                 Spacer(minLength: 0)
                 ZStack {
                     Circle()
@@ -172,12 +182,21 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 }
                 Spacer(minLength: 0)
                 Button { onSwitchTemplate(1) } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.title3.weight(.semibold))
-                        .frame(width: 40, height: 56)
-                        .contentShape(Rectangle())
+                    VStack(spacing: 6) {
+                        Image(systemName: "chevron.right")
+                            .font(.headline.weight(.semibold))
+                        Text(nextTemplateName ?? " ")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(dim)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .frame(width: 49, height: 78)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel(tr("Next template", "Neste mal"))
+                .disabled(nextTemplateName == nil)
             }
             .foregroundStyle(gold)
 
@@ -211,22 +230,6 @@ struct ATHLTHAudioCoachCircleOverview: View {
             VStack(spacing: 9) {
                 if !legacyOptions.isEmpty || !ungroupedRules.isEmpty {
                     builtInCoachGroupCard
-                } else if !draft.coachGroups.isEmpty {
-                    HStack(spacing: 9) {
-                        Image(systemName: "arrow.down.to.line")
-                            .foregroundStyle(gold)
-                        Text(tr("Drop here to move a command out of its group",
-                                "Dra hit for å flytte kommandoen ut av gruppen"))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(dim)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 54)
-                    .background(.white.opacity(0.85),
-                                in: RoundedRectangle(cornerRadius: 16))
-                    .dropDestination(for: String.self) { items, _ in
-                        guard let item = items.first else { return false }
-                        return onMoveCommand(item, nil)
-                    }
                 }
                 ForEach(draft.coachGroups) { group in
                     coachGroupCard(group)
@@ -238,37 +241,22 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     Label(tr("Add coach group", "Legg til coach-gruppe"),
                           systemImage: "plus.circle")
                         .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(gold)
                 .accessibilityIdentifier("athlth-coach-add-group")
 
-                Button(action: onAddSpeechCommand) {
-                    Label(tr("Add speech command", "Legg til snakkekommando"),
+                Button(action: onAddGeneralCommand) {
+                    Label(tr("Add command", "Legg til kommando"),
                           systemImage: "waveform.badge.plus")
                         .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.80)
-                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(.bordered)
                 .tint(gold)
-                .accessibilityIdentifier("athlth-coach-add-speech-command")
+                .accessibilityIdentifier("athlth-coach-add-general-command")
             }
-
-            // Advanced triggers remain available, but voice and music have a
-            // separate expandable card in the parent editor.
-            Button(action: onShowAdvanced) {
-                Label(tr("Advanced trigger settings", "Avanserte triggerinnstillinger"),
-                      systemImage: "slider.horizontal.3")
-                    .font(.subheadline)
-                    .frame(maxWidth: .infinity, minHeight: 42)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(gold)
 
             if selectedProfileName == nil {
                 Button(action: onResetStandard) {
@@ -355,10 +343,6 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
         }
         .accessibilityIdentifier("athlth-coach-standard-group")
-        .dropDestination(for: String.self) { items, _ in
-            guard let item = items.first else { return false }
-            return onMoveCommand(item, nil)
-        }
     }
 
     private func coachGroupCard(_ group: ATHLTHAudioCoachGroup) -> some View {
@@ -426,7 +410,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     Button(tr("Move down", "Flytt ned"), systemImage: "arrow.down") {
                         moveGroup(group.id, by: 1)
                     }
-                    Button(tr("Delete", "Slett"), systemImage: "trash", role: .destructive) {
+                    Button(tr("Delete group and commands", "Slett gruppe og kommandoer"), systemImage: "trash", role: .destructive) {
                         removeGroup(group)
                     }
                 } label: {
@@ -532,8 +516,9 @@ struct ATHLTHAudioCoachCircleOverview: View {
     }
 
     private func removeGroup(_ group: ATHLTHAudioCoachGroup) {
-        // Removing a container must not silently delete the user's
-        // commands. Rules and built-in options become ungrouped instead.
+        // A rule cannot remain without its group trigger when its group is removed.
+        let ids = Set(group.ruleIDs)
+        draft.customRules.removeAll { ids.contains($0.id) }
         draft.coachGroups.removeAll { $0.id == group.id }
         expandedGroups.remove(group.id)
     }
