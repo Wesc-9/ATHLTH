@@ -2780,7 +2780,12 @@ struct TrainingPlanCatalogDetailView: View {
             )
         }
         .sheet(item: $inspectedPlanStep) { step in
-            NavigationStack {
+            if step.kind == .exercise {
+                // The plan preview opens the exact same full exercise card as
+                // Exercises and workout timelines, not a generic step dialog.
+                ATHLTHLinkedExerciseDetailView(block: step)
+            } else {
+                NavigationStack {
                 ScrollView {
                     ATHLTHWorkoutStepDetails(
                         block: ATHLTHWorkoutStructuredDataMigration.normalize(step),
@@ -2806,6 +2811,7 @@ struct TrainingPlanCatalogDetailView: View {
                             inspectedPlanStep = nil
                         }
                     }
+                }
                 }
             }
         }
@@ -3164,8 +3170,10 @@ struct TrainingPlanCatalogDetailView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Open all structured step targets",
-            norwegian: "Åpne alle egne datafelt for øktdelen"
+            english: block.kind == .exercise
+                ? "Open the exercise in your library" : "Open workout step details",
+            norwegian: block.kind == .exercise
+                ? "Åpne øvelsen fra øvelsesbiblioteket" : "Åpne øktdelens mål"
         ))
     }
 
