@@ -4430,7 +4430,8 @@ struct PostWorkoutReviewView: View {
             friendIDs: selectedFriendIDs,
             creatorName: session.profile.displayName,
             creatorUsername: session.profile.username,
-            includeHealthData: includeHealthData
+            includeHealthData: includeHealthData,
+            pulseSamples: completionMeasuredPulse
         )
 
         let mediaSaved =
