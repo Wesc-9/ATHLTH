@@ -10621,10 +10621,17 @@ struct SessionEditorView: View {
                     sourceOwnerID: session.profile.userID,
                     shareVersion: 2
                 )
-                let body = ATHLTHLocalization.choose(
-                    english: "Let's meet and train! \(workout.title) · \(scheduled). Accept or decline the invitation below.",
-                    norwegian: "Vil du trene fysisk sammen? \(workout.title) · \(scheduled). Godta eller avslå invitasjonen nedenfor."
-                )
+                // Concise notification preview. In the conversation the
+                // attachment card carries the actions and details.
+                let body = workout.trainTogetherMode == .sameWorkout
+                    ? ATHLTHLocalization.choose(
+                        english: "Workout invitation: \(workout.title) · \(scheduled). Train at your own pace.",
+                        norwegian: "Invitasjon til \(workout.title) · \(scheduled). Tren i eget tempo."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "You're invited to train together: \(workout.title) · \(scheduled).",
+                        norwegian: "Du er invitert til å trene sammen: \(workout.title) · \(scheduled)."
+                    )
                 let sent = await messaging.send(
                     to: partnerID,
                     conversationID: conversationID,
