@@ -2727,7 +2727,9 @@ final class StrengthWorkoutStore: ObservableObject {
 
             var log = StrengthExerciseLog(
                 id: UUID(),
-                plannedExerciseID: planned.id,
+                // Use the canonical library ID for cross-workout history,
+                // not this session's incidental PlannedExercise row ID.
+                plannedExerciseID: planned.exerciseID ?? planned.id,
                 exercise: planned.embeddedExercise,
                 sets:
                     Array(
