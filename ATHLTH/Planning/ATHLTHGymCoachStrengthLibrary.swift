@@ -50,6 +50,24 @@ enum ATHLTHGymCoachStrengthLibrary {
         return result
     }()
 
+    // Catalog origin proof for repairing legacy, snapshot-only workout blocks.
+    // A name appearing in a user-shared snapshot alone is not enough to link
+    // a custom exercise; the caller also validates the absence of private IDs,
+    // user instructions and media.
+    private static let sourceExerciseNames: Set<String> = Set(
+        programs.flatMap { program in
+            program.program.workouts.flatMap { workout in
+                workout.exercises.map {
+                    ATHLTHExerciseReferenceResolver.key($0.name)
+                }
+            }
+        }
+    )
+
+    static func hasSourceExercise(named name: String) -> Bool {
+        sourceExerciseNames.contains(ATHLTHExerciseReferenceResolver.key(name))
+    }
+
     static func program(for slug: String) -> Program? {
         guard slug.hasPrefix("gymcoach-") else { return nil }
         let id = String(slug.dropFirst("gymcoach-".count))
