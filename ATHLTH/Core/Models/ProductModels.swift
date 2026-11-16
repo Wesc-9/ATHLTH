@@ -1141,6 +1141,10 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var title: String
     var kind: WorkoutKind
     var scheduledStart: Date?
+    /// Explicit or automatically cancelled calendar workout. Optional so
+    /// plans and standalone sessions saved by older versions still decode.
+    /// A cancellation never changes the workout title or completed history.
+    var cancelledAt: Date? = nil
     var durationMinutes: Int?
     var targetDistanceKilometers: Double?
     var targetPaceSecondsPerKilometer: Double?
