@@ -5881,6 +5881,40 @@ struct WorkoutTemplateBuilderView: View {
                         }
                     }
 
+                    // Routes belong to the same walking/running recipe,
+                    // in both Quick Plan and a day inside a training plan.
+                    if initialActivity == .walking || initialActivity == .running ||
+                        hasWalking || hasActualRunning {
+                        HStack(spacing: 10) {
+                            Button {
+                                selectedPhase = .main
+                                studioRoutePhase = .main
+                                showingStudioRoutePicker = true
+                            } label: {
+                                Label(activeRoute?.title ??
+                                    tr("Choose route", "Velg rute"),
+                                    systemImage: "map")
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHPlanDesign.accentInk)
+
+                            if activeRouteID != nil {
+                                Button {
+                                    selectedRouteID = nil
+                                    blocks.removeAll { $0.routeID != nil }
+                                    resequence()
+                                } label: {
+                                    Image(systemName: "xmark.circle")
+                                        .frame(minWidth: 44, minHeight: 44)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(tr("Remove route", "Fjern rute"))
+                            }
+                        }
+                    }
+
                     Button {
                         selectedPhase = .main
                         showingSavedWorkoutPicker = true
@@ -6596,8 +6630,23 @@ struct WorkoutTemplateBuilderView: View {
 
     private func useRoute(_ route: TrainingRoute, in phase: WorkoutPhaseKind) {
         selectedPhase = phase
-        if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
+        // A walking workout in a training plan may have no initialActivity:
+        // its source category lives on the existing canonical walking block.
+        let isWalkingRoute = initialActivity == .walking ||
+            blocks.contains {
+                $0.kind == .run && $0.cardioActivity == .walking &&
+                    $0.resolvedPhase == phase
+            }
+        if isPlannedWorkout && !studioAdvanced &&
+            (initialActivity == .running || isWalkingRoute) {
             removeBasicOwnedBlocks()
+        }
+        // Selecting a course for a Basic free walk replaces the single
+        // untargeted placeholder instead of silently doubling the workout.
+        if !studioAdvanced && isWalkingRoute && blocks.count == 1 &&
+            blocks[0].kind == .run && blocks[0].routeID == nil {
+            blocks.removeAll()
+            studioBasicOwnedBlockIDs.removeAll()
         }
         let previousRoute = session.savedRoutes.first { $0.id == selectedRouteID }
         let existingRouteBlockIndex = previousRoute.flatMap { previous in
@@ -6617,6 +6666,8 @@ struct WorkoutTemplateBuilderView: View {
             blocks[existingRouteBlockIndex].distanceMeters =
                 route.distanceKilometers * 1_000
             blocks[existingRouteBlockIndex].routeID = route.id
+            blocks[existingRouteBlockIndex].cardioActivity =
+                isWalkingRoute ? .walking : .running
             blocks[existingRouteBlockIndex].phase = phase
             blocks[existingRouteBlockIndex].durationSeconds = nil
             resequence()
@@ -6630,12 +6681,13 @@ struct WorkoutTemplateBuilderView: View {
             targetWeightKilograms: nil, loadNote: nil,
             notes: nil, phase: phase
         )
-        routeRun.cardioActivity = initialActivity == .walking ? .walking : .running
+        routeRun.cardioActivity = isWalkingRoute ? .walking : .running
         routeRun.routeID = route.id
         routeRun.isIndoor = false
         insertBlock(routeRun, toGroup: nil)
         if isPlannedWorkout && !studioAdvanced &&
-            initialActivity == .running, let added = blocks.last {
+            (initialActivity == .running || isWalkingRoute),
+           let added = blocks.last {
             studioBasicOwnedBlockIDs.insert(added.editorDragID)
         }
     }
