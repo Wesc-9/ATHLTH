@@ -47,6 +47,18 @@ final class ATHLTHWatchDisplayPreferencesTests: XCTestCase {
         ), 7)
     }
 
+    func testWorkoutStartingScreenCanBeStandardOrCompetition() {
+        var config = ATHLTHLiveWorkoutSurfaceConfiguration.standard
+        config.preferredRunPageRaw = "competition"
+        XCTAssertEqual(ATHLTHWatchDisplayPreferences.startingRunPage(
+            configuration: config, audioCoachAvailable: false
+        ), 10)
+        config.preferredRunPageRaw = "metrics"
+        XCTAssertEqual(ATHLTHWatchDisplayPreferences.startingRunPage(
+            configuration: config, audioCoachAvailable: true
+        ), 0)
+    }
+
     func testPrivacyAndContrastAreOptIn() {
         var config = ATHLTHLiveWorkoutSurfaceConfiguration.standard
         config.privateAlwaysOn = true
