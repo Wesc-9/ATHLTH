@@ -17,6 +17,18 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var showingCatalogue = false
     @State private var showingQuickMessage = false
     @State private var showingGroupBuilder = false
+    @State private var showingGroupCommandBuilder = false
+    @State private var pendingGroupCommandID: UUID?
+    @State private var groupCommandMetric: ATHLTHAudioCoachRule.Metric = .heartRate
+    @State private var groupCommandPhrase = ""
+    @State private var showingVoiceOptions = false
+    @State private var showingSaveChoices = false
+    @State private var showingDirtyTemplatePrompt = false
+    @State private var showingResetStandardPrompt = false
+    @State private var baselineConfiguration: WatchAudioCoachConfiguration?
+    @State private var selectedTemplateID: UUID?
+    @State private var pendingTemplateDestination: TemplateDestination?
+    @State private var isNewEmptyTemplate = false
     @State private var groupDraftName = ""
     @State private var groupDraftTrigger: ATHLTHAudioCoachRule.Trigger = .distance
     @State private var groupDraftInterval = 1_000
@@ -61,8 +73,18 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var placeError: String?
 
     private enum ProfileAction {
-        case replace(UUID)
         case delete(UUID)
+    }
+
+    private enum TemplateDestination {
+        case standard
+        case profile(UUID)
+        case new
+    }
+
+    private var hasUnsavedTemplateChanges: Bool {
+        guard let baselineConfiguration else { return false }
+        return draft.configuration() != baselineConfiguration
     }
 
     private struct PlaceCandidate: Identifiable {
@@ -185,7 +207,25 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            masterCard
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("Voice guidance", "Stemmeveiledning"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(draft.enabled
+                         ? tr("Coach is on", "Coach er på")
+                         : tr("Coach is off", "Coach er av"))
+                        .font(.caption)
+                        .foregroundStyle(dim)
+                }
+                Spacer(minLength: 0)
+                Toggle("Audio Coach", isOn: $draft.enabled)
+                    .labelsHidden()
+                    .tint(bronze)
+                    .accessibilityIdentifier("athlth-audio-coach-enabled")
+            }
+            .padding(.horizontal, 3)
+            .padding(.vertical, 5)
             if draft.enabled {
                 if editorMode == "basic" {
                     ATHLTHAudioCoachCircleOverview(
@@ -202,21 +242,29 @@ struct ATHLTHAudioCoachActiveListView: View {
                         onShowProfiles: {
                             showingProfiles = true
                         },
-                        onSaveAsNew: {
-                            profileName = ""
-                            showingSaveNewProfile = true
+                        onCreateTemplate: {
+                            requestTemplateChange(.new)
                         },
-                        onUseStandard: {
-                            if hasAdvancedConfiguration {
-                                confirmReplaceWithStandard = true
-                            } else {
-                                draft.applySimpleAudioCoach()
-                                selectedProfileName = nil
-                            }
+                        onSaveTemplate: {
+                            showingSaveChoices = true
                         },
-                        onAddTrigger: { groupID in
-                            targetCoachGroupID = groupID
-                            showingGroupTriggerCatalogue = true
+                        onSwitchTemplate: { step in
+                            cycleSavedTemplates(step)
+                        },
+                        onResetStandard: {
+                            showingResetStandardPrompt = true
+                        },
+                        isDirty: hasUnsavedTemplateChanges,
+                        onAddCommand: { groupID in
+                            pendingGroupCommandID = groupID
+                            groupCommandMetric = .heartRate
+                            groupCommandPhrase = ""
+                            showingGroupCommandBuilder = true
+                        },
+                        onMoveCommand: { token, destination in
+                            ATHLTHAudioCoachCommandMoves.move(
+                                token, to: destination, draft: &draft
+                            )
                         },
                         onAddGroup: {
                             groupDraftName = ""
@@ -247,7 +295,33 @@ struct ATHLTHAudioCoachActiveListView: View {
                     .foregroundStyle(bronze)
                     advancedCard
                 }
-                compactNavigationCard
+                DisclosureGroup(isExpanded: $showingVoiceOptions) {
+                    voiceAndMusicContent
+                        .padding(.top, 12)
+                } label: {
+                    HStack(spacing: 11) {
+                        Image(systemName: "speaker.wave.2")
+                            .foregroundStyle(bronze)
+                            .frame(width: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(tr("Voice and music", "Stemme og musikk"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                            Text(tr("Language, Azure voices and playback",
+                                    "Språk, Azure-stemmer og avspilling"))
+                                .font(.caption)
+                                .foregroundStyle(dim)
+                        }
+                    }
+                }
+                .tint(bronze)
+                .padding(17)
+                .background(.white, in: RoundedRectangle(cornerRadius: 19))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 19)
+                        .strokeBorder(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+                }
+                .accessibilityIdentifier("athlth-coach-voice-music-expand")
             }
             Text(globalScope
                  ? tr("Defaults for new workouts. Saved workouts keep their own settings.",
@@ -259,8 +333,15 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .padding(.horizontal, 4)
         }
         .tint(bronze)
-        .sheet(isPresented: $showingGroupBuilder) {
+        .sheet(isPresented: $showingGroupBuilder, onDismiss: {
+            if pendingGroupCommandID != nil {
+                showingGroupCommandBuilder = true
+            }
+        }) {
             groupBuilderSheet
+        }
+        .sheet(isPresented: $showingGroupCommandBuilder) {
+            groupCommandSheet
         }
         .sheet(isPresented: $showingQuickMessage, onDismiss: {
             if openAdvancedAfterQuickMessage {
@@ -346,6 +427,76 @@ struct ATHLTHAudioCoachActiveListView: View {
         .sheet(isPresented: $showingVoice) { voiceSheet }
         .sheet(isPresented: $showingProfiles) { profilesSheet }
         .confirmationDialog(
+            tr("Save this template?", "Lagre denne malen?"),
+            isPresented: $showingSaveChoices,
+            titleVisibility: .visible
+        ) {
+            if !isNewEmptyTemplate {
+                Button(tr("Save changes", "Lagre endringer")) {
+                    saveCurrentTemplate()
+                }
+            }
+            Button(tr("Save as new", "Lagre som ny")) {
+                profileName = isNewEmptyTemplate ? "" : (selectedProfileName ?? "")
+                showingSaveNewProfile = true
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        }
+        .confirmationDialog(
+            tr("Unsaved changes", "Ulagrede endringer"),
+            isPresented: $showingDirtyTemplatePrompt,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Save", "Lagre")) {
+                saveCurrentTemplate()
+                if !isNewEmptyTemplate {
+                    if let destination = pendingTemplateDestination {
+                        applyTemplateDestination(destination)
+                    }
+                    pendingTemplateDestination = nil
+                } else {
+                    profileName = ""
+                    showingSaveNewProfile = true
+                }
+            }
+            Button(tr("Discard changes", "Forkast endringer"), role: .destructive) {
+                if let destination = pendingTemplateDestination {
+                    applyTemplateDestination(destination)
+                }
+                pendingTemplateDestination = nil
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                pendingTemplateDestination = nil
+            }
+        } message: {
+            Text(tr("Save your changes or discard them before changing templates.",
+                    "Lagre eller forkast endringene før du bytter mal."))
+        }
+        .confirmationDialog(
+            tr("Restore Standard?", "Tilbakestille Standard?"),
+            isPresented: $showingResetStandardPrompt,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Restore original Standard", "Tilbakestill til opprinnelig Standard"),
+                   role: .destructive) {
+                draft.applySimpleAudioCoach()
+                selectedProfileName = nil
+                selectedTemplateID = nil
+                isNewEmptyTemplate = false
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        }
+        .onAppear {
+            if baselineConfiguration == nil {
+                baselineConfiguration = draft.configuration()
+                selectedTemplateID = settings.activeAudioCoachProfileID
+                if let selectedTemplateID,
+                   let profile = settings.audioCoachProfiles.first(where: { $0.id == selectedTemplateID }) {
+                    selectedProfileName = profile.name
+                }
+            }
+        }
+        .confirmationDialog(
             tr("Remove active setting?", "Fjerne aktivt valg?"),
             isPresented: Binding(
                 get: { pendingRemoval != nil },
@@ -367,36 +518,6 @@ struct ATHLTHAudioCoachActiveListView: View {
                 "This also removes the saved entries in this list from the current coach setup.",
                 "Dette fjerner også innholdet i den valgte listen fra coach-oppsettet."
             ))
-        }
-    }
-
-    private var masterCard: some View {
-        ATHLTHPlanSurface(ghost: false) {
-            HStack(spacing: 12) {
-                Image(systemName: "waveform")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(bronze)
-                    .frame(width: 44, height: 44)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 14))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Audio Coach")
-                        .font(.headline)
-                        .foregroundStyle(ink)
-                    Text(draft.enabled
-                        ? (globalScope
-                            ? tr("On for new workouts", "På for nye økter")
-                            : tr("Active for this workout", "Aktiv stemmeveiledning"))
-                        : tr("Voice guidance is off", "Stemmeveiledning er av"))
-                        .font(.caption)
-                        .foregroundStyle(dim)
-                }
-                Spacer(minLength: 4)
-                Toggle("Audio Coach", isOn: $draft.enabled)
-                    .labelsHidden()
-                    .tint(bronze)
-                    .accessibilityIdentifier("athlth-audio-coach-enabled")
-            }
         }
     }
 
