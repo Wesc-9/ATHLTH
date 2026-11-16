@@ -38,11 +38,11 @@ struct ATHLTHStudioPlannerHomeView: View {
                         HStack(alignment: .top, spacing: 20) {
                             activePlanCard
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 528)
+                                .frame(minHeight: 528)
 
                             rightColumn
                                 .frame(width: max(345, min(490, geometry.size.width * 0.39)))
-                                .frame(height: 528)
+                                .frame(minHeight: 528)
                         }
                     }
                 }
