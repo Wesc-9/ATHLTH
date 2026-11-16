@@ -1284,10 +1284,11 @@ enum WorkoutLaunchCoordinator {
         }()
         // A planned walk can carry its route independently of Quick Train.
         // A manually picked route always takes precedence over the plan.
-        let selectedWalkingRoute = configuration.route ??
-            plannedWalkingWorkout.flatMap { workout in
+        let selectedWalkingRoute: TrainingRoute? = configuration.suppressPlannedRoute
+            ? nil
+            : (configuration.route ?? plannedWalkingWorkout.flatMap { workout in
                 session?.savedRoutes.first { $0.id == workout.routeID }
-            }
+            })
         var walkingAudioCoach = settings.applyingFuelVoice(
             to: configuration.audioCoach
         )
