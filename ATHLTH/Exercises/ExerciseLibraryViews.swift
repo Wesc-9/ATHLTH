@@ -724,10 +724,13 @@ struct ExerciseLibraryView: View {
                     // different page. Its origin then resets to the new page's
                     // first exercise reliably, without racing SwiftUI layout.
                     .id(visibleStartIndex)
-                    .onScrollGeometryChange(for: Bool.self) { geometry in
-                        geometry.contentOffset.y + geometry.contentInsets.top < -28
-                    } action: { _, isPulling in
-                        if isPulling { searchExpanded = true }
+                    // Refresh only the exercise results. Source tabs and
+                    // display/filter controls remain outside this scroll view
+                    // and do not slide down with the refresh indicator.
+                    .refreshable {
+                        async let exercises: Void = library.refresh(force: true)
+                        async let saved: Void = favorites.refresh()
+                        _ = await (exercises, saved)
                     }
                     .overlay(
                         alignment: .trailing
