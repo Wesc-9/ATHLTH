@@ -350,28 +350,127 @@ struct ATHLTHWorkoutReplayCard: View {
                 Divider()
                     .padding(.top, 12)
 
-                HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "sparkles")
+                if !replayMilestones.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "flag.checkered")
+                            Text(ATHLTHLocalization.choose(
+                                english: "MILESTONES ALONG THE WAY",
+                                norwegian: "MILEPÆLER UNDERVEIS"
+                            ))
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.8)
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("ATHLTH Coach")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                        Text(coachSummary)
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .fixedSize(horizontal: false, vertical: true)
+
+                        HStack(spacing: 8) {
+                            ForEach(Array(replayMilestones.enumerated()), id: \.offset) {
+                                index, kilometer in
+                                HStack(spacing: 5) {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                    Text("\(kilometer) km")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                }
+                                if index < replayMilestones.count - 1 {
+                                    Rectangle()
+                                        .fill(ATHLTHTrainDesign.bronze.opacity(0.3))
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 1)
+                                }
+                            }
+                        }
                     }
-                    Spacer(minLength: 0)
+                    .padding(13)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft.opacity(0.55),
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    )
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("athlth-replay-distance-milestones")
                 }
-                .padding(11)
-                .background(
-                    ATHLTHTheme.premiumGoldSoft.opacity(0.55),
-                    in: RoundedRectangle(cornerRadius: 13)
-                )
-                .padding(.top, 10)
-                .accessibilityIdentifier("athlth-replay-coach-summary")
+
+                if replayPaceBars.count >= 3 {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Your pace rhythm",
+                                    norwegian: "Temporytmen din"
+                                ),
+                                systemImage: "waveform.path"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            Spacer()
+                            Text(ATHLTHLocalization.choose(
+                                english: "Measured sections",
+                                norwegian: "Målte deler"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        let fastest = replayPaceBars.min() ?? 1
+                        let slowest = replayPaceBars.max() ?? fastest
+                        HStack(alignment: .bottom, spacing: 4) {
+                            ForEach(Array(replayPaceBars.enumerated()), id: \.offset) {
+                                _, pace in
+                                let relative = slowest > fastest
+                                    ? (slowest - pace) / (slowest - fastest)
+                                    : 0.5
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(ATHLTHTrainDesign.bronze.opacity(0.35 + relative * 0.6))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 12 + CGFloat(relative) * 28)
+                            }
+                        }
+                        .frame(height: 41, alignment: .bottom)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Taller bars mean a faster measured section. Not a heart-rate or effort chart.",
+                            norwegian: "Høyere stolper betyr raskere målt del. Viser tempo, ikke puls eller anstrengelse."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(12)
+                    .background(
+                        ATHLTHTheme.cardWarm.opacity(0.65),
+                        in: RoundedRectangle(cornerRadius: 15)
+                    )
+                    .padding(.top, 10)
+                    .accessibilityIdentifier("athlth-replay-pace-rhythm")
+                }
+
+                if let summary = coachSummary {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("ATHLTH Coach")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text(summary)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(12)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft.opacity(0.55),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                    .padding(.top, 10)
+                    .accessibilityIdentifier("athlth-replay-coach-summary")
+                }
                 if isStrength,
                    let seconds = workout.strengthCardioDurationSeconds,
                    seconds > 0 {
@@ -584,18 +683,7 @@ struct ATHLTHWorkoutReplayCard: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
-                if !isStrength && usableSegments.isEmpty && !requiresDataReview {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "More replay detail appears with route or heart-rate samples.",
-                            norwegian: "Flere Replay-detaljer vises når økten har rute- eller pulsdata."
-                        ),
-                        systemImage: "info.circle"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 8)
-                }
+
             }
         }
         .padding(12)
@@ -731,7 +819,12 @@ struct ATHLTHWorkoutReplayCard: View {
 
     private var replayMoments: [ReplayMoment] {
         guard !requiresDataReview else { return [] }
-        let available = isStrength ? strengthMoments : enduranceMoments
+        let available = (isStrength ? strengthMoments : enduranceMoments)
+            .filter { moment in
+                // Distance already has a hero and a verified milestone trail.
+                // Duplicating it as another 'insight' is not useful.
+                moment.category != "distance" || replayMilestones.isEmpty
+            }
         let ranked = available.sorted {
             $0.priority == $1.priority
                 ? $0.category < $1.category
@@ -755,57 +848,31 @@ struct ATHLTHWorkoutReplayCard: View {
         return Array(distinct.prefix(3))
     }
 
-    /// Short factual Coach copy; never generates speculative health claims.
-    private var coachSummary: String {
-        if requiresDataReview {
-            return ATHLTHLocalization.choose(
-                english: "This recording has unusually little movement for its duration. Pace and performance conclusions have been hidden; check the workout data before sharing.",
-                norwegian: "Økten har uvanlig lite bevegelse i forhold til varigheten. Tempo- og prestasjonskonklusjoner er skjult. Kontroller målingene før du deler."
-            )
-        }
-
-        if isStrength {
-            if let focus = workout.strengthMuscleGroups?.prefix(2),
-               !focus.isEmpty {
+    /// Only surface Coach when a different, meaningful measured insight
+    /// exists. Never repeat the featured card or pad sparse data with boilerplate.
+    private var coachSummary: String? {
+        guard !requiresDataReview else { return nil }
+        if isStrength { return nil }
+        if replayMoments.first?.category != "history",
+           let similar = previousComparableEndurance,
+           let currentPace = validOverallPace,
+           let previousPace = ATHLTHReplayDataQuality.usablePace(
+                duration: similar.duration,
+                distanceMeters: similar.distanceMeters,
+                activity: workout.activity,
+                requiresReview: false
+           ) {
+            let change = currentPace - previousPace
+            if abs(change) >= 3 && abs(change) / previousPace < 0.3 {
                 return ATHLTHLocalization.choose(
-                    english: "Your logged work focused on \(focus.joined(separator: " and ")). The insights below use completed exercises and recorded loads, not assumed exertion.",
-                    norwegian: "Den registrerte økten prioriterte \(focus.joined(separator: " og ")). Høydepunktene bygger på utførte øvelser og registrert belastning, ikke antatt anstrengelse."
-                )
-            }
-            if let reps = workout.strengthTotalReps, reps > 0 {
-                return ATHLTHLocalization.choose(
-                    english: "\(reps) repetitions were logged. Compare completed work with your previous sessions below when comparable data exists.",
-                    norwegian: "\(reps) repetisjoner er registrert. Vi sammenligner med tidligere lignende økter når sammenlignbare data finnes."
-                )
-            }
-        } else if let similar = previousComparableEndurance,
-                  let currentPace = validOverallPace,
-                  let previousPace = ATHLTHReplayDataQuality.usablePace(
-                    duration: similar.duration,
-                    distanceMeters: similar.distanceMeters,
-                    activity: workout.activity,
-                    requiresReview: false
-                  ) {
-            let diff = currentPace - previousPace
-            if abs(diff) >= 3 && abs(diff) / previousPace < 0.3 {
-                return ATHLTHLocalization.choose(
-                    english: "At a similar distance, the recorded average pace was \(Int(abs(diff).rounded())) sec/km \(diff < 0 ? "quicker" : "slower") than your previous comparable workout. Route and conditions may differ.",
-                    norwegian: "På en lignende distanse var registrert snittempo \(Int(abs(diff).rounded())) sek/km \(diff < 0 ? "raskere" : "roligere") enn i forrige sammenlignbare økt. Rute og forhold kan være ulike."
+                    english: "Compared with a similar-distance workout, today's recorded average was \(Int(abs(change).rounded())) sec/km \(change < 0 ? "faster" : "slower"). Routes and conditions can differ.",
+                    norwegian: "Sammenlignet med en økt på lignende distanse var dagens registrerte snittempo \(Int(abs(change).rounded())) sek/km \(change < 0 ? "raskere" : "roligere"). Rute og forhold kan være ulike."
                 )
             }
         }
-
-        if let first = replayMoments.first,
-           first.category != "recording" {
-            return ATHLTHLocalization.choose(
-                english: "This session's clearest verified insight: \(first.detail) Only measurements available from this workout are used.",
-                norwegian: "Det tydeligste registrerte funnet i denne økten: \(first.detail) Vi bygger oppsummeringen på målinger som faktisk finnes."
-            )
-        }
-        return ATHLTHLocalization.choose(
-            english: "The session has been recorded, but there is not enough reliable data yet to describe progress or training intensity.",
-            norwegian: "Økten er registrert, men vi har foreløpig ikke nok pålitelige data til å vurdere fremgang eller treningsintensitet."
-        )
+        // A single high pulse is never presented as intensity, form or
+        // fitness progress. With no independent evidence, omit Coach.
+        return nil
     }
 
     private var previousComparableEndurance: WorkoutSummary? {
