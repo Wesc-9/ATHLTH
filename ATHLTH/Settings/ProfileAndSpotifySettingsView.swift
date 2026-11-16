@@ -3095,11 +3095,17 @@ struct ATHLTHPrivacyCenterView: View {
                         norwegian: "Del fullførte økter automatisk med venner"
                     ),
                     isOn: Binding(
-                        get: { settings.autoPublishCompletedWorkouts },
+                        get: {
+                            guard let userID = social.currentUserID else { return false }
+                            return FriendFeedSharingPreference.isEnabled(userID: userID)
+                        },
                         set: { wantsToShare in
                             if wantsToShare {
                                 showingAutoShareConsent = true
                             } else {
+                                if let userID = social.currentUserID {
+                                    FriendFeedSharingPreference.setEnabled(false, userID: userID)
+                                }
                                 settings.autoPublishCompletedWorkouts = false
                                 settings.workoutSharingChoiceCompleted = true
                             }
@@ -3245,6 +3251,9 @@ struct ATHLTHPrivacyCenterView: View {
             set: { updated in
                 guard updated != draft else { return }
                 if !updated.shareRecentActivity || updated.profileVisibility == "private" {
+                    if let userID = social.currentUserID {
+                        FriendFeedSharingPreference.setEnabled(false, userID: userID)
+                    }
                     settings.autoPublishCompletedWorkouts = false
                 }
                 draft = updated
@@ -3284,7 +3293,9 @@ struct ATHLTHPrivacyCenterView: View {
 
     @MainActor
     private func enableAutomaticFriendSharing() async {
-        guard !saving, !enablingAutoShare, var updated = draft else { return }
+        guard !saving, !enablingAutoShare, var updated = draft,
+              let userID = social.currentUserID,
+              updated.userID == userID else { return }
         enablingAutoShare = true
         autoShareError = nil
         defer { enablingAutoShare = false }
@@ -3302,9 +3313,11 @@ struct ATHLTHPrivacyCenterView: View {
             settings.defaultActivityVisibility = .friends
             settings.includeWorkoutHealthDataByDefault = false
             settings.workoutSharingChoiceCompleted = true
+            FriendFeedSharingPreference.setEnabled(true, userID: userID)
             settings.autoPublishCompletedWorkouts = true
             saved = true
         case .failure(let error):
+            FriendFeedSharingPreference.setEnabled(false, userID: userID)
             settings.autoPublishCompletedWorkouts = false
             autoShareError = error.localizedDescription
         }
