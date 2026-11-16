@@ -1015,6 +1015,8 @@ struct PostWorkoutReviewView: View {
     @State private var descriptionText = ""
     @State private var effort = 5.0
     @State private var includeHealthData = true
+    @State private var showingFeedPrivacyConfirmation = false
+    @State private var feedPrivacyError: String?
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var selectedPetIDs: Set<UUID> = []
@@ -1059,6 +1061,12 @@ struct PostWorkoutReviewView: View {
                     }
 
                     reflectionCard
+
+                    if visibility != .privateOnly,
+                       social.privacy?.recentActivityVisibility == "private" ||
+                       social.privacy?.shareRecentActivity == false {
+                        blockedActivityVisibilityNotice
+                    }
 
                     ATHLTHUnifiedCard {
                         VStack(alignment: .leading, spacing: 6) {
@@ -1275,6 +1283,28 @@ struct PostWorkoutReviewView: View {
                 saveBar
             }
             .interactiveDismissDisabled(requiresDecision)
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Allow friends to see your shared workouts?",
+                    norwegian: "Vil du la venner se delte treningsøkter?"
+                ),
+                isPresented: $showingFeedPrivacyConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Enable for friends", norwegian: "Aktiver for venner"
+                )) {
+                    Task { await enableSharedActivityForFriends() }
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Keep private", norwegian: "Behold privat"
+                ), role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Your profile's Recent Activity is private. Enabling it for friends can also reveal older workouts you already shared with friends or publicly. Your private workout recordings remain private.",
+                    norwegian: "Siste aktivitet på profilen din er privat. Aktivering for venner kan også gjøre tidligere økter du har delt med venner eller offentlig synlige. Private treningsopptak forblir private."
+                ))
+            }
             .task {
                 async let reviewLoad: Void =
                     loadExistingReview()
@@ -4012,6 +4042,81 @@ struct PostWorkoutReviewView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    /// A post-level audience does not override the separate server-enforced
+    /// Recent Activity audience. Explain the effective audience before saving.
+    private var blockedActivityVisibilityNotice: some View {
+        ATHLTHUnifiedCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Friends cannot see this shared workout yet",
+                        norwegian: "Venner kan ikke se denne delte økten ennå"
+                    ),
+                    systemImage: "eye.slash"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Recent Activity is turned off in Social Privacy. The workout may say Friends or Public, but the profile setting still hides it.",
+                    norwegian: "Siste aktivitet er slått av under Sosialt personvern. Økten kan stå som Venner eller Offentlig, men profilinnstillingen skjuler den fortsatt."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Button {
+                    showingFeedPrivacyConfirmation = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Allow shared activity for friends",
+                            norwegian: "Tillat delte aktiviteter for venner"
+                        ),
+                        systemImage: "person.2"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.accentInk)
+                if let feedPrivacyError {
+                    Text(feedPrivacyError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .accessibilityIdentifier("athlth-shared-activity-privacy-warning")
+    }
+
+    @MainActor
+    private func enableSharedActivityForFriends() async {
+        guard var updated = social.privacy else {
+            feedPrivacyError = ATHLTHLocalization.choose(
+                english: "Privacy settings are unavailable. Try again.",
+                norwegian: "Personverninnstillinger er ikke tilgjengelige. Prøv igjen."
+            )
+            return
+        }
+        guard updated.profileVisibility != "private" else {
+            feedPrivacyError = ATHLTHLocalization.choose(
+                english: "Your entire profile is private. Change profile visibility in Social Privacy first.",
+                norwegian: "Hele profilen er privat. Endre profilsynlighet under Sosialt personvern først."
+            )
+            return
+        }
+        updated.shareRecentActivity = true
+        updated.recentActivityVisibility = "friends"
+        switch await social.updatePrivacy(updated) {
+        case .success:
+            feedPrivacyError = nil
+        case .failure:
+            feedPrivacyError = ATHLTHLocalization.choose(
+                english: "Could not update sharing. Check your connection.",
+                norwegian: "Kunne ikke endre deling. Sjekk tilkoblingen."
+            )
+        }
     }
 
     private var visibilityCard: some View {
