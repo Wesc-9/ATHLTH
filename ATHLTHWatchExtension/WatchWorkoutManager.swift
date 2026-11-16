@@ -31,6 +31,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var distanceMeters: Double = 0
     @Published private(set) var currentPaceSecondsPerKilometer:
         TimeInterval?
+    @Published private(set) var lastKilometerPaceSecondsPerKilometer: TimeInterval?
+    private var rollingKilometerSamples: [(distance: Double, elapsed: TimeInterval)] = []
     @Published private(set) var routeProgressPercent: Double?
     @Published private(set) var routeRemainingMeters: Double?
     @Published private(set) var routeDeviationMeters: Double?
@@ -4063,6 +4065,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         healthKitDistanceLastUpdatedAt = nil
         coachHeartRateSampleAt = nil
         coachPaceSampleAt = nil
+        rollingKilometerSamples.removeAll(keepingCapacity: true)
         speechSynthesizer.stopSpeaking(at: .immediate)
         deactivateAudioCoachAudioSession()
         audioCoachReadyAnnouncedForWorkout = false
@@ -4080,6 +4083,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.activeCalories = 0
             self.distanceMeters = 0
             self.currentPaceSecondsPerKilometer = nil
+            self.lastKilometerPaceSecondsPerKilometer = nil
             self.routeProgressPercent = nil
             self.routeRemainingMeters = nil
             self.routeDeviationMeters = nil
@@ -4131,6 +4135,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard !isActive, state != .preparing, state != .ending else { return }
 
         workoutOwnerID = WatchRouteStore.shared.companionAccountID
+        rollingKilometerSamples.removeAll(keepingCapacity: true)
         let resolvedRoute = route ?? plannedRoute
         returningToRouteStart = false
         routeLegDistanceOffsetMeters = 0
@@ -4155,6 +4160,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.activeCalories = 0
             self.distanceMeters = 0
             self.currentPaceSecondsPerKilometer = nil
+            self.lastKilometerPaceSecondsPerKilometer = nil
             self.routeProgressPercent =
                 resolvedRoute == nil ? nil : 0
             self.routeRemainingMeters =
@@ -5725,6 +5731,42 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             geometry.cumulativeMeters
         plannedRouteGeometryMeters =
             geometry.totalMeters
+    }
+
+    /// Pace over the most recent 1,000 recorded meters, not the full workout
+    /// and not a noisy instantaneous GPS reading. Samples are bounded.
+    private func recordRollingKilometerPace() {
+        guard (kind == .running || kind == .walking),
+              state == .running,
+              distanceMeters.isFinite, elapsedTime.isFinite,
+              distanceMeters > 0, elapsedTime > 0 else { return }
+
+        let distance = distanceMeters
+        let elapsed = elapsedTime
+        if let previous = rollingKilometerSamples.last {
+            if distance < previous.distance {
+                rollingKilometerSamples.removeAll(keepingCapacity: true)
+            } else if distance - previous.distance < 2 &&
+                        elapsed - previous.elapsed < 3 {
+                return
+            }
+        }
+        rollingKilometerSamples.append((distance: distance, elapsed: elapsed))
+        let cutoff = max(0, distance - 1_000)
+        while rollingKilometerSamples.count > 2 &&
+              rollingKilometerSamples[1].distance <= cutoff {
+            rollingKilometerSamples.removeFirst()
+        }
+        if rollingKilometerSamples.count > 420 {
+            rollingKilometerSamples.removeFirst(rollingKilometerSamples.count - 420)
+        }
+        guard let first = rollingKilometerSamples.first else { return }
+        let measuredDistance = distance - first.distance
+        let measuredTime = elapsed - first.elapsed
+        guard measuredDistance >= 250, measuredTime > 0 else { return }
+        let secondsPerKilometer = measuredTime * 1_000 / measuredDistance
+        guard secondsPerKilometer.isFinite, (100...3_600).contains(secondsPerKilometer) else { return }
+        lastKilometerPaceSecondsPerKilometer = secondsPerKilometer
     }
 
     private func updateOutdoorMetrics(
@@ -8795,6 +8837,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             publish {
                 self.distanceMeters = self.healthKitDistanceMeters
             }
+            recordRollingKilometerPace()
         }
     }
 
@@ -9785,6 +9828,7 @@ private extension WatchWorkoutManager {
                 self.gpsFallbackDistanceMeters
             )
         }
+        recordRollingKilometerPace()
     }
 
     func attachWorkoutLocationMetadataIfPossible() {
