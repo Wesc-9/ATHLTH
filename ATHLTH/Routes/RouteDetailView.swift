@@ -596,24 +596,6 @@ struct RouteDetailView: View {
         )) / 1_000
     }
 
-    private var startDistanceLabel: String {
-        guard let distance = distanceToStartKilometers,
-              let location = routeLocation.location else {
-            return ATHLTHLocalization.choose(
-                english: "Location unavailable",
-                norwegian: "Posisjon utilgjengelig"
-            )
-        }
-        if location.horizontalAccuracy < 0 ||
-           location.horizontalAccuracy >= 500 {
-            return ATHLTHLocalization.choose(
-                english: String(format: "About %.0f km", distance),
-                norwegian: String(format: "Ca. %.0f km", distance)
-            )
-        }
-        return String(format: "%.1f km", distance)
-    }
-
     private var resolvedProfileSamples: [Double] {
         if let profile = publicTrailMetadata?.elevationProfile,
            profile.count >= 2 {
@@ -2168,8 +2150,10 @@ struct RouteDetailView: View {
                             session.deleteSavedRoute(
                                 savedCopy.id
                             )
-                            watchMessage =
-                                "Route removed from My Routes."
+                            watchMessage = ATHLTHLocalization.choose(
+                                english: "Route removed from My Routes.",
+                                norwegian: "Ruten er fjernet fra Mine ruter."
+                            )
                         } else {
                             session.saveSharedRoute(
                                 currentRoute,
@@ -2178,14 +2162,21 @@ struct RouteDetailView: View {
                                 sourceRouteID:
                                     currentRoute.id
                             )
-                            watchMessage =
-                                "Route saved to My Routes."
+                            watchMessage = ATHLTHLocalization.choose(
+                                english: "Route saved to My Routes.",
+                                norwegian: "Ruten er lagret under Mine ruter."
+                            )
                         }
                     } label: {
                         Label(
                             savedCopy == nil
-                                ? "Save Route"
-                                : "Saved · Remove",
+                                ? ATHLTHLocalization.choose(
+                                    english: "Save route", norwegian: "Lagre rute"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Saved · Remove",
+                                    norwegian: "Lagret · Fjern"
+                                ),
                             systemImage:
                                 savedCopy == nil
                                     ? "bookmark"
@@ -2209,7 +2200,10 @@ struct RouteDetailView: View {
                                 .frame(maxWidth: .infinity)
                         } else {
                             Label(
-                                "Show 10 Similar Routes",
+                                ATHLTHLocalization.choose(
+                                    english: "Show 10 similar routes",
+                                    norwegian: "Vis 10 lignende ruter"
+                                ),
                                 systemImage:
                                     "square.stack.3d.up.fill"
                             )
@@ -2234,7 +2228,10 @@ struct RouteDetailView: View {
                                 .frame(maxWidth: .infinity)
                         } else {
                             Label(
-                                "Race Your Best",
+                                ATHLTHLocalization.choose(
+                                    english: "Race your best",
+                                    norwegian: "Konkurrer mot din beste"
+                                ),
                                 systemImage: "medal.fill"
                             )
                             .frame(maxWidth: .infinity)
@@ -2263,7 +2260,10 @@ struct RouteDetailView: View {
                                 .frame(maxWidth: .infinity)
                         } else {
                             Label(
-                                "Race Last Attempt",
+                                ATHLTHLocalization.choose(
+                                    english: "Race last attempt",
+                                    norwegian: "Konkurrer mot siste forsøk"
+                                ),
                                 systemImage: "clock.arrow.circlepath"
                             )
                             .frame(maxWidth: .infinity)
@@ -2287,7 +2287,10 @@ struct RouteDetailView: View {
                         )
                     } label: {
                         Label(
-                            "Challenge Friends",
+                            ATHLTHLocalization.choose(
+                                english: "Challenge friends",
+                                norwegian: "Utfordre venner"
+                            ),
                             systemImage: "trophy.fill"
                         )
                         .frame(maxWidth: .infinity)
