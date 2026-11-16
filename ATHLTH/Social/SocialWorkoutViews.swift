@@ -5050,6 +5050,8 @@ struct WorkoutPublishView: View {
     @State private var caption = ""
     @State private var publishing = false
     @State private var selectedAlreadyPublished = false
+    @State private var showingActivityPrivacyConsent = false
+    @State private var activityPrivacyError: String?
     @State private var includeHealthData = true
     @State private var selectedPulseSamples: [ATHLTHRunningHeartRatePoint] = []
     @State private var includeRoute = false
@@ -5239,6 +5241,28 @@ struct WorkoutPublishView: View {
                             }
                         }
 
+                        if visibility != .privateOnly,
+                           (social.privacy?.recentActivityVisibility == "private" ||
+                            social.privacy?.shareRecentActivity == false) {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Your profile hides shared activity, even if this post is public.",
+                                norwegian: "Profilen skjuler delte aktiviteter selv om innlegget er offentlig."
+                            ), systemImage: "eye.slash")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            Button(ATHLTHLocalization.choose(
+                                english: "Allow friends to see my posts",
+                                norwegian: "La venner se innleggene mine"
+                            )) {
+                                showingActivityPrivacyConsent = true
+                            }
+                        }
+                        if let activityPrivacyError {
+                            Text(activityPrivacyError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+
                         if selectedAlreadyPublished {
                             Label(
                                 "This workout is already published.",
@@ -5258,6 +5282,28 @@ struct WorkoutPublishView: View {
             }
             .navigationTitle("Post Workout")
             .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Allow friends to see shared workouts?",
+                    norwegian: "Tillate at venner ser delte treningsøkter?"
+                ),
+                isPresented: $showingActivityPrivacyConsent,
+                titleVisibility: .visible
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Enable for friends", norwegian: "Aktiver for venner"
+                )) {
+                    Task { await enableActivitySharingForFriends() }
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Keep private", norwegian: "Behold privat"
+                ), role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "This may also show older workouts that you previously shared. Fully private workouts remain private.",
+                    norwegian: "Dette kan også vise eldre treningsøkter du tidligere har delt. Helt private økter forblir private."
+                ))
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -5339,6 +5385,35 @@ struct WorkoutPublishView: View {
                 sharingRoute = detail.route
                 loadingRoute = false
             }
+        }
+    }
+
+    @MainActor
+    private func enableActivitySharingForFriends() async {
+        guard var updated = social.privacy else {
+            activityPrivacyError = ATHLTHLocalization.choose(
+                english: "Privacy settings could not be loaded.",
+                norwegian: "Kunne ikke hente personverninnstillinger."
+            )
+            return
+        }
+        guard updated.profileVisibility != "private" else {
+            activityPrivacyError = ATHLTHLocalization.choose(
+                english: "Your profile is private. Change it in Social Privacy first.",
+                norwegian: "Profilen din er privat. Endre dette under Sosialt personvern først."
+            )
+            return
+        }
+        updated.shareRecentActivity = true
+        updated.recentActivityVisibility = "friends"
+        switch await social.updatePrivacy(updated) {
+        case .success:
+            activityPrivacyError = nil
+        case .failure:
+            activityPrivacyError = ATHLTHLocalization.choose(
+                english: "Could not update activity visibility.",
+                norwegian: "Kunne ikke oppdatere aktivitetssynligheten."
+            )
         }
     }
 
