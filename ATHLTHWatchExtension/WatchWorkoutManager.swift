@@ -7869,8 +7869,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 audioCoachConfiguration
                     .shouldDuckOtherAudio
                 ? [
-                    .duckOthers,
-                    .interruptSpokenAudioAndMixWithOthers
+                    .duckOthers
                 ]
                 : [.mixWithOthers]
 
