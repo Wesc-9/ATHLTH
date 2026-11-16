@@ -49,4 +49,46 @@ final class ATHLTHNotificationWorkoutInvitationPolicyTests: XCTestCase {
             .unverified
         )
     }
+    func testOldUnansweredWorkoutNotificationBecomesCancelled() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let now = Date(timeIntervalSince1970: 2_000)
+        XCTAssertEqual(
+            ATHLTHNotificationWorkoutInvitationPolicy.status(
+                sessionStatus: .active,
+                participantState: .invited,
+                scheduledStart: start,
+                now: now
+            ), .cancelled
+        )
+        XCTAssertEqual(
+            ATHLTHNotificationWorkoutInvitationPolicy.status(
+                sessionStatus: .active,
+                participantState: .accepted,
+                scheduledStart: start,
+                now: now
+            ), .accepted
+        )
+    }
+
+    func testFutureOrStartedWorkoutNotificationRemainsCorrect() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        XCTAssertEqual(
+            ATHLTHNotificationWorkoutInvitationPolicy.status(
+                sessionStatus: .active,
+                participantState: .invited,
+                scheduledStart: Date(timeIntervalSince1970: 3_000),
+                now: now
+            ), .actionable
+        )
+        XCTAssertEqual(
+            ATHLTHNotificationWorkoutInvitationPolicy.status(
+                sessionStatus: .active,
+                participantState: .invited,
+                scheduledStart: Date(timeIntervalSince1970: 1_000),
+                isPlanned: false,
+                now: now
+            ), .actionable
+        )
+    }
+
 }
