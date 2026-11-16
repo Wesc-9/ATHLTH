@@ -4770,14 +4770,28 @@ struct PlanMetadataEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Plan") {
-                    TextField("Title", text: $title)
+                Section(ATHLTHLocalization.choose(
+                    english: "Plan", norwegian: "Treningsplan"
+                )) {
                     TextField(
-                        "Summary",
+                        ATHLTHLocalization.choose(english: "Name", norwegian: "Navn"),
+                        text: $title
+                    )
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Plan description (optional)",
+                            norwegian: "Planbeskrivelse (valgfritt)"
+                        ),
                         text: $summary,
                         axis: .vertical
                     )
                     .lineLimit(2...5)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Shown in the plan overview. Can be edited at any time.",
+                        norwegian: "Vises i planoversikten. Kan endres når som helst."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                     Picker("Visibility", selection: $visibility) {
                         ForEach(ProfileVisibility.allCases) { visibility in
