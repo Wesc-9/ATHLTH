@@ -29,6 +29,10 @@ struct ATHLTHWorkoutInviteNotificationRoute: Identifiable, Equatable {
 
     var id: UUID { workoutSessionID }
 
+    func isForAccount(_ accountID: UUID) -> Bool {
+        recipientID == nil || recipientID == accountID
+    }
+
     static func resolve(userInfo: [AnyHashable: Any]) -> Self? {
         guard
             (userInfo["athlth_kind"] as? String)?.lowercased() == "workout_invite",
