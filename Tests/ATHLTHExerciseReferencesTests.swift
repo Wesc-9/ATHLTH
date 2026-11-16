@@ -454,4 +454,38 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         }
     }
 
+
+    func testPublishedHYROXStationsBindToExistingFallbackLibraryEntries() {
+        let aliases: [(String, String)] = [
+            ("burpee-broad-jump", "athlth:burpee-broad-jump"),
+            ("farmers-carry", "athlth:farmers-carry"),
+            ("hand-release-push-up", "athlth:hand-release-push-up"),
+            ("rowing-erg", "athlth:rowing"),
+            ("sandbag-walking-lunge", "athlth:sandbag-walking-lunge"),
+            ("ski-erg", "athlth:skierg"),
+            ("sled-pull", "athlth:sled-pull"),
+            ("sled-push", "athlth:sled-push"),
+            ("stationary-lunge", "athlth:stationary-lunge"),
+            ("wall-ball", "athlth:wall-ball")
+        ]
+        let library = aliases.map {
+            entry("Existing station", id: UUID(),
+                  source: .athlthCatalog, sourceIdentifier: $0.1)
+        }
+        for (publishedID, canonicalID) in aliases {
+            var station = block("Unrelated visible station title")
+            station.exerciseSlug = publishedID
+            let result = ATHLTHExerciseReferenceResolver.resolve(
+                station, in: library
+            )
+            XCTAssertEqual(result?.sourceIdentifier, canonicalID, publishedID)
+        }
+
+        // Unknown authored slugs cannot silently become a different movement
+        // merely because their names happen to match something in the library.
+        var unknown = block("Existing station")
+        unknown.exerciseSlug = "private-unknown-station"
+        XCTAssertNil(ATHLTHExerciseReferenceResolver.resolve(unknown, in: library))
+    }
+
 }
