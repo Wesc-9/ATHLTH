@@ -1202,6 +1202,7 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var treadmillInclinePercent: Double? = nil
     /// Athlete-entered treadmill belt speed. Never automatic sensor speed.
     var initialBeltSpeedKilometersPerHour: Double? = nil
+    var quickBeltSpeedsKilometersPerHour: [Double]? = nil
     // Optional keeps payloads from older builds decodable. The sender resolves
     // app default vs per-workout override before launch.
     var autoPauseEnabled: Bool? = nil
