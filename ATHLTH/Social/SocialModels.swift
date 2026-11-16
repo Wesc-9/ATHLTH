@@ -1443,6 +1443,29 @@ enum ATHLTHSharedPulseSeries {
             return Sample(progress: Double(millesimal) / 1_000, bpm: Double(beats))
         }
     }
+
+    static func encodeZoneSeconds(
+        _ samples: [ATHLTHRunningHeartRatePoint], maximumBPM: Double?
+    ) -> String? {
+        guard let maximumBPM, (100...240).contains(maximumBPM) else { return nil }
+        let zones = ATHLTHRunningHeartRateAnalysis.zoneDurations(
+            samples, maximumBPM: maximumBPM
+        )
+        guard zones.count == 5, zones.reduce(0.0, { $0 + $1.seconds }) > 0 else {
+            return nil
+        }
+        return zones.map { String(Int($0.seconds.rounded())) }.joined(separator: "|")
+    }
+
+    static func decodeZoneSeconds(_ raw: String?) -> [Double] {
+        guard let raw, raw.count <= 50 else { return [] }
+        let parts = raw.split(separator: "|")
+        guard parts.count == 5 else { return [] }
+        let values = parts.compactMap { Double($0) }
+        guard values.count == 5, values.allSatisfy({ $0.isFinite && (0...86_400).contains($0) })
+        else { return [] }
+        return values
+    }
 }
 
 struct SocialPublishableWorkout: Identifiable, Hashable {
