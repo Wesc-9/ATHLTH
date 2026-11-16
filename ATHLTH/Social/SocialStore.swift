@@ -2138,7 +2138,7 @@ final class SocialStore: ObservableObject {
         friendIDs: Set<UUID>,
         creatorName: String,
         creatorUsername: String?,
-        includeHealthData: Bool = true,
+        includeHealthData: Bool = false,
         pulseSamples: [ATHLTHRunningHeartRatePoint] = [],
         maximumHeartRateBPM: Double? = nil
     ) async -> Bool {
@@ -2209,28 +2209,9 @@ final class SocialStore: ObservableObject {
             Self.enrichWorkoutActivityMetadata(
                 &metadata,
                 workout: workout,
-                includeHealthData: includeHealthData
+                includeHealthData: false
             )
-            metadata["share_health_data"] = String(includeHealthData)
-            if includeHealthData,
-               let curve = ATHLTHSharedPulseSeries.encode(
-                    pulseSamples, from: workout.startDate, through: workout.endDate
-               ) {
-                metadata["heart_rate_curve"] = curve
-                if let zones = ATHLTHSharedPulseSeries.encodeZoneSeconds(
-                    pulseSamples, maximumBPM: maximumHeartRateBPM
-                ) {
-                    metadata["heart_rate_zone_seconds"] = zones
-                }
-                let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
-                    pulseSamples, from: workout.startDate, through: workout.endDate
-                )
-                if !valid.isEmpty {
-                    metadata["average_heart_rate_bpm"] = String(
-                        valid.reduce(0.0) { $0 + $1.bpm } / Double(valid.count)
-                    )
-                }
-            }
+            metadata["share_health_data"] = "false"
 
             let cleanDescription = description
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2276,7 +2257,7 @@ final class SocialStore: ObservableObject {
         caption: String? = nil,
         routePreview: [RouteCoordinate] = [],
         hideRouteStartAndEnd: Bool = true,
-        includeHealthData: Bool = true,
+        includeHealthData: Bool = false,
         pulseSamples: [ATHLTHRunningHeartRatePoint] = [],
         maximumHeartRateBPM: Double? = nil
     ) async -> Bool {
@@ -2307,28 +2288,9 @@ final class SocialStore: ObservableObject {
             Self.enrichWorkoutActivityMetadata(
                 &metadata,
                 workout: workout,
-                includeHealthData: includeHealthData
+                includeHealthData: false
             )
-            metadata["share_health_data"] = String(includeHealthData)
-            if includeHealthData,
-               let curve = ATHLTHSharedPulseSeries.encode(
-                    pulseSamples, from: workout.startDate, through: workout.endDate
-               ) {
-                metadata["heart_rate_curve"] = curve
-                if let zones = ATHLTHSharedPulseSeries.encodeZoneSeconds(
-                    pulseSamples, maximumBPM: maximumHeartRateBPM
-                ) {
-                    metadata["heart_rate_zone_seconds"] = zones
-                }
-                let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
-                    pulseSamples, from: workout.startDate, through: workout.endDate
-                )
-                if !valid.isEmpty {
-                    metadata["average_heart_rate_bpm"] = String(
-                        valid.reduce(0.0) { $0 + $1.bpm } / Double(valid.count)
-                    )
-                }
-            }
+            metadata["share_health_data"] = "false"
             metadata["hide_route_start_end"] = String(hideRouteStartAndEnd)
             if let preview = WorkoutRouteSharing.encode(routePreview) {
                 metadata["route_preview"] = preview
@@ -2629,6 +2591,9 @@ final class SocialStore: ObservableObject {
     ) async {
         guard let endedAt = workout.endedAt,
               endedAt >= activationDate,
+              UserDefaults.standard.bool(forKey: "settings.autoPublishCompletedWorkouts"),
+              UserDefaults.standard.bool(forKey: "settings.workoutSharingChoiceCompleted"),
+              privacy?.shareRecentActivity == true,
               let configuredVisibility = privacy.flatMap({
                   ProfileVisibility(rawValue: $0.recentActivityVisibility)
               }),
@@ -2746,7 +2711,7 @@ final class SocialStore: ObservableObject {
                 title: workout.title,
                 subtitle: volume,
                 metadata: metadata,
-                visibility: configuredVisibility
+                visibility: .friends
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -2758,6 +2723,9 @@ final class SocialStore: ObservableObject {
         visibility: ProfileVisibility = .friends
     ) async {
         guard result.endedAt >= activationDate,
+              UserDefaults.standard.bool(forKey: "settings.autoPublishCompletedWorkouts"),
+              UserDefaults.standard.bool(forKey: "settings.workoutSharingChoiceCompleted"),
+              privacy?.shareRecentActivity == true,
               let configuredVisibility = privacy.flatMap({
                   ProfileVisibility(rawValue: $0.recentActivityVisibility)
               }),
@@ -2789,7 +2757,7 @@ final class SocialStore: ObservableObject {
                         max(result.duration, 0)
                     )
                 ],
-                visibility: configuredVisibility
+                visibility: .friends
             )
         } catch {
             errorMessage = error.localizedDescription
