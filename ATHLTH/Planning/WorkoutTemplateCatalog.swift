@@ -7803,9 +7803,23 @@ struct WorkoutTemplateBuilderView: View {
         persistWorkoutDraft()
     }
 
+    private func libraryBoundSnapshot() -> PlannedSession? {
+        var workout = workoutSnapshot()
+        let report = ATHLTHWorkoutExerciseBinding.bind(
+            &workout, library: exerciseLibrary.allExercises
+        )
+        guard report.isReady else {
+            actionNotice = tr(
+                "Choose library exercises before saving: ",
+                "Velg øvelser fra biblioteket før du lagrer: "
+            ) + report.unresolved.prefix(4).joined(separator: ", ")
+            return nil
+        }
+        return workout
+    }
+
     private func saveToMyWorkouts(asNew: Bool = false) {
-        guard canSave else { return }
-        let snapshot = workoutSnapshot()
+        guard canSave, let snapshot = libraryBoundSnapshot() else { return }
         if let savedTemplateID, !asNew,
            session.updateSavedWorkoutTemplate(snapshot, id: savedTemplateID) {
             savedToMyWorkouts = true
@@ -8341,8 +8355,7 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func saveWorkout() {
-        guard canSave else { return }
-        let workout = workoutSnapshot()
+        guard canSave, let workout = libraryBoundSnapshot() else { return }
         if let issue = onValidateSave?(workout) {
             actionNotice = issue
             return
@@ -8366,7 +8379,8 @@ struct WorkoutTemplateBuilderView: View {
             }
         } else if let onSaveToPlan {
             guard onSaveToPlan(
-                cleanTitle, blocks, hasOutdoorCardio ? activeRouteID : nil,
+                cleanTitle, workout.workoutBlocks ?? blocks,
+                hasOutdoorCardio ? activeRouteID : nil,
                 resolvedDurationMinutes, manualDurationMinutes != nil, extras
             ) else {
                 actionNotice = tr("Cannot save this workout yet",
@@ -8375,7 +8389,8 @@ struct WorkoutTemplateBuilderView: View {
             }
             if !pendingCopyDayIDs.isEmpty, let onCopyToPlan {
                 guard onCopyToPlan(
-                    cleanTitle, blocks, hasOutdoorCardio ? activeRouteID : nil,
+                    cleanTitle, workout.workoutBlocks ?? blocks,
+                hasOutdoorCardio ? activeRouteID : nil,
                     resolvedDurationMinutes, Array(pendingCopyDayIDs).sorted(), extras
                 ) else {
                     actionNotice = tr("Workout saved; check copy destinations",
