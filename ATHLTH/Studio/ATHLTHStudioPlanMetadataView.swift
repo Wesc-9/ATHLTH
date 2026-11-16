@@ -42,11 +42,17 @@ struct ATHLTHStudioPlanMetadataView: View {
                     ), text: $title)
                     VStack(alignment: .leading, spacing: 7) {
                         Text(ATHLTHLocalization.choose(
-                            english: "Description or goal", norwegian: "Beskrivelse eller mål"
+                            english: "Plan description (optional)", norwegian: "Planbeskrivelse (valgfritt)"
                         ))
                         .font(.caption.weight(.semibold))
                         TextEditor(text: $summary)
                             .frame(minHeight: 85)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Shown in the plan overview. You can update it later.",
+                            norwegian: "Vises i planoversikten. Du kan endre beskrivelsen senere."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
