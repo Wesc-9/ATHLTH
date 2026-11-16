@@ -996,15 +996,18 @@ struct PostWorkoutReviewView: View {
 
     let workout: SocialPublishableWorkout
     let wasAutoPublished: Bool
+    let requiresDecision: Bool
     let initialVisibilityOverride: ProfileVisibility?
 
     init(
         workout: SocialPublishableWorkout,
         wasAutoPublished: Bool,
-        initialVisibilityOverride: ProfileVisibility? = nil
+        initialVisibilityOverride: ProfileVisibility? = nil,
+        requiresDecision: Bool = false
     ) {
         self.workout = workout
         self.wasAutoPublished = wasAutoPublished
+        self.requiresDecision = requiresDecision
         self.initialVisibilityOverride = initialVisibilityOverride
     }
 
@@ -1148,13 +1151,17 @@ struct PostWorkoutReviewView: View {
                 ) {
                     Button(
                         ATHLTHLocalization.choose(
-                            english: "Save privately",
-                            norwegian: "Lagre privat"
+                            english: requiresDecision ? "Save privately" : "Cancel",
+                            norwegian: requiresDecision ? "Lagre privat" : "Avbryt"
                         )
                     ) {
                         guard !saving else { return }
-                        visibility = .privateOnly
-                        Task { await save() }
+                        if requiresDecision {
+                            visibility = .privateOnly
+                            Task { await save() }
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
 
@@ -1267,7 +1274,7 @@ struct PostWorkoutReviewView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 saveBar
             }
-            .interactiveDismissDisabled()
+            .interactiveDismissDisabled(requiresDecision)
             .task {
                 async let reviewLoad: Void =
                     loadExistingReview()
