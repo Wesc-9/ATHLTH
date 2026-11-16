@@ -128,6 +128,7 @@ function preferenceAllows(
   }
 
   if (
+    normalized === "workout_invite" ||
     normalized.includes("message") ||
     normalized.includes("dm") ||
     normalized === "train_together_chat"
@@ -145,6 +146,12 @@ function preferenceAllows(
 function threadID(event: InboxEvent): string {
   if (event.entity_type === "arena_series" && event.entity_id) {
     return `arena:${event.entity_id}`;
+  }
+
+  if (event.kind === "workout_invite" && event.entity_id) {
+    // Group by actual invitation session, not sender, to avoid replacing
+    // other invitations from the same friend.
+    return `workout_invite:${event.entity_id}`;
   }
 
   if (event.entity_type === "train_together_post" && event.entity_id) {
@@ -490,6 +497,7 @@ async function sendToDevice(
     athlth_kind: event.kind,
     athlth_entity_type: event.entity_type,
     athlth_entity_id: event.entity_id,
+    athlth_recipient_id: event.recipient_id,
   };
 
   const response = await fetch(
@@ -502,7 +510,9 @@ async function sendToDevice(
         "apns-push-type": "alert",
         "apns-priority": "10",
         "apns-expiration": "0",
-        "apns-collapse-id": event.actor_id ?? event.id,
+        "apns-collapse-id": event.kind === "workout_invite" && event.entity_id
+          ? `workout-invite-${event.entity_id}`
+          : event.actor_id ?? event.id,
         "content-type": "application/json",
       },
       body: JSON.stringify(payload),
