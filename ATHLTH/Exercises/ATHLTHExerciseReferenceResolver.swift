@@ -59,7 +59,24 @@ enum ATHLTHExerciseReferenceResolver {
         "kettlebell swing": "kettlebell-swing",
         "step up": "step-up",
         "burpee": "burpee",
-        "mountain climber": "mountain-climber"
+        "mountain climber": "mountain-climber",
+        // Exact reviewed GymCoach program names. Similar-looking variations
+        // must remain separate; for example Leg Curl is not always lying.
+        "overhead press": "overhead-press",
+        "skulderpress": "overhead-press",
+        "barbell row": "barbell-row",
+        "front squat": "front-squat",
+        "incline bench press": "incline-bench-press",
+        "incline dumbbell press": "incline-dumbbell-bench-press",
+        "rear delt fly": "rear-delt-fly",
+        "hanging leg raise": "hanging-leg-raise",
+        "cable curl": "cable-curl",
+        "chin up": "chin-up",
+        "dumbbell row": "dumbbell-row",
+        "leg curl": "leg-curl",
+        "lateral raise": "lateral-raise-unspecified",
+        "power clean": "power-clean",
+        "skullcrusher": "skullcrusher"
     ]
 
     private static let normalizedNativeAliases: [String: String] = {
@@ -99,25 +116,45 @@ enum ATHLTHExerciseReferenceResolver {
             if byIdentifier.count == 1 { return byIdentifier[0] }
         }
 
-        // A friend's embedded instructions are authoritative for that
-        // particular custom exercise. A local exercise with the same name
-        // must not hide the sender's original technique and equipment.
-        if block.exerciseSnapshot != nil { return nil }
+        // Older GymCoach-based plans were saved before explicit slugs were
+        // attached. Their snapshots contain a canonical English source name
+        // and NO technique or media, while the visible title may be Norwegian.
+        // Recover only verified bundled-catalog names, never arbitrary shared
+        // user snapshots or an exercise with a known foreign/private UUID.
+        if let snapshot = block.exerciseSnapshot {
+            guard block.exerciseID == nil,
+                  snapshot.instructions.isEmpty,
+                  snapshot.imageURL == nil,
+                  snapshot.videoURL == nil,
+                  ATHLTHGymCoachStrengthLibrary.hasSourceExercise(
+                      named: snapshot.name
+                  ),
+                  let identifier = nativeSourceIdentifier(for: snapshot.name)
+            else { return nil }
+            let matches = library.filter {
+                $0.sourceIdentifier == identifier &&
+                $0.source == .athlthCatalog
+            }
+            return matches.count == 1 ? matches[0] : nil
+        }
 
         // User-created exercises are only matched by explicit IDs. Equal
         // titles alone are not proof that two personal exercises are the same.
         let clean = key(block.title)
         guard !clean.isEmpty else { return nil }
+        let nativeSlug = nativeSourceIdentifier(for: block.title)
+        if let nativeSlug {
+            let native = library.filter {
+                $0.source == .athlthCatalog &&
+                $0.sourceIdentifier == nativeSlug
+            }
+            if native.count == 1 { return native[0] }
+        }
+
         let repdbExact = library.filter {
             $0.source == .repDB && key($0.canonicalName) == clean
         }
         if repdbExact.count == 1 { return repdbExact[0] }
-
-        let nativeSlug = nativeSourceIdentifier(for: block.title)
-        if let nativeSlug {
-            let native = library.filter { $0.sourceIdentifier == nativeSlug }
-            if native.count == 1 { return native[0] }
-        }
 
         // Match an English canonical name even when the workout title uses
         // hyphens/underscores instead of spaces. Never infer a different exercise.
