@@ -1200,6 +1200,8 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     // Non-nil means this is an indoor treadmill run, including a valid 0%.
     // Optional keeps transfers from older builds decodable.
     var treadmillInclinePercent: Double? = nil
+    /// Athlete-entered treadmill belt speed. Never automatic sensor speed.
+    var initialBeltSpeedKilometersPerHour: Double? = nil
     // Optional keeps payloads from older builds decodable. The sender resolves
     // app default vs per-workout override before launch.
     var autoPauseEnabled: Bool? = nil
@@ -2117,6 +2119,8 @@ struct WatchWorkoutMirrorCommand: Codable, Hashable {
     // decodable while allowing treadmill incline changes during a workout.
     var treadmillInclinePercent: Double? = nil
     var treadmillTargetPaceSecondsPerKilometer: Double? = nil
+    /// Actual belt display entered by the athlete (not a target pace).
+    var manualBeltSpeedKilometersPerHour: Double? = nil
     // Only return-route commands need a workout identity; default nil
     // preserves pause/resume/end compatibility with existing Watch versions.
     var workoutStartedAt: Date? = nil
@@ -2136,6 +2140,7 @@ enum WatchWorkoutCommand: String, Codable, Hashable {
     case resume
     case setTreadmillIncline
     case setTreadmillTargetPace
+    case setTreadmillBeltSpeed
     case returnToStart
     case appendRunningWorkout
     case advanceRunningStep
