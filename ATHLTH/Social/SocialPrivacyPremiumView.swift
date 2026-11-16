@@ -282,8 +282,44 @@ struct SocialPrivacySettingsView: View {
                         visibility: value.recentActivityVisibility,
                         profile: value.profileVisibility
                     ),
-                    binding: data.shareRecentActivity
+                    binding: Binding(
+                        get: { data.wrappedValue.shareRecentActivity },
+                        set: { enabled in
+                            data.wrappedValue.shareRecentActivity = enabled
+                            // First-time sharing must default to friends, not
+                            // silently widen a private section to public.
+                            if enabled && data.wrappedValue.recentActivityVisibility == "private" {
+                                data.wrappedValue.recentActivityVisibility = "friends"
+                            }
+                        }
+                    )
                 )
+                if value.shareRecentActivity {
+                    HStack(spacing: 10) {
+                        Text(loc(
+                            "Shared activity audience", "Hvem kan se delte økter"
+                        ))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        Spacer()
+                        Picker(
+                            loc("Audience", "Mottakere"),
+                            selection: data.recentActivityVisibility
+                        ) {
+                            Text(loc("Friends", "Venner")).tag("friends")
+                            Text(loc("Public", "Offentlig")).tag("public")
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .tint(ATHLTHTheme.accentDeep)
+                    }
+                    Text(loc(
+                        "This setting also affects older workouts you already shared. Individual private workouts stay private.",
+                        "Dette påvirker også eldre økter du tidligere har delt. Enkeltøkter som er private, forblir private."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
             }
 
             shareGroup(
