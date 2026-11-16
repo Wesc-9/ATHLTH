@@ -149,7 +149,9 @@ final class ATHLTHAzureVoicePreviewPlayer:
 /// evaluated separately from the general Audio Coach settings so Free users
 /// can see (but cannot choose or preview) the premium voices.
 struct ATHLTHAzureCoachVoicePreviewView: View {
-    @EnvironmentObject private var settings: AppSettingsStore
+    @Binding var selectedIdentifier: String?
+    @Binding var language: WatchAudioCoachLanguage
+    let duckOtherAudio: Bool
     @EnvironmentObject private var session: AppSessionStore
     @StateObject private var preview = ATHLTHAzureVoicePreviewPlayer()
 
@@ -170,6 +172,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
         let id: String
         let name: String
         let detail: String
+        let locale: String?
     }
 
     private func tr(_ english: String, _ norwegian: String) -> String {
@@ -197,14 +200,29 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
     }
 
     private var voices: [Voice] {
-        discoveredVoices ?? [
+        let catalog = discoveredVoices ?? [
             Voice(id: "finn", name: "Finn",
-                  detail: tr("Norwegian · male", "Norsk · mannlig")),
+                  detail: tr("Norwegian · male", "Norsk · mannlig"),
+                  locale: "nb-NO"),
             Voice(id: "iselin", name: "Iselin",
-                  detail: tr("Norwegian · female", "Norsk · kvinnelig")),
+                  detail: tr("Norwegian · female", "Norsk · kvinnelig"),
+                  locale: "nb-NO"),
             Voice(id: "pernille", name: "Pernille",
-                  detail: tr("Norwegian · female", "Norsk · kvinnelig"))
+                  detail: tr("Norwegian · female", "Norsk · kvinnelig"),
+                  locale: "nb-NO")
         ]
+        let prefix: String
+        switch language {
+        case .norwegian: prefix = "nb-"
+        case .english: prefix = "en-"
+        case .system:
+            let code = Locale.autoupdatingCurrent.language.languageCode?
+                .identifier.lowercased() ?? "nb"
+            prefix = code == "en" ? "en-" : "nb-"
+        }
+        return catalog.filter {
+            ($0.locale ?? "nb-NO").lowercased().hasPrefix(prefix)
+        }
     }
 
     private func select(_ voice: Voice) {
@@ -213,9 +231,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
             pendingConsentVoice = voice
             return
         }
-        settings.audioCoachLanguage = .norwegian
-        settings.audioCoachVoiceIdentifier =
-            ATHLTHAzureCoachVoice.prefix + voice.id
+        selectedIdentifier = ATHLTHAzureCoachVoice.prefix + voice.id
     }
 
     var body: some View {
@@ -230,6 +246,14 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
             .padding(.top, 7)
             .accessibilityAddTraits(.isHeader)
 
+            if voices.isEmpty {
+                Text(tr(
+                    "No Azure voices were returned for this language. Choose another language or use an installed Apple voice.",
+                    "Ingen Azure-stemmer ble returnert for dette språket. Velg et annet språk, eller bruk en installert Apple-stemme."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
             ForEach(voices) { voice in
                 HStack(spacing: 10) {
                     Button {
@@ -237,7 +261,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName:
-                                settings.audioCoachVoiceIdentifier ==
+                                selectedIdentifier ==
                                 ATHLTHAzureCoachVoice.prefix + voice.id
                                     ? "checkmark.circle.fill" : "circle"
                             )
@@ -257,7 +281,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(
-                        settings.audioCoachVoiceIdentifier ==
+                        selectedIdentifier ==
                         ATHLTHAzureCoachVoice.prefix + voice.id
                             ? .isSelected : []
                     )
@@ -268,7 +292,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                     Button {
                         preview.preview(
                             voice.id,
-                            duckMusic: settings.audioCoachDuckOtherAudio
+                            duckMusic: duckOtherAudio
                         )
                     } label: {
                         if preview.loadingVoice == voice.id {
@@ -353,9 +377,9 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
             Button(tr("Turn off", "Slå av"), role: .destructive) {
                 allowsAzureWorkoutText = false
                 if ATHLTHAzureCoachVoice.key(
-                    settings.audioCoachVoiceIdentifier
+                    selectedIdentifier
                 ) != nil {
-                    settings.audioCoachVoiceIdentifier = nil
+                    selectedIdentifier = nil
                 }
             }
             Button(tr("Cancel", "Avbryt"), role: .cancel) {}
