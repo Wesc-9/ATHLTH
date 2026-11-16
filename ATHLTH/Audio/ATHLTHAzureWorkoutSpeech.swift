@@ -14,10 +14,10 @@ enum ATHLTHAzureCoachVoice {
         }
         let value = String(identifier.dropFirst(prefix.count))
         if supported.contains(value) { return value }
-        // New Norwegian neural voices are verified against Azure's live voice
-        // directory on the server. Accept only safe, full Azure ShortNames.
+        // The server verifies each full ShortName against the configured
+        // resource. Keep the on-device language list equally restrictive.
         let range = value.range(
-            of: #"^nb-NO-[A-Za-z0-9]+Neural$"#,
+            of: #"^(nb-NO|en-US|en-GB)-[A-Za-z0-9]+Neural$"#,
             options: .regularExpression
         )
         return range != nil ? value : nil
