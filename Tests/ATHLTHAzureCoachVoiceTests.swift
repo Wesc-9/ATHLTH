@@ -20,7 +20,13 @@ final class ATHLTHAzureCoachVoiceTests: XCTestCase {
             ATHLTHAzureCoachVoice.key("azure:nb-NO-NewVoiceNeural"),
             "nb-NO-NewVoiceNeural"
         )
-        XCTAssertNil(ATHLTHAzureCoachVoice.key("azure:en-US-JennyNeural"))
+        // Azure supports configured English voices as well as Norwegian;
+        // the server still validates full ShortNames against its resource.
+        XCTAssertEqual(
+            ATHLTHAzureCoachVoice.key("azure:en-US-JennyNeural"),
+            "en-US-JennyNeural"
+        )
+        XCTAssertNil(ATHLTHAzureCoachVoice.key("azure:fr-FR-DeniseNeural"))
         XCTAssertNil(ATHLTHAzureCoachVoice.key("azure:nb-NO-Bad<Voice>Neural"))
         XCTAssertNil(ATHLTHAzureCoachVoice.key("azure:nb-NO-OtherNeural?x=1"))
     }
