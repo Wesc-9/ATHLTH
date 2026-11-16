@@ -55,6 +55,9 @@ struct WatchRunWorkoutExperienceView: View {
                     metricsPage
                         .tag(0)
 
+                    competitionPage
+                        .tag(10)
+
                     planPage
                         .tag(1)
 
@@ -1941,9 +1944,9 @@ struct WatchRunWorkoutExperienceView: View {
                         .foregroundStyle(WatchTheme.textSecondary)
 
                     Button {
-                        showingQuickActions = true
+                        confirmingEnd = true
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Image(systemName: "stop.circle")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(WatchTheme.textSecondary)
                             .frame(width: 34, height: 34)
@@ -1951,8 +1954,8 @@ struct WatchRunWorkoutExperienceView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Workout controls, including finish",
-                        norwegian: "Øktkontroller, inkludert avslutt"
+                        english: "Finish workout (confirmation required)",
+                        norwegian: "Avslutt økten (må bekreftes)"
                     ))
                     .accessibilityHint(ATHLTHLocalization.choose(
                         english: "Requires confirmation before ending",
@@ -2310,6 +2313,85 @@ struct WatchRunWorkoutExperienceView: View {
             }
         }
         .padding(.horizontal, 3)
+    }
+
+    /// One whole-screen, swipeable training face; no nested ScrollView.
+    /// Deliberately uses larger metrics and stronger contrast than Standard.
+    private var competitionPage: some View {
+        GeometryReader { viewport in
+            let compact = viewport.size.height < 205
+            VStack(alignment: .leading, spacing: compact ? 5 : 9) {
+                HStack(spacing: 7) {
+                    Image(systemName: "flag.checkered")
+                        .foregroundStyle(WatchTheme.premiumGold)
+                    Text(ATHLTHLocalization.choose(
+                        english: "COMPETITION", norwegian: "KONKURRANSE"
+                    ))
+                    .tracking(1.2)
+                    .font(.system(size: 10, weight: .bold))
+                    Spacer(minLength: 0)
+                    Circle()
+                        .fill(workoutManager.state == .paused
+                            ? WatchTheme.warning : WatchTheme.accent)
+                        .frame(width: 7, height: 7)
+                }
+                Text(liveDisplayedPace.map { paceText($0) } ??
+                     liveWorkoutElapsedLabel)
+                    .font(.system(size: compact ? 39 : 48,
+                                  weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                    .foregroundStyle(WatchTheme.textPrimary)
+                Text(liveDisplayedPace == nil
+                    ? ATHLTHLocalization.choose(
+                        english: "TIME", norwegian: "TID"
+                    )
+                    : livePaceIsAverage
+                        ? ATHLTHLocalization.choose(
+                            english: "AVG PACE /KM", norwegian: "SNITTEMPO /KM"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "PACE /KM", norwegian: "TEMPO /KM"
+                        ))
+                    .font(.system(size: 9, weight: .heavy))
+                    .foregroundStyle(WatchTheme.premiumGold)
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(distanceKilometersText)
+                            .font(.system(size: compact ? 22 : 27,
+                                          weight: .bold, design: .rounded))
+                        Text(ATHLTHLocalization.choose(
+                            english: "DISTANCE KM", norwegian: "DISTANSE KM"
+                        )).font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(WatchTheme.muted)
+                    }
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(Int(workoutManager.heartRate.rounded()))")
+                            .font(.system(size: compact ? 21 : 25,
+                                          weight: .bold, design: .rounded))
+                        Text(ATHLTHLocalization.choose(
+                            english: "PULSE BPM", norwegian: "PULS BPM"
+                        )).font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(WatchTheme.muted)
+                    }
+                }
+                Spacer(minLength: 0)
+                if workoutManager.currentStructuredRunningStep != nil {
+                    Text(liveWorkoutStepTitle)
+                        .font(.system(size: 10, weight: .semibold))
+                        .lineLimit(1)
+                        .foregroundStyle(WatchTheme.premiumGold)
+                }
+            }
+            .padding(.horizontal, compact ? 8 : 10)
+            .padding(.vertical, compact ? 2 : 5)
+            .frame(maxWidth: .infinity, maxHeight: .infinity,
+                   alignment: .topLeading)
+        }
+        .accessibilityIdentifier("athlth-watch-competition-page")
     }
 
     // MARK: - Page 2: workout / interval plan
