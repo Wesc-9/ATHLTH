@@ -1252,7 +1252,7 @@ struct WatchRunWorkoutExperienceView: View {
                     spacing: 4
                 ) {
                     Text(
-                        liveDisplayedPace.map(paceText) ??
+                        liveDisplayedPace.map { paceText($0) } ??
                             durationTextForAlwaysOn
                     )
                     .font(
@@ -1999,7 +1999,7 @@ struct WatchRunWorkoutExperienceView: View {
                             : livePaceIsAverage
                                 ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
                                 : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
-                        value: liveDisplayedPace.map(paceText) ??
+                        value: liveDisplayedPace.map { paceText($0) } ??
                             liveWorkoutElapsedLabel,
                         unit: liveDisplayedPace == nil ? "" : "/km",
                         tint: WatchTheme.premiumGold,
@@ -2013,7 +2013,7 @@ struct WatchRunWorkoutExperienceView: View {
                             : livePaceIsAverage
                                 ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
                                 : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
-                        value: liveDisplayedPace.map(paceText) ??
+                        value: liveDisplayedPace.map { paceText($0) } ??
                             liveWorkoutElapsedLabel,
                         unit: liveDisplayedPace == nil ? "" : "/km",
                         tint: WatchTheme.premiumGold,
