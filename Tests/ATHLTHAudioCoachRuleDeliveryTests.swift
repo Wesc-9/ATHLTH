@@ -31,6 +31,68 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertEqual(draft.configuration().customRules?.first?.id, rule.id)
     }
 
+    func testStandardBuiltInMessagesRemainActiveWithoutStoredGroups() {
+        var draft = AudioCoachDraft()
+        draft.applySimpleAudioCoach()
+
+        let active = ATHLTHAudioCoachOption.allCases.filter {
+            $0 != .customAnnouncements &&
+            $0.isVisible(route: false, structured: false) &&
+            $0.isActive(in: draft)
+        }
+
+        // Older standard settings are virtual presentation groups only.
+        // The Watch engine must not receive duplicate triggers.
+        XCTAssertEqual(active.count, 8)
+        XCTAssertTrue(draft.coachGroups.isEmpty)
+        XCTAssertTrue(draft.customRules.isEmpty)
+    }
+
+    func testCoachGroupWithMultipleReadoutsSpeaksOneCombinedCue() throws {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .time,
+            metric: .distance,
+            interval: 300,
+            additionalMetrics: [.elapsedTime, .heartRate],
+            scope: .workout
+        )
+        let group = ATHLTHAudioCoachGroup(
+            name: "Fem minutter",
+            ruleIDs: [rule.id]
+        )
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.customRules = [rule]
+        config.coachGroups = [group]
+
+        let restored = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self,
+            from: JSONEncoder().encode(config)
+        )
+        XCTAssertEqual(restored.coachGroups?.first?.ruleIDs, [rule.id])
+        XCTAssertEqual(restored.customRules?.first?.selectedMetrics,
+                       [.distance, .elapsedTime, .heartRate])
+
+        var slots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: [rule],
+            distanceMeters: 0,
+            elapsedSeconds: 0
+        )
+        let spoken = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [rule],
+            distanceMeters: 1_000,
+            elapsedSeconds: 300,
+            paceSecondsPerKilometer: 300,
+            heartRateBPM: 150,
+            norwegian: true,
+            lastSlots: &slots
+        )
+        XCTAssertEqual(spoken.count, 1)
+        XCTAssertTrue(spoken[0].contains("Distanse"))
+        XCTAssertTrue(spoken[0].contains("Tid"))
+        XCTAssertTrue(spoken[0].contains("Puls"))
+    }
+
     func testBeforeFinishMotivationIsSpokenOnceOnlyWhenFinishIsKnown() {
         var rule = ATHLTHAudioCoachRule(
             trigger: .time, metric: .motivation, interval: 60
