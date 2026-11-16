@@ -5570,6 +5570,19 @@ struct DirectMessageThreadView: View {
         let workout = lifecycle?.updatedWorkout ?? latestAgreedWorkout(
             for: invitation, in: messaging.messages(in: conversationID)
         ) ?? originalWorkout
+        let currentMessages = messaging.messages(in: conversationID)
+        guard plannedInviteResponse(for: invitation, in: currentMessages) == nil,
+              PlannedWorkoutInvitationPresentationState.resolve(
+                start: workout.scheduledStart,
+                decision: nil,
+                organizerCancelled: lifecycle?.kind == .cancelled
+              ).canRespond else {
+            plannedInviteError = ATHLTHLocalization.choose(
+                english: "This invitation has ended. Ask for a new invitation.",
+                norwegian: "Invitasjonen er avlyst eller allerede besvart. Be om en ny invitasjon."
+            )
+            return
+        }
         respondingToPlannedInviteID = invitation.id
         Task {
             defer { respondingToPlannedInviteID = nil }
@@ -6929,6 +6942,10 @@ private struct MessageBubble: View {
                         lifecycleUpdate: lifecycleUpdate,
                         isMine: isMine,
                         isResponding: respondingToInvite,
+                        organizerName: isMine
+                            ? currentUserProfile.resolvedName : friend.resolvedName,
+                        inviteeName: isMine
+                            ? friend.resolvedName : currentUserProfile.resolvedName,
                         onAccept: { onRespondToInvite(true) },
                         onDecline: { onRespondToInvite(false) },
                         onProposeChanges: onProposeWorkoutChange
@@ -7118,8 +7135,11 @@ private struct MessageBubble: View {
                     }
                 }
 
+                // Invitation metadata already lives in the compact card.
+                // Keep the message body for push previews, but never duplicate
+                // a long invitation as a second chat bubble (also for history).
                 if let body = message.body,
-                   !body.isEmpty {
+                   !body.isEmpty && !isPlannedInvitation {
                     Text(body)
                         .font(.body)
                         .foregroundStyle(
