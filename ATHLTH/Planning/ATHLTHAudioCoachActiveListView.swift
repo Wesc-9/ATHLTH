@@ -865,6 +865,48 @@ struct ATHLTHAudioCoachActiveListView: View {
                     }
 
                     Section {
+                        Text(tr("Choose any measurement, motivation or hydration reminder.",
+                                "Velg blant målinger, motivasjon og drikkepåminnelser."))
+                            .font(.caption)
+                            .foregroundStyle(dim)
+                    } header: {
+                        Text(tr("AVAILABLE COMMANDS", "TILGJENGELIGE KOMMANDOER"))
+                    }
+
+                    Section {
+                        ForEach(ATHLTHAudioCoachOption.allCases.filter { option in
+                            let eventOptions: Set<ATHLTHAudioCoachOption> = [
+                                .currentZone, .targetZoneCoach, .motivation,
+                                .contextual, .randomEncouragement, .adaptiveMotivation,
+                                .workoutStart, .pauseResume, .workoutFinish,
+                                .intervalRecoveryCountdown, .scopedCountdowns,
+                                .routeRemaining, .routeETA, .currentStep,
+                                .remainingStepTime, .remainingStepDistance,
+                                .customPhrases, .landmarks
+                            ]
+                            return eventOptions.contains(option) &&
+                                option.isVisible(route: showRouteOptions,
+                                                 structured: showStructuredOptions)
+                        }) { option in
+                            Button {
+                                option.setActive(true, in: &draft)
+                                pendingGeneralOption = option.requiresConfiguration ? option : nil
+                                showingGroupCommandBuilder = false
+                            } label: {
+                                Label(option.title, systemImage: option.symbol)
+                                    .frame(maxWidth: .infinity, minHeight: 38,
+                                           alignment: .leading)
+                            }
+                            .foregroundStyle(ink)
+                        }
+                    } header: {
+                        Text(tr("Event-triggered commands", "Hendelsesstyrte kommandoer"))
+                    } footer: {
+                        Text(tr("These use the workout's own events, not the group's distance or time interval.",
+                                "Disse bruker øktens egne hendelser, ikke gruppens tids- eller distansetrigger."))
+                    }
+
+                    Section {
                         Button(action: addCommandToGroup) {
                             Label(tr("Add command", "Legg til kommando"),
                                   systemImage: "plus.circle")
