@@ -1300,6 +1300,16 @@ struct AppRootView: View {
             lifecycleRootContent
         .task {
             await runLifecycleStartupTask()
+            restorePendingWorkoutReviewIfNeeded()
+        }
+        .onChange(of: health.workouts.map(\.id)) { _, _ in
+            restorePendingWorkoutReviewIfNeeded()
+        }
+        .onChange(of: phoneWorkout.history.map(\.id)) { _, _ in
+            restorePendingWorkoutReviewIfNeeded()
+        }
+        .onChange(of: strengthWorkout.workoutHistory.map(\.id)) { _, _ in
+            restorePendingWorkoutReviewIfNeeded()
         }
         .overlay {
             if phoneWorkout.showingWorkout,
@@ -2608,7 +2618,11 @@ struct AppRootView: View {
                 }
             )
         }
-        .sheet(item: $pendingWorkoutReview) { workout in
+        .sheet(item: $pendingWorkoutReview, onDismiss: {
+            // The review cannot be swiped away: dismissal follows the
+            // confirmed private-save or share operation.
+            clearPersistedPendingWorkoutReview()
+        }) { workout in
             PostWorkoutReviewView(
                 workout: workout,
                 wasAutoPublished: false,
@@ -3660,7 +3674,7 @@ struct AppRootView: View {
 
         // Always show the post-workout review before anything is shared.
         // The auto-share preference only chooses the default visibility.
-        pendingWorkoutReview = workout
+        presentPendingWorkoutReview(workout)
     }
 
     @MainActor
@@ -3672,7 +3686,7 @@ struct AppRootView: View {
         settings.workoutSharingChoiceCompleted = true
         pendingFirstWorkoutSharePrompt = nil
         pendingWorkoutReviewVisibilityOverride = .friends
-        pendingWorkoutReview = workout
+        presentPendingWorkoutReview(workout)
     }
 
     @MainActor
@@ -3685,7 +3699,7 @@ struct AppRootView: View {
         settings.autoPublishCompletedWorkouts = false
         pendingFirstWorkoutSharePrompt = nil
         pendingWorkoutReviewVisibilityOverride = .privateOnly
-        pendingWorkoutReview = workout
+        presentPendingWorkoutReview(workout)
     }
 
     @MainActor
@@ -3707,7 +3721,55 @@ struct AppRootView: View {
 
         // Keep review mandatory. Nothing is published until the user
         // confirms the completed workout from the review screen.
+        presentPendingWorkoutReview(workout)
+    }
+
+    /// A terminated app must not lose the user's post-workout decision.
+    /// Only the UUID is stored, account-scoped. Metrics are reloaded from
+    /// local journals / HealthKit, not duplicated into the preferences file.
+    @MainActor
+    private func pendingReviewStorageKey() -> String {
+        AccountLocalStorage.key(
+            "postWorkoutPendingDecision.v1",
+            userID: appSession.profile.userID
+        )
+    }
+
+    @MainActor
+    private func presentPendingWorkoutReview(_ workout: SocialPublishableWorkout) {
+        guard appSession.signedIn else { return }
+        UserDefaults.standard.set(
+            workout.id.uuidString,
+            forKey: pendingReviewStorageKey()
+        )
         pendingWorkoutReview = workout
+    }
+
+    @MainActor
+    private func clearPersistedPendingWorkoutReview() {
+        guard appSession.signedIn else { return }
+        UserDefaults.standard.removeObject(forKey: pendingReviewStorageKey())
+        pendingWorkoutReviewVisibilityOverride = nil
+    }
+
+    @MainActor
+    private func restorePendingWorkoutReviewIfNeeded() {
+        guard appSession.signedIn, pendingWorkoutReview == nil,
+              let idText = UserDefaults.standard.string(forKey: pendingReviewStorageKey()),
+              let workoutID = UUID(uuidString: idText)
+        else { return }
+
+        if let phone = phoneWorkout.history.first(where: {
+            ($0.healthID ?? $0.id) == workoutID
+        }) {
+            pendingWorkoutReview = SocialPublishableWorkout(phoneWorkout: phone)
+        } else if let strength = strengthWorkout.workoutHistory.first(where: {
+            $0.id == workoutID && $0.isFinished
+        }) {
+            pendingWorkoutReview = SocialPublishableWorkout(strengthWorkout: strength)
+        } else if let summary = health.workouts.first(where: { $0.id == workoutID }) {
+            pendingWorkoutReview = SocialPublishableWorkout(summary: summary)
+        }
     }
 
     private func handleHomeAssistantCommandNotification(
