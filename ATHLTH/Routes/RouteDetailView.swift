@@ -273,7 +273,9 @@ struct RouteDetailView: View {
                             editingTitle = true
                         } label: {
                             Label(
-                                "Rename Route",
+                                ATHLTHLocalization.choose(
+                                    english: "Rename route", norwegian: "Endre rutenavn"
+                                ),
                                 systemImage: "pencil"
                             )
                         }
@@ -298,7 +300,9 @@ struct RouteDetailView: View {
                             )
                         } label: {
                             Label(
-                                "Create Challenge",
+                                ATHLTHLocalization.choose(
+                                    english: "Create challenge", norwegian: "Opprett utfordring"
+                                ),
                                 systemImage: "trophy.fill"
                             )
                         }
@@ -309,7 +313,9 @@ struct RouteDetailView: View {
                             showingDeleteConfirmation = true
                         } label: {
                             Label(
-                                "Delete Route",
+                                ATHLTHLocalization.choose(
+                                    english: "Delete route", norwegian: "Slett rute"
+                                ),
                                 systemImage: "trash"
                             )
                         }
@@ -741,7 +747,7 @@ struct RouteDetailView: View {
                     Spacer(minLength: 4)
                     if downloaded.has(currentRoute) {
                         Label(ATHLTHLocalization.choose(
-                            english: "Offline", norwegian: "Frakoblet"
+                            english: "Saved offline", norwegian: "Lagret offline"
                         ), systemImage: "checkmark.circle.fill")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -1134,7 +1140,7 @@ struct RouteDetailView: View {
                 HStack(spacing: 8) {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "RUNNING ROUTE", norwegian: "LØPERUTE"
+                            english: "ROUTE", norwegian: "RUTE"
                         ),
                         systemImage: "figure.run"
                     )
@@ -1265,7 +1271,7 @@ struct RouteDetailView: View {
                     .padding(.horizontal, 17)
                     .frame(maxWidth: .infinity, minHeight: 49)
                     .background(
-                        ATHLTHTheme.accentDeep,
+                        ATHLTHTrainDesign.bronze.gradient,
                         in: RoundedRectangle(cornerRadius: 14)
                     )
                 }
@@ -1762,36 +1768,47 @@ struct RouteDetailView: View {
     private var privacyCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Route visibility")
+                Text(ATHLTHLocalization.choose(
+                    english: "Route visibility", norwegian: "Hvem kan se ruten?"
+                ))
                     .font(.headline)
 
-                Text(
-                    "Choose who can discover this route and appear with you on its leaderboard."
-                )
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose who can discover this route and see its leaderboard.",
+                    norwegian: "Velg hvem som kan finne ruten og se resultater på ledertavlen."
+                ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
                 Picker(
-                    "Visibility",
+                    ATHLTHLocalization.choose(
+                        english: "Visibility", norwegian: "Synlighet"
+                    ),
                     selection: Binding(
                         get: { currentRoute.visibility },
                         set: { updateVisibility($0) }
                     )
                 ) {
                     Label(
-                        "Only me",
+                        ATHLTHLocalization.choose(
+                            english: "Only me", norwegian: "Bare meg"
+                        ),
                         systemImage: "lock.fill"
                     )
                     .tag(ProfileVisibility.privateOnly)
 
                     Label(
-                        "Friends",
+                        ATHLTHLocalization.choose(
+                            english: "Friends", norwegian: "Venner"
+                        ),
                         systemImage: "person.2.fill"
                     )
                     .tag(ProfileVisibility.friends)
 
                     Label(
-                        "Public",
+                        ATHLTHLocalization.choose(
+                            english: "Public", norwegian: "Offentlig"
+                        ),
                         systemImage: "globe.europe.africa.fill"
                     )
                     .tag(ProfileVisibility.publicProfile)
@@ -2004,7 +2021,9 @@ struct RouteDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Leaderboard")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Leaderboard", norwegian: "Ledertabell"
+                        ))
                             .font(.headline)
 
                         Text(
@@ -2017,7 +2036,9 @@ struct RouteDetailView: View {
                     Spacer()
 
                     if leaderboard.count > 3 {
-                        Button("View all") {
+                        Button(ATHLTHLocalization.choose(
+                            english: "View all", norwegian: "Se alle"
+                        )) {
                             showingFullLeaderboard = true
                         }
                         .font(.caption.weight(.semibold))
