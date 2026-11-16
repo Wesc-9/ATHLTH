@@ -2801,275 +2801,50 @@ struct WatchRunWorkoutExperienceView: View {
 
     // MARK: - Route navigation
 
+    /// One navigation map per vertical Watch page; no inner scroll.
     private var navigationPage: some View {
-        ScrollView {
-            VStack(spacing: 8) {
-                pageLabel(
-                    "NAVIGATION",
-                    icon:
-                        "location.north.fill"
-                )
-
-                if let userCoordinate =
-                        navigationUserCoordinate,
-                   navigationRouteCoordinates
-                    .count >= 2 {
-                    Map(
-                        position:
-                            $navigationMapPosition,
-                        interactionModes: []
-                    ) {
-                        MapPolyline(
-                            coordinates:
-                                navigationRouteCoordinates
-                        )
-                        .stroke(
-                            WatchTheme.accent,
-                            style:
-                                StrokeStyle(
-                                    lineWidth: 6,
-                                    lineCap: .round,
-                                    lineJoin: .round
-                                )
-                        )
-
-                        Annotation(
-                            "You",
-                            coordinate:
-                                userCoordinate,
-                            anchor: .center
-                        ) {
-                            ZStack {
-                                Circle()
-                                    .fill(
-                                        Color.white
-                                    )
-                                    .frame(
-                                        width: 28,
-                                        height: 28
-                                    )
-
-                                Image(
-                                    systemName:
-                                        "location.north.fill"
-                                )
-                                .font(
-                                    .system(
-                                        size: 14,
-                                        weight: .bold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    Color(
-                                        red: 0.10,
-                                        green: 0.14,
-                                        blue: 0.20
-                                    )
-                                )
-                                .rotationEffect(
-                                    .degrees(
-                                        workoutManager
-                                            .routeNavigationCourseDegrees ??
-                                        0
-                                    )
-                                )
-                            }
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        WatchTheme
-                                            .accent,
-                                        lineWidth: 2
-                                    )
-                            }
-                            .shadow(
-                                color:
-                                    Color.black
-                                        .opacity(0.18),
-                                radius: 2,
-                                y: 1
-                            )
-                        }
-
-                        if let finish =
-                                navigationFinishCoordinate,
-                           (
-                                workoutManager
-                                    .routeRemainingMeters ??
-                                .greatestFiniteMagnitude
-                           ) <= 550 {
-                            Annotation(
-                                "Finish",
-                                coordinate:
-                                    finish,
-                                anchor: .center
-                            ) {
-                                Image(
-                                    systemName:
-                                        "flag.checkered"
-                                )
-                                .font(
-                                    .system(
-                                        size: 12,
-                                        weight: .bold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    .white
-                                )
-                                .frame(
-                                    width: 25,
-                                    height: 25
-                                )
-                                .background(
-                                    Color.black
-                                        .opacity(0.82),
-                                    in: Circle()
-                                )
+        GeometryReader { proxy in
+            let compact = proxy.size.height < 205
+            VStack(alignment: .leading, spacing: compact ? 4 : 7) {
+                pageLabel(ATHLTHLocalization.choose(
+                    english: "NAVIGATION", norwegian: "NAVIGASJON"
+                ), icon: "location.north.fill")
+                if navigationRouteCoordinates.count >= 2 {
+                    Map(position: $navigationMapPosition, interactionModes: []) {
+                        MapPolyline(coordinates: navigationRouteCoordinates)
+                            .stroke(WatchTheme.accent, lineWidth: 5)
+                        if let point = navigationUserCoordinate {
+                            Annotation("You", coordinate: point) {
+                                Circle().fill(WatchTheme.premiumGold)
+                                    .frame(width: 11, height: 11)
                             }
                         }
                     }
-                    .mapStyle(
-                        .standard(
-                            pointsOfInterest:
-                                .excludingAll
-                        )
-                    )
-                    .frame(height: 132)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                    )
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                        .stroke(
-                            WatchTheme.border,
-                            lineWidth: 1
-                        )
-                    }
-                    .overlay(
-                        alignment:
-                            .topLeading
-                    ) {
-                        Text(
-                            navigationStatusText
-                        )
-                        .font(
-                            .system(
-                                size: 8,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                        .padding(
-                            .horizontal,
-                            8
-                        )
-                        .padding(
-                            .vertical,
-                            5
-                        )
-                        .background(
-                            navigationStatusTint
-                                .opacity(0.90),
-                            in: Capsule()
-                        )
-                        .padding(6)
-                    }
-                    .onAppear {
-                        updateNavigationMapCamera()
-                    }
-                    .onChange(
-                        of:
-                            workoutManager
-                                .routeNavigationRevision
-                    ) { _, _ in
-                        updateNavigationMapCamera()
-                    }
+                    .frame(height: max(75, proxy.size.height * (compact ? 0.52 : 0.56)))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 } else {
-                    VStack(spacing: 6) {
-                        ProgressView()
-                            .controlSize(
-                                .small
-                            )
-
-                        Text(
-                            "Finding your position…"
-                        )
-                        .font(
-                            .system(
-                                size: 10,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            WatchTheme.muted
-                        )
-                    }
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 112
-                    )
-                    .watchSurface(
-                        radius: 18
-                    )
+                    Label(ATHLTHLocalization.choose(
+                        english: "Waiting for route", norwegian: "Venter på rute"
+                    ), systemImage: "location.slash")
+                    .font(.system(size: 11))
+                    .frame(maxWidth: .infinity,
+                           minHeight: max(65, proxy.size.height * 0.45))
                 }
-
                 HStack(spacing: 7) {
-                    metricTile(
-                        title: "REMAINING",
-                        value:
-                            remainingDistanceText,
-                        suffix: "",
-                        icon:
-                            "flag.checkered"
-                    )
-
-                    metricTile(
-                        title: "OFF ROUTE",
-                        value:
-                            routeDeviationText,
-                        suffix: "",
-                        icon:
-                            "location.triangle.fill"
-                    )
+                    Label(workoutManager.routeRemainingMeters.map {
+                        String(format: "%.1f km", $0 / 1000)
+                    } ?? "—", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    Spacer(minLength: 2)
+                    Text(routeDeviationText)
+                        .foregroundStyle(WatchTheme.premiumGold)
                 }
-
-                routeNextTurnCard
-
-                if workoutManager.canRunBackToStart {
-                    Button {
-                        workoutManager.startReturnToRouteStart()
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Run back to start",
-                                norwegian: "Løp tilbake til start"
-                            ),
-                            systemImage: "arrow.uturn.backward"
-                        )
-                        .font(.system(size: 11, weight: .bold))
-                        .frame(maxWidth: .infinity, minHeight: 42)
-                        .foregroundStyle(.white)
-                        .background(WatchTheme.accent,
-                                    in: RoundedRectangle(cornerRadius: 13))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(ATHLTHLocalization.choose(
-                        english: "Continue the same workout on the reversed route",
-                        norwegian: "Fortsett samme økt på ruten motsatt vei"
-                    ))
-                }
+                .font(.system(size: 11, weight: .bold))
+                .lineLimit(1)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -3397,163 +3172,49 @@ struct WatchRunWorkoutExperienceView: View {
 
     // MARK: - Page 3: route, Route Guardian and Ghost
 
+    /// Compact route overview. Ghost and turn-by-turn are on their own pages.
+    /// Swiping vertically always changes the Watch page.
     private var routePage: some View {
-        ScrollView {
-            VStack(spacing: 8) {
-                pageLabel(
-                    workoutManager
-                        .plannedRoute == nil
-                        ? "GPS"
-                        : "ROUTE",
-                    icon: "map.fill"
-                )
-
-                if let userCoordinate =
-                        ghostMapUserCoordinate,
-                   let ghostCoordinate =
-                        ghostMapGhostCoordinate {
-                    ghostProximityMap(
-                        userCoordinate:
-                            userCoordinate,
-                        ghostCoordinate:
-                            ghostCoordinate
-                    )
-                } else if routeCoordinates.count >= 2 {
-                    Map {
-                        MapPolyline(
-                            coordinates:
-                                routeCoordinates
-                        )
-                        .stroke(
-                            WatchTheme.accent,
-                            lineWidth: 4
-                        )
+        GeometryReader { proxy in
+            let compact = proxy.size.height < 205
+            VStack(alignment: .leading, spacing: compact ? 4 : 7) {
+                pageLabel(workoutManager.plannedRoute == nil
+                    ? "GPS" : ATHLTHLocalization.choose(
+                        english: "ROUTE", norwegian: "RUTE"
+                    ), icon: "map.fill")
+                if routeCoordinates.count >= 2 {
+                    Map(interactionModes: []) {
+                        MapPolyline(coordinates: routeCoordinates)
+                            .stroke(WatchTheme.accent, lineWidth: 4)
                     }
-                    .frame(height: 102)
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                    )
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                        .stroke(
-                            WatchTheme.border,
-                            lineWidth: 1
-                        )
-                    }
+                    .frame(height: max(70, proxy.size.height * (compact ? 0.52 : 0.59)))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 } else {
-                    VStack(spacing: 6) {
-                        Image(
-                            systemName:
-                                "location.fill.viewfinder"
-                        )
-                        .font(.title2)
-                        .foregroundStyle(
-                            WatchTheme.accent
-                        )
-
-                        Text(
-                            workoutManager
-                                .routePoints
-                                .isEmpty
-                                ? "Finding GPS…"
-                                : "Building your route…"
-                        )
-                        .font(
-                            .system(
-                                size: 11,
-                                weight: .semibold
-                            )
-                        )
-                    }
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 86
-                    )
-                    .watchSurface(radius: 18)
+                    Label(ATHLTHLocalization.choose(
+                        english: "Route appears when GPS is ready",
+                        norwegian: "Ruten vises når GPS er klar"
+                    ), systemImage: "location")
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(maxWidth: .infinity,
+                           minHeight: max(65, proxy.size.height * 0.48))
                 }
-
-                if workoutManager.plannedRoute != nil {
-                    HStack(spacing: 7) {
-                        metricTile(
-                            title: "REMAINING",
-                            value:
-                                remainingDistanceText,
-                            suffix: "",
-                            icon:
-                                "location.north.fill"
-                        )
-
-                        metricTile(
-                            title: "OFF ROUTE",
-                            value:
-                                routeDeviationText,
-                            suffix: "",
-                            icon:
-                                "location.triangle.fill"
-                        )
-                    }
-
-                    if let progress =
-                            workoutManager
-                                .routeProgressPercent {
-                        ProgressView(
-                            value:
-                                min(
-                                    max(
-                                        progress / 100,
-                                        0
-                                    ),
-                                    1
-                                )
-                        )
-                        .tint(
-                            WatchTheme.accent
-                        )
-                        .padding(
-                            .horizontal,
-                            5
-                        )
+                HStack(spacing: 8) {
+                    Label(distanceKilometersText + " km",
+                          systemImage: "figure.run")
+                    Spacer(minLength: 0)
+                    if let progress = workoutManager.routeProgressPercent,
+                       progress.isFinite {
+                        Text(String(format: "%.0f %%", progress))
+                            .foregroundStyle(WatchTheme.premiumGold)
                     }
                 }
-
-                if workoutManager
-                        .ghostRaceTitle != nil {
-                    ghostCard
-                    Button {
-                        workoutManager.disableGhostDuringWorkout()
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Turn off Ghost Race",
-                                norwegian: "Slå av Ghost Race"
-                            ),
-                            systemImage: "eye.slash"
-                        )
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(maxWidth: .infinity, minHeight: 40)
-                    }
-                    .buttonStyle(.bordered)
-                } else if workoutManager
-                            .plannedRoute == nil {
-                    Text(
-                        "Free run · the Watch records your live route."
-                    )
-                    .font(
-                        .system(size: 8)
-                    )
-                    .foregroundStyle(
-                        WatchTheme.muted
-                    )
-                }
+                .font(.system(size: 11, weight: .bold))
+                .lineLimit(1)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
