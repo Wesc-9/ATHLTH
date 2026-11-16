@@ -259,8 +259,7 @@ final class ATHLTHStudioAnalyticsTests: XCTestCase {
 
     func testRecordedWorkoutShowsStartAndEndWhenFinished() {
         let start = Date(timeIntervalSince1970: 1_794_744_000)
-        let record = WorkoutSummary(localStrengthWorkout:
-            strength(started: start, duration: 45 * 60))
+        let record = recordedStrength(started: start, seconds: 45 * 60)
         let label = ATHLTHStudioRecordedWorkouts.timeRange(record)
         XCTAssertTrue(label.contains("–"))
         XCTAssertFalse(label.isEmpty)
@@ -268,8 +267,7 @@ final class ATHLTHStudioAnalyticsTests: XCTestCase {
 
     func testZeroDurationRecordingDoesNotInventFinishTime() {
         let start = Date(timeIntervalSince1970: 1_794_744_000)
-        let record = WorkoutSummary(localStrengthWorkout:
-            strength(started: start, duration: 0))
+        let record = recordedStrength(started: start, seconds: 0)
         XCTAssertFalse(ATHLTHStudioRecordedWorkouts.timeRange(record).contains("–"))
     }
 
