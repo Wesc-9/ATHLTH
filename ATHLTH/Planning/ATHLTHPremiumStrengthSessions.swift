@@ -113,12 +113,15 @@ enum ATHLTHPremiumStrengthSessions {
         ]
 
         for move in recipe.moves {
-            let id = ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(
+            let id = ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(
                 for: move.name
             )
             let translatedName = NorwegianExerciseText.name(for: id) ??
                 (ATHLTHLocalization.isNorwegian
-                 ? ATHLTHExerciseNameLocalization.norwegianName(for: move.name)
+                 ? (id.flatMap { ExerciseLibraryStore.norwegianExerciseNames[$0] }
+                    ?? (id == "athlth-native-hip-thrust"
+                        ? "Hip thrust med stang"
+                        : ATHLTHExerciseNameLocalization.norwegianName(for: move.name)))
                  : move.name)
             // Repetition bounds, duration and RIR are independent
             // prescribed fields; only the coaching advice remains prose.
