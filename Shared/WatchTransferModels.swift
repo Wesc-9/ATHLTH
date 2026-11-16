@@ -451,6 +451,9 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     // Optional for backwards compatibility with configurations already
     // persisted or queued before these Audio Coach controls were introduced.
     var duckOtherAudio: Bool? = nil
+    // Optional for decoding old iPhone/Watch sessions. Temporarily interrupt
+    // other audio while a Coach cue speaks; restore at cue completion.
+    var muteOtherAudio: Bool? = nil
     var guidanceQuietPeriodSeconds: TimeInterval? = nil
     var voiceIdentifier: String? = nil
     var speechRate: Float? = nil
@@ -535,6 +538,10 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
 
     var shouldDuckOtherAudio: Bool {
         duckOtherAudio ?? true
+    }
+
+    var shouldMuteOtherAudio: Bool {
+        muteOtherAudio ?? false
     }
 
     var resolvedGuidanceQuietPeriodSeconds:
