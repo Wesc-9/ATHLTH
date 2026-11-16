@@ -1592,7 +1592,9 @@ struct RunQuickStartSheet: View {
     @State private var environment: RunEnvironment = .outdoor
     @State private var treadmillInitialSpeed: Double?
     @State private var showingTreadmillQuickSpeeds = false
-    @State private var watchCompetitionStart = false
+    // Last choice is remembered, but can be overridden before every launch.
+    @AppStorage("athlth.watch.preferredQuickRunCompetition")
+    private var watchCompetitionStart = false
     @State private var quickWorkoutName = ""
     @State private var quickDisplayDate = Date()
     @State private var pendingStartDate: Date?
