@@ -2937,7 +2937,7 @@ struct AIProgramBuilderView: View {
         var generated = draft.makeTrainingPlan(
             ownerID: session.profile.userID,
             startDate: startDate,
-            exerciseLibrary: exerciseLibrary.selectableExercises
+            exerciseLibrary: exerciseLibrary.allExercises
         )
 
         if mode == .generate,
@@ -2960,6 +2960,21 @@ struct AIProgramBuilderView: View {
                     ? seed.structuredWorkoutsByDay : [:],
                 to: &generated.weeks
             )
+        }
+
+        // Nothing leaves the Coach draft until every structured strength
+        // movement can be traced to an actual library exercise. Preserve the
+        // draft/targets for correction instead of fabricating technique.
+        let binding = ATHLTHWorkoutExerciseBinding.bind(
+            &generated, library: exerciseLibrary.allExercises
+        )
+        guard binding.isReady else {
+            let names = binding.unresolved.prefix(6).joined(separator: ", ")
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Choose the matching library exercise for: \(names). The draft was not saved.",
+                norwegian: "Velg riktig øvelse fra biblioteket for: \(names). Utkastet er ikke lagret."
+            )
+            return
         }
 
         switch mode {
