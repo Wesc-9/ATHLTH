@@ -468,9 +468,26 @@ struct ATHLTHCommunityV5View: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(tr("Train Together", "Tren sammen"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(CommunityReferenceStyle.ink)
+                    HStack(spacing: 8) {
+                        Text(tr("Train Together", "Tren sammen"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(CommunityReferenceStyle.ink)
+                        let pendingInvites = social.workoutInvites.filter {
+                            $0.participant.state == .invited
+                        }.count
+                        if pendingInvites > 0 {
+                            Text("\(pendingInvites)")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(CommunityReferenceStyle.cream, in: Capsule())
+                                .accessibilityLabel(tr(
+                                    "\(pendingInvites) workout invitations",
+                                    "\(pendingInvites) treningsinvitasjoner"
+                                ))
+                        }
+                    }
                     Text(tr(
                         "Find a shared workout or invite other athletes.",
                         "Finn en fellesøkt eller inviter andre til å trene."
