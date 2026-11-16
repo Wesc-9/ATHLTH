@@ -1443,6 +1443,12 @@ struct AppRootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 crossDeviceWorkout.didForeground()
+                if appSession.signedIn {
+                    _ = appSession.reconcileExpiredPlannedWorkouts(
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strengthWorkout.workoutHistory
+                    )
+                }
             } else {
                 crossDeviceWorkout.didBackground()
             }
