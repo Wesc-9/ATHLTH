@@ -354,7 +354,9 @@ struct RouteLibraryListView: View {
                     }
 
                     LazyVGrid(
-                        columns: ATHLTHLibraryResponsiveLayout.columns(
+                        columns: viewMode == .largeCards
+                            ? [GridItem(.flexible())]
+                            : ATHLTHLibraryResponsiveLayout.columns(
                             mode: viewMode == .list || viewMode == .map ? .list : .grid,
                             width: libraryViewWidth,
                             accessibilityText: dynamicTypeSize.isAccessibilitySize,
@@ -364,9 +366,12 @@ struct RouteLibraryListView: View {
                         spacing: 10
                     ) {
                         ForEach(entries) { entry in
-                            if viewMode == .cards {
+                            switch viewMode {
+                            case .cards:
                                 databaseCompactTile(entry)
-                            } else {
+                            case .largeCards:
+                                databasePremiumCard(entry)
+                            case .list, .map:
                                 databaseCompactRow(entry)
                             }
                         }
@@ -920,7 +925,10 @@ struct RouteLibraryListView: View {
                         showingMapRoute = route
                     } label: {
                         ZStack(alignment: .bottomTrailing) {
-                            RouteMapSnapshotThumbnail(route: route, height: 150)
+                            RouteMapSnapshotThumbnail(
+                                route: route, height: 190,
+                                allowsLiveSnapshot: !routeCardsScrolling
+                            )
                                 .frame(maxWidth: .infinity)
                                 .clipShape(RoundedRectangle(cornerRadius: 17))
                             Label(tr("Explore", "Utforsk"),
@@ -949,7 +957,7 @@ struct RouteLibraryListView: View {
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                     }
-                    .frame(height: 150)
+                    .frame(height: 190)
                 }
             }
             .task(id: entry.id) { await loadRouteDetail(entry.id) }
