@@ -2134,6 +2134,18 @@ struct AppRootView: View {
             }
             scheduleHomeAssistantSnapshotSync()
         }
+        .onChange(of: appSession.recordedPlannedWorkoutTimes) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
+        .onChange(of: appSession.skippedPlanSessions) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
+        .onChange(of: appSession.linkedHealthWorkoutsByPlanSession) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
         .onChange(of: appSession.activePlan) { _, _ in
             guard appSession.signedIn else { return }
             Task { await syncCalendarIfAllowed() }
@@ -2627,9 +2639,9 @@ struct AppRootView: View {
         }
         // A failed network refresh must not delete previously synced
         // tournament events as if the athlete had left every competition.
-        guard await tournamentCalendar.refresh(
+        let tournamentRefreshed = await tournamentCalendar.refresh(
             for: appSession.profile.userID, force: true
-        ) else { return }
+        )
 
         async let eventRefresh: Void =
             communityEvents.refresh()
@@ -2644,6 +2656,10 @@ struct AppRootView: View {
             clubChallengeRefresh
         )
 
+        _ = appSession.reconcileExpiredPlannedWorkouts(
+            healthWorkouts: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory
+        )
         await calendarSync.syncIfEnabled(
             plan: appSession.activePlan,
             additionalPlans: appSession.scheduledPlans.filter {
@@ -2651,6 +2667,10 @@ struct AppRootView: View {
                 !appSession.isTrainingPlanDeactivated($0.id)
             },
             standaloneSessions: appSession.standalonePlannedSessions,
+            workoutStatuses: appSession.calendarWorkoutStatuses(
+                healthWorkouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory
+            ),
             communityEvents: communityEvents.events,
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
@@ -2659,7 +2679,8 @@ struct AppRootView: View {
             clubChallengeParticipations:
                 communityGroups.calendarChallengeParticipations,
             challenges: challengeStore.challenges,
-            tournamentExercises: tournamentCalendar.items,
+            tournamentExercises: tournamentRefreshed
+                ? tournamentCalendar.items : nil,
             currentUserID:
                 appSession.profile.userID
         )
