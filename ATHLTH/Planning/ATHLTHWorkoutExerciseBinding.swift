@@ -58,17 +58,21 @@ enum ATHLTHWorkoutExerciseBinding {
                 // Only exact, curated public catalog names can be resolved.
                 let name = exercise.embeddedExercise.name
                 let key = ATHLTHExerciseReferenceResolver.key(name)
-                let reviewedSlug =
-                    ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(for: name)
-                let native = library.filter {
-                    $0.source == .athlthCatalog &&
-                    $0.sourceIdentifier == reviewedSlug
+                let reviewedIdentifier =
+                    ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(for: name)
+                let reviewed = library.filter {
+                    guard let reviewedIdentifier else { return false }
+                    let source: ExerciseLibrarySource =
+                        reviewedIdentifier.hasPrefix("athlth-native-")
+                        ? .athlthCatalog : .repDB
+                    return $0.source == source &&
+                        $0.sourceIdentifier == reviewedIdentifier
                 }
                 let exact = library.filter {
                     ($0.source == .athlthCatalog || $0.source == .repDB) &&
                     ATHLTHExerciseReferenceResolver.key($0.canonicalName) == key
                 }
-                match = native.count == 1 ? native[0] :
+                match = reviewed.count == 1 ? reviewed[0] :
                     exact.count == 1 ? exact[0] : nil
             }
             guard let match else {
