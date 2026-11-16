@@ -312,7 +312,7 @@ struct ATHLTHWorkoutInvitationSection: View {
         }
         .padding(15)
         .athlthTrainTogetherCard(radius: 19, subtle: true)
-        .accessibilityIdentifier("athlth-workout-invite-\\(invite.participant.id)")
+        .accessibilityIdentifier("athlth-workout-invite-\(invite.participant.id)")
     }
 
     private func respond(to invite: SocialWorkoutInviteDisplay, accept: Bool) {
