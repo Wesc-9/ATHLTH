@@ -1885,13 +1885,40 @@ struct HomeWeeklyProgressStrip:
             )
         }
         .onAppear {
+            _ = session.reconcileExpiredPlannedWorkouts(
+                healthWorkouts: workouts,
+                strengthHistory: strength.workoutHistory
+            )
             restoreWorkoutComposerIfNeeded()
             if !composerActive { restoreDaySheetIfNeeded() }
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
+            _ = session.reconcileExpiredPlannedWorkouts(
+                healthWorkouts: workouts,
+                strengthHistory: strength.workoutHistory
+            )
             restoreWorkoutComposerIfNeeded()
             if !composerActive { restoreDaySheetIfNeeded() }
+        }
+        .task(id: "\(session.activePlan?.version ?? 0):\(session.standalonePlannedSessions.map { $0.scheduledStart?.timeIntervalSince1970 ?? 0 }.reduce(0, +))") {
+            guard session.signedIn else { return }
+            while !Task.isCancelled {
+                _ = session.reconcileExpiredPlannedWorkouts(
+                    healthWorkouts: workouts,
+                    strengthHistory: strength.workoutHistory
+                )
+                guard let next = session.nextPlannedCancellationDeadline(
+                    healthWorkouts: workouts,
+                    strengthHistory: strength.workoutHistory
+                ) else { break }
+                let seconds = min(3600, max(1, next.timeIntervalSinceNow))
+                do {
+                    try await Task.sleep(
+                        nanoseconds: UInt64(seconds * 1_000_000_000)
+                    )
+                } catch { break }
+            }
         }
         .onChange(of: session.profile.userID) { _, _ in
             restoreWorkoutComposerIfNeeded()
