@@ -3024,6 +3024,9 @@ struct WorkoutTemplateDetailView: View {
         // personal My Workouts copies and their distinct session IDs.
         var original = entry.plannedSession(useOriginalID: true)
         original.workoutBlocks = libraryDisplayBlocks
+        _ = ATHLTHWorkoutExerciseBinding.bind(
+            &original, library: exerciseLibrary.allExercises
+        )
         return original
     }
 
@@ -3194,6 +3197,17 @@ struct WorkoutTemplateDetailView: View {
 
                 Button {
                     guard !hasActiveWorkout else { return }
+                    var workout = workoutForStarting
+                    let report = ATHLTHWorkoutExerciseBinding.bind(
+                        &workout, library: exerciseLibrary.allExercises
+                    )
+                    guard report.isReady else {
+                        shareError = tr(
+                            "Resolve library exercises before starting: ",
+                            "Koble øvelsene til biblioteket før start: "
+                        ) + report.unresolved.prefix(4).joined(separator: ", ")
+                        return
+                    }
                     showingWorkout = true
                 } label: {
                     Label(tr("Start workout", "Start økt"),
