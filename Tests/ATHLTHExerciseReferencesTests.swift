@@ -218,6 +218,91 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
     }
 
     @MainActor
+    func testEveryGymCoachProgramExerciseOpensARealLibraryExercise() throws {
+        let library = ExerciseLibraryStore()
+        let bundled = library.allExercises
+        let programs = ATHLTHGymCoachStrengthLibrary.programs
+        XCTAssertEqual(programs.count, 11)
+
+        var matchedNames = Set<String>()
+        for program in programs {
+            for workout in program.program.workouts {
+                let steps = ATHLTHGymCoachStrengthLibrary.blocks(for: workout)
+                    .filter { $0.kind == .exercise }
+                XCTAssertEqual(steps.count, workout.exercises.count)
+                for (step, original) in zip(steps, workout.exercises) {
+                    matchedNames.insert(original.name)
+                    let match = ATHLTHExerciseReferenceResolver.resolve(
+                        step, in: bundled
+                    )
+                    XCTAssertNotNil(
+                        match,
+                        "Missing actual library exercise for \(original.name) in \(program.slug)"
+                    )
+                    XCTAssertEqual(match?.source, .athlthCatalog)
+                    XCTAssertEqual(match?.sourceIdentifier, step.exerciseSlug)
+                    XCTAssertEqual(step.setCount, original.targetSets)
+                    XCTAssertEqual(step.repetitions, original.targetRepsMin)
+                    XCTAssertEqual(step.targetRepsInReserve, original.targetRIR)
+                    XCTAssertEqual(
+                        step.restBetweenSetsSeconds, Double(original.restSec)
+                    )
+                }
+            }
+        }
+        XCTAssertEqual(matchedNames.count, 32)
+    }
+
+    @MainActor
+    func testOldGZCLPNorwegianShoulderPressResolvesUsingEnglishSourceSnapshot() throws {
+        let library = ExerciseLibraryStore()
+        var legacy = block("Skulderpress")
+        legacy.setCount = 5
+        legacy.repetitions = 3
+        legacy.restBetweenSetsSeconds = 180
+        legacy.targetRepsInReserve = 1
+        legacy.exerciseSnapshot = ExerciseSnapshot(
+            name: "Overhead Press",
+            instructions: [],
+            primaryMuscles: ["shoulders"],
+            equipment: [], imageURL: nil
+        )
+
+        let matched = try XCTUnwrap(
+            ATHLTHExerciseReferenceResolver.resolve(
+                legacy, in: library.allExercises
+            )
+        )
+        XCTAssertEqual(matched.sourceIdentifier, "athlth-native-overhead-press")
+        // Linking must not rewrite any prescription from the plan.
+        XCTAssertEqual(legacy.setCount, 5)
+        XCTAssertEqual(legacy.repetitions, 3)
+        XCTAssertEqual(legacy.restBetweenSetsSeconds, 180)
+        XCTAssertEqual(legacy.targetRepsInReserve, 1)
+    }
+
+    @MainActor
+    func testPrivateOrAmbiguousExercisesNeverResolveBySimilarName() {
+        let library = ExerciseLibraryStore()
+        var personal = block("Skulderpress")
+        personal.exerciseID = UUID()
+        personal.exerciseSnapshot = ExerciseSnapshot(
+            name: "Overhead Press",
+            instructions: ["Use my private setup"],
+            primaryMuscles: ["shoulders"],
+            equipment: [], imageURL: nil
+        )
+        XCTAssertNil(ATHLTHExerciseReferenceResolver.resolve(
+            personal, in: library.allExercises
+        ))
+        // Without an explicit reference, "Skulderpress" does not prove
+        // whether a user meant barbell, dumbbell or machine.
+        XCTAssertNil(ATHLTHExerciseReferenceResolver.resolve(
+            block("Skulderpress"), in: library.allExercises
+        ))
+    }
+
+    @MainActor
     func testDifferentCreatorsMayShareDifferentExercisesWithIdenticalNames() throws {
         let recipient = UUID()
         let library = ExerciseLibraryStore()
