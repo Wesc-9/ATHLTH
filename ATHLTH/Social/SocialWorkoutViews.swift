@@ -5354,7 +5354,8 @@ struct WorkoutPublishView: View {
             routePreview: includeRoute ? WorkoutRouteSharing.preview(sharingRoute, hideStartAndEnd: hideRouteStartAndEnd) : [],
             hideRouteStartAndEnd: hideRouteStartAndEnd,
             includeHealthData: includeHealthData,
-            pulseSamples: selectedPulseSamples
+            pulseSamples: selectedPulseSamples,
+            maximumHeartRateBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
         )
 
         if success {
