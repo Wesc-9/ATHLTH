@@ -75,11 +75,20 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     func testCuratedExercisesRemainSelectableButDuplicateNativeMovementsAreHidden() {
         let library = ExerciseLibraryStore()
         let featured = ExerciseLibraryStore.featuredNativeExerciseSlugs
-        XCTAssertEqual(featured, Set([
+        // The initial three curated IDs remain available; 2.2.2 also
+        // intentionally exposes additional non-duplicate native movements
+        // referenced by bundled training plans.
+        let originalFeatured: Set<String> = [
             "athlth-native-tabletop-sit-up",
             "athlth-native-free-strength-training",
             "athlth-native-test-bodyweight-squat"
-        ]))
+        ]
+        XCTAssertTrue(featured.isSuperset(of: originalFeatured))
+        XCTAssertTrue(featured.contains("athlth-native-cable-curl"))
+        XCTAssertTrue(featured.contains("athlth-native-power-clean"))
+        XCTAssertTrue(featured.isDisjoint(
+            with: ExerciseLibraryStore.retiredNativeDuplicateSlugs
+        ))
         XCTAssertEqual(ExerciseLibraryStore.retiredNativeDuplicateSlugs, Set([
             "athlth-native-weighted-russian-twist",
             "athlth-native-six-inch-hold",
@@ -170,15 +179,20 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         )
         XCTAssertFalse(bicepsExercises.isEmpty)
         XCTAssertTrue(bicepsExercises.allSatisfy { entry in
-            entry.source != .athlthCatalog &&
-                (
-                    (entry.bodyPart.map {
-                        ExerciseLibraryStore.canonicalMuscleFilter($0) == "Biceps"
-                    } ?? false) ||
-                    entry.exercise.primaryMuscles.contains {
-                        ExerciseLibraryStore.canonicalMuscleFilter($0) == "Biceps"
-                    }
-                )
+            // Allow intentionally featured ATHLTH exercises such as Cable
+            // Curl, while keeping retired duplicates out of search results.
+            let isSelectableSource = entry.source != .athlthCatalog ||
+                (entry.sourceIdentifier.map {
+                    ExerciseLibraryStore.featuredNativeExerciseSlugs.contains($0)
+                } == true &&
+                !ExerciseLibraryStore.isRetiredNativeDuplicate(entry))
+            let isBiceps = (entry.bodyPart.map {
+                ExerciseLibraryStore.canonicalMuscleFilter($0) == "Biceps"
+            } ?? false) ||
+            entry.exercise.primaryMuscles.contains {
+                ExerciseLibraryStore.canonicalMuscleFilter($0) == "Biceps"
+            }
+            return isSelectableSource && isBiceps
         })
     }
 
