@@ -1,3 +1,10 @@
+# ACTIVE ATHLTH DEVELOPMENT (2026-11-16)
+
+- **CURRENT ACTIVE VERSION: 2.2.3 (build 131)** on `release/v2.2.3`, created from the exact verified ATHLTH 2.2.2 TestFlight source `f1b94ac9ae738888333e0aede33e5d3f5a1e2d31`. Make ALL new ATHLTH source, UI, tests and workflow changes only on `release/v2.2.3`; older versions must remain unchanged.
+- **VERSION 2.2.2 (build 130) IS FROZEN** at `f1b94ac9ae738888333e0aede33e5d3f5a1e2d31`. Preservation refs: `locked/v2.2.2` and `backup/v2.2.2-locked-before-v2.2.3-20261116`. Same-commit GitHub Actions successes: TestFlight upload `43872258344`, Build ATHLTH `43872258418`, backend regressions `43872258357`, Train/Hybrid XCTest `43872258402`. Upload is verified; separate Apple processing/tester availability cannot be inferred from CI success. Never modify `release/v2.2.2` or its preservation refs.
+- **VERSION TRANSITION:** This 2.2.3 section supersedes historical active-version instructions below. Preserve all approved 2.2.2 exercise-library identities, canonical training plans, premium route details, map editing, Basic Quick Train routing, Audio Coach and iPhone/iPad/Watch behavior. Do not trigger a new 2.2.3 TestFlight release without explicit user authorization. Routine build, backend, and simulator test workflows may run.
+- **Freeze enforcement:** preserved Git refs and project policy record the immutable release. Repository administrator branch protection is separate and has not been configured through this transition.
+
 # ACTIVE ATHLTH DEVELOPMENT (2026-11-15)
 
 - **CURRENT ACTIVE VERSION: 2.2.2 (build 130)** on `release/v2.2.2`, created from exact verified 2.2.1 TestFlight source `7e9c26532032f24d12c1d2d84d935406f67248b9`. Make ALL new ATHLTH source, UI, tests and workflow changes only on `release/v2.2.2`; older versions remain immutable.
