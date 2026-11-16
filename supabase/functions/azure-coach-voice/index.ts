@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
       (typeof liveText !== "string" || liveText.trim().length < 1 ||
        liveText.length > 220 || /[\u0000-\u0008\u000e-\u001f]/.test(liveText)))
     return json({ error: "Invalid speech text" }, 400);
-  const speech = typeof liveText === "string" ? liveText.trim() : sample;
+  const requestedText = typeof liveText === "string" ? liveText.trim() : null;
 
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -147,6 +147,9 @@ Deno.serve(async (req: Request) => {
   if (!azureShortName)
     return json({ error: "Unsupported voice", code: "UNSUPPORTED_VOICE" }, 400);
 
+  const selectedLocale = azureShortName.slice(0, 5);
+  const speech = requestedText ??
+    (selectedLocale.startsWith("en-") ? englishSample : sample);
 
   // Both routes require the server-verified ATHLTH+ entitlement above.
   // Live training uses its own fair-use cap. Previews keep the existing
@@ -176,12 +179,9 @@ Deno.serve(async (req: Request) => {
                     code: "FREE_BUDGET_EXHAUSTED" }, 429);
   }
 
-  const selectedLocale = azureShortName.slice(0, 5);
-  const spokenText = typeof liveText === "string" ? speech :
-    selectedLocale.startsWith("en-") ? englishSample : sample;
   const ssml = '<speak version="1.0" xml:lang="' + selectedLocale +
     '"><voice name="' + azureShortName + '">' +
-    escapeXML(spokenText) + '</voice></speak>';
+    escapeXML(speech) + '</voice></speak>';
   let azure: Response;
   try {
     azure = await fetch("https://" + region + ".tts.speech.microsoft.com/cognitiveservices/v1", {
