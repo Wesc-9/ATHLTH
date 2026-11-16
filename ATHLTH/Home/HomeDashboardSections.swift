@@ -4900,7 +4900,8 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
         }
         .monospacedDigit()
-        .frame(width: 50, minHeight: 43, alignment: .leading)
+        .frame(width: 50, alignment: .leading)
+        .frame(minHeight: 43)
         .padding(.leading, 10)
         .accessibilityElement(children: .combine)
     }
