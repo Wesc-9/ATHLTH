@@ -19,6 +19,8 @@ enum ATHLTHWatchDisplayPreferences {
         audioCoachAvailable: Bool
     ) -> Int {
         switch configuration.preferredRunPageRaw {
+        case "competition": return 10
+        case "metrics": return 0
         case "pulse": return 7
         case "coach" where audioCoachAvailable: return 8
         default: return 0
