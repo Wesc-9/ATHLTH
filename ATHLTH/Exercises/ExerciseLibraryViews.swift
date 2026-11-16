@@ -883,9 +883,6 @@ struct ExerciseLibraryView: View {
             async let favoriteRefresh: Void = favorites.refresh()
             _ = await (exerciseRefresh, favoriteRefresh)
         }
-        .refreshable {
-            await library.refresh(force: true)
-        }
         .task {
             guard ATHLTHLocalization.isNorwegian else { return }
             languageStatus = await NorwegianExerciseAutoTranslation.availabilityStatus()
