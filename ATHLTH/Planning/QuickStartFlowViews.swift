@@ -638,6 +638,7 @@ struct RunQuickStartConfiguration {
     var advancedWorkout: PlannedSession? = nil
     /// User-reported actual belt speed, not an interval goal.
     var treadmillInitialSpeedKilometersPerHour: Double? = nil
+    var treadmillQuickSpeedPresets: [Double] = []
     /// Presentation-only choice; the Watch remains on its own workout session.
     var watchCompetitionStart = false
 
@@ -3153,6 +3154,18 @@ struct RunQuickStartSheet: View {
         configuration.treadmillInitialSpeedKilometersPerHour =
             runEnvironment == .treadmill ? treadmillInitialSpeed : nil
         configuration.watchCompetitionStart = watchCompetitionStart
+        let savedSpeeds = (UserDefaults.standard.string(
+            forKey: "athlth.treadmill.presetSpeeds"
+        ) ?? "6,8,10,12,14,16").split(separator: ",")
+            .compactMap { Double($0) }
+            .filter { $0.isFinite && (0.1...30).contains($0) }
+        let presetCount = min(max(
+            UserDefaults.standard.object(
+                forKey: "athlth.treadmill.presetCount"
+            ) as? Int ?? 4, 2), 6)
+        configuration.treadmillQuickSpeedPresets =
+            Array((savedSpeeds.count >= 6
+                ? savedSpeeds : [6,8,10,12,14,16]).prefix(presetCount))
         liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
         launchInProgress = true
         Task { @MainActor in
