@@ -29,13 +29,14 @@ private enum MessageInboxFilter: String, CaseIterable, Identifiable {
     case all
     case unread
     case direct
+    case invitations
     case groups
     case archive
 
-    // Open private messages first for every account. Group and mixed
-    // conversations remain available as separate, explicit filters.
+    // Inbox is the single destination for conversations and invitations.
+    // Keep invitations ahead of messages without mixing them into DMs.
     static let mainFilters: [MessageInboxFilter] = [
-        .direct, .unread, .groups, .all
+        .all, .invitations, .direct, .unread, .groups
     ]
 
     var id: String { rawValue }
@@ -48,6 +49,8 @@ private enum MessageInboxFilter: String, CaseIterable, Identifiable {
             return ATHLTHLocalization.choose(english: "Unread", norwegian: "Uleste")
         case .direct:
             return ATHLTHLocalization.choose(english: "Messages", norwegian: "Meldinger")
+        case .invitations:
+            return ATHLTHLocalization.choose(english: "Invitations", norwegian: "Invitasjoner")
         case .groups:
             return ATHLTHLocalization.choose(english: "Groups", norwegian: "Grupper")
         case .archive:
@@ -60,6 +63,7 @@ private enum MessageInboxFilter: String, CaseIterable, Identifiable {
         case .all: return "tray.full"
         case .unread: return "envelope.badge"
         case .direct: return "bubble.left"
+        case .invitations: return "envelope.open"
         case .groups: return "person.3"
         case .archive: return "archivebox"
         }
@@ -85,7 +89,7 @@ struct MessageInboxView: View {
     @State private var searchText = ""
     @State private var showingSearch = false
     @State private var selectedFilter:
-        MessageInboxFilter = .direct
+        MessageInboxFilter = .all
     @State private var selectedWorkoutInvite:
         SocialWorkoutInviteDisplay?
     @State private var coachPinned = true
@@ -109,11 +113,23 @@ struct MessageInboxView: View {
                 // selected inbox filter. Keep them above the tabs even
                 // when private Messages is the default.
                 if selectedFilter != .archive &&
+                    selectedFilter != .invitations &&
                     !recentConversations.isEmpty {
                     recentConversationsStrip
                 }
 
                 inboxFilterBar
+
+                // Same invitation records and actions as Tren sammen.
+                // Accepting here updates SocialStore before the other
+                // screen is opened; no duplicate message is generated.
+                if selectedFilter == .all || selectedFilter == .invitations {
+                    ATHLTHWorkoutInvitationSection(
+                        showsAccepted: true,
+                        showsEmptyState: selectedFilter == .invitations,
+                        searchText: searchText
+                    )
+                }
 
                 if selectedFilter == .all && requestCount > 0 {
                     inboxSectionLabel(
@@ -1003,6 +1019,10 @@ struct MessageInboxView: View {
             return ATHLTHLocalization.choose(
                 english: "No messages yet", norwegian: "Ingen meldinger ennå"
             )
+        case .invitations:
+            return ATHLTHLocalization.choose(
+                english: "No invitations", norwegian: "Ingen invitasjoner"
+            )
         case .groups:
             return ATHLTHLocalization.choose(
                 english: "No group conversations", norwegian: "Ingen gruppesamtaler"
@@ -1036,6 +1056,11 @@ struct MessageInboxView: View {
             return ATHLTHLocalization.choose(
                 english: "Start a conversation with someone you follow.",
                 norwegian: "Start en samtale med noen du følger."
+            )
+        case .invitations:
+            return ATHLTHLocalization.choose(
+                english: "Your workout invitations will appear here.",
+                norwegian: "Treningsinvitasjonene dine vises her."
             )
         case .groups:
             return ATHLTHLocalization.choose(
@@ -1242,6 +1267,8 @@ struct MessageInboxView: View {
                     // Only actual one-to-one conversations (including
                     // pending message requests), never invite-only people.
                     return !archived && item.conversation != nil
+                case .invitations:
+                    return false
                 case .groups:
                     // Actual group conversations are presented by Arena and Clubs,
                     // not inferred from workout/challenge invitations in a DM.
@@ -1301,7 +1328,9 @@ struct MessageInboxView: View {
     private var shouldShowEmptyState: Bool {
         let hasClubInvites = (selectedFilter == .all || selectedFilter == .groups)
             && groups.ownInvites.contains { $0.status == "pending" }
-        return displayedPersonItems.isEmpty &&
+        return selectedFilter != .invitations &&
+            social.workoutInvites.isEmpty &&
+            displayedPersonItems.isEmpty &&
             arenaInboxVisibleCount == 0 &&
             !hasClubInvites &&
             !hasVisibleClubChats &&
@@ -1513,29 +1542,8 @@ struct MessageInboxView: View {
             grouped[userID] = current
         }
 
-        for invite in social.workoutInvites
-        where invite.participant.state == .invited {
-            guard let friend =
-                    invite.creator ??
-                    profile(
-                        for:
-                            invite.session.creatorID
-                    )
-            else {
-                continue
-            }
-
-            var current =
-                grouped[friend.userID] ??
-                MessagePersonInboxItem(
-                    friend: friend
-                )
-
-            current.pendingWorkoutInvites
-                .append(invite)
-            grouped[friend.userID] =
-                current
-        }
+        // Workout invitations are displayed once as actionable Inbox cards.
+        // Never synthesize a second invite-only DM row for the same request.
 
         for challenge in incomingChallengeRequests {
             guard
