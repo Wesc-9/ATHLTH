@@ -437,17 +437,7 @@ struct RouteDetailView: View {
             ATHLTHRouteShareSheet(url: file.url)
         }
         .sheet(item: $routeToStart) { route in
-            RunQuickStartSheet(
-                trainingDeviceProvider:
-                    watchConnection.isReady
-                        ? .appleWatch
-                        : .none,
-                watchConnected: watchConnection.isReady,
-                initialRoute: route
-            ) { configuration in
-                launchRunFromDetails(configuration)
-                return nil
-            }
+            ATHLTHRouteQuickTrainSheet(route: route)
         }
         .sheet(isPresented: $showingAllPersonalAttempts) {
             NavigationStack {
@@ -2759,48 +2749,6 @@ struct RouteDetailView: View {
 
         session.deleteSavedRoute(currentRoute.id)
         dismiss()
-    }
-
-    private func launchRunFromDetails(
-        _ configuration: RunQuickStartConfiguration
-    ) {
-        Task { @MainActor in
-            await social.beginWorkoutWithFriends(
-                title: configuration.title,
-                kind: .running,
-                friends: configuration.friends,
-                creatorName: session.profile.displayName,
-                creatorUsername: session.profile.username
-            )
-
-            do {
-                try await WorkoutLaunchCoordinator
-                    .startRunQuick(
-                        configuration: configuration,
-                        session: session,
-                        settings: settings,
-                        gear: gear,
-                        phoneWorkout: phoneWorkout,
-                        watchConnection:
-                            watchConnection,
-                        spotify: spotify,
-                        ghostRace: ghostRace
-                    )
-
-                watchMessage =
-                    "\(configuration.title) started" +
-                    (
-                        configuration.captureDevice ==
-                            .appleWatch
-                            ? " on Apple Watch."
-                            : " on iPhone."
-                    )
-            } catch {
-                await social.cancelActiveWorkout()
-                watchError =
-                    error.localizedDescription
-            }
-        }
     }
 
     @MainActor
