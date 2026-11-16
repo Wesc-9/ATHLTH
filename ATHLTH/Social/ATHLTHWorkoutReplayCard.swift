@@ -271,9 +271,14 @@ struct ATHLTHWorkoutReplayCard: View {
                         )
                         replayMetric(
                             title: isStrength
-                                ? ATHLTHLocalization.choose(
-                                    english: "Volume", norwegian: "Volum"
-                                )
+                                ? (workout.strengthTotalVolumeKilograms == nil &&
+                                   workout.strengthCardioDurationSeconds != nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Cardio", norwegian: "Kondisjon"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Volume", norwegian: "Volum"
+                                    ))
                                 : ATHLTHLocalization.choose(
                                     english: "Avg pace", norwegian: "Snitt-tempo"
                                 ),
