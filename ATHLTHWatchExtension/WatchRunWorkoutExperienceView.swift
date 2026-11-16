@@ -14,6 +14,7 @@ struct WatchRunWorkoutExperienceView: View {
     private var isLuminanceReduced
 
     @State private var selectedPage = 0
+    @State private var beltSpeedDraft = 10.0
 
     private var prefersDistanceFirst: Bool {
         ATHLTHWatchDisplayPreferences.prefersDistance(
@@ -77,6 +78,8 @@ struct WatchRunWorkoutExperienceView: View {
 
                     if workoutManager
                         .treadmillInclinePercent != nil {
+                        treadmillSpeedPage
+                            .tag(12)
                         treadmillInclinePage
                             .tag(6)
                     }
@@ -129,6 +132,7 @@ struct WatchRunWorkoutExperienceView: View {
                     configuration: workoutManager.liveSurfaceConfiguration,
                     audioCoachAvailable: workoutManager.audioCoachConfigured
                 )
+            beltSpeedDraft = workoutManager.beltSpeedKilometersPerHour ?? 10
             coachOutputName = AVAudioSession.sharedInstance()
                 .currentRoute.outputs.first?.portName
             if workoutManager.indoorSuggestionAvailable {
@@ -2403,6 +2407,71 @@ struct WatchRunWorkoutExperienceView: View {
     // MARK: - Page 2: workout / interval plan
 
     @ViewBuilder
+    /// No inner ScrollView: one Watch page for fast belt-speed changes.
+    /// The Watch records the chosen value as user-reported at active time.
+    private var treadmillSpeedPage: some View {
+        GeometryReader { viewport in
+            let compact = viewport.size.height < 205
+            VStack(spacing: compact ? 5 : 7) {
+                pageLabel(ATHLTHLocalization.choose(
+                    english: "BELT SPEED", norwegian: "MØLLEFART"
+                ), icon: "speedometer")
+
+                Text(workoutManager.beltSpeedKilometersPerHour.map {
+                    String(format: "%.1f km/t", $0)
+                } ?? ATHLTHLocalization.choose(
+                    english: "No speed set", norwegian: "Ingen fart valgt"
+                ))
+                .font(.system(size: compact ? 18 : 22,
+                              weight: .bold, design: .rounded))
+                .foregroundStyle(WatchTheme.premiumGold)
+                .monospacedDigit()
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())],
+                          spacing: compact ? 4 : 6) {
+                    ForEach(Array(
+                        workoutManager.quickBeltSpeedsKilometersPerHour.prefix(6)
+                    ), id: \.self) { speed in
+                        Button {
+                            workoutManager.setBeltSpeedKilometersPerHour(speed)
+                            beltSpeedDraft = speed
+                        } label: {
+                            Text(String(format: "%.1f", speed))
+                                .font(.system(size: 12, weight: .bold))
+                                .monospacedDigit()
+                                .frame(maxWidth: .infinity,
+                                       minHeight: compact ? 26 : 29)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(WatchTheme.premiumGold)
+                    }
+                }
+
+                HStack(spacing: 5) {
+                    Stepper(value: $beltSpeedDraft, in: 0.1...30, step: 0.5) {
+                        Text(String(format: "%.1f", beltSpeedDraft))
+                            .font(.system(size: 11, weight: .bold))
+                            .monospacedDigit()
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Set", norwegian: "Bruk"
+                    )) {
+                        workoutManager.setBeltSpeedKilometersPerHour(
+                            beltSpeedDraft
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(WatchTheme.premiumGold)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, compact ? 2 : 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .accessibilityIdentifier("athlth-watch-treadmill-speed")
+    }
+
     private var treadmillInclinePage: some View {
         VStack(spacing: 10) {
             Text(
