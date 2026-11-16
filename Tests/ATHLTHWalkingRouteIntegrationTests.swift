@@ -56,4 +56,27 @@ final class ATHLTHWalkingRouteIntegrationTests: XCTestCase {
         XCTAssertNil(payload.route)
         XCTAssertNil(payload.workout.targetDistanceKilometers)
     }
+
+    func testPlannedWalkingRouteNeverBecomesRunningWithNoInitialActivity() {
+        var step = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Gåtur",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 1_800, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )
+        step.cardioActivity = .walking
+
+        XCTAssertTrue(ATHLTHWalkingRouteAssignmentPolicy.isWalking(
+            initialActivity: nil, blocks: [step], phase: .main
+        ))
+        XCTAssertTrue(ATHLTHWalkingRouteAssignmentPolicy.isWalking(
+            initialActivity: .walking, blocks: [], phase: .main
+        ))
+        XCTAssertFalse(ATHLTHWalkingRouteAssignmentPolicy.isWalking(
+            initialActivity: nil, blocks: [step], phase: .warmup
+        ))
+        XCTAssertFalse(ATHLTHWalkingRouteAssignmentPolicy.isWalking(
+            initialActivity: .running, blocks: [], phase: .main
+        ))
+    }
 }
