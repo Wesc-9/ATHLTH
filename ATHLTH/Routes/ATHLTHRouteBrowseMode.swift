@@ -3,7 +3,7 @@ import SwiftUI
 /// Shared presentation preference for Browse, My Routes and Choose Route.
 /// Switching mode changes only the layout, never the data source or filters.
 enum ATHLTHRouteBrowseMode: String, CaseIterable, Identifiable {
-    case cards, list, map
+    case list, largeCards, cards, map
 
     var id: String { rawValue }
 
@@ -11,6 +11,10 @@ enum ATHLTHRouteBrowseMode: String, CaseIterable, Identifiable {
         switch self {
         case .cards:
             return ATHLTHLocalization.choose(english: "Cards", norwegian: "Kort")
+        case .largeCards:
+            return ATHLTHLocalization.choose(
+                english: "Large cards", norwegian: "Store kort"
+            )
         case .list:
             return ATHLTHLocalization.choose(english: "List", norwegian: "Liste")
         case .map:
@@ -21,6 +25,7 @@ enum ATHLTHRouteBrowseMode: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .cards: return "square.grid.2x2"
+        case .largeCards: return "rectangle.grid.1x2"
         case .list: return "list.bullet"
         case .map: return "map"
         }
@@ -46,11 +51,33 @@ struct ATHLTHRouteBrowseModePicker: View {
                             get: {
                                 // Avoid showing both Map and a grid mode as
                                 // selected when Map is the active presentation.
-                                selection == .map ? -1 : columns.wrappedValue
+                                selection == .map || selection == .largeCards
+                                    ? -1 : columns.wrappedValue
                             },
                             set: { columns.wrappedValue = $0 }
                         )
                     )
+                    Button {
+                        selection = .largeCards
+                    } label: {
+                        Image(systemName: ATHLTHRouteBrowseMode.largeCards.symbol)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(selection == .largeCards
+                                ? Color.white : ATHLTHPlanDesign.secondaryInk)
+                            .frame(width: 40, height: 43)
+                            .background(
+                                selection == .largeCards
+                                    ? ATHLTHPlanDesign.ink : ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Large cards – one per row",
+                        norwegian: "Store kort – ett per rad"
+                    ))
+                    .accessibilityAddTraits(selection == .largeCards ? [.isSelected] : [])
+
                     Button {
                         selection = .map
                     } label: {
