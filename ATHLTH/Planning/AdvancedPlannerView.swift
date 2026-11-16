@@ -10135,31 +10135,9 @@ struct SessionEditorView: View {
                 $0.kind == .exercise
             }
             .map { block in
-                let slug =
-                    block.exerciseSlug?
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-
-                let resolvedEntry =
-                    exerciseLibrary
-                        .allExercises
-                        .first { entry in
-                            if let slug,
-                               let identifier =
-                                entry.sourceIdentifier {
-                                return identifier
-                                    .caseInsensitiveCompare(
-                                        slug
-                                    ) == .orderedSame
-                            }
-
-                            return entry.name
-                                .caseInsensitiveCompare(
-                                    block.title
-                                ) == .orderedSame
-                        }
+                let resolvedEntry = ATHLTHExerciseReferenceResolver.resolve(
+                    block, in: exerciseLibrary.allExercises
+                )
 
                 let snapshot =
                     resolvedEntry?
@@ -10196,20 +10174,22 @@ struct SessionEditorView: View {
                             .exercise.id,
                     embeddedExercise:
                         snapshot,
-                    sets: 1,
+                    sets: max(1, block.setCount ?? 1),
                     reps:
                         block.repetitions,
                     targetWeightKilograms:
                         block.targetWeightKilograms,
-                    targetRPE: nil,
-                    restSeconds: nil,
+                    targetRPE: block.targetEffortRPE.map(Double.init),
+                    restSeconds: block.restBetweenSetsSeconds.map {
+                        Int($0.rounded())
+                    },
                     notes:
                         noteParts.isEmpty
                             ? nil
                             : noteParts.joined(
                                 separator: " · "
                             ),
-                    targetRIR: nil,
+                    targetRIR: block.targetRepsInReserve.map(Double.init),
                     supersetGroupID: nil,
                     progression:
                         StrengthProgressionRule.none
