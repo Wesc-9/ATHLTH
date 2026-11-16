@@ -667,6 +667,8 @@ struct WalkQuickStartConfiguration {
         SocialWorkoutParticipationMode
     let gearIDs: Set<UUID>
     var petIDs: Set<UUID> = []
+    /// A walking course is optional; free walks continue to work as before.
+    var route: TrainingRoute? = nil
 }
 
 extension RunQuickStartConfiguration {
@@ -759,10 +761,14 @@ extension WalkQuickStartConfiguration {
             durationMinutes: nil,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
-            routeID: nil,
+            routeID: route?.id,
             exercises: [],
             notes: nil
         )
+        if let route {
+            snapshot.title = route.title
+            snapshot.targetDistanceKilometers = route.distanceKilometers
+        }
         snapshot.audioCoachConfiguration =
             audioCoach
         snapshot.autoPauseEnabled =
@@ -770,6 +776,7 @@ extension WalkQuickStartConfiguration {
 
         return SocialWorkoutInvitePayload(
             workout: snapshot,
+            route: route,
             participationMode:
                 socialMode,
             maxParticipants:
@@ -3594,6 +3601,8 @@ struct WalkQuickStartSheet: View {
     @State private var didLoadAudioCoachDefaults = false
     @State private var isAdvancedSetup = false
     @State private var showingWalkDetails = false
+    @State private var showingWalkingRoutes = false
+    @State private var selectedWalkingRoute: TrainingRoute?
     @State private var autoPausePreference:
         WorkoutAutoPausePreference = .appDefault
     @State private var selectedSpotifyPlaylist:
@@ -3644,18 +3653,20 @@ struct WalkQuickStartSheet: View {
                     }
 
                     ATHLTHBasicActivityHero(
-                        title: ATHLTHLocalization.choose(
+                        title: selectedWalkingRoute?.title ?? ATHLTHLocalization.choose(
                             english: "Free walking", norwegian: "Fri gåtur"
                         ),
-                        subtitle: ATHLTHLocalization.choose(
+                        subtitle: selectedWalkingRoute.map {
+                            String(format: "%.1f km", $0.distanceKilometers)
+                        } ?? ATHLTHLocalization.choose(
                             english: "Start a walk without planning. Add coaching or company if you want.",
                             norwegian: "Start en gåtur uten plan. Legg til veiledning eller selskap hvis du ønsker."
                         ),
                         symbol: "figure.walk",
                         isSelected: true,
-                        actionTitle: ATHLTHLocalization.choose(
-                            english: "Start free walk", norwegian: "Start fri gåtur"
-                        )
+                        actionTitle: selectedWalkingRoute == nil
+                            ? ATHLTHLocalization.choose(english: "Start free walk", norwegian: "Start fri gåtur")
+                            : ATHLTHLocalization.choose(english: "Start route walk", norwegian: "Start gåtur med rute")
                     ) {
                         startWalk(using:
                             trainingDeviceProvider == .appleWatch &&
@@ -3673,6 +3684,15 @@ struct WalkQuickStartSheet: View {
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())],
                               spacing: 10) {
+                        ATHLTHBasicActivityModeTile(
+                            title: ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
+                            subtitle: selectedWalkingRoute?.title ??
+                                ATHLTHLocalization.choose(english: "Choose a walking route", norwegian: "Velg en gårute"),
+                            symbol: "map",
+                            selected: selectedWalkingRoute != nil
+                        ) {
+                            showingWalkingRoutes = true
+                        }
                         if session.canAccess(.audioCoach) {
                             ATHLTHBasicActivityModeTile(
                             title: "Audio Coach",
@@ -3698,6 +3718,32 @@ struct WalkQuickStartSheet: View {
                             selected: showingWalkDetails
                         ) {
                             showingWalkDetails.toggle()
+                        }
+                    }
+
+                    if let route = selectedWalkingRoute {
+                        ATHLTHPlanSurface(density: .compact) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(route.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .lineLimit(1)
+                                    Text(String(format: "%.1f km", route.distanceKilometers))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button {
+                                    selectedWalkingRoute = nil
+                                } label: {
+                                    Image(systemName: "xmark.circle")
+                                }
+                                .accessibilityLabel(ATHLTHLocalization.choose(
+                                    english: "Remove route", norwegian: "Fjern rute"
+                                ))
+                            }
                         }
                     }
 
@@ -3750,7 +3796,7 @@ struct WalkQuickStartSheet: View {
                             PerWorkoutAudioCoachView(
                                 draft:
                                     $audioCoachDraft,
-                                showRouteOptions: false,
+                                showRouteOptions: selectedWalkingRoute != nil,
                                 showStructuredOptions: false
                             )
                         } label: {
@@ -3865,6 +3911,18 @@ struct WalkQuickStartSheet: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingWalkingRoutes) {
+                NavigationStack {
+                    SavedRoutesView(
+                        selectionTitle: ATHLTHLocalization.choose(
+                            english: "Choose walking route", norwegian: "Velg gårute"
+                        )
+                    ) { route in
+                        selectedWalkingRoute = route
+                        showingWalkingRoutes = false
+                    }
+                }
+            }
             .sheet(isPresented: $showingSpotifyPicker) {
                 SpotifyPlaylistPickerView(
                     title:
@@ -3883,6 +3941,11 @@ struct WalkQuickStartSheet: View {
             .task {
                 if let invited = social.takePreparedQuickTrainFriends() {
                     selectedFriendIDs = invited
+                }
+                // Scheduled walking workouts retain their planned course
+                // when launched from the calendar or a training plan.
+                if selectedWalkingRoute == nil, let routeID = plannedSession?.routeID {
+                    selectedWalkingRoute = session.savedRoutes.first { $0.id == routeID }
                 }
 
                 if !didLoadAudioCoachDefaults {
@@ -3951,6 +4014,7 @@ struct WalkQuickStartSheet: View {
                 gearIDs: selectedGearIDs
             )
         configuration.petIDs = selectedPetIDs
+        configuration.route = selectedWalkingRoute
         liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
         launchInProgress = true
         Task { @MainActor in
