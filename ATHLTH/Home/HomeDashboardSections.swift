@@ -1945,9 +1945,7 @@ struct HomeWeeklyProgressStrip:
                 [.fraction(0.78), .large],
                 selection: $daySheetDetent
             )
-            .presentationDragIndicator(
-                .visible
-            )
+            .presentationDragIndicator(.hidden)
             .presentationCornerRadius(
                 28
             )
@@ -3938,7 +3936,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 9) {
+                    HStack(alignment: .top, spacing: 9) {
                         ForEach(Array(saved.enumerated()), id: \.offset) { index, workout in
                             Button {
                                 presentSuggestion(workout)
@@ -4009,13 +4007,14 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(dayInk)
                     .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .minimumScaleFactor(0.88)
+                    .frame(height: 38, alignment: .topLeading)
 
                 Text(workout.notes?.components(separatedBy: "\n").first ?? "")
                     .font(.system(size: 11))
                     .foregroundStyle(dayInk.opacity(0.62))
                     .lineLimit(2)
-                    .frame(minHeight: 26, alignment: .topLeading)
+                    .frame(height: 28, alignment: .topLeading)
 
                 Spacer(minLength: 0)
                 HStack(spacing: 4) {
