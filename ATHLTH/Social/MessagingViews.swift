@@ -845,6 +845,19 @@ struct MessageInboxView: View {
     }
 
     private var inboxSummaryText: String {
+        let pendingWorkouts = social.workoutInvites.filter {
+            $0.participant.state == .invited
+        }.count
+        if pendingWorkouts > 0 {
+            return ATHLTHLocalization.choose(
+                english: pendingWorkouts == 1
+                    ? "1 workout invitation waiting"
+                    : "\(pendingWorkouts) workout invitations waiting",
+                norwegian: pendingWorkouts == 1
+                    ? "1 treningsinvitasjon venter"
+                    : "\(pendingWorkouts) treningsinvitasjoner venter"
+            )
+        }
         if messaging.unreadCount > 0 {
             return ATHLTHLocalization.choose(
                 english:
@@ -1329,7 +1342,7 @@ struct MessageInboxView: View {
         let hasClubInvites = (selectedFilter == .all || selectedFilter == .groups)
             && groups.ownInvites.contains { $0.status == "pending" }
         return selectedFilter != .invitations &&
-            social.workoutInvites.isEmpty &&
+            (selectedFilter != .all || social.workoutInvites.isEmpty) &&
             displayedPersonItems.isEmpty &&
             arenaInboxVisibleCount == 0 &&
             !hasClubInvites &&
