@@ -128,6 +128,7 @@ struct ProfileFriendsSection: View {
 /// changes the backend participant state, not a screen-local copy.
 struct ATHLTHWorkoutInvitationSection: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
 
     var showsAccepted = true
     var showsEmptyState = false
@@ -328,6 +329,12 @@ struct ATHLTHWorkoutInvitationSection: View {
             }
             respondingToID = nil
             if success {
+                for item in notifications.items where
+                    item.socialEventKind?.lowercased() == "workout_invite" &&
+                    item.socialEntityID == invite.session.id &&
+                    item.readAt == nil {
+                    notifications.markRead(item.id)
+                }
                 if accept {
                     openedInvite = social.workoutInvites.first(where: {
                         $0.participant.id == invite.participant.id
