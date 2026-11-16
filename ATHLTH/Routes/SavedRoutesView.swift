@@ -807,6 +807,12 @@ struct SavedRoutesView: View {
                     }
                 }
                 Spacer(minLength: 4)
+                LibraryFavoriteButton(
+                    kind: .route, itemID: route.id.uuidString,
+                    title: route.title,
+                    subtitle: String(format: "%.1f km", route.distanceKilometers),
+                    icon: "map.fill"
+                )
                 Menu {
                     if settings.trainingDeviceProvider == .appleWatch {
                         Button { sendToWatch(route) } label: {
