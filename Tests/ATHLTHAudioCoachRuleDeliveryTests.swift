@@ -93,6 +93,118 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertTrue(spoken[0].contains("Puls"))
     }
 
+    func testGroupTriggerAndCommandsSurviveWatchAndProfileRoundTrip() throws {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 1_000,
+            additionalMetrics: [.heartRate, .pace]
+        )
+        var group = ATHLTHAudioCoachGroup(
+            name: "Kilometerstatus", ruleIDs: [rule.id]
+        )
+        group.trigger = .distance
+        group.interval = 1_000
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.customRules = [rule]
+        config.coachGroups = [group]
+
+        let profile = ATHLTHAudioCoachProfile(
+            name: "Egen mal", configuration: config
+        )
+        let decoded = try JSONDecoder().decode(
+            ATHLTHAudioCoachProfile.self,
+            from: JSONEncoder().encode(profile)
+        )
+        var draft = AudioCoachDraft()
+        draft.load(profile: decoded)
+        XCTAssertEqual(draft.coachGroups.first?.trigger, .distance)
+        XCTAssertEqual(draft.coachGroups.first?.interval, 1_000)
+        XCTAssertEqual(draft.customRules.first?.selectedMetrics,
+                       [.distance, .heartRate, .pace])
+    }
+
+    func testDraggingIndividualCommandsIntoAndOutOfGroupDoesNotDuplicate() {
+        var draft = AudioCoachDraft()
+        draft.customRules = [
+            ATHLTHAudioCoachRule(
+                trigger: .time, metric: .distance, interval: 60,
+                additionalMetrics: [.heartRate]
+            )
+        ]
+        var group = ATHLTHAudioCoachGroup(name: "Tre minutter")
+        group.trigger = .time
+        group.interval = 180
+        draft.coachGroups = [group]
+
+        let source = draft.customRules[0]
+        XCTAssertTrue(ATHLTHAudioCoachCommandMoves.move(
+            "metric:\(source.id.uuidString):heartRate",
+            to: group.id, draft: &draft
+        ))
+        XCTAssertEqual(draft.customRules.count, 2)
+        XCTAssertEqual(draft.customRules.first?.selectedMetrics, [.distance])
+        let moved = draft.customRules.first(where: {
+            group.id == draft.coachGroups.first?.id &&
+                draft.coachGroups[0].ruleIDs.contains($0.id)
+        })
+        XCTAssertEqual(moved?.selectedMetrics, [.heartRate])
+        XCTAssertEqual(moved?.validatedInterval, 180)
+
+        XCTAssertTrue(ATHLTHAudioCoachCommandMoves.move(
+            "metric:\(moved!.id.uuidString):heartRate",
+            to: nil, draft: &draft
+        ))
+        XCTAssertTrue(draft.coachGroups[0].ruleIDs.isEmpty)
+        XCTAssertEqual(
+            draft.customRules.flatMap(\.selectedMetrics)
+                .filter { $0 == .heartRate }.count,
+            1
+        )
+        XCTAssertFalse(ATHLTHAudioCoachCommandMoves.move(
+            "metric:00000000-0000-0000-0000-000000000000:pace",
+            to: group.id, draft: &draft
+        ))
+    }
+
+    func testDraggingBuiltInOptionsOnlyMovesPresentationOwnership() {
+        var draft = AudioCoachDraft()
+        draft.applySimpleAudioCoach()
+        let group = ATHLTHAudioCoachGroup(name: "Mine varsler")
+        draft.coachGroups = [group]
+
+        XCTAssertTrue(ATHLTHAudioCoachCommandMoves.move(
+            "option:workoutStart", to: group.id, draft: &draft
+        ))
+        XCTAssertTrue(draft.announceWorkoutStart)
+        XCTAssertEqual(draft.coachGroups[0].optionIDs, ["workoutStart"])
+        XCTAssertTrue(draft.customRules.isEmpty)
+
+        XCTAssertTrue(ATHLTHAudioCoachCommandMoves.move(
+            "option:workoutStart", to: nil, draft: &draft
+        ))
+        XCTAssertTrue(draft.coachGroups[0].optionIDs.isEmpty)
+        XCTAssertTrue(draft.announceWorkoutStart)
+    }
+
+    func testPersonalMotivationTextIsSpokenWithGroupMetrics() {
+        var rule = ATHLTHAudioCoachRule(
+            trigger: .time,
+            metric: .motivation,
+            interval: 300,
+            additionalMetrics: [.distance]
+        )
+        rule.customPhrase = "Nå gir du alt!"
+        let phrase = rule.phrase(
+            distanceMeters: 1_500,
+            elapsedSeconds: 300,
+            paceSecondsPerKilometer: 305,
+            heartRateBPM: nil,
+            norwegian: true
+        )
+        XCTAssertTrue(phrase?.contains("Nå gir du alt!") == true)
+        XCTAssertTrue(phrase?.contains("Distanse") == true)
+    }
+
     func testBeforeFinishMotivationIsSpokenOnceOnlyWhenFinishIsKnown() {
         var rule = ATHLTHAudioCoachRule(
             trigger: .time, metric: .motivation, interval: 60
