@@ -3027,15 +3027,27 @@ struct WorkoutTemplateDetailView: View {
         return original
     }
 
-    private func savePersonalWorkout(blocks: [WorkoutTemplateBlock]) {
+    @discardableResult
+    private func savePersonalWorkout(blocks: [WorkoutTemplateBlock]) -> Bool {
         var copy = entry.plannedSession()
         copy.workoutBlocks = blocks
+        let binding = ATHLTHWorkoutExerciseBinding.bind(
+            &copy, library: exerciseLibrary.allExercises
+        )
+        guard binding.isReady else {
+            shareError = tr(
+                "Choose exercises from your library before saving: ",
+                "Velg øvelser fra biblioteket før lagring: "
+            ) + binding.unresolved.prefix(4).joined(separator: ", ")
+            return false
+        }
         if let existing = savedPersonalWorkout {
             _ = session.updateSavedWorkoutTemplate(copy, id: existing.id)
         } else {
             _ = session.saveSharedWorkout(copy, sourceSessionID: entry.id)
         }
         saved = true
+        return true
     }
 
     private func addToMyWorkouts() {
@@ -3246,8 +3258,9 @@ struct WorkoutTemplateDetailView: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(tr("Save workout", "Lagre økt")) {
                             guard let personalBlocks else { return }
-                            savePersonalWorkout(blocks: personalBlocks)
-                            editingPersonalTargets = false
+                            if savePersonalWorkout(blocks: personalBlocks) {
+                                editingPersonalTargets = false
+                            }
                         }
                     }
                 }
@@ -3256,7 +3269,7 @@ struct WorkoutTemplateDetailView: View {
         .sheet(item: $preparedShare) { draft in
             ATHLTHDirectShareSheet(draft: draft)
         }
-        .alert(tr("Could not share", "Kunne ikke dele"),
+        .alert(tr("Could not complete action", "Kunne ikke fullføre"),
                isPresented: Binding(
                    get: { shareError != nil },
                    set: { if !$0 { shareError = nil } }
