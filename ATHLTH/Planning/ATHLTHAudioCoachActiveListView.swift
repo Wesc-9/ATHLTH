@@ -31,6 +31,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var selectedFromProfiles: TemplateDestination?
     @State private var isNewEmptyTemplate = false
     @State private var groupDraftName = ""
+    @State private var editingGroupTriggerID: UUID?
     @State private var groupDraftTrigger: ATHLTHAudioCoachRule.Trigger = .distance
     @State private var groupDraftInterval = 1_000
     @State private var groupDraftContents: Set<ATHLTHAudioCoachRule.Metric> = [.distance]
@@ -261,12 +262,26 @@ struct ATHLTHAudioCoachActiveListView: View {
                             groupCommandPhrase = ""
                             showingGroupCommandBuilder = true
                         },
+                        onEditGroupTrigger: { groupID in
+                            guard let group = draft.coachGroups.first(where: {
+                                $0.id == groupID
+                            }) else { return }
+                            let rule = group.ruleIDs.compactMap { id in
+                                draft.customRules.first(where: { $0.id == id })
+                            }.first
+                            editingGroupTriggerID = groupID
+                            groupDraftName = group.name
+                            groupDraftTrigger = group.trigger ?? rule?.trigger ?? .time
+                            groupDraftInterval = group.interval ?? rule?.interval ?? 60
+                            showingGroupBuilder = true
+                        },
                         onMoveCommand: { token, destination in
                             ATHLTHAudioCoachCommandMoves.move(
                                 token, to: destination, draft: &draft
                             )
                         },
                         onAddGroup: {
+                            editingGroupTriggerID = nil
                             groupDraftName = ""
                             groupDraftTrigger = .distance
                             groupDraftInterval = 1_000
@@ -1287,8 +1302,12 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
                 Section {
                     Button(action: createCoachGroup) {
-                        Label(tr("Continue to commands", "Fortsett til kommandoer"),
-                              systemImage: "arrow.right")
+                        Label(
+                            editingGroupTriggerID == nil
+                                ? tr("Continue to commands", "Fortsett til kommandoer")
+                                : tr("Save group trigger", "Lagre gruppens trigger"),
+                            systemImage: "arrow.right"
+                        )
                             .frame(maxWidth: .infinity, minHeight: 48)
                     }
                     .buttonStyle(.borderedProminent)
@@ -1298,7 +1317,11 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             .scrollContentBackground(.hidden)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("New coach group", "Ny coach-gruppe"))
+            .navigationTitle(
+                editingGroupTriggerID == nil
+                    ? tr("New coach group", "Ny coach-gruppe")
+                    : tr("Group trigger", "Gruppens trigger")
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1311,6 +1334,23 @@ struct ATHLTHAudioCoachActiveListView: View {
     }
 
     private func createCoachGroup() {
+        if let editingGroupTriggerID,
+           let index = draft.coachGroups.firstIndex(where: {
+               $0.id == editingGroupTriggerID
+           }) {
+            draft.coachGroups[index].trigger = groupDraftTrigger
+            draft.coachGroups[index].interval = groupDraftInterval
+            for id in draft.coachGroups[index].ruleIDs {
+                if let ruleIndex = draft.customRules.firstIndex(where: { $0.id == id }),
+                   draft.customRules[ruleIndex].beforeEndSeconds == nil {
+                    draft.customRules[ruleIndex].trigger = groupDraftTrigger
+                    draft.customRules[ruleIndex].interval = groupDraftInterval
+                }
+            }
+            self.editingGroupTriggerID = nil
+            showingGroupBuilder = false
+            return
+        }
         let name = String(groupDraftName.trimmingCharacters(
             in: .whitespacesAndNewlines).prefix(60))
         let fallback = groupDraftTrigger == .time
