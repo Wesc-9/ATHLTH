@@ -6,6 +6,7 @@ import SwiftUI
 struct HomeActivityRunDetailView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var watch: AppleWatchConnectionStore
 
@@ -271,6 +272,19 @@ struct HomeActivityRunDetailView: View {
             LazyVStack(spacing: 16) {
                 summaryCard
 
+                // Route is the first detail after the workout overview.
+                if !isIndoorActivity {
+                    ATHLTHWorkoutLocationSection(
+                        workout: workout,
+                        hasRecordedGPS: routeCoordinates.count >= 2,
+                        isLoadingGPS: !hasResolvedDetail
+                    ) {
+                        mapCard
+                    }
+                }
+
+                sharedWorkoutComparisonCard
+
                 if let intervals = displayedInterval {
                     ATHLTHIntervalResultSummaryCard(
                         performance: intervals,
@@ -311,14 +325,6 @@ struct HomeActivityRunDetailView: View {
                         .map(Double.init),
                     isStructured: structuredIntervalResult != nil
                 )
-
-                ATHLTHWorkoutLocationSection(
-                    workout: workout,
-                    hasRecordedGPS: routeCoordinates.count >= 2,
-                    isLoadingGPS: !hasResolvedDetail
-                ) {
-                    mapCard
-                }
 
                 if isTreadmillWorkout {
                     treadmillFactsCard
@@ -483,9 +489,11 @@ struct HomeActivityRunDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("ATHLTH  /  " + (displayedInterval == nil
-                            ? tr("RUNNING", "LØPING")
-                            : tr("INTERVAL RUN", "INTERVALLØKT")))
+                        Text("ATHLTH  /  " + (workout.activity == .walking
+                            ? tr("WALKING", "GÅTUR")
+                            : displayedInterval == nil
+                                ? tr("RUNNING", "LØPING")
+                                : tr("INTERVAL RUN", "INTERVALLØKT")))
                             .font(.caption2.weight(.bold))
                             .tracking(1.5)
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -502,6 +510,25 @@ struct HomeActivityRunDetailView: View {
                         .padding(.horizontal, 9)
                         .padding(.vertical, 7)
                         .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+                }
+
+                Text(workout.activity == .walking
+                    ? tr("Walk completed", "Gåøkt fullført")
+                    : tr("Run completed", "Løpeøkt fullført"))
+                    .font(.system(size: 28, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                let partners = social.acceptedTrainingPartnerNames(for: workout.id)
+                if !partners.isEmpty {
+                    Label(
+                        tr("Trained with ", "Trent sammen med ") + partners.joined(separator: ", "),
+                        systemImage: "person.2.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
                 }
 
                 if let interval = displayedInterval {
@@ -566,6 +593,90 @@ struct HomeActivityRunDetailView: View {
 
             }
         }
+    }
+
+    /// A shared session can contain individual measurements only when both
+    /// people published them and server-side feed privacy grants access.
+    @ViewBuilder
+    private var sharedWorkoutComparisonCard: some View {
+        if let sharedSession = social.workoutSessions.first(where: {
+            $0.creatorID == social.currentUserID &&
+            $0.sourceWorkoutID == workout.id
+        }) {
+            let others = social.feed.filter {
+                $0.activity.kind == "workout" &&
+                $0.activity.workoutSessionID == sharedSession.id &&
+                $0.activity.actorID != social.currentUserID
+            }
+            if !others.isEmpty {
+                ATHLTHPlanSurface {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(tr("Training together", "Trent sammen"))
+                            .font(.system(size: 22, weight: .semibold, design: .serif))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(tr(
+                            "Individual results from athletes who have shared their session.",
+                            "Individuelle resultater fra deltakere som har delt økten."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        comparisonRow(
+                            name: session.profile.displayName.isEmpty
+                                ? tr("You", "Deg") : session.profile.displayName,
+                            duration: workout.duration,
+                            distance: workout.distanceMeters,
+                            heartRate: detail?.averageHeartRate
+                        )
+                        ForEach(others, id: \.id) { other in
+                            comparisonRow(
+                                name: other.actor.resolvedName,
+                                duration: Double(other.activity.metadata?["duration_seconds"] ?? "") ?? 0,
+                                distance: Double(other.activity.metadata?["distance_meters"] ?? ""),
+                                heartRate: other.activity.metadata?["share_health_data"] == "true"
+                                    ? Double(other.activity.metadata?["average_heart_rate_bpm"] ?? "")
+                                    : nil
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func comparisonRow(
+        name: String, duration: TimeInterval, distance: Double?, heartRate: Double?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            HStack(spacing: 12) {
+                Label(routeTimeText(duration), systemImage: "clock")
+                if let distance, distance > 0 {
+                    Label(String(format: "%.2f km", distance / 1_000), systemImage: "figure.walk")
+                    if duration > 0 {
+                        Text(averagePaceText(duration: duration, distance: distance))
+                    }
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            if let heartRate, heartRate > 0 {
+                Label(String(format: "%.0f bpm", heartRate), systemImage: "heart.fill")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func averagePaceText(duration: TimeInterval, distance: Double) -> String {
+        guard let pace = ATHLTHRunningPace.average(elapsedSeconds: duration, distanceMeters: distance)
+        else { return "—" }
+        let rounded = Int(pace.rounded())
+        return String(format: "%d:%02d/km", rounded / 60, rounded % 60)
     }
 
     @ViewBuilder
