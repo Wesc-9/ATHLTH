@@ -95,6 +95,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         Double?
     @Published private(set) var treadmillTargetPaceSecondsPerKilometer:
         Double?
+    @Published private(set) var beltSpeedKilometersPerHour: Double?
+    @Published private(set) var quickBeltSpeedsKilometersPerHour =
+        [6.0, 8.0, 10.0, 12.0]
+    private var beltSpeedTimeline: [WatchBeltSpeedPoint] = []
     @Published private(set) var structuredStepIndex = 0
     @Published private(set) var awaitingMainStart = false
     @Published private(set) var strengthSession:
@@ -567,6 +571,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.treadmillInclinePercent =
                 workout.treadmillInclinePercent
             self.treadmillTargetPaceSecondsPerKilometer = nil
+            let speed = ATHLTHBeltSpeedPolicy.speed(
+                forPace: workout.steps.first?.targetPaceMinSecondsPerKilometer
+            ) ?? workout.initialBeltSpeedKilometersPerHour
+            self.beltSpeedKilometersPerHour =
+                workout.treadmillInclinePercent != nil ? speed : nil
+            self.beltSpeedTimeline = speed.map {
+                [WatchBeltSpeedPoint(
+                    activeElapsedSeconds: elapsedTime,
+                    kilometersPerHour: $0
+                )]
+            } ?? []
+            let presets = workout.quickBeltSpeedsKilometersPerHour?.filter {
+                $0.isFinite && (0.1...30).contains($0)
+            } ?? []
+            self.quickBeltSpeedsKilometersPerHour = presets.isEmpty
+                ? [6, 8, 10, 12] : presets
             self.structuredStepIndex = 0
             self.awaitingMainStart = false
 
@@ -676,6 +696,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if !hasActivePart {
             announceCurrentStructuredStep(prefix: "Starting")
         }
+        Task { @MainActor [weak self] in
+            await self?.sendLiveSnapshot(force: true)
+        }
+    }
+
+    /// Timestamped athlete-entered belt speed; never claimed as sensor pace.
+    func setBeltSpeedKilometersPerHour(_ speed: Double) {
+        guard kind == .running,
+              treadmillInclinePercent != nil,
+              speed.isFinite, (0.1...30).contains(speed) else { return }
+        let rounded = (speed * 10).rounded() / 10
+        guard beltSpeedKilometersPerHour != rounded else { return }
+        publish {
+            self.beltSpeedKilometersPerHour = rounded
+            self.beltSpeedTimeline.append(WatchBeltSpeedPoint(
+                activeElapsedSeconds: max(0, elapsedTime),
+                kilometersPerHour: rounded
+            ))
+        }
+        persistWorkoutRecoveryState()
         Task { @MainActor [weak self] in
             await self?.sendLiveSnapshot(force: true)
         }
@@ -5368,6 +5408,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.awaitingMainStart = mustStartMainManually
             self.liveTargetStatus = nil
         }
+        if treadmillInclinePercent != nil,
+           let speed = ATHLTHBeltSpeedPolicy.speed(
+               forPace: workout.steps[nextIndex].targetPaceMinSecondsPerKilometer
+           ) {
+            setBeltSpeedKilometersPerHour(speed)
+        }
 
         persistWorkoutRecoveryState()
         WKInterfaceDevice.current().play(.notification)
@@ -8616,6 +8662,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             !audioCoachConfiguration.shouldPreferIPhoneAudioWhenReachable
         snapshot.treadmillTargetPaceSecondsPerKilometer =
             treadmillTargetPaceSecondsPerKilometer
+        snapshot.manualBeltSpeedKilometersPerHour =
+            beltSpeedKilometersPerHour
+        snapshot.manualBeltSpeedTimeline = beltSpeedTimeline
         snapshot.runningStepTargetTreadmillInclinePercent =
             currentRunningStep?.targetTreadmillInclinePercent
         snapshot.runningStepTargetPaceSecondsPerKilometer =
@@ -9312,6 +9361,13 @@ extension WatchWorkoutManager:
                 case .setTreadmillIncline:
                     if let value = command.treadmillInclinePercent {
                         self.setTreadmillInclinePercent(value)
+                    }
+                case .setTreadmillBeltSpeed:
+                    if let value = command.manualBeltSpeedKilometersPerHour,
+                       let requested = command.workoutStartedAt,
+                       let activeStart = self.startedAt,
+                       abs(requested.timeIntervalSince(activeStart)) < 5 {
+                        self.setBeltSpeedKilometersPerHour(value)
                     }
                 case .setTreadmillTargetPace:
                     if let value = command.treadmillTargetPaceSecondsPerKilometer,
