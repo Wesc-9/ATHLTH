@@ -4508,11 +4508,11 @@ struct TreadmillSpeedEditorView: View {
                         GridItem(.flexible(), spacing: 10)
                     ], spacing: 10) {
                         ForEach(Array(speeds.prefix(min(max(presetCount, 2), 6)).enumerated()),
-                                id: \.offset) { _, speed in
+                                id: \.offset) { entry in
                             Button {
-                                apply(speed)
+                                apply(entry.element)
                             } label: {
-                                Text(String(format: "%.1f km/t", speed))
+                                Text(String(format: "%.1f km/t", entry.element))
                                     .font(.system(size: 18, weight: .bold, design: .rounded))
                                     .monospacedDigit()
                                     .frame(maxWidth: .infinity, minHeight: 55)
