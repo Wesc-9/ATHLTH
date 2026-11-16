@@ -156,9 +156,16 @@ enum ATHLTHCatalogPlanSessionFactory {
                 "Øk gradvis kun når teknikk og restitusjon tillater det. Behold omtrent 2 reps i reserve på styrkesett."
             )
         }
+        let withoutEquipment = blueprint == .home ||
+            (entry.slug == "home-bodyweight-8w" && blueprint == .core)
+        let equipmentNote: String? = withoutEquipment ? tr(
+            "Equipment: None required. Use bodyweight only — no kettlebells, weights or machines.",
+            "Utstyr: Ingen. Bruk bare egen kroppsvekt – ingen kettlebells, vekter eller apparater."
+        ) : nil
         let notes = [
             tr("ATHLTH training plan: ", "ATHLTH treningsplan: ") + entry.title,
             tr("Week ", "Uke ") + "\(weekNumber)/\(entry.durationWeeks)",
+            equipmentNote,
             stage,
             blueprint.note(week: weekNumber, totalWeeks: entry.durationWeeks)
         ].compactMap { $0 }.joined(separator: "\n")
