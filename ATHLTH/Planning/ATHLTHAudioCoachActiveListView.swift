@@ -1054,10 +1054,10 @@ struct ATHLTHAudioCoachActiveListView: View {
                         step: groupDraftTrigger == .time ? 15 : 100
                     ) {
                         Text(groupDraftTrigger == .time
-                            ? tr("Every \\(groupDraftInterval) seconds",
-                                 "Hvert \\(groupDraftInterval) sekund")
-                            : tr("Every \\(groupDraftInterval) metres",
-                                 "Hver \\(groupDraftInterval) meter"))
+                            ? tr("Every \(groupDraftInterval) seconds",
+                                 "Hvert \(groupDraftInterval) sekund")
+                            : tr("Every \(groupDraftInterval) metres",
+                                 "Hver \(groupDraftInterval) meter"))
                     }
                 } header: {
                     Text(tr("1 · When should Coach speak?", "1 · Når skal Coach snakke?"))
