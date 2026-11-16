@@ -2344,6 +2344,20 @@ struct WatchRunWorkoutExperienceView: View {
                         .fill(workoutManager.state == .paused
                             ? WatchTheme.warning : WatchTheme.accent)
                         .frame(width: 7, height: 7)
+                    Button {
+                        confirmingEnd = true
+                    } label: {
+                        Image(systemName: "stop.circle")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(WatchTheme.textSecondary)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Finish workout (confirm)",
+                        norwegian: "Avslutt økten (bekreft)"
+                    ))
                 }
                 Text(liveDisplayedPace.map { paceText($0) } ??
                      liveWorkoutElapsedLabel)
