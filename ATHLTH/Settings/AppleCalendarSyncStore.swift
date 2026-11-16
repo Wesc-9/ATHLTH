@@ -27,6 +27,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         let plan: TrainingPlan?
         let additionalPlans: [TrainingPlan]
         let standaloneSessions: [PlannedSession]
+        let workoutStatuses: [UUID: ATHLTHCalendarWorkoutStatus]
         let communityEvents: [CommunityEventItem]
         let groupEvents: [CommunityGroupEventRecord]
         let groupEventRSVPs: [CommunityGroupEventRSVPRecord]
@@ -212,6 +213,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         plan: TrainingPlan?,
         additionalPlans: [TrainingPlan] = [],
         standaloneSessions: [PlannedSession] = [],
+        workoutStatuses: [UUID: ATHLTHCalendarWorkoutStatus] = [:],
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
         groupEventRSVPs: [CommunityGroupEventRSVPRecord] = [],
@@ -241,6 +243,7 @@ final class AppleCalendarSyncStore: ObservableObject {
                 plan: plan,
                 additionalPlans: additionalPlans,
                 standaloneSessions: standaloneSessions,
+            workoutStatuses: workoutStatuses,
                 communityEvents: communityEvents,
                 groupEvents: groupEvents,
                 groupEventRSVPs: groupEventRSVPs,
@@ -379,6 +382,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         plan: TrainingPlan?,
         additionalPlans: [TrainingPlan] = [],
         standaloneSessions: [PlannedSession] = [],
+        workoutStatuses: [UUID: ATHLTHCalendarWorkoutStatus] = [:],
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
         groupEventRSVPs: [CommunityGroupEventRSVPRecord] = [],
@@ -404,6 +408,7 @@ final class AppleCalendarSyncStore: ObservableObject {
             plan: plan,
             additionalPlans: additionalPlans,
             standaloneSessions: standaloneSessions,
+            workoutStatuses: workoutStatuses,
             communityEvents: communityEvents,
             groupEvents: groupEvents,
             groupEventRSVPs: groupEventRSVPs,
@@ -419,6 +424,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         plan: TrainingPlan?,
         additionalPlans: [TrainingPlan] = [],
         standaloneSessions: [PlannedSession] = [],
+        workoutStatuses: [UUID: ATHLTHCalendarWorkoutStatus] = [:],
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
         groupEventRSVPs: [CommunityGroupEventRSVPRecord] = [],
@@ -432,6 +438,7 @@ final class AppleCalendarSyncStore: ObservableObject {
             plan: plan,
             additionalPlans: additionalPlans,
             standaloneSessions: standaloneSessions,
+            workoutStatuses: workoutStatuses,
             communityEvents: communityEvents,
             groupEvents: groupEvents,
             groupEventRSVPs: groupEventRSVPs,
@@ -740,7 +747,9 @@ final class AppleCalendarSyncStore: ObservableObject {
                             EKEvent(eventStore: eventStore)
                         configure(
                             event, session: session,
-                            plan: plan, dayDate: dayDate, calendar: calendar
+                            plan: plan, dayDate: dayDate, calendar: calendar,
+                            status: snapshot.workoutStatuses[session.id] ??
+                                ATHLTHCalendarWorkoutStatus()
                         )
                         try eventStore.save(
                             event, span: .thisEvent, commit: false
@@ -761,7 +770,9 @@ final class AppleCalendarSyncStore: ObservableObject {
                 EKEvent(eventStore: eventStore)
             configure(
                 event, session: session,
-                plan: nil, dayDate: start, calendar: calendar
+                plan: nil, dayDate: start, calendar: calendar,
+                status: snapshot.workoutStatuses[session.id] ??
+                    ATHLTHCalendarWorkoutStatus()
             )
             try eventStore.save(
                 event, span: .thisEvent, commit: false
@@ -1307,14 +1318,16 @@ final class AppleCalendarSyncStore: ObservableObject {
         session: PlannedSession,
         plan: TrainingPlan?,
         dayDate: Date,
-        calendar: EKCalendar
+        calendar: EKCalendar,
+        status: ATHLTHCalendarWorkoutStatus
     ) {
         let calendarAPI = Calendar.current
 
         resetManagedEvent(event)
         event.calendar = calendar
-        event.title = plan.map { "\($0.title): \(session.title)" } ??
+        let originalTitle = plan.map { "\($0.title): \(session.title)" } ??
             session.title
+        event.title = status.calendarTitle(originalTitle)
         // When moved, scheduledStart is the absolute date and time. Never
         // replace its date with the session's old plan-day offset.
         event.startDate = session.scheduledStart ??
@@ -1340,13 +1353,23 @@ final class AppleCalendarSyncStore: ObservableObject {
                     3_600
                 )
 
+        if status.hasValidRecordedInterval,
+           let actualStart = status.actualStart,
+           let actualEnd = status.actualEnd {
+            event.startDate = actualStart
+            event.endDate = actualEnd
+        }
+
         event.isAllDay = false
         event.availability = .busy
 
-        event.notes = eventNotes(
-            session: session,
-            plan: plan
-        )
+        var notes = eventNotes(session: session, plan: plan)
+        if status.completed {
+            notes += "\nResult: Completed"
+        } else if status.cancelled {
+            notes += "\nResult: Cancelled"
+        }
+        event.notes = notes
     }
 
     private func eventNotes(
