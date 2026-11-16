@@ -338,4 +338,120 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         )
     }
 
+
+    func testReviewedPlanAliasesUseExistingExerciseSourceIdentifiers() {
+        let expected: [(String, String)] = [
+            ("Bird Dog", "bird-dog"),
+            ("Fuglehund", "bird-dog"),
+            ("Bodyweight Squat", "bodyweight-squat"),
+            ("Reverse Lunge", "kettlebell-reverse-lunge"),
+            ("Bodyweight Reverse Lunge", "bodyweight-reverse-lunge"),
+            ("Incline Dumbbell Curl", "incline-db-curl"),
+            ("Hip Thrust", "athlth-native-hip-thrust")
+        ]
+        for (name, identifier) in expected {
+            XCTAssertEqual(
+                ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(for: name),
+                identifier, name
+            )
+        }
+        XCTAssertNotEqual(
+            ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(for: "Incline Dumbbell Curl"),
+            ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(for: "Hammer Curl")
+        )
+        XCTAssertNotEqual(
+            ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(for: "Reverse Lunge"),
+            ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(for: "Bodyweight Reverse Lunge")
+        )
+    }
+
+    func testReviewedRepDBPlanNamesResolveWithoutDuplicatingExercises() {
+        let bird = entry("Bird-Dog", id: UUID(), source: .repDB,
+                         sourceIdentifier: "bird-dog")
+        let squat = entry("Bodyweight Squat", id: UUID(), source: .repDB,
+                          sourceIdentifier: "bodyweight-squat")
+        let kettlebellLunge = entry("Kettlebell Reverse Lunge", id: UUID(), source: .repDB,
+                                   sourceIdentifier: "kettlebell-reverse-lunge")
+        let bodyweightLunge = entry("Bodyweight Reverse Lunge", id: UUID(), source: .repDB,
+                                   sourceIdentifier: "bodyweight-reverse-lunge")
+        let inclineCurl = entry("Incline Dumbbell Curl", id: UUID(), source: .repDB,
+                                sourceIdentifier: "incline-db-curl")
+        let hammerCurl = entry("Hammer Curl", id: UUID(), source: .repDB,
+                               sourceIdentifier: "hammer-curl")
+        let nativeHipThrust = entry("Barbell Hip Thrust", id: UUID(),
+                                    source: .athlthCatalog,
+                                    sourceIdentifier: "athlth-native-hip-thrust")
+        let library = [bird, squat, kettlebellLunge, bodyweightLunge,
+                       inclineCurl, hammerCurl, nativeHipThrust]
+        let expected: [(String, UUID)] = [
+            ("Bird Dog", bird.id),
+            ("Bodyweight Squat", squat.id),
+            ("Reverse Lunge", kettlebellLunge.id),
+            ("Bodyweight Reverse Lunge", bodyweightLunge.id),
+            ("Incline Dumbbell Curl", inclineCurl.id),
+            ("Hip Thrust", nativeHipThrust.id)
+        ]
+        for (name, expectedID) in expected {
+            XCTAssertEqual(
+                ATHLTHExerciseReferenceResolver.resolve(block(name), in: library)?.id,
+                expectedID, name
+            )
+        }
+        XCTAssertNotEqual(inclineCurl.id, hammerCurl.id)
+        var explicitBodyweight = block("Reverse Lunge")
+        explicitBodyweight.exerciseSlug = "bodyweight-reverse-lunge"
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(explicitBodyweight, in: library)?.id,
+            bodyweightLunge.id,
+            "Explicit canonical identity must take precedence over a plan title"
+        )
+    }
+
+    @MainActor
+    func testEveryBundledStrengthRecipeHasCanonicalExerciseSourceIDs() {
+        let workouts = ATHLTHCuratedStrengthWorkouts.entries +
+            ATHLTHPremiumStrengthSessions.entries
+        XCTAssertEqual(ATHLTHCuratedStrengthWorkouts.entries.count, 23)
+        XCTAssertEqual(ATHLTHPremiumStrengthSessions.entries.count, 36)
+        for workout in workouts {
+            for move in workout.blocks where move.kind == .exercise {
+                XCTAssertNotNil(move.exerciseSlug,
+                                "\(workout.slug): \(move.title) needs a library identity")
+            }
+        }
+    }
+
+    @MainActor
+    func testEquipmentFreeHomePlanOnlyUsesExistingBodyweightExercises() throws {
+        let plan = try XCTUnwrap(ATHLTHCuratedTrainingPlans.entries.first {
+            $0.slug == "home-bodyweight-8w"
+        })
+        XCTAssertTrue(plan.tags.contains("no equipment"))
+        let bodyweightIDs: Set<String> = [
+            "bird-dog", "bodyweight-squat", "bodyweight-reverse-lunge",
+            "athlth-native-push-up", "athlth-native-glute-bridge",
+            "athlth-native-dead-bug", "athlth-native-hollow-body-hold",
+            "athlth-native-plank", "athlth-native-side-plank"
+        ]
+        for blueprint in plan.sessionBlueprints {
+            let workout = ATHLTHCatalogPlanSessionFactory.session(
+                entry: plan, blueprint: blueprint, week: 1
+            )
+            let exercises = workout.resolvedWorkoutBlocks.filter {
+                $0.kind == .exercise
+            }
+            XCTAssertFalse(exercises.isEmpty, blueprint.rawValue)
+            for exercise in exercises {
+                XCTAssertTrue(
+                    exercise.exerciseSlug.map(bodyweightIDs.contains) == true,
+                    "\(plan.slug) / \(blueprint.rawValue): \(exercise.title) requires equipment or has no reviewed ID"
+                )
+            }
+            XCTAssertTrue(
+                workout.notes?.contains("Equipment: None required") == true ||
+                workout.notes?.contains("Utstyr: Ingen") == true
+            )
+        }
+    }
+
 }
