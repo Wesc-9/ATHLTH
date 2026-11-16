@@ -108,6 +108,9 @@ struct AIProgramRequest: Encodable {
     // Optional, explicitly consented training-derived signals. Nothing is uploaded
     // until Coach History access is enabled by the athlete.
     var coachStrengthContext: ATHLTHCoachStrengthIntelligence.Snapshot? = nil
+    /// Only public, bundled ATHLTH exercise names may be supplied. Never send
+    /// account-owned/private exercise names without the user's permission.
+    var allowedExerciseNames: [String]? = nil
     let goals: [AIProgramGoalInput]
     let existingDays: [AIProgramExistingDay]
 }
