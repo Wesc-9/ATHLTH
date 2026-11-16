@@ -4528,6 +4528,7 @@ struct PostWorkoutReviewView: View {
     private func automaticallyShareNewWorkoutIfConsented() async {
         guard requiresDecision,
               !alreadyPublished,
+              visibility != .privateOnly,
               FriendFeedSharingPreference.isEnabled(userID: session.profile.userID),
               social.privacy?.userID == session.profile.userID,
               social.privacy?.shareRecentActivity == true,
