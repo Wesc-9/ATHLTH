@@ -112,6 +112,7 @@ struct AudioCoachDraft {
     var announceRemainingStepTime = true
     var announceRemainingStepDistance = true
     var duckOtherAudio = true
+    var muteOtherAudio = false
     var voiceIdentifier: String? = nil
     var speechRate: Double = 0.48
     var speechVolume: Double = 1.0
@@ -270,6 +271,7 @@ struct AudioCoachDraft {
             settings.audioCoachAnnounceRemainingStepDistance
         duckOtherAudio =
             settings.audioCoachDuckOtherAudio
+        muteOtherAudio = settings.audioCoachMuteOtherAudio
         voiceIdentifier =
             settings.audioCoachVoiceIdentifier
         speechRate =
@@ -318,6 +320,7 @@ struct AudioCoachDraft {
         announceRemainingStepTime = config.announceRemainingStepTime
         announceRemainingStepDistance = config.announceRemainingStepDistance
         duckOtherAudio = config.duckOtherAudio ?? true
+        muteOtherAudio = config.shouldMuteOtherAudio
         guidanceQuietPeriodSeconds = config.guidanceQuietPeriodSeconds ?? 10
         voiceIdentifier = config.voiceIdentifier
         speechRate = Double(config.speechRate ?? 0.48)
@@ -366,6 +369,7 @@ struct AudioCoachDraft {
         saved.announceRemainingStepTime = values.announceRemainingStepTime
         saved.announceRemainingStepDistance = values.announceRemainingStepDistance
         saved.duckOtherAudio = values.duckOtherAudio
+        saved.muteOtherAudio = values.muteOtherAudio
         saved.guidanceQuietPeriodSeconds = values.guidanceQuietPeriodSeconds
         saved.voiceIdentifier = values.voiceIdentifier
         saved.speechRate = values.speechRate
@@ -432,6 +436,8 @@ struct AudioCoachDraft {
                 enabled && announceRemainingStepDistance,
             duckOtherAudio:
                 duckOtherAudio,
+            muteOtherAudio:
+                muteOtherAudio,
             guidanceQuietPeriodSeconds:
                 guidanceQuietPeriodSeconds,
             voiceIdentifier:
