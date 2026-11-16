@@ -124,6 +124,226 @@ struct ProfileFriendsSection: View {
     }
 }
 
+/// Both Inbox and Train Together render these exact same records. Responding
+/// changes the backend participant state, not a screen-local copy.
+struct ATHLTHWorkoutInvitationSection: View {
+    @EnvironmentObject private var social: SocialStore
+
+    var showsAccepted = true
+    var showsEmptyState = false
+    var searchText = ""
+
+    @State private var respondingToID: UUID?
+    @State private var openedInvite: SocialWorkoutInviteDisplay?
+    @State private var responseError: String?
+
+    private var matchingInvites: [SocialWorkoutInviteDisplay] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sorted = social.workoutInvites.sorted {
+            $0.session.createdAt > $1.session.createdAt
+        }
+        var seenSessionIDs = Set<UUID>()
+        return sorted.filter { invite in
+            // Never render duplicate notifications for the same session.
+            guard seenSessionIDs.insert(invite.session.id).inserted else {
+                return false
+            }
+            return query.isEmpty ||
+                invite.session.title.localizedCaseInsensitiveContains(query) ||
+                invite.session.workoutKind.localizedCaseInsensitiveContains(query) ||
+                (invite.creator?.resolvedName.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+
+    private var pendingInvites: [SocialWorkoutInviteDisplay] {
+        matchingInvites.filter { $0.participant.state == .invited }
+    }
+
+    private var acceptedInvites: [SocialWorkoutInviteDisplay] {
+        guard showsAccepted else { return [] }
+        return matchingInvites.filter { $0.participant.state == .accepted }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !pendingInvites.isEmpty {
+                ATHLTHTrainTogetherSectionTitle(
+                    title: ATHLTHLocalization.choose(
+                        english: "Invitations", norwegian: "Invitasjoner"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Reply here or in Train Together. One invite, one status.",
+                        norwegian: "Svar her eller i Tren sammen. Samme invitasjon begge steder."
+                    )
+                )
+                ForEach(pendingInvites) { invite in
+                    invitationCard(invite)
+                }
+            }
+
+            if !acceptedInvites.isEmpty {
+                ATHLTHTrainTogetherSectionTitle(
+                    title: ATHLTHLocalization.choose(
+                        english: "Upcoming together", norwegian: "Kommende fellesøkter"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Accepted workouts you can open again.",
+                        norwegian: "Godtatte økter du kan åpne igjen."
+                    )
+                )
+                ForEach(acceptedInvites) { invite in
+                    invitationCard(invite)
+                }
+            }
+
+            if let responseError {
+                Label(responseError, systemImage: "exclamationmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if showsEmptyState && pendingInvites.isEmpty && acceptedInvites.isEmpty {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(
+                        english: "No workout invitations", norwegian: "Ingen treningsinvitasjoner"
+                    ),
+                    systemImage: "person.2.badge.plus",
+                    description: Text(ATHLTHLocalization.choose(
+                        english: "New requests will appear here and in Train Together.",
+                        norwegian: "Nye forespørsler vises her og under Tren sammen."
+                    ))
+                )
+                .padding(.vertical, 18)
+            }
+        }
+        .sheet(item: $openedInvite) { invite in
+            WorkoutInviteLaunchSheet(
+                invite: social.workoutInvites.first(where: {
+                    $0.participant.id == invite.participant.id
+                }) ?? invite
+            )
+        }
+    }
+
+    private func invitationCard(_ invite: SocialWorkoutInviteDisplay) -> some View {
+        let accepted = invite.participant.state == .accepted
+        return VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .center, spacing: 12) {
+                if let creator = invite.creator {
+                    SocialAvatar(profile: creator, size: 44)
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                        .frame(width: 44, height: 44)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(invite.creator?.resolvedName ??
+                         ATHLTHLocalization.choose(
+                            english: "ATHLTH athlete", norwegian: "ATHLTH-utøver"
+                         ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                    Text(invite.session.title)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+                        .lineLimit(2)
+                    Text(invite.session.startedAt.formatted(
+                        date: .abbreviated, time: .shortened
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                if accepted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Accepted", norwegian: "Godtatt"
+                            )
+                        )
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    respond(to: invite, accept: false)
+                } label: {
+                    Text(accepted
+                         ? ATHLTHLocalization.choose(
+                             english: "Leave", norwegian: "Forlat"
+                         )
+                         : ATHLTHLocalization.choose(
+                             english: "Decline", norwegian: "Avslå"
+                         ))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(respondingToID != nil)
+
+                Button {
+                    if accepted {
+                        openedInvite = invite
+                    } else {
+                        respond(to: invite, accept: true)
+                    }
+                } label: {
+                    HStack {
+                        if respondingToID == invite.participant.id {
+                            ProgressView().tint(.white).controlSize(.small)
+                        }
+                        Text(accepted
+                             ? ATHLTHLocalization.choose(
+                                 english: "Open workout", norwegian: "Åpne økt"
+                             )
+                             : ATHLTHLocalization.choose(
+                                 english: "Accept", norwegian: "Godta"
+                             ))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTrainTogetherDesign.accent)
+                .disabled(respondingToID != nil)
+            }
+            .controlSize(.regular)
+        }
+        .padding(15)
+        .athlthTrainTogetherCard(radius: 19, subtle: true)
+        .accessibilityIdentifier("athlth-workout-invite-\\(invite.participant.id)")
+    }
+
+    private func respond(to invite: SocialWorkoutInviteDisplay, accept: Bool) {
+        guard respondingToID == nil else { return }
+        respondingToID = invite.participant.id
+        responseError = nil
+        Task {
+            let success: Bool
+            if accept {
+                success = await social.acceptWorkoutInvite(invite)
+            } else {
+                success = await social.declineWorkoutInvite(invite)
+            }
+            respondingToID = nil
+            if success {
+                if accept {
+                    openedInvite = social.workoutInvites.first(where: {
+                        $0.participant.id == invite.participant.id
+                    }) ?? invite
+                }
+            } else {
+                responseError = social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not update invitation. Try again.",
+                        norwegian: "Kunne ikke oppdatere invitasjonen. Prøv igjen."
+                    )
+            }
+        }
+    }
+}
+
 struct SocialHubView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
@@ -134,8 +354,6 @@ struct SocialHubView: View {
     @State private var selectedTab: SocialHubTab
     @State private var searchText = ""
     @State private var showingNewMessage = false
-    @State private var acceptedWorkoutInvite:
-        SocialWorkoutInviteDisplay?
 
     private var clubForest: Color {
         Color(red: 0.025, green: 0.30, blue: 0.21)
@@ -292,11 +510,6 @@ struct SocialHubView: View {
         .sheet(isPresented: $showingNewMessage) {
             NewMessageView()
         }
-        .sheet(item: $acceptedWorkoutInvite) { invite in
-            WorkoutInviteLaunchSheet(
-                invite: invite
-            )
-        }
         .task {
             async let socialRefresh: Void =
                 social.refresh()
@@ -348,139 +561,7 @@ struct SocialHubView: View {
                 }
 
                 if !social.workoutInvites.isEmpty {
-                    ATHLTHTrainTogetherSectionTitle(
-                        title: ATHLTHLocalization.choose(
-                            english: "Train Together", norwegian: "Tren sammen"
-                        ),
-                        subtitle: ATHLTHLocalization.choose(
-                            english: "Your invitations and shared workout requests.",
-                            norwegian: "Invitasjoner og forespørsler om felles trening."
-                        )
-                    )
-
-                    ForEach(social.workoutInvites) { invite in
-                        VStack(alignment: .leading, spacing: 11) {
-                            HStack(spacing: 12) {
-                                if let creator = invite.creator {
-                                    SocialAvatar(profile: creator, size: 46)
-                                } else {
-                                    Image(systemName: "person.fill")
-                                        .foregroundStyle(clubForest)
-                                        .frame(width: 46, height: 46)
-                                        .background(
-                                            ATHLTHTheme.accent.opacity(0.10),
-                                            in: Circle()
-                                        )
-                                }
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(
-                                        invite.creator?.resolvedName
-                                            ?? "An athlete"
-                                    )
-                                    .font(.subheadline.weight(.semibold))
-
-                                    Text(invite.session.title)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-
-                                    Text(
-                                        invite.session.startedAt.formatted(
-                                            date: .abbreviated,
-                                            time: .shortened
-                                        )
-                                    )
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-                            }
-
-                            HStack(spacing: 8) {
-                                if invite.participant.state == .accepted {
-                                    Button(
-                                        role: .destructive
-                                    ) {
-                                        Task {
-                                            await social
-                                                .declineWorkoutInvite(
-                                                    invite
-                                                )
-                                        }
-                                    } label: {
-                                        Text(
-                                            ATHLTHLocalization.choose(
-                                                english: "Leave",
-                                                norwegian: "Forlat"
-                                            )
-                                        )
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .frame(maxWidth: .infinity)
-
-                                    Button(
-                                        ATHLTHLocalization.choose(
-                                            english: "Continue",
-                                            norwegian: "Fortsett"
-                                        )
-                                    ) {
-                                        acceptedWorkoutInvite =
-                                            invite
-                                    }
-                                    .buttonStyle(
-                                        .borderedProminent
-                                    )
-                                    .tint(ATHLTHTrainTogetherDesign.accent)
-                                    .frame(
-                                        maxWidth: .infinity
-                                    )
-                                } else {
-                                    Button(
-                                        ATHLTHLocalization.choose(
-                                            english: "Decline",
-                                            norwegian: "Avslå"
-                                        )
-                                    ) {
-                                        Task {
-                                            await social
-                                                .declineWorkoutInvite(
-                                                    invite
-                                                )
-                                        }
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .frame(maxWidth: .infinity)
-
-                                    Button(
-                                        ATHLTHLocalization.choose(
-                                            english: "Join",
-                                            norwegian: "Godta"
-                                        )
-                                    ) {
-                                        Task {
-                                            if await social
-                                                .acceptWorkoutInvite(
-                                                    invite
-                                                ) {
-                                                acceptedWorkoutInvite =
-                                                    invite
-                                            }
-                                        }
-                                    }
-                                    .buttonStyle(
-                                        .borderedProminent
-                                    )
-                                    .tint(ATHLTHTrainTogetherDesign.accent)
-                                    .frame(
-                                        maxWidth: .infinity
-                                    )
-                                }
-                            }
-                        }
-                        .padding(15)
-                        .athlthTrainTogetherCard(radius: 19, subtle: true)
-                    }
+                    ATHLTHWorkoutInvitationSection()
                 }
 
                 if !social.incomingRequests.isEmpty {
