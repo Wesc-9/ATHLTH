@@ -6072,8 +6072,7 @@ struct ATHLTHTrainView: View {
                             ghostRace: ghostRace,
                             workoutMirroring: workoutMirroring,
                             plannedPlanID: planOrigin?.planID,
-                            plannedSessionID: planOrigin?.workout.id,
-                            session: session
+                            plannedSessionID: planOrigin?.workout.id
                         )
                         if needsSocialLobby {
                             _ = await social.confirmCurrentJoinedWorkoutStarted()
