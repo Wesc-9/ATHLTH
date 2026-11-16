@@ -733,16 +733,30 @@ struct ATHLTHWorkoutRecipePreview: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(recipeTint)
-                } else {
+                }
+                // Exercise identity and prescription are separate actions.
+                // Always allow opening the normal library exercise card,
+                // including from editable scheduled workouts.
+                if block.kind == .exercise {
                     Button {
-                        if block.kind == .exercise {
-                            selectedExercise = block
-                        } else {
-                            inspectedCardioStep = IndexedWorkoutStep(
-                                index: index,
-                                block: ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
-                            )
-                        }
+                        selectedExercise = block
+                    } label: {
+                        Label(
+                            tr("Open exercise details", "Åpne øvelsen i biblioteket"),
+                            systemImage: "arrow.up.right.square"
+                        )
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(recipeTint)
+                    .accessibilityIdentifier("athlth-recipe-open-exercise-detail")
+                } else if onUpdateBlock == nil {
+                    Button {
+                        inspectedCardioStep = IndexedWorkoutStep(
+                            index: index,
+                            block: ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+                        )
                     } label: {
                         Label(tr("View step details", "Se øktdetaljer"),
                               systemImage: "info.circle")
