@@ -720,6 +720,10 @@ struct ExerciseLibraryView: View {
                         .padding(.horizontal, 16)
                         .padding(.bottom, 18)
                     }
+                    // Recreate the scroll container when a letter selects a
+                    // different page. Its origin then resets to the new page's
+                    // first exercise reliably, without racing SwiftUI layout.
+                    .id(visibleStartIndex)
                     .onScrollGeometryChange(for: Bool.self) { geometry in
                         geometry.contentOffset.y + geometry.contentInsets.top < -28
                     } action: { _, isPulling in
@@ -746,16 +750,11 @@ struct ExerciseLibraryView: View {
                                             proxy.scrollTo(id, anchor: .top)
                                         }
                                     } else {
-                                        // Rebase on the first item of the letter
-                                        // without constructing every preceding row.
+                                        // The page starts with the selected
+                                        // letter. Its scroll container is rebuilt
+                                        // at the top, avoiding an async scroll race.
                                         visibleStartIndex = index
                                         visibleLimit = ATHLTHLibraryPagination.pageSize
-                                        // Scroll only after SwiftUI installs the new
-                                        // page's IDs in the lazy grid.
-                                        Task { @MainActor in
-                                            await Task.yield()
-                                            proxy.scrollTo(id, anchor: .top)
-                                        }
                                     }
                                 }
                             )
