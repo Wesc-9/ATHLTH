@@ -563,6 +563,11 @@ struct ATHLTHAdminUserDirectoryView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("admin-confirm-username")
+                } footer: {
+                    Text(tr(
+                        "Keep the explanation short and factual. Do not include health data, private messages or other sensitive details.",
+                        "Hold begrunnelsen kort og saklig. Ikke skriv helseopplysninger, private meldinger eller andre sensitive detaljer."
+                    ))
                 }
 
                 if action.kind == .requestDeletion {
