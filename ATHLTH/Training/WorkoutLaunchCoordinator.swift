@@ -1373,6 +1373,11 @@ enum WorkoutLaunchCoordinator {
                 dateOfBirth: session?.onboardingProfile?.dateOfBirth
             )
 
+        if let selectedWalkingRoute {
+            // The Watch must receive route geometry before selecting its ID.
+            // Otherwise its navigation screen may refer to a missing route.
+            try watchConnection.sendRoute(selectedWalkingRoute)
+        }
         watchConnection
             .sendWorkoutRouteSelection(selectedWalkingRoute?.id)
 
