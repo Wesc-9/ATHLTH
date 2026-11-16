@@ -79,9 +79,91 @@ struct ATHLTHLinkedExerciseDetailView: View {
         )
     }
 
+    private var plannedTargets: [(label: String, value: String)] {
+        var result: [(label: String, value: String)] = []
+        if let sets = block.setCount, sets > 0 {
+            result.append((
+                ATHLTHLocalization.choose(english: "Sets", norwegian: "Sett"),
+                "\(sets)"
+            ))
+        }
+        if let repetitions = block.repetitions, repetitions > 0 {
+            let value = block.targetRepetitionsMaximum.map { maximum in
+                maximum > repetitions
+                    ? "\(repetitions)–\(maximum)" : "\(repetitions)"
+            } ?? "\(repetitions)"
+            result.append((
+                ATHLTHLocalization.choose(english: "Reps", norwegian: "Reps"),
+                value
+            ))
+        }
+        if let rest = block.restBetweenSetsSeconds, rest > 0 {
+            result.append((
+                ATHLTHLocalization.choose(english: "Set rest", norwegian: "Settpause"),
+                ATHLTHWorkoutStepCopy.duration(rest)
+            ))
+        }
+        if let rir = block.targetRepsInReserve {
+            result.append(("RIR", "\(rir)"))
+        }
+        if let weight = block.targetWeightKilograms, weight > 0 {
+            result.append((
+                ATHLTHLocalization.choose(english: "Target weight", norwegian: "Målvekt"),
+                "\(weight.formatted()) kg"
+            ))
+        }
+        return result
+    }
+
+    private var workoutTargetsStrip: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 6) {
+                Image(systemName: "list.bullet.rectangle")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(ATHLTHLocalization.choose(
+                    english: "Targets in this workout",
+                    norwegian: "Mål i denne treningsøkten"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(plannedTargets.enumerated()), id: \.offset) { _, target in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(target.label.uppercased())
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Text(target.value)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(minWidth: 85, minHeight: 56, alignment: .leading)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            ATHLTHPlanDesign.warmSurface,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .padding(.horizontal, 15)
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                if !plannedTargets.isEmpty {
+                    workoutTargetsStrip
+                        .padding(.top, 8)
+                        .padding(.bottom, 10)
+                }
                 if matched == nil {
                     HStack(spacing: 9) {
                         Image(systemName: "person.crop.square")
