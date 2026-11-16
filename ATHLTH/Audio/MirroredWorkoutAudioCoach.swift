@@ -457,6 +457,7 @@ final class MirroredWorkoutAudioCoach:
         utterance.volume = configuration.resolvedSpeechVolume
         try? ATHLTHSpokenAudioSession.activate(
             duckOtherAudio: configuration.shouldDuckOtherAudio,
+            muteOtherAudio: configuration.shouldMuteOtherAudio,
             owner: audioOwner
         )
         synthesizer.speak(utterance)
@@ -1187,6 +1188,7 @@ final class MirroredWorkoutAudioCoach:
             phrase,
             voiceIdentifier: configuration.voiceIdentifier,
             duckMusic: configuration.shouldDuckOtherAudio,
+            muteMusic: configuration.shouldMuteOtherAudio,
             onFallback: { [weak self] in
                 self?.speakFinishedWorkoutRecapLocally(phrase)
             },
@@ -1208,6 +1210,7 @@ final class MirroredWorkoutAudioCoach:
         utterance.volume = configuration.resolvedSpeechVolume
         try? ATHLTHSpokenAudioSession.activate(
             duckOtherAudio: configuration.shouldDuckOtherAudio,
+            muteOtherAudio: configuration.shouldMuteOtherAudio,
             owner: audioOwner
         )
         synthesizer.speak(utterance)
@@ -1305,6 +1308,7 @@ final class MirroredWorkoutAudioCoach:
             spokenText,
             voiceIdentifier: configuration.voiceIdentifier,
             duckMusic: configuration.shouldDuckOtherAudio,
+            muteMusic: configuration.shouldMuteOtherAudio,
             shouldStart: { [weak self] in
                 guard let self, self.configuration.enabled, !self.finished else { return false }
                 guard let event else { return true }
@@ -1316,6 +1320,7 @@ final class MirroredWorkoutAudioCoach:
                 else { return }
                 try? ATHLTHSpokenAudioSession.activate(
                     duckOtherAudio: self.configuration.shouldDuckOtherAudio,
+                    muteOtherAudio: self.configuration.shouldMuteOtherAudio,
                     owner: self.audioOwner
                 )
                 self.pendingLocalSpokenEvent = event.map {
@@ -1337,6 +1342,7 @@ final class MirroredWorkoutAudioCoach:
         if !routedToAzure {
             try? ATHLTHSpokenAudioSession.activate(
                 duckOtherAudio: configuration.shouldDuckOtherAudio,
+            muteOtherAudio: configuration.shouldMuteOtherAudio,
                 owner: audioOwner
             )
             pendingLocalSpokenEvent = event.map {
