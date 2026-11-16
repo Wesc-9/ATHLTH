@@ -5048,6 +5048,7 @@ struct WorkoutPublishView: View {
     @State private var publishing = false
     @State private var selectedAlreadyPublished = false
     @State private var includeHealthData = true
+    @State private var selectedPulseSamples: [ATHLTHRunningHeartRatePoint] = []
     @State private var includeRoute = false
     @State private var hideRouteStartAndEnd = true
     @State private var sharingRoute: [CLLocation] = []
@@ -5290,6 +5291,7 @@ struct WorkoutPublishView: View {
             .task(id: selectedWorkoutID) {
                 includeRoute = false
                 includeHealthData = settings.includeWorkoutHealthDataByDefault
+                selectedPulseSamples = []
                 sharingRoute = []
                 loadingRoute = false
                 // Publishing from a completed-result card starts with safe
@@ -5321,7 +5323,13 @@ struct WorkoutPublishView: View {
                     visibility = initialVisibility ?? settings.defaultActivityVisibility
                 }
                 guard !Task.isCancelled, self.selectedWorkoutID == selectedWorkoutID,
-                      let workout = selectedWorkout, workout.isIndoor != true else { return }
+                      let workout = selectedWorkout else { return }
+                if workout.activity == .running || workout.activity == .walking {
+                    let pulse = await health.runningHeartRateTimeline(for: workout.id)
+                    guard !Task.isCancelled, self.selectedWorkoutID == selectedWorkoutID else { return }
+                    selectedPulseSamples = pulse
+                }
+                guard workout.isIndoor != true else { return }
                 loadingRoute = true
                 let detail = await health.workoutDetail(for: workout.id)
                 guard !Task.isCancelled else { return }
@@ -5344,7 +5352,8 @@ struct WorkoutPublishView: View {
             caption: caption,
             routePreview: includeRoute ? WorkoutRouteSharing.preview(sharingRoute, hideStartAndEnd: hideRouteStartAndEnd) : [],
             hideRouteStartAndEnd: hideRouteStartAndEnd,
-            includeHealthData: includeHealthData
+            includeHealthData: includeHealthData,
+            pulseSamples: selectedPulseSamples
         )
 
         if success {
