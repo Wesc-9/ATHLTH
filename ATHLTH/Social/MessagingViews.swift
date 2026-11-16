@@ -721,6 +721,19 @@ struct MessageInboxView: View {
                             .font(.system(size: 12, weight: .medium))
                         Text(filter.title)
                             .lineLimit(1)
+                        if filter == .invitations {
+                            let unansweredCount = social.workoutInvites.filter {
+                                $0.participant.state == .invited
+                            }.count
+                            if unansweredCount > 0 {
+                                Text("\(min(unansweredCount, 99))")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(ATHLTHTheme.accentSoft, in: Capsule())
+                            }
+                        }
                     }
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(
