@@ -3181,6 +3181,12 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var selectedPlannedWorkout: PlannedSession?
     @State private var pendingPlanTracking: PlannedSession?
     @State private var selectedPlanTracking: PlannedSession?
+    @State private var pendingStandaloneTracking: PlannedSession?
+    @State private var selectedStandaloneTracking: PlannedSession?
+    @State private var editingWorkoutTime: PlannedSession?
+    @State private var editedWorkoutClock = Date()
+    @State private var showingTimeEditFailure = false
+    @State private var workoutPendingCancellation: PlannedSession?
     @State private var workoutPendingRemoval: PlannedSession?
     @State private var showingRemoveConfirmation = false
     @State private var showingRemovalFailure = false
@@ -3611,14 +3617,83 @@ private struct HomeWeeklyProgressDaySheet: View {
             // A planned workout opens as a card over the calendar rather
             // than pushing another page inside the day sheet.
             .sheet(item: $selectedPlanTracking) { workout in
-                if let planID = HomeWeeklyProgressCalendar.containingPlanID(for: workout, in: plan) {
-                    PlannedWorkoutDetailView(planID: planID, workout: workout, isHealthCompleted: false)
-                        .presentationDetents([.fraction(0.85), .large])
+                if let planID = HomeWeeklyProgressCalendar.containingPlanID(
+                    for: workout, in: plan
+                ) {
+                    PlannedWorkoutDetailView(
+                        planID: planID,
+                        workout: workout,
+                        isHealthCompleted: false
+                    )
+                    .presentationDetents([.fraction(0.85), .large])
                 }
+            }
+            .sheet(item: $selectedStandaloneTracking) { workout in
+                HomeWeeklyStandaloneWorkoutDetailView(
+                    workout: workout,
+                    onStartWorkout: onStartStandaloneWorkout
+                )
+                .presentationDetents([.fraction(0.85), .large])
+            }
+            .sheet(item: $editingWorkoutTime) { workout in
+                timeOnlyEditor(for: workout)
+                    .presentationDetents([.height(355)])
+                    .presentationDragIndicator(.hidden)
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "Could not change the time",
+                    norwegian: "Kunne ikke endre tidspunkt"
+                ),
+                isPresented: $showingTimeEditFailure
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "This workout may have started, been completed, or changed elsewhere.",
+                    norwegian: "Økten kan være startet, fullført eller endret et annet sted."
+                ))
+            }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Cancel this workout?",
+                    norwegian: "Avlyse denne økten?"
+                ),
+                isPresented: Binding(
+                    get: { workoutPendingCancellation != nil },
+                    set: { if !$0 { workoutPendingCancellation = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Cancel workout", norwegian: "Avlys økten"
+                    ),
+                    role: .destructive
+                ) {
+                    if let workout = workoutPendingCancellation {
+                        _ = session.cancelPlannedWorkout(
+                            workout.id,
+                            healthWorkouts: recentWorkouts,
+                            strengthHistory: strength.workoutHistory
+                        )
+                    }
+                    workoutPendingCancellation = nil
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Keep workout", norwegian: "Behold økten"
+                ), role: .cancel) { workoutPendingCancellation = nil }
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "The workout remains on the calendar as cancelled. Training history is unchanged.",
+                    norwegian: "Økten blir stående som avlyst. Treningshistorikken endres ikke."
+                ))
             }
             .sheet(item: $selectedPlannedWorkout, onDismiss: {
                 selectedPlanTracking = pendingPlanTracking
                 pendingPlanTracking = nil
+                selectedStandaloneTracking = pendingStandaloneTracking
+                pendingStandaloneTracking = nil
             }) { workout in
                 let isPlanWorkout = HomeWeeklyProgressCalendar.containingPlanID(
                     for: workout, in: plan
@@ -3628,8 +3703,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                     isPlanWorkout: isPlanWorkout,
                     canStartWithWatch: canStartWithWatch,
                     onOpenPlannedWorkout: {
-                        pendingPlanTracking = workout
-                        selectedPlannedWorkout = nil
+                        openWorkoutDetailsAfterSheet(workout)
                     },
                     onStartOnPhone: {
                         guard canLaunchPlannedWorkout(workout) else { return }
@@ -3658,6 +3732,14 @@ private struct HomeWeeklyProgressDaySheet: View {
                     },
                     isCalendarWorkout: true,
                     canStart: canLaunchPlannedWorkout(workout),
+                    isCancelled: isCancelledPlannedWorkout(workout),
+                    onEdit: canModifyPlannedWorkout(workout)
+                        ? { openWorkoutDetailsAfterSheet(workout) } : nil,
+                    onCancel: canModifyPlannedWorkout(workout)
+                        ? {
+                            selectedPlannedWorkout = nil
+                            workoutPendingCancellation = workout
+                        } : nil,
                     onDelete: canRemovePlannedWorkout(workout)
                         ? { removePlannedWorkout(workout) } : nil
                 )
