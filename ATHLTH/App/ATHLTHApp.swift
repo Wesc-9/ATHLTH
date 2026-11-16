@@ -2627,7 +2627,8 @@ struct AppRootView: View {
                 workout: workout,
                 wasAutoPublished: false,
                 initialVisibilityOverride:
-                    pendingWorkoutReviewVisibilityOverride
+                    pendingWorkoutReviewVisibilityOverride,
+                requiresDecision: true
             )
         }
         .sheet(
