@@ -2,6 +2,18 @@ import Foundation
 import MapKit
 import SwiftUI
 
+/// Keep ambiguous start/end names out of the top workout-style card.
+enum ATHLTHRouteHeroPresentation {
+    static func endpointSubtitle(start: String?, finish: String?) -> String? {
+        guard let start = start?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let finish = finish?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !start.isEmpty, !finish.isEmpty,
+              start.localizedCaseInsensitiveCompare(finish) != .orderedSame
+        else { return nil }
+        return "\(start) → \(finish)"
+    }
+}
+
 struct RouteDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -1115,174 +1127,214 @@ struct RouteDetailView: View {
         }
     }
 
+    /// First card mirrors ATHLTH's compact workout overview: important
+    /// exercise/run information first, then the route map, then deeper data.
+    /// The route's workout starts through the shared Basic Quick Train motor.
     private var overviewCard: some View {
         ATHLTHCard {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 15) {
                 HStack(spacing: 8) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "RUNNING ROUTE", norwegian: "LØPERUTE"
+                        ),
+                        systemImage: "figure.run"
+                    )
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(1.1)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                    Spacer(minLength: 6)
+
                     if isPublicTrail {
-                        Label(
-                            "PUBLIC TRAIL",
-                            systemImage: "map.fill"
-                        )
-                        .font(.caption2.weight(.bold))
-                        .tracking(0.8)
-                        .foregroundStyle(ATHLTHTheme.vitality)
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .background(
-                            ATHLTHTheme.vitalitySoft,
-                            in: Capsule()
-                        )
+                        Label(ATHLTHLocalization.choose(
+                            english: "Public trail", norwegian: "Offentlig tursti"
+                        ), systemImage: "map.fill")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    } else {
+                        visibilityBadge(currentRoute.visibility)
                     }
 
                     if publicTrailMetadata?.athlthVerified == true {
-                        Label(
-                            "ATHLTH VERIFIED",
-                            systemImage: "checkmark.seal.fill"
-                        )
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.premiumGold)
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .background(
-                            ATHLTHTheme.premiumGoldSoft,
-                            in: Capsule()
-                        )
-                    }
-
-                    Spacer()
-
-                    if !isPublicTrail {
-                        visibilityBadge(currentRoute.visibility)
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                            .accessibilityLabel("ATHLTH verified")
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(currentRoute.title)
-                        .font(.title.weight(.bold))
+                        .font(.system(size: 25, weight: .bold, design: .rounded))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    if let start = currentRoute.startName,
-                       let end = currentRoute.endName {
-                        Text("\(start) → \(end)")
+                    if let endpoints = ATHLTHRouteHeroPresentation.endpointSubtitle(
+                        start: currentRoute.startName, finish: currentRoute.endName
+                    ) {
+                        Text(endpoints)
                             .font(.subheadline)
                             .foregroundStyle(ATHLTHTheme.mutedText)
-                    } else if let description =
-                                publicTrailMetadata?.osmDescription,
+                            .lineLimit(2)
+                    } else if let description = publicTrailMetadata?.osmDescription,
                               !description.isEmpty {
                         Text(description)
                             .font(.subheadline)
                             .foregroundStyle(ATHLTHTheme.mutedText)
-                            .lineLimit(3)
+                            .lineLimit(2)
                     }
                 }
 
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 146), spacing: 10)],
-                    spacing: 12
-                ) {
-                    premiumRouteMetric(
-                        value: String(
-                            format: "%.1f km",
-                            currentRoute.distanceKilometers
-                        ),
-                        label: ATHLTHLocalization.choose(
+                HStack(alignment: .top, spacing: 5) {
+                    routeHeroStat(
+                        ATHLTHLocalization.choose(
                             english: "Distance", norwegian: "Distanse"
                         ),
+                        value: String(
+                            format: "%.1f km", currentRoute.distanceKilometers
+                        ),
+                        icon: "point.topleft.down.to.point.bottomright.curvepath",
+                        prominent: true
+                    )
+                    Rectangle()
+                        .fill(ATHLTHTheme.divider)
+                        .frame(width: 1, height: 64)
+                    routeHeroStat(
+                        ATHLTHLocalization.choose(
+                            english: "Running", norwegian: "Løping"
+                        ),
+                        value: resolvedRunEstimate.map(compactDuration) ?? "—",
                         icon: "figure.run"
                     )
-                    premiumRouteMetric(
-                        value: resolvedElevationGain.map {
-                            "\(Int($0.rounded())) m"
-                        } ?? "—",
-                        label: ATHLTHLocalization.choose(
-                            english: "Ascent", norwegian: "Stigning"
+                    Rectangle()
+                        .fill(ATHLTHTheme.divider)
+                        .frame(width: 1, height: 64)
+                    routeHeroStat(
+                        ATHLTHLocalization.choose(
+                            english: "Walking", norwegian: "Gange"
                         ),
-                        icon: "mountain.2.fill"
-                    )
-                    premiumRouteMetric(
-                        value: routeTypeTitle,
-                        label: ATHLTHLocalization.choose(
-                            english: "Route type", norwegian: "Rutetype"
-                        ),
-                        icon: "arrow.triangle.branch"
-                    )
-                    premiumRouteMetric(
                         value: resolvedWalkEstimate.map(compactDuration) ?? "—",
-                        label: ATHLTHLocalization.choose(
-                            english: "Est. walk", norwegian: "Est. gange"
-                        ),
                         icon: "figure.walk"
                     )
-                    premiumRouteMetric(
-                        value: resolvedRunEstimate.map(compactDuration) ?? "—",
-                        label: ATHLTHLocalization.choose(
-                            english: "Est. run", norwegian: "Est. løping"
-                        ),
-                        icon: "figure.run"
-                    )
                 }
-                Text(ATHLTHLocalization.choose(
-                    english: "Times are estimates, not a personalized pace guarantee.",
-                    norwegian: "Tidene er estimater, ikke en garanti for personlig tempo."
-                ))
-                .font(.caption2)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 15)
+                .frame(maxWidth: .infinity)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 17)
+                )
+                .accessibilityElement(children: .contain)
 
-                let characteristics =
-                    trailCharacteristics
-                if !characteristics.isEmpty {
-                    ScrollView(
-                        .horizontal,
-                        showsIndicators: false
-                    ) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 14) { routeQuickFacts }
+                    VStack(alignment: .leading, spacing: 9) {
+                        routeQuickFacts
+                    }
+                }
+
+                if !trailCharacteristics.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 7) {
-                            ForEach(
-                                characteristics,
-                                id: \.self
-                            ) { value in
-                                Text(value)
-                                    .font(
-                                        .caption2
-                                            .weight(.semibold)
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .accentDeep
-                                    )
-                                    .padding(
-                                        .horizontal,
-                                        10
-                                    )
-                                    .frame(height: 28)
+                            ForEach(trailCharacteristics, id: \.self) { trait in
+                                Text(trait)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .padding(.horizontal, 10)
+                                    .frame(minHeight: 27)
                                     .background(
-                                        Color.white
-                                            .opacity(0.62),
+                                        ATHLTHPlanDesign.selectedSurface,
                                         in: Capsule()
                                     )
                             }
                         }
                     }
                 }
+
+                Button {
+                    routeToStart = directedRoute
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "play.fill")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Start workout", norwegian: "Start økt"
+                        ))
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 17)
+                    .frame(maxWidth: .infinity, minHeight: 49)
+                    .background(
+                        ATHLTHTheme.accentDeep,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(phoneWorkout.active != nil)
+                .opacity(phoneWorkout.active != nil ? 0.5 : 1)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Opens Basic Quick Train with this route selected.",
+                    norwegian: "Åpner enkel Quick Train med denne ruten valgt."
+                ))
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Walking and running times are estimates based on distance.",
+                    norwegian: "Tidene for gange og løping er estimater basert på distanse."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
             }
         }
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: ATHLTHTheme.cornerRadius,
-                style: .continuous
+    }
+
+    private func routeHeroStat(
+        _ label: String,
+        value: String,
+        icon: String,
+        prominent: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(label, systemImage: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(value)
+                .font(.system(
+                    size: prominent ? 23 : 18,
+                    weight: .bold,
+                    design: .rounded
+                ))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var routeQuickFacts: some View {
+        Label(routeTypeTitle, systemImage: "arrow.triangle.branch")
+        if let ascent = resolvedElevationGain {
+            Label(
+                "\(Int(ascent.rounded())) m " +
+                    ATHLTHLocalization.choose(
+                        english: "ascent", norwegian: "stigning"
+                    ),
+                systemImage: "mountain.2"
             )
-            .stroke(
-                LinearGradient(
-                    colors: [
-                        ATHLTHTheme.premiumGold.opacity(0.24),
-                        ATHLTHTheme.vitality.opacity(0.16),
-                        Color.white.opacity(0.72)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
+        }
+        if let distance = distanceToStartKilometers {
+            Label(
+                String(format: "%.1f km", distance) + " " +
+                    ATHLTHLocalization.choose(
+                        english: "to start", norwegian: "til start"
+                    ),
+                systemImage: "location"
             )
         }
     }
@@ -2237,23 +2289,6 @@ struct RouteDetailView: View {
                         phoneWorkout.active != nil
                     )
                 }
-
-                Button {
-                    routeToStart = directedRoute
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Start Route",
-                            norwegian: "Start rute"
-                        ),
-                        systemImage: "play.fill"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
-                .controlSize(.large)
-                .disabled(phoneWorkout.active != nil)
 
                 if let challengeRoute = isOwner
                     ? Optional(currentRoute)
