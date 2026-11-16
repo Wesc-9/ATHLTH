@@ -395,6 +395,42 @@ struct ATHLTHWorkoutReplayCard: View {
                     .accessibilityIdentifier("athlth-replay-distance-milestones")
                 }
 
+                if !isStrength && !requiresDataReview {
+                    let maximum = context?.maxHeartRateBPM
+                    let energy = workout.activeEnergyKilocalories
+                    let hasMaximum = maximum.map {
+                        $0.isFinite && (60...240).contains($0)
+                    } ?? false
+                    let hasEnergy = energy.map {
+                        $0.isFinite && $0 >= 30
+                    } ?? false
+                    if hasMaximum || hasEnergy {
+                        HStack(spacing: 9) {
+                            if let maximum, hasMaximum {
+                                replayRecordedFact(
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Highest recorded pulse",
+                                        norwegian: "Høyeste målte puls"
+                                    ),
+                                    value: "\(Int(maximum.rounded())) bpm",
+                                    icon: "heart"
+                                )
+                            }
+                            if let energy, hasEnergy {
+                                replayRecordedFact(
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Active energy",
+                                        norwegian: "Aktiv energi"
+                                    ),
+                                    value: "\(Int(energy.rounded())) kcal",
+                                    icon: "flame"
+                                )
+                            }
+                        }
+                        .padding(.top, 10)
+                    }
+                }
+
                 if replayPaceBars.count >= 3 {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -671,17 +707,6 @@ struct ATHLTHWorkoutReplayCard: View {
                     }
                 }
 
-                if replayMoments.first?.category == "recording" && !requiresDataReview {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Not enough comparable measurements for performance insights.",
-                            norwegian: "For få sammenlignbare målinger til å vise prestasjonshøydepunkter."
-                        ),
-                        systemImage: "info.circle"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                }
 
 
             }
@@ -761,6 +786,34 @@ struct ATHLTHWorkoutReplayCard: View {
         }
     }
 
+    private func replayRecordedFact(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+            Text(value)
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            ATHLTHTheme.cardWarm.opacity(0.65),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+    }
+
     private func replayMetric(title: String, value: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 3) {
@@ -823,7 +876,7 @@ struct ATHLTHWorkoutReplayCard: View {
             .filter { moment in
                 // Distance already has a hero and a verified milestone trail.
                 // Duplicating it as another 'insight' is not useful.
-                moment.category != "distance" || replayMilestones.isEmpty
+                isStrength || !["distance", "heart", "energy"].contains(moment.category)
             }
         let ranked = available.sorted {
             $0.priority == $1.priority
@@ -832,19 +885,6 @@ struct ATHLTHWorkoutReplayCard: View {
         }
         var seenCategories = Set<String>()
         let distinct = ranked.filter { seenCategories.insert($0.category).inserted }
-        if distinct.isEmpty {
-            return [ReplayMoment(
-                title: ATHLTHLocalization.choose(
-                    english: "Recording saved", norwegian: "Økten er registrert"
-                ),
-                detail: ATHLTHLocalization.choose(
-                    english: "More verified measurements are needed for performance highlights.",
-                    norwegian: "Vi trenger flere pålitelige målinger for prestasjonshøydepunkter."
-                ),
-                icon: "checkmark.circle", tint: ATHLTHTrainDesign.bronze,
-                priority: 1, category: "recording"
-            )]
-        }
         return Array(distinct.prefix(3))
     }
 
