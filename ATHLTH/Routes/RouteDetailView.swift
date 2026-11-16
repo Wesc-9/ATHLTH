@@ -34,8 +34,6 @@ struct RouteDetailView: View {
     @State private var snapshotScrollID = UUID()
     @State private var cachedOfflinePreview: UIImage?
     @State private var routeHasTurnaround = false
-    @State private var gpxShareFile: ATHLTHRouteShareFile?
-    @State private var gpxExportError: String?
     @State private var editingTitle = false
     @State private var draftTitle = ""
     @State private var watchMessage: String?
@@ -165,9 +163,8 @@ struct RouteDetailView: View {
     private var routePrimaryContent: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                mapCard
-                offlineAndExportCard
                 overviewCard
+                mapCard
                 startDirectionsCard
                 elevationCard
                 tagsAndSurfacesCard
@@ -208,9 +205,54 @@ struct RouteDetailView: View {
             )
             .ignoresSafeArea()
         )
-        .navigationTitle(currentRoute.title)
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Route details", norwegian: "Rutedetaljer"
+        ))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    if downloaded.has(currentRoute) {
+                        showingOfflineMap.toggle()
+                    } else {
+                        Task { await downloadRouteToDevice() }
+                    }
+                } label: {
+                    if downloaded.downloadingRouteID != nil {
+                        ProgressView()
+                    } else {
+                        Image(systemName: downloaded.has(currentRoute)
+                              ? "checkmark.circle.fill" : "arrow.down.to.line")
+                    }
+                }
+                .disabled(downloaded.downloadingRouteID != nil)
+                .accessibilityLabel(downloaded.has(currentRoute)
+                    ? ATHLTHLocalization.choose(
+                        english: showingOfflineMap ? "Show normal map" : "Show offline map",
+                        norwegian: showingOfflineMap ? "Vis vanlig kart" : "Vis offlinekart"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Download route", norwegian: "Last ned rute"
+                    ))
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Save the route and map preview for use without coverage.",
+                    norwegian: "Lagrer GPS-sporet og kartvisningen for bruk uten dekning."
+                ))
+                .contextMenu {
+                    if downloaded.has(currentRoute) {
+                        Button(role: .destructive) {
+                            downloaded.remove(currentRoute)
+                            cachedOfflinePreview = nil
+                            showingOfflineMap = false
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Remove offline download",
+                                norwegian: "Fjern nedlastingen"
+                            ), systemImage: "trash")
+                        }
+                    }
+                }
+            }
             if isOwner {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -433,9 +475,6 @@ struct RouteDetailView: View {
         .fullScreenCover(isPresented: $showingInteractiveMap) {
             SavedRouteFullscreenMap(route: directedRoute)
         }
-        .sheet(item: $gpxShareFile) { file in
-            ATHLTHRouteShareSheet(url: file.url)
-        }
         .sheet(item: $routeToStart) { route in
             ATHLTHRouteQuickTrainSheet(route: route)
         }
@@ -489,8 +528,7 @@ struct RouteDetailView: View {
                     watchError != nil ||
                     attemptErrorMessage != nil ||
                     discovery.errorMessage != nil ||
-                    downloaded.errorMessage != nil ||
-                    gpxExportError != nil
+                    downloaded.errorMessage != nil
                 },
                 set: { visible in
                     if !visible {
@@ -500,7 +538,6 @@ struct RouteDetailView: View {
                         publicTrailAttempts.errorMessage = nil
                         discovery.errorMessage = nil
                         downloaded.errorMessage = nil
-                        gpxExportError = nil
                     }
                 }
             )
@@ -512,7 +549,6 @@ struct RouteDetailView: View {
                 attemptErrorMessage ??
                 discovery.errorMessage ??
                 downloaded.errorMessage ??
-                gpxExportError ??
                 watchMessage ??
                 ""
             )
@@ -659,103 +695,6 @@ struct RouteDetailView: View {
         )
     }
 
-    private var offlineAndExportCard: some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    Image(systemName: downloaded.has(currentRoute)
-                        ? "checkmark.circle.fill" : "arrow.down.circle")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Offline route", norwegian: "Rute uten nett"
-                        ))
-                        .font(.headline)
-                        Text(downloaded.has(currentRoute)
-                            ? ATHLTHLocalization.choose(
-                                english: "GPS track saved on this device",
-                                norwegian: "GPS-sporet er lagret på denne enheten"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Save GPS and a static map preview before you leave",
-                                norwegian: "Lagre GPS og statisk kartforhåndsvisning før turen"
-                            ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                }
-
-                HStack(spacing: 9) {
-                    Button {
-                        if downloaded.has(currentRoute) {
-                            showingOfflineMap.toggle()
-                        } else {
-                            Task { await downloadRouteToDevice() }
-                        }
-                    } label: {
-                        if downloaded.downloadingRouteID != nil {
-                            ProgressView()
-                                .frame(maxWidth: .infinity, minHeight: 43)
-                        } else {
-                            Label(
-                                downloaded.has(currentRoute)
-                                    ? (showingOfflineMap
-                                        ? ATHLTHLocalization.choose(
-                                            english: "Interactive map", norwegian: "Vanlig kart"
-                                        )
-                                        : ATHLTHLocalization.choose(
-                                            english: "Offline map", norwegian: "Offlinekart"
-                                        ))
-                                    : ATHLTHLocalization.choose(
-                                        english: "Download route", norwegian: "Last ned rute"
-                                    ),
-                                systemImage: downloaded.has(currentRoute)
-                                    ? "map" : "arrow.down.to.line"
-                            )
-                            .frame(maxWidth: .infinity, minHeight: 43)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-                    .disabled(downloaded.downloadingRouteID != nil)
-
-                    Button(action: exportGPX) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Export GPX", norwegian: "Eksporter GPX"
-                            ),
-                            systemImage: "square.and.arrow.up"
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 43)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(currentRoute.coordinates.count < 2)
-                }
-                if downloaded.has(currentRoute) {
-                    Button(role: .destructive) {
-                        downloaded.remove(currentRoute)
-                        cachedOfflinePreview = nil
-                        showingOfflineMap = false
-                    } label: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Remove offline download",
-                            norwegian: "Fjern nedlastingen"
-                        ))
-                        .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                }
-                Text(ATHLTHLocalization.choose(
-                    english: "The offline preview and GPS trace work without service. Interactive street maps may still need network access.",
-                    norwegian: "Forhåndsvisning og GPS-spor virker uten dekning. Interaktive gatekart kan fortsatt kreve nett."
-                ))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-        }
-    }
-
     private func downloadRouteToDevice() async {
         guard await downloaded.download(
             currentRoute,
@@ -774,95 +713,113 @@ struct RouteDetailView: View {
         showingOfflineMap = true
     }
 
-    private func exportGPX() {
-        do {
-            let url = try ATHLTHRouteGPXExport.temporaryFile(directedRoute)
-            gpxShareFile = ATHLTHRouteShareFile(url: url)
-        } catch {
-            gpxExportError = error.localizedDescription
-        }
-    }
-
+    /// Map is secondary to the workout-style route overview. Keep its
+    /// preview static inside the scroll view; the full map remains interactive.
     private var mapCard: some View {
         ATHLTHCard {
-            if currentRoute.coordinates.count >= 2 {
-                VStack(alignment: .leading, spacing: 10) {
-                    if showingOfflineMap && downloaded.has(currentRoute) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "map")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Route map", norwegian: "Rutekart"
+                    ))
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Spacer(minLength: 4)
+                    if downloaded.has(currentRoute) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Offline", norwegian: "Frakoblet"
+                        ), systemImage: "checkmark.circle.fill")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                }
+
+                if currentRoute.coordinates.count >= 2 {
+                    ZStack(alignment: .bottomTrailing) {
                         Group {
-                            if let image = offlineRouteSnapshot {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
+                            if showingOfflineMap && downloaded.has(currentRoute) {
+                                if let image = offlineRouteSnapshot {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                } else {
+                                    RouteMapSnapshotThumbnail(
+                                        route: directedRoute,
+                                        height: 300,
+                                        allowsLiveSnapshot: false
+                                    )
+                                }
                             } else {
                                 RouteMapSnapshotThumbnail(
                                     route: directedRoute,
-                                    height: 270,
-                                    allowsLiveSnapshot: false
+                                    height: 300,
+                                    allowsLiveSnapshot: !routeDetailScrolling
                                 )
                             }
                         }
-                        .frame(height: 270)
                         .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                    } else {
-                        // A static route snapshot inside the scrolling page
-                        // avoids MapKit competing with the page's gestures.
-                        // The full interactive map is one tap away.
-                        RouteMapSnapshotThumbnail(
-                            route: directedRoute,
-                            height: 270,
-                            allowsLiveSnapshot: !routeDetailScrolling
-                        )
+                        .frame(height: 300)
+                        .clipped()
                         .contentShape(Rectangle())
                         .onTapGesture { showingInteractiveMap = true }
                         .accessibilityLabel(ATHLTHLocalization.choose(
                             english: "Open interactive route map",
                             norwegian: "Åpne interaktivt rutekart"
                         ))
-                    }
 
-                    Button {
-                        showingInteractiveMap = true
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Open interactive map",
-                                norwegian: "Åpne interaktivt kart"
-                            ),
-                            systemImage: "arrow.up.left.and.arrow.down.right"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 42)
+                        Button {
+                            showingInteractiveMap = true
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Open map", norwegian: "Åpne kart"
+                            ), systemImage: "arrow.up.left.and.arrow.down.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 10)
+                            .background(.regularMaterial, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(12)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHTheme.accentDeep)
+                    .clipShape(RoundedRectangle(cornerRadius: 17))
 
                     if routeHasTurnaround {
                         HStack(spacing: 14) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Outbound", norwegian: "Ut"
-                                ),
-                                systemImage: "arrow.up.right"
-                            )
+                            Label(ATHLTHLocalization.choose(
+                                english: "Outbound", norwegian: "Ut"
+                            ), systemImage: "arrow.up.right")
                             .foregroundStyle(ATHLTHTheme.premiumGold)
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Return", norwegian: "Retur"
-                                ),
-                                systemImage: "arrow.down.left"
-                            )
+
+                            Label(ATHLTHLocalization.choose(
+                                english: "Return", norwegian: "Retur"
+                            ), systemImage: "arrow.down.left")
                             .foregroundStyle(ATHLTHTheme.accentDeep)
-                            Spacer(minLength: 4)
+
+                            Spacer(minLength: 3)
                             Text(ATHLTHLocalization.choose(
                                 english: "Follow the arrows",
                                 norwegian: "Følg pilene"
                             ))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                         }
                         .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 3)
                     }
+                } else {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No route geometry", norwegian: "Mangler rutetrasé"
+                        ),
+                        systemImage: "map",
+                        description: Text(ATHLTHLocalization.choose(
+                            english: "A route map is unavailable for this item.",
+                            norwegian: "Kartet er ikke tilgjengelig for denne ruten."
+                        ))
+                    )
+                    .frame(minHeight: 180)
                 }
             }
         }
