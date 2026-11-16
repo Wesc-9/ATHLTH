@@ -10978,6 +10978,15 @@ private struct PlannedAudioCoachEditorView: View {
 
     @State private var usesCustomSettings: Bool
     @State private var coachDraft: AudioCoachDraft
+    @State private var initiallyUsesCustomSettings: Bool
+    @State private var initialCoachConfiguration: WatchAudioCoachConfiguration
+    @State private var showingExitConfirmation = false
+
+    private var hasUnsavedChanges: Bool {
+        usesCustomSettings != initiallyUsesCustomSettings ||
+            (usesCustomSettings &&
+             coachDraft.configuration() != initialCoachConfiguration)
+    }
 
     init(
         configuration: Binding<WatchAudioCoachConfiguration?>,
@@ -10989,10 +10998,13 @@ private struct PlannedAudioCoachEditorView: View {
         self.defaultConfiguration = defaultConfiguration
         self.showRouteOptions = showRouteOptions
         self.showStructuredOptions = showStructuredOptions
-        _usesCustomSettings = State(initialValue: configuration.wrappedValue != nil)
+        let customized = configuration.wrappedValue != nil
+        _usesCustomSettings = State(initialValue: customized)
+        _initiallyUsesCustomSettings = State(initialValue: customized)
         var initial = AudioCoachDraft()
         initial.load(configuration: configuration.wrappedValue ?? defaultConfiguration)
         _coachDraft = State(initialValue: initial)
+        _initialCoachConfiguration = State(initialValue: initial.configuration())
     }
 
     var body: some View {
@@ -11059,7 +11071,13 @@ private struct PlannedAudioCoachEditorView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(ATHLTHLocalization.choose(
                         english: "Cancel", norwegian: "Avbryt"
-                    )) { dismiss() }
+                    )) {
+                        if hasUnsavedChanges {
+                            showingExitConfirmation = true
+                        } else {
+                            dismiss()
+                        }
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(ATHLTHLocalization.choose(
@@ -11088,6 +11106,46 @@ private struct PlannedAudioCoachEditorView: View {
                 if enabled && configuration == nil {
                     coachDraft.load(configuration: defaultConfiguration)
                 }
+            }
+            .interactiveDismissDisabled(hasUnsavedChanges)
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Save Audio Coach changes?",
+                    norwegian: "Lagre endringene i Audio Coach?"
+                ),
+                isPresented: $showingExitConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Save", norwegian: "Lagre"
+                )) {
+                    if usesCustomSettings {
+                        var updated = coachDraft.applying(
+                            to: configuration ?? defaultConfiguration,
+                            maximumHeartRateBPM:
+                                session.onboardingProfile?.maximumHeartRateBPM
+                                    .map(Double.init)
+                        )
+                        updated.routeDistanceMeters = nil
+                        configuration = updated
+                    } else {
+                        configuration = nil
+                    }
+                    dismiss()
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Discard changes", norwegian: "Forkast endringer"
+                ), role: .destructive) {
+                    dismiss()
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Continue editing", norwegian: "Fortsett å redigere"
+                ), role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Your workout settings have changed. Save or discard them before leaving.",
+                    norwegian: "Du har endret innstillinger for økten. Lagre eller forkast dem før du går ut."
+                ))
             }
         }
     }
