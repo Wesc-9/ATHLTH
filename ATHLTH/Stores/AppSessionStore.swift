@@ -4045,7 +4045,7 @@ final class AppSessionStore: ObservableObject {
     ) {
         // A finished calendar entry and its real execution interval are
         // immutable. The caller may still delete an untouched draft.
-        guard recordedTimes(for: session.id)?.endedAt == nil else { return }
+        guard recordedTimes(for: session.id) == nil else { return }
         guard let index =
                 standalonePlannedSessions
                     .firstIndex(
@@ -4672,6 +4672,10 @@ final class AppSessionStore: ObservableObject {
               let workoutIndex = plan.weeks[location.week].days[location.day]
                   .sessions.firstIndex(where: { $0.id == workoutID }),
               recordedTimes(for: workoutID) == nil,
+              linkedHealthWorkoutID(planID: planID, sessionID: workoutID) == nil,
+              !isPlanSessionManuallyCompleted(
+                  planID: planID, sessionID: workoutID
+              ),
               !isPlanSessionCompleted(
                   planID: planID, sessionID: workoutID,
                   healthWorkouts: healthWorkouts,
