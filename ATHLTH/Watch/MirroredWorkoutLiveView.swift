@@ -29,9 +29,7 @@ struct MirroredWorkoutLiveView: View {
     }
     @State private var pendingLiveAction: LiveAction?
     @State private var showingSpotifyControls = false
-    @State private var showingTargetPaceEditor = false
-    @State private var targetPaceDraftSeconds = 330.0
-    @State private var enteredTargetPaceSeconds: Double?
+    @State private var showingBeltSpeedEditor = false
     @State private var paceSamples: [(elapsed: Double, distance: Double)] = []
     @State private var rollingPaceSeconds: TimeInterval?
     @State private var paceWorkoutStart: Date?
@@ -199,47 +197,18 @@ struct MirroredWorkoutLiveView: View {
                     value
             }
         }
-        .sheet(isPresented: $showingTargetPaceEditor) {
-            NavigationStack {
-                Form {
-                    Section {
-                        Stepper(
-                            targetPaceEditorLabel,
-                            value: $targetPaceDraftSeconds,
-                            in: 120...1200, step: 5
-                        )
-                        Slider(value: $targetPaceDraftSeconds,
-                               in: 120...1200, step: 5)
-                    } footer: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "A manually chosen target. Actual pace comes from Apple Watch and is not overwritten.",
-                            norwegian: "Et manuelt mål. Faktisk tempo måles av Apple Watch og endres ikke."
-                        ))
-                    }
+        .sheet(isPresented: $showingBeltSpeedEditor) {
+            TreadmillSpeedEditorView(
+                initialValue:
+                    mirroring.snapshot?.manualBeltSpeedKilometersPerHour ?? 0,
+                onSave: {
+                    _ = mirroring.sendTreadmillBeltSpeedKilometersPerHour($0)
+                },
+                onHistorySave: {
+                    _ = mirroring.sendTreadmillBeltSpeedKilometersPerHour($0)
                 }
-                .navigationTitle(ATHLTHLocalization.choose(
-                    english: "Target pace", norwegian: "Måltempo"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Cancel", norwegian: "Avbryt"
-                        )) { showingTargetPaceEditor = false }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Save", norwegian: "Lagre"
-                        )) {
-                            if mirroring.sendTreadmillTargetPaceSecondsPerKilometer(
-                                targetPaceDraftSeconds
-                            ) {
-                                enteredTargetPaceSeconds = targetPaceDraftSeconds
-                                showingTargetPaceEditor = false
-                            }
-                        }
-                    }
-                }
-            }
+            )
+            .presentationDetents([.large])
         }
         .onChange(of: mirroring.snapshot?.capturedAt) { _, _ in
             guard let snap = mirroring.snapshot else { return }
@@ -1545,19 +1514,18 @@ struct MirroredWorkoutLiveView: View {
                     unit: "/km"
                 )
                 if snapshot.kind == .running &&
-                   snapshot.runningStepTitle == nil {
+                   snapshot.treadmillInclinePercent != nil {
                     Button {
-                        targetPaceDraftSeconds =
-                            snapshot.treadmillTargetPaceSecondsPerKilometer ??
-                            enteredTargetPaceSeconds ?? 330
-                        showingTargetPaceEditor = true
+                        showingBeltSpeedEditor = true
                     } label: {
                         runningMetric(
                             title: ATHLTHLocalization.choose(
-                                english: "TARGET PACE", norwegian: "MÅLTEMPO"),
-                            value: (snapshot.treadmillTargetPaceSecondsPerKilometer ??
-                                    enteredTargetPaceSeconds).map(paceText) ?? "Legg inn",
-                            unit: "/km"
+                                english: "BELT SPEED", norwegian: "MØLLEFART"),
+                            value: snapshot.manualBeltSpeedKilometersPerHour.map {
+                                String(format: "%.1f", $0)
+                            } ?? ATHLTHLocalization.choose(
+                                english: "Choose", norwegian: "Velg"),
+                            unit: "km/t"
                         )
                     }
                     .buttonStyle(.plain)
