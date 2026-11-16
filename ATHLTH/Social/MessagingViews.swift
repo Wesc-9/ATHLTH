@@ -8,11 +8,13 @@ struct MessageInboxDestinationView: View {
     var onBack: (() -> Void)? = nil
     /// iPad inspector collapses to the right; iPhone navigation goes back left.
     var isInspectorPanel = false
+    var initialWorkoutInviteID: UUID? = nil
 
     var body: some View {
         MessageInboxView(
             onBack: onBack,
             isInspectorPanel: isInspectorPanel,
+            initialWorkoutInviteID: initialWorkoutInviteID,
             onNewMessage: { showingNewMessage = true }
         )
         .navigationTitle("")
@@ -83,6 +85,7 @@ struct MessageInboxView: View {
     // open the composer rather than unintentionally wiring a back action.
     var onBack: (() -> Void)? = nil
     var isInspectorPanel = false
+    var initialWorkoutInviteID: UUID? = nil
     var onNewMessage: () -> Void = {}
 
     @State private var arenaInboxVisibleCount = 0
@@ -127,7 +130,8 @@ struct MessageInboxView: View {
                     ATHLTHWorkoutInvitationSection(
                         showsAccepted: true,
                         showsEmptyState: selectedFilter == .invitations,
-                        searchText: searchText
+                        searchText: searchText,
+                        highlightedSessionID: initialWorkoutInviteID
                     )
                 }
 
@@ -227,6 +231,9 @@ struct MessageInboxView: View {
             await groups.refreshRecentChatActivity(force: true)
         }
         .task {
+            if initialWorkoutInviteID != nil {
+                selectedFilter = .invitations
+            }
             refreshCoachInboxState()
             await social.refresh(
                 challengeStore: challenges
@@ -238,7 +245,16 @@ struct MessageInboxView: View {
             await realtime.refreshOnlineUsers()
         }
         .onAppear {
+            if initialWorkoutInviteID != nil {
+                selectedFilter = .invitations
+            }
             refreshCoachInboxState()
+        }
+        .onChange(of: initialWorkoutInviteID) { _, inviteID in
+            if inviteID != nil {
+                selectedFilter = .invitations
+                searchText = ""
+            }
         }
         .sheet(
             item: $selectedWorkoutInvite
