@@ -1453,6 +1453,28 @@ struct AppRootView: View {
                 crossDeviceWorkout.didBackground()
             }
         }
+        // While the app is running, deadlines are checked across every tab,
+        // not only while Home's weekly card is visible. A foreground refresh
+        // reconciles anything missed while iOS was suspended.
+        .task(id: "\(appSession.signedIn):\(appSession.activePlan?.version ?? 0):\(appSession.scheduledPlans.map(\.version).reduce(0, +)):\(appSession.standalonePlannedSessions.compactMap(\.scheduledStart).map(\.timeIntervalSince1970).reduce(0, +))") {
+            guard appSession.signedIn else { return }
+            while !Task.isCancelled {
+                _ = appSession.reconcileExpiredPlannedWorkouts(
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strengthWorkout.workoutHistory
+                )
+                guard let next = appSession.nextPlannedCancellationDeadline(
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strengthWorkout.workoutHistory
+                ) else { break }
+                let seconds = min(3600, max(1, next.timeIntervalSinceNow))
+                do {
+                    try await Task.sleep(
+                        nanoseconds: UInt64(seconds * 1_000_000_000)
+                    )
+                } catch { break }
+            }
+        }
         // The iPad keeps a small return pill only after the spectator has
         // explicitly minimized its full-screen workout dashboard.
         .overlay(alignment: .top) {
