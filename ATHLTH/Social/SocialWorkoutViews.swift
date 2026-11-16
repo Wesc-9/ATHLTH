@@ -5052,7 +5052,6 @@ struct WorkoutPublishView: View {
     @State private var selectedAlreadyPublished = false
     @State private var showingActivityPrivacyConsent = false
     @State private var activityPrivacyError: String?
-    @State private var selectedPulseSamples: [ATHLTHRunningHeartRatePoint] = []
     @State private var includeRoute = false
     @State private var hideRouteStartAndEnd = true
     @State private var sharingRoute: [CLLocation] = []
@@ -5330,7 +5329,6 @@ struct WorkoutPublishView: View {
             }
             .task(id: selectedWorkoutID) {
                 includeRoute = false
-                selectedPulseSamples = []
                 sharingRoute = []
                 loadingRoute = false
                 // Publishing from a completed-result card starts with safe
@@ -5349,7 +5347,7 @@ struct WorkoutPublishView: View {
                     for: selectedWorkoutID
                 ) {
                     selectedAlreadyPublished = true
-                        caption = activity.metadata?["caption"] ?? ""
+                    caption = activity.metadata?["caption"] ?? ""
                     visibility =
                         ProfileVisibility(
                             rawValue: activity.visibility
@@ -5362,11 +5360,6 @@ struct WorkoutPublishView: View {
                 }
                 guard !Task.isCancelled, self.selectedWorkoutID == selectedWorkoutID,
                       let workout = selectedWorkout else { return }
-                if workout.activity == .running || workout.activity == .walking {
-                    let pulse = await health.runningHeartRateTimeline(for: workout.id)
-                    guard !Task.isCancelled, self.selectedWorkoutID == selectedWorkoutID else { return }
-                    selectedPulseSamples = pulse
-                }
                 guard workout.isIndoor != true else { return }
                 loadingRoute = true
                 let detail = await health.workoutDetail(for: workout.id)
@@ -5419,9 +5412,7 @@ struct WorkoutPublishView: View {
             caption: caption,
             routePreview: includeRoute ? WorkoutRouteSharing.preview(sharingRoute, hideStartAndEnd: hideRouteStartAndEnd) : [],
             hideRouteStartAndEnd: hideRouteStartAndEnd,
-            includeHealthData: false,
-            pulseSamples: selectedPulseSamples,
-            maximumHeartRateBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+            includeHealthData: false
         )
 
         if success {
