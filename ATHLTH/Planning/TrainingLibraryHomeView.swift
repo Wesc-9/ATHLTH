@@ -3297,6 +3297,7 @@ struct TrainingPlanCatalogDetailView: View {
 struct PersonalizeTrainingPlanView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     let entry: TrainingPlanCatalogEntry
     var onPlanCreated: (() -> Void)? = nil
@@ -3874,7 +3875,8 @@ struct PersonalizeTrainingPlanView: View {
             // The curated catalog entry itself is never mutated.
             if let template = session.saveCatalogPlanTemplate(
                 entry,
-                preferredDayIndexes: selectedDays.sorted()
+                preferredDayIndexes: selectedDays.sorted(),
+                exerciseLibrary: exerciseLibrary.allExercises
             ) {
                 let created = session.usePlanTemplate(
                     template.id,
@@ -3892,7 +3894,8 @@ struct PersonalizeTrainingPlanView: View {
             plan = session.scheduleCatalogPlan(
                 entry,
                 startDate: resolvedStartDate,
-                preferredDayIndexes: selectedDays.sorted()
+                preferredDayIndexes: selectedDays.sorted(),
+                exerciseLibrary: exerciseLibrary.allExercises
             )
         }
 
