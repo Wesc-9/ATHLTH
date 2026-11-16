@@ -2,6 +2,47 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHReplayDataQualityTests: XCTestCase {
+    func testReplayMilestonesAreActualMeasuredDistances() {
+        XCTAssertEqual(
+            ATHLTHReplayStory.milestones(distanceMeters: 10_060, requiresReview: false),
+            [1, 5, 10]
+        )
+        XCTAssertEqual(
+            ATHLTHReplayStory.milestones(distanceMeters: 4_990, requiresReview: false),
+            [1, 2, 3]
+        )
+        XCTAssertEqual(
+            ATHLTHReplayStory.milestones(distanceMeters: 980, requiresReview: false),
+            []
+        )
+        XCTAssertEqual(
+            ATHLTHReplayStory.milestones(distanceMeters: nil, requiresReview: false),
+            []
+        )
+        XCTAssertEqual(
+            ATHLTHReplayStory.milestones(distanceMeters: 12_000, requiresReview: true),
+            []
+        )
+    }
+
+    func testReplayDoesNotClaimMilestonesForCorruptMeasurements() {
+        XCTAssertTrue(
+            ATHLTHReplayStory.milestones(
+                distanceMeters: .infinity, requiresReview: false
+            ).isEmpty
+        )
+        XCTAssertTrue(
+            ATHLTHReplayStory.milestones(
+                distanceMeters: .nan, requiresReview: false
+            ).isEmpty
+        )
+        XCTAssertNil(
+            ATHLTHReplayStory.milestoneTitle(
+                distanceMeters: 500, requiresReview: false
+            )
+        )
+    }
+
     func testAccidentalOvernightRunIsFlaggedAndPaceSuppressed() {
         // The regression shown in the UI: ~6h45 for just 20 metres.
         let duration: TimeInterval = 6 * 3600 + 45 * 60
