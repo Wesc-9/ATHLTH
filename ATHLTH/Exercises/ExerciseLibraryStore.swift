@@ -828,7 +828,16 @@ final class ExerciseLibraryStore: ObservableObject {
     static let featuredNativeExerciseSlugs: Set<String> = [
         "athlth-native-tabletop-sit-up",
         "athlth-native-free-strength-training",
-        "athlth-native-test-bodyweight-squat"
+        "athlth-native-test-bodyweight-squat",
+        // Exact catalog references missing from the standard RepDB roster
+        // must remain discoverable in Exercises even with RepDB installed.
+        "athlth-native-cable-curl",
+        "athlth-native-chin-up",
+        "athlth-native-dumbbell-row",
+        "athlth-native-leg-curl",
+        "athlth-native-lateral-raise-unspecified",
+        "athlth-native-power-clean",
+        "athlth-native-skullcrusher"
     ]
 
     /// Older workout plans may still reference these stable ATHLTH-native
