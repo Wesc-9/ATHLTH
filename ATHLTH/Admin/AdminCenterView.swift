@@ -398,11 +398,11 @@ struct AdminCenterView: View {
 
                 AdminSectionCard(title: "Users & access", icon: "person.3.fill") {
                     NavigationLink {
-                        AdminUsersView(store: store)
+                        ATHLTHAdminUserDirectoryView()
                     } label: {
                         adminNavigationRow(
                             title: "Users",
-                            subtitle: "Search, plan, status and account activity",
+                            subtitle: "Verified accounts, roles and support actions",
                             icon: "person.2"
                         )
                     }
@@ -411,11 +411,11 @@ struct AdminCenterView: View {
                     Divider()
 
                     NavigationLink {
-                        AdminRolesView(store: store)
+                        ATHLTHAdminUserDirectoryView()
                     } label: {
                         adminNavigationRow(
                             title: "Admins & owner",
-                            subtitle: "See privileged accounts and role history",
+                            subtitle: "Manage roles with audited owner access",
                             icon: "person.badge.key.fill"
                         )
                     }
