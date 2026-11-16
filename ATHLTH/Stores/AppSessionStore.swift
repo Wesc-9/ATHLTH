@@ -5121,7 +5121,8 @@ final class AppSessionStore: ObservableObject {
     @discardableResult
     func saveCatalogPlanTemplate(
         _ entry: TrainingPlanCatalogEntry,
-        preferredDayIndexes: [Int]? = nil
+        preferredDayIndexes: [Int]? = nil,
+        exerciseLibrary: [ExerciseLibraryEntry] = []
     ) -> TrainingPlan? {
         guard entry.hasCompleteWorkoutPattern else { return nil }
         let catalogTag = "catalog:\(entry.slug)"
@@ -5143,6 +5144,12 @@ final class AppSessionStore: ObservableObject {
             startDate: nil,
             preferredDayIndexes: preferredDayIndexes
         )
+        if !exerciseLibrary.isEmpty {
+            let report = ATHLTHWorkoutExerciseBinding.bind(
+                &template, library: exerciseLibrary
+            )
+            guard report.isReady else { return nil }
+        }
 
         if preferredDayIndexes != nil {
             template.title = "\(entry.title) · Custom"
@@ -5191,7 +5198,8 @@ final class AppSessionStore: ObservableObject {
     func scheduleCatalogPlan(
         _ entry: TrainingPlanCatalogEntry,
         startDate: Date,
-        preferredDayIndexes: [Int]
+        preferredDayIndexes: [Int],
+        exerciseLibrary: [ExerciseLibraryEntry] = []
     ) -> TrainingPlan? {
         guard entry.hasCompleteWorkoutPattern else { return nil }
         let start = Self.catalogWeekStart(
@@ -5210,11 +5218,17 @@ final class AppSessionStore: ObservableObject {
             return existing
         }
 
-        let plan = makeCatalogPlan(
+        var plan = makeCatalogPlan(
             entry,
             startDate: start,
             preferredDayIndexes: preferredDayIndexes
         )
+        if !exerciseLibrary.isEmpty {
+            let report = ATHLTHWorkoutExerciseBinding.bind(
+                &plan, library: exerciseLibrary
+            )
+            guard report.isReady else { return nil }
+        }
 
         guard addTrainingPlan(plan) else {
             return nil
