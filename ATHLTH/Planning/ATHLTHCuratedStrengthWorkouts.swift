@@ -49,6 +49,19 @@ enum ATHLTHCuratedStrengthWorkouts {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
+    /// Titles are presentation only. Movement identity stays tied to the
+    /// existing library entry even when the athlete uses Norwegian.
+    private static func displayedMoveTitle(_ name: String) -> String {
+        guard ATHLTHLocalization.isNorwegian,
+              let identifier = ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(
+                  for: name
+              ) else { return name }
+        if identifier == "athlth-native-hip-thrust" {
+            return "Hip thrust med stang"
+        }
+        return ExerciseLibraryStore.norwegianExerciseNames[identifier] ?? name
+    }
+
     private static func entry(
         _ number: Int, _ englishTitle: String, _ norwegianTitle: String,
         _ englishSummary: String, _ norwegianSummary: String,
@@ -74,7 +87,8 @@ enum ATHLTHCuratedStrengthWorkouts {
             )
         ] + moves.enumerated().map { index, move in
             var block = WorkoutTemplateBlock(
-                sequence: index + 2, kind: .exercise, title: move.title,
+                sequence: index + 2, kind: .exercise,
+                title: displayedMoveTitle(move.title),
                 exerciseSlug: ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(
                     for: move.title
                 ),
