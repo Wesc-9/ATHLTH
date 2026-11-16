@@ -1101,6 +1101,13 @@ enum WorkoutLaunchCoordinator {
         )
         watchRunningWorkout.heartRateZoneMaximumBPM = resolvedMaximumBPM
 
+        if configuration.environment == .treadmill {
+            watchRunningWorkout.initialBeltSpeedKilometersPerHour =
+                configuration.treadmillInitialSpeedKilometersPerHour
+            watchRunningWorkout.quickBeltSpeedsKilometersPerHour =
+                configuration.treadmillQuickSpeedPresets
+        }
+
         watchRunningWorkout
             .treadmillInclinePercent =
                 configuration.environment ==
