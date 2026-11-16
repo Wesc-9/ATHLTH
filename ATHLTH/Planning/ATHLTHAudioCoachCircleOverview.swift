@@ -24,7 +24,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
     @State private var showingGroupNameEditor = false
     @State private var editingGroupID: UUID?
     @State private var groupNameInput = ""
-    @State private var showingLegacyOptions = false
+    @State private var showingLegacyOptions = true
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -326,6 +326,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
             draft.customRules.first(where: { $0.id == id })
         }
         let options = group.optionIDs.compactMap(ATHLTHAudioCoachOption.init(rawValue:))
+        let spokenValues = rules.reduce(0) { $0 + $1.selectedMetrics.count }
         let expanded = expandedGroups.contains(group.id)
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
@@ -345,8 +346,8 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ink)
                             Text(tr(
-                                "\(rules.count + options.count) triggers · \(rules.reduce(0) { $0 + $1.selectedMetrics.count }) values",
-                                "\(rules.count + options.count) triggere · \(rules.reduce(0) { $0 + $1.selectedMetrics.count }) innhold"
+                                "\(rules.count + options.count) triggers · \(spokenValues) values",
+                                "\(rules.count + options.count) triggere · \(spokenValues) innhold"
                             ))
                             .font(.caption)
                             .foregroundStyle(dim)
