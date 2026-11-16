@@ -669,6 +669,9 @@ struct WalkQuickStartConfiguration {
     var petIDs: Set<UUID> = []
     /// A walking course is optional; free walks continue to work as before.
     var route: TrainingRoute? = nil
+    /// Explicitly clearing a planned route should not silently restore it
+    /// in the launch coordinator.
+    var suppressPlannedRoute = false
 }
 
 extension RunQuickStartConfiguration {
@@ -3603,6 +3606,7 @@ struct WalkQuickStartSheet: View {
     @State private var showingWalkDetails = false
     @State private var showingWalkingRoutes = false
     @State private var selectedWalkingRoute: TrainingRoute?
+    @State private var walkingRouteChoiceTouched = false
     @State private var autoPausePreference:
         WorkoutAutoPausePreference = .appDefault
     @State private var selectedSpotifyPlaylist:
@@ -3737,6 +3741,7 @@ struct WalkQuickStartSheet: View {
                                 Spacer()
                                 Button {
                                     selectedWalkingRoute = nil
+                                    walkingRouteChoiceTouched = true
                                 } label: {
                                     Image(systemName: "xmark.circle")
                                 }
@@ -3919,6 +3924,7 @@ struct WalkQuickStartSheet: View {
                         )
                     ) { route in
                         selectedWalkingRoute = route
+                        walkingRouteChoiceTouched = true
                         showingWalkingRoutes = false
                     }
                 }
@@ -3944,7 +3950,8 @@ struct WalkQuickStartSheet: View {
                 }
                 // Scheduled walking workouts retain their planned course
                 // when launched from the calendar or a training plan.
-                if selectedWalkingRoute == nil, let routeID = plannedSession?.routeID {
+                if !walkingRouteChoiceTouched, selectedWalkingRoute == nil,
+                   let routeID = plannedSession?.routeID {
                     selectedWalkingRoute = session.savedRoutes.first { $0.id == routeID }
                 }
 
@@ -4015,6 +4022,8 @@ struct WalkQuickStartSheet: View {
             )
         configuration.petIDs = selectedPetIDs
         configuration.route = selectedWalkingRoute
+        configuration.suppressPlannedRoute =
+            walkingRouteChoiceTouched && selectedWalkingRoute == nil
         liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
         launchInProgress = true
         Task { @MainActor in
