@@ -17,7 +17,8 @@ final class ATHLTHWalkingRouteIntegrationTests: XCTestCase {
             distanceKilometers: 5.0,
             elevationGainMeters: nil,
             importedFilename: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            routeSource: nil
         )
     }
 
