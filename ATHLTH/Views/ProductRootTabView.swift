@@ -9408,62 +9408,6 @@ struct ATHLTHTrainView: View {
         }
     }
 
-    private func startWalkQuickWorkout(
-        _ configuration: WalkQuickStartConfiguration
-    ) {
-        if configuration.captureDevice == .iPhone {
-            gear.prepareNextWorkoutGear(configuration.gearIDs)
-            phoneWorkout.start(
-                walking: true,
-                autoPauseEnabled:
-                    configuration.autoPauseEnabled
-            )
-            Task {
-                _ = await social
-                    .confirmCurrentJoinedWorkoutStarted()
-            }
-            return
-        }
-
-        guard watchConnection.isReady else {
-            watchTransferError =
-                "Apple Watch is not ready to start this walk."
-            return
-        }
-
-        watchConnection.sendWorkoutRouteSelection(nil)
-        watchConnection.sendRunningWorkout(
-            WatchRunningWorkoutTransfer(
-                title: "",
-                steps: [],
-                routeAlerts:
-                    settings.routeAlertConfiguration,
-                autoPauseEnabled:
-                    configuration.autoPauseEnabled
-            )
-        )
-
-        Task {
-            do {
-                try await watchConnection
-                    .startWorkoutOnWatch(.walking)
-                gear.prepareNextWorkoutGear(
-                    configuration.gearIDs
-                )
-                watchConnection.sendAudioCoachConfiguration(
-                    configuration.audioCoach
-                )
-                _ = await social
-                    .confirmCurrentJoinedWorkoutStarted()
-                watchTransferMessage =
-                    "Walk started on Apple Watch."
-            } catch {
-                await social.markCurrentJoinedWorkoutLaunchFailed()
-                watchTransferError = error.localizedDescription
-            }
-        }
-    }
-
     private func startQuickWorkoutOnWatch(_ kind: WorkoutKind) {
         guard watchConnection.isReady,
               let watchKind = watchWorkoutKind(for: kind)
