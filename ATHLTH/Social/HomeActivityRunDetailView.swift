@@ -1,4 +1,5 @@
 import Foundation
+import Charts
 import CoreLocation
 import MapKit
 import SwiftUI
@@ -284,6 +285,7 @@ struct HomeActivityRunDetailView: View {
                 }
 
                 sharedWorkoutComparisonCard
+                sharedWorkoutPulseComparisonCard
 
                 if let intervals = displayedInterval {
                     ATHLTHIntervalResultSummaryCard(
@@ -677,6 +679,128 @@ struct HomeActivityRunDetailView: View {
         else { return "—" }
         let rounded = Int(pace.rounded())
         return String(format: "%d:%02d/km", rounded / 60, rounded % 60)
+    }
+
+    private struct SharedPulseLine: Identifiable {
+        let athlete: String
+        let isMe: Bool
+        let progress: Double
+        let bpm: Double
+        var id: String { "\(athlete)-\(Int(progress * 1_000))" }
+    }
+
+    private struct SharedZoneBar: Identifiable {
+        let athlete: String
+        let zone: Int
+        let minutes: Double
+        var id: String { "\(athlete)-\(zone)" }
+    }
+
+    /// Overlay comparable data in one surface; never infer absent partner
+    /// HealthKit samples from approximate routes or another user's pace.
+    @ViewBuilder
+    private var sharedWorkoutPulseComparisonCard: some View {
+        if let sharedSession = social.workoutSessions.first(where: {
+            $0.creatorID == social.currentUserID && $0.sourceWorkoutID == workout.id
+        }) {
+            let others = social.feed.filter {
+                $0.activity.kind == "workout" &&
+                $0.activity.workoutSessionID == sharedSession.id &&
+                $0.activity.actorID != social.currentUserID &&
+                $0.activity.metadata?["share_health_data"] == "true"
+            }
+            let mineName = session.profile.displayName.isEmpty
+                ? tr("You", "Deg") : session.profile.displayName
+            let mineCurve = ATHLTHSharedPulseSeries.decode(
+                ATHLTHSharedPulseSeries.encode(
+                    measuredPulse, from: workout.startDate, through: workout.endDate
+                )
+            )
+            let myLines = mineCurve.map {
+                SharedPulseLine(athlete: mineName, isMe: true,
+                    progress: $0.progress, bpm: $0.bpm)
+            }
+            let otherLines = others.flatMap { item in
+                ATHLTHSharedPulseSeries.decode(item.activity.metadata?["heart_rate_curve"])
+                    .map { point in
+                        SharedPulseLine(athlete: item.actor.resolvedName, isMe: false,
+                            progress: point.progress, bpm: point.bpm)
+                    }
+            }
+            let allLines = myLines + otherLines
+            let myZones = ATHLTHRunningHeartRateAnalysis.zoneDurations(
+                measuredPulse,
+                maximumBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+            )
+            let myZoneTotal = myZones.reduce(0.0) { $0 + $1.seconds }
+            let ownBars: [SharedZoneBar] = myZoneTotal > 0
+                ? myZones.map { SharedZoneBar(athlete: mineName, zone: $0.zone,
+                                              minutes: $0.seconds / 60) }
+                : []
+            let otherBars = others.flatMap { item -> [SharedZoneBar] in
+                ATHLTHSharedPulseSeries.decodeZoneSeconds(
+                    item.activity.metadata?["heart_rate_zone_seconds"]
+                ).enumerated().map { index, seconds in
+                    SharedZoneBar(athlete: item.actor.resolvedName,
+                                  zone: index + 1, minutes: seconds / 60)
+                }
+            }
+            if myLines.count >= 2 && otherLines.count >= 2 {
+                ATHLTHPlanSurface {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(tr("Heart rate together", "Puls sammen"))
+                            .font(.system(size: 22, weight: .semibold, design: .serif))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(tr(
+                            "Measured pulse over the same relative workout progress.",
+                            "Målt puls sammenlignet etter relativ fremdrift i økten."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Chart(allLines) { entry in
+                            LineMark(
+                                x: .value("Progress", entry.progress * 100),
+                                y: .value("BPM", entry.bpm),
+                                series: .value("Athlete", entry.athlete)
+                            )
+                            .foregroundStyle(entry.isMe
+                                ? ATHLTHPlanDesign.accentInk : ATHLTHPlanDesign.ink)
+                        }
+                        .frame(height: 190)
+                        .chartXAxisLabel(tr("Workout progress (%)", "Øktens fremdrift (%)"))
+                        HStack(spacing: 14) {
+                            Label(mineName, systemImage: "circle.fill")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            ForEach(others, id: \.id) { item in
+                                Label(item.actor.resolvedName, systemImage: "circle.fill")
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                            }
+                        }
+                        .font(.caption.weight(.medium))
+                        if !ownBars.isEmpty && !otherBars.isEmpty {
+                            Divider()
+                            Text(tr("Time in heart-rate zones", "Tid i pulssoner"))
+                                .font(.headline)
+                            Chart(ownBars + otherBars) { entry in
+                                BarMark(
+                                    x: .value("Athlete", entry.athlete),
+                                    y: .value("Minutes", entry.minutes)
+                                )
+                                .foregroundStyle(by: .value("Zone", "Z\(entry.zone)"))
+                            }
+                            .chartForegroundStyleScale([
+                                "Z1": Color.gray.opacity(0.45),
+                                "Z2": ATHLTHPlanDesign.accentInk.opacity(0.38),
+                                "Z3": ATHLTHPlanDesign.accentInk.opacity(0.70),
+                                "Z4": ATHLTHPlanDesign.accentInk,
+                                "Z5": ATHLTHPlanDesign.ink
+                            ])
+                            .frame(height: 160)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
