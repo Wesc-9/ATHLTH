@@ -6,6 +6,7 @@ struct ATHLTHSideMenuUtilitiesView: View {
     @Environment(\.dismiss) private var dismiss
 
     let destination: ATHLTHSideMenuDestination
+    var workoutInviteID: UUID? = nil
 
     var body: some View {
         NavigationStack {
@@ -57,7 +58,10 @@ struct ATHLTHSideMenuUtilitiesView: View {
         case .search:
             ATHLTHGlobalSearchView()
         case .inbox:
-            MessageInboxDestinationView(onBack: { dismiss() })
+            MessageInboxDestinationView(
+                onBack: { dismiss() },
+                initialWorkoutInviteID: workoutInviteID
+            )
         case .notifications:
             ATHLTHNotificationCenterView()
         default:
