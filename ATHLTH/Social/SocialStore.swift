@@ -2108,7 +2108,8 @@ final class SocialStore: ObservableObject {
         friendIDs: Set<UUID>,
         creatorName: String,
         creatorUsername: String?,
-        includeHealthData: Bool = true
+        includeHealthData: Bool = true,
+        pulseSamples: [ATHLTHRunningHeartRatePoint] = []
     ) async -> Bool {
         guard let currentUserID else { return false }
 
@@ -2180,6 +2181,20 @@ final class SocialStore: ObservableObject {
                 includeHealthData: includeHealthData
             )
             metadata["share_health_data"] = String(includeHealthData)
+            if includeHealthData,
+               let curve = ATHLTHSharedPulseSeries.encode(
+                    pulseSamples, from: workout.startDate, through: workout.endDate
+               ) {
+                metadata["heart_rate_curve"] = curve
+                let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
+                    pulseSamples, from: workout.startDate, through: workout.endDate
+                )
+                if !valid.isEmpty {
+                    metadata["average_heart_rate_bpm"] = String(
+                        valid.reduce(0.0) { $0 + $1.bpm } / Double(valid.count)
+                    )
+                }
+            }
 
             let cleanDescription = description
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2225,7 +2240,8 @@ final class SocialStore: ObservableObject {
         caption: String? = nil,
         routePreview: [RouteCoordinate] = [],
         hideRouteStartAndEnd: Bool = true,
-        includeHealthData: Bool = true
+        includeHealthData: Bool = true,
+        pulseSamples: [ATHLTHRunningHeartRatePoint] = []
     ) async -> Bool {
         errorMessage = nil
 
@@ -2257,6 +2273,20 @@ final class SocialStore: ObservableObject {
                 includeHealthData: includeHealthData
             )
             metadata["share_health_data"] = String(includeHealthData)
+            if includeHealthData,
+               let curve = ATHLTHSharedPulseSeries.encode(
+                    pulseSamples, from: workout.startDate, through: workout.endDate
+               ) {
+                metadata["heart_rate_curve"] = curve
+                let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
+                    pulseSamples, from: workout.startDate, through: workout.endDate
+                )
+                if !valid.isEmpty {
+                    metadata["average_heart_rate_bpm"] = String(
+                        valid.reduce(0.0) { $0 + $1.bpm } / Double(valid.count)
+                    )
+                }
+            }
             metadata["hide_route_start_end"] = String(hideRouteStartAndEnd)
             if let preview = WorkoutRouteSharing.encode(routePreview) {
                 metadata["route_preview"] = preview
