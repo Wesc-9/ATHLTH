@@ -2906,6 +2906,7 @@ struct ATHLTHPrivacyCenterView: View {
     @State private var saved = false
     @State private var saveError: String?
     @State private var showingAutoShareConsent = false
+    @State private var showingProfileHighlightsConsent = false
     @State private var enablingAutoShare = false
     @State private var autoShareError: String?
 
@@ -2992,6 +2993,15 @@ struct ATHLTHPrivacyCenterView: View {
                 }
 
                 Section("What Others Can See") {
+                    Button {
+                        showingProfileHighlightsConsent = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Share safe profile highlights with friends",
+                            norwegian: "Del trygge profilhøydepunkter med venner"
+                        ), systemImage: "person.2.badge.gearshape")
+                    }
+
                     Toggle(
                         "Performance stats",
                         isOn: binding.sharePerformanceStats
@@ -2999,10 +3009,6 @@ struct ATHLTHPrivacyCenterView: View {
                     Toggle(
                         "Trophy cabinet",
                         isOn: binding.shareTrophyCabinet
-                    )
-                    Toggle(
-                        "Recent activity",
-                        isOn: binding.shareRecentActivity
                     )
                     Toggle(
                         "Running PRs",
@@ -3024,7 +3030,10 @@ struct ATHLTHPrivacyCenterView: View {
                         isOn: binding.shareGear
                     )
                     Toggle(
-                        "Workout totals",
+                        ATHLTHLocalization.choose(
+                            english: "Workout totals",
+                            norwegian: "Treningssummer"
+                        ),
                         isOn: binding.shareWorkoutTotals
                     )
 
@@ -3123,8 +3132,8 @@ struct ATHLTHPrivacyCenterView: View {
                 }
 
                 Label(ATHLTHLocalization.choose(
-                    english: "Workout sharing is limited to friends. Map routes are never added automatically.",
-                    norwegian: "Øktdeling er begrenset til venner. GPS-ruter legges aldri ved automatisk."
+                    english: "Automatic workout sharing is friends-only. GPS routes are never added automatically.",
+                    norwegian: "Automatisk øktdeling er kun for venner. GPS-ruter legges aldri ved automatisk."
                 ), systemImage: "lock.shield")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -3173,6 +3182,25 @@ struct ATHLTHPrivacyCenterView: View {
             english: "Sharing & privacy",
             norwegian: "Deling og personvern"
         ))
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Share safe profile highlights?",
+                norwegian: "Dele profilhøydepunkter med venner?"
+            ),
+            isPresented: $showingProfileHighlightsConsent
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Enable for friends", norwegian: "Aktiver for venner"
+            )) { enableFriendsProfileHighlights() }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Your training milestones, gear, goals, workout summaries and online status become visible to friends. Previously shared workouts may become visible. Heart rate, sleep, recovery, live location and medical data remain private.",
+                norwegian: "Treningsmilepæler, utstyr, mål, øktoppsummeringer og påloggingsstatus blir synlig for venner. Tidligere delte økter kan bli synlige. Puls, søvn, restitusjon, liveposisjon og medisinske data forblir private."
+            ))
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Share future workouts with friends?",
@@ -3223,6 +3251,35 @@ struct ATHLTHPrivacyCenterView: View {
                 schedulePrivacySave()
             }
         )
+    }
+
+    @MainActor
+    private func enableFriendsProfileHighlights() {
+        guard var updated = draft else { return }
+        updated.profileVisibility = "friends"
+        updated.showOnlineStatus = true
+        updated.shareTrainingPresence = true
+        updated.trainingPresenceVisibility = "friends"
+        updated.sharePerformanceStats = true
+        updated.performanceStatsVisibility = "friends"
+        updated.shareTrophyCabinet = true
+        updated.trophyCabinetVisibility = "friends"
+        updated.shareGoals = true
+        updated.goalsVisibility = "friends"
+        updated.shareGear = true
+        updated.gearVisibility = "friends"
+        updated.shareRecentActivity = true
+        updated.recentActivityVisibility = "friends"
+        updated.shareRunningPRs = true
+        updated.runningPRsVisibility = "friends"
+        updated.shareStrengthPRs = true
+        updated.strengthPRsVisibility = "friends"
+        updated.shareWorkoutTotals = true
+        // Location and physiology are never enabled by a bulk social action.
+        updated.shareLiveWorkoutLocation = false
+        updated.shareLiveWorkoutHeartRate = false
+        draft = updated
+        schedulePrivacySave()
     }
 
     @MainActor
