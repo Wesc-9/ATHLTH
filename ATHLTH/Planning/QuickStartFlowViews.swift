@@ -636,6 +636,10 @@ struct RunQuickStartConfiguration {
     var customWorkoutTitle: String? = nil
     /// Shared Plan timeline from the Advanced Quick Train composer.
     var advancedWorkout: PlannedSession? = nil
+    /// User-reported actual belt speed, not an interval goal.
+    var treadmillInitialSpeedKilometersPerHour: Double? = nil
+    /// Presentation-only choice; the Watch remains on its own workout session.
+    var watchCompetitionStart = false
 
     var title: String {
         if mode == .structured, let advancedWorkout {
@@ -1585,6 +1589,9 @@ struct RunQuickStartSheet: View {
     @State private var captureDevice: WorkoutCaptureDevice
     @State private var watchStartMode: WatchWorkoutStartMode = .immediate
     @State private var environment: RunEnvironment = .outdoor
+    @State private var treadmillInitialSpeed: Double?
+    @State private var showingTreadmillQuickSpeeds = false
+    @State private var watchCompetitionStart = false
     @State private var quickWorkoutName = ""
     @State private var quickDisplayDate = Date()
     @State private var pendingStartDate: Date?
@@ -1661,6 +1668,12 @@ struct RunQuickStartSheet: View {
                     // Identical details card in Basic and Advanced.
                     // Quick Train always starts now, so its time is read-only.
                     advancedWorkoutDetailsCard
+                    if environment == .treadmill {
+                        treadmillQuickSpeedCard
+                    }
+                    if watchConnected {
+                        watchStartingScreenCard
+                    }
                     if isAdvancedSetup {
                         modeCard
                     } else {
@@ -1905,6 +1918,14 @@ struct RunQuickStartSheet: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $showingTreadmillQuickSpeeds) {
+                TreadmillSpeedEditorView(
+                    initialValue: treadmillInitialSpeed ?? 0,
+                    onSave: { treadmillInitialSpeed = $0 },
+                    onHistorySave: { treadmillInitialSpeed = $0 }
+                )
+                .presentationDetents([.large])
+            }
             .sheet(isPresented: $showingSpotifyPicker) {
                 SpotifyPlaylistPickerView(
                     title:
@@ -2065,6 +2086,74 @@ struct RunQuickStartSheet: View {
 
     /// Advanced reuses the Basic workout-details hierarchy, but keeps
     /// its full mode and coaching tools below the compact identity card.
+    private var treadmillQuickSpeedCard: some View {
+        ATHLTHPlanSurface(density: .compact) {
+            Button {
+                showingTreadmillQuickSpeeds = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "speedometer")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 29)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Current treadmill speed",
+                            norwegian: "Fart på tredemøllen"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        Text(treadmillInitialSpeed.map {
+                            ATHLTHLocalization.format(
+                                english: "%.1f km/h", norwegian: "%.1f km/t", $0
+                            )
+                        } ?? ATHLTHLocalization.choose(
+                            english: "Choose quick speed or enter your own",
+                            norwegian: "Velg hurtigfart eller skriv egen verdi"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                }
+                .frame(minHeight: 49)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var watchStartingScreenCard: some View {
+        ATHLTHPlanSurface(density: .compact) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(ATHLTHLocalization.choose(
+                    english: "Apple Watch starting screen",
+                    norwegian: "Startskjerm på Apple Watch"
+                ), systemImage: "applewatch")
+                .font(.subheadline.weight(.semibold))
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Starting screen", norwegian: "Startskjerm"
+                    ),
+                    selection: $watchCompetitionStart
+                ) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Standard", norwegian: "Vanlig"
+                    )).tag(false)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Competition", norwegian: "Konkurranse"
+                    )).tag(true)
+                }
+                .pickerStyle(.segmented)
+                Text(ATHLTHLocalization.choose(
+                    english: "Only changes the first Watch page. Swipe up or down for the others.",
+                    norwegian: "Endrer kun første Watch-side. Sveip opp eller ned for de andre."
+                ))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private var advancedWorkoutDetailsCard: some View {
         ATHLTHWorkoutDetailsCard(
             activityTitle: ATHLTHLocalization.choose(
@@ -3061,6 +3150,9 @@ struct RunQuickStartSheet: View {
             } : nil
         configuration.routeWarmup = mode == .route ? routeWarmup : .disabled
         configuration.ghostPacingStrategy = ghostDraft.pacingStrategy
+        configuration.treadmillInitialSpeedKilometersPerHour =
+            runEnvironment == .treadmill ? treadmillInitialSpeed : nil
+        configuration.watchCompetitionStart = watchCompetitionStart
         liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
         launchInProgress = true
         Task { @MainActor in
