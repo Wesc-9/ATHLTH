@@ -4043,6 +4043,9 @@ final class AppSessionStore: ObservableObject {
     func updateStandalonePlannedSession(
         _ session: PlannedSession
     ) {
+        // A finished calendar entry and its real execution interval are
+        // immutable. The caller may still delete an untouched draft.
+        guard recordedTimes(for: session.id)?.endedAt == nil else { return }
         guard let index =
                 standalonePlannedSessions
                     .firstIndex(
@@ -4774,7 +4777,19 @@ final class AppSessionStore: ObservableObject {
         _ updatedSession: PlannedSession,
         inPlan planID: UUID
     ) {
-        guard var plan = trainingPlan(withID: planID) else {
+        // The editor cannot mutate an executed, explicitly credited or
+        // manually completed workout, even if a stale sheet remains open.
+        guard recordedTimes(for: updatedSession.id) == nil,
+              !isPlanSessionManuallyCompleted(
+                planID: planID, sessionID: updatedSession.id
+              ),
+              linkedHealthWorkoutID(
+                planID: planID, sessionID: updatedSession.id
+              ) == nil,
+              !isPlanSessionSkipped(
+                planID: planID, sessionID: updatedSession.id
+              ),
+              var plan = trainingPlan(withID: planID) else {
             return
         }
 
