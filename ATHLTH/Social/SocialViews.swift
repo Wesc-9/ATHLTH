@@ -133,6 +133,7 @@ struct ATHLTHWorkoutInvitationSection: View {
     var showsAccepted = true
     var showsEmptyState = false
     var searchText = ""
+    var highlightedSessionID: UUID? = nil
 
     @State private var respondingToID: UUID?
     @State private var openedInvite: SocialWorkoutInviteDisplay?
@@ -140,8 +141,11 @@ struct ATHLTHWorkoutInvitationSection: View {
 
     private var matchingInvites: [SocialWorkoutInviteDisplay] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let sorted = social.workoutInvites.sorted {
-            $0.session.createdAt > $1.session.createdAt
+        let sorted = social.workoutInvites.sorted { first, second in
+            let firstHighlighted = first.session.id == highlightedSessionID
+            let secondHighlighted = second.session.id == highlightedSessionID
+            if firstHighlighted != secondHighlighted { return firstHighlighted }
+            return first.session.createdAt > second.session.createdAt
         }
         var seenSessionIDs = Set<UUID>()
         return sorted.filter { invite in
@@ -313,6 +317,13 @@ struct ATHLTHWorkoutInvitationSection: View {
         }
         .padding(15)
         .athlthTrainTogetherCard(radius: 19, subtle: true)
+        .overlay {
+            if invite.session.id == highlightedSessionID {
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
+                    .strokeBorder(ATHLTHTrainTogetherDesign.accent, lineWidth: 2)
+                    .allowsHitTesting(false)
+            }
+        }
         .accessibilityIdentifier("athlth-workout-invite-\(invite.participant.id)")
     }
 
