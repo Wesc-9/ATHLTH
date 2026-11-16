@@ -2814,6 +2814,14 @@ struct AIProgramBuilderView: View {
             // A linked ATHLTH goal is optional. Direction and outcomes are
             // carried in the explicit Coach intake when this array is empty.
             coachStrengthContext: coachStrengthSnapshot,
+            allowedExerciseNames: Array(Set(
+                exerciseLibrary.allExercises
+                    .filter {
+                        $0.source == .athlthCatalog &&
+                        $0.sourceIdentifier?.hasPrefix("athlth-native-") == true
+                    }
+                    .map(\.canonicalName)
+            )).sorted().prefix(100).map { $0 },
             goals: selectedGoals.map(AIProgramGoalInput.init),
             existingDays: existingDays
         )
