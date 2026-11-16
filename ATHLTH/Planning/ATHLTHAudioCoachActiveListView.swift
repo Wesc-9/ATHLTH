@@ -535,58 +535,91 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     private var saveNewProfileSheet: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField(tr("Template name", "Navn på mal"), text: $profileName)
-                        .textInputAutocapitalization(.words)
-                } header: {
-                    Text(tr("Save current Coach as new", "Lagre aktiv coach som ny mal"))
-                } footer: {
-                    Text(tr("Includes named groups and every configured trigger.",
-                            "Lagrer gruppenavnene og alle triggerne."))
-                }
-                Section {
-                    Button {
-                        let name = String(profileName.trimmingCharacters(
-                            in: .whitespacesAndNewlines).prefix(60))
-                        guard !name.isEmpty, settings.audioCoachProfiles.count < 30 else { return }
-                        let profile = ATHLTHAudioCoachProfile(
-                            name: name, configuration: draft.configuration()
-                        )
-                        settings.audioCoachProfiles.append(profile)
-                        settings.activeAudioCoachProfileID = profile.id
-                        selectedProfileName = profile.name
-                        selectedTemplateID = profile.id
-                        isNewEmptyTemplate = false
-                        baselineConfiguration = draft.configuration()
-                        profileName = ""
-                        showingSaveNewProfile = false
-                        if let destination = pendingTemplateDestination {
-                            pendingTemplateDestination = nil
-                            continueTemplateChange(destination)
-                        }
-                    } label: {
-                        Label(tr("Save as new template", "Lagre som ny mal"),
-                              systemImage: "bookmark.badge.plus")
-                            .frame(maxWidth: .infinity, minHeight: 44)
+            VStack(alignment: .leading, spacing: 17) {
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform")
+                        .font(.title2)
+                        .foregroundStyle(bronze)
+                        .frame(width: 48, height: 48)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("Name your template", "Gi malen et navn"))
+                            .font(.system(size: 24, weight: .medium, design: .serif))
+                            .foregroundStyle(ink)
+                        Text(tr("A name is required before creating a template.",
+                                "Du må velge et navn før malen opprettes."))
+                            .font(.caption)
+                            .foregroundStyle(dim)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(bronze)
-                    .disabled(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                              settings.audioCoachProfiles.count >= 30)
                 }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(tr("TEMPLATE NAME", "MALNAVN"))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.4)
+                        .foregroundStyle(bronze)
+                    TextField(tr("For example: Interval Coach", "F.eks. Intervall Coach"),
+                              text: $profileName)
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.done)
+                        .padding(14)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                        .accessibilityIdentifier("athlth-coach-template-name")
+                }
+                Button {
+                    let name = String(profileName.trimmingCharacters(
+                        in: .whitespacesAndNewlines).prefix(60))
+                    guard !name.isEmpty, settings.audioCoachProfiles.count < 30 else { return }
+                    if creatingBlankTemplate {
+                        applyTemplateDestination(.new)
+                    }
+                    let profile = ATHLTHAudioCoachProfile(
+                        name: name, configuration: draft.configuration()
+                    )
+                    settings.audioCoachProfiles.append(profile)
+                    settings.activeAudioCoachProfileID = profile.id
+                    selectedProfileName = profile.name
+                    selectedTemplateID = profile.id
+                    isNewEmptyTemplate = false
+                    creatingBlankTemplate = false
+                    baselineConfiguration = draft.configuration()
+                    profileName = ""
+                    showingSaveNewProfile = false
+                    if let destination = pendingTemplateDestination {
+                        pendingTemplateDestination = nil
+                        continueTemplateChange(destination)
+                    }
+                } label: {
+                    Label(
+                        creatingBlankTemplate
+                            ? tr("Create template", "Opprett mal")
+                            : tr("Save as new template", "Lagre som ny mal"),
+                        systemImage: "checkmark"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(bronze)
+                .disabled(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                          settings.audioCoachProfiles.count >= 30)
+                Spacer(minLength: 0)
             }
-            .scrollContentBackground(.hidden)
+            .padding(22)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("New Coach template", "Ny coach-mal"))
+            .navigationTitle(tr("New template", "Ny mal"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Cancel", "Avbryt")) { showingSaveNewProfile = false }
+                    Button(tr("Cancel", "Avbryt")) {
+                        showingSaveNewProfile = false
+                        creatingBlankTemplate = false
+                    }
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 
     private var availableGroupContents: [ATHLTHAudioCoachRule.Metric] {
