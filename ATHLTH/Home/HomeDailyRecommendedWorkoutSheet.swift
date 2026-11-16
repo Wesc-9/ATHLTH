@@ -15,8 +15,12 @@ struct HomeDailyRecommendedWorkoutSheet: View {
 
     var isCalendarWorkout = false
     var canStart = true
+    var isCancelled = false
+    var onEdit: (() -> Void)? = nil
+    var onCancel: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
     @State private var confirmingDeletion = false
+    @State private var confirmingCancellation = false
 
     @Environment(\.dismiss) private var dismiss
 
@@ -50,13 +54,41 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                         .minimumScaleFactor(0.8)
 
                     Spacer(minLength: 0)
-                    // Balance the leading close control to keep the title centered.
-                    if onDelete != nil {
-                        Button { confirmingDeletion = true } label: {
-                            Image(systemName: "trash").frame(width: 42, height: 42)
+                    // Calendar actions are distinct: edit, cancel and delete.
+                    // Never display these controls for a completed workout.
+                    if onEdit != nil || onCancel != nil || onDelete != nil {
+                        Menu {
+                            if let onEdit {
+                                Button {
+                                    onEdit()
+                                    dismiss()
+                                } label: {
+                                    Label(tr("Edit workout", "Rediger økt"),
+                                          systemImage: "pencil")
+                                }
+                            }
+                            if onCancel != nil {
+                                Button {
+                                    confirmingCancellation = true
+                                } label: {
+                                    Label(tr("Cancel workout", "Avlys økt"),
+                                          systemImage: "calendar.badge.minus")
+                                }
+                            }
+                            if onDelete != nil {
+                                Button(role: .destructive) {
+                                    confirmingDeletion = true
+                                } label: {
+                                    Label(tr("Delete workout", "Slett økt"),
+                                          systemImage: "trash")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .foregroundStyle(ATHLTHTrainDesign.ink)
+                                .frame(width: 42, height: 42)
                         }
-                        .foregroundStyle(.red)
-                        .accessibilityLabel(tr("Delete workout", "Slett økt"))
+                        .accessibilityLabel(tr("Workout actions", "Økthandlinger"))
                     } else {
                         Color.clear.frame(width: 42, height: 42).accessibilityHidden(true)
                     }
@@ -132,6 +164,19 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
+            }
+            .alert(tr("Cancel planned workout?", "Avlyse planlagt økt?"),
+                   isPresented: $confirmingCancellation) {
+                Button(tr("Keep", "Behold"), role: .cancel) {}
+                Button(tr("Cancel workout", "Avlys økt"), role: .destructive) {
+                    onCancel?()
+                    dismiss()
+                }
+            } message: {
+                Text(tr(
+                    "The session stays in your calendar as cancelled. It is not deleted.",
+                    "Økten blir stående som avlyst i kalenderen. Den slettes ikke."
+                ))
             }
             .alert(tr("Delete planned workout?", "Slette planlagt økt?"), isPresented: $confirmingDeletion) {
                 Button(tr("Cancel", "Avbryt"), role: .cancel) {}
