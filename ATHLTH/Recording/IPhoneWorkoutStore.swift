@@ -1277,6 +1277,55 @@ final class IPhoneWorkoutStore:
         ]
     }
 
+    /// Post-workout correction of the athlete's *entered* belt speeds.
+    /// Rebuild the local estimated distance from active-time segments;
+    /// historical HealthKit records are not silently rewritten.
+    func correctCompletedTreadmillSpeeds(
+        _ corrected: [PhoneTreadmillSpeedEntry],
+        workoutID: UUID
+    ) {
+        guard let index = history.firstIndex(where: {
+            $0.id == workoutID || $0.healthID == workoutID
+        }), history[index].runEnvironment == .treadmill,
+          history[index].end != nil else { return }
+
+        let duration = history[index].elapsed(
+            at: history[index].end ?? Date()
+        )
+        guard duration.isFinite, duration > 0 else { return }
+        let ordered = corrected
+            .filter {
+                $0.activeElapsedSeconds.isFinite &&
+                $0.kilometersPerHour.isFinite &&
+                (0...30).contains($0.kilometersPerHour)
+            }
+            .map {
+                PhoneTreadmillSpeedEntry(
+                    activeElapsedSeconds: min(max(0, $0.activeElapsedSeconds), duration),
+                    kilometersPerHour: ($0.kilometersPerHour * 10).rounded() / 10
+                )
+            }
+            .sorted { $0.activeElapsedSeconds < $1.activeElapsedSeconds }
+        guard !ordered.isEmpty else { return }
+
+        var estimatedMeters = 0.0
+        for (i, point) in ordered.enumerated() {
+            let end = i + 1 < ordered.count
+                ? ordered[i + 1].activeElapsedSeconds : duration
+            estimatedMeters += point.kilometersPerHour / 3.6 *
+                max(0, end - point.activeElapsedSeconds)
+        }
+        history[index].treadmillSpeedHistory = ordered
+        history[index].treadmillSpeedKilometersPerHour =
+            ordered.last?.kilometersPerHour
+        history[index].distanceMeters = estimatedMeters
+        history[index].treadmillDistanceElapsedSeconds = duration
+        if lastCompletedWorkout?.id == history[index].id {
+            lastCompletedWorkout = history[index]
+        }
+        persistHistory()
+    }
+
     func setCompletedTreadmillInclinePercent(
         _ percent: Double,
         workoutID: UUID
