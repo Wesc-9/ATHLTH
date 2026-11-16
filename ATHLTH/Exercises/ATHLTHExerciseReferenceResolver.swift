@@ -105,6 +105,9 @@ enum ATHLTHExerciseReferenceResolver {
             }) {
                 return imported
             }
+            // An explicit identity from another athlete or account must not
+            // be silently replaced with a similarly named stock exercise.
+            return nil
         }
         if let slug = block.exerciseSlug, !slug.isEmpty {
             let normalizedSlug = key(slug)
@@ -113,6 +116,9 @@ enum ATHLTHExerciseReferenceResolver {
                 return identifier == slug || key(identifier) == normalizedSlug
             }
             if byIdentifier.count == 1 { return byIdentifier[0] }
+            // Explicit source identifiers are authoritative. Do not fall
+            // back to a name match when the referenced item is unavailable.
+            return nil
         }
 
         // Older GymCoach-based plans were saved before explicit slugs were
