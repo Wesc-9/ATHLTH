@@ -242,52 +242,26 @@ struct ATHLTHCoachVoiceChoices: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(ATHLTHLocalization.choose(
-                    english: "Available voices",
-                    norwegian: "Tilgjengelige stemmer"
-                ))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                Spacer()
-                Text("\(voices.count)")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-            }
+        VStack(alignment: .leading, spacing: 9) {
+            Text(ATHLTHLocalization.choose(
+                english: "APPLE VOICES", norwegian: "APPLE-STEMMER"
+            ))
+            .font(.caption2.weight(.bold))
+            .tracking(1.3)
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
-            HStack(spacing: 10) {
-                Button {
-                    selectedIdentifier = nil
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: selectedIdentifier == nil
-                              ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Automatic · best available",
-                                norwegian: "Automatisk · beste tilgjengelige"
-                            ))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                            Text(ATHLTHLocalization.choose(
-                                english: "Best installed voice",
-                                norwegian: "Beste installerte stemme"
-                            ))
-                            .font(.caption2)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(
-                    selectedIdentifier == nil ? .isSelected : []
-                )
-
-                Button {
+            ATHLTHCoachVoiceRow(
+                title: ATHLTHLocalization.choose(
+                    english: "Automatic", norwegian: "Automatisk"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Best installed voice", norwegian: "Beste installerte stemme"
+                ),
+                selected: selectedIdentifier == nil,
+                locked: false,
+                busy: false,
+                onSelect: { selectedIdentifier = nil },
+                onPreview: {
                     ATHLTHAudioCoachPreviewSpeaker.shared.speak(
                         language: language,
                         voiceIdentifier: nil,
@@ -296,51 +270,19 @@ struct ATHLTHCoachVoiceChoices: View {
                         duckOtherAudio: duckOtherAudio,
                         speechStyle: speechStyle
                     )
-                } label: {
-                    Image(systemName: "play.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 40, height: 40)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Preview automatic voice",
-                    norwegian: "Forhåndslytt på automatisk stemme"
-                ))
-            }
-            .padding(10)
-            .background(ATHLTHTheme.accentSoft.opacity(0.65),
-                        in: RoundedRectangle(cornerRadius: 14))
+            )
+            .accessibilityIdentifier("athlth-coach-voice-automatic")
 
             ForEach(voices) { voice in
-                HStack(spacing: 10) {
-                    Button {
-                        selectedIdentifier = voice.id
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: selectedIdentifier == voice.id
-                                  ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(voice.name)
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-                                Text(voice.qualityTitle ?? ATHLTHLocalization.choose(
-                                    english: "Standard",
-                                    norwegian: "Standard"
-                                ))
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(
-                        selectedIdentifier == voice.id ? .isSelected : []
-                    )
-
-                    Button {
+                ATHLTHCoachVoiceRow(
+                    title: voice.name,
+                    subtitle: voice.qualityTitle ?? voice.language,
+                    selected: selectedIdentifier == voice.id,
+                    locked: false,
+                    busy: false,
+                    onSelect: { selectedIdentifier = voice.id },
+                    onPreview: {
                         ATHLTHAudioCoachPreviewSpeaker.shared.speak(
                             language: language,
                             voiceIdentifier: voice.id,
@@ -349,26 +291,88 @@ struct ATHLTHCoachVoiceChoices: View {
                             duckOtherAudio: duckOtherAudio,
                             speechStyle: speechStyle
                         )
-                    } label: {
-                        Image(systemName: "play.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 40, height: 40)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Listen to \(voice.displayTitle)",
-                            norwegian: "Lytt til \(voice.displayTitle)"
-                        )
-                    )
+                )
+                .accessibilityIdentifier("athlth-coach-voice-apple")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Shared row for Apple, Azure and future voice providers.
+/// Selection and preview share the same hit sizes and colors.
+struct ATHLTHCoachVoiceRow: View {
+    let title: String
+    let subtitle: String
+    let selected: Bool
+    let locked: Bool
+    let busy: Bool
+    let onSelect: () -> Void
+    let onPreview: () -> Void
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Button(action: onSelect) {
+                HStack(spacing: 11) {
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(10)
-                .background(
-                    ATHLTHTheme.accentSoft.opacity(0.65),
-                    in: RoundedRectangle(cornerRadius: 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(locked)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+
+            if locked {
+                Image(systemName: "lock.fill")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .frame(width: 36, height: 40)
+            } else {
+                Button(action: onPreview) {
+                    Group {
+                        if busy {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "play.circle.fill")
+                                .font(.title2)
+                        }
+                    }
+                    .frame(width: 40, height: 40)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .buttonStyle(.plain)
+                .disabled(busy)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Preview " + title, norwegian: "Forhåndslytt på " + title
+                    )
                 )
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 66)
+        .background(
+            selected ? ATHLTHPlanDesign.selectedSurface : Color.white,
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+        }
+        .opacity(locked ? 0.55 : 1)
     }
 }
