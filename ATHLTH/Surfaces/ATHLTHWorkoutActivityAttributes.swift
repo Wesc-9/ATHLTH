@@ -9,6 +9,8 @@ struct ATHLTHWorkoutActivityAttributes: ActivityAttributes {
         var distanceMeters: Double
         var heartRate: Double
         var currentPaceSecondsPerKilometer: TimeInterval? = nil
+        /// False: current GPS pace; true: distance/time measured average (indoor).
+        var paceIsAverage: Bool? = nil
         var routeProgressPercent: Double? = nil
         var routeRemainingMeters: Double? = nil
         var routeDeviationMeters: Double? = nil

@@ -362,13 +362,24 @@ struct WatchTrainingAlwaysOnDashboard: View {
                 .font(.system(size: 8, weight: .bold))
                 .foregroundStyle(accent)
 
+                Text(paceCaption)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
                 paceMetric(fontSize: compact ? 25 : 30)
             } else {
                 paceMetric(fontSize: compact ? 35 : 43)
-                Text("PACE")
+                Text(paceCaption)
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(accent)
+                    .lineLimit(1)
                 distanceMetric(fontSize: compact ? 30 : 37)
+                Text(ATHLTHLocalization.choose(
+                    english: "DISTANCE", norwegian: "DISTANSE"
+                ))
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(accent)
+                .lineLimit(1)
             }
 
             Spacer(minLength: 0)
@@ -443,7 +454,9 @@ struct WatchTrainingAlwaysOnDashboard: View {
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    Text(paceString + "/km")
+                    Text(paceReadout.secondsPerKilometer == nil
+                        ? timeString(workout.elapsedTime)
+                        : paceString + "/km")
                     Spacer(minLength: 0)
                     Text(String(format: "%.2f km",
                                 max(workout.distanceMeters, 0) / 1_000))
@@ -576,13 +589,14 @@ struct WatchTrainingAlwaysOnDashboard: View {
 
     private func paceMetric(fontSize: CGFloat) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(paceString)
+            Text(paceReadout.secondsPerKilometer == nil
+                ? timeString(workout.elapsedTime) : paceString)
                 .font(.system(size: fontSize, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Text("/km")
+            Text(paceReadout.secondsPerKilometer == nil ? "" : "/km")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(secondary)
             Spacer(minLength: 0)
@@ -710,9 +724,25 @@ struct WatchTrainingAlwaysOnDashboard: View {
             )
     }
 
+    private var paceReadout: (secondsPerKilometer: TimeInterval?, isAverage: Bool) {
+        ATHLTHRunningPace.displayPace(
+            current: workout.usesOutdoorGPS
+                ? workout.currentPaceSecondsPerKilometer : nil,
+            average: workout.averagePaceSecondsPerKilometer
+        )
+    }
+
+    private var paceCaption: String {
+        paceReadout.secondsPerKilometer == nil
+            ? ATHLTHLocalization.choose(english: "WORKOUT TIME", norwegian: "ØKTTID")
+            : paceReadout.isAverage
+                ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
+                : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO")
+    }
+
     private var paceString: String {
-        guard let pace = workout.currentPaceSecondsPerKilometer,
-              pace.isFinite, pace > 0 else { return "—:—" }
+        guard let pace = paceReadout.secondsPerKilometer
+        else { return "—:—" }
         let seconds = max(0, Int(pace.rounded()))
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }

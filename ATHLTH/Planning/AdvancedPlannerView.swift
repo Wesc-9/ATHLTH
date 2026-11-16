@@ -6823,6 +6823,11 @@ struct SessionEditorView: View {
 
             if editorMode == .basic {
                 basicWorkoutChoiceSection
+                // A walking route is useful in Basic as well as Advanced.
+                // Persist through the same selectedRouteID and session model.
+                if kind == .walking {
+                    routeBuilder
+                }
             } else {
                 if kind == .running {
                     if !selectedRunningWorkouts.isEmpty ||
@@ -9589,9 +9594,12 @@ struct SessionEditorView: View {
 
 
     private var routeBuilder: some View {
-        Section("Route") {
-            Picker("Route", selection: $selectedRouteID) {
-                Text("No specific route")
+        Section(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute")) {
+            Picker(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
+                   selection: $selectedRouteID) {
+                Text(ATHLTHLocalization.choose(
+                    english: "No specific route", norwegian: "Ingen valgt rute"
+                ))
                     .tag(nil as UUID?)
 
                 ForEach(session.savedRoutes) { route in
@@ -10621,10 +10629,17 @@ struct SessionEditorView: View {
                     sourceOwnerID: session.profile.userID,
                     shareVersion: 2
                 )
-                let body = ATHLTHLocalization.choose(
-                    english: "Let's meet and train! \(workout.title) · \(scheduled). Accept or decline the invitation below.",
-                    norwegian: "Vil du trene fysisk sammen? \(workout.title) · \(scheduled). Godta eller avslå invitasjonen nedenfor."
-                )
+                // Concise notification preview. In the conversation the
+                // attachment card carries the actions and details.
+                let body = workout.trainTogetherMode == .sameWorkout
+                    ? ATHLTHLocalization.choose(
+                        english: "Workout invitation: \(workout.title) · \(scheduled). Train at your own pace.",
+                        norwegian: "Invitasjon til \(workout.title) · \(scheduled). Tren i eget tempo."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "You're invited to train together: \(workout.title) · \(scheduled).",
+                        norwegian: "Du er invitert til å trene sammen: \(workout.title) · \(scheduled)."
+                    )
                 let sent = await messaging.send(
                     to: partnerID,
                     conversationID: conversationID,

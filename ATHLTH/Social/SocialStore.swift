@@ -1312,8 +1312,8 @@ final class SocialStore: ObservableObject {
                         conversationID: conversationID,
                         to: recipient.userID,
                         body: ATHLTHLocalization.choose(
-                            english: "Would you like to join my workout? Accept the invitation here.",
-                            norwegian: "Vil du bli med på økten min? Godta invitasjonen her."
+                            english: "Workout invitation: \(snapshot.title). Open the invitation to respond.",
+                            norwegian: "Treningsinvitasjon: \(snapshot.title). Åpne invitasjonen for å svare."
                         ),
                         attachment: attachment
                     )

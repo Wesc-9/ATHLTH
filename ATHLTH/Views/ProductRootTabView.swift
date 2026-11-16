@@ -6072,7 +6072,8 @@ struct ATHLTHTrainView: View {
                             ghostRace: ghostRace,
                             workoutMirroring: workoutMirroring,
                             plannedPlanID: planOrigin?.planID,
-                            plannedSessionID: planOrigin?.workout.id
+                            plannedSessionID: planOrigin?.workout.id,
+                            session: session
                         )
                         if needsSocialLobby {
                             _ = await social.confirmCurrentJoinedWorkoutStarted()
@@ -6106,7 +6107,8 @@ struct ATHLTHTrainView: View {
                     let lobbyReady: Bool
                     if needsSocialLobby {
                         lobbyReady = await social.beginWorkoutWithFriends(
-                            title: "Walk",
+                            title: configuration.route?.title ??
+                                ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
                             kind: .walking,
                             friends: configuration.friends,
                             creatorName: session.profile.displayName,
@@ -9399,62 +9401,6 @@ struct ATHLTHTrainView: View {
                     .confirmCurrentJoinedWorkoutStarted()
                 watchTransferMessage =
                     "\(configuration.title) started on Apple Watch."
-            } catch {
-                await social.markCurrentJoinedWorkoutLaunchFailed()
-                watchTransferError = error.localizedDescription
-            }
-        }
-    }
-
-    private func startWalkQuickWorkout(
-        _ configuration: WalkQuickStartConfiguration
-    ) {
-        if configuration.captureDevice == .iPhone {
-            gear.prepareNextWorkoutGear(configuration.gearIDs)
-            phoneWorkout.start(
-                walking: true,
-                autoPauseEnabled:
-                    configuration.autoPauseEnabled
-            )
-            Task {
-                _ = await social
-                    .confirmCurrentJoinedWorkoutStarted()
-            }
-            return
-        }
-
-        guard watchConnection.isReady else {
-            watchTransferError =
-                "Apple Watch is not ready to start this walk."
-            return
-        }
-
-        watchConnection.sendWorkoutRouteSelection(nil)
-        watchConnection.sendRunningWorkout(
-            WatchRunningWorkoutTransfer(
-                title: "",
-                steps: [],
-                routeAlerts:
-                    settings.routeAlertConfiguration,
-                autoPauseEnabled:
-                    configuration.autoPauseEnabled
-            )
-        )
-
-        Task {
-            do {
-                try await watchConnection
-                    .startWorkoutOnWatch(.walking)
-                gear.prepareNextWorkoutGear(
-                    configuration.gearIDs
-                )
-                watchConnection.sendAudioCoachConfiguration(
-                    configuration.audioCoach
-                )
-                _ = await social
-                    .confirmCurrentJoinedWorkoutStarted()
-                watchTransferMessage =
-                    "Walk started on Apple Watch."
             } catch {
                 await social.markCurrentJoinedWorkoutLaunchFailed()
                 watchTransferError = error.localizedDescription

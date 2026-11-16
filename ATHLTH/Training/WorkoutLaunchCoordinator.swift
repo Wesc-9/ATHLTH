@@ -1274,6 +1274,27 @@ enum WorkoutLaunchCoordinator {
 
         try await watchConnection.requireNoActiveWatchWorkout()
 
+        let plannedWalkingWorkout: PlannedSession? = {
+            guard let planID = plannedPlanID,
+                  let workoutID = plannedSessionID,
+                  let plan = session?.trainingPlan(withID: planID) else { return nil }
+            return plan.weeks.flatMap(\.days).flatMap(\.sessions).first {
+                $0.id == workoutID && $0.kind == .walking
+            }
+        }()
+        // A planned walk can carry its route independently of Quick Train.
+        // A manually picked route always takes precedence over the plan.
+        let selectedWalkingRoute: TrainingRoute? = configuration.suppressPlannedRoute
+            ? nil
+            : (configuration.route ?? plannedWalkingWorkout.flatMap { workout in
+                session?.savedRoutes.first { $0.id == workout.routeID }
+            })
+        var walkingAudioCoach = settings.applyingFuelVoice(
+            to: configuration.audioCoach
+        )
+        walkingAudioCoach.routeDistanceMeters =
+            selectedWalkingRoute.map { $0.distanceKilometers * 1_000 }
+
         if configuration.captureDevice == .iPhone {
             workoutMirroring?
                 .clearIPhoneAudioCoach()
@@ -1286,15 +1307,17 @@ enum WorkoutLaunchCoordinator {
         }
             phoneWorkout.start(
                 walking: true,
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Walk",
-                        norwegian: "Gåtur"
-                    ),
-                audioCoach:
-                    settings.applyingFuelVoice(
-                        to: configuration.audioCoach
-                    ),
+                route: selectedWalkingRoute,
+                title: plannedWalkingWorkout?.title ?? selectedWalkingRoute?.title ??
+                    ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
+                audioCoach: walkingAudioCoach,
+                structuredWorkout: plannedWalkingWorkout.map {
+                    PlannedWorkoutWatchBuilder.runningTransfer(
+                        from: $0,
+                        routeAlerts: settings.routeAlertConfiguration,
+                        autoPauseEnabled: configuration.autoPauseEnabled
+                    )
+                },
                 routeAlerts:
                     settings.routeAlertConfiguration,
                 autoPauseEnabled:
@@ -1333,8 +1356,14 @@ enum WorkoutLaunchCoordinator {
             )
         }
 
-        var watchWorkout = WatchRunningWorkoutTransfer(
-            title: "",
+        var watchWorkout = plannedWalkingWorkout.map {
+            PlannedWorkoutWatchBuilder.runningTransfer(
+                from: $0,
+                routeAlerts: settings.routeAlertConfiguration,
+                autoPauseEnabled: configuration.autoPauseEnabled
+            )
+        } ?? WatchRunningWorkoutTransfer(
+            title: selectedWalkingRoute?.title ?? "",
             steps: [],
             routeAlerts: settings.routeAlertConfiguration,
             autoPauseEnabled: configuration.autoPauseEnabled
@@ -1345,12 +1374,15 @@ enum WorkoutLaunchCoordinator {
                 dateOfBirth: session?.onboardingProfile?.dateOfBirth
             )
 
+        if let selectedWalkingRoute {
+            // The Watch must receive route geometry before selecting its ID.
+            // Otherwise its navigation screen may refer to a missing route.
+            try watchConnection.sendRoute(selectedWalkingRoute)
+        }
         watchConnection
-            .sendWorkoutRouteSelection(nil)
+            .sendWorkoutRouteSelection(selectedWalkingRoute?.id)
 
-        var watchAudioCoach = settings.applyingFuelVoice(
-            to: configuration.audioCoach
-        )
+        var watchAudioCoach = walkingAudioCoach
 
         // Walking on Watch uses the same single speaker rule as running.
         watchAudioCoach.preferIPhoneAudioWhenReachable = false

@@ -4,13 +4,15 @@ import SwiftUI
 struct MessageInboxDestinationView: View {
     @State private var showingNewMessage = false
 
-    /// Populated only when the inbox was launched from the Home side drawer.
-    /// Other inbox entry points retain their original profile shortcut.
+    /// Used for dismissing the inbox from iPhone navigation or the iPad inspector.
     var onBack: (() -> Void)? = nil
+    /// iPad inspector collapses to the right; iPhone navigation goes back left.
+    var isInspectorPanel = false
 
     var body: some View {
         MessageInboxView(
             onBack: onBack,
+            isInspectorPanel: isInspectorPanel,
             onNewMessage: { showingNewMessage = true }
         )
         .navigationTitle("")
@@ -76,6 +78,7 @@ struct MessageInboxView: View {
     // Keep onNewMessage last so existing trailing-closure callers still
     // open the composer rather than unintentionally wiring a back action.
     var onBack: (() -> Void)? = nil
+    var isInspectorPanel = false
     var onNewMessage: () -> Void = {}
 
     @State private var arenaInboxVisibleCount = 0
@@ -344,14 +347,13 @@ struct MessageInboxView: View {
     }
 
     private var messagesHeader: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 16
-        ) {
-            HStack(alignment: .center) {
+        VStack(alignment: .leading, spacing: 16) {
+            // The inbox owns its navigation controls on iPhone and iPad.
+            // No duplicate profile shortcut or wordmark is needed here.
+            HStack(alignment: .center, spacing: 12) {
                 if let onBack {
                     Button(action: onBack) {
-                        Image(systemName: "chevron.left")
+                        Image(systemName: isInspectorPanel ? "chevron.right" : "chevron.left")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .frame(width: 48, height: 48)
@@ -369,69 +371,40 @@ struct MessageInboxView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Back to Home",
-                            norwegian: "Tilbake til Hjem"
-                        )
+                        isInspectorPanel
+                            ? ATHLTHLocalization.choose(
+                                english: "Hide Inbox",
+                                norwegian: "Skjul innboks"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Back to Home",
+                                norwegian: "Tilbake til Hjem"
+                            )
                     )
-                    .accessibilityIdentifier("athlth-inbox-back-to-home")
-                } else {
-                    NavigationLink {
-                        ATHLTHProfileView()
-                    } label: {
-                        ownProfileAvatar
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Open your profile",
-                            norwegian: "Åpne profilen din"
-                        )
+                    .accessibilityIdentifier(
+                        isInspectorPanel
+                            ? "athlth-ipad-hide-inspector"
+                            : "athlth-inbox-back-to-home"
                     )
                 }
 
-                Spacer()
-
-                Text("ATHLTH")
-                    .font(
-                        .system(
-                            size: 23,
-                            weight: .medium,
-                            design: .rounded
-                        )
-                    )
-                    .tracking(7)
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .padding(.leading, 7)
-
-                Spacer()
+                Spacer(minLength: 0)
 
                 HStack(spacing: 9) {
                     headerAction(
-                        systemImage:
-                            showingSearch
-                                ? "xmark"
-                                : "magnifyingglass",
-                        accessibilityLabel:
-                            showingSearch
-                                ? ATHLTHLocalization.choose(
-                                    english: "Close search",
-                                    norwegian: "Lukk søk"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Search messages",
-                                    norwegian: "Søk i meldinger"
-                                )
-                    ) {
-                        withAnimation(
-                            .easeInOut(
-                                duration: 0.20
+                        systemImage: showingSearch ? "xmark" : "magnifyingglass",
+                        accessibilityLabel: showingSearch
+                            ? ATHLTHLocalization.choose(
+                                english: "Close search",
+                                norwegian: "Lukk søk"
                             )
-                        ) {
+                            : ATHLTHLocalization.choose(
+                                english: "Search messages",
+                                norwegian: "Søk i meldinger"
+                            )
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.20)) {
                             showingSearch.toggle()
-
                             if !showingSearch {
                                 searchText = ""
                             }
@@ -440,36 +413,25 @@ struct MessageInboxView: View {
 
                     headerAction(
                         systemImage: "plus",
-                        accessibilityLabel:
-                            ATHLTHLocalization.choose(
-                                english: "New message",
-                                norwegian: "Ny melding"
-                            ),
+                        accessibilityLabel: ATHLTHLocalization.choose(
+                            english: "New message",
+                            norwegian: "Ny melding"
+                        ),
                         action: onNewMessage
                     )
                 }
             }
 
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(
                     ATHLTHLocalization.choose(
                         english: "INNER CIRCLE",
                         norwegian: "INNER CIRCLE"
                     )
                 )
-                .font(
-                    .system(
-                        size: 10,
-                        weight: .semibold
-                    )
-                )
+                .font(.system(size: 10, weight: .semibold))
                 .tracking(3.2)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+                .foregroundStyle(ATHLTHTheme.mutedText)
 
                 Text(
                     ATHLTHLocalization.choose(
@@ -477,99 +439,34 @@ struct MessageInboxView: View {
                         norwegian: "Meldinger"
                     )
                 )
-                .font(
-                    .system(
-                        size: 40,
-                        weight: .bold,
-                        design: .serif
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
+                .font(.system(size: 40, weight: .bold, design: .serif))
+                .foregroundStyle(ATHLTHTheme.primaryText)
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english:
-                            "The people who move you forward.",
-                        norwegian:
-                            "Menneskene som får deg videre."
+                        english: "The people who move you forward.",
+                        norwegian: "Menneskene som får deg videre."
                     )
                 )
-                .font(
-                    .system(
-                        size: 16,
-                        weight: .regular
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(ATHLTHTheme.mutedText)
             }
         }
-        .padding(.top, 4)
-    }
-
-    @ViewBuilder
-    private var ownProfileAvatar:
-        some View {
-        if let avatarURL =
-                session.profile.avatarURL {
-            ATHLTHStorageImage(
-                url: avatarURL
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    ownProfileAvatarFallback
+        .padding(.top, 0)
+        // Preserve the iPad inspector's header-only close gesture without
+        // interfering with gestures inside actual conversations.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    guard isInspectorPanel,
+                          let onBack,
+                          ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
+                            translation: value.translation
+                          )
+                    else { return }
+                    onBack()
                 }
-            }
-            .frame(
-                width: 48,
-                height: 48
-            )
-            .clipShape(Circle())
-            .overlay {
-                Circle()
-                    .stroke(
-                        Color.white.opacity(
-                            0.96
-                        ),
-                        lineWidth: 2
-                    )
-            }
-        } else {
-            ownProfileAvatarFallback
-                .frame(
-                    width: 48,
-                    height: 48
-                )
-        }
-    }
-
-    private var ownProfileAvatarFallback:
-        some View {
-        Circle()
-            .fill(
-                ATHLTHTheme.accentSoft
-            )
-            .overlay {
-                Image(
-                    systemName: "person.fill"
-                )
-                .font(
-                    .system(
-                        size: 21,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-            }
+        )
     }
 
     private struct RecentInboxConversation: Identifiable {
@@ -5673,6 +5570,19 @@ struct DirectMessageThreadView: View {
         let workout = lifecycle?.updatedWorkout ?? latestAgreedWorkout(
             for: invitation, in: messaging.messages(in: conversationID)
         ) ?? originalWorkout
+        let currentMessages = messaging.messages(in: conversationID)
+        guard plannedInviteResponse(for: invitation, in: currentMessages) == nil,
+              PlannedWorkoutInvitationPresentationState.resolve(
+                start: workout.scheduledStart,
+                decision: nil,
+                organizerCancelled: lifecycle?.kind == .cancelled
+              ).canRespond else {
+            plannedInviteError = ATHLTHLocalization.choose(
+                english: "This invitation has ended. Ask for a new invitation.",
+                norwegian: "Invitasjonen er avlyst eller allerede besvart. Be om en ny invitasjon."
+            )
+            return
+        }
         respondingToPlannedInviteID = invitation.id
         Task {
             defer { respondingToPlannedInviteID = nil }
@@ -7032,6 +6942,10 @@ private struct MessageBubble: View {
                         lifecycleUpdate: lifecycleUpdate,
                         isMine: isMine,
                         isResponding: respondingToInvite,
+                        organizerName: isMine
+                            ? currentUserProfile.resolvedName : friend.resolvedName,
+                        inviteeName: isMine
+                            ? friend.resolvedName : currentUserProfile.resolvedName,
                         onAccept: { onRespondToInvite(true) },
                         onDecline: { onRespondToInvite(false) },
                         onProposeChanges: onProposeWorkoutChange
@@ -7221,8 +7135,11 @@ private struct MessageBubble: View {
                     }
                 }
 
+                // Invitation metadata already lives in the compact card.
+                // Keep the message body for push previews, but never duplicate
+                // a long invitation as a second chat bubble (also for history).
                 if let body = message.body,
-                   !body.isEmpty {
+                   !body.isEmpty && !isPlannedInvitation {
                     Text(body)
                         .font(.body)
                         .foregroundStyle(

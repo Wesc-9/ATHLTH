@@ -422,6 +422,17 @@ private final class ATHLTHLiveActivityController {
             liveContext = storedLiveContext
         }
 
+        // Indoor sessions have no instantaneous GPS pace. The Watch or
+        // iPhone HealthKit workout still measures distance and active time:
+        // publish its average pace with a truthful source label.
+        let displayPace = ATHLTHRunningPace.displayPace(
+            current: snapshot.currentPaceSecondsPerKilometer,
+            average: ATHLTHRunningPace.average(
+                elapsedSeconds: snapshot.elapsedTime,
+                distanceMeters: snapshot.distanceMeters
+            )
+        )
+
         let contentState =
             ATHLTHWorkoutActivityAttributes.ContentState(
                 phase: snapshot.state.rawValue,
@@ -430,7 +441,8 @@ private final class ATHLTHLiveActivityController {
                 distanceMeters: snapshot.distanceMeters,
                 heartRate: snapshot.heartRate,
                 currentPaceSecondsPerKilometer:
-                    snapshot.currentPaceSecondsPerKilometer,
+                    displayPace.secondsPerKilometer,
+                paceIsAverage: displayPace.isAverage,
                 routeProgressPercent:
                     snapshot.routeProgressPercent,
                 routeRemainingMeters:
