@@ -5,7 +5,7 @@ enum PrivacyVisibilityRules {
         guard enabled, profile != "private" else { return "private" }
         if profile == "friends" { return "friends" }
         guard profile == "public" else { return "private" }
-        return current == "friends" ? "friends" : "public"
+        return current == "public" ? "public" : "friends"
     }
 }
 
