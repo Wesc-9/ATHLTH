@@ -1078,6 +1078,96 @@ struct ATHLTHAudioCoachActiveListView: View {
         showingGroupTriggerCatalogue = false
     }
 
+    private func saveCurrentTemplate() {
+        if let selectedTemplateID,
+           let index = settings.audioCoachProfiles.firstIndex(where: {
+               $0.id == selectedTemplateID
+           }) {
+            settings.audioCoachProfiles[index].configuration = draft.configuration()
+            settings.activeAudioCoachProfileID = selectedTemplateID
+        } else if !isNewEmptyTemplate {
+            // Standard is the durable, non-deletable default template.
+            settings.updateAudioCoachDefaults(from: draft)
+            settings.activeAudioCoachProfileID = nil
+        } else {
+            profileName = ""
+            showingSaveNewProfile = true
+            return
+        }
+        baselineConfiguration = draft.configuration()
+    }
+
+    private func requestTemplateChange(_ destination: TemplateDestination) {
+        if hasUnsavedTemplateChanges {
+            pendingTemplateDestination = destination
+            showingDirtyTemplatePrompt = true
+        } else {
+            applyTemplateDestination(destination)
+        }
+    }
+
+    private func cycleSavedTemplates(_ step: Int) {
+        let ids = settings.audioCoachProfiles.map(\.id)
+        let current = selectedTemplateID.flatMap(ids.firstIndex(of:)).map { $0 + 1 } ?? 0
+        let next = (current + step + ids.count + 1) % (ids.count + 1)
+        requestTemplateChange(next == 0 ? .standard : .profile(ids[next - 1]))
+    }
+
+    private func applyTemplateDestination(_ destination: TemplateDestination) {
+        switch destination {
+        case .standard:
+            var defaults = AudioCoachDraft()
+            defaults.load(from: settings)
+            draft = defaults
+            selectedTemplateID = nil
+            selectedProfileName = nil
+            isNewEmptyTemplate = false
+        case let .profile(id):
+            guard let profile = settings.audioCoachProfiles.first(where: {
+                $0.id == id
+            }) else { return }
+            draft.load(profile: profile)
+            selectedTemplateID = profile.id
+            selectedProfileName = profile.name
+            isNewEmptyTemplate = false
+        case .new:
+            var empty = AudioCoachDraft()
+            empty.distanceTriggerEnabled = false
+            empty.timeTriggerEnabled = false
+            empty.customRules = []
+            empty.coachGroups = []
+            empty.announceDistance = false
+            empty.announceElapsedTime = false
+            empty.announceAveragePace = false
+            empty.announceClockTime = false
+            empty.announceHeartRate = false
+            empty.announceRemainingRouteDistance = false
+            empty.announceEstimatedRemainingRouteTime = false
+            empty.announceCurrentWorkoutStep = false
+            empty.announceRemainingStepTime = false
+            empty.announceRemainingStepDistance = false
+            empty.announceWorkoutStart = false
+            empty.announcePauseResume = false
+            empty.announceWorkoutComplete = false
+            empty.smartPrompts = ATHLTHAudioCoachSmartSettings()
+            empty.smartPrompts.motivationEnabled = false
+            empty.smartPrompts.randomEncouragementEnabled = false
+            empty.smartPrompts.contextualFeedbackEnabled = false
+            empty.smartPrompts.announceCurrentHeartRateZone = false
+            empty.smartPrompts.targetZoneVoiceAlertsEnabled = false
+            empty.smartPrompts.boundaryCountdownRules = []
+            empty.smartPrompts.intervalCountdownToRecoverySeconds = nil
+            empty.smartPrompts.intervalCountdownFromRecoverySeconds = nil
+            empty.language = draft.language
+            empty.voiceIdentifier = draft.voiceIdentifier
+            draft = empty
+            selectedTemplateID = nil
+            selectedProfileName = tr("New template", "Ny mal")
+            isNewEmptyTemplate = true
+        }
+        baselineConfiguration = draft.configuration()
+    }
+
     private var saveNewProfileSheet: some View {
         NavigationStack {
             Form {
@@ -1101,8 +1191,15 @@ struct ATHLTHAudioCoachActiveListView: View {
                         settings.audioCoachProfiles.append(profile)
                         settings.activeAudioCoachProfileID = profile.id
                         selectedProfileName = profile.name
+                        selectedTemplateID = profile.id
+                        isNewEmptyTemplate = false
+                        baselineConfiguration = draft.configuration()
                         profileName = ""
                         showingSaveNewProfile = false
+                        if let destination = pendingTemplateDestination {
+                            pendingTemplateDestination = nil
+                            applyTemplateDestination(destination)
+                        }
                     } label: {
                         Label(tr("Save as new template", "Lagre som ny mal"),
                               systemImage: "bookmark.badge.plus")
@@ -1140,8 +1237,8 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
     }
 
-    /// A new group owns one rule with multiple readouts on one trigger.
-    /// No empty or duplicate speech rules are created before Save.
+    /// First establish the one shared group trigger. Spoken values are
+    /// added afterwards so the group never schedules multiple overlapping cues.
     private var groupBuilderSheet: some View {
         NavigationStack {
             Form {
@@ -1154,12 +1251,9 @@ struct ATHLTHAudioCoachActiveListView: View {
                 } header: {
                     Text(tr("NAME", "NAVN"))
                 }
-
                 Section {
-                    Picker(
-                        tr("Choose trigger", "Velg trigger"),
-                        selection: $groupDraftTrigger
-                    ) {
+                    Picker(tr("Choose trigger", "Velg trigger"),
+                           selection: $groupDraftTrigger) {
                         ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                             Text(trigger.title).tag(trigger)
                         }
@@ -1168,75 +1262,33 @@ struct ATHLTHAudioCoachActiveListView: View {
                     .onChange(of: groupDraftTrigger) { _, trigger in
                         groupDraftInterval = trigger == .time ? 60 : 1_000
                     }
-
                     Stepper(
                         value: $groupDraftInterval,
                         in: groupDraftTrigger == .time ? 15...7_200 : 100...42_000,
                         step: groupDraftTrigger == .time ? 15 : 100
                     ) {
                         Text(groupDraftTrigger == .time
-                            ? tr("Every \(groupDraftInterval) seconds",
-                                 "Hvert \(groupDraftInterval) sekund")
-                            : tr("Every \(groupDraftInterval) metres",
-                                 "Hver \(groupDraftInterval) meter"))
+                             ? tr("Every \(groupDraftInterval) seconds",
+                                  "Hvert \(groupDraftInterval) sekund")
+                             : tr("Every \(groupDraftInterval) metres",
+                                  "Hver \(groupDraftInterval) meter"))
                     }
                 } header: {
-                    Text(tr("1 · When should Coach speak?", "1 · Når skal Coach snakke?"))
+                    Text(tr("1 · Choose trigger", "1 · Velg trigger"))
                 } footer: {
                     Text(tr(
-                        "All selected readouts will be spoken together when this one trigger fires.",
-                        "Alt valgt innhold leses samlet når denne ene triggeren utløses."
+                        "Create a group first. Then add one or more commands to be spoken together on this trigger.",
+                        "Opprett gruppen først. Legg deretter til kommandoer som leses samlet på denne triggeren."
                     ))
                 }
-
                 Section {
-                    ForEach(availableGroupContents) { metric in
-                        Button {
-                            if groupDraftContents.contains(metric) {
-                                groupDraftContents.remove(metric)
-                            } else {
-                                groupDraftContents.insert(metric)
-                            }
-                        } label: {
-                            HStack(spacing: 12) {
-                                Text(metric.title)
-                                    .foregroundStyle(ink)
-                                Spacer()
-                                Image(systemName: groupDraftContents.contains(metric)
-                                      ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(bronze)
-                            }
-                            .frame(minHeight: 34)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(
-                            groupDraftContents.contains(metric) ? .isSelected : []
-                        )
-                    }
-                } header: {
-                    Text(tr("2 · What should Coach say?", "2 · Hva skal Coach si?"))
-                } footer: {
-                    Text(tr(
-                        "Choose one or more values. Missing sensor values are skipped.",
-                        "Velg én eller flere verdier. Utilgjengelige sensordata hoppes over."
-                    ))
-                }
-
-                Section {
-                    Button {
-                        createCoachGroup()
-                    } label: {
-                        Label(
-                            tr("Create coach group", "Opprett coach-gruppe"),
-                            systemImage: "checkmark"
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                    Button(action: createCoachGroup) {
+                        Label(tr("Continue to commands", "Fortsett til kommandoer"),
+                              systemImage: "arrow.right")
+                            .frame(maxWidth: .infinity, minHeight: 48)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(bronze)
-                    .disabled(groupDraftContents.isEmpty ||
-                              draft.customRules.count >= 20)
                     .accessibilityIdentifier("athlth-coach-save-group")
                 }
             }
@@ -1255,63 +1307,142 @@ struct ATHLTHAudioCoachActiveListView: View {
     }
 
     private func createCoachGroup() {
-        guard draft.customRules.count < 20 else { return }
-        let metrics = availableGroupContents.filter {
-            groupDraftContents.contains($0)
-        }
-        guard let primary = metrics.first else { return }
-
-        let name = String(
-            groupDraftName.trimmingCharacters(in: .whitespacesAndNewlines)
-                .prefix(60)
-        )
-        let defaultName = groupDraftTrigger == .time
+        let name = String(groupDraftName.trimmingCharacters(
+            in: .whitespacesAndNewlines).prefix(60))
+        let fallback = groupDraftTrigger == .time
             ? tr("Time updates", "Tidsoppdateringer")
             : tr("Distance updates", "Distanseoppdateringer")
-
-        let rule = ATHLTHAudioCoachRule(
-            trigger: groupDraftTrigger,
-            metric: primary,
-            interval: groupDraftInterval,
-            additionalMetrics: Array(metrics.dropFirst()),
-            scope: .workout
-        )
-        var group = ATHLTHAudioCoachGroup(
-            name: name.isEmpty ? defaultName : name
-        )
-        group.ruleIDs = [rule.id]
-        draft.customRules.append(rule)
+        var group = ATHLTHAudioCoachGroup(name: name.isEmpty ? fallback : name)
+        group.trigger = groupDraftTrigger
+        group.interval = groupDraftInterval
         draft.coachGroups.append(group)
+        pendingGroupCommandID = group.id
+        groupCommandMetric = groupDraftTrigger == .time ? .elapsedTime : .distance
+        groupCommandPhrase = ""
         showingGroupBuilder = false
+    }
+
+    private var groupCommandSheet: some View {
+        NavigationStack {
+            Form {
+                if let group = draft.coachGroups.first(where: {
+                    $0.id == pendingGroupCommandID
+                }) {
+                    Section {
+                        Label(
+                            group.trigger == .time
+                                ? tr("Every \(group.interval ?? 60) seconds",
+                                     "Hvert \(group.interval ?? 60) sekund")
+                                : tr("Every \(group.interval ?? 1_000) metres",
+                                     "Hver \(group.interval ?? 1_000) meter"),
+                            systemImage: group.trigger == .time ? "clock" : "figure.run"
+                        )
+                        .foregroundStyle(bronze)
+                    } header: {
+                        Text(tr("GROUP TRIGGER", "GRUPPENS TRIGGER"))
+                    }
+
+                    Section {
+                        Picker(tr("What should Coach say?", "Hva skal Coach si?"),
+                               selection: $groupCommandMetric) {
+                            ForEach(availableGroupContents) { metric in
+                                Text(metric.title).tag(metric)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        if groupCommandMetric == .motivation {
+                            TextField(
+                                tr("Personal phrase (optional)",
+                                   "Egen setning (valgfritt)"),
+                                text: $groupCommandPhrase,
+                                axis: .vertical
+                            )
+                            .lineLimit(2...4)
+                        }
+                    } header: {
+                        Text(tr("ADD ONE COMMAND", "LEGG TIL ÉN KOMMANDO"))
+                    } footer: {
+                        Text(tr(
+                            "Add as many commands as you wish, one at a time. They share the group's trigger and play as one message.",
+                            "Legg til én kommando om gangen. Alle bruker gruppens trigger og leses som én beskjed."
+                        ))
+                    }
+
+                    Section {
+                        Button(action: addCommandToGroup) {
+                            Label(tr("Add command", "Legg til kommando"),
+                                  systemImage: "plus.circle")
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(bronze)
+                        .disabled(draft.customRules.count >= 20 &&
+                                  group.ruleIDs.isEmpty)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("Group commands", "Gruppekommandoer"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Done", "Ferdig")) {
+                        pendingGroupCommandID = nil
+                        showingGroupCommandBuilder = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func addCommandToGroup() {
+        guard let groupID = pendingGroupCommandID,
+              let groupIndex = draft.coachGroups.firstIndex(where: {
+                  $0.id == groupID
+              })
+        else { return }
+        let group = draft.coachGroups[groupIndex]
+        let metric = groupCommandMetric
+        let phrase = String(groupCommandPhrase.trimmingCharacters(
+            in: .whitespacesAndNewlines).prefix(180))
+        let existingID = group.ruleIDs.first(where: { id in
+            draft.customRules.contains {
+                $0.id == id && $0.beforeEndSeconds == nil
+            }
+        })
+
+        if let existingID,
+           let index = draft.customRules.firstIndex(where: { $0.id == existingID }) {
+            if !draft.customRules[index].selectedMetrics.contains(metric) {
+                draft.customRules[index].additionalMetrics =
+                    (draft.customRules[index].additionalMetrics ?? []) + [metric]
+            }
+            if metric == .motivation && !phrase.isEmpty {
+                draft.customRules[index].customPhrase = phrase
+            }
+        } else {
+            guard draft.customRules.count < 20 else { return }
+            var rule = ATHLTHAudioCoachRule(
+                trigger: group.trigger ?? .time,
+                metric: metric,
+                interval: group.interval ?? 60,
+                scope: .workout
+            )
+            if metric == .motivation && !phrase.isEmpty {
+                rule.customPhrase = phrase
+            }
+            draft.customRules.append(rule)
+            draft.coachGroups[groupIndex].ruleIDs.append(rule.id)
+        }
+        groupCommandPhrase = ""
+        // Keep this sheet open so the next command can be added immediately.
     }
 
     private var quickMessageSheet: some View {
         NavigationStack {
             Form {
-                if showStructuredOptions {
-                    Section {
-                        Button {
-                            draft.smartPrompts.targetZoneVoiceAlertsEnabled = true
-                            draft.smartPrompts.preferredHeartRateZone = nil
-                            showingQuickMessage = false
-                        } label: {
-                            Label(
-                                tr("Notify me when outside my planned pulse zone",
-                                   "Si fra når jeg er utenfor planlagt pulssone"),
-                                systemImage: "heart.text.square"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(bronze)
-                            .frame(minHeight: 44, alignment: .leading)
-                        }
-                    } header: {
-                        Text(tr("Recommended for intervals", "Anbefalt for intervaller"))
-                    } footer: {
-                        Text(tr("Uses Z1–Z5 from each programmed effort. No separate message per interval.",
-                                "Bruker Z1–Z5 fra hvert planlagte drag. Ingen egen beskjed per intervall."))
-                    }
-                }
-
                 Section {
                     Picker(tr("When should Coach speak?", "Når skal Coach snakke?"),
                            selection: $quickTrigger) {
