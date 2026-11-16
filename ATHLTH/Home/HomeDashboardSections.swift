@@ -4727,7 +4727,8 @@ private struct HomeWeeklyProgressDaySheet: View {
         guard onStartStandaloneWorkout != nil,
               !workout.isExplicitRestDay,
               workout.trainTogetherMode == nil,
-              session.recordedTimes(for: workout.id)?.endedAt == nil,
+              session.recordedTimes(for: workout.id) == nil,
+              !isCancelledPlannedWorkout(workout),
               !selection.completedPlannedIDs.contains(workout.id)
         else { return false }
         if let planID = HomeWeeklyProgressCalendar.containingPlanID(
@@ -4748,6 +4749,20 @@ private struct HomeWeeklyProgressDaySheet: View {
 
     private func plannedRow(_ workout: PlannedSession) -> some View {
         HStack(spacing: 6) {
+            if canModifyPlannedWorkout(workout) {
+                Button { editTimeOfWorkout(workout) } label: {
+                    plannedTimeLabel(workout)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Change scheduled time",
+                    norwegian: "Endre klokkeslett"
+                ))
+                .accessibilityIdentifier("athlth-home-day-edit-time")
+            } else {
+                plannedTimeLabel(workout)
+            }
+
             Button {
                 if workout.trainTogetherMode != nil {
                     selectedInvitationLobby = workout
@@ -4799,6 +4814,53 @@ private struct HomeWeeklyProgressDaySheet: View {
                 ))
                 .accessibilityIdentifier("athlth-home-day-start-planned-workout")
             }
+            if canModifyPlannedWorkout(workout) || canRemovePlannedWorkout(workout) {
+                Menu {
+                    if canModifyPlannedWorkout(workout) {
+                        Button {
+                            openWorkoutDetailsAfterSheet(workout)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Edit workout",
+                                norwegian: "Rediger økt"
+                            ), systemImage: "pencil")
+                        }
+                        Button {
+                            editTimeOfWorkout(workout)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Change time",
+                                norwegian: "Endre klokkeslett"
+                            ), systemImage: "clock")
+                        }
+                        Button {
+                            workoutPendingCancellation = workout
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Cancel workout",
+                                norwegian: "Avlys økt"
+                            ), systemImage: "calendar.badge.minus")
+                        }
+                    }
+                    if canRemovePlannedWorkout(workout) {
+                        Button(role: .destructive) {
+                            workoutPendingRemoval = workout
+                            showingRemoveConfirmation = true
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Delete workout",
+                                norwegian: "Slett økt"
+                            ), systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 30, height: 42)
+                }
+                .accessibilityIdentifier("athlth-home-day-workout-actions")
+            }
         }
         .background {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
@@ -4818,29 +4880,37 @@ private struct HomeWeeklyProgressDaySheet: View {
         }
     }
 
+    private func plannedTimeLabel(_ workout: PlannedSession) -> some View {
+        let recordedTimes = session.recordedTimes(for: workout.id)
+        return VStack(alignment: .leading, spacing: 3) {
+            Text((recordedTimes?.startedAt ?? workout.scheduledStart)?
+                .formatted(date: .omitted, time: .shortened) ?? "—:—")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            if let end = recordedTimes?.endedAt {
+                Text("–" + end.formatted(
+                    date: .omitted, time: .shortened
+                ))
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else if canModifyPlannedWorkout(workout) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+        }
+        .monospacedDigit()
+        .frame(width: 50, minHeight: 43, alignment: .leading)
+        .padding(.leading, 10)
+        .accessibilityElement(children: .combine)
+    }
+
     private func plannedRowContent(_ workout: PlannedSession) -> some View {
         let recordedTimes = session.recordedTimes(for: workout.id)
         let completed = !workout.isExplicitRestDay &&
             (selection.completedPlannedIDs.contains(workout.id) ||
              recordedTimes?.endedAt != nil)
         return HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text((recordedTimes?.startedAt ?? workout.scheduledStart)?
-                    .formatted(date: .omitted, time: .shortened) ?? "—:—")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                if let end = recordedTimes?.endedAt {
-                    Text("–" + end.formatted(
-                        date: .omitted, time: .shortened
-                    ))
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
-            }
-            .monospacedDigit()
-            .frame(width: 49, alignment: .leading)
-            .accessibilityElement(children: .combine)
-
             Image(systemName:
                 completed ? "checkmark" :
                 workout.isExplicitRestDay ? "moon.stars.fill" :
@@ -4877,11 +4947,13 @@ private struct HomeWeeklyProgressDaySheet: View {
             Spacer(minLength: 4)
             Text(completed
                 ? ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
-                : workout.isExplicitRestDay
-                    ? ATHLTHLocalization.choose(english: "Rest", norwegian: "Hvile")
-                    : recordedTimes != nil
-                        ? ATHLTHLocalization.choose(english: "In progress", norwegian: "Pågår")
-                        : ATHLTHLocalization.choose(english: "Planned", norwegian: "Planlagt"))
+                : isCancelledPlannedWorkout(workout)
+                    ? ATHLTHLocalization.choose(english: "Cancelled", norwegian: "Avlyst")
+                    : workout.isExplicitRestDay
+                        ? ATHLTHLocalization.choose(english: "Rest", norwegian: "Hvile")
+                        : recordedTimes != nil
+                            ? ATHLTHLocalization.choose(english: "In progress", norwegian: "Pågår")
+                            : ATHLTHLocalization.choose(english: "Planned", norwegian: "Planlagt"))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(completed
                     ? ATHLTHTheme.vitality
