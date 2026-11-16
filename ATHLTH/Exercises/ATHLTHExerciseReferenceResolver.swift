@@ -51,6 +51,8 @@ enum ATHLTHExerciseReferenceResolver {
         "overhead triceps extension": "overhead-triceps-extension",
         "cable fly": "cable-fly",
         "glute bridge": "glute-bridge",
+        "hip thrust": "hip-thrust",
+        "barbell hip thrust": "hip-thrust",
         "plank": "plank",
         "side plank": "side-plank",
         "dead bug": "dead-bug",
@@ -87,6 +89,36 @@ enum ATHLTHExerciseReferenceResolver {
         // Do not guess across different equipment or movement variations.
         guard let slug = normalizedNativeAliases[normalized] else { return nil }
         return "athlth-native-" + slug
+    }
+
+    /// Reviewed RepDB IDs already present in the shipped/downloadable exercise
+    /// library. Never map incline curls to hammer curls or an equipment-free
+    /// reverse lunge to a kettlebell variant.
+    private static let reviewedRepDBAliases: [String: String] = [
+        "bird dog": "bird-dog",
+        "fuglehund": "bird-dog",
+        "bodyweight squat": "bodyweight-squat",
+        "knebøy med kroppsvekt": "bodyweight-squat",
+        "reverse lunge": "kettlebell-reverse-lunge",
+        "bakoverutfall med kettlebell": "kettlebell-reverse-lunge",
+        "bodyweight reverse lunge": "bodyweight-reverse-lunge",
+        "bakoverutfall med kroppsvekt": "bodyweight-reverse-lunge",
+        "incline dumbbell curl": "incline-db-curl",
+        "skrå manualcurl": "incline-db-curl",
+        "bicepscurl med manualer på skråbenk": "incline-db-curl"
+    ]
+
+    private static let normalizedRepDBAliases: [String: String] = {
+        Dictionary(uniqueKeysWithValues: reviewedRepDBAliases.map {
+            (key($0.key), $0.value)
+        })
+    }()
+
+    /// Use this for curated source workouts. Native IDs and RepDB IDs share a
+    /// single exact-identity resolution path without creating duplicate data.
+    static func exerciseSourceIdentifier(for name: String) -> String? {
+        nativeSourceIdentifier(for: name) ??
+            normalizedRepDBAliases[key(name)]
     }
 
     static func resolve(
@@ -146,13 +178,13 @@ enum ATHLTHExerciseReferenceResolver {
         // titles alone are not proof that two personal exercises are the same.
         let clean = key(block.title)
         guard !clean.isEmpty else { return nil }
-        let nativeSlug = nativeSourceIdentifier(for: block.title)
-        if let nativeSlug {
-            let native = library.filter {
-                $0.source == .athlthCatalog &&
-                $0.sourceIdentifier == nativeSlug
+        if let reviewedID = exerciseSourceIdentifier(for: block.title) {
+            let source: ExerciseLibrarySource = reviewedID.hasPrefix("athlth-native-")
+                ? .athlthCatalog : .repDB
+            let matches = library.filter {
+                $0.source == source && $0.sourceIdentifier == reviewedID
             }
-            if native.count == 1 { return native[0] }
+            if matches.count == 1 { return matches[0] }
         }
 
         let repdbExact = library.filter {
