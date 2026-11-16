@@ -131,6 +131,8 @@ struct ExerciseLibraryView: View {
     @State private var favoritesOnly = false
     @State private var standaloneFavorites = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
+    // A tapped letter changes the 50-row window, not the number of mounted rows.
+    @State private var visibleStartIndex = 0
     @State private var searchExpanded = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
     @State private var preferredColumns = 0
@@ -297,6 +299,7 @@ struct ExerciseLibraryView: View {
             set: { scope in
                 standaloneFavorites = scope == .favorites
                 selectedSection = scope == .mine ? .mine : .library
+                visibleStartIndex = 0
                 visibleLimit = ATHLTHLibraryPagination.pageSize
             }
         )
@@ -563,7 +566,13 @@ struct ExerciseLibraryView: View {
                             ),
                             spacing: 10
                         ) {
-                            ForEach(Array(entries.prefix(visibleLimit))) { entry in
+                            ForEach(
+                                ATHLTHExerciseAlphabetPage.visibleEntries(
+                                    from: entries,
+                                    startIndex: visibleStartIndex,
+                                    limit: visibleLimit
+                                )
+                            ) { entry in
                                 Group {
                                     if displayMode == .grid, let onSelect {
                                         // A dedicated footer keeps the entire
@@ -694,8 +703,17 @@ struct ExerciseLibraryView: View {
                         .padding(.trailing, 34)
                         .padding(.vertical, 16)
                         ATHLTHLibraryLoadMoreButton(
-                            shown: min(entries.count, visibleLimit),
-                            total: entries.count
+                            shown: min(
+                                ATHLTHExerciseAlphabetPage.remainingCount(
+                                    total: entries.count,
+                                    startIndex: visibleStartIndex
+                                ),
+                                visibleLimit
+                            ),
+                            total: ATHLTHExerciseAlphabetPage.remainingCount(
+                                total: entries.count,
+                                startIndex: visibleStartIndex
+                            )
                         ) {
                             visibleLimit += ATHLTHLibraryPagination.pageSize
                         }
@@ -712,12 +730,32 @@ struct ExerciseLibraryView: View {
                     ) {
                         if !entries.isEmpty {
                             ATHLTHExerciseAlphabetIndex(
-                                targets: library.alphabetIndexTargets(
-                                    for: Array(entries.prefix(visibleLimit))
-                                ),
+                                // Targets must cover ALL matching exercises, not
+                                // only the 50 rows currently mounted in the grid.
+                                targets: library.alphabetIndexTargets(for: entries),
                                 onJump: { id in
-                                    withAnimation(.easeOut(duration: 0.18)) {
-                                        proxy.scrollTo(id, anchor: .top)
+                                    guard let index =
+                                        ATHLTHExerciseAlphabetPage.startIndex(
+                                            for: id, in: entries
+                                        )
+                                    else { return }
+                                    let isVisible = index >= visibleStartIndex &&
+                                        index < visibleStartIndex + visibleLimit
+                                    if isVisible {
+                                        withAnimation(.easeOut(duration: 0.18)) {
+                                            proxy.scrollTo(id, anchor: .top)
+                                        }
+                                    } else {
+                                        // Rebase on the first item of the letter
+                                        // without constructing every preceding row.
+                                        visibleStartIndex = index
+                                        visibleLimit = ATHLTHLibraryPagination.pageSize
+                                        // Scroll only after SwiftUI installs the new
+                                        // page's IDs in the lazy grid.
+                                        Task { @MainActor in
+                                            await Task.yield()
+                                            proxy.scrollTo(id, anchor: .top)
+                                        }
                                     }
                                 }
                             )
@@ -799,6 +837,7 @@ struct ExerciseLibraryView: View {
             ))
         }
         .onChange(of: pageFilterKey) { _, _ in
+            visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .onChange(of: selectedSection) { _, section in
