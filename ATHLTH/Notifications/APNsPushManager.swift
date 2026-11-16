@@ -20,6 +20,35 @@ struct ATHLTHBodyGoalNotificationRoute: Identifiable, Equatable {
     var id: UUID { goalID }
 }
 
+/// Deep link for a real Train Together invitation. The recipient identifier
+/// prevents a push for one account from opening another account's inbox.
+struct ATHLTHWorkoutInviteNotificationRoute: Identifiable, Equatable {
+    let workoutSessionID: UUID
+    let recipientID: UUID?
+    let backendEventID: UUID?
+
+    var id: UUID { workoutSessionID }
+
+    static func resolve(userInfo: [AnyHashable: Any]) -> Self? {
+        guard
+            (userInfo["athlth_kind"] as? String)?.lowercased() == "workout_invite",
+            (userInfo["athlth_entity_type"] as? String)?.lowercased() == "workout_session",
+            let rawID = userInfo["athlth_entity_id"] as? String,
+            let sessionID = UUID(uuidString: rawID)
+        else { return nil }
+
+        let recipientID = (userInfo["athlth_recipient_id"] as? String)
+            .flatMap(UUID.init(uuidString:))
+        let backendEventID = (userInfo["athlth_event_id"] as? String)
+            .flatMap(UUID.init(uuidString:))
+        return Self(
+            workoutSessionID: sessionID,
+            recipientID: recipientID,
+            backendEventID: backendEventID
+        )
+    }
+}
+
 struct ATHLTHPushNavigationTarget:
     Identifiable,
     Equatable
@@ -52,6 +81,8 @@ final class APNsPushManager: ObservableObject {
         ATHLTHPushNavigationTarget?
     @Published private(set) var pendingChallengeNotification:
         ATHLTHChallengeNotificationRoute?
+    @Published private(set) var pendingWorkoutInviteNotification:
+        ATHLTHWorkoutInviteNotificationRoute?
     @Published private(set) var pendingDailyCheckInAccountID: UUID?
     @Published private(set) var pendingBodyGoalCheckIn:
         ATHLTHBodyGoalNotificationRoute?
@@ -106,6 +137,13 @@ final class APNsPushManager: ObservableObject {
             pendingDailyCheckInAccountID = accountID
             return
         }
+        if let invite = ATHLTHWorkoutInviteNotificationRoute.resolve(
+            userInfo: userInfo
+        ) {
+            pendingWorkoutInviteNotification = invite
+            return
+        }
+
         if let route = ATHLTHChallengeNotificationRoute.resolve(
             userInfo: userInfo
         ) {
@@ -161,6 +199,10 @@ final class APNsPushManager: ObservableObject {
 
     func clearPendingChallengeNotification() {
         pendingChallengeNotification = nil
+    }
+
+    func clearPendingWorkoutInviteNotification() {
+        pendingWorkoutInviteNotification = nil
     }
 
     func clearPendingDailyCheckIn() {
