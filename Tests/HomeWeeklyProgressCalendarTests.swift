@@ -316,3 +316,47 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
     }
 
 }
+
+
+final class HomeTodayRecordedWorkoutPolicyTests: XCTestCase {
+    func testCompletedUnplannedWorkoutAppearsToday() {
+        let now = Date()
+        let start = now.addingTimeInterval(-1_800)
+        let end = now.addingTimeInterval(-500)
+        XCTAssertTrue(HomeTodayRecordedWorkoutPolicy.shouldShow(
+            startedAt: start,
+            endedAt: end,
+            plannedRecordedStarts: [],
+            today: end
+        ))
+    }
+
+    func testActualCompletedPlannedWorkoutNotDuplicated() {
+        let date = Date()
+        let start = date.addingTimeInterval(-3_000)
+        let end = date.addingTimeInterval(-2_400)
+        XCTAssertFalse(HomeTodayRecordedWorkoutPolicy.shouldShow(
+            startedAt: start,
+            endedAt: end,
+            plannedRecordedStarts: [start.addingTimeInterval(30)],
+            today: end
+        ))
+    }
+
+    func testPastWorkoutAndUnfinishedRecordingNotPresentedAsToday() {
+        let today = Date()
+        let yesterday = today.addingTimeInterval(-86_400)
+        XCTAssertFalse(HomeTodayRecordedWorkoutPolicy.shouldShow(
+            startedAt: yesterday.addingTimeInterval(-900),
+            endedAt: yesterday,
+            plannedRecordedStarts: [],
+            today: today
+        ))
+        XCTAssertFalse(HomeTodayRecordedWorkoutPolicy.shouldShow(
+            startedAt: today,
+            endedAt: today.addingTimeInterval(-30),
+            plannedRecordedStarts: [],
+            today: today
+        ))
+    }
+}
