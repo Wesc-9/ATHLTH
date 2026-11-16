@@ -122,6 +122,22 @@ enum ATHLTHExerciseReferenceResolver {
             normalizedRepDBAliases[key(name)]
     }
 
+    /// Legacy published HYROX recipes use short identifiers, while the
+    /// stock exercise library uses athlth: names. These exact aliases are
+    /// limited to published, app-owned stations — never private exercises.
+    private static let publishedHYROXSourceAliases: [String: String] = [
+        "burpee-broad-jump": "athlth:burpee-broad-jump",
+        "farmers-carry": "athlth:farmers-carry",
+        "hand-release-push-up": "athlth:hand-release-push-up",
+        "rowing-erg": "athlth:rowing",
+        "sandbag-walking-lunge": "athlth:sandbag-walking-lunge",
+        "ski-erg": "athlth:skierg",
+        "sled-pull": "athlth:sled-pull",
+        "sled-push": "athlth:sled-push",
+        "stationary-lunge": "athlth:stationary-lunge",
+        "wall-ball": "athlth:wall-ball"
+    ]
+
     static func resolve(
         _ block: WorkoutTemplateBlock,
         in library: [ExerciseLibraryEntry]
@@ -148,8 +164,15 @@ enum ATHLTHExerciseReferenceResolver {
                 return identifier == slug || key(identifier) == normalizedSlug
             }
             if byIdentifier.count == 1 { return byIdentifier[0] }
-            // Explicit source identifiers are authoritative. Do not fall
-            // back to a name match when the referenced item is unavailable.
+            if let canonicalID = publishedHYROXSourceAliases[slug] {
+                let matches = library.filter {
+                    $0.source == .athlthCatalog &&
+                    $0.sourceIdentifier == canonicalID
+                }
+                if matches.count == 1 { return matches[0] }
+            }
+            // All other explicit source identifiers remain authoritative.
+            // Never replace an absent private/custom exercise by title.
             return nil
         }
 
