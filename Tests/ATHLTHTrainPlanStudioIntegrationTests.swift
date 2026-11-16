@@ -604,7 +604,7 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
     }
 
     @MainActor
-    func testPastUnfinishedWorkoutCanBeRemovedWithoutTouchingCompletedOrSkipped() throws {
+    func testPastUnfinishedAndExplicitlySkippedWorkoutsCanBeRemovedWithoutTouchingCompleted() throws {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
         let yesterday = try XCTUnwrap(Calendar.current.date(
@@ -646,10 +646,21 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
             expectedVersion: after.version,
             healthWorkouts: [], strengthHistory: []
         ))
-        XCTAssertFalse(store.removePlanStudioWorkout(
+        // A skipped workout is not recorded execution and may be explicitly
+        // deleted. Removing it must also clear its stale skipped marker.
+        XCTAssertTrue(store.removePlanStudioWorkout(
             planID: plan.id, workoutID: skipped.id, dayID: dayID,
             expectedVersion: after.version,
             healthWorkouts: [], strengthHistory: []
+        ))
+        let final = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(final.version, after.version + 1)
+        XCTAssertEqual(final.weeks[0].days[0].sessions.map(\.id), [completed.id])
+        XCTAssertFalse(store.isPlanSessionSkipped(
+            planID: plan.id, sessionID: skipped.id
+        ))
+        XCTAssertTrue(store.isPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: completed.id
         ))
     }
 
