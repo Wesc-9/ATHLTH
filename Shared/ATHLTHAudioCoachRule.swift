@@ -136,10 +136,14 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             ? Int(min(floor(intervalValue / Double(validatedInterval)),
                       Double(Int.max / 2)))
             : 0
+        let personal = customPhrase?.trimmingCharacters(in: .whitespacesAndNewlines)
         let parts = selectedMetrics.filter {
             !excludedMetrics.contains($0)
-        }.compactMap { item in
-            component(
+        }.compactMap { item -> String? in
+            if item == .motivation, let personal, !personal.isEmpty {
+                return personal
+            }
+            return component(
                 item, distanceMeters: distanceMeters,
                 elapsedSeconds: elapsedSeconds,
                 paceSecondsPerKilometer: paceSecondsPerKilometer,
@@ -492,6 +496,10 @@ struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
     var ruleIDs: [UUID] = []
     /// Existing smart/structured Audio Coach options belonging to this group.
     var optionIDs: [String] = []
+    /// One shared trigger for commands added to this group. Optional to
+    /// preserve existing profiles and Watch transfers that predate v2.2.2.
+    var trigger: ATHLTHAudioCoachRule.Trigger? = nil
+    var interval: Int? = nil
 }
 
 struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {
