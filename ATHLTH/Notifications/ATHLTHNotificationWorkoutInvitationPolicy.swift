@@ -46,9 +46,16 @@ enum ATHLTHNotificationWorkoutInvitationStatus: Equatable {
 enum ATHLTHNotificationWorkoutInvitationPolicy {
     static func status(
         session: SocialWorkoutSessionRecord?,
-        participant: SocialWorkoutParticipantRecord?
+        participant: SocialWorkoutParticipantRecord?,
+        now: Date = Date()
     ) -> ATHLTHNotificationWorkoutInvitationStatus {
-        status(sessionStatus: session?.status, participantState: participant?.state)
+        status(
+            sessionStatus: session?.status,
+            participantState: participant?.state,
+            scheduledStart: session?.invitePayload?.workout.scheduledStart,
+            isPlanned: session?.resolvedWorkoutPhase == .planned,
+            now: now
+        )
     }
 
     /// Do not call a missing entry "deleted": a limited list read or offline
@@ -56,7 +63,10 @@ enum ATHLTHNotificationWorkoutInvitationPolicy {
     /// server status merits the word "Avlyst".
     static func status(
         sessionStatus: SocialWorkoutSessionStatus?,
-        participantState: SocialWorkoutParticipantState?
+        participantState: SocialWorkoutParticipantState?,
+        scheduledStart: Date? = nil,
+        isPlanned: Bool = true,
+        now: Date = Date()
     ) -> ATHLTHNotificationWorkoutInvitationStatus {
         guard let sessionStatus else { return .unverified }
 
@@ -64,6 +74,11 @@ enum ATHLTHNotificationWorkoutInvitationPolicy {
         case .cancelled: return .cancelled
         case .completed: return .completed
         case .active:
+            // Only pending planned invitations expire, not accepted sessions.
+            if participantState == .invited, isPlanned,
+               let scheduledStart, scheduledStart <= now {
+                return .cancelled
+            }
             switch participantState {
             case .invited: return .actionable
             case .accepted: return .accepted
