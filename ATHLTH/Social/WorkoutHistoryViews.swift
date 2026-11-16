@@ -4431,7 +4431,8 @@ struct PostWorkoutReviewView: View {
             creatorName: session.profile.displayName,
             creatorUsername: session.profile.username,
             includeHealthData: includeHealthData,
-            pulseSamples: completionMeasuredPulse
+            pulseSamples: completionMeasuredPulse,
+            maximumHeartRateBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
         )
 
         let mediaSaved =
