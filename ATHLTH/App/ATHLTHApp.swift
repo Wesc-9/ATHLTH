@@ -2170,6 +2170,16 @@ struct AppRootView: View {
             guard appSession.signedIn else { return }
             Task { await syncCalendarIfAllowed() }
         }
+        .onChange(of: appSession.manuallyCompletedPlanSessions) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
+        .onChange(of: strengthWorkout.workoutHistory.compactMap {
+            $0.plannedSessionID != nil && $0.isFinished ? $0.id : nil
+        }) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
         .onChange(of: appSession.linkedHealthWorkoutsByPlanSession) { _, _ in
             guard appSession.signedIn else { return }
             Task { await syncCalendarIfAllowed() }
