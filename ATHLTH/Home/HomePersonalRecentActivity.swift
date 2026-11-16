@@ -275,8 +275,29 @@ private enum HomeActivityVisibilityStore {
     }
 }
 
+/// A completed personal recording can appear in Today's Calendar without
+/// turning into a new planned session. Match actual start times to suppress
+/// duplicate planned/completed rows; never infer completion from a title.
+enum HomeTodayRecordedWorkoutPolicy {
+    static func shouldShow(
+        startedAt: Date,
+        endedAt: Date,
+        plannedRecordedStarts: [Date],
+        today: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard endedAt >= startedAt,
+              calendar.isDate(endedAt, inSameDayAs: today) else { return false }
+        return !plannedRecordedStarts.contains {
+            abs($0.timeIntervalSince(startedAt)) <= 180
+        }
+    }
+}
+
+/// Shared between Home recent activity and Today's Calendar so the latter
+/// cannot silently omit valid recorded workouts.
 @MainActor
-private enum HomePersonalWorkoutCatalog {
+enum HomePersonalWorkoutCatalog {
     static func merge(
         healthSummaries: [WorkoutSummary],
         strengthHistory: [StrengthWorkoutLog],
