@@ -1304,7 +1304,9 @@ struct WatchRunWorkoutExperienceView: View {
                     ? ATHLTHLocalization.choose(
                         english: "WORKOUT TIME", norwegian: "ØKTTID"
                     )
-                    : livePaceIsAverage
+                    : workoutManager.lastKilometerPaceSecondsPerKilometer != nil
+                        ? ATHLTHLocalization.choose(english: "LAST KM", norwegian: "SISTE KM")
+                        : livePaceIsAverage
                         ? ATHLTHLocalization.choose(
                             english: "AVG PACE", norwegian: "SNITTEMPO"
                         )
@@ -2009,7 +2011,9 @@ struct WatchRunWorkoutExperienceView: View {
                     liveHeroMetric(
                         title: liveDisplayedPace == nil
                             ? ATHLTHLocalization.choose(english: "WORKOUT TIME", norwegian: "ØKTTID")
-                            : livePaceIsAverage
+                            : workoutManager.lastKilometerPaceSecondsPerKilometer != nil
+                        ? ATHLTHLocalization.choose(english: "LAST KM", norwegian: "SISTE KM")
+                        : livePaceIsAverage
                                 ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
                                 : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
                         value: liveDisplayedPace.map { paceText($0) } ??
@@ -2023,7 +2027,9 @@ struct WatchRunWorkoutExperienceView: View {
                     liveHeroMetric(
                         title: liveDisplayedPace == nil
                             ? ATHLTHLocalization.choose(english: "WORKOUT TIME", norwegian: "ØKTTID")
-                            : livePaceIsAverage
+                            : workoutManager.lastKilometerPaceSecondsPerKilometer != nil
+                        ? ATHLTHLocalization.choose(english: "LAST KM", norwegian: "SISTE KM")
+                        : livePaceIsAverage
                                 ? ATHLTHLocalization.choose(english: "AVG PACE", norwegian: "SNITTEMPO")
                                 : ATHLTHLocalization.choose(english: "PACE", norwegian: "TEMPO"),
                         value: liveDisplayedPace.map { paceText($0) } ??
@@ -2196,7 +2202,10 @@ struct WatchRunWorkoutExperienceView: View {
     private var livePaceReadout: (
         secondsPerKilometer: TimeInterval?, isAverage: Bool
     ) {
-        ATHLTHRunningPace.displayPace(
+        if let lastKilometer = workoutManager.lastKilometerPaceSecondsPerKilometer {
+            return (secondsPerKilometer: lastKilometer, isAverage: false)
+        }
+        return ATHLTHRunningPace.displayPace(
             current: workoutManager.usesOutdoorGPS
                 ? workoutManager.currentPaceSecondsPerKilometer : nil,
             average: workoutManager.averagePaceSecondsPerKilometer
@@ -2371,7 +2380,9 @@ struct WatchRunWorkoutExperienceView: View {
                     ? ATHLTHLocalization.choose(
                         english: "TIME", norwegian: "TID"
                     )
-                    : livePaceIsAverage
+                    : workoutManager.lastKilometerPaceSecondsPerKilometer != nil
+                        ? ATHLTHLocalization.choose(english: "LAST KM", norwegian: "SISTE KM")
+                        : livePaceIsAverage
                         ? ATHLTHLocalization.choose(
                             english: "AVG PACE /KM", norwegian: "SNITTEMPO /KM"
                         )
