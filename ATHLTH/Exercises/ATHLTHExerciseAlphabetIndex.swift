@@ -29,6 +29,30 @@ enum ATHLTHExerciseAlphabet {
     }
 }
 
+/// Jump directly to any matching letter without mounting all earlier pages.
+/// The dataset is already filtered and alphabetized by ExerciseLibraryStore.
+/// This keeps at most the requested page in the on-screen lazy grid.
+enum ATHLTHExerciseAlphabetPage {
+    static func startIndex(
+        for targetID: UUID,
+        in entries: [ExerciseLibraryEntry]
+    ) -> Int? {
+        entries.firstIndex { $0.id == targetID }
+    }
+
+    static func visibleEntries(
+        from entries: [ExerciseLibraryEntry],
+        startIndex: Int,
+        limit: Int
+    ) -> [ExerciseLibraryEntry] {
+        Array(entries.dropFirst(max(0, startIndex)).prefix(max(0, limit)))
+    }
+
+    static func remainingCount(total: Int, startIndex: Int) -> Int {
+        max(0, total - max(0, startIndex))
+    }
+}
+
 struct ATHLTHExerciseAlphabetIndex: View {
     let targets: [String: UUID]
     let onJump: (UUID) -> Void
