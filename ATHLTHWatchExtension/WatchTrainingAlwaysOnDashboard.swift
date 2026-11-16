@@ -362,13 +362,24 @@ struct WatchTrainingAlwaysOnDashboard: View {
                 .font(.system(size: 8, weight: .bold))
                 .foregroundStyle(accent)
 
+                Text(paceCaption)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
                 paceMetric(fontSize: compact ? 25 : 30)
             } else {
                 paceMetric(fontSize: compact ? 35 : 43)
                 Text(paceCaption)
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(accent)
+                    .lineLimit(1)
                 distanceMetric(fontSize: compact ? 30 : 37)
+                Text(ATHLTHLocalization.choose(
+                    english: "DISTANCE", norwegian: "DISTANSE"
+                ))
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(accent)
+                .lineLimit(1)
             }
 
             Spacer(minLength: 0)
