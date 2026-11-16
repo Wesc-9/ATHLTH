@@ -34,7 +34,7 @@ private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
         case .account: return ATHLTHLocalization.choose(english: "Health profile, sign-in and security", norwegian: "Helseprofil, innlogging og sikkerhet")
         case .app: return ATHLTHLocalization.choose(english: "Language, units, time and widgets", norwegian: "Språk, enheter, tid og widgeter")
         case .membership: return ATHLTHLocalization.choose(english: "ATHLTH+, purchases and billing", norwegian: "ATHLTH+, kjøp og betaling")
-        case .privacy: return ATHLTHLocalization.choose(english: "Privacy policy and terms", norwegian: "Personvernerklæring og vilkår")
+        case .privacy: return ATHLTHLocalization.choose(english: "Sharing, privacy and legal information", norwegian: "Deling, personvern og juridisk informasjon")
         case .developer: return ATHLTHLocalization.choose(english: "Diagnostics, AI usage and testing", norwegian: "Diagnostikk, AI-bruk og testing")
         }
     }
@@ -1752,6 +1752,28 @@ settingsSection("Account") {
     private var privacySettingsSection: some View {
         settingsSection("Privacy") {
             PremiumSettingsCard {
+                NavigationLink {
+                    ATHLTHPrivacyCenterView()
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "person.2.shield.checkmark",
+                        title: ATHLTHLocalization.choose(
+                            english: "Sharing & privacy",
+                            norwegian: "Deling og personvern"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Friend feed, workout sharing and profile visibility",
+                            norwegian: "Vennefeed, øktdeling og profilsynlighet"
+                        )
+                    ) {
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                SettingsDivider()
+
                 NavigationLink {
                     LegalDocumentView(kind: .terms)
                 } label: {
@@ -3792,44 +3814,6 @@ private struct ATHLTHTrainingSettingsView: View {
                 )
             }
 
-            Section("Activity sharing") {
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english: "Default visibility for new workouts",
-                        norwegian: "Standard synlighet for nye økter"
-                    ),
-                    selection: $settings.defaultActivityVisibility
-                ) {
-                    ForEach(ProfileVisibility.allCases) { visibility in
-                        Text(visibility.title).tag(visibility)
-                    }
-                }
-
-                Toggle(
-                    "Share completed workouts by default",
-                    isOn: $settings.autoPublishCompletedWorkouts
-                )
-                .onChange(
-                    of: settings.autoPublishCompletedWorkouts
-                ) { _, _ in
-                    settings.workoutSharingChoiceCompleted = true
-                }
-
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Include health data in shared workouts",
-                        norwegian: "Vis helsedata i delte økter"
-                    ),
-                    isOn: $settings.includeWorkoutHealthDataByDefault
-                )
-
-                Text(ATHLTHLocalization.choose(
-                    english: "New workouts use these defaults, but you confirm each post and can always hide heart rate, zones and calories before sharing. Existing posts are unchanged.",
-                    norwegian: "Nye økter bruker disse standardvalgene, men du bekrefter hvert innlegg og kan alltid skjule puls, pulssoner og kalorier før deling. Eksisterende innlegg endres ikke."
-                ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
         }
         .athlthBrandedForm()
         .navigationTitle("Training")
