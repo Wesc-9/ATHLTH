@@ -528,7 +528,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
         else { return }
         draft.coachGroups[index].name = name
         groupNameInput = ""
-        editingGroupID = nil
+        self.editingGroupID = nil
     }
 
     private func removeGroup(_ group: ATHLTHAudioCoachGroup) {
