@@ -18,6 +18,8 @@ final class ATHLTHWorkoutInvitationPushRouteTests: XCTestCase {
         XCTAssertEqual(route?.workoutSessionID, sessionID)
         XCTAssertEqual(route?.recipientID, recipientID)
         XCTAssertEqual(route?.backendEventID, eventID)
+        XCTAssertEqual(route?.isForAccount(recipientID), true)
+        XCTAssertEqual(route?.isForAccount(UUID()), false)
     }
 
     func testLegacyWorkoutInviteWithoutRecipientStillOpensOwnInbox() {
