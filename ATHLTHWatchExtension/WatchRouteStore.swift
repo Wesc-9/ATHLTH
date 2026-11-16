@@ -798,8 +798,9 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WatchWorkoutManager.shared.pause()
         case .resume:
             WatchWorkoutManager.shared.resume()
-        case .setTreadmillIncline, .setTreadmillTargetPace:
-            // Both incline and target pace require a numeric value delivered
+        case .setTreadmillIncline, .setTreadmillTargetPace,
+             .setTreadmillBeltSpeed:
+            // Treadmill adjustments require numeric values delivered
             // with the authorized workout mirror. A raw WCSession command
             // carries neither value and must not overwrite live settings.
             break
