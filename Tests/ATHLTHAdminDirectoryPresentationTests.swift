@@ -38,6 +38,29 @@ final class ATHLTHAdminDirectoryPresentationTests: XCTestCase {
         )
     }
 
+    func testExpiredTrialIsNotPresentedAsActivePlus() {
+        XCTAssertEqual(
+            ATHLTHAdminDirectoryPresentation.subscriptionLabel(
+                tier: "free", status: "trial_expired", norwegian: true
+            ), "Utløpt prøveperiode"
+        )
+        XCTAssertEqual(
+            ATHLTHAdminDirectoryPresentation.subscriptionLabel(
+                tier: "athlth_plus", status: "trialing", norwegian: true
+            ), "ATHLTH+ · Prøveperiode"
+        )
+        XCTAssertEqual(
+            ATHLTHAdminDirectoryPresentation.subscriptionLabel(
+                tier: "athlth_plus", status: "admin_grant", norwegian: true
+            ), "ATHLTH+ · Tildelt"
+        )
+        XCTAssertEqual(
+            ATHLTHAdminDirectoryPresentation.accountStatusTitle(
+                "suspended", norwegian: true
+            ), "Deaktivert"
+        )
+    }
+
     func testRolesUseNorwegianLabels() {
         XCTAssertEqual(
             ATHLTHAdminDirectoryPresentation.roleTitle(
