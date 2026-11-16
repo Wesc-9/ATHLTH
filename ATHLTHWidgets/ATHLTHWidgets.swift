@@ -951,6 +951,74 @@ private struct ATHLTHAdaptiveCompactClock: View {
     }
 }
 
+/// Keep the collapsed Island useful for outdoor and GPS-free indoor cardio.
+/// iOS may shrink it to one metric when another activity (music, calls, etc.)
+/// takes space; the expanded Island and Lock Screen retain all statistics.
+@available(iOS 27.0, *)
+private struct ATHLTHCompactCardioIslandReadout: View {
+    @Environment(\.isDynamicIslandLimitedInWidth)
+    private var isLimitedInWidth
+
+    let elapsedAtSnapshot: TimeInterval
+    let updatedAt: Date
+    let distanceMeters: Double
+    let isPaused: Bool
+
+    private var hasDistance: Bool {
+        distanceMeters.isFinite && distanceMeters > 0
+    }
+
+    private var elapsedLabel: String {
+        ATHLTHLiveActivityDisplayPolicy.compactDuration(
+            max(elapsedAtSnapshot.isFinite ? elapsedAtSnapshot : 0, 0)
+        )
+    }
+
+    private var distanceLabel: String {
+        if distanceMeters >= 1_000 {
+            return String(format: "%.1f km", distanceMeters / 1_000)
+        }
+        return "\(Int(max(distanceMeters, 0).rounded())) m"
+    }
+
+    @ViewBuilder
+    private var elapsedClock: some View {
+        if isPaused {
+            Text(elapsedLabel)
+        } else {
+            Text(updatedAt.addingTimeInterval(
+                -max(elapsedAtSnapshot.isFinite ? elapsedAtSnapshot : 0, 0)
+            ), style: .timer)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: isLimitedInWidth ? 0 : 5) {
+            if hasDistance {
+                Text(isLimitedInWidth
+                    ? ATHLTHLiveActivityDisplayPolicy.compactDistance(distanceMeters)
+                    : distanceLabel)
+                    .lineLimit(1)
+            }
+            if !hasDistance || !isLimitedInWidth {
+                if hasDistance {
+                    Text("·").foregroundStyle(.white.opacity(0.45))
+                }
+                elapsedClock
+                    .lineLimit(1)
+            }
+        }
+        .font(.system(size: isLimitedInWidth ? 11 : 12,
+                      weight: .bold, design: .rounded))
+        .monospacedDigit()
+        .minimumScaleFactor(0.72)
+        .foregroundStyle(.white)
+        .accessibilityLabel(
+            (hasDistance ? distanceLabel + ", " : "") + elapsedLabel
+        )
+    }
+}
+
 struct ATHLTHWorkoutLiveActivity: Widget {
     private typealias Context =
         ActivityViewContext<ATHLTHWorkoutActivityAttributes>
@@ -1006,13 +1074,35 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             } compactLeading: {
                 compactActivityIdentity(context)
             } compactTrailing: {
-                compactTrainingValue(context)
+                compactIslandCardioOrMetric(context)
             } minimal: {
                 compactActivityIdentity(context)
             }
         }
     }
 
+
+    @ViewBuilder
+    private func compactIslandCardioOrMetric(_ context: Context) -> some View {
+        if (context.state.workoutKindRaw == "running" ||
+            context.state.workoutKindRaw == "walking"),
+            context.state.runningStepTitle == nil,
+            (context.state.phase == "running" ||
+             context.state.phase == "paused") {
+            if #available(iOS 27.0, *) {
+                ATHLTHCompactCardioIslandReadout(
+                    elapsedAtSnapshot: context.state.elapsedTime,
+                    updatedAt: context.state.updatedAt,
+                    distanceMeters: context.state.distanceMeters,
+                    isPaused: context.state.phase == "paused"
+                )
+            } else {
+                compactTrainingValue(context)
+            }
+        } else {
+            compactTrainingValue(context)
+        }
+    }
 
     /// Strength uses a deliberately compact Live Activity. Earlier versions
     /// stacked multiple timers and long rows, overflowing the Lock Screen.
@@ -1159,6 +1249,27 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     .frame(maxWidth: 103, alignment: .trailing)
                 }
             }
+
+            HStack(spacing: 12) {
+                if let pace = state.currentPaceSecondsPerKilometer,
+                   pace.isFinite, (120...1_800).contains(pace) {
+                    Label(
+                        (state.paceIsAverage == true
+                            ? localized("Avg", "Snitt")
+                            : localized("Pace", "Tempo")) +
+                            " " + validPace(pace) + "/km",
+                        systemImage: "speedometer"
+                    )
+                }
+                if state.heartRate.isFinite, state.heartRate > 0 {
+                    Label("\(Int(state.heartRate.rounded())) bpm",
+                          systemImage: "heart.fill")
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(ATHLTHWidgetPalette.muted)
+            .lineLimit(1)
 
             if let next = state.runningNextStepTitle,
                !next.isEmpty {
@@ -1820,6 +1931,11 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 }
 
             case .running:
+                Text(context.state.paceIsAverage == true
+                    ? localized("AVG PACE", "SNITTEMPO")
+                    : localized("PACE", "TEMPO"))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.65))
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
                     Text(validPace(context.state.currentPaceSecondsPerKilometer))
                         .font(.title2.weight(.bold))
