@@ -1473,6 +1473,62 @@ private struct ATHLTHRunQuickStartPlanPreview: View {
     }
 }
 
+/// Opens the existing Quick Train motor with a selected route and the
+/// beginner-friendly one-tap iPhone start. Never transfers a route to Watch.
+struct ATHLTHRouteQuickTrainSheet: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
+
+    let route: TrainingRoute
+
+    var body: some View {
+        RunQuickStartSheet(
+            trainingDeviceProvider: watchConnection.isReady ? .appleWatch : .none,
+            watchConnected: watchConnection.isReady,
+            initialRoute: route,
+            forceBasicSetup: true
+        ) { configuration in
+            await startExistingQuickRun(configuration)
+        }
+    }
+
+    @MainActor
+    private func startExistingQuickRun(
+        _ configuration: RunQuickStartConfiguration
+    ) async -> String? {
+        await social.beginWorkoutWithFriends(
+            title: configuration.title,
+            kind: .running,
+            friends: configuration.friends,
+            creatorName: session.profile.displayName,
+            creatorUsername: session.profile.username
+        )
+
+        do {
+            try await WorkoutLaunchCoordinator.startRunQuick(
+                configuration: configuration,
+                session: session,
+                settings: settings,
+                gear: gear,
+                phoneWorkout: phoneWorkout,
+                watchConnection: watchConnection,
+                spotify: spotify,
+                ghostRace: ghostRace
+            )
+            return nil
+        } catch {
+            await social.cancelActiveWorkout()
+            return error.localizedDescription
+        }
+    }
+}
+
 struct RunQuickStartSheet: View {
     @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
     @Environment(\.dismiss) private var dismiss
@@ -1488,6 +1544,9 @@ struct RunQuickStartSheet: View {
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let plannedSession: PlannedSession?
+    /// Route-card entry always uses Basic, regardless of the last-used mode
+    /// in ordinary Quick Train. This never rewrites the user's preference.
+    let forceBasicSetup: Bool
     let onStart: (RunQuickStartConfiguration) async -> String?
     @State private var launchInProgress = false
     @State private var launchFailure: String?
@@ -1532,11 +1591,13 @@ struct RunQuickStartSheet: View {
         initialWorkout:
             RunningWorkoutTemplate? = nil,
         plannedSession: PlannedSession? = nil,
+        forceBasicSetup: Bool = false,
         onStart: @escaping (RunQuickStartConfiguration) async -> String?
     ) {
         self.trainingDeviceProvider = trainingDeviceProvider
         self.watchConnected = watchConnected
         self.plannedSession = plannedSession
+        self.forceBasicSetup = forceBasicSetup
         self.onStart = onStart
 
         // Planned indoor and treadmill workouts must never inherit GPS
@@ -1746,7 +1807,9 @@ struct RunQuickStartSheet: View {
                     placement:
                         .confirmationAction
                 ) {
-                    runSetupModeButton
+                    if !forceBasicSetup {
+                        runSetupModeButton
+                    }
                 }
             }
             .sheet(isPresented: $showingRoutes) {
@@ -1853,11 +1916,9 @@ struct RunQuickStartSheet: View {
                 }
 
                 if !didResolveSetupMode {
-                    isAdvancedSetup =
-                        settings
-                            .resolvedAdvancedSetup(
-                                for: .running
-                            )
+                    isAdvancedSetup = forceBasicSetup
+                        ? false
+                        : settings.resolvedAdvancedSetup(for: .running)
                     didResolveSetupMode = true
                 }
 
@@ -2608,6 +2669,34 @@ struct RunQuickStartSheet: View {
             }
             ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
                 .padding(.horizontal, 12)
+            if forceBasicSetup {
+                Button {
+                    cancelPendingQuickRun()
+                    captureDevice = .iPhone
+                    watchStartMode = .immediate
+                    submitQuickRun(captureDevice: .iPhone)
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Start now", norwegian: "Start nå"
+                        ),
+                        systemImage: "play.fill"
+                    )
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(
+                        ATHLTHTrainDesign.bronze.gradient,
+                        in: RoundedRectangle(cornerRadius: 15)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    launchInProgress ||
+                    !canSubmitQuickRun(captureDevice: .iPhone)
+                )
+                .padding(.horizontal, 14)
+            } else {
             ATHLTHQuickRunStartFooter(
                 watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
                 canStart: canSubmitQuickRun(captureDevice: .iPhone),
@@ -2642,6 +2731,7 @@ struct RunQuickStartSheet: View {
                 },
                 onCancelDelay: cancelPendingQuickRun
             )
+            }
         }
     }
 
