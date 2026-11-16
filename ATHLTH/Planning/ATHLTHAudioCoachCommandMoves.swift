@@ -83,6 +83,17 @@ enum ATHLTHAudioCoachCommandMoves {
                 draft.customRules[index].additionalMetrics =
                     (draft.customRules[index].additionalMetrics ?? []) + [metric]
             }
+            // Preserve an authored motivation sentence when that individual
+            // command is dragged into another group's shared spoken cue.
+            if metric == .motivation,
+               let phrase = source.customPhrase?.trimmingCharacters(
+                   in: .whitespacesAndNewlines
+               ), !phrase.isEmpty {
+                let original = draft.customRules[index].customPhrase ?? ""
+                let combined = original.isEmpty ? phrase : original + " " + phrase
+                draft.customRules[index].customPhrase =
+                    String(combined.prefix(180))
+            }
         } else {
             var newRule = source
             newRule.id = UUID()
