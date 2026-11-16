@@ -55,6 +55,7 @@ enum ATHLTHCuratedStrengthWorkouts {
         minutes: Int, difficulty: String, tags: [String],
         moves: [Move], groups: [FormatGroup] = []
     ) -> WorkoutTemplateCatalogEntry {
+        let withoutEquipment = tags.contains("no equipment")
         var blocks: [WorkoutTemplateBlock] = [
             WorkoutTemplateBlock(
                 sequence: 1, kind: .note,
@@ -62,7 +63,10 @@ enum ATHLTHCuratedStrengthWorkouts {
                 exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
                 durationSeconds: 300, targetWeightKilograms: nil,
                 loadNote: nil,
-                notes: tr(
+                notes: withoutEquipment ? tr(
+                    "No equipment is needed. Warm up with gentle bodyweight movements.",
+                    "Ingen utstyr er nødvendig. Varm opp med rolige bevegelser med egen kroppsvekt."
+                ) : tr(
                     "5 minutes of easy movement and dynamic mobility. Add light warm-up sets before the first heavy lift.",
                     "5 minutter lett bevegelse og dynamisk mobilitet. Ta lette oppvarmingssett før første tunge løft."
                 ),
@@ -71,17 +75,20 @@ enum ATHLTHCuratedStrengthWorkouts {
         ] + moves.enumerated().map { index, move in
             var block = WorkoutTemplateBlock(
                 sequence: index + 2, kind: .exercise, title: move.title,
-                exerciseSlug: ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(
+                exerciseSlug: ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(
                     for: move.title
                 ),
                 distanceMeters: nil,
                 repetitions: move.reps,
                 durationSeconds: move.durationSeconds.map(TimeInterval.init),
                 targetWeightKilograms: nil, loadNote: nil,
-                notes: move.cue ?? tr(
+                notes: move.cue ?? (withoutEquipment ? tr(
+                    "Use bodyweight only; no kettlebells, dumbbells or machines.",
+                    "Bruk bare egen kroppsvekt – ingen kettlebells, manualer eller apparater."
+                ) : tr(
                     "Choose a manageable load and leave about 2 reps in reserve. Adjust sets and reps to your level.",
                     "Velg en håndterbar belastning og behold omtrent 2 repetisjoner i reserve. Tilpass sett og reps til nivået ditt."
-                ),
+                )),
                 phase: .main, setCount: move.sets,
                 restBetweenSetsSeconds: TimeInterval(move.rest)
             )
@@ -267,7 +274,7 @@ enum ATHLTHCuratedStrengthWorkouts {
                   moves: [
                     exercise("Dead Bug", 3, 10, 45),
                     exercise("Bird Dog", 3, 10, 45),
-                    exercise("Pallof Press", 3, 12, 60),
+                    timedExercise("Hollow Body Hold", 3, 30, 60),
                     timedExercise("Plank", 3, 30, 45, cue: tr(
                         "30 seconds per set.", "30 sekunder per sett."
                     )),
@@ -302,18 +309,18 @@ enum ATHLTHCuratedStrengthWorkouts {
                     exercise("Dead Bug", 2, 10, 45)
                   ]),
             entry(14, "Home Strength", "Hjemmestyrke – uten utstyr",
-                  "A practical whole-body workout without gym equipment.",
-                  "En tilgjengelig fullkroppsøkt uten treningsapparater.",
+                  "Bodyweight-only full-body training. No gym or training equipment required.",
+                  "Kun kroppsvekt. Du trenger verken treningsapparater, manualer eller annet treningsutstyr.",
                   minutes: 35, difficulty: "Beginner",
-                  tags: ["home", "hjemme", "bodyweight", "kroppsvekt"],
+                  tags: ["home", "hjemme", "bodyweight", "kroppsvekt", "no equipment", "uten utstyr"],
                   moves: [
                     exercise("Bodyweight Squat", 3, 12, 60),
                     exercise("Push Up", 3, 8, 60, cue: tr(
-                        "Use an elevated surface or knees if needed.",
-                        "Bruk en benk eller knærne ved behov."
+                        "Do push-ups on your knees if needed. No equipment is required.",
+                        "Ta armhevinger på knærne ved behov. Ingen utstyr er nødvendig."
                     )),
                     exercise("Glute Bridge", 3, 12, 60),
-                    exercise("Reverse Lunge", 3, 10, 60),
+                    exercise("Bodyweight Reverse Lunge", 3, 10, 60),
                     exercise("Bird Dog", 3, 10, 45)
                   ]),
             entry(15, "Arms", "Armer – biceps og triceps",
