@@ -191,19 +191,14 @@ enum ATHLTHSpokenAudioSession {
             options.insert(.duckOthers)
         }
 
-        // Spotify/AirPods can reject spokenAudio during handoff. Retry
-        // playback without dropping our mix/duck preference.
-        do {
-            try session.setCategory(
-                .playback, mode: .spokenAudio, options: options
-            )
-            try session.setActive(true)
-        } catch {
-            try session.setCategory(
-                .playback, mode: .default, options: options
-            )
-            try session.setActive(true)
-        }
+        // Spoken-audio mode can classify Spotify as interruptible spoken
+        // content and pause it *after* the coach finishes. Always use the
+        // ordinary playback mode with mix/duck options instead. We never
+        // issue play/pause commands to a music app to restore speech.
+        try session.setCategory(
+            .playback, mode: .default, options: options
+        )
+        try session.setActive(true)
     }
 
     static func deactivate(owner: String = "legacy") {
