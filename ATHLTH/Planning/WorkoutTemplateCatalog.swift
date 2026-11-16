@@ -5414,8 +5414,10 @@ struct WorkoutTemplateBuilderView: View {
                 }
             )
         }
+        // Group remains layout-transparent, as the original ViewBuilder was
+        // on iPhone. Do not introduce an extra VStack or change spacing.
         return AnyView(
-            VStack(alignment: .leading, spacing: 16) {
+            Group {
                 AnyView(studioPlanHeader)
                 AnyView(plannedStudio)
             }
@@ -5430,7 +5432,7 @@ struct WorkoutTemplateBuilderView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if isPlannedWorkout {
                         if studioAdvanced {
-                            AnyView(studioPlanWorkspace)
+                            studioPlanWorkspace
                         } else {
                             AnyView(simplePlannedWorkoutComposer)
                         }
