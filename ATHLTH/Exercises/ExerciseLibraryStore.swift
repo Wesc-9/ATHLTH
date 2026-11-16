@@ -357,7 +357,7 @@ final class ExerciseLibraryStore: ObservableObject {
 
     // Local aliases make Norwegian searches work without altering or
     // redistributing the upstream RepDB dataset.
-    static let norwegianExerciseNames: [String: String] = [
+    nonisolated static let norwegianExerciseNames: [String: String] = [
         "plank": "Planke",
         "side-plank": "Sideplanke",
         "crunches": "Magecrunch",
