@@ -460,6 +460,29 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         return true
     }
 
+    /// Send a genuine athlete-entered belt-speed choice to the Watch.
+    /// The workout start token prevents stale commands changing a new session.
+    @discardableResult
+    func sendTreadmillBeltSpeedKilometersPerHour(_ speed: Double) -> Bool {
+        guard let mirroredSession, let startedAt = snapshot?.startedAt,
+              snapshot?.kind == .running,
+              snapshot?.treadmillInclinePercent != nil,
+              speed.isFinite, (0.1...30).contains(speed),
+              let data = try? JSONEncoder().encode(WatchWorkoutMirrorCommand(
+                  command: .setTreadmillBeltSpeed,
+                  manualBeltSpeedKilometersPerHour: speed,
+                  workoutStartedAt: startedAt
+              )) else { return false }
+        Task {
+            do {
+                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
+            } catch {
+                publish { self.errorMessage = error.localizedDescription }
+            }
+        }
+        return true
+    }
+
     /// Append interval steps without creating another HealthKit session.
     /// The Watch validates the startedAt token and performs the append.
     /// This returns only whether the command could be sent, not an ACK.
