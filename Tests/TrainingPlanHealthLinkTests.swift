@@ -143,7 +143,7 @@ final class TrainingPlanHealthLinkTests: XCTestCase {
     }
 
     @MainActor
-    func testChangingPlannedActivityInvalidatesOldHealthLink() {
+    func testCompletedHealthLinkedWorkoutCannotBeEditedUntilExplicitlyUnlinked() {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
         let start = Calendar.current.date(from: DateComponents(
@@ -171,11 +171,31 @@ final class TrainingPlanHealthLinkTests: XCTestCase {
         planned.kind = .walking
         store.updateSession(planned, inPlan: plan.id)
 
+        // A linked completed workout is immutable from a stale plan editor.
+        // This prevents retroactive changes to an already recorded activity.
+        let lockedSession = store.trainingPlan(withID: plan.id)?
+            .weeks.flatMap(\.days).flatMap(\.sessions)
+            .first(where: { $0.id == planned.id })
+        XCTAssertEqual(lockedSession?.kind, .running)
+        XCTAssertTrue(store.isPlanSessionCompleted(
+            planID: plan.id, sessionID: planned.id,
+            healthWorkouts: [healthRun], strengthHistory: []
+        ))
+
+        // If the athlete explicitly unlinks the completion, editing is valid,
+        // but the old Health record must never count for the new activity.
+        store.unlinkHealthWorkout(planID: plan.id, sessionID: planned.id)
+        store.updateSession(planned, inPlan: plan.id)
+        let edited = store.trainingPlan(withID: plan.id)?
+            .weeks.flatMap(\.days).flatMap(\.sessions)
+            .first(where: { $0.id == planned.id })
+        XCTAssertEqual(edited?.kind, .walking)
+        XCTAssertNil(store.linkedHealthWorkoutID(
+            planID: plan.id, sessionID: planned.id
+        ))
         XCTAssertFalse(store.isPlanSessionCompleted(
-            planID: plan.id,
-            sessionID: planned.id,
-            healthWorkouts: [healthRun],
-            strengthHistory: []
+            planID: plan.id, sessionID: planned.id,
+            healthWorkouts: [healthRun], strengthHistory: []
         ))
         let progress = store.trainingPlanProgress(
             store.trainingPlan(withID: plan.id)!,
