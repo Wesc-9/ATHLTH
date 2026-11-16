@@ -5551,6 +5551,8 @@ struct SessionEditorView: View {
     @State private var isSaving = false
     @State private var invitationError = ""
     @State private var showingInvitationError = false
+    @State private var missingLibraryExercises: [String] = []
+    @State private var showingMissingLibraryExercises = false
 
     @State private var plannedExercises: [PlannedExercise] = []
     @State private var exerciseInsertPhase: WorkoutPhaseKind = .main
@@ -6934,6 +6936,26 @@ struct SessionEditorView: View {
         }
         .alert(
             ATHLTHLocalization.choose(
+                english: "Select library exercises",
+                norwegian: "Velg øvelser fra biblioteket"
+            ),
+            isPresented: $showingMissingLibraryExercises
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Continue editing", norwegian: "Fortsett å redigere"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "These exercises are not linked to your library: " +
+                    missingLibraryExercises.joined(separator: ", ") +
+                    ". Choose an existing exercise or create it in Exercises before saving.",
+                norwegian: "Disse øvelsene er ikke koblet til biblioteket: " +
+                    missingLibraryExercises.joined(separator: ", ") +
+                    ". Velg en eksisterende øvelse, eller opprett den i Øvelser før lagring."
+            ))
+        }
+        .alert(
+            ATHLTHLocalization.choose(
                 english: "Invitation not sent",
                 norwegian: "Invitasjonen ble ikke sendt"
             ),
@@ -7098,7 +7120,7 @@ struct SessionEditorView: View {
                                 original.reminderMinutesBefore
                             scheduled.targetPaceSecondsPerKilometer =
                                 original.targetPaceSecondsPerKilometer
-                            persistSession(scheduled)
+                            guard persistSession(scheduled) else { return false }
                             finishDraft()
                             closeAfterImportedAdvancedSave = true
                         } else if selectedScratchWorkoutType != nil &&
@@ -7114,7 +7136,7 @@ struct SessionEditorView: View {
                             // version or show the old 0-step confirmation.
                             var scheduled = updated
                             scheduled.scheduledStart = scheduledTime
-                            persistSession(scheduled)
+                            guard persistSession(scheduled) else { return false }
                             finishDraft()
                             closeAfterScratchSave = true
                         } else {
@@ -10515,6 +10537,19 @@ struct SessionEditorView: View {
         return prepared
     }
 
+    private func libraryBoundWorkout(_ workout: PlannedSession) -> PlannedSession? {
+        var copy = workout
+        let report = ATHLTHWorkoutExerciseBinding.bind(
+            &copy, library: exerciseLibrary.allExercises
+        )
+        guard report.isReady else {
+            missingLibraryExercises = report.unresolved
+            showingMissingLibraryExercises = true
+            return nil
+        }
+        return copy
+    }
+
     private func saveSession() {
         guard canAdd, !isSaving else { return }
         // Enforce valid consecutive supersets before creating a persisted
@@ -10522,7 +10557,9 @@ struct SessionEditorView: View {
         if pendingInvitationWorkout == nil {
             normalizeSupersetGroups()
         }
-        let workout = pendingInvitationWorkout ?? composeSession()
+        guard let workout = libraryBoundWorkout(
+            pendingInvitationWorkout ?? composeSession()
+        ) else { return }
 
         // Marketplace proposals only prepare a workout; they must not
         // modify the author's calendar or send another invitation.
@@ -10540,7 +10577,7 @@ struct SessionEditorView: View {
         // and of temporary Messages/network failures. A retry reuses the
         // SAME session ID, rather than creating duplicate calendar entries.
         if pendingInvitationWorkout == nil {
-            persistSession(workout)
+            guard persistSession(workout) else { return }
             pendingInvitationWorkout = workout
         }
 
@@ -10608,21 +10645,24 @@ struct SessionEditorView: View {
     }
 
     private func commitSession(_ workout: PlannedSession) {
+        guard let bound = libraryBoundWorkout(workout) else { return }
         if let onPreparedWorkout {
-            onPreparedWorkout(workout)
+            onPreparedWorkout(bound)
             finishDraft()
             onExit?()
             dismiss()
             return
         }
 
-        persistSession(workout)
+        guard persistSession(bound) else { return }
         finishDraft()
         onExit?()
         dismiss()
     }
 
-    private func persistSession(_ workout: PlannedSession) {
+    @discardableResult
+    private func persistSession(_ workout: PlannedSession) -> Bool {
+        guard let workout = libraryBoundWorkout(workout) else { return false }
         if selectedScratchWorkoutType != nil {
             // Count the activity that was actually saved. A scratch running
             // workout may have become a hybrid or cycling session in the
@@ -10651,6 +10691,7 @@ struct SessionEditorView: View {
             }
         }
         // AppSessionStore schedules the reminder when saving.
+        return true
     }
 
     private struct ScratchComposerEntry: Codable {
