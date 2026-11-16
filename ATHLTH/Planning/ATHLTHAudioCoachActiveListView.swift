@@ -38,7 +38,6 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var quickTrigger: ATHLTHAudioCoachRule.Trigger = .time
     @State private var quickMetric: ATHLTHAudioCoachRule.Metric = .heartRate
     @State private var quickInterval = 60
-    @State private var showingVoice = false
     @State private var showingProfiles = false
     @State private var showingSaveNewProfile = false
     @State private var showingGroupTriggerCatalogue = false
@@ -425,7 +424,6 @@ struct ATHLTHAudioCoachActiveListView: View {
                 "Aktive regler blir erstattet av enkel coach. Lagrede profiler er fortsatt tilgjengelige."
             ))
         }
-        .sheet(isPresented: $showingVoice) { voiceSheet }
         .sheet(isPresented: $showingProfiles, onDismiss: {
             if let selectedFromProfiles {
                 self.selectedFromProfiles = nil
@@ -2275,121 +2273,149 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
     }
 
-    private var compactNavigationCard: some View {
-        ATHLTHPlanSurface(ghost: false) {
-            Button { showingVoice = true } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "speaker.wave.2").foregroundStyle(bronze)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(tr("Voice and music", "Stemme og musikk"))
-                            .font(.subheadline.weight(.semibold))
-                        Text(tr("Language, voice and music ducking",
-                                "Språk, stemme og musikkdemping"))
-                            .font(.caption)
-                            .foregroundStyle(dim)
+    /// One expandable, premium editor. Language choice and the provider's
+    /// available voices sit alongside each other; no hidden second settings
+    /// screen and no fake Azure voice IDs.
+    private var voiceAndMusicContent: some View {
+        VStack(alignment: .leading, spacing: 17) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 11) {
+                    Text(tr("LANGUAGE", "SPRÅK"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(bronze)
+
+                    ForEach(WatchAudioCoachLanguage.allCases, id: \.rawValue) { language in
+                        Button {
+                            draft.language = language
+                            draft.voiceIdentifier = nil
+                        } label: {
+                            HStack(spacing: 7) {
+                                Text(language.title)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(2)
+                                Spacer(minLength: 0)
+                                if draft.language == language {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption2)
+                                }
+                            }
+                            .foregroundStyle(draft.language == language ? bronze : ink)
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 40)
+                            .background(
+                                draft.language == language
+                                    ? ATHLTHPlanDesign.selectedSurface : .white,
+                                in: RoundedRectangle(cornerRadius: 11)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    Spacer()
-                    Image(systemName: "chevron.right").foregroundStyle(dim)
                 }
-                .frame(minHeight: 52)
-                .contentShape(Rectangle())
+                .frame(width: 125, alignment: .leading)
+                .padding(10)
+                .background(ATHLTHPlanDesign.canvas, in: RoundedRectangle(cornerRadius: 15))
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(tr("AZURE VOICES", "AZURE-STEMMER"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(bronze)
+
+                    ATHLTHAzureCoachVoicePreviewView(
+                        selectedIdentifier: $draft.voiceIdentifier,
+                        language: $draft.language,
+                        duckOtherAudio: draft.duckOtherAudio
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(ATHLTHPlanDesign.canvas, in: RoundedRectangle(cornerRadius: 15))
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            DisclosureGroup {
+                ATHLTHCoachVoiceChoices(
+                    selectedIdentifier: $draft.voiceIdentifier,
+                    language: draft.language,
+                    speechRate: draft.speechRate,
+                    speechVolume: draft.speechVolume,
+                    duckOtherAudio: draft.duckOtherAudio,
+                    speechStyle: draft.speechStyle
+                )
+                .padding(.top, 8)
+            } label: {
+                Label(tr("Installed Apple voices", "Installerte Apple-stemmer"),
+                      systemImage: "iphone")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .frame(minHeight: 42)
+            }
+            .tint(bronze)
+
+            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+
+            Picker(tr("Speaking style", "Snakkestil"),
+                   selection: $draft.speechStyle) {
+                ForEach(ATHLTHCoachSpeechStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .pickerStyle(.menu)
+
+            HStack {
+                Text(tr("Speaking speed", "Stemmehastighet"))
+                Spacer()
+                Text(draft.speechRate.formatted(
+                    .number.precision(.fractionLength(2))
+                ))
+                .monospacedDigit()
+                .foregroundStyle(dim)
+            }
+            .font(.subheadline)
+            Slider(value: $draft.speechRate, in: 0.35...0.65, step: 0.01)
+                .tint(bronze)
+
+            HStack {
+                Text(tr("Coach volume", "Coachvolum"))
+                Spacer()
+                Text("\(Int((draft.speechVolume * 100).rounded())) %")
+                    .monospacedDigit()
+                    .foregroundStyle(dim)
+            }
+            .font(.subheadline)
+            Slider(value: $draft.speechVolume, in: 0.2...1, step: 0.05)
+                .tint(bronze)
+
+            Toggle(tr("Lower music while Coach speaks",
+                      "Demp musikken mens Coach snakker"),
+                   isOn: $draft.duckOtherAudio)
+                .font(.subheadline)
+                .tint(bronze)
+
+            Picker(tr("Quiet time after announcements",
+                      "Stilleperiode etter varsler"),
+                   selection: $draft.guidanceQuietPeriodSeconds) {
+                ForEach([0.0, 5.0, 10.0, 15.0, 30.0], id: \.self) { seconds in
+                    Text("\(Int(seconds)) s").tag(seconds)
+                }
+            }
+            .pickerStyle(.menu)
+
             if globalScope {
-                Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 NavigationLink {
                     AthleteFuelView()
                 } label: {
-                    HStack {
-                        Label(tr("Fuel and hydration reminders", "Energi og væske"),
-                              systemImage: "drop")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(dim)
-                    }
-                    .frame(minHeight: 50)
+                    Label(tr("Fuel and hydration reminders", "Energi og væske"),
+                          systemImage: "drop")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44, alignment: .leading)
                 }
                 .buttonStyle(.plain)
+                .foregroundStyle(ink)
             }
         }
-    }
-
-    private var voiceSheet: some View {
-        NavigationStack {
-            ScrollView {
-                editorCard {
-                    Picker(tr("Language", "Språk"), selection: $draft.language) {
-                        ForEach(WatchAudioCoachLanguage.allCases, id: \.rawValue) { language in
-                            Text(language.title).tag(language)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .onChange(of: draft.language) { _, _ in
-                        draft.voiceIdentifier = nil
-                    }
-                    Picker(tr("Speaking style", "Snakkestil"),
-                           selection: $draft.speechStyle) {
-                        ForEach(ATHLTHCoachSpeechStyle.allCases) { style in
-                            Text(style.title).tag(style)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    // Keep voice selection in the same sheet. A nested
-                    // NavigationLink had no guaranteed navigation host when
-                    // this view was opened from a modal workout setup.
-                    DisclosureGroup {
-                        ATHLTHCoachVoiceChoices(
-                            selectedIdentifier: $draft.voiceIdentifier,
-                            language: draft.language,
-                            speechRate: draft.speechRate,
-                            speechVolume: draft.speechVolume,
-                            duckOtherAudio: draft.duckOtherAudio,
-                            speechStyle: draft.speechStyle
-                        )
-                        .padding(.top, 8)
-                    } label: {
-                        Label(tr("Choose and preview voice", "Velg og test stemme"),
-                              systemImage: "waveform")
-                            .frame(minHeight: 44)
-                    }
-                    HStack {
-                        Text(tr("Voice speed", "Stemmehastighet"))
-                        Spacer()
-                        Text(draft.speechRate.formatted(
-                            .number.precision(.fractionLength(2))
-                        )).monospacedDigit()
-                    }
-                    Slider(value: $draft.speechRate, in: 0.35...0.65, step: 0.01)
-                    HStack {
-                        Text(tr("Coach volume", "Coachvolum"))
-                        Spacer()
-                        Text("\(Int((draft.speechVolume * 100).rounded())) %")
-                    }
-                    Slider(value: $draft.speechVolume, in: 0.2...1, step: 0.05)
-                    Toggle(tr("Lower music only while coach speaks",
-                              "Demp musikken bare når coachen snakker"),
-                           isOn: $draft.duckOtherAudio)
-                        .tint(bronze)
-                    Picker(tr("Quiet period after alerts", "Stilleperiode etter varsler"),
-                           selection: $draft.guidanceQuietPeriodSeconds) {
-                        ForEach([0.0, 5.0, 10.0, 15.0, 30.0], id: \.self) { seconds in
-                            Text("\(Int(seconds)) s").tag(seconds)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-                .padding(16)
-            }
-            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("Voice and music", "Stemme og musikk"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(tr("Done", "Ferdig")) { showingVoice = false }
-                }
-            }
-        }
-        .presentationDetents([.large])
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var profilesSheet: some View {
