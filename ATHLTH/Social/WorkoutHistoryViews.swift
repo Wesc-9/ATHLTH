@@ -1011,6 +1011,7 @@ struct PostWorkoutReviewView: View {
     @State private var visibility: ProfileVisibility = .publicProfile
     @State private var descriptionText = ""
     @State private var effort = 5.0
+    @State private var includeHealthData = true
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var selectedPetIDs: Set<UUID> = []
@@ -1055,6 +1056,28 @@ struct PostWorkoutReviewView: View {
                     }
 
                     reflectionCard
+
+                    ATHLTHUnifiedCard {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle(isOn: $includeHealthData) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Include health data when sharing",
+                                        norwegian: "Vis helsedata ved deling"
+                                    ),
+                                    systemImage: "heart.text.square"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                            }
+                            .tint(ATHLTHPlanDesign.accentInk)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Heart rate, zones and calories can be hidden for this workout. Your private recording is unchanged.",
+                                norwegian: "Puls, pulssoner og kalorier kan skjules for denne økten. Den private treningsloggen endres ikke."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
 
                     ATHLTHWorkoutReplayCard(
                         workout: workout,
@@ -1125,11 +1148,13 @@ struct PostWorkoutReviewView: View {
                 ) {
                     Button(
                         ATHLTHLocalization.choose(
-                            english: "Later",
-                            norwegian: "Senere"
+                            english: "Save privately",
+                            norwegian: "Lagre privat"
                         )
                     ) {
-                        dismiss()
+                        guard !saving else { return }
+                        visibility = .privateOnly
+                        Task { await save() }
                     }
                 }
 
@@ -1242,6 +1267,7 @@ struct PostWorkoutReviewView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 saveBar
             }
+            .interactiveDismissDisabled(saving)
             .task {
                 async let reviewLoad: Void =
                     loadExistingReview()
@@ -4342,6 +4368,7 @@ struct PostWorkoutReviewView: View {
         visibility =
             initialVisibilityOverride ??
             settings.defaultActivityVisibility
+        includeHealthData = settings.includeWorkoutHealthDataByDefault
         selectedFriendIDs =
             social.workoutAssociatedFriendIDs(
                 for: workout.id
@@ -4361,6 +4388,10 @@ struct PostWorkoutReviewView: View {
 
             if let existingVisibility = ProfileVisibility(rawValue: activity.visibility) {
                 visibility = existingVisibility
+            }
+
+            if let recordedConsent = activity.metadata?["share_health_data"] {
+                includeHealthData = recordedConsent == "true"
             }
 
             if let caption = activity.metadata?["caption"] {
@@ -4398,7 +4429,8 @@ struct PostWorkoutReviewView: View {
             effort: Int(effort),
             friendIDs: selectedFriendIDs,
             creatorName: session.profile.displayName,
-            creatorUsername: session.profile.username
+            creatorUsername: session.profile.username,
+            includeHealthData: includeHealthData
         )
 
         let mediaSaved =
