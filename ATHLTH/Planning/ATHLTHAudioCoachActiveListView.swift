@@ -34,17 +34,12 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var editingGroupTriggerID: UUID?
     @State private var groupDraftTrigger: ATHLTHAudioCoachRule.Trigger = .distance
     @State private var groupDraftInterval = 1_000
-    @State private var groupDraftContents: Set<ATHLTHAudioCoachRule.Metric> = [.distance]
     @State private var openAdvancedAfterQuickMessage = false
     @State private var quickTrigger: ATHLTHAudioCoachRule.Trigger = .time
     @State private var quickMetric: ATHLTHAudioCoachRule.Metric = .heartRate
     @State private var quickInterval = 60
     @State private var showingProfiles = false
     @State private var showingSaveNewProfile = false
-    @State private var showingGroupTriggerCatalogue = false
-    @State private var targetCoachGroupID: UUID?
-    @State private var pendingGroupRuleEditorID: UUID?
-    @State private var pendingGroupOptionEditor: ATHLTHAudioCoachOption?
     @State private var editingOption: ATHLTHAudioCoachOption?
     @State private var selectedRule: SelectedRule?
     @State private var expandedCoachGroups: Set<UUID> = []
@@ -285,7 +280,6 @@ struct ATHLTHAudioCoachActiveListView: View {
                             groupDraftName = ""
                             groupDraftTrigger = .distance
                             groupDraftInterval = 1_000
-                            groupDraftContents = [.distance]
                             showingGroupBuilder = true
                         },
                         onAddSpeechCommand: {
@@ -373,17 +367,6 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
         }) {
             catalogueSheet
-        }
-        .sheet(isPresented: $showingGroupTriggerCatalogue, onDismiss: {
-            if let id = pendingGroupRuleEditorID {
-                pendingGroupRuleEditorID = nil
-                selectedRule = SelectedRule(id: id)
-            } else if let option = pendingGroupOptionEditor {
-                pendingGroupOptionEditor = nil
-                editingOption = option
-            }
-        }) {
-            groupTriggerCatalogue
         }
         .sheet(isPresented: $showingSaveNewProfile) {
             saveNewProfileSheet
@@ -906,196 +889,6 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     /// The everyday flow asks only when to speak and what to read.
     /// Advanced editing still uses the SAME underlying custom-rule model.
-
-    // Keep all legacy Audio Coach options available without crowding the
-    // first screen. The curated triggers remain first in their categories.
-    private var extraGroupTriggerOptions: [ATHLTHAudioCoachOption] {
-        let featured: Set<ATHLTHAudioCoachOption> = [
-            .targetZoneCoach, .adaptiveMotivation, .customPhrases,
-            .currentStep, .scopedCountdowns, .workoutStart, .workoutFinish
-        ]
-        return ATHLTHAudioCoachOption.allCases.filter {
-            !featured.contains($0) && $0 != .customAnnouncements &&
-            $0.isVisible(route: showRouteOptions, structured: showStructuredOptions)
-        }
-    }
-
-    // The trigger catalogue is a NEW card, never an inline menu under a group.
-    private var groupTriggerCatalogue: some View {
-        NavigationStack {
-            List {
-                Section(tr("TIME AND PROGRESS", "TID OG PROGRESJON")) {
-                    triggerRow(tr("After time", "Etter tid"),
-                               tr("For example every 5 minutes", "For eksempel hvert 5. minutt"),
-                               icon: "clock") {
-                        addGroupRule(metric: .elapsedTime, trigger: .time, interval: 300)
-                    }
-                    triggerRow(tr("After distance", "Etter distanse"),
-                               tr("For example every kilometer", "For eksempel hver kilometer"),
-                               icon: "figure.run") {
-                        addGroupRule(metric: .distance, trigger: .distance, interval: 1_000)
-                    }
-                    triggerRow(tr("Before workout ends", "Før økten er ferdig"),
-                               tr("Push me 15 minutes before the finish", "Push meg 15 min før slutt"),
-                               icon: "flag") {
-                        addGroupRule(metric: .motivation, trigger: .time,
-                                     interval: 60, beforeEndMinutes: 15)
-                    }
-                }
-                Section(tr("HYDRATION", "DRIKKEPAUSE")) {
-                    triggerRow(tr("Drink reminder", "Drikkepåminnelse"),
-                               tr("Remind me every 15 minutes, or choose another interval",
-                                  "Minn meg på å drikke hvert 15. minutt, eller velg et annet intervall"),
-                               icon: "drop") {
-                        addGroupRule(metric: .hydrationReminder,
-                                     trigger: .time, interval: 15 * 60)
-                    }
-                }
-                Section(tr("HEART RATE AND INTENSITY", "PULS OG INTENSITET")) {
-                    triggerRow(tr("Target zone", "Veiledning for pulssone"),
-                               tr("Outside the target and back in", "Utenfor målsonen og tilbake"),
-                               icon: "heart.text.square") {
-                        addGroupOption(.targetZoneCoach)
-                    }
-                    triggerRow(tr("Heart rate", "Puls"),
-                               tr("Read pulse at chosen intervals", "Les opp puls etter intervall"),
-                               icon: "heart") {
-                        addGroupRule(metric: .heartRate, trigger: .time, interval: 300)
-                    }
-                    triggerRow(tr("Pace", "Tempo"),
-                               tr("Read out current pace", "Les opp gjeldende tempo"),
-                               icon: "speedometer") {
-                        addGroupRule(metric: .pace, trigger: .time, interval: 300)
-                    }
-                }
-                Section(tr("MOTIVATION AND FOCUS", "MOTIVASJON OG FOKUS")) {
-                    triggerRow(tr("Motivation during workout", "Motivasjon under økt"),
-                               tr("Encouragement at a chosen interval", "Oppmuntring ved valgt intervall"),
-                               icon: "bolt.heart") {
-                        addGroupRule(metric: .motivation, trigger: .time, interval: 180)
-                    }
-                    triggerRow(tr("Situation-aware encouragement", "Situasjonsstyrt motivasjon"),
-                               tr("Respond to effort and progress", "Reager på innsats og fremdrift"),
-                               icon: "sparkles") {
-                        addGroupOption(.adaptiveMotivation)
-                    }
-                    triggerRow(tr("Custom messages", "Egne beskjeder"),
-                               tr("Personal phrases in Coach's voice", "Egne fraser med Coach-stemmen"),
-                               icon: "text.bubble") {
-                        addGroupOption(.customPhrases)
-                    }
-                }
-                Section(tr("INTERVALS AND EVENTS", "INTERVALLER OG HENDELSER")) {
-                    triggerRow(tr("Interval / phase", "Intervall / deløvelse"),
-                               tr("Announce the current part", "Les opp gjeldende deløvelse"),
-                               icon: "list.number") {
-                        addGroupOption(.currentStep)
-                    }
-                    triggerRow(tr("Spoken countdown", "Nedtelling"),
-                               tr("Before and after workout boundaries", "Før og etter øktgrenser"),
-                               icon: "timer") {
-                        addGroupOption(.scopedCountdowns)
-                    }
-                    triggerRow(tr("Workout start", "Start på økt"),
-                               tr("Start cues", "Startbeskjeder"),
-                               icon: "play.circle") {
-                        addGroupOption(.workoutStart)
-                    }
-                    triggerRow(tr("Workout finish", "Øktslutt"),
-                               tr("Finish summary", "Oppsummering ved mål"),
-                               icon: "flag.checkered") {
-                        addGroupOption(.workoutFinish)
-                    }
-                }
-                Section(tr("MORE TRIGGERS", "FLERE TRIGGERE")) {
-                    ForEach(extraGroupTriggerOptions) { option in
-                        triggerRow(option.title, option.detail(in: draft),
-                                   icon: option.symbol) {
-                            addGroupOption(option)
-                        }
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("Add trigger", "Legg til trigger"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Close", "Lukk")) {
-                        showingGroupTriggerCatalogue = false
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                Text(tr(
-                    "Before-finish cues require a workout with a known or estimated finish time.",
-                    "Varsler før slutt krever en økt med kjent eller beregnbar sluttid."
-                ))
-                .font(.caption).foregroundStyle(dim)
-                .padding(12)
-                .frame(maxWidth: .infinity)
-                .background(ATHLTHPlanDesign.canvas)
-            }
-        }
-        .presentationDetents([.large])
-        .accessibilityIdentifier("athlth-coach-trigger-catalogue")
-    }
-
-    private func triggerRow(_ title: String, _ subtitle: String, icon: String,
-                            action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.title3).foregroundStyle(bronze).frame(width: 34)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(ink)
-                    Text(subtitle).font(.caption).foregroundStyle(dim)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption).foregroundStyle(dim)
-            }
-            .frame(minHeight: 50).contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func addGroupRule(
-        metric: ATHLTHAudioCoachRule.Metric,
-        trigger: ATHLTHAudioCoachRule.Trigger, interval: Int,
-        beforeEndMinutes: Int? = nil
-    ) {
-        guard draft.customRules.count < 20,
-              let id = targetCoachGroupID,
-              let index = draft.coachGroups.firstIndex(where: { $0.id == id })
-        else { return }
-        var rule = ATHLTHAudioCoachRule(
-            trigger: trigger, metric: metric, interval: interval, scope: .workout
-        )
-        if let beforeEndMinutes {
-            rule.beforeEndSeconds = beforeEndMinutes * 60
-            rule.encouragementStyle = .push
-        }
-        draft.customRules.append(rule)
-        draft.coachGroups[index].ruleIDs.append(rule.id)
-        pendingGroupRuleEditorID = rule.id
-        showingGroupTriggerCatalogue = false
-    }
-
-    private func addGroupOption(_ option: ATHLTHAudioCoachOption) {
-        guard let id = targetCoachGroupID,
-              let index = draft.coachGroups.firstIndex(where: { $0.id == id })
-        else { return }
-        if !option.isContentList { option.setActive(true, in: &draft) }
-        // Smart options are shared engine behaviours, not independent copies.
-        for i in draft.coachGroups.indices {
-            draft.coachGroups[i].optionIDs.removeAll { $0 == option.rawValue }
-        }
-        draft.coachGroups[index].optionIDs.append(option.rawValue)
-        pendingGroupOptionEditor = option.requiresConfiguration ? option : nil
-        showingGroupTriggerCatalogue = false
-    }
 
     private func saveCurrentTemplate() {
         if let selectedTemplateID,
