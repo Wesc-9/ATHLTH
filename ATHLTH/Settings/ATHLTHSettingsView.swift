@@ -2626,6 +2626,8 @@ if session.currentRole.canAccessControlCenter {
 
 private struct AppleCalendarSettingsView: View {
     @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
@@ -3091,6 +3093,10 @@ private struct AppleCalendarSettingsView: View {
                 !session.isTrainingPlanDeactivated($0.id)
             },
             standaloneSessions: session.standalonePlannedSessions,
+            workoutStatuses: session.calendarWorkoutStatuses(
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            ),
             communityEvents: communityEvents.events,
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
@@ -3113,6 +3119,10 @@ private struct AppleCalendarSettingsView: View {
                 !session.isTrainingPlanDeactivated($0.id)
             },
             standaloneSessions: session.standalonePlannedSessions,
+            workoutStatuses: session.calendarWorkoutStatuses(
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            ),
             communityEvents: communityEvents.events,
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
