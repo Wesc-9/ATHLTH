@@ -41,9 +41,12 @@ enum ATHLTHPlannedWorkoutLifecycle {
         let components = calendar.dateComponents([.hour, .minute], from: clock)
         guard let hour = components.hour, let minute = components.minute
         else { return nil }
-        return calendar.date(
-            bySettingHour: hour, minute: minute, second: 0, of: scheduled
-        )
+        guard let updated = calendar.date(
+            bySettingHour: hour, minute: minute, second: 0,
+            of: scheduled, matchingPolicy: .strict
+        ), calendar.isDate(updated, inSameDayAs: scheduled)
+        else { return nil }
+        return updated
     }
 }
 
