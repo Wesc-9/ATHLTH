@@ -126,7 +126,6 @@ struct RouteLibraryListView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
-    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
     @StateObject private var locationStore = HomeLocationStore()
@@ -148,8 +147,6 @@ struct RouteLibraryListView: View {
     @State private var favoritesOnly = false
     @AppStorage("athlth.routes.picker.runPace.v1")
     private var manualRunSecondsPerKm = 0
-    @State private var watchMessage: String?
-    @State private var watchError: String?
     @State private var loading = false
     @State private var errorMessage: String?
     @State private var hasMore = false
@@ -159,6 +156,7 @@ struct RouteLibraryListView: View {
     @State private var hydratedRoutes: [UUID: TrainingRoute] = [:]
     @State private var loadingDetails: Set<UUID> = []
     @State private var showingMapRoute: TrainingRoute?
+    @State private var routeToQuickTrain: TrainingRoute?
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
     @State private var routeCardsScrolling = false
@@ -466,8 +464,9 @@ struct RouteLibraryListView: View {
             if viewMode == .map { await loadMapRouteGeometry() }
         }
         .onChange(of: viewMode) { _, mode in
-            if mode != .map {
-                // Map geometry is for an explicit viewing session only.
+            if mode != .map && mode != .largeCards {
+                // Route geometry is only retained while needed for a map
+                // or a visible full-width card.
                 hydratedRoutes.removeAll(keepingCapacity: false)
                 loadingDetails.removeAll()
             }
@@ -483,19 +482,11 @@ struct RouteLibraryListView: View {
             RouteMapSnapshotCache.setScrolling(false, owner: snapshotScrollID)
         }
         .sheet(isPresented: $showingCustomLength) { publicCustomLengthSheet }
+        .sheet(item: $routeToQuickTrain) { route in
+            ATHLTHRouteQuickTrainSheet(route: route)
+        }
         .fullScreenCover(item: $showingMapRoute) { route in
             SavedRouteFullscreenMap(route: route)
-        }
-        .alert("ATHLTH", isPresented: Binding(
-            get: { watchMessage != nil || watchError != nil },
-            set: { if !$0 { watchMessage = nil; watchError = nil } }
-        )) {
-            Button("OK", role: .cancel) {
-                watchMessage = nil
-                watchError = nil
-            }
-        } message: {
-            Text(watchError ?? watchMessage ?? "")
         }
     }
 
@@ -824,16 +815,6 @@ struct RouteLibraryListView: View {
         return tr("Public", "Offentlig")
     }
 
-    private func sendPublicRouteToWatch(_ route: TrainingRoute) {
-        guard watchConnection.isReady else { return }
-        do {
-            try watchConnection.sendRoute(route)
-            watchMessage = tr("Route sent to Apple Watch.", "Ruten er sendt til Apple Watch.")
-        } catch {
-            watchError = error.localizedDescription
-        }
-    }
-
     /// Compact image-first route tile for 2/3-column iPhone grids and
     /// wider iPad collections. Full metrics and actions remain in Details.
     private func catalogSourceTitle(_ entry: RouteLibraryEntry) -> String {
@@ -996,17 +977,6 @@ struct RouteLibraryListView: View {
                     icon: "map.fill"
                 )
                 Menu {
-                    if settings.trainingDeviceProvider == .appleWatch {
-                        Button {
-                            if let route = hydratedRoutes[entry.id] {
-                                sendPublicRouteToWatch(route)
-                            }
-                        } label: {
-                            Label(tr("Send to Apple Watch", "Send til Apple Watch"),
-                                  systemImage: "applewatch")
-                        }
-                        .disabled(!watchConnection.isReady || hydratedRoutes[entry.id] == nil)
-                    }
                     if hydratedRoutes[entry.id] != nil {
                         NavigationLink {
                             ChallengeCreationView(preselectedRouteID: entry.id)
@@ -1070,25 +1040,22 @@ struct RouteLibraryListView: View {
                 .simultaneousGesture(TapGesture().onEnded {
                     markRecent(entry)
                 })
-                if settings.trainingDeviceProvider == .appleWatch {
-                    Button {
-                        if let route = hydratedRoutes[entry.id] {
-                            markRecent(entry)
-                            sendPublicRouteToWatch(route)
-                        }
-                    } label: {
-                        Label(tr("Send to Watch", "Send til Watch"),
-                              systemImage: "applewatch")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, minHeight: 46)
-                            .background(ATHLTHPlanDesign.ink,
-                                        in: RoundedRectangle(cornerRadius: 13))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!watchConnection.isReady || hydratedRoutes[entry.id] == nil)
-                    .opacity(!watchConnection.isReady || hydratedRoutes[entry.id] == nil ? 0.45 : 1)
+                Button {
+                    guard let route = hydratedRoutes[entry.id] else { return }
+                    markRecent(entry)
+                    routeToQuickTrain = route
+                } label: {
+                    Label(tr("Start workout", "Start økt"),
+                          systemImage: "figure.run")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .background(ATHLTHPlanDesign.ink,
+                                    in: RoundedRectangle(cornerRadius: 13))
                 }
+                .buttonStyle(.plain)
+                .disabled(hydratedRoutes[entry.id] == nil)
+                .opacity(hydratedRoutes[entry.id] == nil ? 0.45 : 1)
             }
         }
         .padding(12)
@@ -1169,7 +1136,8 @@ struct RouteLibraryListView: View {
 
     @MainActor
     private func loadRouteDetail(_ id: UUID) async {
-        guard viewMode == .map, hydratedRoutes[id] == nil,
+        guard (viewMode == .map || viewMode == .largeCards),
+              hydratedRoutes[id] == nil,
               !loadingDetails.contains(id),
               let entry = entries.first(where: { $0.id == id })
         else { return }
@@ -1187,8 +1155,11 @@ struct RouteLibraryListView: View {
                     .eq("id", value: id).single().execute().value
                 resolved = record.trainingRoute
             }
-            guard !Task.isCancelled, viewMode == .map,
-                  entries.prefix(20).contains(where: { $0.id == id })
+            guard !Task.isCancelled,
+                  viewMode == .map || viewMode == .largeCards,
+                  (viewMode == .map
+                   ? entries.prefix(20).contains(where: { $0.id == id })
+                   : entries.contains(where: { $0.id == id }))
             else { return }
             if let resolved { hydratedRoutes[id] = resolved }
         } catch {
