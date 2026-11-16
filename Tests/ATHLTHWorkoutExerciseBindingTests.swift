@@ -59,6 +59,11 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         XCTAssertEqual(block.targetRepsInReserve, 1)
         XCTAssertEqual(block.targetEffortRPE, 9)
         XCTAssertEqual(block.notes, "Last set AMRAP")
+        // The live strength engine must forward the library identity into
+        // completed logs so "Last trained" and progression see this movement.
+        let queue = StrengthWorkoutStore.strengthExerciseLogsFromBlocks([block])
+        XCTAssertEqual(queue.first?.plannedExerciseID, matched.id)
+        XCTAssertEqual(queue.first?.sets.count, 5)
     }
 
     func testEveryBundledGymCoachBlockCanBindBeforePlanActivation() {
