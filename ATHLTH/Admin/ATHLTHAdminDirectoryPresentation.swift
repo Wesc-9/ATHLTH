@@ -26,6 +26,35 @@ enum ATHLTHAdminDirectoryPresentation {
         }
     }
 
+    /// An expired trial is not a Plus subscription, even if its stored
+    /// entitlement tier was originally athlth_plus.
+    static func subscriptionLabel(
+        tier: String, status: String, norwegian: Bool
+    ) -> String {
+        switch status {
+        case "trialing":
+            return norwegian ? "ATHLTH+ · Prøveperiode" : "ATHLTH+ · Trial"
+        case "trial_expired":
+            return norwegian ? "Utløpt prøveperiode" : "Trial expired"
+        case "expired", "revoked", "cancelled":
+            return norwegian ? "Utgått abonnement" : "Subscription expired"
+        case "admin_grant":
+            return norwegian ? "ATHLTH+ · Tildelt" : "ATHLTH+ · Granted"
+        default:
+            return planTitle(tier, norwegian: norwegian)
+        }
+    }
+
+    static func accountStatusTitle(
+        _ raw: String, norwegian: Bool
+    ) -> String {
+        switch raw {
+        case "active": return norwegian ? "Aktiv" : "Active"
+        case "suspended": return norwegian ? "Deaktivert" : "Suspended"
+        default: return norwegian ? "Ukjent kontostatus" : "Unknown account status"
+        }
+    }
+
     static func roleTitle(_ raw: String, norwegian: Bool) -> String {
         switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "owner": norwegian ? "Eier" : "Owner"
