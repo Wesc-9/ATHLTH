@@ -54,7 +54,6 @@ private struct PositionedSavedRoute {
 struct SavedRoutesView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
-    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
     @EnvironmentObject private var health: HealthKitManager
@@ -88,8 +87,7 @@ struct SavedRoutesView: View {
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var showingCustomLength = false
     @State private var previewRoute: TrainingRoute?
-    @State private var watchMessage: String?
-    @State private var watchError: String?
+    @State private var routeToQuickTrain: TrainingRoute?
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
     @State private var routeCardsScrolling = false
@@ -351,16 +349,11 @@ struct SavedRoutesView: View {
             RouteMapSnapshotCache.setScrolling(false, owner: snapshotScrollID)
         }
         .sheet(isPresented: $showingCustomLength) { customLengthSheet }
+        .sheet(item: $routeToQuickTrain) { route in
+            ATHLTHRouteQuickTrainSheet(route: route)
+        }
         .fullScreenCover(item: $previewRoute) { route in
             SavedRouteFullscreenMap(route: route)
-        }
-        .alert("ATHLTH", isPresented: Binding(
-            get: { watchMessage != nil || watchError != nil },
-            set: { if !$0 { watchMessage = nil; watchError = nil } }
-        )) {
-            Button("OK", role: .cancel) { watchMessage = nil; watchError = nil }
-        } message: {
-            Text(watchError ?? watchMessage ?? "")
         }
     }
 
@@ -606,19 +599,18 @@ struct SavedRoutesView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("Use route", "Bruk rute"))
-            } else if settings.trainingDeviceProvider == .appleWatch {
+            } else {
                 Button {
                     markRecent(route)
-                    sendToWatch(route)
+                    routeToQuickTrain = route
                 } label: {
-                    Image(systemName: "applewatch")
-                        .font(.system(size: 18, weight: .semibold))
+                    Image(systemName: "figure.run.circle.fill")
+                        .font(.system(size: 21, weight: .semibold))
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        .frame(width: 32, height: 42)
+                        .frame(width: 36, height: 42)
                 }
                 .buttonStyle(.plain)
-                .disabled(!watchConnection.isReady)
-                .accessibilityLabel(tr("Send to Apple Watch", "Send til Apple Watch"))
+                .accessibilityLabel(tr("Start workout", "Start økt"))
             }
             LibraryFavoriteButton(
                 kind: .route, itemID: route.id.uuidString,
@@ -814,12 +806,6 @@ struct SavedRoutesView: View {
                     icon: "map.fill"
                 )
                 Menu {
-                    if settings.trainingDeviceProvider == .appleWatch {
-                        Button { sendToWatch(route) } label: {
-                            Label(tr("Send to Apple Watch", "Send til Apple Watch"), systemImage: "applewatch")
-                        }
-                        .disabled(!watchConnection.isReady)
-                    }
                     NavigationLink {
                         ChallengeCreationView(preselectedRouteID: route.id)
                     } label: {
@@ -886,20 +872,18 @@ struct SavedRoutesView: View {
                             .background(ATHLTHTheme.accentDeep, in: RoundedRectangle(cornerRadius: 13))
                     }
                     .buttonStyle(.plain)
-                } else if settings.trainingDeviceProvider == .appleWatch {
+                } else {
                     Button {
                         markRecent(route)
-                        sendToWatch(route)
+                        routeToQuickTrain = route
                     } label: {
-                        Label(tr("Send to Watch", "Send til Watch"), systemImage: "applewatch")
+                        Label(tr("Start workout", "Start økt"), systemImage: "figure.run")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 46)
                             .background(ATHLTHTheme.accentDeep, in: RoundedRectangle(cornerRadius: 13))
                     }
                     .buttonStyle(.plain)
-                    .disabled(!watchConnection.isReady)
-                    .opacity(watchConnection.isReady ? 1 : 0.45)
                 }
             }
         }
@@ -977,15 +961,6 @@ struct SavedRoutesView: View {
         }
     }
 
-    private func sendToWatch(_ route: TrainingRoute) {
-        guard watchConnection.isReady else { return }
-        do {
-            try watchConnection.sendRoute(route)
-            watchMessage = tr("Route sent to Apple Watch.", "Ruten er sendt til Apple Watch.")
-        } catch {
-            watchError = error.localizedDescription
-        }
-    }
 }
 
 // The map/list toggle only draws a bounded number of routes at once so a
