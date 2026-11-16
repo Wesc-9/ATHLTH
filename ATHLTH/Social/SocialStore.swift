@@ -318,15 +318,11 @@ final class SocialStore: ObservableObject {
                     followingRows.map(\.followingID)
                 )
                 .subtracting(blockedIDs)
-            let refreshedFeed =
-                feed.filter { item in
-                    item.activity.actorID ==
-                        currentUserID ||
-                    refreshedFollowingIDs
-                        .contains(
-                            item.activity.actorID
-                        )
-                }
+            let mutualIDs = refreshedFollowingIDs.intersection(refreshedFollowerIDs)
+            let refreshedFeed = feed.filter { item in
+                item.activity.actorID == currentUserID ||
+                    mutualIDs.contains(item.activity.actorID)
+            }
 
             if visibleProfiles != visibleCards {
                 visibleProfiles = visibleCards
@@ -517,11 +513,15 @@ final class SocialStore: ObservableObject {
             async let followingTask = service.loadFollowing(
                 for: currentUserID
             )
+            async let followersTask = service.loadFollowers(
+                for: currentUserID
+            )
             async let privacyTask = service.loadPrivacySettings()
             async let feedTask = service.loadFeed(limit: 18)
             async let inboxTask = service.loadInboxEvents()
 
             let followingRows = try await followingTask
+            let followersRows = try await followersTask
             let loadedPrivacy = try await privacyTask
             let loadedFeed = try await feedTask
             let loadedInbox = try await inboxTask
@@ -532,20 +532,18 @@ final class SocialStore: ObservableObject {
                         \.followingID
                     )
                 )
-            let refreshedFeed =
-                loadedFeed.filter { item in
-                    item.activity.actorID ==
-                        currentUserID ||
-                    refreshedFollowingIDs
-                        .contains(
-                            item.activity.actorID
-                        )
-                }
+            let refreshedFollowerIDs = Set(followersRows.map(\.followerID))
+            let mutualIDs = refreshedFollowingIDs.intersection(refreshedFollowerIDs)
+            let refreshedFeed = loadedFeed.filter { item in
+                item.activity.actorID == currentUserID ||
+                    mutualIDs.contains(item.activity.actorID)
+            }
 
-            if followingIDs !=
-                refreshedFollowingIDs {
-                followingIDs =
-                    refreshedFollowingIDs
+            if followingIDs != refreshedFollowingIDs {
+                followingIDs = refreshedFollowingIDs
+            }
+            if followerIDs != refreshedFollowerIDs {
+                followerIDs = refreshedFollowerIDs
             }
             if privacy != loadedPrivacy {
                 privacy = loadedPrivacy
@@ -2240,10 +2238,7 @@ final class SocialStore: ObservableObject {
                 workoutSessionID: resolvedSession?.id
             )
 
-            feed = try await service.loadFeed().filter { item in
-                item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
-            }
+            feed = scopedFeed(try await service.loadFeed())
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -2319,10 +2314,7 @@ final class SocialStore: ObservableObject {
                 workoutSessionID: linkedSession?.id
             )
 
-            feed = try await service.loadFeed().filter { item in
-                item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
-            }
+            feed = scopedFeed(try await service.loadFeed())
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -3622,9 +3614,10 @@ final class SocialStore: ObservableObject {
     ) -> [SocialFeedItem] {
         guard let currentUserID else { return [] }
 
+        let mutualIDs = followingIDs.intersection(followerIDs)
         return loaded.filter { item in
             item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
+                mutualIDs.contains(item.activity.actorID)
         }
     }
 
