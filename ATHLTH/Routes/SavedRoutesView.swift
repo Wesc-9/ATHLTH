@@ -271,7 +271,7 @@ struct SavedRoutesView: View {
                     filteredEmptyState
                 } else {
                     LazyVGrid(
-                        columns: viewMode == .largeCards
+                        columns: viewMode.forcesSingleColumn
                             ? [GridItem(.flexible())]
                             : ATHLTHLibraryResponsiveLayout.columns(
                             mode: viewMode == .list || viewMode == .map ? .list : .grid,
