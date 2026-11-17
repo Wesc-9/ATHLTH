@@ -47,13 +47,14 @@ enum ATHLTHCoachStrengthComparableHistory {
             // sides. Renaming an exercise does not create a different exercise.
             // A single missing ID can never be guessed from name alone.
             if libraryExerciseID != nil || other.libraryExerciseID != nil {
-                guard libraryExerciseID != nil,
-                      libraryExerciseID == other.libraryExerciseID else { return false }
-            } else {
-                guard !name.isEmpty, name == other.name else { return false }
+                // Catalog identity is authoritative. Muscle labels and the
+                // display name can change over time without splitting history.
+                return libraryExerciseID != nil &&
+                    libraryExerciseID == other.libraryExerciseID
             }
-            // Older snapshots can omit muscle metadata; use it only to rule
-            // out an explicit conflict, not invent a new identity from it.
+            guard !name.isEmpty, name == other.name else { return false }
+            // For legacy records without an ID, explicit muscle conflicts
+            // are a conservative reason not to merge separate exercises.
             if !primaryMuscles.isEmpty && !other.primaryMuscles.isEmpty {
                 return primaryMuscles == other.primaryMuscles
             }
@@ -79,8 +80,11 @@ enum ATHLTHCoachStrengthComparableHistory {
         let identity = signature.libraryExerciseID?.uuidString ??
             ("legacy:" + signature.name)
         guard !identity.isEmpty else { return nil }
+        let legacyMuscleKey = signature.libraryExerciseID == nil
+            ? "|" + signature.primaryMuscles.joined(separator: ",")
+            : ""
         return identity + "|" + signature.equipment.joined(separator: ",") +
-            "|" + signature.primaryMuscles.joined(separator: ",")
+            legacyMuscleKey
     }
 
     struct TargetEvidence {
