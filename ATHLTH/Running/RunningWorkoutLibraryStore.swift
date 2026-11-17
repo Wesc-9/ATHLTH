@@ -1,32 +1,69 @@
-import Foundation
+/// A personal copy is a genuinely customized workout, not another name
+/// for the same executable recipe. Original/library IDs are never changed.
+enum ATHLTHRunningWorkoutCopyPolicy {
+    static func normalizedName(_ name: String) -> String {
+        ATHLTHWorkoutSearch.normalized(name.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
 
-/// A saved personal copy represents the same recipe as its original in the
-/// combined workout picker. Keep the personal copy visible and editable,
-/// without deleting either workout or changing their permanent IDs.
-/// Favorites and source filters run *before* this policy, so an explicitly
-/// favorited original remains selectable when its personal copy is not starred.
-enum ATHLTHRunningWorkoutDisplayDeduplication {
-    static func visible(_ templates: [RunningWorkoutTemplate]) -> [RunningWorkoutTemplate] {
-        let personal = templates.filter { !$0.isBuiltIn }
-        guard !personal.isEmpty else { return templates }
-        return templates.filter { workout in
-            guard workout.isBuiltIn else { return true }
-            let name = ATHLTHWorkoutSearch.normalized(workout.title)
-            return !personal.contains { copy in
-                guard copy.type == workout.type else { return false }
-                let copyName = ATHLTHWorkoutSearch.normalized(copy.title)
-                guard copyName == name || copyName == name + " copy" else {
-                    return false
-                }
-                // New copies retain a stable source pointer. Older saved
-                // copies can be matched only when their summary agrees.
-                if let originalID = copy.sharedSourceWorkoutID {
-                    return originalID == workout.id
-                }
-                return ATHLTHWorkoutSearch.normalized(copy.summary) ==
-                    ATHLTHWorkoutSearch.normalized(workout.summary)
-            }
+    static func hasChanges(
+        _ candidate: RunningWorkoutTemplate,
+        comparedTo source: RunningWorkoutTemplate
+    ) -> Bool {
+        let baseline = source.isBuiltIn
+            ? ATHLTHRunningLibraryDefaults.unpersonalized(source) : source
+        if candidate.type != baseline.type || candidate.routeID != baseline.routeID ||
+            candidate.blocks.count != baseline.blocks.count {
+            return true
         }
+        // Blocks carry identity UUIDs, which must not count as an edit.
+        for (left, right) in zip(candidate.blocks, baseline.blocks) {
+            let sameIdentity = RunningWorkoutBlock(
+                id: right.id, kind: left.kind, title: left.title,
+                repetitions: left.repetitions, work: left.work,
+                recovery: left.recovery, notes: left.notes,
+                repetitionOverrides: left.repetitionOverrides,
+                spotifyPlaylist: left.spotifyPlaylist,
+                intervalMotivation: left.intervalMotivation,
+                recoveryStyle: left.recoveryStyle,
+                spokenReport: left.spokenReport
+            )
+            if sameIdentity != right { return true }
+        }
+        return (candidate.autoAdvanceTimedSteps ?? true) != (baseline.autoAdvanceTimedSteps ?? true) ||
+            (candidate.autoStartMainAfterWarmup ?? false) != (baseline.autoStartMainAfterWarmup ?? false) ||
+            candidate.intervalCoachCueEverySeconds != baseline.intervalCoachCueEverySeconds ||
+            candidate.intervalCoachCountdownSeconds != baseline.intervalCoachCountdownSeconds ||
+            candidate.intervalGhostPaceSecondsPerKilometer != baseline.intervalGhostPaceSecondsPerKilometer ||
+            (candidate.intervalGhostFollowRecovery ?? false) != (baseline.intervalGhostFollowRecovery ?? false) ||
+            (candidate.intervalGhostPaceSecondsPerKilometer != nil &&
+             candidate.intervalGhostRecoverySlowdownPercent != baseline.intervalGhostRecoverySlowdownPercent) ||
+            (candidate.coachBrief ?? "").trimmingCharacters(in: .whitespacesAndNewlines) !=
+                (baseline.coachBrief ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func saveError(
+        _ candidate: RunningWorkoutTemplate,
+        comparedTo source: RunningWorkoutTemplate
+    ) -> String? {
+        guard !normalizedName(candidate.title).isEmpty else {
+            return ATHLTHLocalization.choose(
+                english: "Give this workout a name.",
+                norwegian: "Gi treningsøkten et navn."
+            )
+        }
+        guard normalizedName(candidate.title) != normalizedName(source.title) else {
+            return ATHLTHLocalization.choose(
+                english: "Give your copy a different name from the original.",
+                norwegian: "Gi kopien et annet navn enn originaløkten."
+            )
+        }
+        guard hasChanges(candidate, comparedTo: source) else {
+            return ATHLTHLocalization.choose(
+                english: "Change the workout itself before saving a copy. Renaming alone is not enough.",
+                norwegian: "Endre selve økten før du lagrer en kopi. Det holder ikke å bare endre navnet."
+            )
+        }
+        return nil
     }
 }
 
@@ -152,19 +189,29 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         }
     }
 
-    func save(_ template: RunningWorkoutTemplate) {
-        guard accountID != nil else { return }
+    /// Returns false when the athlete attempts to save an unchanged copy or
+    /// reuse the source title. Callers may display the validation explanation.
+    @discardableResult
+    func save(_ template: RunningWorkoutTemplate) -> Bool {
+        guard accountID != nil else { return false }
         var copy = template
+        if let sourceID = copy.sharedSourceWorkoutID,
+           let source = Self.builtInTemplates.first(where: { $0.id == sourceID }) ??
+                customTemplates.first(where: { $0.id == sourceID }),
+           ATHLTHRunningWorkoutCopyPolicy.saveError(copy, comparedTo: source) != nil {
+            return false
+        }
+        // Never mutate the immutable catalog source (even if a caller passed
+        // its ID through the editor).
+        guard !copy.isBuiltIn else { return false }
         copy.updatedAt = Date()
-        copy.isBuiltIn = false
-
         if let index = customTemplates.firstIndex(where: { $0.id == copy.id }) {
             customTemplates[index] = copy
         } else {
             customTemplates.append(copy)
         }
-
         persist()
+        return true
     }
 
     func delete(_ id: UUID) {
@@ -205,46 +252,38 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         return copy
     }
 
+    /// Produces an editable, *unsaved* draft. No copy is added to Mine until
+    /// the athlete changes the recipe, gives it a distinct name and saves.
     func duplicate(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
-        let source = source.isBuiltIn
+        let draftSource = source.isBuiltIn
             ? ATHLTHRunningLibraryDefaults.unpersonalized(source) : source
-        let duplicate = RunningWorkoutTemplate(
+        var editable = draftSource
+        // struct has a fixed ID, so construct a personal draft with a fresh ID.
+        editable = RunningWorkoutTemplate(
             id: UUID(),
-            title: source.isBuiltIn ? source.title : "\(source.title) Copy",
-            type: source.type,
-            summary: source.summary,
-            blocks: source.blocks.map {
-                RunningWorkoutBlock(
-                    kind: $0.kind,
-                    title: $0.title,
-                    repetitions: $0.repetitions,
-                    work: $0.work,
-                    recovery: $0.recovery,
-                    notes: $0.notes,
-                    repetitionOverrides: $0.repetitionOverrides,
-                    intervalMotivation: $0.intervalMotivation,
-                    recoveryStyle: $0.recoveryStyle,
-                    spokenReport: $0.spokenReport
-                )
-            },
-            routeID: source.routeID,
+            title: String((source.title + " – Min variant")
+                .prefix(ATHLTHLibraryName.maximumWorkoutCharacters)),
+            type: draftSource.type,
+            summary: draftSource.summary,
+            blocks: draftSource.blocks,
+            routeID: draftSource.routeID,
             isBuiltIn: false,
             createdAt: Date(),
             updatedAt: Date()
         )
-
-        var editable = duplicate
-        editable.autoAdvanceTimedSteps = source.autoAdvanceTimedSteps
+        editable.autoAdvanceTimedSteps = draftSource.autoAdvanceTimedSteps
+        editable.autoStartMainAfterWarmup = draftSource.autoStartMainAfterWarmup
+        editable.intervalCoachCueEverySeconds = draftSource.intervalCoachCueEverySeconds
+        editable.intervalCoachCountdownSeconds = draftSource.intervalCoachCountdownSeconds
         editable.intervalGhostPaceSecondsPerKilometer =
-            source.intervalGhostPaceSecondsPerKilometer
-        editable.coachBrief = source.coachBrief
-        editable.intervalGhostFollowRecovery = source.intervalGhostFollowRecovery
+            draftSource.intervalGhostPaceSecondsPerKilometer
+        editable.intervalGhostFollowRecovery =
+            draftSource.intervalGhostFollowRecovery
         editable.intervalGhostRecoverySlowdownPercent =
-            source.intervalGhostRecoverySlowdownPercent
-        editable.sharedSourceWorkoutID = source.sharedSourceWorkoutID ??
-            (source.isBuiltIn ? source.id : nil)
-        customTemplates.append(editable)
-        persist()
+            draftSource.intervalGhostRecoverySlowdownPercent
+        editable.coachBrief = draftSource.coachBrief
+        editable.sharedSourceOwnerID = source.sharedSourceOwnerID
+        editable.sharedSourceWorkoutID = source.sharedSourceWorkoutID ?? source.id
         return editable
     }
 
