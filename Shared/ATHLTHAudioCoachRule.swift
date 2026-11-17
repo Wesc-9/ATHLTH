@@ -25,6 +25,20 @@ enum ATHLTHCoachWorkoutPhase: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum ATHLTHCoachMetricCategory: String, CaseIterable, Identifiable {
+    case workout, heartRate, exercises, motivation, navigation
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .workout: return ATHLTHLocalization.choose(english: "Workout data", norwegian: "Øktdata")
+        case .heartRate: return ATHLTHLocalization.choose(english: "Heart rate", norwegian: "Puls")
+        case .exercises: return ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser")
+        case .motivation: return ATHLTHLocalization.choose(english: "Motivation", norwegian: "Motivasjon")
+        case .navigation: return ATHLTHLocalization.choose(english: "Route", norwegian: "Rute")
+        }
+    }
+}
+
 /// Independent periodic Audio Coach rules. Stored as part of the iPhone
 /// settings and copied unchanged to a Watch workout's configuration.
 struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
@@ -135,6 +149,17 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case previousExerciseSummary
         case previousMainSectionSummary
         var id: String { rawValue }
+        var category: ATHLTHCoachMetricCategory {
+            switch self {
+            case .heartRate, .heartRateZone: return .heartRate
+            case .stepName, .stepRemainingTime, .groupRemainingTime,
+                 .remainingExercises, .nextExercise, .previousExerciseSummary,
+                 .previousMainSectionSummary: return .exercises
+            case .motivation, .hydrationReminder: return .motivation
+            case .routeRemainingDistance, .estimatedRouteTime: return .navigation
+            default: return .workout
+            }
+        }
         var title: String {
             switch self {
             case .pace: return ATHLTHLocalization.choose(
