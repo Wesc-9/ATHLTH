@@ -633,5 +633,101 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         }
     }
 
+
+    @MainActor
+    func testInterruptedPlanComposerReopensTheSameDatedDraft() throws {
+        let (defaults, suite) = defaults()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHInterruptedPlan.\(UUID().uuidString)",
+                                    isDirectory: true)
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: defaults, directoryURL: folder
+        )
+        let account = UUID()
+        let draftID = UUID()
+        let lastEdit = ATHLTHPlanCreationDraft(
+            title: "Walking and recovery",
+            weekCount: 3,
+            startDate: Date(),
+            advanced: true,
+            source: "scratch",
+            stage: "week",
+            guidedDayCursor: 1,
+            selectedPlanWeekIndex: 0,
+            editorDay: 2,
+            editorKind: "studio"
+        )
+        XCTAssertTrue(store.save(lastEdit, userID: account, draftID: draftID))
+        store.setEditing(true, userID: account, draftID: draftID)
+
+        let interrupted = try XCTUnwrap(
+            TrainProgramCreationLaunch.interruptedDraft(
+                userID: account, store: store
+            )
+        )
+        XCTAssertTrue(interrupted.resumesDraft)
+        XCTAssertEqual(interrupted.draftID, draftID)
+        let loaded = try XCTUnwrap(
+            store.load(userID: account, draftID: interrupted.draftID)
+        )
+        XCTAssertEqual(loaded.stage, "week")
+        XCTAssertEqual(loaded.editorDay, 2)
+        XCTAssertEqual(loaded.editorKind, "studio")
+
+        store.setEditing(false, userID: account, draftID: draftID)
+        XCTAssertNil(TrainProgramCreationLaunch.interruptedDraft(
+            userID: account, store: store
+        ), "Explicitly closed drafts must not pop up after relaunch")
+    }
+
+    @MainActor
+    func testMissingRecentDraftPointerRecoversExistingSavedPlan() {
+        let (defaults, suite) = defaults()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHOrphanedPlan.\(UUID().uuidString)",
+                                    isDirectory: true)
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: defaults, directoryURL: folder
+        )
+        let account = UUID()
+        let savedID = UUID()
+        XCTAssertTrue(store.save(
+            draft(name: "Please keep this plan"),
+            userID: account, draftID: savedID
+        ))
+        XCTAssertNil(store.recentDraftID(userID: account))
+        let resumed = TrainProgramCreationLaunch.reopenOrCreate(
+            userID: account, store: store
+        )
+        XCTAssertTrue(resumed.resumesDraft)
+        XCTAssertEqual(resumed.draftID, savedID)
+        XCTAssertEqual(store.recentDraftID(userID: account), savedID)
+    }
+
+    func testInvalidNewCheckpointCannotEraseExistingGoodDraft() {
+        let (defaults, suite) = defaults()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHProtectedPlan.\(UUID().uuidString)",
+                                    isDirectory: true)
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: defaults, directoryURL: folder
+        )
+        let account = UUID()
+        XCTAssertTrue(store.save(draft(name: "Saved week four"), userID: account))
+        XCTAssertFalse(store.save(draft(name: " "), userID: account))
+        XCTAssertEqual(store.load(userID: account)?.title, "Saved week four")
+    }
 }
 
