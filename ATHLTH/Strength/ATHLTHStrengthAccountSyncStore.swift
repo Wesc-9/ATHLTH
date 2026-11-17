@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Supabase
 
@@ -90,8 +91,8 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
         func validatedWorkout(owner: UUID) -> StrengthWorkoutLog? {
             guard user_id == owner, workout_id == document.id,
                   ended_at >= started_at,
-                  document.startedAt == started_at,
-                  document.endedAt == ended_at,
+                  abs(document.startedAt.timeIntervalSince(started_at)) < 1,
+                  abs(document.endedAt.timeIntervalSince(ended_at)) < 1,
                   document.exercises.count <= 200 else { return nil }
             return document.asWorkout()
         }
@@ -101,6 +102,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
     private let client = SupabaseEnvironment.client
     private var accountID: UUID?
     private var task: Task<Void, Never>?
+    private var lastSyncedLocalCount = -1
 
     func switchAccount(_ id: UUID?) {
         guard accountID != id else { return }
@@ -109,6 +111,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
         accountID = id
         isBusy = false
         lastSuccessfulSync = nil
+        lastSyncedLocalCount = -1
         status = id == nil ? "Sign in to sync training history." :
             "Strength training history syncs automatically with your account."
     }
@@ -134,6 +137,13 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
               session.profile.userID == owner,
               client.auth.currentUser?.id == owner,
               !isBusy, !Self.syncingAccounts.contains(owner) else { return }
+        // Periodic foreground checks are cheap when nothing changed. Local
+        // completed workouts bypass this delay and publish promptly.
+        if let lastSuccessfulSync,
+           Date().timeIntervalSince(lastSuccessfulSync) < 60,
+           lastSyncedLocalCount == strength.workoutHistory.count {
+            return
+        }
 
         Self.syncingAccounts.insert(owner)
         isBusy = true
@@ -205,6 +215,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
                 downloads, for: owner
             )
             lastSuccessfulSync = Date()
+            lastSyncedLocalCount = strength.workoutHistory.count
             status = "Training history synced. \(added) new workouts received."
         } catch {
             if accountID == session.profile.userID {
