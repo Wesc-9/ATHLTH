@@ -289,6 +289,8 @@ enum ExerciseOrigin: String, Codable, Hashable {
 struct ExerciseSnapshot: Codable, Hashable {
     var name: String
     var instructions: [String]
+    /// Measurement profile, never includes the athlete's recorded values.
+    var assessmentMethod: ATHLTHAssessmentMethod? = nil
     var primaryMuscles: [String]
     // Optional for backwards compatibility with workout logs created
     // before secondary-muscle metadata was preserved in snapshots.
@@ -359,6 +361,8 @@ struct Exercise: Identifiable, Codable, Hashable {
     /// Optional to keep existing saved exercises decodable. Legacy custom
     /// exercises are shown under Strength until explicitly recategorized.
     var activityCategory: ATHLTHExerciseActivity? = nil
+    /// Optional athlete-selected measurement for this exercise only.
+    var assessmentMethod: ATHLTHAssessmentMethod? = nil
     /// A private import may retain the source UUID as provenance, not as a
     /// shared ownership or edit permission. Missing for legacy exercises.
     var sharedSourceExerciseID: UUID? = nil
@@ -411,6 +415,7 @@ struct Exercise: Identifiable, Codable, Hashable {
         ExerciseSnapshot(
             name: name,
             instructions: instructions,
+            assessmentMethod: assessmentMethod,
             primaryMuscles: primaryMuscles,
             secondaryMuscles: secondaryMuscles,
             equipment: equipment,
