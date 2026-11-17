@@ -65,6 +65,7 @@ final class ATHLTHAzureWorkoutSpeech:
         _ phrase: String,
         voiceIdentifier: String?,
         duckMusic: Bool,
+        muteMusic: Bool = false,
         shouldStart: @escaping () -> Bool = { true },
         onFallback: @escaping () -> Void,
         onStarted: @escaping () -> Void,
@@ -125,6 +126,7 @@ final class ATHLTHAzureWorkoutSpeech:
                 do {
                     try ATHLTHSpokenAudioSession.activate(
                         duckOtherAudio: duckMusic,
+                        muteOtherAudio: muteMusic,
                         owner: audioOwner
                     )
                     self.ownsAudioSession = true
