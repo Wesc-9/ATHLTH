@@ -4888,6 +4888,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// Read only crossed rule milestones; the routine scheduler merges
     /// these with basic distance/time updates before speaking.
     private var coachReadoutContext: ATHLTHCoachReadoutContext {
+        if kind == .strength, let strengthSession {
+            return ATHLTHCoachReadoutContext.make(strength: strengthSession)
+        }
         let rules = audioCoachConfiguration.activeCustomRules
         return ATHLTHCoachReadoutContext.make(
             plan: ATHLTHCoachReadoutContext.needsSegmentData(rules) ? structuredRunningWorkout : nil,
@@ -4900,11 +4903,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func evaluateCustomAudioCoachRules() -> [ATHLTHAudioCoachDueAnnouncement] {
-        guard !coachSpeechPaused, kind == .running || kind == .walking else {
-            return []
+        guard !coachSpeechPaused,
+              kind == .running || kind == .walking || kind == .strength
+        else { return [] }
+        let rules = audioCoachConfiguration.activeCustomRules.filter { rule in
+            guard kind == .strength else { return true }
+            // Strength-specific voice data must come from a real exercise
+            // queue; running pace and distance prompts are excluded.
+            return rule.selectedMetrics.contains {
+                switch $0 {
+                case .remainingExercises, .nextExercise, .previousExerciseSummary,
+                     .previousMainSectionSummary, .stepName, .elapsedTime:
+                    return true
+                default: return false
+                }
+            }
         }
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
-            rules: audioCoachConfiguration.activeCustomRules,
+            rules: rules,
             distanceMeters: distanceMeters,
             elapsedSeconds: elapsedTime,
             paceSecondsPerKilometer:
@@ -5088,7 +5104,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             shouldAnnounce = true
         }
 
-        let maySpeakRoutine = shouldAnnounce &&
+        let maySpeakRoutine = shouldAnnounce && kind != .strength &&
             ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
                 step: currentStructuredRunningStep,
                 elapsedInStep: currentStructuredStepElapsedTime,
