@@ -190,18 +190,19 @@ struct RouteDetailView: View {
     }
 
     private var allOwnAttempts: [RouteAttemptRecord] {
-        allRouteAttempts
-            .filter { $0.userID == session.profile.userID }
-            .sorted { $0.startedAt > $1.startedAt }
+        ATHLTHRouteAttemptDirectionPolicy.personalHistory(
+            allRouteAttempts, userID: session.profile.userID
+        )
     }
 
-    /// The personal history includes older attempts with unknown GPS direction.
-    /// This does not change which attempts qualify for the leaderboard.
+    /// Visible attempts include legacy runs even if the direction is unknown;
+    /// those runs still cannot qualify for the GPS-verified leaderboard.
     private var ownAttempts: [RouteAttemptRecord] {
-        allOwnAttempts.filter {
-            $0.direction == selectedAttemptDirection ||
-                ($0.direction ?? .unknown) == .unknown
-        }
+        ATHLTHRouteAttemptDirectionPolicy.visiblePersonalHistory(
+            allRouteAttempts,
+            direction: selectedAttemptDirection,
+            userID: session.profile.userID
+        )
     }
 
     private var historicalAttemptsWithoutDirection: [RouteAttemptRecord] {
