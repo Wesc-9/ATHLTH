@@ -249,8 +249,11 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         copy.sharedSourceWorkoutID =
             source.sharedSourceWorkoutID ?? sourceWorkoutID ?? source.id
 
-        customTemplates.append(copy)
-        persist()
+        // A shared workout is not a valid *saved* copy until it is edited
+        // and renamed. Do not append a byte-identical shared source.
+        // The returned draft can be opened in the editor for customization.
+        copy.title = String((source.title + " – Min variant")
+            .prefix(ATHLTHLibraryName.maximumWorkoutCharacters))
         return copy
     }
 
