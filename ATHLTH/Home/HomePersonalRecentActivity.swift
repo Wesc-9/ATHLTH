@@ -1489,8 +1489,7 @@ struct HomePersonalRecentActivitySection:
                         distanceMeters: workout.distanceMeters,
                         durationSeconds: workout.duration,
                         exerciseCount: workout.strengthExerciseCount,
-                        volumeKilograms: workout.strengthTotalVolumeKilograms,
-                        fallback: nil
+                        volumeKilograms: workout.strengthTotalVolumeKilograms
                     )
 
                     HomeCompactActivityEngagementRow(
@@ -1550,8 +1549,7 @@ struct HomePersonalRecentActivitySection:
                         ),
                         volumeKilograms: HomeRecentCardFormat.number(
                             feedItem, key: "volume_kg"
-                        ),
-                        fallback: nil
+                        )
                     )
 
                     HomeCompactActivityEngagementRow(item: feedItem)
@@ -1636,6 +1634,9 @@ struct HomePersonalRecentActivitySection:
             let handles = [username, partnerUsernames]
                 .compactMap { $0 }
                 .filter { !$0.isEmpty }
+                .map { handle in
+                    handle.hasPrefix("@") ? handle : "@\(handle)"
+                }
             return handles.joined(separator: " · ")
         }
 
@@ -1648,7 +1649,8 @@ struct HomePersonalRecentActivitySection:
                     Text(authorName)
                         .font(.system(size: 13.5, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if let partnerNames, !partnerNames.isEmpty {
                         Text(
@@ -1693,7 +1695,6 @@ struct HomePersonalRecentActivitySection:
         let durationSeconds: TimeInterval?
         let exerciseCount: Int?
         let volumeKilograms: Double?
-        let fallback: String?
 
         var body: some View {
             VStack(alignment: .trailing, spacing: 3) {
