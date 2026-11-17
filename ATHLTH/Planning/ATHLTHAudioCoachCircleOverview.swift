@@ -410,6 +410,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
                         setGroupEnabled(group.id, to: !group.isEnabled)
                     }
                     .accessibilityIdentifier("athlth-coach-group-toggle")
+                    Button(tr("Preview group's speech", "Prøvelytt på gruppen"),
+                           systemImage: "speaker.wave.2") {
+                        previewGroup(group)
+                    }
                     Divider()
                     Button(tr("Edit group trigger", "Endre gruppens trigger"),
                            systemImage: "clock.arrow.circlepath") {
@@ -531,6 +535,31 @@ struct ATHLTHAudioCoachCircleOverview: View {
 
     /// Keep the group's named commands and cadence intact while muting them.
     /// The shared audio configuration filters rules from disabled groups.
+    @MainActor
+    private func previewGroup(_ group: ATHLTHAudioCoachGroup) {
+        let norwegian: Bool
+        switch draft.language {
+        case .norwegian: norwegian = true
+        case .english: norwegian = false
+        case .system:
+            norwegian = ["no", "nb", "nn"].contains(
+                Locale.current.language.languageCode?.identifier.lowercased() ?? ""
+            )
+        }
+        let text = ATHLTHAudioCoachGroupPreview.text(
+            group: group, rules: draft.customRules, norwegian: norwegian
+        )
+        ATHLTHAudioCoachPreviewSpeaker.shared.speak(
+            language: draft.language,
+            voiceIdentifier: draft.voiceIdentifier,
+            speechRate: draft.speechRate,
+            speechVolume: draft.speechVolume,
+            duckOtherAudio: draft.duckOtherAudio,
+            speechStyle: draft.speechStyle,
+            sampleText: text
+        )
+    }
+
     private func setGroupEnabled(_ id: UUID, to enabled: Bool) {
         guard let index = draft.coachGroups.firstIndex(where: { $0.id == id }) else {
             return
