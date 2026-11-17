@@ -3,6 +3,20 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHRunningWorkoutDisplayDeduplicationTests: XCTestCase {
+    private func builtIn4x4() -> RunningWorkoutTemplate {
+        RunningWorkoutTemplate(
+            id: UUID(uuidString: "A1000000-0000-0000-0000-000000000051")!,
+            title: "4 × 4 intervaller",
+            type: .intervals,
+            summary: "10 min warmup · 4 × 4 min efforts · 2 min recovery.",
+            blocks: [],
+            routeID: nil,
+            isBuiltIn: true,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0)
+        )
+    }
+
     private func savedCopy(
         of original: RunningWorkoutTemplate,
         title: String? = nil,
@@ -25,9 +39,7 @@ final class ATHLTHRunningWorkoutDisplayDeduplicationTests: XCTestCase {
     }
 
     func testBuiltIn4x4AndItsSavedCopyAppearOnlyOnce() throws {
-        let builtIn = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first {
-            $0.title == "4 × 4 intervaller"
-        })
+        let builtIn = builtIn4x4()
         let saved = savedCopy(of: builtIn, sourceID: builtIn.id)
         let displayed = ATHLTHRunningWorkoutDisplayDeduplication.visible([
             builtIn, saved
@@ -36,9 +48,7 @@ final class ATHLTHRunningWorkoutDisplayDeduplicationTests: XCTestCase {
     }
 
     func testLegacyCopyWithSameSummaryAndTitleIsDeduplicated() throws {
-        let builtIn = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first {
-            $0.title == "4 × 4 intervaller"
-        })
+        let builtIn = builtIn4x4()
         let saved = savedCopy(of: builtIn)
         let displayed = ATHLTHRunningWorkoutDisplayDeduplication.visible([
             builtIn, saved
@@ -47,9 +57,7 @@ final class ATHLTHRunningWorkoutDisplayDeduplicationTests: XCTestCase {
     }
 
     func testDistinctWorkoutsWithSameTitleAreNotDeletedOrHidden() throws {
-        let builtIn = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first {
-            $0.title == "4 × 4 intervaller"
-        })
+        let builtIn = builtIn4x4()
         let other = savedCopy(
             of: builtIn,
             summary: "Different four by four training prescription."
@@ -61,9 +69,7 @@ final class ATHLTHRunningWorkoutDisplayDeduplicationTests: XCTestCase {
     }
 
     func testOriginalRemainsWhenSavedCopyIsExcludedByFavoritesFilter() throws {
-        let builtIn = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first {
-            $0.title == "4 × 4 intervaller"
-        })
+        let builtIn = builtIn4x4()
         // The filter executes before deduplication: if only the original
         // is starred, its source ID remains a valid favorite target.
         XCTAssertEqual(
@@ -73,9 +79,7 @@ final class ATHLTHRunningWorkoutDisplayDeduplicationTests: XCTestCase {
     }
 
     func testPersonalCopyAloneRemainsSelectableUnderMineFilter() throws {
-        let builtIn = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first {
-            $0.title == "4 × 4 intervaller"
-        })
+        let builtIn = builtIn4x4()
         let saved = savedCopy(of: builtIn, sourceID: builtIn.id)
         XCTAssertEqual(
             ATHLTHRunningWorkoutDisplayDeduplication.visible([saved]).map(\.id),
