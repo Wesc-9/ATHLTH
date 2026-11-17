@@ -232,7 +232,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                 if ATHLTHThreeMinuteAllOut.isRunningTest(
                     title: workoutName, blocks: blocks
                 ) {
-                    ATHLTHThreeMinuteAllOutGuide()
+                    ATHLTHThreeMinuteAllOutProtocol()
                 }
 
                 if previewDistance?.usesAssumedPace == true {
