@@ -628,6 +628,7 @@ struct RunningWorkoutBuilderView: View {
     @State private var summary = ""
     @State private var blocks: [RunningWorkoutBlock] = []
     @State private var showingBlockEditor = false
+    @State private var saveError: String?
 
     var body: some View {
         NavigationStack {
@@ -707,27 +708,45 @@ struct RunningWorkoutBuilderView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        library.save(
-                            RunningWorkoutTemplate(
-                                id: UUID(),
-                                title: String(title.trimmingCharacters(in: .whitespacesAndNewlines)
-                                    .prefix(ATHLTHLibraryName.maximumWorkoutCharacters)),
-                                type: type,
-                                summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
-                                blocks: blocks,
-                                routeID: nil,
-                                isBuiltIn: false,
-                                createdAt: Date(),
-                                updatedAt: Date()
-                            )
+                        let item = RunningWorkoutTemplate(
+                            id: UUID(),
+                            title: String(title.trimmingCharacters(in: .whitespacesAndNewlines)
+                                .prefix(ATHLTHLibraryName.maximumWorkoutCharacters)),
+                            type: type,
+                            summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
+                            blocks: blocks,
+                            routeID: nil,
+                            isBuiltIn: false,
+                            createdAt: Date(),
+                            updatedAt: Date()
                         )
-                        dismiss()
+                        if library.save(item) {
+                            dismiss()
+                        } else {
+                            saveError = ATHLTHLocalization.choose(
+                                english: "Choose a different name from the original workout.",
+                                norwegian: "Velg et annet navn enn originaløkten."
+                            )
+                        }
                     }
                     .disabled(
                         title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                         blocks.isEmpty
                     )
                 }
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "Workout not saved", norwegian: "Økten ble ikke lagret"
+                ),
+                isPresented: Binding(
+                    get: { saveError != nil },
+                    set: { if !$0 { saveError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "")
             }
             .sheet(isPresented: $showingBlockEditor) {
                 RunningBlockEditorView { block in
