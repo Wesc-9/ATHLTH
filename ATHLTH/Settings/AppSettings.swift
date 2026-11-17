@@ -519,59 +519,59 @@ final class AppSettingsStore: ObservableObject {
     @Published var routeAlertAnnounceUpcomingTurns: Bool { didSet { persist() } }
     @Published var routeAlertTurnCueLeadMeters: Double { didSet { persist() } }
 
-    @Published var audioCoachEnabledByDefault: Bool { didSet { persist() } }
+    @Published var audioCoachEnabledByDefault: Bool { didSet { audioCoachDidChange() } }
     @Published var audioCoachLanguage: WatchAudioCoachLanguage {
         didSet {
             audioCoachVoiceIdentifier = nil
-            persist()
+            audioCoachDidChange()
         }
     }
-    @Published var audioCoachDistanceTriggerEnabled: Bool { didSet { persist() } }
-    @Published var audioCoachTimeTriggerEnabled: Bool { didSet { persist() } }
-    @Published var audioCoachDistanceIntervalKilometers: Double { didSet { persist() } }
-    @Published var audioCoachTimeIntervalMinutes: Int { didSet { persist() } }
+    @Published var audioCoachDistanceTriggerEnabled: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachTimeTriggerEnabled: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachDistanceIntervalKilometers: Double { didSet { audioCoachDidChange() } }
+    @Published var audioCoachTimeIntervalMinutes: Int { didSet { audioCoachDidChange() } }
     /// Precise custom cadence (seconds). Old installs migrate from minutes.
-    @Published var audioCoachTimeIntervalSeconds: Int { didSet { persist() } }
+    @Published var audioCoachTimeIntervalSeconds: Int { didSet { audioCoachDidChange() } }
     @Published var audioCoachCustomRules: [ATHLTHAudioCoachRule] {
-        didSet { persist() }
+        didSet { audioCoachDidChange() }
     }
     @Published var audioCoachGroups: [ATHLTHAudioCoachGroup] {
-        didSet { persist() }
+        didSet { audioCoachDidChange() }
     }
     @Published var audioCoachSavedRuleSets: [ATHLTHAudioCoachRuleSet] {
-        didSet { persist() }
+        didSet { audioCoachDidChange() }
     }
     @Published var audioCoachSmartSettings: ATHLTHAudioCoachSmartSettings {
-        didSet { persist() }
+        didSet { audioCoachDidChange() }
     }
     @Published var audioCoachProfiles: [ATHLTHAudioCoachProfile] {
-        didSet { persist() }
+        didSet { audioCoachDidChange() }
     }
     @Published var activeAudioCoachProfileID: UUID? {
-        didSet { persist() }
+        didSet { audioCoachDidChange() }
     }
-    @Published var audioCoachAnnounceDistance: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceElapsedTime: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceAveragePace: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceClockTime: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceHeartRate: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceRemainingRouteDistance: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceEstimatedRemainingRouteTime: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceCurrentWorkoutStep: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceRemainingStepTime: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceRemainingStepDistance: Bool { didSet { persist() } }
-    @Published var audioCoachDuckOtherAudio: Bool { didSet { persist() } }
-    @Published var audioCoachMuteOtherAudio: Bool { didSet { persist() } }
-    @Published var audioCoachVoiceIdentifier: String? { didSet { persist() } }
-    @Published var audioCoachSpeechRate: Double { didSet { persist() } }
+    @Published var audioCoachAnnounceDistance: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceElapsedTime: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceAveragePace: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceClockTime: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceHeartRate: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceRemainingRouteDistance: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceEstimatedRemainingRouteTime: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceCurrentWorkoutStep: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceRemainingStepTime: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceRemainingStepDistance: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachDuckOtherAudio: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachMuteOtherAudio: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachVoiceIdentifier: String? { didSet { audioCoachDidChange() } }
+    @Published var audioCoachSpeechRate: Double { didSet { audioCoachDidChange() } }
     @Published var audioCoachSpeechStyle: ATHLTHCoachSpeechStyle {
-        didSet { persist() }
+        didSet { audioCoachDidChange() }
     }
-    @Published var audioCoachSpeechVolume: Double { didSet { persist() } }
-    @Published var audioCoachAnnounceWorkoutStart: Bool { didSet { persist() } }
-    @Published var audioCoachAnnouncePauseResume: Bool { didSet { persist() } }
-    @Published var audioCoachAnnounceWorkoutComplete: Bool { didSet { persist() } }
-    @Published var guidanceQuietPeriodSeconds: Int { didSet { persist() } }
+    @Published var audioCoachSpeechVolume: Double { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceWorkoutStart: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnouncePauseResume: Bool { didSet { audioCoachDidChange() } }
+    @Published var audioCoachAnnounceWorkoutComplete: Bool { didSet { audioCoachDidChange() } }
+    @Published var guidanceQuietPeriodSeconds: Int { didSet { audioCoachDidChange() } }
 
     @Published var ghostRaceAudioEnabled: Bool { didSet { persist() } }
     @Published var ghostRaceAudioDistanceIntervalKilometers: Double { didSet { persist() } }
@@ -669,6 +669,31 @@ final class AppSettingsStore: ObservableObject {
 
     private let defaults: UserDefaults
     private var isInitializing = true
+    private var isApplyingRemoteAudioCoach = false
+    private(set) var audioCoachEditedAt: Date = .distantPast
+
+    private func audioCoachDidChange() {
+        if !isInitializing && !isApplyingRemoteAudioCoach {
+            audioCoachEditedAt = Date()
+            defaults.set(audioCoachEditedAt, forKey: "settings.audioCoach.lastLocalEdit.v1")
+        }
+        persist()
+    }
+
+    /// Reconcile account-owned audio settings without treating an incoming
+    /// cloud snapshot as a new local edit or changing a live workout snapshot.
+    func applyAccountAudioCoach(_ snapshot: ATHLTHAudioCoachAccountSnapshot) {
+        isApplyingRemoteAudioCoach = true
+        defer { isApplyingRemoteAudioCoach = false }
+        var draft = AudioCoachDraft()
+        draft.load(configuration: snapshot.configuration)
+        updateAudioCoachDefaults(from: draft)
+        audioCoachProfiles = snapshot.profiles
+        audioCoachSavedRuleSets = snapshot.savedRuleSets
+        activeAudioCoachProfileID = snapshot.activeProfileID
+        audioCoachEditedAt = snapshot.editedAt
+        defaults.set(snapshot.editedAt, forKey: "settings.audioCoach.lastLocalEdit.v1")
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -1193,6 +1218,9 @@ final class AppSettingsStore: ObservableObject {
             ) as? Bool ?? false
         homeAssistantConnected = defaults.object(forKey: "settings.homeAssistantConnected") as? Bool ?? false
 
+        audioCoachEditedAt = defaults.object(
+            forKey: "settings.audioCoach.lastLocalEdit.v1"
+        ) as? Date ?? .distantPast
         isInitializing = false
     }
 
