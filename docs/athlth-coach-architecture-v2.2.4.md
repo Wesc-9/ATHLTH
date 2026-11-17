@@ -38,9 +38,19 @@ ATHLTH Coach er **den eneste brukervendte coachen**. Vi skal ikke introdusere «
 4. **Årsak:** konkret dokumentert regel, datakvalitets-/tillitsnivå, hvorfor alternativ ikke ble valgt.
 5. **Handling:** kun `preview`; bruker må godta/beholde/justere før synkronisert mutasjon.
 
+## Iterasjon 2 – forslag om repetisjoner og volum (direkte på release)
+- `ATHLTHCoachStrengthRepetitionVolume` er en deterministisk, skrivebeskyttet regelmotor. Den krever eksplisitt repetisjonsområde og et faktisk lagret planmål (`getStronger` eller `buildMuscle`). Ingen oppdiktede intervaller eller anbefalinger fra bare én god økt.
+- Økningsforslag: kun én repetisjon av gangen ved to distinkte planlinkede og fullførte økter, med registrert innsats (RIR/RPE) og korrekt arbeidsvekt. Manglende/høy innsats, hoppede sett, ukjent vektenhet eller mismatchet øvelse skal blokkere økning.
+- I `ATHLTHTrainProgressionCoachView` aktiverer brukeren selv repetisjonsforslag og velger min/maks. Når vekt og reps begge kunne økes, prioriteres reps innen valgt område (dobbel progresjon).
+- `AppSessionStore.applySuggestedTrainingRepetitions` kontrollerer planversjonen og **beregner forslaget på nytt** ved eksplisitt godkjenning, oppdaterer kun arbeidsrepetisjonene for én fremtidig planlagt øvelse, og bevarer oppvarming, sett-ID-er og fullførte økter.
+- For muskelvekst kan tre sammenlignbare, flate økter over minst 14 dager gi `reviewTrainingVolume`. Dette er **bare et signal om å vurdere volum**, ikke en automatisk økning eller diagnose. Et eget brukervendt volumkort og målbasert volumdosering er ennå ikke på plass.
+- `ATHLTHCoachStrengthIntelligence` bruker nå samme historikk-/vektbeslutning og skiller utstyrsvarianter for å unngå motstridende Coach-signaler.
+- Nye tester: `ATHLTHCoachStrengthRepetitionVolumeTests`, utvidet `ATHLTHTrainProgressionCoachTests`, `ATHLTHCoachStrengthIntelligenceTests`.
+- Gjenstående: Xcode-/iPhone-/iPad- og Watch-verifikasjon, full UI-testing, utstyrsproveniens (total kg versus per manual, konkrete apparat), fremtidige volumforslag, restitusjonskontekst, end-to-end-synkronisering og kjørt testbevis. Ingen av de fem fasene er merket ferdig.
+
 ## Faser og ferdigkriterium
 - [ ] Fase 1 – grunnlagskartlegging, identitet, felles API og compile/verifikasjon (**pågår**).
-- [ ] Fase 2 – algoritmisk styrkeprogresjon med sikkerhetstester (**påbegynt: vektreview/hold/datagrunnlag, reps/sett/utstyr gjenstår**).
+- [ ] Fase 2 – algoritmisk styrkeprogresjon med sikkerhetstester (**påbegynt: godkjente vekt- og repsforslag, volum kun review; sett-/utstyrsdosering og verifikasjon gjenstår**).
 - [ ] Fase 3 – integrert UI i Basic/Advanced, live, plan, iPad og Watch (**kun avsendernavn i eksisterende livekort oppdatert**).
 - [ ] Fase 4 – innsikt og godkjente planjusteringer via Coach.
 - [ ] Fase 5 – komplett test, ytelse og TestFlight.
