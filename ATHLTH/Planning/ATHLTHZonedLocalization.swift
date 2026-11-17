@@ -220,6 +220,36 @@ enum ATHLTHZonedLocalization {
                     norwegian: "Løp gjentatte drag på 20 meter etter lydsignalene. Farten øker gradvis. Fortsett til du ikke klarer å følge signalene."
                 )
             )
+        case "5 km at constant maf hr (180 - age). record time for each kilometer.":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "5 km MAF test", norwegian: "5 km MAF-test"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Run 5 km at a steady MAF heart rate (180 minus age). Record the time for each kilometer.",
+                    norwegian: "Løp 5 km med jevn MAF-puls (180 minus alder). Noter tiden for hver kilometer."
+                )
+            )
+        case "progressive warmup: walk then very gradual acceleration over 12-15 min to reach maf hr":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Progressive MAF warmup", norwegian: "Gradvis MAF-oppvarming"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Start walking, then increase the speed gradually over 12–15 minutes until you reach your MAF heart rate.",
+                    norwegian: "Begynn med gange, og øk farten gradvis over 12–15 minutter til du når MAF-pulsen din."
+                )
+            )
+        case "progressive pace decrease over 10-15 min":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Gradual cool-down", norwegian: "Gradvis nedtrapping"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Reduce the pace gradually over 10–15 minutes.",
+                    norwegian: "Senk farten gradvis over 10–15 minutter."
+                )
+            )
         case "jog down":
             return StepCopy(
                 title: ATHLTHLocalization.choose(
@@ -251,6 +281,28 @@ enum ATHLTHZonedLocalization {
                 )
             )
         default: break
+        }
+        if isRunning && input.lowercased().hasPrefix("progressive run: start at 8-9 km/h") {
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Conconi running test", norwegian: "Conconi-test"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Start at 8–9 km/h and increase by 0.5 km/h every 200 m (or every 2 min). Record heart rate at each stage and continue until exhaustion.",
+                    norwegian: "Start på 8–9 km/t og øk med 0,5 km/t for hver 200 meter (eller hvert 2. minutt). Noter pulsen på hvert trinn, og fortsett til utmattelse."
+                )
+            )
+        }
+        if isRunning && input.lowercased().hasPrefix("4-5min stages at increasing speed") {
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Lactate step test", norwegian: "Laktat-trinntest"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Run 4–5-minute stages at increasing speed (+0.5 km/h per stage), starting around 60% of vVO2max. At each stage record HR, RPE and lactate if available. Continue until exhaustion.",
+                    norwegian: "Løp trinn på 4–5 minutter med økende fart (+0,5 km/t per trinn). Start rundt 60 % av vVO2-maks. Noter puls, RPE og eventuelt laktat etter hvert trinn. Fortsett til utmattelse."
+                )
+            )
         }
         if isRunning && isThreeMinuteAllOut(input) {
             return StepCopy(
