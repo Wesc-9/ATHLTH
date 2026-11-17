@@ -56,13 +56,13 @@ enum ATHLTHExerciseAlphabetPage {
 /// One shared A–Å lookup for all LOCAL library collections. Build targets
 /// from the complete filtered result, not the current 50 rendered records.
 /// The stable ID→index map allows jumps without loading intermediate pages.
-struct ATHLTHLibraryAlphabetLookup {
-    let targets: [String: UUID]
-    private let indices: [UUID: Int]
+struct ATHLTHLibraryAlphabetLookup<ID: Hashable> {
+    let targets: [String: ID]
+    private let indices: [ID: Int]
 
-    init<Item>(items: [Item], id: (Item) -> UUID, title: (Item) -> String) {
-        var first: [String: UUID] = [:]
-        var positions: [UUID: Int] = [:]
+    init<Item>(items: [Item], id: (Item) -> ID, title: (Item) -> String) {
+        var first: [String: ID] = [:]
+        var positions: [ID: Int] = [:]
         for (offset, item) in items.enumerated() {
             let itemID = id(item)
             let letter = ATHLTHExerciseAlphabet.letter(for: title(item))
@@ -75,7 +75,7 @@ struct ATHLTHLibraryAlphabetLookup {
         indices = positions
     }
 
-    func index(for targetID: UUID) -> Int? { indices[targetID] }
+    func index(for targetID: ID) -> Int? { indices[targetID] }
 }
 
 enum ATHLTHLibraryAlphabetWindow {
@@ -88,9 +88,9 @@ enum ATHLTHLibraryAlphabetWindow {
     }
 }
 
-struct ATHLTHExerciseAlphabetIndex: View {
-    let targets: [String: UUID]
-    let onJump: (UUID) -> Void
+struct ATHLTHExerciseAlphabetIndex<ID: Hashable>: View {
+    let targets: [String: ID]
+    let onJump: (ID) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
