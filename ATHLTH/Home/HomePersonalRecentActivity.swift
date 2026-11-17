@@ -1196,6 +1196,7 @@ struct HomePersonalRecentActivitySection:
     @State private var visibleItems: [HomeActivityStreamItem] = []
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var availableFeedWidth: CGFloat = 0
+    @State private var showingAllActivities = false
 
     private var isWideRecentLayout: Bool {
         ATHLTHRecentActivityLayoutPolicy.isHorizontal(
@@ -1241,7 +1242,9 @@ struct HomePersonalRecentActivitySection:
             alignment: .leading,
             spacing: 12
         ) {
+            // Keep See all above workout artwork links in the hit-test stack.
             header
+                .zIndex(1)
 
             if recent.isEmpty {
                 emptyState
@@ -1259,7 +1262,11 @@ struct HomePersonalRecentActivitySection:
                     availableFeedWidth = width
                 }
                 .accessibilityIdentifier("athlth-home-recent-vertical-feed")
+                .zIndex(0)
             }
+        }
+        .navigationDestination(isPresented: $showingAllActivities) {
+            HomePersonalActivityHistoryView()
         }
         .onChange(of: recentRevision) { _, _ in
             rebuildRecentWorkouts()
@@ -1386,8 +1393,8 @@ struct HomePersonalRecentActivitySection:
 
             Spacer()
 
-            NavigationLink {
-                HomePersonalActivityHistoryView()
+            Button {
+                showingAllActivities = true
             } label: {
                 HStack(spacing: 5) {
                     Text(
@@ -1416,17 +1423,20 @@ struct HomePersonalRecentActivitySection:
                 .foregroundStyle(
                     ATHLTHTheme.accentDeep
                 )
-                .padding(
-                    .horizontal,
-                    11
-                )
-                .frame(height: 32)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
                 .background(
                     ATHLTHTheme.accentSoft,
                     in: Capsule()
                 )
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-home-recent-see-all")
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Open full activity history",
+                norwegian: "Åpne hele aktivitetshistorikken"
+            ))
         }
     }
 
@@ -1459,6 +1469,7 @@ struct HomePersonalRecentActivitySection:
                     )
                     .frame(maxWidth: .infinity)
                     .clipped()
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             } details: {
@@ -1516,6 +1527,7 @@ struct HomePersonalRecentActivitySection:
                     )
                     .frame(maxWidth: .infinity)
                     .clipped()
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             } details: {
