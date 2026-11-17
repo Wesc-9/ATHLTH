@@ -5763,7 +5763,7 @@ struct ATHLTHTrainView: View {
     @State private var selectedSection: ATHLTHTrainSection = .today
     @SceneStorage("athlth.train.selectedSection") private var persistedTrainSection = "today"
     @State private var restoredTrainSectionAccount: UUID?
-    @State private var resumedInterruptedDraftAccount: UUID?
+    @State private var interruptedDraftResumePending = false
     @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
     @State private var preparedTrainUserID: UUID?
     @State private var trainHistoryReconcileTask: Task<Void, Never>?
@@ -5961,6 +5961,10 @@ struct ATHLTHTrainView: View {
                     selectedTrainPlanWeekIndex = 0
                     selectedSection = .plan
                     newlyCreatedPlanToOpen = nil
+                } else {
+                    // Reopen a workspace if iOS dismissed it without an
+                    // explicit Save Draft or Discard decision.
+                    restoreInterruptedPlanDestinationIfNeeded()
                 }
             }) { launch in
                 ATHLTHTrainProgramComposerView(
@@ -7020,23 +7024,21 @@ struct ATHLTHTrainView: View {
     /// Never create a fresh UUID or overwrite the checkpoint on restoration.
     private func restoreInterruptedPlanDestinationIfNeeded() {
         guard isActive, session.signedIn, scenePhase == .active,
-              trainProgramCreationLaunch == nil else { return }
+              trainProgramCreationLaunch == nil,
+              !interruptedDraftResumePending else { return }
         let userID = session.profile.userID
-        guard resumedInterruptedDraftAccount != userID,
-              let launch = TrainProgramCreationLaunch.interruptedDraft(
-                  userID: userID, store: ATHLTHPlanCreationDraftStore()
-              ) else { return }
+        guard let launch = TrainProgramCreationLaunch.interruptedDraft(
+            userID: userID, store: ATHLTHPlanCreationDraftStore()
+        ) else { return }
+        interruptedDraftResumePending = true
         selectedSection = .plan
         Task { @MainActor in
+            defer { interruptedDraftResumePending = false }
             // Let the Train tab mount before presenting its fullscreen editor.
             await Task.yield()
             guard isActive, session.signedIn, scenePhase == .active,
                   session.profile.userID == userID,
-                  resumedInterruptedDraftAccount != userID,
                   trainProgramCreationLaunch == nil else { return }
-            // Mark consumed only once the editor is actually presented.
-            // A scene that becomes inactive during the yield may retry.
-            resumedInterruptedDraftAccount = userID
             trainProgramCreationLaunch = launch
         }
     }
