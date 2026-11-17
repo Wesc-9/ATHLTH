@@ -1008,6 +1008,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var catalogResultsCache = CatalogResultsCache()
     @State private var selectedCategory = "All"
     @State private var favoritesOnly = false
+    @State private var mineOnly = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var expandedWorkoutCardID: String?
     @State private var selectedMuscleFocus = "all"
@@ -1491,6 +1492,13 @@ struct WorkoutTemplateLibraryView: View {
         )).sorted()
     }
 
+    private var sourceFilter: ATHLTHWorkoutLibrarySourceFilter {
+        ATHLTHWorkoutLibrarySourceFilter(
+            favoritesOnly: favoritesOnly,
+            mineOnly: mineOnly
+        )
+    }
+
     private var builtInRunningTemplates: [RunningWorkoutTemplate] {
         // Workouts must also expose user-created running templates.
         runningLibrary.allTemplates
@@ -1507,13 +1515,15 @@ struct WorkoutTemplateLibraryView: View {
         let filter = discoveryFilter
         let matching = builtInRunningTemplates.filter { workout in
             guard filter.matches(workout) else { return false }
-            let favoriteMatches =
-                !favoritesOnly ||
-                favorites.isFavorite(.workout, itemID: workout.id.uuidString)
-            let searchMatches = clean.isEmpty || ATHLTHWorkoutSearch.matches(
+            guard sourceFilter.matches(
+                isPersonal: !workout.isBuiltIn,
+                isFavorite: favorites.isFavorite(
+                    .workout, itemID: workout.id.uuidString
+                )
+            ) else { return false }
+            return clean.isEmpty || ATHLTHWorkoutSearch.matches(
                 clean, texts: [workout.title, workout.summary, workout.type.title]
             )
-            return favoriteMatches && searchMatches
         }
         return discoverySorted(matching, title: { $0.title }) {
             $0.estimatedDurationSeconds.map { $0 / 60 }
@@ -1522,6 +1532,9 @@ struct WorkoutTemplateLibraryView: View {
 
     private var filteredEntries:
         [WorkoutTemplateCatalogEntry] {
+        // Published/catalog recipes never qualify as "Mine". Returning here
+        // avoids scanning the catalog when the athlete wants personal copies.
+        guard !mineOnly else { return [] }
         let key = CatalogResultsKey(
             contentRevision: catalog.contentRevision,
             query: committedQuery,
@@ -1562,8 +1575,12 @@ struct WorkoutTemplateLibraryView: View {
             guard catalog.matchesSearch(entry, normalizedNeedle: needle),
                   selectedMuscleFocus == "all" ||
                     entry.tags.contains(selectedMuscleFocus),
-                  !favoritesOnly ||
-                    favorites.isFavorite(.workout, itemID: entry.id.uuidString)
+                  sourceFilter.matches(
+                    isPersonal: false,
+                    isFavorite: favorites.isFavorite(
+                        .workout, itemID: entry.id.uuidString
+                    )
+                  )
             else { return false }
             return filter.matches(entry)
         }
@@ -1591,6 +1608,12 @@ struct WorkoutTemplateLibraryView: View {
                 uniquingKeysWith: { first, _ in first }
             ) : [:]
         let matching = session.savedWorkoutTemplates.filter { workout in
+            guard sourceFilter.matches(
+                isPersonal: true,
+                isFavorite: favorites.isFavorite(
+                    .workout, itemID: workout.id.uuidString
+                )
+            ) else { return false }
             let matchesCategory = selectedCategory == "All" ||
                 (selectedCategory == "Hybrid" &&
                  ATHLTHPlannedWorkoutType.custom.matches(workout)) ||
@@ -1618,7 +1641,8 @@ struct WorkoutTemplateLibraryView: View {
     /// The original picker only exposed saved templates. "Bruk planlagt
     /// økt" also needs actual sessions from the calendar and active plans.
     private var filteredScheduledWorkouts: [PlannedSession] {
-        guard onSelectPlanned != nil else { return [] }
+        // Planned sessions are from a plan, not separately saved in Mine.
+        guard onSelectPlanned != nil, !mineOnly else { return [] }
         let clean = committedQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let filter = discoveryFilter
         let stored = session.standalonePlannedSessions +
@@ -1638,6 +1662,12 @@ struct WorkoutTemplateLibraryView: View {
             ) : [:]
         let matching = stored.filter { workout in
             guard seen.insert(workout.id).inserted else { return false }
+            guard sourceFilter.matches(
+                isPersonal: false,
+                isFavorite: favorites.isFavorite(
+                    .workout, itemID: workout.id.uuidString
+                )
+            ) else { return false }
             let matchingType = ATHLTHPlannedWorkoutType(
                 rawValue: selectedCategory.lowercased()
             )
@@ -1704,7 +1734,7 @@ struct WorkoutTemplateLibraryView: View {
          selectedStrengthMuscles.sorted().joined(separator: ","),
          selectedStrengthStyle.map { String(describing: $0) } ?? "",
          selectedExerciseName ?? "", selectedDiscoverySort.rawValue,
-         String(favoritesOnly)].joined(separator: "|")
+         String(favoritesOnly), String(mineOnly)].joined(separator: "|")
     }
 
     var body: some View {
