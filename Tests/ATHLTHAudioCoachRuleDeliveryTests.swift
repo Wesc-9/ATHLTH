@@ -872,7 +872,7 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
             distance: 0, recorded: records, routeRemainingMeters: nil
         )
         XCTAssertEqual(cooldown.previousExerciseName, "Pause")
-        XCTAssertEqual(cooldown.previousMainSectionExerciseCount, 2)
+        XCTAssertEqual(cooldown.previousMainSectionExerciseCount, 1)
         XCTAssertEqual(cooldown.previousMainSectionSeconds, 150)
         XCTAssertEqual(cooldown.previousMainSectionDistanceMeters, 470)
 
@@ -916,6 +916,101 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
             paceSecondsPerKilometer: nil, heartRateBPM: nil,
             norwegian: true, context: cooldown
         )?.contains("470 meter") == true)
+    }
+
+    func testInactiveGroupPreservesAuthoredBuiltInOptionsButSuppressesPlayback() throws {
+        var group = ATHLTHAudioCoachGroup(name: "Muted values")
+        group.enabled = false
+        group.optionIDs = ["distanceUpdates", "motivation", "scopedCountdowns", "customPhrases"]
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.distanceIntervalMeters = 1_000
+        var smart = ATHLTHAudioCoachSmartSettings()
+        smart.motivationEnabled = true
+        smart.customEncouragements = ["My original motivation"]
+        smart.boundaryCountdownRules = [ATHLTHCoachBoundaryCountdownRule()]
+        config.smartPrompts = smart
+        config.coachGroups = [group]
+
+        let spoken = config.deliveryConfiguration
+        XCTAssertNil(spoken.distanceIntervalMeters)
+        XCTAssertFalse(spoken.smartPrompts?.motivationEnabled ?? true)
+        XCTAssertTrue(spoken.smartPrompts?.customEncouragements.isEmpty ?? false)
+        XCTAssertNil(spoken.smartPrompts?.boundaryCountdownRules)
+        // The same payload must survive a template/Watch round trip verbatim.
+        let stored = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self, from: JSONEncoder().encode(config)
+        )
+        XCTAssertEqual(stored.distanceIntervalMeters, 1_000)
+        XCTAssertEqual(stored.smartPrompts?.customEncouragements, ["My original motivation"])
+        XCTAssertEqual(stored.coachGroups?.first?.isEnabled, false)
+        var enabled = stored
+        enabled.coachGroups?[0].enabled = true
+        XCTAssertNotNil(enabled.deliveryConfiguration.distanceIntervalMeters)
+    }
+
+    func testCoachGroupPhaseFilterConsumesEarlierMilestonesWithoutLateReplay() {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .distance, interval: 60
+        )
+        var group = ATHLTHAudioCoachGroup(name: "Hoveddel", ruleIDs: [rule.id])
+        group.phases = [.main]
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.coachGroups = [group]
+        config.customRules = [rule]
+        let active = config.activeCustomRules
+        XCTAssertEqual(active.first?.allowedPhases, [.main])
+        var slots: [UUID: Int] = [:]
+
+        var warmup = ATHLTHCoachReadoutContext()
+        warmup.stepPhase = "warmup"
+        let first = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: active, distanceMeters: 250, elapsedSeconds: 60,
+            paceSecondsPerKilometer: 350, heartRateBPM: nil,
+            norwegian: true, context: warmup,
+            lastSlots: &slots
+        )
+        XCTAssertTrue(first.isEmpty)
+        XCTAssertEqual(slots[rule.id], 1)
+        var main = warmup
+        main.stepPhase = "work"
+        let second = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: active, distanceMeters: 500, elapsedSeconds: 120,
+            paceSecondsPerKilometer: 350, heartRateBPM: nil,
+            norwegian: true, context: main,
+            lastSlots: &slots
+        )
+        XCTAssertEqual(second.count, 1)
+        XCTAssertEqual(slots[rule.id], 2)
+    }
+
+    func testPriorityComposerLimitsSimultaneousMessages() {
+        let due: [ATHLTHAudioCoachDueAnnouncement] = [
+            .init(text: "Motivasjon", metrics: [.motivation], milestoneKey: "a"),
+            .init(text: "Distanse", metrics: [.distance], milestoneKey: "b"),
+            .init(text: "Puls", metrics: [.heartRate], milestoneKey: "c"),
+            .init(text: "Neste øvelse", metrics: [.nextExercise], milestoneKey: "d")
+        ]
+        let message = ATHLTHCoachRoutineComposition.compose(
+            regular: "Vanlig status", customDue: due
+        )
+        XCTAssertTrue(message.contains("Neste øvelse"))
+        XCTAssertTrue(message.contains("Puls"))
+        XCTAssertTrue(message.contains("Distanse"))
+        XCTAssertFalse(message.contains("Motivasjon"))
+        XCTAssertFalse(message.contains("Vanlig status"))
+    }
+
+    func testGroupPreviewUsesExampleDataNotHealthKitWorkout() {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .stepStart, metric: .nextExercise, interval: 1
+        )
+        let group = ATHLTHAudioCoachGroup(name: "Preview", ruleIDs: [rule.id])
+        let text = ATHLTHAudioCoachGroupPreview.text(
+            group: group, rules: [rule], norwegian: true
+        )
+        XCTAssertTrue(text.contains("Knebøy"))
     }
 
     func testOpenCooldownDoesNotInventAnEstimatedFinishTime() throws {
