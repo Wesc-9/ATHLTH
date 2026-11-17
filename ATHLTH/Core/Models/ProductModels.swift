@@ -287,6 +287,10 @@ enum ExerciseOrigin: String, Codable, Hashable {
 }
 
 struct ExerciseSnapshot: Codable, Hashable {
+    /// Stable library exercise identity where available. Optional so every
+    /// previously persisted training plan and strength log remains decodable.
+    /// Never substitute a planned-set UUID for this canonical identity.
+    var libraryExerciseID: UUID? = nil
     var name: String
     var instructions: [String]
     /// Measurement profile, never includes the athlete's recorded values.
@@ -414,6 +418,7 @@ struct Exercise: Identifiable, Codable, Hashable {
 
     var snapshot: ExerciseSnapshot {
         ExerciseSnapshot(
+            libraryExerciseID: id,
             name: name,
             instructions: instructions,
             assessmentMethod: assessmentMethod,
