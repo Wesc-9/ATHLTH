@@ -80,30 +80,6 @@ struct ATHLTHPlannedRunStepEditor: View {
         ) + " m"
     }
 
-    private var indoors: Binding<Bool> {
-        Binding(
-            get: { block.isIndoor == true },
-            set: { value in
-                block.isIndoor = value
-                if !value { block.treadmillInclinePercent = nil }
-            }
-        )
-    }
-
-    private var treadmill: Binding<Bool> {
-        Binding(
-            get: { block.treadmillInclinePercent != nil },
-            set: { value in
-                block.treadmillInclinePercent = value ? (block.treadmillInclinePercent ?? 0) : nil
-                if value {
-                    block.isIndoor = true
-                    block.targetPaceSecondsPerKilometer =
-                        block.targetPaceSecondsPerKilometer ?? 360
-                }
-            }
-        )
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 17) {
             // Same step editor and WorkoutTemplateBlock as the simple plan
@@ -182,17 +158,10 @@ struct ATHLTHPlannedRunStepEditor: View {
                 }
             }
 
+            // Indoor/outdoor/treadmill is selected once for the whole
+            // workout in Workout Details. This step edits only its own pace
+            // and, when the workout is on a treadmill, the incline.
             VStack(alignment: .leading, spacing: 11) {
-                Toggle(tr("Indoor workout", "Innendørs"), isOn: indoors)
-                    .tint(ATHLTHTrainDesign.bronze)
-                    .font(.subheadline.weight(.medium))
-                if block.isIndoor == true {
-                    Picker(tr("Indoor type", "Innendørstype"), selection: treadmill) {
-                        Text(tr("Indoor running", "Innendørs løping")).tag(false)
-                        Text(tr("Treadmill", "Tredemølle")).tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                }
                 if block.treadmillInclinePercent != nil {
                     ATHLTHPlannedTreadmillTargetsView(block: $block)
                 } else {
