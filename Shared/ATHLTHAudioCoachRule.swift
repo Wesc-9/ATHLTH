@@ -824,6 +824,53 @@ extension WatchAudioCoachConfiguration {
     }
 }
 
+/// Deterministic sample data for one group's test playback. Never reads
+/// personal HealthKit samples, and cannot claim to be an actual workout recap.
+enum ATHLTHAudioCoachGroupPreview {
+    static func text(
+        group: ATHLTHAudioCoachGroup,
+        rules: [ATHLTHAudioCoachRule],
+        norwegian: Bool
+    ) -> String {
+        var context = ATHLTHCoachReadoutContext()
+        context.stepName = norwegian ? "Intervall 2" : "Interval 2"
+        context.stepIndex = 1
+        context.stepCount = 4
+        context.stepPhase = "work"
+        context.stepElapsedSeconds = 95
+        context.stepRemainingSeconds = 25
+        context.groupRemainingSeconds = 180
+        context.workoutRemainingSeconds = 900
+        context.routeRemainingMeters = 2100
+        context.remainingExerciseCount = 2
+        context.nextExerciseName = norwegian ? "Knebøy" : "Squats"
+        context.previousExerciseName = norwegian ? "Utfall" : "Lunges"
+        context.previousExerciseSeconds = 120
+        context.previousExerciseDistanceMeters = 400
+        context.previousMainSectionExerciseCount = 3
+        context.previousMainSectionSeconds = 420
+        context.previousMainSectionDistanceMeters = 1300
+        let groupRules = group.ruleIDs.compactMap { id in
+            rules.first(where: { $0.id == id })
+        }
+        let messages = groupRules.compactMap { rule in
+            rule.phrase(
+                distanceMeters: 2_000,
+                elapsedSeconds: 750,
+                paceSecondsPerKilometer: 330,
+                heartRateBPM: 145,
+                norwegian: norwegian,
+                maximumHeartRateBPM: 190,
+                context: context
+            )
+        }
+        let sample = messages.joined(separator: ". ")
+        return sample.isEmpty
+            ? (norwegian ? "Dette er en test av gruppens stemme." : "This is a preview of the group's voice.")
+            : sample
+    }
+}
+
 struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {
     var id: UUID = UUID()
     var title: String
