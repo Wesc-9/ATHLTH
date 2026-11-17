@@ -60,11 +60,16 @@ enum ATHLTHThreeMinuteAllOut {
         let normalized = title.trimmingCharacters(
             in: .whitespacesAndNewlines
         ).lowercased()
-        return normalized.contains("3-minute all-out") ||
-            normalized.contains("3-minutt all-out") ||
-            normalized.contains("3 min maksimaltest") ||
-            normalized == "3mt" ||
-            normalized.hasPrefix("3mt ·")
+        let accepted: Set<String> = [
+            "3-minute all-out test", "3-minutt all-out test",
+            "3 min maksimaltest", "3min maksimaltest", "3mt"
+        ]
+        let aliases = [
+            "3-minute all-out test ·", "3-minutt all-out test ·",
+            "3 min maksimaltest ·", "3min maksimaltest ·", "3mt ·"
+        ]
+        return accepted.contains(normalized) ||
+            aliases.contains(where: { normalized.hasPrefix($0) })
     }
 
     static func isRunningTest(
