@@ -25,6 +25,25 @@ final class ATHLTHCoachWatchLoadBasisTests: XCTestCase {
         XCTAssertEqual(decoded.name, snapshot.name)
     }
 
+    func testExerciseLibrarySnapshotCarriesSelectedWeightInterpretation() {
+        var exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: UUID(),
+            name: "Dumbbell Press",
+            instructions: [],
+            primaryMuscles: ["shoulders"],
+            secondaryMuscles: [],
+            equipment: ["dumbbells"],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        exercise.coachLoadBasis = .kilogramsPerHand
+        let snapshot = exercise.snapshot
+        XCTAssertEqual(snapshot.libraryExerciseID, exercise.id)
+        XCTAssertEqual(snapshot.coachLoadBasis, .kilogramsPerHand)
+    }
+
     func testNewWatchQueueRoundTripsWeightBasisAndLibraryID() throws {
         var queueItem = WatchStrengthExerciseSummary(
             index: 0,
