@@ -4128,7 +4128,8 @@ final class StrengthWorkoutStore: ObservableObject {
             in: workoutHistory
         )
 
-        guard let latest = sessions.first else { return nil }
+        guard let latest = sessions.first,
+              !latest.isAmbiguous else { return nil }
         let latestEvidence = ATHLTHCoachStrengthComparableHistory
             .targetEvidence(for: latest.exercise)
         let baselineLoad = exercise.sets
@@ -4138,9 +4139,10 @@ final class StrengthWorkoutStore: ObservableObject {
 
         let assessment = ATHLTHCoachStrengthDecision.assess(
             evidence: sessions.map { record in
-                let data = ATHLTHCoachStrengthComparableHistory.targetEvidence(
-                    for: record.exercise
-                )
+                let data = record.isAmbiguous ? nil :
+                    ATHLTHCoachStrengthComparableHistory.targetEvidence(
+                        for: record.exercise
+                    )
                 return ATHLTHCoachStrengthDecision.Evidence(
                     workoutID: record.workoutID,
                     date: record.date,
