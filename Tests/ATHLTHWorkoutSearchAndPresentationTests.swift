@@ -103,4 +103,33 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
             for: steps[0], workoutTitle: "Recovery run"
         ))
     }
+
+    func testFourByFourTimelineFactsPreserveActualEffortsAndRecovery() throws {
+        let workout = try XCTUnwrap(
+            RunningWorkoutLibraryStore.builtInTemplates.first { $0.title == workoutTitle }
+        )
+        let steps = workout.recipePreviewBlocks
+        XCTAssertEqual(steps.count, 9)
+        XCTAssertEqual(steps[1].durationSeconds, 4 * 60)
+        XCTAssertEqual(steps[2].durationSeconds, 2 * 60)
+
+        // Both the tapped drag and its next step use canonical execution order.
+        XCTAssertEqual(ATHLTHWorkoutStepCopy.title(
+            for: steps[2], workoutTitle: workoutTitle, compact: true
+        ), ATHLTHLocalization.choose(
+            english: "Active recovery · easy jog",
+            norwegian: "Aktiv pause · rolig jogg"
+        ))
+        let facts = ATHLTHPlanWorkoutCardPresentation.facts(
+            for: steps[1], workoutTitle: workoutTitle
+        )
+        XCTAssertTrue(facts.contains("4 min"))
+        XCTAssertTrue(facts.contains(ATHLTHLocalization.choose(
+            english: "Suggested HR zone Z4",
+            norwegian: "Anbefalt pulssone S4"
+        )))
+        // A suggestion in the preview is never silently written as a target.
+        XCTAssertNil(steps[1].targetHeartRateZone)
+    }
+
 }
