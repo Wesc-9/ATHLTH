@@ -121,6 +121,9 @@ enum ATHLTHWorkoutPhasePlacement {
         let members = affectedIndices.map { index -> WorkoutTemplateBlock in
             var copy = blocks[index]
             copy.phase = phase
+            copy.assessmentMethod = ATHLTHAssessmentMethod.normalized(
+                copy.assessmentMethod, for: copy
+            )
             return copy
         }
         let affected = Set(affectedIndices)
