@@ -45,7 +45,7 @@ private struct ATHLTHAudioCoachVoiceOption:
 }
 
 @MainActor
-private final class ATHLTHAudioCoachPreviewSpeaker:
+final class ATHLTHAudioCoachPreviewSpeaker:
     NSObject,
     AVSpeechSynthesizerDelegate
 {
@@ -54,6 +54,7 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
 
     private let synthesizer =
         AVSpeechSynthesizer()
+    private let azureSpeech = ATHLTHAzureWorkoutSpeech()
     private let audioOwner = "audio-coach-preview-\(UUID().uuidString)"
     private var restorationWatchdog: Task<Void, Never>?
 
@@ -68,13 +69,15 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
         speechRate: Double,
         speechVolume: Double,
         duckOtherAudio: Bool,
-        speechStyle: ATHLTHCoachSpeechStyle
+        speechStyle: ATHLTHCoachSpeechStyle,
+        sampleText: String? = nil
     ) {
         restorationWatchdog?.cancel()
         restorationWatchdog = nil
         synthesizer.stopSpeaking(
             at: .immediate
         )
+        azureSpeech.stop()
 
         try? ATHLTHSpokenAudioSession.activate(
             duckOtherAudio: duckOtherAudio,
@@ -113,11 +116,52 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
                 : "Distance 2 kilometers. Time 12 minutes."
         }
         let preview = speechStyle.render(
-            sample,
+            sampleText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                ? String((sampleText ?? sample).prefix(350))
+                : sample,
             language: language,
             priority: .routineCoach,
             eventKind: .routineMilestone
         )
+        // Premium voices use their real configured Azure voice, not an
+        // unrelated local voice. If Azure is offline/denied, fallback to
+        // Apple's selected voice without delaying the UI.
+        let startedAzure = azureSpeech.begin(
+            String(preview.prefix(220)),
+            voiceIdentifier: voiceIdentifier,
+            duckMusic: duckOtherAudio,
+            onFallback: { [weak self] in
+                self?.speakLocally(
+                    preview,
+                    language: language,
+                    voiceIdentifier: voiceIdentifier,
+                    speechRate: speechRate,
+                    speechVolume: speechVolume
+                )
+            },
+            onStarted: {},
+            onFinished: { [weak self] in
+                guard let self else { return }
+                ATHLTHSpokenAudioSession.deactivate(owner: self.audioOwner)
+            }
+        )
+        if startedAzure { return }
+        speakLocally(
+            preview,
+            language: language,
+            voiceIdentifier: voiceIdentifier,
+            speechRate: speechRate,
+            speechVolume: speechVolume
+        )
+    }
+
+    private func speakLocally(
+        _ preview: String,
+        language: WatchAudioCoachLanguage,
+        voiceIdentifier: String?,
+        speechRate: Double,
+        speechVolume: Double
+    ) {
         let utterance = AVSpeechUtterance(string: preview)
 
         utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
