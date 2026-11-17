@@ -35,7 +35,8 @@ enum ATHLTHRouteAttemptDirectionPolicy {
     /// potentially unfair leaderboard placement.
     static func classify(
         reference: [CLLocation],
-        actual: [CLLocation]
+        actual: [CLLocation],
+        precomputedRouteMatchPercent: Double? = nil
     ) -> ATHLTHRouteAttemptDirection {
         guard reference.count >= 2, actual.count >= 2,
               let first = reference.first, let last = reference.last,
@@ -72,9 +73,10 @@ enum ATHLTHRouteAttemptDirectionPolicy {
             guard referenceLength > 300,
                   actualLength >= referenceLength * 0.70,
                   actualLength <= referenceLength * 1.45,
-                  (RoutePerformanceMatcher.analyze(
-                    reference: reference, actual: actual
-                  )?.routeMatchPercent ?? 0) >= 85
+                  (precomputedRouteMatchPercent ??
+                    RoutePerformanceMatcher.analyze(
+                        reference: reference, actual: actual
+                    )?.routeMatchPercent ?? 0) >= 85
             else { return .unknown }
             return .forward
         }
