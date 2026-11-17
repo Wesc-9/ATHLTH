@@ -23,6 +23,7 @@ enum ATHLTHTrainProgressionCoach {
     private struct Evidence {
         let date: Date
         let workoutID: UUID
+        let exercise: ExerciseSnapshot
         let sets: Int
         let highestLoad: Double
         let metTargets: Bool
@@ -43,7 +44,9 @@ enum ATHLTHTrainProgressionCoach {
         let plannedIDs = Set(plan.weeks.flatMap(\.days)
             .flatMap(\.sessions).map(\.id))
         let logList = strengthHistory.filter {
-            $0.isFinished && $0.plannedSessionID.map(plannedIDs.contains) == true
+            $0.isFinished &&
+            ($0.endedAt ?? $0.startedAt) <= now &&
+            $0.plannedSessionID.map(plannedIDs.contains) == true
         }
         var evidenceByName: [String: [Evidence]] = [:]
         var seenLogIDs = Set<UUID>()
@@ -52,47 +55,18 @@ enum ATHLTHTrainProgressionCoach {
             for entry in log.exercises {
                 let key = ATHLTHTrainTrendEngine.normalize(entry.exercise.name)
                 guard !key.isEmpty else { continue }
-                let working = entry.sets.filter {
-                    $0.countsTowardTrainingLoad && $0.plannedSetType != .warmUp
-                }
-                var loads: [Double] = []
-                // Insufficient or entirely missing working sets in the
-                // most recent session must suppress a recommendation.
-                var allMet = working.count >= 2
-                for set in working {
-                    guard let plannedReps = set.plannedReps, plannedReps > 0,
-                          let plannedLoad = set.plannedWeightKilograms,
-                          plannedLoad > 0, plannedLoad.isFinite,
-                          let actualReps = set.resolvedCompletedReps,
-                          actualReps >= plannedReps else {
-                        allMet = false
-                        break
-                    }
-                    let actualLoads: [Double]
-                    if let segments = set.effortSegments, !segments.isEmpty {
-                        // Only an effort consisting entirely of segments at
-                        // or above the target is treated as "met".
-                        actualLoads = segments.compactMap(\.weightKilograms)
-                        if actualLoads.count != segments.count {
-                            allMet = false
-                            break
-                        }
-                    } else {
-                        actualLoads = set.completedWeightKilograms.map { [$0] } ?? []
-                    }
-                    guard !actualLoads.isEmpty,
-                          actualLoads.allSatisfy({ $0.isFinite && $0 >= plannedLoad }) else {
-                        allMet = false
-                        break
-                    }
-                    loads.append(contentsOf: actualLoads)
-                }
+                // The same Coach evidence policy is used for scheduled
+                // plans and live training. Skipped or invalid working sets
+                // never qualify as successful attempts.
+                let evidence = ATHLTHCoachStrengthComparableHistory
+                    .targetEvidence(for: entry)
                 evidenceByName[key, default: []].append(Evidence(
                     date: log.endedAt ?? log.startedAt,
                     workoutID: log.id,
-                    sets: working.count,
-                    highestLoad: loads.max() ?? 0,
-                    metTargets: allMet && !loads.isEmpty
+                    exercise: entry.exercise,
+                    sets: evidence?.workingSetIDs.count ?? 0,
+                    highestLoad: evidence?.maximumRecordedWeightKg ?? 0,
+                    metTargets: evidence?.metAllTargets == true
                 ))
             }
         }
@@ -114,15 +88,29 @@ enum ATHLTHTrainProgressionCoach {
                           !skippedSessionIDs.contains(workout.id) else { continue }
                     for exercise in workout.exercises {
                         let name = exercise.embeddedExercise.displayName
-                        let key = ATHLTHTrainTrendEngine.normalize(name)
-                        guard !key.isEmpty, !suggestedNames.contains(key),
+                        let key = ATHLTHTrainTrendEngine.normalize(
+                            exercise.embeddedExercise.name
+                        )
+                        let identityKey = key + "|" +
+                            exercise.embeddedExercise.equipment
+                                .map(ATHLTHTrainTrendEngine.normalize)
+                                .sorted()
+                                .joined(separator: ";") +
+                            "|" + (exercise.embeddedExercise.libraryExerciseID?.uuidString ?? "")
+                        guard !key.isEmpty,
+                              !suggestedNames.contains(identityKey),
                               exercise.resolvedTargetKind == .reps,
                               exercise.resolvedLoadKind == .weightKilograms,
                               let current = plannedWorkingLoad(exercise),
                               current > 0 else { continue }
 
                         let records = (evidenceByName[key] ?? [])
-                            .filter { $0.date < now }
+                            .filter {
+                                $0.date < now &&
+                                ATHLTHCoachStrengthComparableHistory.isSameExercise(
+                                    $0.exercise, exercise.embeddedExercise
+                                )
+                            }
                             .sorted { $0.date > $1.date }
                         // Require two distinct verified finished sessions,
                         // not two sets from the same session.
@@ -139,7 +127,7 @@ enum ATHLTHTrainProgressionCoach {
 
                         let proposed = (current + increaseKg).rounded(toPlaces: 2)
                         guard proposed > current else { continue }
-                        suggestedNames.insert(key)
+                        suggestedNames.insert(identityKey)
                         suggestions.append(Suggestion(
                             workoutID: workout.id,
                             exerciseID: exercise.id,
