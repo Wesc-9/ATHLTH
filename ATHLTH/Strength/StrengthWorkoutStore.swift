@@ -1441,6 +1441,37 @@ final class StrengthWorkoutStore: ObservableObject {
         return true
     }
 
+    /// Correct the recorded unit interpretation for an unstarted iPhone
+    /// exercise. The workout snapshot is independent of the catalog entry:
+    /// never rewrite existing completed sets, other exercises or history.
+    /// Watch-owned sessions remain read-only to avoid racing Watch input.
+    @discardableResult
+    func setActiveExerciseCoachLoadBasis(
+        _ exerciseID: UUID,
+        basis: ATHLTHStrengthLoadBasis?
+    ) -> Bool {
+        guard var workout = activeWorkout,
+              workout.captureDevice == .iPhone,
+              let index = workout.exercises.firstIndex(where: {
+                  $0.id == exerciseID
+              }),
+              workout.exercises[index].sets.contains(where: {
+                  $0.resolvedLoadKind == .weightKilograms
+              }),
+              workout.exercises[index].sets.allSatisfy({
+                  !$0.isCompleted && $0.skippedAt == nil
+              })
+        else { return false }
+
+        guard workout.exercises[index].exercise.coachLoadBasis != basis else {
+            return true
+        }
+        workout.exercises[index].exercise.coachLoadBasis = basis
+        activeWorkout = workout
+        persistCheckpointNow()
+        return true
+    }
+
     /// Bar weight is metadata for the exercise's bar, not an additional load
     /// to add on top of the already-total kg recorded for each set.
     @discardableResult
