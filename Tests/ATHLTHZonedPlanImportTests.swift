@@ -542,6 +542,43 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         }
     }
 
+
+    @MainActor
+    func testAssessmentCatalogSourceInstructionsNoLongerBecomeEnglishHeadings() throws {
+        let previous = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+
+        let cases: [(id: String, title: String, note: String)] = [
+            ("ASS-003", "5 km testløp", "Løp 5 km"),
+            ("ASS-004", "20 m skytteltest", "lydsignalene"),
+            ("ASS-006", "Conconi-test", "0,5 km/t"),
+            ("ASS-008", "5 km MAF-test", "180 minus alder"),
+            ("ASS-010", "Laktat-trinntest", "eventuelt laktat")
+        ]
+        for sample in cases {
+            let source = try XCTUnwrap(
+                ATHLTHZonedPlanLibrary.workouts.first { $0.id == sample.id }
+            )
+            let main = ATHLTHZonedPlanLibrary.blocks(for: source)
+            let test = try XCTUnwrap(main.first {
+                $0.title == sample.title
+            }, "Missing clear Norwegian step: \(sample.id)")
+            XCTAssertTrue(test.notes?.contains(sample.note) == true, sample.id)
+            XCTAssertFalse(test.title.contains("Record"), sample.id)
+            XCTAssertFalse(
+                ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: test),
+                sample.id
+            )
+        }
+    }
+
     @MainActor
     func testOrdinaryRunStillOffersWalkingAndUserTitleIsPreserved() throws {
         let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
