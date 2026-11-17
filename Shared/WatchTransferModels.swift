@@ -1421,6 +1421,11 @@ struct WatchStrengthExerciseSummary: Codable, Hashable {
     var instructions: [String]? = nil
     var secondaryMuscles: [String]? = nil
     var equipment: [String]? = nil
+    /// Optional Coach provenance travels with the prescription. The Watch
+    /// only preserves the values; it must not infer identity or weight units
+    /// for older offline sessions with missing metadata.
+    var libraryExerciseID: UUID? = nil
+    var coachLoadBasisRaw: String? = nil
     var setPlans: [WatchStrengthSetPlan]? = nil
     var isCompleted: Bool? = nil
     var firstPendingSetIndex: Int? = nil
