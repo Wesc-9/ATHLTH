@@ -105,6 +105,10 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case estimatedFinishTime
         case routeRemainingDistance
         case estimatedRouteTime
+        case remainingExercises
+        case nextExercise
+        case previousExerciseSummary
+        case previousMainSectionSummary
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -133,6 +137,10 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .estimatedFinishTime: return ATHLTHLocalization.choose(english: "Estimated finish time", norwegian: "Estimert sluttid")
             case .routeRemainingDistance: return ATHLTHLocalization.choose(english: "Route distance remaining", norwegian: "Distanse igjen av ruten")
             case .estimatedRouteTime: return ATHLTHLocalization.choose(english: "Estimated route time remaining", norwegian: "Estimert tid igjen av ruten")
+            case .remainingExercises: return ATHLTHLocalization.choose(english: "Remaining exercises", norwegian: "Gjenstående øvelser")
+            case .nextExercise: return ATHLTHLocalization.choose(english: "Next exercise", norwegian: "Neste øvelse")
+            case .previousExerciseSummary: return ATHLTHLocalization.choose(english: "Previous exercise summary", norwegian: "Sammendrag forrige øvelse")
+            case .previousMainSectionSummary: return ATHLTHLocalization.choose(english: "Previous main section summary", norwegian: "Sammendrag forrige hoveddel")
             }
         }
     }
@@ -321,6 +329,38 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             return Self.remaining(meters * pace / 1000,
                                   label: norwegian ? "Estimert igjen av ruten" : "Estimated route time left",
                                   norwegian: norwegian)
+        case .remainingExercises:
+            guard let count = context.remainingExerciseCount else { return nil }
+            return norwegian ? "\(count) øvelser gjenstår" : "\(count) exercises remaining"
+        case .nextExercise:
+            guard let name = context.nextExerciseName, !name.isEmpty else { return nil }
+            return norwegian ? "Neste øvelse: \(name)" : "Next exercise: \(name)"
+        case .previousExerciseSummary:
+            guard let name = context.previousExerciseName,
+                  let seconds = context.previousExerciseSeconds,
+                  seconds.isFinite, seconds >= 0 else { return nil }
+            let minutes = Int(seconds.rounded()) / 60
+            let remainder = Int(seconds.rounded()) % 60
+            let distance = context.previousExerciseDistanceMeters ?? 0
+            let portion = distance.isFinite && distance >= 1
+                ? (norwegian ? String(format: ", %.0f meter", distance) : String(format: ", %.0f meters", distance))
+                : ""
+            return norwegian
+                ? "Forrige øvelse \(name): \(minutes) minutter og \(remainder) sekunder\(portion)"
+                : "Previous exercise \(name): \(minutes) minutes and \(remainder) seconds\(portion)"
+        case .previousMainSectionSummary:
+            guard let count = context.previousMainSectionExerciseCount,
+                  let seconds = context.previousMainSectionSeconds,
+                  seconds.isFinite, seconds >= 0 else { return nil }
+            let minutes = Int(seconds.rounded()) / 60
+            let remainder = Int(seconds.rounded()) % 60
+            let distance = context.previousMainSectionDistanceMeters ?? 0
+            let portion = distance.isFinite && distance >= 1
+                ? (norwegian ? String(format: ", %.0f meter", distance) : String(format: ", %.0f meters", distance))
+                : ""
+            return norwegian
+                ? "Forrige hoveddel: \(count) øvelser, \(minutes) minutter og \(remainder) sekunder\(portion)"
+                : "Previous main section: \(count) exercises, \(minutes) minutes and \(remainder) seconds\(portion)"
         case .hydrationReminder:
             // A short, optional reminder; never imply a fixed drinking dose
             // or pause the running workout/interval timers.
@@ -702,6 +742,20 @@ struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
     /// preserve existing profiles and Watch transfers that predate v2.2.2.
     var trigger: ATHLTHAudioCoachRule.Trigger? = nil
     var interval: Int? = nil
+    /// Nil for existing saved templates and older Watch payloads (enabled).
+    var enabled: Bool? = nil
+
+    var isEnabled: Bool { enabled ?? true }
+}
+
+/// Disabled groups remain editable, but their linked rules never speak.
+extension WatchAudioCoachConfiguration {
+    var activeCustomRules: [ATHLTHAudioCoachRule] {
+        let muted = Set((coachGroups ?? [])
+            .filter { !$0.isEnabled }
+            .flatMap(\.ruleIDs))
+        return (customRules ?? []).filter { $0.isEnabled && !muted.contains($0.id) }
+    }
 }
 
 struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {
@@ -735,6 +789,15 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var previousWasActiveRecovery: Bool? = nil
     var nextIsActiveRecovery: Bool? = nil
     var stepCount: Int? = nil
+    // Optional fields keep old Watch/phone snapshots backwards compatible.
+    var remainingExerciseCount: Int? = nil
+    var nextExerciseName: String? = nil
+    var previousExerciseName: String? = nil
+    var previousExerciseSeconds: Double? = nil
+    var previousExerciseDistanceMeters: Double? = nil
+    var previousMainSectionExerciseCount: Int? = nil
+    var previousMainSectionSeconds: Double? = nil
+    var previousMainSectionDistanceMeters: Double? = nil
 
     static func needsSegmentData(_ rules: [ATHLTHAudioCoachRule]) -> Bool {
         rules.contains { rule in
@@ -744,7 +807,9 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
                 rule.selectedMetrics.contains { metric in
                     switch metric {
                     case .stepName, .stepRemainingTime, .groupRemainingTime,
-                         .workoutRemainingTime, .estimatedFinishTime: return true
+                         .workoutRemainingTime, .estimatedFinishTime,
+                         .remainingExercises, .nextExercise, .previousExerciseSummary,
+                         .previousMainSectionSummary: return true
                     default: return false
                     }
                 })
@@ -762,6 +827,31 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         context.stepName = step.title
         context.stepIndex = index
         context.stepCount = steps.count
+        context.remainingExerciseCount = max(0, steps.count - index - 1)
+        if index + 1 < steps.count {
+            context.nextExerciseName = steps[index + 1].title
+        }
+        if index > 0, let previous = recorded.last(where: { $0.index == index - 1 }) {
+            context.previousExerciseName = steps[index - 1].title
+            context.previousExerciseSeconds = previous.activeSeconds
+            context.previousExerciseDistanceMeters = previous.distanceMeters
+        }
+        // A main-part report only exists when that section is complete.
+        // Never turn planned targets into claimed achieved measurements.
+        let isMain: (WatchRunningWorkoutStep) -> Bool = {
+            $0.phase == "work" || $0.phase == "recovery"
+        }
+        if !isMain(step), index > 0, isMain(steps[index - 1]) {
+            let completedMain = recorded.filter { entry in
+                entry.index < index && steps.indices.contains(entry.index) &&
+                    isMain(steps[entry.index])
+            }
+            if !completedMain.isEmpty {
+                context.previousMainSectionExerciseCount = completedMain.count
+                context.previousMainSectionSeconds = completedMain.reduce(0) { $0 + max(0, $1.activeSeconds) }
+                context.previousMainSectionDistanceMeters = completedMain.reduce(0) { $0 + max(0, $1.distanceMeters) }
+            }
+        }
         context.stepPhase = step.phase
         context.previousStepPhase = index > 0 ? steps[index - 1].phase : nil
         context.nextStepPhase = index + 1 < steps.count ? steps[index + 1].phase : nil
