@@ -11,6 +11,8 @@ enum ATHLTHCoachStrengthComparableHistory {
         let workoutID: UUID
         let date: Date
         let exercise: StrengthExerciseLog
+        /// More than one matching exercise in this workout is ambiguous.
+        let isAmbiguous: Bool
     }
 
     /// The snapshot does not contain a stable exercise-catalog identifier.
@@ -181,7 +183,7 @@ enum ATHLTHCoachStrengthComparableHistory {
               }) else { return [] }
 
         let signature = Signature(target.exercise)
-        guard !signature.name.isEmpty else { return [] }
+        guard identityKey(for: target.exercise) != nil else { return [] }
         let days = min(max(windowDays, 1), 56)
         let earliest = now.addingTimeInterval(-Double(days) * 86_400)
         let maximum = min(max(limit, 0), 12)
@@ -199,16 +201,21 @@ enum ATHLTHCoachStrengthComparableHistory {
                 ($0.endedAt ?? $0.startedAt) > ($1.endedAt ?? $1.startedAt)
             }
             .compactMap { workout -> Session? in
-                guard seenWorkoutIDs.insert(workout.id).inserted,
-                      let matching = workout.exercises.first(where: { candidate in
-                          candidate.isEmbeddedRunningInterval != true &&
-                          signature.matches(Signature(candidate.exercise)) &&
-                          candidate.sets.contains(where: isComparableWorkingSet)
-                      }) else { return nil }
+                guard seenWorkoutIDs.insert(workout.id).inserted else { return nil }
+                let matching = workout.exercises.filter { candidate in
+                    candidate.isEmbeddedRunningInterval != true &&
+                    signature.matches(Signature(candidate.exercise))
+                }
+                guard let first = matching.first else { return nil }
+                // Include even a fully skipped or invalid latest exercise:
+                // it must block stale increases from older successful logs.
+                // More than one matching entry cannot be treated as two
+                // independent successes.
                 return Session(
                     workoutID: workout.id,
                     date: workout.endedAt ?? workout.startedAt,
-                    exercise: matching
+                    exercise: first,
+                    isAmbiguous: matching.count != 1
                 )
             }
             .prefix(maximum)
