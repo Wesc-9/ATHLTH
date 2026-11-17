@@ -40,18 +40,65 @@ enum ATHLTHExerciseProgress {
         exerciseID: UUID,
         name: String,
         isCustom: Bool,
-        workouts: [StrengthWorkoutLog]
+        workouts: [StrengthWorkoutLog],
+        reference: ExerciseSnapshot? = nil
     ) -> Summary {
         let canonical = ATHLTHExerciseReferenceResolver.key(name)
+        let referenceIdentity = reference?.libraryExerciseID ?? exerciseID
         var sessions: [Session] = []
         for workout in workouts where workout.isFinished {
             let matching = workout.exercises.filter { entry in
-                if entry.plannedExerciseID == exerciseID { return true }
-                // Built-in catalogue items can appear in plans under their
-                // plan-specific IDs; exact canonical names are a fallback.
-                // Custom exercises never use a potentially ambiguous name.
-                return !isCustom &&
-                    ATHLTHExerciseReferenceResolver.key(entry.exercise.name) == canonical
+                let logged = entry.exercise
+                if let loggedID = logged.libraryExerciseID {
+                    // Canonical library identity is authoritative, including
+                    // when an exercise is renamed after the workout.
+                    guard loggedID == referenceIdentity else { return false }
+                    // Known load semantics and equipment must also agree.
+                    return reference.map {
+                        ATHLTHCoachStrengthComparableHistory.isSameExercise(
+                            logged, $0
+                        )
+                    } ?? true
+                }
+
+                // PlannedExerciseID is not the library ID. Preserve the
+                // legacy custom fallback only when the ID was explicitly
+                // stored as the library ID AND metadata is still comparable.
+                if isCustom {
+                    guard entry.plannedExerciseID == exerciseID else {
+                        return false
+                    }
+                } else {
+                    guard ATHLTHExerciseReferenceResolver.key(logged.name) ==
+                            canonical else { return false }
+                }
+
+                // Legacy public snapshots without canonical ID may use the
+                // exact name only if apparatus and weight semantics match.
+                // Unknown historical load basis is NOT assumed equal to a
+                // newly specified per-hand/total basis.
+                guard let reference else { return !isCustom }
+                let oldEquipment = Set(logged.equipment.map {
+                    $0.folding(options: [.caseInsensitive, .diacriticInsensitive],
+                               locale: .current).trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                })
+                let newEquipment = Set(reference.equipment.map {
+                    $0.folding(options: [.caseInsensitive, .diacriticInsensitive],
+                               locale: .current).trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                })
+                guard !oldEquipment.isEmpty, oldEquipment == newEquipment,
+                      logged.coachLoadBasis == reference.coachLoadBasis else {
+                    return false
+                }
+                if !isCustom {
+                    return ATHLTHExerciseReferenceResolver.key(logged.name) ==
+                        canonical
+                }
+                return true
             }
             guard !matching.isEmpty else { continue }
             let sets = matching.flatMap(\.sets).filter(\.countsTowardTrainingLoad)
