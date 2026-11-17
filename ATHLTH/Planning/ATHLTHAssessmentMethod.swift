@@ -600,7 +600,13 @@ struct ATHLTHAssessmentMethodPicker: View {
     var body: some View {
         if !available.isEmpty {
             DisclosureGroup(isExpanded: $expanded) {
-                Picker("Ekstramåling", selection: $selection) {
+                Picker("Ekstramåling", selection: Binding(
+                    get: {
+                        selection == .cooperTwelveMinute
+                            ? .estimatedVO2Max : selection
+                    },
+                    set: { selection = $0 }
+                )) {
                     Text("Ingen ekstra måling").tag(ATHLTHAssessmentMethod?.none)
                     ForEach(available) { method in
                         Text(method.title)
