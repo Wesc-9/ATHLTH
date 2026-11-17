@@ -423,6 +423,17 @@ enum ATHLTHZonedPlanLibrary {
             planRepeatDepth: overrideDepth
         )
         append(workout.cooldownStructure ?? [], phase: .cooldown, sport: workout.discipline, depth: 0, to: &result)
+        // Persist the WHOLE 3MT protocol with the one dedicated test effort.
+        // It then travels with saved workouts and copied plans even if the
+        // display title is changed. No other imported assessment is touched.
+        if workout.id == "ASS-009" {
+            for index in result.indices
+                where result[index].kind == .run &&
+                result[index].resolvedPhase == .main &&
+                result[index].durationSeconds == 180 {
+                result[index].notes = ATHLTHThreeMinuteAllOut.fullProtocolNotes
+            }
+        }
         // A timed cycling segment uses a non-running block in ATHLTH.
         // Swimming stays in the source bundle but is not published as a workout
         // until a swimming engine is available.
