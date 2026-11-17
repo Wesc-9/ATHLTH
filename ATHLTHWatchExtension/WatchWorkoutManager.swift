@@ -7952,14 +7952,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         audioCoachRestorationTask = nil
         let session =
             AVAudioSession.sharedInstance()
-        let options:
-            AVAudioSession.CategoryOptions =
-                audioCoachConfiguration
-                    .shouldDuckOtherAudio
-                ? [
-                    .duckOthers
-                ]
-                : [.mixWithOthers]
+        let options: AVAudioSession.CategoryOptions =
+            audioCoachConfiguration.shouldMuteOtherAudio
+                ? []
+                : audioCoachConfiguration.shouldDuckOtherAudio
+                    ? [.duckOthers]
+                    : [.mixWithOthers]
 
         do {
             // First preserve normal coach/music mixing. On watchOS the
