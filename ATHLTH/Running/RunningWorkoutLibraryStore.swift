@@ -1,3 +1,5 @@
+import Foundation
+
 /// A personal copy is a genuinely customized workout, not another name
 /// for the same executable recipe. Original/library IDs are never changed.
 enum ATHLTHRunningWorkoutCopyPolicy {
@@ -257,9 +259,8 @@ final class RunningWorkoutLibraryStore: ObservableObject {
     func duplicate(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
         let draftSource = source.isBuiltIn
             ? ATHLTHRunningLibraryDefaults.unpersonalized(source) : source
-        var editable = draftSource
-        // struct has a fixed ID, so construct a personal draft with a fresh ID.
-        editable = RunningWorkoutTemplate(
+        // The immutable source ID stays untouched.
+        var editable = RunningWorkoutTemplate(
             id: UUID(),
             title: String((source.title + " – Min variant")
                 .prefix(ATHLTHLibraryName.maximumWorkoutCharacters)),
