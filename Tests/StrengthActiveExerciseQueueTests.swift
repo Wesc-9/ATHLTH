@@ -142,6 +142,66 @@ final class StrengthActiveExerciseQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testCoachLoadBasisCanChangeBeforeFirstSetButNeverAfter() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let dumbbell = exercise("Dumbbell Press", equipment: ["Dumbbell"])
+        store.appendExercise(
+            dumbbell, sets: 2, reps: 8,
+            targetWeightKilograms: 20, restSeconds: 0
+        )
+        let id = try XCTUnwrap(store.currentExercise?.id)
+        let firstSetID = try XCTUnwrap(store.currentSet?.id)
+        XCTAssertNil(store.currentExercise?.exercise.coachLoadBasis)
+        XCTAssertTrue(store.setActiveExerciseCoachLoadBasis(
+            id, basis: .kilogramsPerHand
+        ))
+        XCTAssertEqual(
+            store.currentExercise?.exercise.coachLoadBasis,
+            .kilogramsPerHand
+        )
+        XCTAssertEqual(store.currentSet?.id, firstSetID)
+        XCTAssertEqual(store.currentSet?.plannedWeightKilograms, 20)
+        store.setDraft(reps: 8, weightKilograms: 20)
+        store.completeCurrentDraftSet()
+        let completedWeight = store.activeWorkout?.exercises.first?
+            .sets.first?.completedWeightKilograms
+        XCTAssertEqual(completedWeight, 20)
+
+        XCTAssertFalse(store.setActiveExerciseCoachLoadBasis(
+            id, basis: .totalKilograms
+        ))
+        XCTAssertEqual(
+            store.activeWorkout?.exercises.first?.exercise.coachLoadBasis,
+            .kilogramsPerHand
+        )
+        XCTAssertEqual(
+            store.activeWorkout?.exercises.first?.sets.first?.completedWeightKilograms,
+            completedWeight
+        )
+        XCTAssertFalse(store.setActiveExerciseCoachLoadBasis(
+            UUID(), basis: .totalKilograms
+        ))
+    }
+
+    @MainActor
+    func testWatchOwnedStrengthSessionRejectsPhoneBasisEdits() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(
+            watchSessionID: UUID(), captureDevice: .appleWatch
+        )
+        store.appendExercise(
+            exercise("Dumbbell Press", equipment: ["Dumbbell"]),
+            sets: 2, reps: 8
+        )
+        let id = try XCTUnwrap(store.currentExercise?.id)
+        XCTAssertFalse(store.setActiveExerciseCoachLoadBasis(
+            id, basis: .kilogramsPerHand
+        ))
+        XCTAssertNil(store.currentExercise?.exercise.coachLoadBasis)
+    }
+
+    @MainActor
     func testBarWeightIsMetadataNotAdditionalLoggedKilograms() throws {
         let store = StrengthWorkoutStore()
         store.startFreestyle(watchSessionID: nil)
