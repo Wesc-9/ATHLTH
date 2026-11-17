@@ -6419,6 +6419,7 @@ struct ATHLTHTrainView: View {
                         refreshTrainDayIfChanged()
                     }
                     resolveDelayedPlanStartIfReady()
+                    scheduleTrainDailyRecommendationRefresh()
                 }
             }
             .task(id: delayedPlanStart?.id) {
