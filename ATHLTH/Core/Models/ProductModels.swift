@@ -292,6 +292,23 @@ enum ATHLTHStrengthLoadBasis: String, Codable, Hashable, CaseIterable {
     case totalKilograms
     case kilogramsPerHand
     case machineStackKilograms
+
+    var localizedTitle: String {
+        switch self {
+        case .totalKilograms:
+            return ATHLTHLocalization.choose(
+                english: "Total weight (kg)", norwegian: "Totalvekt (kg)"
+            )
+        case .kilogramsPerHand:
+            return ATHLTHLocalization.choose(
+                english: "Weight per hand (kg)", norwegian: "Vekt per hånd (kg)"
+            )
+        case .machineStackKilograms:
+            return ATHLTHLocalization.choose(
+                english: "Machine stack (kg)", norwegian: "Maskinvekt (kg)"
+            )
+        }
+    }
 }
 
 struct ExerciseSnapshot: Codable, Hashable {
