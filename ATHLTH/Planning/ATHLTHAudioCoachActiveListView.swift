@@ -44,7 +44,6 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var selectedRule: SelectedRule?
     @State private var expandedCoachGroups: Set<UUID> = []
     @State private var creatingBlankTemplate = false
-    @State private var pendingGeneralOption: ATHLTHAudioCoachOption?
 
     private struct SelectedRule: Identifiable {
         let id: UUID
@@ -227,10 +226,6 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
         .sheet(isPresented: $showingGroupCommandBuilder, onDismiss: {
             pendingGroupCommandID = nil
-            if let pendingGeneralOption {
-                self.pendingGeneralOption = nil
-                editingOption = pendingGeneralOption
-            }
         }) {
             groupCommandSheet
         }
@@ -621,23 +616,6 @@ struct ATHLTHAudioCoachActiveListView: View {
         .presentationDragIndicator(.visible)
     }
 
-    private var eventCommandOptions: [ATHLTHAudioCoachOption] {
-        let eventOptions: Set<ATHLTHAudioCoachOption> = [
-            .currentZone, .targetZoneCoach, .motivation,
-            .contextual, .randomEncouragement, .adaptiveMotivation,
-            .workoutStart, .pauseResume, .workoutFinish,
-            .intervalRecoveryCountdown, .scopedCountdowns,
-            .routeRemaining, .routeETA, .currentStep,
-            .remainingStepTime, .remainingStepDistance,
-            .customPhrases, .landmarks
-        ]
-        return ATHLTHAudioCoachOption.allCases.filter { option in
-            eventOptions.contains(option) &&
-                option.isVisible(route: showRouteOptions,
-                                 structured: showStructuredOptions)
-        }
-    }
-
     private var availableGroupContents: [ATHLTHAudioCoachRule.Metric] {
         ATHLTHAudioCoachRule.Metric.allCases.filter { metric in
             switch metric {
@@ -892,12 +870,9 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }) {
                     Section {
                         Label(
-                            group.trigger == .time
-                                ? tr("Every \(group.interval ?? 60) seconds",
-                                     "Hvert \(group.interval ?? 60) sekund")
-                                : tr("Every \(group.interval ?? 1_000) metres",
-                                     "Hver \(group.interval ?? 1_000) meter"),
-                            systemImage: group.trigger == .time ? "clock" : "figure.run"
+                            (group.trigger ?? .time).summary(interval: group.interval ?? 60),
+                            systemImage: group.trigger == .time ? "clock" :
+                                group.trigger == .distance ? "figure.run" : "waveform"
                         )
                         .foregroundStyle(bronze)
                     } header: {
@@ -928,35 +903,6 @@ struct ATHLTHAudioCoachActiveListView: View {
                             "Add as many commands as you wish, one at a time. They share the group's trigger and play as one message.",
                             "Legg til én kommando om gangen. Alle bruker gruppens trigger og leses som én beskjed."
                         ))
-                    }
-
-                    Section {
-                        Text(tr("Choose any measurement, motivation or hydration reminder.",
-                                "Velg blant målinger, motivasjon og drikkepåminnelser."))
-                            .font(.caption)
-                            .foregroundStyle(dim)
-                    } header: {
-                        Text(tr("AVAILABLE COMMANDS", "TILGJENGELIGE KOMMANDOER"))
-                    }
-
-                    Section {
-                        ForEach(eventCommandOptions) { option in
-                            Button {
-                                option.setActive(true, in: &draft)
-                                pendingGeneralOption = option.requiresConfiguration ? option : nil
-                                showingGroupCommandBuilder = false
-                            } label: {
-                                Label(option.title, systemImage: option.symbol)
-                                    .frame(maxWidth: .infinity, minHeight: 38,
-                                           alignment: .leading)
-                            }
-                            .foregroundStyle(ink)
-                        }
-                    } header: {
-                        Text(tr("Event-triggered commands", "Hendelsesstyrte kommandoer"))
-                    } footer: {
-                        Text(tr("These use the workout's own events, not the group's distance or time interval.",
-                                "Disse bruker øktens egne hendelser, ikke gruppens tids- eller distansetrigger."))
                     }
 
                     Section {
