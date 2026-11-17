@@ -72,9 +72,9 @@ enum ATHLTHRouteAttemptDirectionPolicy {
             guard referenceLength > 300,
                   actualLength >= referenceLength * 0.70,
                   actualLength <= referenceLength * 1.45,
-                  RoutePerformanceMatcher.analyze(
+                  (RoutePerformanceMatcher.analyze(
                     reference: reference, actual: actual
-                  )?.routeMatchPercent ?? 0 >= 85
+                  )?.routeMatchPercent ?? 0) >= 85
             else { return .unknown }
             return .forward
         }
