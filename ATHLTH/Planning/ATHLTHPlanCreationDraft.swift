@@ -298,10 +298,10 @@ struct ATHLTHPlanCreationDraftStore {
         userID: UUID,
         draftID: UUID? = nil
     ) -> Bool {
-        guard draft.isRestorable() else {
-            clear(userID: userID, draftID: draftID)
-            return false
-        }
+        // A transient invalid/unfinished snapshot must never DELETE the
+        // last good checkpoint. Only the athlete's explicit Discard action
+        // (or a successful final Save) may remove saved work.
+        guard draft.isRestorable() else { return false }
         guard let data = try? JSONEncoder().encode(draft),
               data.count <= 64_000_000,
               let destination = url(for: userID, draftID: draftID),
