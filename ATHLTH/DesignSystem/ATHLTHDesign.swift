@@ -1151,6 +1151,8 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     let warmHomePalette: Bool
     let sheetOverlapOverride: CGFloat?
     let transitionFadeHeightOverride: CGFloat?
+    /// Per-screen fade adjustment; default preserves every existing tab.
+    let fadeBridgeIntensity: Double
     private let hero: Hero
     private let content: Content
 
@@ -1201,6 +1203,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         warmHomePalette: Bool = false,
         sheetOverlapOverride: CGFloat? = nil,
         transitionFadeHeightOverride: CGFloat? = nil,
+        fadeBridgeIntensity: Double = 1,
         @ViewBuilder hero: () -> Hero,
         @ViewBuilder content: () -> Content
     ) {
@@ -1215,6 +1218,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
             sheetOverlapOverride
         self.transitionFadeHeightOverride =
             transitionFadeHeightOverride
+        self.fadeBridgeIntensity = min(max(fadeBridgeIntensity, 0), 1)
         self.hero = hero()
         self.content = content()
     }
@@ -1239,6 +1243,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                     .overlay(alignment: .bottom) {
                         if pullDownFadeBridge {
                             ATHLTHPullDownFadeBridge()
+                                .opacity(fadeBridgeIntensity)
                         } else if !scrollFadeTransition &&
                                     (softTransition || immersiveTransition) {
                             LinearGradient(
@@ -1350,9 +1355,12 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
+                            .opacity(fadeBridgeIntensity)
                             .frame(
                                 height:
-                                    pullDownFadeBridge ? 54 : 42
+                                    pullDownFadeBridge
+                                        ? (fadeBridgeIntensity < 1 ? 38 : 54)
+                                        : 42
                             )
                             .clipShape(
                                 ATHLTHTopRoundedSheetShape(

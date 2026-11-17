@@ -280,12 +280,6 @@ struct ATHLTHProfileCompetitionCard: View {
                 metric(icon: "star.fill", value: "—",
                        label: tr("App ranking", "Rangering"))
             }
-            Text(tr(
-                "Only completed challenges with eligible scored results are counted. An overall app ranking is not available.",
-                "Kun fullførte konkurranser med gyldige resultater telles. Samlet app-rangering er ikke tilgjengelig."
-            ))
-            .font(.caption2)
-            .foregroundStyle(dim)
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)

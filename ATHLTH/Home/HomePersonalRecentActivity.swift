@@ -509,7 +509,8 @@ private enum HomeActivityStreamBuilder {
     /// The underlying athlete recordings remain separate and unchanged.
     private static func uniqueFollowingFeed(
         mine: [SocialPublishableWorkout],
-        social: SocialStore
+        social: SocialStore,
+        feed: [SocialFeedItem]? = nil
     ) -> [SocialFeedItem] {
         let localWorkoutIDs = Set(mine.map(\.id))
         let ownSessionIDs = Set(
@@ -522,7 +523,7 @@ private enum HomeActivityStreamBuilder {
             }
         )
         var seenSessions = ownSessionIDs
-        return social.feed
+        return (feed ?? social.feed)
             .filter {
                 $0.activity.kind == "workout" &&
                 $0.actor.userID != social.currentUserID
@@ -541,7 +542,8 @@ private enum HomeActivityStreamBuilder {
     static func recentPreview(
         mine: [SocialPublishableWorkout],
         social: SocialStore,
-        maximumCount: Int = 6
+        maximumCount: Int = 6,
+        feed: [SocialFeedItem]? = nil
     ) -> [HomeActivityStreamItem] {
         let limit = max(0, maximumCount)
         guard limit > 0 else { return [] }
@@ -569,7 +571,7 @@ private enum HomeActivityStreamBuilder {
         for workout in mine {
             consider(HomeActivityStreamItem(source: .mine(workout)))
         }
-        for item in uniqueFollowingFeed(mine: mine, social: social) {
+        for item in uniqueFollowingFeed(mine: mine, social: social, feed: feed) {
             consider(HomeActivityStreamItem(source: .following(item)))
         }
 
@@ -1189,6 +1191,9 @@ struct HomePersonalRecentActivitySection:
 
     @State private var myWorkouts:
         [SocialPublishableWorkout] = []
+    // A snapshot changes only when actual workout/feed sources publish.
+    // Do not sort the social feed from SwiftUI's scrolling/body path.
+    @State private var visibleItems: [HomeActivityStreamItem] = []
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var availableFeedWidth: CGFloat = 0
 
@@ -1200,9 +1205,10 @@ struct HomePersonalRecentActivitySection:
     }
 
     private var recentArtworkHeight: CGFloat {
+        // Compact Home-only preview: the detail screen keeps full artwork.
         ATHLTHRecentActivityLayoutPolicy.artworkHeight(
             horizontal: isWideRecentLayout
-        )
+        ) * 0.78
     }
 
     private var recentRevision:
@@ -1228,12 +1234,6 @@ struct HomePersonalRecentActivitySection:
     // Store calculated muscle maps for the few Home cards rather than
     // rebuilding the full strength anatomy on every SwiftUI body update.
     @State private var recentStrengthProfiles: [UUID: StrengthMuscleProfile] = [:]
-
-    private var visibleItems: [HomeActivityStreamItem] {
-        HomeActivityStreamBuilder.recentPreview(
-            mine: myWorkouts, social: social
-        )
-    }
 
     var body: some View {
         let recent = visibleItems
@@ -1265,6 +1265,8 @@ struct HomePersonalRecentActivitySection:
             rebuildRecentWorkouts()
         }
         .onAppear {
+            rebuildRecentWorkouts()
+            rebuildVisibleItems(feed: social.feed)
             // One initial/returning refresh is sufficient. The former
             // additional .task also launched this HealthKit query when Home
             // mounted, creating duplicate work on first display.
@@ -1273,6 +1275,15 @@ struct HomePersonalRecentActivitySection:
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task { await refreshRecentWorkouts() }
+        }
+        .onReceive(social.$feed) { updatedFeed in
+            // Reactions and new shared workouts still update promptly;
+            // unrelated Home observations no longer re-sort this feed.
+            rebuildVisibleItems(feed: updatedFeed)
+        }
+        .onReceive(social.$workoutSessions) { _ in
+            // Shared-session grouping can change without a new feed post.
+            rebuildVisibleItems(feed: social.feed)
         }
         .onReceive(health.$workouts.removeDuplicates()) { _ in
             // Also observes edits that retain the same workout ID and count.
@@ -1345,7 +1356,21 @@ struct HomePersonalRecentActivitySection:
             }
             recentStrengthProfiles = profiles
             myWorkouts = refreshed
+            rebuildVisibleItems(mine: refreshed, feed: social.feed)
         }
+    }
+
+    private func rebuildVisibleItems(
+        mine: [SocialPublishableWorkout]? = nil,
+        feed: [SocialFeedItem]
+    ) {
+        let refreshed = HomeActivityStreamBuilder.recentPreview(
+            mine: mine ?? myWorkouts,
+            social: social,
+            feed: feed
+        )
+        // This work is now on source updates, never on each scroll frame.
+        visibleItems = refreshed
     }
 
     private var header: some View {
@@ -1453,6 +1478,7 @@ struct HomePersonalRecentActivitySection:
                             displayName: session.profile.displayName,
                             partnerNames: social.acceptedTrainingPartnerNames(for: workout.id)
                                 .joined(separator: ", "),
+                            partnerUsernames: homePartnerUsernames(for: workout.id),
                             date: workout.endDate
                         )
                     }
@@ -1463,9 +1489,7 @@ struct HomePersonalRecentActivitySection:
                         distanceMeters: workout.distanceMeters,
                         durationSeconds: workout.duration,
                         exerciseCount: workout.strengthExerciseCount,
-                        volumeKilograms: workout.strengthTotalVolumeKilograms,
-                        fallback: workout.activity == .running || workout.activity == .strength
-                            ? nil : workout.summaryText
+                        volumeKilograms: workout.strengthTotalVolumeKilograms
                     )
 
                     HomeCompactActivityEngagementRow(
@@ -1506,6 +1530,7 @@ struct HomePersonalRecentActivitySection:
                                 : feedItem.actor.usernameLabel,
                             displayName: feedItem.actor.resolvedName,
                             partnerNames: feedItem.activity.metadata?["with_names"],
+                            partnerUsernames: feedItem.activity.metadata?["with_usernames"],
                             date: feedItem.activity.createdAt
                         )
                     }
@@ -1524,8 +1549,7 @@ struct HomePersonalRecentActivitySection:
                         ),
                         volumeKilograms: HomeRecentCardFormat.number(
                             feedItem, key: "volume_kg"
-                        ),
-                        fallback: feedItem.activity.title
+                        )
                     )
 
                     HomeCompactActivityEngagementRow(item: feedItem)
@@ -1534,6 +1558,26 @@ struct HomePersonalRecentActivitySection:
             }
             .accessibilityIdentifier("athlth-home-recent-following-card")
         }
+    }
+
+    // Resolve only handles we actually have permission to see. A partner's
+    // display name is never guessed into a username.
+    private func homePartnerUsernames(for workoutID: UUID) -> String? {
+        guard let sessionID = social.workoutSessions.first(where: {
+            $0.creatorID == social.currentUserID &&
+            $0.sourceWorkoutID == workoutID
+        })?.id else { return nil }
+
+        let handles = social.workoutParticipants.compactMap { participant -> String? in
+            guard participant.sessionID == sessionID,
+                  participant.userID != social.currentUserID,
+                  participant.state == .accepted,
+                  let profile = social.profile(for: participant.userID),
+                  !profile.usernameLabel.isEmpty
+            else { return nil }
+            return profile.usernameLabel
+        }
+        return handles.isEmpty ? nil : handles.joined(separator: " · ")
     }
 
     // The account avatar comes from the same verified profile image source
@@ -1571,47 +1615,73 @@ struct HomePersonalRecentActivitySection:
             }
     }
 
-    /// Keep the avatar, visible handle, and posting time readable at a glance.
-    /// The profile navigation remains independent of tapping the workout art.
+    /// Use two readable name lines, genuine handles, and a compact timestamp.
+    /// The whole author area remains a single profile navigation target.
     private struct HomeRecentAuthorLine<Avatar: View>: View {
         let avatar: Avatar
         let username: String
         let displayName: String?
         let partnerNames: String?
+        let partnerUsernames: String?
         let date: Date
 
-        var body: some View {
-            HStack(alignment: .center, spacing: 9) {
-                avatar
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(
-                        (displayName?.isEmpty == false ? displayName! : username) +
-                        (partnerNames?.isEmpty == false
-                            ? ATHLTHLocalization.choose(english: " with ", norwegian: " sammen med ") + partnerNames!
-                            : "")
-                    )
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.79)
+        private var authorName: String {
+            guard let displayName, !displayName.isEmpty else { return username }
+            return displayName
+        }
 
-                    if displayName != username && !username.isEmpty {
-                        Text(username)
+        private var shownHandles: String {
+            let handles = [username, partnerUsernames]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .map { handle in
+                    handle.hasPrefix("@") ? handle : "@\(handle)"
+                }
+            return handles.joined(separator: " · ")
+        }
+
+        var body: some View {
+            HStack(alignment: .top, spacing: 9) {
+                avatar
+                    .frame(width: 36, height: 36)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(authorName)
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let partnerNames, !partnerNames.isEmpty {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "with ", norwegian: "sammen med "
+                            ) + partnerNames
+                        )
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if !shownHandles.isEmpty && shownHandles != authorName {
+                        Text(shownHandles)
                             .font(.system(size: 10.5, weight: .medium))
                             .foregroundStyle(ATHLTHTheme.mutedText)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(HomeRecentCardFormat.date(date))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9.5, weight: .medium))
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .fixedSize(horizontal: true, vertical: false)
             }
-            .frame(minHeight: 36)
+            .frame(minHeight: 36, alignment: .top)
             .contentShape(Rectangle())
             .accessibilityElement(children: .combine)
         }
@@ -1625,7 +1695,6 @@ struct HomePersonalRecentActivitySection:
         let durationSeconds: TimeInterval?
         let exerciseCount: Int?
         let volumeKilograms: Double?
-        let fallback: String?
 
         var body: some View {
             VStack(alignment: .trailing, spacing: 3) {
@@ -1677,13 +1746,9 @@ struct HomePersonalRecentActivitySection:
                     )
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(ATHLTHTheme.mutedText)
-                } else if activity != .strength && activity != .running,
-                          let fallback, !fallback.isEmpty {
-                    Text(fallback)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineLimit(1)
                 }
+                // Do not append the free-form summary: it repeats distance
+                // and duration already shown in the structured metric row.
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }

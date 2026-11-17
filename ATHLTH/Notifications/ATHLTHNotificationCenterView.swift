@@ -622,8 +622,11 @@ struct ATHLTHNotificationCenterView: View {
             return followRequest(for: item) != nil
         }
 
-        if let status = workoutInvitationStatus(for: item) {
-            return status == .actionable
+        // A workout invitation is actionable only while its current
+        // recipient/session state is pending. Event names are historical:
+        // "workout_invite_accepted" must never reopen an empty Requests view.
+        if eventKind == "workout_invite" {
+            return workoutInvitationStatus(for: item) == .actionable
         }
 
         // An old challenge_invite remains an event named "invite" even
@@ -641,6 +644,19 @@ struct ATHLTHNotificationCenterView: View {
                 )?.state,
                 expiredWithoutOpponent: challenge.expiredWithoutOpponent()
             )
+        }
+
+        // Outcome notifications are informational, even when their names
+        // include "invite" (e.g. workout_invite_accepted). Only invitations
+        // which can still be acted on belong in "Needs attention".
+        if eventKind.hasSuffix("_accepted") ||
+            eventKind.hasSuffix("_approved") ||
+            eventKind.hasSuffix("_declined") ||
+            eventKind.hasSuffix("_rejected") ||
+            eventKind.hasSuffix("_cancelled") ||
+            eventKind.hasSuffix("_withdrawn") ||
+            eventKind.hasSuffix("_expired") {
+            return false
         }
 
         return eventKind.contains("invite")
@@ -2389,7 +2405,7 @@ struct ATHLTHNotificationCenterView: View {
 
             if eventKind == "friend_request" ||
                 eventKind == "follow_request" ||
-                eventKind.contains("workout_invite") {
+                eventKind == "workout_invite" {
                 SocialHubView(
                     initialTab: .requests
                 )

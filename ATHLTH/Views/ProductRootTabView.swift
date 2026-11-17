@@ -1107,7 +1107,6 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
-    @EnvironmentObject private var pets: ATHLTHPetStore
 
     @State private var homeStreakDays: [Date]?
     @State private var lastHomeInitialLoadAt: Date?
@@ -1123,9 +1122,6 @@ struct ATHLTHHomeView: View {
     @State private var selectedHomeCompletedWorkout: SocialPublishableWorkout?
     @State private var homeDeferredPhoneWorkout: PlannedSession?
     @State private var homeDeferredPhoneDelaySeconds: TimeInterval = 30
-    @State private var selectedHomeRecommendedWorkout: PlannedSession?
-    @State private var selectedHomeRecommendationInfo: HomeDailyRecommendationInfo?
-    @State private var homeRecommendedPlanID: UUID?
     @State private var selectedHomeAllStandaloneWorkout: PlannedSession?
     @State private var homeWorkoutPendingRemoval: PlannedSession?
     @State private var showingHomeWorkoutRemovalConfirmation = false
@@ -1277,7 +1273,7 @@ struct ATHLTHHomeView: View {
 
                     homeSocialStatusStrip
 
-                    homeDailyRecommendationAndCalendarRow
+                    homeFriendsAndCalendarRow
 
                     HomePersonalRecentActivitySection()
                 }
@@ -1619,31 +1615,6 @@ struct ATHLTHHomeView: View {
             // Invitations open the same edge-to-edge inbox as the side menu.
             .fullScreenCover(isPresented: $showingHomeSocialInbox) {
                 ATHLTHSideMenuUtilitiesView(destination: .inbox)
-            }
-            .sheet(item: $selectedHomeRecommendationInfo) { information in
-                HomeDailyRecommendationInfoSheet(info: information)
-                    .presentationDetents([.fraction(0.82), .large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(28)
-            }
-            .sheet(item: $selectedHomeRecommendedWorkout) { workout in
-                HomeDailyRecommendedWorkoutSheet(
-                    workout: workout,
-                    isPlanWorkout: homeRecommendedPlanID != nil,
-                    canStartWithWatch: watchConnection.isReady,
-                    onOpenPlannedWorkout: {
-                        startHomeDailyRecommendedWorkout(workout, device: .appleWatch)
-                    },
-                    onStartOnPhone: {
-                        startHomeDailyRecommendedWorkout(workout, device: .iPhone)
-                    },
-                    onStartOnWatch: {
-                        startHomeDailyRecommendedWorkout(workout, device: .appleWatch)
-                    }
-                )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
             }
             // Independent sessions share the calendar but not a plan ID.
             .sheet(item: $homeDeferredPhoneWorkout) { workout in
@@ -2340,164 +2311,6 @@ struct ATHLTHHomeView: View {
     // former Home goal shortcut without deleting any saved goals.
     private let homeCalendarContentMinHeight: CGFloat = 70
 
-    /// Prefer the actual uncompleted workout in the plan, then a standalone
-    /// scheduled session. Rest days are never executable recommendations.
-    private var homeRecommendedScheduledWorkout:
-        (planID: UUID?, workout: PlannedSession)? {
-        if let selection = homeTodayPlanWorkout {
-            return (selection.planID, selection.workout)
-        }
-        if let workout = HomeTodayCalendarSchedule.workouts(
-            plan: nil, standalone: session.standalonePlannedSessions
-        ).first(where: { !$0.isExplicitRestDay }) {
-            return (nil, workout)
-        }
-        return nil
-    }
-
-    private var homeRecommendationReadiness: HomeDailyRecommendationPolicy.Readiness {
-        if health.recovery.score == nil {
-            return .unavailable
-        }
-        switch health.recovery.state {
-        case .ready: return .ready
-        case .balanced: return .balanced
-        case .takeItEasy: return .takeItEasy
-        case .recover: return .recover
-        case .buildingBaseline: return .unavailable
-        }
-    }
-
-    private var homeRecommendationHistory: HomeTrainingPatternAdvisor.Snapshot {
-        HomeTrainingPatternAdvisor.snapshot(
-            workouts: health.workouts,
-            strengthHistory: strengthWorkout.workoutHistory,
-            phoneHistory: phoneWorkout.history,
-            dogs: pets.pets.filter { $0.userID == session.profile.userID }
-        )
-    }
-
-    private var homeDailyRecommendation: HomeDailyRecommendationPolicy.Advice {
-        let scheduled = homeRecommendedScheduledWorkout
-        let activity: HomeDailyRecommendationPolicy.PlannedActivity? =
-            scheduled.map {
-                switch $0.workout.kind {
-                case .running: return .running
-                case .strength: return .strength
-                default: return .other
-                }
-            }
-        return HomeDailyRecommendationPolicy.recommendation(
-            readiness: homeRecommendationReadiness,
-            hasWorkoutToday: scheduled != nil,
-            trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio,
-            plannedActivity: activity,
-            plannedWorkoutTitle: scheduled?.workout.title,
-            trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
-                workouts: homeRecordedWorkouts
-            ),
-            personalizedHistory: homeRecommendationHistory
-        )
-    }
-
-    private func showHomeDailyRecommendationDetails(
-        _ advice: HomeDailyRecommendationPolicy.Advice
-    ) {
-        selectedHomeRecommendationInfo = HomeDailyRecommendationInfo(
-            advice: advice,
-            history: homeRecommendationHistory,
-            readiness: homeRecommendationReadiness,
-            trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio
-        )
-    }
-
-    private func openHomeDailyRecommendation(
-        _ advice: HomeDailyRecommendationPolicy.Advice
-    ) {
-        if advice.suggestedWorkout == .restDay {
-            onOpenTrain(.today)
-            return
-        }
-        if advice.suggestedWorkout == .planned {
-            guard let scheduled = homeRecommendedScheduledWorkout else {
-                onOpenTrain(.today)
-                return
-            }
-            homeRecommendedPlanID = scheduled.planID
-            selectedHomeRecommendedWorkout = scheduled.workout
-        } else if let suggested =
-                    HomeDailyRecommendationSessionFactory.make(advice: advice) {
-            homeRecommendedPlanID = nil
-            selectedHomeRecommendedWorkout = suggested
-        }
-    }
-
-    private func startHomeDailyRecommendedWorkout(
-        _ workout: PlannedSession, device: WorkoutCaptureDevice
-    ) {
-        selectedHomeRecommendedWorkout = nil
-        let planID = homeRecommendedPlanID
-        Task { @MainActor in
-            // Avoid presenting a recorder while the sheet dismissal animates.
-            try? await Task.sleep(for: .milliseconds(330))
-            if let planID {
-                // A plan workout uses its existing detail, start options and
-                // completion linkage. Never launch an unlinked copy.
-                onOpenTrain(.workout(planID: planID, workoutID: workout.id))
-                return
-            }
-            if session.standalonePlannedSessions.contains(where: {
-                $0.id == workout.id
-            }) {
-                startHomeStandaloneWorkout(workout, device: device)
-                return
-            }
-
-            guard !homeDirectStartInProgress,
-                  phoneWorkout.active == nil,
-                  strengthWorkout.activeWorkout == nil,
-                  !watchConnection.hasActiveWatchWorkout,
-                  !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
-            else {
-                homeWatchTransferError = ATHLTHLocalization.choose(
-                    english: "Finish your current workout first.",
-                    norwegian: "Avslutt økten som pågår først."
-                )
-                return
-            }
-            // History-backed strength suggestions must use the existing
-            // strength workout engine. Never launch them as a walking/running
-            // recorder just because they came from the Home recommendation.
-            if workout.kind == .strength {
-                if device == .appleWatch && !watchConnection.isReady {
-                    homeWatchTransferError = ATHLTHLocalization.choose(
-                        english: "Apple Watch is unavailable. Start with iPhone instead.",
-                        norwegian: "Apple Watch er ikke tilgjengelig. Start med iPhone i stedet."
-                    )
-                    return
-                }
-                if device == .iPhone && workout.isStructuredWorkout {
-                    selectedHomeStructuredWorkout = workout
-                } else {
-                    startHomePlannedStrengthWorkout(workout, device: device)
-                }
-                return
-            }
-            if device == .appleWatch {
-                guard watchConnection.isReady else {
-                    homeWatchTransferError = ATHLTHLocalization.choose(
-                        english: "Apple Watch is unavailable. Start with iPhone instead.",
-                        norwegian: "Apple Watch er ikke tilgjengelig. Start med iPhone i stedet."
-                    )
-                    return
-                }
-                startHomePlannedWorkoutOnWatch(workout)
-            } else {
-                startHomeStandalonePhoneEndurance(workout)
-            }
-        }
-    }
-
     private var homeChallengeInvitationCount: Int {
         challenges.incomingInvitations(for: session.profile.userID).count
     }
@@ -2631,21 +2444,9 @@ struct ATHLTHHomeView: View {
         .contentShape(Rectangle())
     }
 
-    private var homeShowsDailyRecommendation: Bool {
-        HomeCalendarRecommendationDisplayPolicy.showsRecommendation(
-            plannedWorkoutCount: HomeTodayCalendarSchedule.workouts(
-                plan: session.activePlan,
-                standalone: session.standalonePlannedSessions
-            ).count,
-            personalEventCount: homeTodayCommunityEvents.count,
-            clubEventCount: homeTodayGroupEvents.count,
-            tournamentCount: tournamentCalendar.events(on: Date()).count
-        )
-    }
-
     // Keep Friends and Calendar compact to protect Recent Activity space.
-    // The existing recommendation is now a small, tappable Friends footer.
-    private var homeDailyRecommendationAndCalendarRow: some View {
+    // Daily recommendations now belong only to Train > Today on open days.
+    private var homeFriendsAndCalendarRow: some View {
         Group {
             if homeDynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 10) {
@@ -2687,36 +2488,6 @@ struct ATHLTHHomeView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.top, 7)
-            }
-            if homeShowsDailyRecommendation {
-                let advice = homeDailyRecommendation
-                Button {
-                    showHomeDailyRecommendationDetails(advice)
-                } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Today's recommendation",
-                            norwegian: "Dagens anbefaling"
-                        ))
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-
-                        Text(advice.shortDescription)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(ATHLTHTrainDesign.secondary)
-                            .multilineTextAlignment(.leading)
-                            .lineLimit(2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(.top, 7)
-                    .overlay(alignment: .top) {
-                        Rectangle()
-                            .fill(ATHLTHTrainDesign.rule.opacity(0.30))
-                            .frame(height: 0.7)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("athlth-home-friends-recommendation")
             }
             Spacer(minLength: 0)
         }
@@ -5943,6 +5714,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
 
     @State private var selectedSection: ATHLTHTrainSection = .today
     @SceneStorage("athlth.train.selectedSection") private var persistedTrainSection = "today"
@@ -5968,6 +5740,12 @@ struct ATHLTHTrainView: View {
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
     @State private var selectedSuggestedWorkout: WorkoutTemplateCatalogEntry?
+    // Recommendation snapshots are updated on source changes, never during
+    // scrolling. The detail sheet keeps the exact advice the athlete tapped.
+    @State private var trainDailyRecommendationInfo: HomeDailyRecommendationInfo?
+    @State private var selectedTrainDailyRecommendationInfo: HomeDailyRecommendationInfo?
+    @State private var selectedTrainDailySuggestedWorkout: PlannedSession?
+    @State private var trainRecommendationRefreshTask: Task<Void, Never>?
     // Reuse the immutable published catalog and search cache already shared
     // with other workout-library entry points. Avoid rebuilding all bundled
     // recipes or fetching the same remote data on the first Train tab tap.
@@ -6130,6 +5908,35 @@ struct ATHLTHTrainView: View {
                 NavigationStack {
                     WorkoutTemplateDetailView(entry: entry)
                 }
+            }
+            .sheet(item: $selectedTrainDailyRecommendationInfo) { info in
+                HomeDailyRecommendationInfoSheet(info: info)
+                    .presentationDetents([.fraction(0.82), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
+            }
+            .sheet(item: $selectedTrainDailySuggestedWorkout) { workout in
+                HomeDailyRecommendedWorkoutSheet(
+                    workout: workout,
+                    isPlanWorkout: false,
+                    // This preview is reviewed before launch. A Watch
+                    // recording must be configured via its own existing
+                    // device-aware start flow rather than silently starting
+                    // the iPhone structured player.
+                    canStartWithWatch: false,
+                    onOpenPlannedWorkout: {
+                        openConfirmedTrainDailyWorkout(workout)
+                    },
+                    onStartOnPhone: {
+                        openConfirmedTrainDailyWorkout(workout)
+                    },
+                    onStartOnWatch: {
+                        openConfirmedTrainDailyWorkout(workout)
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
             }
             .athlthStudioEditor(item: $selectedPlanWorkout, useFullScreen: studioFullscreenEditing) { selection in
                 PlannedWorkoutDetailView(
@@ -6553,7 +6360,9 @@ struct ATHLTHTrainView: View {
             }
             .onChange(of: selectedSection) { _, section in
                 switch section {
-                case .today: persistedTrainSection = "today"
+                case .today:
+                    persistedTrainSection = "today"
+                    scheduleTrainDailyRecommendationRefresh()
                 case .plan: persistedTrainSection = "plan"
                 case .progress: persistedTrainSection = "progress"
                 }
@@ -6604,14 +6413,20 @@ struct ATHLTHTrainView: View {
                         phoneWorkout.history, healthWorkouts: health.workouts
                     )
                 }
+                scheduleTrainDailyRecommendationRefresh()
             }
             // HealthKit and phone history can publish in bursts. Coalesce
             // them rather than reconciling plans repeatedly in one frame.
             .onReceive(phoneWorkout.$history) { _ in
                 scheduleTrainHistoryReconciliation()
+                scheduleTrainDailyRecommendationRefresh()
             }
             .onReceive(health.$workouts) { _ in
                 scheduleTrainHistoryReconciliation()
+                scheduleTrainDailyRecommendationRefresh()
+            }
+            .onReceive(strengthWorkout.$workoutHistory) { _ in
+                scheduleTrainDailyRecommendationRefresh()
             }
             .onChange(
                 of: navigationRequest?.id
@@ -6627,6 +6442,7 @@ struct ATHLTHTrainView: View {
                         refreshTrainDayIfChanged()
                     }
                     resolveDelayedPlanStartIfReady()
+                    scheduleTrainDailyRecommendationRefresh()
                 }
             }
             .task(id: delayedPlanStart?.id) {
@@ -6749,6 +6565,128 @@ struct ATHLTHTrainView: View {
         ) else { return }
         displayedTrainDay = today
         session.refreshActivePlanForToday()
+    }
+
+    /// Coalesce Health/phone/strength bursts outside the Train tab animation.
+    /// The recommendation never runs from an on-scroll view computation.
+    private func scheduleTrainDailyRecommendationRefresh() {
+        trainRecommendationRefreshTask?.cancel()
+        guard isActive, selectedSection == .today else { return }
+        let account = session.profile.userID
+        trainRecommendationRefreshTask = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(450)) }
+            catch { return }
+            guard !Task.isCancelled, isActive,
+                  selectedSection == .today,
+                  session.profile.userID == account else { return }
+
+            let history = HomeTrainingPatternAdvisor.snapshot(
+                workouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory,
+                phoneHistory: phoneWorkout.history,
+                dogs: pets.pets.filter { $0.userID == account }
+            )
+            guard history.supportsPersonalization else {
+                trainDailyRecommendationInfo = nil
+                return
+            }
+            let readiness: HomeDailyRecommendationPolicy.Readiness
+            if health.recovery.score == nil {
+                readiness = .unavailable
+            } else {
+                switch health.recovery.state {
+                case .ready: readiness = .ready
+                case .balanced: readiness = .balanced
+                case .takeItEasy: readiness = .takeItEasy
+                case .recover: readiness = .recover
+                case .buildingBaseline: readiness = .unavailable
+                }
+            }
+            let ratio: Double?
+            if health.hasRequestedAuthorization {
+                ratio = await health.recoveryTrendSnapshot(days: 14)
+                    .trainingLoad.ratio
+            } else {
+                ratio = nil
+            }
+            guard !Task.isCancelled, isActive,
+                  selectedSection == .today,
+                  session.profile.userID == account else { return }
+
+            let recorded = ATHLTHStudioRecordedWorkouts.merged(
+                health: health.workouts,
+                localStrength: strengthWorkout.workoutHistory
+            )
+            let advice = HomeDailyRecommendationPolicy.recommendation(
+                readiness: readiness,
+                hasWorkoutToday: false,
+                trainingLoadRatio: ratio,
+                trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
+                    workouts: recorded
+                ),
+                personalizedHistory: history
+            )
+            trainDailyRecommendationInfo = HomeDailyRecommendationInfo(
+                advice: advice, history: history,
+                readiness: readiness, trainingLoadRatio: ratio
+            )
+        }
+    }
+
+    /// Recommendation sessions remain independent: they must never write to
+    /// today's plan or replace an active workout. Structured blocks are kept.
+    private func openTrainDailyRecommendedWorkout(
+        _ advice: HomeDailyRecommendationPolicy.Advice
+    ) {
+        guard !hasOngoingTrainWorkout,
+              HomeTodayCalendarSchedule.workouts(
+                  plan: session.activePlan,
+                  standalone: session.standalonePlannedSessions
+              ).isEmpty,
+              !TrainTodayOverviewPolicy.hasRecordedWorkout(
+                  on: Date(),
+                  healthStartDates: health.workouts.map(\.startDate),
+                  strengthEndDates: strengthWorkout.workoutHistory.compactMap(\.endedAt),
+                  phoneCompletedDates: phoneWorkout.history.compactMap(\.end)
+              )
+        else { return }
+
+        guard let workout = HomeDailyRecommendationSessionFactory.make(
+            advice: advice
+        ) else {
+            selectedTrainDailyRecommendationInfo = trainDailyRecommendationInfo
+            return
+        }
+
+        selectedTrainDailySuggestedWorkout = workout
+    }
+
+    /// Only this explicit confirmation may open the recording/setup flow.
+    /// Dismiss the review sheet first so SwiftUI never presents two sheets
+    /// from the same navigation stack in a single transaction.
+    private func openConfirmedTrainDailyWorkout(_ workout: PlannedSession) {
+        selectedTrainDailySuggestedWorkout = nil
+        Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(350)) }
+            catch { return }
+            guard !hasOngoingTrainWorkout else { return }
+            if workout.kind == .strength {
+                selectedStrengthSession = workout
+            } else if workout.isStructuredWorkout {
+                // Keep the recommended interval phases and targets intact.
+                selectedStructuredWorkout = workout
+            } else if workout.kind == .walking {
+                showingWalkQuickStart = true
+            } else if workout.kind == .running {
+                if let template = workout.resolvedRunningWorkouts.first {
+                    pendingRunningTemplate = template
+                } else {
+                    showingRunQuickStart = true
+                }
+            } else {
+                showingLibrary = true
+            }
+        }
     }
 
     // Every Train section has exactly one shared navigation row, embedded
@@ -7152,6 +7090,23 @@ struct ATHLTHTrainView: View {
             activeWorkoutCard: hasOngoingTrainWorkout
                 ? AnyView(activeTrainWorkoutCard) : nil,
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,
+            dailyRecommendation:
+                ATHLTHTrainTodayDailyAdvicePolicy.isVisible(
+                    scheduledItemCount: HomeTodayCalendarSchedule.workouts(
+                        plan: active,
+                        standalone: session.standalonePlannedSessions,
+                        on: today
+                    ).count,
+                    hasRecordedWorkoutToday: hasRecordedWorkoutToday,
+                    hasActiveWorkout: hasOngoingTrainWorkout,
+                    hasPersonalizedAdvice: trainDailyRecommendationInfo != nil
+                ) ? trainDailyRecommendationInfo?.advice : nil,
+            onShowDailyRecommendationDetails: {
+                selectedTrainDailyRecommendationInfo = trainDailyRecommendationInfo
+            },
+            onChooseDailyRecommendedWorkout: { advice in
+                openTrainDailyRecommendedWorkout(advice)
+            },
             todaysReadiness: readiness,
             latestHealthWeightKilograms: health.personalDetails.weightKilograms,
             onChooseSuggestedWorkout: { selectedSuggestedWorkout = $0 },
@@ -11213,7 +11168,6 @@ struct ATHLTHSwipeBackEnabler: UIViewControllerRepresentable {
 }
 
 struct ATHLTHProfileView: View {
-    var showsSideMenuCloseButton: Bool = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var profileRecords: ATHLTHProfileRecordSyncStore
@@ -11285,7 +11239,8 @@ struct ATHLTHProfileView: View {
             softTransition: true,
             pullDownFadeBridge: true,
             warmHomePalette: true,
-            sheetOverlapOverride: 8
+            sheetOverlapOverride: 8,
+            fadeBridgeIntensity: 0.58
         ) {
             profileHero
         } content: {
@@ -11795,50 +11750,6 @@ struct ATHLTHProfileView: View {
                 )
             }
         }
-        .overlay(
-            alignment: .topTrailing
-        ) {
-            HStack(spacing: 10) {
-                NavigationLink {
-                    ATHLTHSettingsView()
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(
-                            .system(
-                                size: 17,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-                        .background(
-                            Color.black.opacity(0.30),
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white.opacity(0.30),
-                                    lineWidth: 0.8
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Settings",
-                        norwegian: "Innstillinger"
-                    )
-                )
-            }
-            // Follow the lowered profile identity while keeping the hero
-            // height and statistics card positions unchanged.
-            .padding(.top, 84)
-            .padding(.trailing, showsSideMenuCloseButton ? 72 : 18)
-        }
         .frame(height: 236)
         .clipped()
     }
@@ -11948,14 +11859,14 @@ struct ATHLTHProfileView: View {
             } label: {
                 heroStat(
                     value:
-                        lifetimeDistanceText,
+                        lifetimeTrainingTimeText,
                     title:
                         ATHLTHLocalization.choose(
-                            english: "Total km",
-                            norwegian: "Km totalt"
+                            english: "Total training time",
+                            norwegian: "Total treningstid"
                         ),
                     icon:
-                        "chart.bar.fill"
+                        "clock.fill"
                 )
             }
             .buttonStyle(.plain)
@@ -12903,30 +12814,23 @@ struct ATHLTHProfileView: View {
             health.workouts.count
     }
 
-    private var lifetimeDistanceText:
-        String {
-        guard let meters =
-                performanceStats?
-                    .totalRunningDistanceMeters,
-              meters > 0
-        else {
-            return "0"
+    /// Use the existing deduplicated Apple Health performance aggregate.
+    /// This measures all supported workout types, not just running distance.
+    private var lifetimeTrainingTimeText: String {
+        guard let seconds = performanceStats?.totalTrainingDuration,
+              seconds.isFinite, seconds >= 0 else { return "—" }
+
+        let hours = seconds / 3_600
+        if hours >= 1_000 {
+            return String(format: "%.1fk t", hours / 1_000)
         }
-
-        let kilometers =
-            meters / 1_000
-
-        if kilometers >= 1_000 {
-            return String(
-                format: "%.1fk",
-                kilometers / 1_000
-            )
+        if hours >= 1 {
+            return "\(Int(hours.rounded())) t"
         }
-
-        return String(
-            format: "%.0f",
-            kilometers
-        )
+        if seconds > 0 {
+            return "\(max(1, Int((seconds / 60).rounded()))) min"
+        }
+        return "0 t"
     }
 
     private var trainingIdentityFocus:
