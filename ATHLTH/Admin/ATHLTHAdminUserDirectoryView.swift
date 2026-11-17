@@ -548,7 +548,7 @@ struct ATHLTHAdminUserDirectoryView: View {
                     ))
                 }
 
-                Section(tr("Why is this needed?", "Hvorfor er dette nødvendig?")) {
+                Section {
                     TextField(
                         tr("Reason for the change (required)", "Begrunnelse (obligatorisk)"),
                         text: $actionReason, axis: .vertical
@@ -563,6 +563,8 @@ struct ATHLTHAdminUserDirectoryView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("admin-confirm-username")
+                } header: {
+                    Text(tr("Why is this needed?", "Hvorfor er dette nødvendig?"))
                 } footer: {
                     Text(tr(
                         "Keep the explanation short and factual. Do not include health data, private messages or other sensitive details.",
