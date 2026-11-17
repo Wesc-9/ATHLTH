@@ -5963,9 +5963,11 @@ struct WorkoutTemplateBuilderView: View {
                     ScrollView {
                         if let index = selection.index(in: blocks) {
                             VStack(alignment: .leading, spacing: 15) {
-                                Text(ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]))
-                                    .font(.title2.weight(.semibold))
-                                    .foregroundStyle(studioInk)
+                                if blocks[index].kind != .run {
+                                    Text(ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]))
+                                        .font(.title2.weight(.semibold))
+                                        .foregroundStyle(studioInk)
+                                }
                                 blockDetails(index)
                             }
                             .padding(18)
@@ -5978,8 +5980,14 @@ struct WorkoutTemplateBuilderView: View {
                                 }
                                 let original = blocks[liveIndex]
                                 let adapted = ATHLTHRunningLibraryExerciseAdapter.adapt(original)
-                                if original.kind != adapted.kind {
-                                    blocks[liveIndex] = adapted
+                                // Existing personal copies may still contain
+                                // the original English sentence as their title.
+                                // Normalize only recognized imported source
+                                // steps when they are explicitly opened.
+                                let normalized = ATHLTHZonedLocalization
+                                    .normalizeLegacyImportedStep(adapted)
+                                if original != normalized {
+                                    blocks[liveIndex] = normalized
                                 }
                                 updateRouteStepIfNeeded(original.editorDragID)
                             }
