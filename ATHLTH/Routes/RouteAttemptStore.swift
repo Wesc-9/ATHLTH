@@ -187,8 +187,8 @@ final class RouteAttemptStore: ObservableObject {
 
     private let service: SupabaseRouteAttemptService
     private var latestRefreshRequestID = UUID()
-    // v3 requires a fresh GPS direction classification for legacy attempts.
-    private let routeMetricVersion = 3
+    // v4 rechecks legacy A-B-A GPS direction and route-coordinate ordering.
+    private let routeMetricVersion = 4
 
     private func metricVersionKey(
         routeID: UUID,
@@ -303,6 +303,28 @@ final class RouteAttemptStore: ObservableObject {
             for workout in candidates {
                 workByID[workout.id] =
                     workout
+            }
+
+            // The ordinary Health feed contains up to 100 recent workouts.
+            // Fetch older saved attempts by their exact HealthKit UUID
+            // instead of silently leaving their legacy direction unknown.
+            let missingExisting = existing.filter {
+                $0.userID == userID &&
+                workByID[$0.workoutID] == nil &&
+                !UserDefaults.standard.bool(
+                    forKey: metricVersionKey(
+                        routeID: route.id,
+                        userID: userID,
+                        workoutID: $0.workoutID
+                    )
+                )
+            }
+            for attempt in missingExisting.prefix(16) {
+                if let historical = await health.workoutSummaryForRouteAttempt(
+                    attempt.workoutID
+                ) {
+                    workByID[historical.id] = historical
+                }
             }
 
             let orderedWorkouts =
