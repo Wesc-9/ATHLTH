@@ -2500,6 +2500,7 @@ struct CustomExerciseEditorView: View {
         self.onSaved = onSaved
         _name = State(initialValue: editing?.exercise.name ?? "")
         _activityCategory = State(initialValue: editing?.exercise.activityCategory ?? .strength)
+        _assessmentMethod = State(initialValue: editing?.exercise.assessmentMethod)
         _primaryMuscles = State(initialValue: Set(
             ExerciseMuscleGroup.allCases.filter {
                 editing?.exercise.primaryMuscles.contains($0.rawValue) ?? false
@@ -2545,6 +2546,7 @@ struct CustomExerciseEditorView: View {
 
     @State private var name = ""
     @State private var activityCategory: ATHLTHExerciseActivity = .strength
+    @State private var assessmentMethod: ATHLTHAssessmentMethod?
     @State private var primaryMuscles:
         Set<ExerciseMuscleGroup> = []
     @State private var secondaryMuscles:
@@ -3191,6 +3193,18 @@ struct CustomExerciseEditorView: View {
                     equipmentEditor
                 }
 
+                if !ATHLTHAssessmentMethod.available(for: activityCategory).isEmpty {
+                    Section {
+                        ATHLTHAssessmentMethodPicker(
+                            selection: $assessmentMethod,
+                            available: ATHLTHAssessmentMethod.available(
+                                for: activityCategory
+                            )
+                        )
+                    }
+                    .accessibilityIdentifier("exercise-studio-assessment-section")
+                }
+
                 Section(ATHLTHLocalization.choose(
                     english: "Instructions", norwegian: "Instruksjoner"
                 )) {
@@ -3524,6 +3538,10 @@ struct CustomExerciseEditorView: View {
                 updated.secondaryMuscles = selectedMuscleValues(secondaryMuscles)
                 updated.equipment = resolvedEquipment
                 updated.activityCategory = activityCategory
+                updated.assessmentMethod = assessmentMethod.flatMap {
+                    ATHLTHAssessmentMethod.available(for: activityCategory).contains($0)
+                        ? $0 : nil
+                }
                 updated.visibility = scopedVisibility
                 updated.isVisibleOutsideOwnerLibrary = scopedVisibility.shareable
                 updated.videoURL = video
@@ -3556,6 +3574,10 @@ struct CustomExerciseEditorView: View {
                     videoURL: video,
                     creatorUsername: session.profile.username,
                     activityCategory: activityCategory,
+                    assessmentMethod: assessmentMethod.flatMap {
+                        ATHLTHAssessmentMethod.available(for: activityCategory).contains($0)
+                            ? $0 : nil
+                    },
                     visibility: scopedVisibility
                 )
             }
