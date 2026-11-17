@@ -1030,7 +1030,7 @@ final class IPhoneWorkoutStore:
                 config: configuration
             )
             customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
-                rules: configuration.customRules ?? [],
+                rules: configuration.activeCustomRules,
                 distanceMeters: workout.distanceMeters,
                 elapsedSeconds: workout.elapsed(at: now)
             )
@@ -2919,7 +2919,7 @@ final class IPhoneWorkoutStore:
     ) {
         lastGoalEncouragementAt = nil
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
-            rules: configuration?.customRules ?? [],
+            rules: configuration?.activeCustomRules ?? [],
             distanceMeters: active?.distanceMeters ?? 0,
             elapsedSeconds: active?.elapsed(at: Date()) ?? 0
         )
@@ -4868,7 +4868,7 @@ final class IPhoneWorkoutStore:
             norwegian: "no",
             configuration: configuration
         ) == "no"
-        let rules = configuration.customRules ?? []
+        let rules = configuration.activeCustomRules
         let context = ATHLTHCoachReadoutContext.make(
             plan: ATHLTHCoachReadoutContext.needsSegmentData(rules) ? workout.structuredRunningWorkout : nil,
             index: currentCoachRunningStepIndex,
