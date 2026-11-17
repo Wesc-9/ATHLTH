@@ -318,15 +318,11 @@ final class SocialStore: ObservableObject {
                     followingRows.map(\.followingID)
                 )
                 .subtracting(blockedIDs)
-            let refreshedFeed =
-                feed.filter { item in
-                    item.activity.actorID ==
-                        currentUserID ||
-                    refreshedFollowingIDs
-                        .contains(
-                            item.activity.actorID
-                        )
-                }
+            let mutualIDs = refreshedFollowingIDs.intersection(refreshedFollowerIDs)
+            let refreshedFeed = feed.filter { item in
+                item.activity.actorID == currentUserID ||
+                    mutualIDs.contains(item.activity.actorID)
+            }
 
             if visibleProfiles != visibleCards {
                 visibleProfiles = visibleCards
@@ -517,11 +513,15 @@ final class SocialStore: ObservableObject {
             async let followingTask = service.loadFollowing(
                 for: currentUserID
             )
+            async let followersTask = service.loadFollowers(
+                for: currentUserID
+            )
             async let privacyTask = service.loadPrivacySettings()
             async let feedTask = service.loadFeed(limit: 18)
             async let inboxTask = service.loadInboxEvents()
 
             let followingRows = try await followingTask
+            let followersRows = try await followersTask
             let loadedPrivacy = try await privacyTask
             let loadedFeed = try await feedTask
             let loadedInbox = try await inboxTask
@@ -532,20 +532,18 @@ final class SocialStore: ObservableObject {
                         \.followingID
                     )
                 )
-            let refreshedFeed =
-                loadedFeed.filter { item in
-                    item.activity.actorID ==
-                        currentUserID ||
-                    refreshedFollowingIDs
-                        .contains(
-                            item.activity.actorID
-                        )
-                }
+            let refreshedFollowerIDs = Set(followersRows.map(\.followerID))
+            let mutualIDs = refreshedFollowingIDs.intersection(refreshedFollowerIDs)
+            let refreshedFeed = loadedFeed.filter { item in
+                item.activity.actorID == currentUserID ||
+                    mutualIDs.contains(item.activity.actorID)
+            }
 
-            if followingIDs !=
-                refreshedFollowingIDs {
-                followingIDs =
-                    refreshedFollowingIDs
+            if followingIDs != refreshedFollowingIDs {
+                followingIDs = refreshedFollowingIDs
+            }
+            if followerIDs != refreshedFollowerIDs {
+                followerIDs = refreshedFollowerIDs
             }
             if privacy != loadedPrivacy {
                 privacy = loadedPrivacy
@@ -2138,7 +2136,7 @@ final class SocialStore: ObservableObject {
         friendIDs: Set<UUID>,
         creatorName: String,
         creatorUsername: String?,
-        includeHealthData: Bool = true,
+        includeHealthData: Bool = false,
         pulseSamples: [ATHLTHRunningHeartRatePoint] = [],
         maximumHeartRateBPM: Double? = nil
     ) async -> Bool {
@@ -2209,28 +2207,9 @@ final class SocialStore: ObservableObject {
             Self.enrichWorkoutActivityMetadata(
                 &metadata,
                 workout: workout,
-                includeHealthData: includeHealthData
+                includeHealthData: false
             )
-            metadata["share_health_data"] = String(includeHealthData)
-            if includeHealthData,
-               let curve = ATHLTHSharedPulseSeries.encode(
-                    pulseSamples, from: workout.startDate, through: workout.endDate
-               ) {
-                metadata["heart_rate_curve"] = curve
-                if let zones = ATHLTHSharedPulseSeries.encodeZoneSeconds(
-                    pulseSamples, maximumBPM: maximumHeartRateBPM
-                ) {
-                    metadata["heart_rate_zone_seconds"] = zones
-                }
-                let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
-                    pulseSamples, from: workout.startDate, through: workout.endDate
-                )
-                if !valid.isEmpty {
-                    metadata["average_heart_rate_bpm"] = String(
-                        valid.reduce(0.0) { $0 + $1.bpm } / Double(valid.count)
-                    )
-                }
-            }
+            metadata["share_health_data"] = "false"
 
             let cleanDescription = description
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2259,10 +2238,7 @@ final class SocialStore: ObservableObject {
                 workoutSessionID: resolvedSession?.id
             )
 
-            feed = try await service.loadFeed().filter { item in
-                item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
-            }
+            feed = scopedFeed(try await service.loadFeed())
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -2276,7 +2252,7 @@ final class SocialStore: ObservableObject {
         caption: String? = nil,
         routePreview: [RouteCoordinate] = [],
         hideRouteStartAndEnd: Bool = true,
-        includeHealthData: Bool = true,
+        includeHealthData: Bool = false,
         pulseSamples: [ATHLTHRunningHeartRatePoint] = [],
         maximumHeartRateBPM: Double? = nil
     ) async -> Bool {
@@ -2307,28 +2283,9 @@ final class SocialStore: ObservableObject {
             Self.enrichWorkoutActivityMetadata(
                 &metadata,
                 workout: workout,
-                includeHealthData: includeHealthData
+                includeHealthData: false
             )
-            metadata["share_health_data"] = String(includeHealthData)
-            if includeHealthData,
-               let curve = ATHLTHSharedPulseSeries.encode(
-                    pulseSamples, from: workout.startDate, through: workout.endDate
-               ) {
-                metadata["heart_rate_curve"] = curve
-                if let zones = ATHLTHSharedPulseSeries.encodeZoneSeconds(
-                    pulseSamples, maximumBPM: maximumHeartRateBPM
-                ) {
-                    metadata["heart_rate_zone_seconds"] = zones
-                }
-                let valid = ATHLTHRunningHeartRateAnalysis.validPoints(
-                    pulseSamples, from: workout.startDate, through: workout.endDate
-                )
-                if !valid.isEmpty {
-                    metadata["average_heart_rate_bpm"] = String(
-                        valid.reduce(0.0) { $0 + $1.bpm } / Double(valid.count)
-                    )
-                }
-            }
+            metadata["share_health_data"] = "false"
             metadata["hide_route_start_end"] = String(hideRouteStartAndEnd)
             if let preview = WorkoutRouteSharing.encode(routePreview) {
                 metadata["route_preview"] = preview
@@ -2357,10 +2314,7 @@ final class SocialStore: ObservableObject {
                 workoutSessionID: linkedSession?.id
             )
 
-            feed = try await service.loadFeed().filter { item in
-                item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
-            }
+            feed = scopedFeed(try await service.loadFeed())
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -2629,6 +2583,9 @@ final class SocialStore: ObservableObject {
     ) async {
         guard let endedAt = workout.endedAt,
               endedAt >= activationDate,
+              let userID = currentUserID,
+              FriendFeedSharingPreference.isEnabled(userID: userID),
+              privacy?.shareRecentActivity == true,
               let configuredVisibility = privacy.flatMap({
                   ProfileVisibility(rawValue: $0.recentActivityVisibility)
               }),
@@ -2746,7 +2703,7 @@ final class SocialStore: ObservableObject {
                 title: workout.title,
                 subtitle: volume,
                 metadata: metadata,
-                visibility: configuredVisibility
+                visibility: .friends
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -2758,6 +2715,9 @@ final class SocialStore: ObservableObject {
         visibility: ProfileVisibility = .friends
     ) async {
         guard result.endedAt >= activationDate,
+              let userID = currentUserID,
+              FriendFeedSharingPreference.isEnabled(userID: userID),
+              privacy?.shareRecentActivity == true,
               let configuredVisibility = privacy.flatMap({
                   ProfileVisibility(rawValue: $0.recentActivityVisibility)
               }),
@@ -2789,7 +2749,7 @@ final class SocialStore: ObservableObject {
                         max(result.duration, 0)
                     )
                 ],
-                visibility: configuredVisibility
+                visibility: .friends
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -3654,9 +3614,10 @@ final class SocialStore: ObservableObject {
     ) -> [SocialFeedItem] {
         guard let currentUserID else { return [] }
 
+        let mutualIDs = followingIDs.intersection(followerIDs)
         return loaded.filter { item in
             item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
+                mutualIDs.contains(item.activity.actorID)
         }
     }
 

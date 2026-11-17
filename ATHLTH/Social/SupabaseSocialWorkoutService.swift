@@ -460,6 +460,8 @@ extension SupabaseSocialService {
             throw SocialServiceError.notAuthenticated
         }
 
+        let safeMetadata = WorkoutFeedSafety.sanitizedMetadata(metadata)
+
         if try await isActivityPublished(eventKey: eventKey) {
             try await client
                 .from("social_activities")
@@ -467,7 +469,7 @@ extension SupabaseSocialService {
                     WorkoutActivityUpdate(
                         title: title,
                         subtitle: subtitle,
-                        metadata: metadata,
+                        metadata: safeMetadata,
                         visibility: visibility.rawValue,
                         workoutSessionID: workoutSessionID
                     )
@@ -484,7 +486,7 @@ extension SupabaseSocialService {
                         kind: "workout",
                         title: title,
                         subtitle: subtitle,
-                        metadata: metadata,
+                        metadata: safeMetadata,
                         visibility: visibility.rawValue,
                         eventKey: eventKey,
                         workoutSessionID: workoutSessionID

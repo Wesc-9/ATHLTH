@@ -9,7 +9,6 @@ struct ATHLTHEditProfileView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var settings: AppSettingsStore
-    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     // Allows the same header picker and upload/cropping flow to be
     // reused from the profile hero instead of creating a second editor.
@@ -33,10 +32,6 @@ struct ATHLTHEditProfileView: View {
     @State private var removingHeader = false
     @State private var editingPublicField: PublicProfileField?
     @State private var loadedProfile = false
-    @State private var showOnlineStatus = false
-    @State private var showTrainingStatus = false
-    @State private var presenceChoicesLoaded = false
-    @State private var presenceChoicesError: String?
 
     private enum PublicProfileField: String, Identifiable {
         case name, username, bio
@@ -85,7 +80,6 @@ struct ATHLTHEditProfileView: View {
                         trainingIdentityCard
                     }
 
-                    activityStatusCard
 
                     VStack(spacing: 12) {
                         ATHLTHSectionHeader(
@@ -259,7 +253,6 @@ struct ATHLTHEditProfileView: View {
         }
         .task {
             await gear.refresh()
-            await loadActivityStatus()
         }
         .onChange(of: selectedPhoto) { _, newItem in
             guard let newItem else { return }
@@ -864,103 +857,6 @@ struct ATHLTHEditProfileView: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
-    private var activityStatusCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ATHLTHSectionHeader(title: ATHLTHLocalization.choose(
-                english: "Activity status",
-                norwegian: "Aktivitetsstatus"
-            ))
-            .padding(.horizontal, 2)
-
-            ATHLTHCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    if presenceChoicesLoaded {
-                        Toggle(isOn: $showOnlineStatus) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Show when I'm online",
-                                    norwegian: "Vis når jeg er pålogget"
-                                ),
-                                systemImage: "circle.fill"
-                            )
-                        }
-
-                        profileDivider
-
-                        Toggle(isOn: $showTrainingStatus) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Show when I'm training",
-                                    norwegian: "Vis når jeg trener"
-                                ),
-                                systemImage: "figure.run"
-                            )
-                        }
-
-                        Text(ATHLTHLocalization.choose(
-                            english: "Only mutual follows can see these status indicators. Both can be changed at any time.",
-                            norwegian: "Kun personer dere følger gjensidig kan se disse statusene. Du kan endre valgene når som helst."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    } else {
-                        HStack(spacing: 10) {
-                            if presenceChoicesError == nil {
-                                ProgressView()
-                            }
-                            Text(presenceChoicesError ?? ATHLTHLocalization.choose(
-                                english: "Loading status sharing…",
-                                norwegian: "Henter statusdeling…"
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                    }
-                }
-                .tint(ATHLTHTheme.accentDeep)
-            }
-        }
-    }
-
-    @MainActor
-    private func loadActivityStatus() async {
-        do {
-            let privacy = try await SupabaseSocialService().loadPrivacySettings()
-            showOnlineStatus = privacy.showOnlineStatus
-            showTrainingStatus = privacy.shareTrainingPresence
-            presenceChoicesLoaded = true
-            presenceChoicesError = nil
-        } catch {
-            presenceChoicesError = ATHLTHLocalization.choose(
-                english: "Unable to load status sharing. You can still edit other profile details.",
-                norwegian: "Kunne ikke hente statusdeling. Du kan fortsatt redigere resten av profilen."
-            )
-        }
-    }
-
-    @MainActor
-    private func saveActivityStatus() async throws {
-        guard presenceChoicesLoaded else { return }
-        var privacy = try await SupabaseSocialService().loadPrivacySettings()
-        guard privacy.showOnlineStatus != showOnlineStatus ||
-                privacy.shareTrainingPresence != showTrainingStatus
-        else { return }
-
-        privacy.showOnlineStatus = showOnlineStatus
-        privacy.shareTrainingPresence = showTrainingStatus
-        privacy.trainingPresenceVisibility = showTrainingStatus ? "friends" : "private"
-        switch await social.updatePrivacy(privacy) {
-        case .success:
-            settings.shareTrainingPresence = showTrainingStatus
-            await realtime.configureOnlinePresence(
-                appIsActive: true,
-                enabled: showOnlineStatus
-            )
-        case .failure(let error):
-            throw error
-        }
-    }
-
     private var gearCard: some View {
         NavigationLink {
             ProfileGearManagerView()
@@ -1319,7 +1215,6 @@ struct ATHLTHEditProfileView: View {
             }
             session.setProfileTrainingFocuses(selectedTrainingFocuses)
 
-            try await saveActivityStatus()
             selectedAvatarData = nil
             hasEditedATHLTHProfile = true
             dismiss()
@@ -3004,11 +2899,16 @@ struct ATHLTHPrivacyCenterView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     @State private var draft: SocialPrivacySettings?
     @State private var saving = false
     @State private var saved = false
     @State private var saveError: String?
+    @State private var showingAutoShareConsent = false
+    @State private var showingProfileHighlightsConsent = false
+    @State private var enablingAutoShare = false
+    @State private var autoShareError: String?
 
     var body: some View {
         Form {
@@ -3044,13 +2944,24 @@ struct ATHLTHPrivacyCenterView: View {
                     .foregroundStyle(.secondary)
                 }
 
+                Section("Activity status") {
+                    Toggle("Show when I'm online", isOn: binding.showOnlineStatus)
+                    Toggle("Show when I'm training", isOn: binding.shareTrainingPresence)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only mutual friends can see your status. Live location and heart rate remain off.",
+                        norwegian: "Bare gjensidige venner ser statusen din. Posisjon og puls under økten deles ikke."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
                 Section {
                     Label(
                         ATHLTHLocalization.choose(
                             english:
-                                "Visible by default",
+                                "You control what you share",
                             norwegian:
-                                "Synlig som standard"
+                                "Du bestemmer hva du deler"
                         ),
                         systemImage:
                             "lock.fill"
@@ -3063,9 +2974,9 @@ struct ATHLTHPrivacyCenterView: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Profile sections are visible by default. Turn off anything you do not want to share.",
+                                "Choose which profile sections your friends may see. Nothing is unlocked without your choice.",
                             norwegian:
-                                "Profilseksjonene er synlige som standard. Skru av det du ikke ønsker å dele."
+                                "Velg hva vennene dine får se. Ingenting åpnes uten at du velger det."
                         )
                     )
                     .font(.caption)
@@ -3082,10 +2993,15 @@ struct ATHLTHPrivacyCenterView: View {
                 }
 
                 Section("What Others Can See") {
-                    Toggle(
-                        "Training now",
-                        isOn: binding.shareTrainingPresence
-                    )
+                    Button {
+                        showingProfileHighlightsConsent = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Share safe profile highlights with friends",
+                            norwegian: "Del trygge profilhøydepunkter med venner"
+                        ), systemImage: "person.2.badge.gearshape")
+                    }
+
                     Toggle(
                         "Performance stats",
                         isOn: binding.sharePerformanceStats
@@ -3093,10 +3009,6 @@ struct ATHLTHPrivacyCenterView: View {
                     Toggle(
                         "Trophy cabinet",
                         isOn: binding.shareTrophyCabinet
-                    )
-                    Toggle(
-                        "Recent activity",
-                        isOn: binding.shareRecentActivity
                     )
                     Toggle(
                         "Running PRs",
@@ -3118,7 +3030,10 @@ struct ATHLTHPrivacyCenterView: View {
                         isOn: binding.shareGear
                     )
                     Toggle(
-                        "Workout totals",
+                        ATHLTHLocalization.choose(
+                            english: "Workout totals",
+                            norwegian: "Treningssummer"
+                        ),
                         isOn: binding.shareWorkoutTotals
                     )
 
@@ -3171,26 +3086,57 @@ struct ATHLTHPrivacyCenterView: View {
                 }
             }
 
-            Section("Activities") {
-                Picker(
-                    "Default activity visibility",
-                    selection: $settings.defaultActivityVisibility
-                ) {
-                    ForEach(ProfileVisibility.allCases) { visibility in
-                        Text(visibility.title).tag(visibility)
-                    }
-                }
-
-                Text(
-                    "You can still change visibility during post-workout review before an activity is shared."
+            Section(ATHLTHLocalization.choose(
+                english: "Friends feed", norwegian: "Vennefeed"
+            )) {
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Automatically share completed workouts with friends",
+                        norwegian: "Del fullførte økter automatisk med venner"
+                    ),
+                    isOn: Binding(
+                        get: {
+                            guard let userID = social.currentUserID else { return false }
+                            return FriendFeedSharingPreference.isEnabled(userID: userID)
+                        },
+                        set: { wantsToShare in
+                            if wantsToShare {
+                                showingAutoShareConsent = true
+                            } else {
+                                if let userID = social.currentUserID {
+                                    FriendFeedSharingPreference.setEnabled(false, userID: userID)
+                                }
+                                settings.autoPublishCompletedWorkouts = false
+                                settings.workoutSharingChoiceCompleted = true
+                                if var updated = draft {
+                                    updated.shareRecentActivity = false
+                                    updated.recentActivityVisibility = "private"
+                                    draft = updated
+                                    schedulePrivacySave()
+                                }
+                            }
+                        }
+                    )
                 )
+                .disabled(enablingAutoShare || saving || draft == nil)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "After you agree, completed workout summaries appear in your friends' feed. Turning this off hides your existing shared workouts from friends; you can also make individual workouts private. HealthKit metrics are never posted.",
+                    norwegian: "Etter at du samtykker vises øktoppsummeringer i vennefeeden. Slår du av, skjules også tidligere delte økter for venner. Du kan skjule enkeltøkter. Apple Helse-målinger publiseres aldri."
+                ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                Label(
-                    "Leaderboards only use activity that is already visible to the viewer.",
-                    systemImage: "trophy.fill"
-                )
+                if let autoShareError {
+                    Text(autoShareError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Label(ATHLTHLocalization.choose(
+                    english: "Automatic workout sharing is friends-only. GPS routes are never added automatically.",
+                    norwegian: "Automatisk øktdeling er kun for venner. GPS-ruter legges aldri ved automatisk."
+                ), systemImage: "lock.shield")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -3235,9 +3181,51 @@ struct ATHLTHPrivacyCenterView: View {
             }
         }
         .navigationTitle(ATHLTHLocalization.choose(
-            english: "Profile visibility & sharing",
-            norwegian: "Profilsynlighet og deling"
+            english: "Sharing & privacy",
+            norwegian: "Deling og personvern"
         ))
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Share safe profile highlights?",
+                norwegian: "Dele profilhøydepunkter med venner?"
+            ),
+            isPresented: $showingProfileHighlightsConsent
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Enable for friends", norwegian: "Aktiver for venner"
+            )) { enableFriendsProfileHighlights() }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Your training milestones, gear, goals, workout summaries and online status become visible to friends. Previously shared workouts may become visible. Heart rate, sleep, recovery, live location and medical data remain private.",
+                norwegian: "Treningsmilepæler, utstyr, mål, øktoppsummeringer og påloggingsstatus blir synlig for venner. Tidligere delte økter kan bli synlige. Puls, søvn, restitusjon, liveposisjon og medisinske data forblir private."
+            ))
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Share future workouts with friends?",
+                norwegian: "Dele fremtidige treningsøkter med venner?"
+            ),
+            isPresented: $showingAutoShareConsent,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Enable friends feed",
+                norwegian: "Aktiver vennefeed"
+            )) {
+                Task { await enableAutomaticFriendSharing() }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Keep private", norwegian: "Behold privat"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Only new completed workout summaries will be posted automatically. No heart rate, calories, zones, HealthKit samples or GPS routes. You can hide posts individually.",
+                norwegian: "Bare nye øktoppsummeringer deles automatisk. Ingen puls, kalorier, pulssoner, Apple Helse-målinger eller GPS-ruter. Du kan skjule enkeltøkter."
+            ))
+        }
         .navigationBarTitleDisplayMode(.inline)
         .task {
             guard draft == nil else { return }
@@ -3258,10 +3246,78 @@ struct ATHLTHPrivacyCenterView: View {
             get: { draft! },
             set: { updated in
                 guard updated != draft else { return }
+                if !updated.shareRecentActivity || updated.profileVisibility == "private" {
+                    if let userID = social.currentUserID {
+                        FriendFeedSharingPreference.setEnabled(false, userID: userID)
+                    }
+                    settings.autoPublishCompletedWorkouts = false
+                }
                 draft = updated
                 schedulePrivacySave()
             }
         )
+    }
+
+    @MainActor
+    private func enableFriendsProfileHighlights() {
+        guard var updated = draft else { return }
+        updated.profileVisibility = "friends"
+        updated.showOnlineStatus = true
+        updated.shareTrainingPresence = true
+        updated.trainingPresenceVisibility = "friends"
+        updated.trainingFocusVisibility = "friends"
+        updated.sharePerformanceStats = true
+        updated.performanceStatsVisibility = "friends"
+        updated.shareTrophyCabinet = true
+        updated.trophyCabinetVisibility = "friends"
+        updated.shareGoals = true
+        updated.goalsVisibility = "friends"
+        updated.shareGear = true
+        updated.gearVisibility = "friends"
+        updated.shareRecentActivity = true
+        updated.recentActivityVisibility = "friends"
+        updated.shareRunningPRs = true
+        updated.runningPRsVisibility = "friends"
+        updated.shareStrengthPRs = true
+        updated.strengthPRsVisibility = "friends"
+        updated.shareWorkoutTotals = true
+        // Location and physiology are never enabled by a bulk social action.
+        updated.shareLiveWorkoutLocation = false
+        updated.shareLiveWorkoutHeartRate = false
+        draft = updated
+        schedulePrivacySave()
+    }
+
+    @MainActor
+    private func enableAutomaticFriendSharing() async {
+        guard !saving, !enablingAutoShare, var updated = draft,
+              let userID = social.currentUserID,
+              updated.userID == userID else { return }
+        enablingAutoShare = true
+        autoShareError = nil
+        defer { enablingAutoShare = false }
+
+        // This is an active opt-in, not a migration that makes old posts public.
+        if updated.profileVisibility == "private" {
+            updated.profileVisibility = "friends"
+        }
+        updated.shareRecentActivity = true
+        updated.recentActivityVisibility = "friends"
+
+        switch await social.updatePrivacy(updated) {
+        case .success:
+            draft = social.privacy ?? updated
+            settings.defaultActivityVisibility = .friends
+            settings.includeWorkoutHealthDataByDefault = false
+            settings.workoutSharingChoiceCompleted = true
+            FriendFeedSharingPreference.setEnabled(true, userID: userID)
+            settings.autoPublishCompletedWorkouts = true
+            saved = true
+        case .failure(let error):
+            FriendFeedSharingPreference.setEnabled(false, userID: userID)
+            settings.autoPublishCompletedWorkouts = false
+            autoShareError = error.localizedDescription
+        }
     }
 
     @MainActor
@@ -3289,6 +3345,10 @@ struct ATHLTHPrivacyCenterView: View {
                     settings.profileVisibility = visibility
                 }
                 settings.shareTrainingPresence = snapshot.shareTrainingPresence
+                await realtime.configureOnlinePresence(
+                    appIsActive: true,
+                    enabled: snapshot.showOnlineStatus
+                )
                 draft = social.privacy ?? snapshot
                 saved = true
                 return

@@ -2595,7 +2595,7 @@ struct AppRootView: View {
             }
         } message: {
             Text(
-                "Completed workouts are private by default. You can share this workout, automatically share future workouts, or keep them private. You can change this later in Settings."
+                "Workout summaries are private until you choose otherwise. Auto Share posts future summaries to friends without heart rate, zones, calories or GPS routes. You can turn it off in Settings or hide any individual workout."
             )
         }
         .sheet(isPresented: $showingNotificationPermissionPrimer) {
@@ -3662,19 +3662,19 @@ struct AppRootView: View {
         queuedWorkoutReviewIDs.insert(workout.id)
         lastQueuedWorkoutReview = workout
 
-        if !settings.workoutSharingChoiceCompleted &&
-            !settings.autoPublishCompletedWorkouts {
+        let autoShare = FriendFeedSharingPreference.isEnabled(
+            userID: appSession.profile.userID
+        )
+        if !settings.workoutSharingChoiceCompleted && !autoShare {
             pendingFirstWorkoutSharePrompt = workout
             return
         }
 
         pendingWorkoutReviewVisibilityOverride =
-            settings.autoPublishCompletedWorkouts
-                ? settings.defaultActivityVisibility
-                : nil
+            autoShare ? .friends : .privateOnly
 
-        // Always show the post-workout review before anything is shared.
-        // The auto-share preference only chooses the default visibility.
+        // Post-workout review stays available even when the social summary
+        // was posted with the account owner's explicit auto-share consent.
         presentPendingWorkoutReview(workout)
     }
 
@@ -3698,6 +3698,9 @@ struct AppRootView: View {
 
         settings.workoutSharingChoiceCompleted = true
         settings.autoPublishCompletedWorkouts = false
+        FriendFeedSharingPreference.setEnabled(
+            false, userID: appSession.profile.userID
+        )
         pendingFirstWorkoutSharePrompt = nil
         pendingWorkoutReviewVisibilityOverride = .privateOnly
         presentPendingWorkoutReview(workout)
@@ -3709,20 +3712,46 @@ struct AppRootView: View {
             return
         }
 
-        settings.workoutSharingChoiceCompleted = true
-        settings.autoPublishCompletedWorkouts = true
+        Task { @MainActor in
+            let userID = appSession.profile.userID
+            if social.privacy == nil {
+                await social.refresh()
+            }
 
-        if settings.defaultActivityVisibility == .privateOnly {
-            settings.defaultActivityVisibility = .friends
+            // A local toggle alone is not enough. Server-enforced profile
+            // sharing must match the user's explicit first-workout choice.
+            guard var privacy = social.privacy,
+                  privacy.userID == userID else {
+                settings.autoPublishCompletedWorkouts = false
+                settings.workoutSharingChoiceCompleted = true
+                pendingFirstWorkoutSharePrompt = nil
+                pendingWorkoutReviewVisibilityOverride = .friends
+                presentPendingWorkoutReview(workout)
+                return
+            }
+
+            if privacy.profileVisibility == "private" {
+                privacy.profileVisibility = "friends"
+            }
+            privacy.shareRecentActivity = true
+            privacy.recentActivityVisibility = "friends"
+
+            switch await social.updatePrivacy(privacy) {
+            case .success:
+                FriendFeedSharingPreference.setEnabled(true, userID: userID)
+                settings.autoPublishCompletedWorkouts = true
+                settings.defaultActivityVisibility = .friends
+            case .failure:
+                FriendFeedSharingPreference.setEnabled(false, userID: userID)
+                settings.autoPublishCompletedWorkouts = false
+            }
+
+            settings.includeWorkoutHealthDataByDefault = false
+            settings.workoutSharingChoiceCompleted = true
+            pendingFirstWorkoutSharePrompt = nil
+            pendingWorkoutReviewVisibilityOverride = .friends
+            presentPendingWorkoutReview(workout)
         }
-
-        let visibility = settings.defaultActivityVisibility
-        pendingFirstWorkoutSharePrompt = nil
-        pendingWorkoutReviewVisibilityOverride = visibility
-
-        // Keep review mandatory. Nothing is published until the user
-        // confirms the completed workout from the review screen.
-        presentPendingWorkoutReview(workout)
     }
 
     /// A terminated app must not lose the user's post-workout decision.

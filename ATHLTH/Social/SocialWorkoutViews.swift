@@ -5052,8 +5052,6 @@ struct WorkoutPublishView: View {
     @State private var selectedAlreadyPublished = false
     @State private var showingActivityPrivacyConsent = false
     @State private var activityPrivacyError: String?
-    @State private var includeHealthData = true
-    @State private var selectedPulseSamples: [ATHLTHRunningHeartRatePoint] = []
     @State private var includeRoute = false
     @State private var hideRouteStartAndEnd = true
     @State private var sharingRoute: [CLLocation] = []
@@ -5210,19 +5208,12 @@ struct WorkoutPublishView: View {
                     }
 
                     Section(ATHLTHLocalization.choose(
-                        english: "Health data", norwegian: "Helsedata"
+                        english: "Privacy", norwegian: "Personvern"
                     )) {
-                        Toggle(
-                            ATHLTHLocalization.choose(
-                                english: "Share heart rate, zones and calories",
-                                norwegian: "Del puls, pulssoner og kalorier"
-                            ),
-                            isOn: $includeHealthData
-                        )
-                        Text(ATHLTHLocalization.choose(
-                            english: "You can override your default for every workout.",
-                            norwegian: "Du kan overstyre standardvalget for hver økt."
-                        ))
+                        Label(ATHLTHLocalization.choose(
+                            english: "HealthKit data, heart rate, zones and calories always stay private in the friends feed.",
+                            norwegian: "Apple Helse-data, puls, pulssoner og kalorier er alltid private i vennefeeden."
+                        ), systemImage: "lock.shield")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     }
@@ -5324,8 +5315,7 @@ struct WorkoutPublishView: View {
                 }
             }
             .task {
-                visibility = initialVisibility ?? settings.defaultActivityVisibility
-                includeHealthData = settings.includeWorkoutHealthDataByDefault
+                visibility = initialVisibility ?? (settings.workoutSharingChoiceCompleted ? .friends : .privateOnly)
 
                 if health.hasRequestedAuthorization && health.workouts.isEmpty {
                     await health.refreshAll()
@@ -5339,8 +5329,6 @@ struct WorkoutPublishView: View {
             }
             .task(id: selectedWorkoutID) {
                 includeRoute = false
-                includeHealthData = settings.includeWorkoutHealthDataByDefault
-                selectedPulseSamples = []
                 sharingRoute = []
                 loadingRoute = false
                 // Publishing from a completed-result card starts with safe
@@ -5351,7 +5339,7 @@ struct WorkoutPublishView: View {
                 guard let selectedWorkoutID else {
                     selectedAlreadyPublished = false
                     caption = ""
-                    visibility = initialVisibility ?? settings.defaultActivityVisibility
+                    visibility = initialVisibility ?? (settings.workoutSharingChoiceCompleted ? .friends : .privateOnly)
                     return
                 }
 
@@ -5359,7 +5347,6 @@ struct WorkoutPublishView: View {
                     for: selectedWorkoutID
                 ) {
                     selectedAlreadyPublished = true
-                    includeHealthData = activity.metadata?["share_health_data"] == "true"
                     caption = activity.metadata?["caption"] ?? ""
                     visibility =
                         ProfileVisibility(
@@ -5369,15 +5356,10 @@ struct WorkoutPublishView: View {
                 } else {
                     selectedAlreadyPublished = false
                     caption = ""
-                    visibility = initialVisibility ?? settings.defaultActivityVisibility
+                    visibility = initialVisibility ?? (settings.workoutSharingChoiceCompleted ? .friends : .privateOnly)
                 }
                 guard !Task.isCancelled, self.selectedWorkoutID == selectedWorkoutID,
                       let workout = selectedWorkout else { return }
-                if workout.activity == .running || workout.activity == .walking {
-                    let pulse = await health.runningHeartRateTimeline(for: workout.id)
-                    guard !Task.isCancelled, self.selectedWorkoutID == selectedWorkoutID else { return }
-                    selectedPulseSamples = pulse
-                }
                 guard workout.isIndoor != true else { return }
                 loadingRoute = true
                 let detail = await health.workoutDetail(for: workout.id)
@@ -5430,9 +5412,7 @@ struct WorkoutPublishView: View {
             caption: caption,
             routePreview: includeRoute ? WorkoutRouteSharing.preview(sharingRoute, hideStartAndEnd: hideRouteStartAndEnd) : [],
             hideRouteStartAndEnd: hideRouteStartAndEnd,
-            includeHealthData: includeHealthData,
-            pulseSamples: selectedPulseSamples,
-            maximumHeartRateBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+            includeHealthData: false
         )
 
         if success {

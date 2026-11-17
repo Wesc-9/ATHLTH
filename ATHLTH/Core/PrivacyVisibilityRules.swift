@@ -5,7 +5,7 @@ enum PrivacyVisibilityRules {
         guard enabled, profile != "private" else { return "private" }
         if profile == "friends" { return "friends" }
         guard profile == "public" else { return "private" }
-        return current == "friends" ? "friends" : "public"
+        return current == "public" ? "public" : "friends"
     }
 }
 
@@ -34,5 +34,31 @@ enum AccountLocalStorage {
 enum CoachHistoryPermission {
     static func isEnabled(userID: UUID, defaults: UserDefaults = .standard) -> Bool {
         AccountLocalStorage.read(Bool.self, name: "coachHistoryConsent", userID: userID, defaults: defaults) == true
+    }
+}
+
+
+// Feed publication is a separate, account-scoped choice. Sharing cannot be
+// enabled by carrying settings over from another athlete on the same device.
+enum FriendFeedSharingPreference {
+    private static let storageName = "friendsFeedAutomaticSharing.v223"
+
+    static func isEnabled(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        AccountLocalStorage.read(
+            Bool.self, name: storageName, userID: userID, defaults: defaults
+        ) == true
+    }
+
+    static func setEnabled(
+        _ enabled: Bool,
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        AccountLocalStorage.write(
+            enabled, name: storageName, userID: userID, defaults: defaults
+        )
     }
 }

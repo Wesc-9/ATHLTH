@@ -1011,10 +1011,9 @@ struct PostWorkoutReviewView: View {
         self.initialVisibilityOverride = initialVisibilityOverride
     }
 
-    @State private var visibility: ProfileVisibility = .publicProfile
+    @State private var visibility: ProfileVisibility = .privateOnly
     @State private var descriptionText = ""
     @State private var effort = 5.0
-    @State private var includeHealthData = true
     @State private var showingFeedPrivacyConfirmation = false
     @State private var feedPrivacyError: String?
     @State private var selectedFriendIDs: Set<UUID> = []
@@ -1069,21 +1068,31 @@ struct PostWorkoutReviewView: View {
                     }
 
                     ATHLTHUnifiedCard {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Toggle(isOn: $includeHealthData) {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Include health data when sharing",
-                                        norwegian: "Vis helsedata ved deling"
-                                    ),
-                                    systemImage: "heart.text.square"
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle(
+                                ATHLTHLocalization.choose(
+                                    english: "Share this workout with friends",
+                                    norwegian: "Del denne økten med venner"
+                                ),
+                                isOn: Binding(
+                                    get: { visibility != .privateOnly },
+                                    set: { enabled in
+                                        visibility = enabled ? .friends : .privateOnly
+                                        if enabled && (
+                                            social.privacy?.shareRecentActivity != true ||
+                                            social.privacy?.recentActivityVisibility == "private"
+                                        ) {
+                                            showingFeedPrivacyConfirmation = true
+                                        }
+                                    }
                                 )
-                                .font(.subheadline.weight(.semibold))
-                            }
+                            )
+                            .font(.subheadline.weight(.semibold))
                             .tint(ATHLTHPlanDesign.accentInk)
+
                             Text(ATHLTHLocalization.choose(
-                                english: "Heart rate, zones and calories can be hidden for this workout. Your private recording is unchanged.",
-                                norwegian: "Puls, pulssoner og kalorier kan skjules for denne økten. Den private treningsloggen endres ikke."
+                                english: "Only a basic workout summary is shared. Heart rate, zones, calories and raw HealthKit data stay private.",
+                                norwegian: "Bare en enkel øktoppsummering deles. Puls, pulssoner, kalorier og rå Apple Helse-data forblir private."
                             ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -1327,6 +1336,7 @@ struct PostWorkoutReviewView: View {
                     distanceSplitLoad,
                     mediaLoad
                 )
+                await automaticallyShareNewWorkoutIfConsented()
             }
             // PR comparisons traverse earlier strength history. Cache once
             // per completed workout; a change to RPE, visibility or another
@@ -4168,8 +4178,8 @@ struct PostWorkoutReviewView: View {
                     .autoPublishCompletedWorkouts {
                     Label(
                         alreadyPublished
-                            ? "Already shared. Saving updates the existing activity."
-                            : "Nothing is posted until you save this review.",
+                            ? "Shared with friends. Set Private and save to hide it."
+                            : "Automatic sharing requires a finished workout and your consent.",
                         systemImage: "bolt.fill"
                     )
                     .font(
@@ -4477,10 +4487,11 @@ struct PostWorkoutReviewView: View {
     }
 
     private func loadExistingReview() async {
-        visibility =
-            initialVisibilityOverride ??
-            settings.defaultActivityVisibility
-        includeHealthData = settings.includeWorkoutHealthDataByDefault
+        visibility = initialVisibilityOverride ?? (
+            settings.workoutSharingChoiceCompleted
+                ? (settings.defaultActivityVisibility == .privateOnly ? .privateOnly : .friends)
+                : .privateOnly
+        )
         selectedFriendIDs =
             social.workoutAssociatedFriendIDs(
                 for: workout.id
@@ -4502,10 +4513,6 @@ struct PostWorkoutReviewView: View {
                 visibility = existingVisibility
             }
 
-            if let recordedConsent = activity.metadata?["share_health_data"] {
-                includeHealthData = recordedConsent == "true"
-            }
-
             if let caption = activity.metadata?["caption"] {
                 descriptionText = caption
             }
@@ -4514,6 +4521,34 @@ struct PostWorkoutReviewView: View {
                let existingEffort = Double(rawEffort) {
                 effort = min(max(existingEffort, 1), 10)
             }
+        }
+    }
+
+    @MainActor
+    private func automaticallyShareNewWorkoutIfConsented() async {
+        guard requiresDecision,
+              !alreadyPublished,
+              visibility != .privateOnly,
+              FriendFeedSharingPreference.isEnabled(userID: session.profile.userID),
+              social.privacy?.userID == session.profile.userID,
+              social.privacy?.shareRecentActivity == true,
+              social.privacy?.recentActivityVisibility == "friends"
+        else { return }
+
+        // Safe across re-opening a completion screen and across devices.
+        if await social.isWorkoutPublished(workout.id) {
+            alreadyPublished = true
+            return
+        }
+
+        let posted = await social.publishWorkout(
+            workout,
+            visibility: .friends,
+            includeHealthData: false
+        )
+        if posted {
+            alreadyPublished = true
+            visibility = .friends
         }
     }
 
@@ -4542,7 +4577,7 @@ struct PostWorkoutReviewView: View {
             friendIDs: selectedFriendIDs,
             creatorName: session.profile.displayName,
             creatorUsername: session.profile.username,
-            includeHealthData: includeHealthData,
+            includeHealthData: false,
             pulseSamples: completionMeasuredPulse,
             maximumHeartRateBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
         )

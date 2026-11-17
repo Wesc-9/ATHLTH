@@ -492,7 +492,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
     @Published var externalWorkoutImportMode: ExternalWorkoutImportMode { didSet { persist() } }
     @Published var autoPublishCompletedWorkouts: Bool { didSet { persist() } }
-    /// Default for the explicit per-workout health-data sharing switch.
+    /// Retained for storage compatibility. Public activity never contains HealthKit measurements.
     @Published var includeWorkoutHealthDataByDefault: Bool { didSet { persist() } }
     @Published var workoutSharingChoiceCompleted: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
@@ -849,8 +849,17 @@ final class AppSettingsStore: ObservableObject {
         externalWorkoutImportMode = ExternalWorkoutImportMode(
             rawValue: defaults.string(forKey: "settings.externalWorkoutImportMode") ?? ""
         ) ?? .ask
-        autoPublishCompletedWorkouts = defaults.object(forKey: "settings.autoPublishCompletedWorkouts") as? Bool ?? false
-        includeWorkoutHealthDataByDefault = defaults.object(forKey: "settings.includeWorkoutHealthDataByDefault") as? Bool ?? true
+        // The previous switch described per-post confirmation rather than automatic
+        // publication. Require a fresh opt-in before enabling hands-free feed posts.
+        let friendFeedConsentMigrationKey = "settings.friendFeedConsent.v223"
+        autoPublishCompletedWorkouts =
+            defaults.bool(forKey: friendFeedConsentMigrationKey) &&
+            (defaults.object(forKey: "settings.autoPublishCompletedWorkouts") as? Bool ?? false)
+        defaults.set(true, forKey: friendFeedConsentMigrationKey)
+        // Never reuse earlier permissions to attach Apple Health measurements.
+        // Sharing a workout and accessing HealthKit are independent consents.
+        includeWorkoutHealthDataByDefault = false
+        defaults.set(false, forKey: "settings.includeWorkoutHealthDataByDefault")
         workoutSharingChoiceCompleted = defaults.object(
             forKey: "settings.workoutSharingChoiceCompleted"
         ) as? Bool ?? false
