@@ -821,7 +821,17 @@ struct ATHLTHTrainTodayPremiumView: View {
     private func dailyRecommendationCard(
         _ advice: HomeDailyRecommendationPolicy.Advice
     ) -> some View {
-        let hasWorkout = HomeDailyRecommendationSessionFactory.make(advice: advice) != nil
+        // A cheap eligibility check: never construct a temporary workout
+        // (with a fresh UUID and step graph) during SwiftUI body evaluation.
+        let hasWorkout: Bool
+        switch advice.suggestedWorkout {
+        case .restDay, .planned:
+            hasWorkout = false
+        case .historicalStrength:
+            hasWorkout = advice.strengthSession != nil
+        default:
+            hasWorkout = true
+        }
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 7) {
@@ -833,6 +843,10 @@ struct ATHLTHTrainTodayPremiumView: View {
                         .font(.system(size: 25, weight: .regular, design: .serif))
                         .foregroundStyle(ink)
                         .fixedSize(horizontal: false, vertical: true)
+                    Label(tr("TODAY'S RECOMMENDATION", "DAGENS ANBEFALING"),
+                          systemImage: "sparkles")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(champagne)
                 }
                 Spacer(minLength: 4)
                 Button(action: onShowDailyRecommendationDetails) {
