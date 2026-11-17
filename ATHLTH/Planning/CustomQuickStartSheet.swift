@@ -208,12 +208,16 @@ struct CustomQuickWorkoutConfiguration: Hashable {
     var workSeconds: Int
     var restSeconds: Int
     var rounds: Int
+    /// Optional presentation label for universal free sessions. The real
+    /// recording category and its Watch activity stay unchanged.
+    var titleOverride: String? = nil
     var audioCoach: WatchAudioCoachConfiguration = .disabled
     var selectedFriendIDs: Set<UUID> = []
     var socialMode: SocialWorkoutParticipationMode = .physical
 
     var title: String {
-        method == .open
+        if let titleOverride, !titleOverride.isEmpty { return titleOverride }
+        return method == .open
             ? activity.localizedTitle
             : "\(activity.localizedTitle) · \(method.localizedTitle)"
     }
@@ -275,6 +279,9 @@ struct CustomQuickStartSheet: View {
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let onStart: (CustomQuickWorkoutConfiguration, CustomQuickStartDestination) -> Void
+    /// Only the Free Training shortcut uses the compact, zero-planning view.
+    /// Custom / Egendefinert keeps the complete activity and method editor.
+    let simpleFreeTraining: Bool
 
     @State private var shareThisWorkoutOnIPad = false
     @State private var activity: CustomQuickWorkoutActivity = .hiit
@@ -293,13 +300,15 @@ struct CustomQuickStartSheet: View {
         trainingDeviceProvider: TrainingDeviceProvider,
         watchConnected: Bool,
         initialActivity: CustomQuickWorkoutActivity = .hiit,
+        simpleFreeTraining: Bool = false,
         onStart: @escaping (CustomQuickWorkoutConfiguration,
                             CustomQuickStartDestination) -> Void
     ) {
         self.trainingDeviceProvider = trainingDeviceProvider
         self.watchConnected = watchConnected
         self.onStart = onStart
-        _activity = State(initialValue: initialActivity)
+        self.simpleFreeTraining = simpleFreeTraining
+        _activity = State(initialValue: simpleFreeTraining ? .other : initialActivity)
     }
 
     private let ink = ATHLTHTheme.primaryText
@@ -324,6 +333,9 @@ struct CustomQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 19) {
+                    if simpleFreeTraining {
+                        freeTrainingIntro
+                    } else {
                     ATHLTHWorkoutDetailsCard(
                         activityTitle: activity.localizedTitle,
                         symbol: activity.systemImage
@@ -412,12 +424,15 @@ struct CustomQuickStartSheet: View {
                     if !recordedWorkouts.isEmpty {
                         recentRecordings
                     }
+                    }
                 }
                 .padding(20)
                 .padding(.bottom, 110)
             }
             .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
-            .navigationTitle(tr("Custom workout", "Egendefinert økt"))
+            .navigationTitle(simpleFreeTraining
+                ? tr("Free training", "Fri trening")
+                : tr("Custom workout", "Egendefinert økt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -426,7 +441,9 @@ struct CustomQuickStartSheet: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 5) {
-                    ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
+                    if !simpleFreeTraining {
+                        ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
+                    }
                     ATHLTHQuickStartDeviceLaunchBar(
                         watchAvailable: canUseWatch,
                         onIPhone: {
@@ -453,6 +470,7 @@ struct CustomQuickStartSheet: View {
                             : nil
                     )
 
+                    if !simpleFreeTraining {
                     Button {
                         onStart(previewConfiguration, .retrospective)
                         dismiss()
@@ -479,6 +497,7 @@ struct CustomQuickStartSheet: View {
                         .foregroundStyle(muted)
                         .padding(.horizontal, 20)
                     }
+                    }
                 }
                 .background(.regularMaterial)
             }
@@ -491,20 +510,49 @@ struct CustomQuickStartSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .task {
-            if let invited = social.takePreparedQuickTrainFriends() {
-                selectedFriendIDs = invited
+            if !simpleFreeTraining {
+                if let invited = social.takePreparedQuickTrainFriends() {
+                    selectedFriendIDs = invited
+                }
+                if !audioCoachLoaded {
+                    audioCoachDraft.load(from: settings)
+                    audioCoachLoaded = true
+                }
+                if social.trainingPartners.isEmpty {
+                    await social.refresh()
+                }
             }
-            if !audioCoachLoaded {
-                audioCoachDraft.load(from: settings)
-                audioCoachLoaded = true
-            }
-            // Probe availability whenever the chooser is opened. Paired
-            // does not mean the athlete brought their Watch to the gym.
+            // Paired does not mean the athlete brought the Watch.
             watchConnection.connect()
-            if social.trainingPartners.isEmpty {
-                await social.refresh()
-            }
         }
+    }
+
+    private var freeTrainingIntro: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ATHLTHWorkoutDetailsCard(
+                activityTitle: tr("Free training", "Fri trening"),
+                symbol: "figure.mixed.cardio"
+            ) {
+                Text(tr(
+                    "No plan. No targets. Just go train.",
+                    "Ingen plan eller mål. Bare dra og tren."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(muted)
+            }
+
+            Label(
+                tr("Start on your iPhone or Apple Watch. Stop when you're done.",
+                   "Start på iPhone eller Apple Watch. Avslutt når du er ferdig."),
+                systemImage: "play.circle"
+            )
+            .font(.subheadline)
+            .foregroundStyle(ink)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        }
+        .accessibilityIdentifier("athlth-free-training-quick-start")
     }
 
     private var availableMethods: [CustomQuickWorkoutMethod] {
@@ -629,7 +677,10 @@ struct CustomQuickStartSheet: View {
             workSeconds: workSeconds,
             restSeconds: restSeconds,
             rounds: rounds,
-            audioCoach: audioCoachDraft.configuration(),
+            titleOverride: simpleFreeTraining
+                ? tr("Free training", "Fri trening") : nil,
+            audioCoach: simpleFreeTraining
+                ? .disabled : audioCoachDraft.configuration(),
             selectedFriendIDs: selectedFriendIDs,
             socialMode: socialMode
         )
