@@ -156,8 +156,31 @@ enum ATHLTHWorkoutPhaseDeletionPolicy {
         for block: WorkoutTemplateBlock,
         visiblePhases: Set<WorkoutPhaseKind>
     ) -> WorkoutPhaseKind {
-        block.resolvedPhase == .recovery && !visiblePhases.contains(.recovery)
+        // Active recovery is an actual training block with its own phase.
+        // Unlike an ordinary rest step it must never be silently presented
+        // as Hoveddel, otherwise "Aktiv pause" turns into "Pause" when the
+        // guided day is reopened in the full workout editor.
+        if block.isActiveRecovery { return .recovery }
+        return block.resolvedPhase == .recovery && !visiblePhases.contains(.recovery)
             ? .main : block.resolvedPhase
+    }
+
+    /// Present workout sections in their first occurrence order, not in a
+    /// hard-coded Warmup/Main/Recovery order. The stored block timeline is
+    /// never reordered (important when a day starts with active recovery).
+    static func orderedVisiblePhases(
+        for blocks: [WorkoutTemplateBlock],
+        visiblePhases: Set<WorkoutPhaseKind>
+    ) -> [WorkoutPhaseKind] {
+        var ordered: [WorkoutPhaseKind] = []
+        for block in blocks {
+            let phase = presentedPhase(for: block, visiblePhases: visiblePhases)
+            if !ordered.contains(phase) { ordered.append(phase) }
+        }
+        for phase in WorkoutPhaseKind.allCases where visiblePhases.contains(phase) {
+            if !ordered.contains(phase) { ordered.append(phase) }
+        }
+        return ordered
     }
 
     static func removing(
