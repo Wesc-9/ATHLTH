@@ -82,3 +82,17 @@ enum ATHLTHPlanJourney {
     }
 }
 
+
+/// An iOS background/foreground transition is not a navigation event.
+/// If the SwiftUI hierarchy is still mounted, the exact current card,
+/// sheet, scroll position and nested picker must remain untouched.
+/// Only a cold scene mount or an actually dismissed sheet may be recovered.
+enum ATHLTHPlanEditorContinuityPolicy {
+    static func shouldRestore(
+        coldMount: Bool,
+        unexpectedlyDismissed: Bool,
+        editorIsPresented: Bool
+    ) -> Bool {
+        !editorIsPresented && (coldMount || unexpectedlyDismissed)
+    }
+}
