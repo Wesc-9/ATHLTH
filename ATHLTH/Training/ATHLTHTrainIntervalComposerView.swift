@@ -17,6 +17,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var targetEffort: RunningIntensityKind = .easy
     @State private var showingExercisePicker = false
     @State private var saveAsReusableTemplate = false
+    @State private var copySaveError: String?
     @State private var showingReplaceStructureConfirmation = false
     @State private var measure: RunningMeasureKind = .distance
     @State private var workSeconds = 300
@@ -164,6 +165,17 @@ struct ATHLTHTrainIntervalComposerView: View {
             }
             .background(paper.ignoresSafeArea())
             .navigationTitle(tr("Advanced session builder", "Avansert øktbygger"))
+            .alert(
+                tr("Copy not saved", "Kopien ble ikke lagret"),
+                isPresented: Binding(
+                    get: { copySaveError != nil },
+                    set: { if !$0 { copySaveError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(copySaveError ?? "")
+            }
             .navigationBarTitleDisplayMode(.inline)
             .confirmationDialog(
                 tr("Replace current workout structure?", "Erstatte gjeldende øktoppsett?"),
@@ -1028,8 +1040,25 @@ struct ATHLTHTrainIntervalComposerView: View {
         result.intervalGhostRecoverySlowdownPercent = ghostRecoverySlowdownPercent
         result.coachBrief = coachBrief.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? nil : String(coachBrief.prefix(300))
-        if saveAsReusableTemplate {
-            runningLibrary.save(result)
+        // A copy's source identity must be present *before* any save path,
+        // including the optional reusable-template toggle.
+        result.sharedSourceWorkoutID = initial?.sharedSourceWorkoutID ??
+            (initial?.isBuiltIn == true ? initial?.id : nil)
+        if saveAsReusableTemplate && !runningLibrary.save(result) {
+            let source = initial?.isBuiltIn == true
+                ? initial
+                : RunningWorkoutLibraryStore.builtInTemplates.first {
+                    $0.id == result.sharedSourceWorkoutID
+                }
+            copySaveError = source.flatMap {
+                ATHLTHRunningWorkoutCopyPolicy.saveError(
+                    result, comparedTo: $0
+                )
+            } ?? tr(
+                "Could not save this copy.",
+                "Kunne ikke lagre denne kopien."
+            )
+            return
         }
         onSave(result)
         dismiss()
