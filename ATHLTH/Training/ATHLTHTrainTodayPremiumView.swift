@@ -1,5 +1,22 @@
 import SwiftUI
 
+/// A personal recommendation replaces the history shortcut only when
+/// the calendar is genuinely open. Even a scheduled rest day is deliberate
+/// and must not be replaced by a suggested workout.
+enum ATHLTHTrainTodayDailyAdvicePolicy {
+    static func isVisible(
+        scheduledItemCount: Int,
+        hasRecordedWorkoutToday: Bool,
+        hasActiveWorkout: Bool,
+        hasPersonalizedAdvice: Bool
+    ) -> Bool {
+        scheduledItemCount == 0 &&
+        !hasRecordedWorkoutToday &&
+        !hasActiveWorkout &&
+        hasPersonalizedAdvice
+    }
+}
+
 /// The light "I dag" surface is deliberately separate from workout recording.
 /// Plans feed this view, while launching still goes through ATHLTHTrainView.
 struct ATHLTHTrainTodayPremiumView: View {
