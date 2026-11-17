@@ -80,13 +80,16 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         ATHLTHPlannedWorkoutMetrics.commonPaceSecondsPerKilometer(for: blocks)
     }
 
+    /// Never display an inferred average as the athlete's target tempo.
+    /// Estimation may use duration, distance and intensity in the background,
+    /// but this metric reflects only an explicitly configured pace.
     private var paceText: String {
-        let pace = commonPace ?? previewDistance?.averagePaceSecondsPerKilometer
-        guard let pace, pace.isFinite, pace > 0 else { return "–" }
+        guard let pace = commonPace, pace.isFinite, pace > 0 else {
+            return "–"
+        }
         let rounded = Int(pace.rounded())
         let seconds = rounded % 60
-        let value = "\(rounded / 60):" + (seconds < 10 ? "0" : "") + "\(seconds)"
-        return commonPace == nil ? "~ " + value : value
+        return "\(rounded / 60):" + (seconds < 10 ? "0" : "") + "\(seconds)"
     }
 
     private var treadmillSpeedText: String? {
@@ -216,8 +219,8 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                         ), inclineText)
                     } else if runningLocation != nil {
                         metric("speedometer", ATHLTHLocalization.choose(
-                            english: commonPace == nil ? "Avg. pace (min/km)" : "Pace (min/km)",
-                            norwegian: commonPace == nil ? "Snittempo (min/km)" : "Tempo (min/km)"
+                            english: "Pace (min/km)",
+                            norwegian: "Tempo (min/km)"
                         ), paceText)
                     } else {
                         metric("mountain.2", ATHLTHLocalization.choose(
@@ -228,8 +231,8 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
 
                 if previewDistance?.usesAssumedPace == true {
                     Text(ATHLTHLocalization.choose(
-                        english: "Distance and average pace are estimates until a target pace is chosen.",
-                        norwegian: "Distanse og snittempo er estimater til du velger måltempo."
+                        english: "Distance is estimated from the available duration and intensity. Pace is shown only when you set a target.",
+                        norwegian: "Distanse estimeres fra tilgjengelig tid og intensitet. Tempo vises først når du setter et måltempo."
                     ))
                     .font(.system(size: 10))
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
