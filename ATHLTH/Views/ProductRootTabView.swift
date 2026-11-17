@@ -1107,7 +1107,6 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
-    @EnvironmentObject private var pets: ATHLTHPetStore
 
     @State private var homeStreakDays: [Date]?
     @State private var lastHomeInitialLoadAt: Date?
