@@ -178,6 +178,31 @@ final class ATHLTHCoachStrengthComparableHistoryTests: XCTestCase {
         )
     }
 
+    func testExplicitLoadBasisMustMatchAcrossSessions() {
+        var total = exercise().exercise
+        total.libraryExerciseID = UUID()
+        total.coachLoadBasis = .totalKilograms
+        var perHand = total
+        perHand.coachLoadBasis = .kilogramsPerHand
+
+        XCTAssertFalse(ATHLTHCoachStrengthComparableHistory.isSameExercise(
+            total, perHand
+        ))
+        XCTAssertNotEqual(
+            ATHLTHCoachStrengthComparableHistory.identityKey(for: total),
+            ATHLTHCoachStrengthComparableHistory.identityKey(for: perHand)
+        )
+
+        perHand.coachLoadBasis = nil
+        XCTAssertFalse(ATHLTHCoachStrengthComparableHistory.isSameExercise(
+            total, perHand
+        ))
+        perHand.coachLoadBasis = .totalKilograms
+        XCTAssertTrue(ATHLTHCoachStrengthComparableHistory.isSameExercise(
+            total, perHand
+        ))
+    }
+
     func testMissingEquipmentCannotJustifyWeightIncrease() {
         let first = exercise(equipment: []).exercise
         let second = exercise(equipment: []).exercise
