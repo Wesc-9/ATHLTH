@@ -11213,7 +11213,6 @@ struct ATHLTHSwipeBackEnabler: UIViewControllerRepresentable {
 }
 
 struct ATHLTHProfileView: View {
-    var showsSideMenuCloseButton: Bool = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var profileRecords: ATHLTHProfileRecordSyncStore
@@ -11285,7 +11284,8 @@ struct ATHLTHProfileView: View {
             softTransition: true,
             pullDownFadeBridge: true,
             warmHomePalette: true,
-            sheetOverlapOverride: 8
+            sheetOverlapOverride: 8,
+            fadeBridgeIntensity: 0.58
         ) {
             profileHero
         } content: {
@@ -11795,50 +11795,6 @@ struct ATHLTHProfileView: View {
                 )
             }
         }
-        .overlay(
-            alignment: .topTrailing
-        ) {
-            HStack(spacing: 10) {
-                NavigationLink {
-                    ATHLTHSettingsView()
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(
-                            .system(
-                                size: 17,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-                        .background(
-                            Color.black.opacity(0.30),
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white.opacity(0.30),
-                                    lineWidth: 0.8
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Settings",
-                        norwegian: "Innstillinger"
-                    )
-                )
-            }
-            // Follow the lowered profile identity while keeping the hero
-            // height and statistics card positions unchanged.
-            .padding(.top, 84)
-            .padding(.trailing, showsSideMenuCloseButton ? 72 : 18)
-        }
         .frame(height: 236)
         .clipped()
     }
@@ -11948,14 +11904,14 @@ struct ATHLTHProfileView: View {
             } label: {
                 heroStat(
                     value:
-                        lifetimeDistanceText,
+                        lifetimeTrainingTimeText,
                     title:
                         ATHLTHLocalization.choose(
-                            english: "Total km",
-                            norwegian: "Km totalt"
+                            english: "Total training time",
+                            norwegian: "Total treningstid"
                         ),
                     icon:
-                        "chart.bar.fill"
+                        "clock.fill"
                 )
             }
             .buttonStyle(.plain)
@@ -12903,30 +12859,23 @@ struct ATHLTHProfileView: View {
             health.workouts.count
     }
 
-    private var lifetimeDistanceText:
-        String {
-        guard let meters =
-                performanceStats?
-                    .totalRunningDistanceMeters,
-              meters > 0
-        else {
-            return "0"
+    /// Use the existing deduplicated Apple Health performance aggregate.
+    /// This measures all supported workout types, not just running distance.
+    private var lifetimeTrainingTimeText: String {
+        guard let seconds = performanceStats?.totalTrainingDuration,
+              seconds.isFinite, seconds >= 0 else { return "—" }
+
+        let hours = seconds / 3_600
+        if hours >= 1_000 {
+            return String(format: "%.1fk t", hours / 1_000)
         }
-
-        let kilometers =
-            meters / 1_000
-
-        if kilometers >= 1_000 {
-            return String(
-                format: "%.1fk",
-                kilometers / 1_000
-            )
+        if hours >= 1 {
+            return "\(Int(hours.rounded())) t"
         }
-
-        return String(
-            format: "%.0f",
-            kilometers
-        )
+        if seconds > 0 {
+            return "\(max(1, Int((seconds / 60).rounded()))) min"
+        }
+        return "0 t"
     }
 
     private var trainingIdentityFocus:
