@@ -913,6 +913,51 @@ struct ATHLTHAudioCoachActiveListView: View {
                         .padding(16)
                         .background(.white, in: RoundedRectangle(cornerRadius: 20))
 
+                        VStack(alignment: .leading, spacing: 11) {
+                            Text(tr("WHEN SHOULD THE GROUP SPEAK?", "NÅR SKAL GRUPPEN SNAKKE?"))
+                                .font(.caption.weight(.bold))
+                                .tracking(1.3)
+                                .foregroundStyle(bronze)
+                            Button {
+                                setAllPhases(for: groupID)
+                            } label: {
+                                Label(
+                                    tr("Entire workout", "Hele økten"),
+                                    systemImage: (group.phases?.isEmpty != false)
+                                        ? "checkmark.circle.fill" : "circle"
+                                )
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(minHeight: 42)
+                                .foregroundStyle(group.phases?.isEmpty != false ? bronze : ink)
+                            }
+                            .buttonStyle(.plain)
+                            ForEach(ATHLTHCoachWorkoutPhase.allCases) { phase in
+                                Button {
+                                    togglePhase(phase, groupID: groupID)
+                                } label: {
+                                    Label(
+                                        phase.title,
+                                        systemImage: (group.phases ?? []).contains(phase)
+                                            ? "checkmark.circle.fill" : "circle"
+                                    )
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(minHeight: 40)
+                                    .foregroundStyle(
+                                        (group.phases ?? []).contains(phase) ? bronze : ink
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            Text(tr(
+                                "Choose one or several phases. No phase selected means the whole workout. Free workouts have no phase data and only use whole-workout groups.",
+                                "Velg én eller flere deler. Ingen valgt del betyr hele økten. Frie økter har ikke faseinformasjon og bruker bare grupper som gjelder hele økten."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(dim)
+                        }
+                        .padding(16)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 19))
+
                         Text(tr("COMMANDS IN THIS GROUP", "KOMMANDOER I GRUPPEN"))
                             .font(.caption.weight(.bold))
                             .tracking(1.4)
@@ -992,9 +1037,20 @@ struct ATHLTHAudioCoachActiveListView: View {
                             .font(.caption.weight(.bold))
                             .tracking(1.4)
                             .foregroundStyle(bronze)
-                        LazyVStack(spacing: 8) {
-                            ForEach(availableGroupContents.filter { !selected.contains($0) }) { metric in
-                                Button {
+                        LazyVStack(alignment: .leading, spacing: 9) {
+                            ForEach(ATHLTHCoachMetricCategory.allCases) { category in
+                                let choices = availableGroupContents.filter {
+                                    $0.category == category && !selected.contains($0)
+                                }
+                                if !choices.isEmpty {
+                                    Text(category.title.uppercased())
+                                        .font(.caption2.weight(.bold))
+                                        .tracking(1.3)
+                                        .foregroundStyle(dim)
+                                        .padding(.top, 8)
+                                }
+                                ForEach(choices) { metric in
+                                    Button {
                                     addCommandToGroup(metric, groupID: groupID)
                                 } label: {
                                     HStack(spacing: 12) {
@@ -1016,7 +1072,8 @@ struct ATHLTHAudioCoachActiveListView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(draft.customRules.count >= 20 && group.ruleIDs.isEmpty)
-                                .accessibilityIdentifier("athlth-coach-group-add-\(metric.rawValue)")
+                                    .accessibilityIdentifier("athlth-coach-group-add-\(metric.rawValue)")
+                                }
                             }
                         }
                         if selected.count == availableGroupContents.count {
@@ -1053,6 +1110,23 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
         .presentationDetents([.large])
         .accessibilityIdentifier("athlth-coach-group-commands")
+    }
+
+    private func setAllPhases(for groupID: UUID) {
+        guard let index = draft.coachGroups.firstIndex(where: { $0.id == groupID }) else { return }
+        draft.coachGroups[index].phases = nil
+    }
+
+    private func togglePhase(_ phase: ATHLTHCoachWorkoutPhase, groupID: UUID) {
+        guard let index = draft.coachGroups.firstIndex(where: { $0.id == groupID }) else { return }
+        var selected = draft.coachGroups[index].phases ?? []
+        if selected.contains(phase) {
+            selected.removeAll { $0 == phase }
+        } else {
+            selected.append(phase)
+        }
+        // Clearing every phase restores the legacy whole-workout behavior.
+        draft.coachGroups[index].phases = selected.isEmpty ? nil : selected
     }
 
     private func addCommandToGroup(
