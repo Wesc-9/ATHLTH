@@ -395,9 +395,14 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             let detail = context.nextExerciseDetails.map { ". " + $0 } ?? ""
             return norwegian ? "Neste øvelse: \(name)\(detail)" : "Next exercise: \(name)\(detail)"
         case .previousExerciseSummary:
-            guard let name = context.previousExerciseName,
-                  let seconds = context.previousExerciseSeconds,
-                  seconds.isFinite, seconds >= 0 else { return nil }
+            guard let name = context.previousExerciseName else { return nil }
+            guard let seconds = context.previousExerciseSeconds,
+                  seconds.isFinite, seconds >= 0 else {
+                return context.previousExerciseCompleted == true
+                    ? (norwegian ? "Forrige øvelse \(name) er fullført"
+                                 : "Previous exercise \(name) completed")
+                    : nil
+            }
             let minutes = Int(seconds.rounded()) / 60
             let remainder = Int(seconds.rounded()) % 60
             let distance = context.previousExerciseDistanceMeters ?? 0
@@ -408,9 +413,12 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 ? "Forrige øvelse \(name): \(minutes) minutter og \(remainder) sekunder\(portion)"
                 : "Previous exercise \(name): \(minutes) minutes and \(remainder) seconds\(portion)"
         case .previousMainSectionSummary:
-            guard let count = context.previousMainSectionExerciseCount,
-                  let seconds = context.previousMainSectionSeconds,
-                  seconds.isFinite, seconds >= 0 else { return nil }
+            guard let count = context.previousMainSectionExerciseCount else { return nil }
+            guard let seconds = context.previousMainSectionSeconds,
+                  seconds.isFinite, seconds >= 0 else {
+                return norwegian ? "Forrige hoveddel: \(count) øvelser fullført"
+                    : "Previous section: \(count) exercises completed"
+            }
             let minutes = Int(seconds.rounded()) / 60
             let remainder = Int(seconds.rounded()) % 60
             let distance = context.previousMainSectionDistanceMeters ?? 0
@@ -1003,6 +1011,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var nextExerciseName: String? = nil
     var nextExerciseDetails: String? = nil
     var previousExerciseName: String? = nil
+    var previousExerciseCompleted: Bool? = nil
     var previousExerciseSeconds: Double? = nil
     var previousExerciseDistanceMeters: Double? = nil
     var previousMainSectionExerciseCount: Int? = nil
@@ -1025,6 +1034,60 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
                     }
                 })
         }
+    }
+
+    /// Strength uses the Watch's actual completed/pending exercise queue.
+    /// Planned repetitions and weight are only announced as NEXT targets.
+    /// A completed exercise is not given an invented duration or load.
+    static func make(strength snapshot: WatchStrengthSessionSnapshot) -> Self {
+        var context = Self()
+        let exercises = (snapshot.exerciseQueue ?? []).sorted { $0.index < $1.index }
+        context.stepIndex = snapshot.exerciseIndex
+        context.stepCount = max(snapshot.exerciseCount, exercises.count)
+        context.stepName = snapshot.exerciseName
+        context.stepPhase = snapshot.isResting ? "recovery"
+            : snapshot.isWarmUp == true ? "warmup" : "work"
+        context.remainingExerciseCount = exercises.filter {
+            $0.index > snapshot.exerciseIndex && $0.isCompleted != true
+        }.count
+
+        if let next = exercises.first(where: {
+            $0.index > snapshot.exerciseIndex && $0.isCompleted != true
+        }) {
+            context.nextExerciseName = next.name
+            var parts: [String] = []
+            if next.setCount > 0 { parts.append("\(next.setCount) × sett") }
+            if let first = next.setPlans?.first {
+                if let reps = first.reps, reps > 0 {
+                    parts.append("\(reps) reps")
+                } else if let seconds = first.durationSeconds, seconds > 0 {
+                    parts.append("\(seconds) s")
+                }
+                if let kilograms = first.weightKilograms,
+                   kilograms.isFinite, kilograms > 0 {
+                    parts.append("\(kilograms.formatted(.number.precision(.fractionLength(0...1)))) kg mål")
+                }
+            }
+            context.nextExerciseDetails = parts.joined(separator: ", ")
+        }
+        if let completed = exercises.last(where: {
+            $0.index < snapshot.exerciseIndex && $0.isCompleted == true
+        }) {
+            context.previousExerciseName = completed.name
+            context.previousExerciseCompleted = true
+        }
+        let previous = exercises.last(where: { $0.index < snapshot.exerciseIndex })
+        let currentGroupID = exercises.first(where: {
+            $0.index == snapshot.exerciseIndex
+        })?.strengthGroupID
+        if let previousGroupID = previous?.strengthGroupID,
+           currentGroupID != previousGroupID {
+            let earlier = exercises.filter { $0.strengthGroupID == previousGroupID }
+            if !earlier.isEmpty && earlier.allSatisfy({ $0.isCompleted == true }) {
+                context.previousMainSectionExerciseCount = earlier.count
+            }
+        }
+        return context
     }
 
     static func make(
