@@ -4329,6 +4329,9 @@ struct WorkoutTemplateBuilderView: View {
     private let onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int], ATHLTHWorkoutPlannerExtras) -> Bool)?
     private let initialDraftSignature: String
     private let initialSourceTitle: String
+    private let initialCopyBlocks: [WorkoutTemplateBlock]
+    private let initialCopyRouteID: UUID?
+    private let initialCopyDurationMinutes: Int?
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
     private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool, ATHLTHWorkoutPlannerExtras) -> Bool)?
@@ -4477,6 +4480,9 @@ struct WorkoutTemplateBuilderView: View {
             "|" + (initialRouteID?.uuidString ?? "") +
             "|" + String(initialMinutes ?? -1)
         self.initialSourceTitle = initialTitle
+        self.initialCopyBlocks = initialRecipe
+        self.initialCopyRouteID = initialRouteID
+        self.initialCopyDurationMinutes = initialMinutes
         self.onSaveToPlan = onSaveToPlan
         self.onAddStandalone = onAddStandalone
         self.onSwitchToBasic = onSwitchToBasic
@@ -8552,6 +8558,28 @@ struct WorkoutTemplateBuilderView: View {
             return
         }
         let cleanTitle = workout.title
+        if sourceTemplateID != nil, onSaveToPlan == nil, onAddStandalone == nil {
+            // Copying an ATHLTH/public recipe is an explicit new workout,
+            // never a silent duplicate of the original.
+            if ATHLTHWorkoutSearch.normalized(cleanTitle) ==
+                ATHLTHWorkoutSearch.normalized(initialSourceTitle) {
+                actionNotice = tr(
+                    "Give your copy a different name from the original.",
+                    "Gi kopien et annet navn enn originaløkten."
+                )
+                return
+            }
+            let recipeChanged = blocks != initialCopyBlocks ||
+                activeRouteID != initialCopyRouteID ||
+                manualDurationMinutes != initialCopyDurationMinutes
+            guard recipeChanged else {
+                actionNotice = tr(
+                    "Change the workout itself before saving. Renaming alone is not enough.",
+                    "Endre selve økten før du lagrer. Det holder ikke å bare endre navnet."
+                )
+                return
+            }
+        }
         let extras = ATHLTHWorkoutPlannerExtras(
             gearIDs: workout.gearIDs,
             spotifyPlaylist: workout.spotifyPlaylist,
