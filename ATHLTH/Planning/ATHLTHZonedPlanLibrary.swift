@@ -444,6 +444,11 @@ enum ATHLTHZonedPlanLibrary {
            }) {
             result[index].assessmentMethod =
                 ATHLTHAssessmentMethod.normalized(method, for: result[index])
+            if method.isEstimatedVO2 && workout.id == "ASS-005" {
+                result[index].assessmentScope = ATHLTHAssessmentScope(
+                    vo2Protocol: .cooperTwelveMinutes
+                )
+            }
         }
         // A timed cycling segment uses a non-running block in ATHLTH.
         // Swimming stays in the source bundle but is not published as a workout
