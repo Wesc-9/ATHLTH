@@ -8521,13 +8521,11 @@ struct WorkoutTemplateBuilderView: View {
         guard isPlannedWorkout, initialActivity == .running else { return }
         let place = studioBasicRunEnvironment
         for index in blocks.indices where blocks[index].kind == .run {
-            let indoor = place != .outdoor
-            let incline = place == .treadmill
-                ? (blocks[index].treadmillInclinePercent ?? 0) : nil
-            if blocks[index].isIndoor != indoor ||
-               blocks[index].treadmillInclinePercent != incline {
-                blocks[index].isIndoor = indoor
-                blocks[index].treadmillInclinePercent = incline
+            let updated = ATHLTHWorkoutRunEnvironmentSync.applying(
+                place, to: blocks[index]
+            )
+            if blocks[index] != updated {
+                blocks[index] = updated
             }
         }
         if place != .outdoor {
