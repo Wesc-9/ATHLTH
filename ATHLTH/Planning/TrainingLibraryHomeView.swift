@@ -5423,6 +5423,8 @@ struct LibraryFavoritesView: View {
     @State private var libraryWidth: CGFloat = 390
     @State private var searchQuery = ""
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
+    @State private var visibleStartIndex = 0
+    @State private var alphabetJumpRevision = 0
 
     private var favoriteColumns: [GridItem] {
         ATHLTHLibraryResponsiveLayout.columns(
@@ -5452,10 +5454,16 @@ struct LibraryFavoritesView: View {
         }
     }
 
+    private var pageFavorites: [LibraryFavoriteRecord] {
+        ATHLTHLibraryAlphabetWindow.visible(
+            displayedFavorites, start: visibleStartIndex, limit: visibleLimit
+        )
+    }
+
     /// Resolve only favorited exercise IDs against the already cached offline
     /// catalog. Avoid one full library scan or an extra network call per row.
     private var favoriteExerciseEntriesByID: [UUID: ExerciseLibraryEntry] {
-        let ids = Set(displayedFavorites.prefix(visibleLimit).compactMap { favorite -> UUID? in
+        let ids = Set(pageFavorites.compactMap { favorite -> UUID? in
             guard favorite.itemType == .exercise else { return nil }
             return UUID(uuidString: favorite.itemID)
         })
@@ -5470,6 +5478,10 @@ struct LibraryFavoritesView: View {
 
     var body: some View {
         let exerciseEntries = favoriteExerciseEntriesByID
+        let matches = displayedFavorites
+        let alphabet = ATHLTHLibraryAlphabetLookup(
+            items: matches, id: { $0.id }, title: { $0.title }
+        )
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
                 if initialKind == nil {
@@ -5609,7 +5621,7 @@ struct LibraryFavoritesView: View {
                     )
                 } else {
                     LazyVGrid(columns: favoriteColumns, spacing: 10) {
-                        ForEach(Array(displayedFavorites.prefix(visibleLimit))) { item in
+                        ForEach(pageFavorites) { item in
                             HStack(spacing: 8) {
                                 NavigationLink {
                                     favoriteDestination(item)
@@ -5644,21 +5656,46 @@ struct LibraryFavoritesView: View {
                         }
                     }
                     ATHLTHLibraryLoadMoreButton(
-                        shown: min(visibleLimit, displayedFavorites.count),
-                        total: displayedFavorites.count
+                        shown: pageFavorites.count,
+                        total: ATHLTHLibraryAlphabetWindow.remaining(
+                            total: matches.count, start: visibleStartIndex
+                        )
                     ) {
                         visibleLimit += ATHLTHLibraryPagination.pageSize
                     }
                 }
             }
-            .padding(18)
+            .padding(.leading, 18)
+            .padding(.trailing, alphabet.targets.isEmpty ? 18 : 42)
+            .padding(.vertical, 18)
             .frame(maxWidth: .infinity)
         }
+        .id(alphabetJumpRevision)
+        .overlay(alignment: .trailing) {
+            if !alphabet.targets.isEmpty {
+                ATHLTHExerciseAlphabetIndex(targets: alphabet.targets) { target in
+                    guard let index = alphabet.index(for: target) else { return }
+                    visibleStartIndex = index
+                    visibleLimit = ATHLTHLibraryPagination.pageSize
+                    alphabetJumpRevision += 1
+                }
+                .padding(.trailing, 6)
+            }
+        }
         .onChange(of: searchQuery) { _, _ in
+            visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
         }
         .onChange(of: selectedKind) { _, _ in
+            visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
+        }
+        .onChange(of: ownExerciseFavoritesOnly) { _, _ in
+            visibleStartIndex = 0
+            visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
             libraryWidth = $0
