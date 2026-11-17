@@ -152,7 +152,8 @@ struct ATHLTHThreeMinuteAllOutProtocol: View {
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 14) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                ForEach(Array(items.enumerated()), id: \.offset) { entry in
+                    let item = entry.element
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.title)
                             .font(.subheadline.weight(.semibold))
@@ -355,7 +356,7 @@ struct ATHLTHThreeMinuteAllOutMeasurementsView: View {
         .padding(16)
         .background(.white, in: RoundedRectangle(cornerRadius: 19))
         .accessibilityIdentifier("athlth-3mt-measurements-and-summary")
-        .task(id: workoutID) {
+        .task(id: userID.uuidString + "|" + workoutID.uuidString) {
             let previous = ATHLTHThreeMinuteAllOutMeasurementStore.load(
                 workoutID: workoutID, userID: userID
             )
