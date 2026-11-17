@@ -384,6 +384,38 @@ enum ATHLTHZonedPlanLibrary {
             planRepetitionDepth(in: workout, scaled: $0)
         }
         append(workout.warmupStructure ?? [], phase: .warmup, sport: workout.discipline, depth: 0, to: &result)
+        // The ATHLTH 3MT protocol prescribes 3 × 10-second strides.
+        // The original source gives five total minutes for drills + strides,
+        // not individual durations. Allocate 4:30 to drills and exactly
+        // 10 seconds to each stride, preserving the source's total.
+        if workout.id == "ASS-009" {
+            let strides = result.indices.filter {
+                $0 > 0 && result[$0].resolvedPhase == .warmup &&
+                    result[$0].title.contains("/3")
+            }
+            if strides.count == 3,
+               let drills = result.indices.first(where: {
+                   $0 > 0 && result[$0].resolvedPhase == .warmup &&
+                   result[$0].title.lowercased().contains(
+                       ATHLTHLocalization.isNorwegian ? "løpsdriller" : "drills"
+                   )
+               }),
+               result[drills].durationSeconds == 210,
+               strides.allSatisfy({ result[$0].durationSeconds == 30 }) {
+                result[drills].durationSeconds = 270
+                result[drills].notes = ATHLTHLocalization.choose(
+                    english: "Running drills and dynamic mobility before the three 10-second strides.",
+                    norwegian: "Løpsdriller og dynamisk bevegelighet før tre stigningsløp på 10 sekunder."
+                )
+                for index in strides {
+                    result[index].durationSeconds = 10
+                    result[index].notes = ATHLTHLocalization.choose(
+                        english: "Accelerate progressively for 10 seconds; this is a warm-up, not the all-out test.",
+                        norwegian: "Øk farten gradvis i 10 sekunder. Dette er oppvarming, ikke selve maksimaltesten."
+                    )
+                }
+            }
+        }
         append(
             workout.mainSetStructure ?? [], phase: .main,
             sport: workout.discipline, depth: 0, to: &result,
