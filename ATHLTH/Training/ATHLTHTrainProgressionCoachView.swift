@@ -8,6 +8,9 @@ struct ATHLTHTrainProgressionCoachView: View {
     @EnvironmentObject private var health: HealthKitManager
 
     let planID: UUID
+    /// iPad embeds Coach directly in the Studio detail column, which owns
+    /// the back action. Modal iPhone presentations retain their Close button.
+    var showsCloseButton = true
 
     @State private var incrementKg = 1.0
     // Confirmation is per exercise, never a blanket equipment assertion.
@@ -141,9 +144,11 @@ struct ATHLTHTrainProgressionCoachView: View {
             .navigationTitle(tr("Progression suggestions", "Progresjonsforslag"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Close", "Lukk")) { dismiss() }
-                        .foregroundStyle(ink)
+                if showsCloseButton {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(tr("Close", "Lukk")) { dismiss() }
+                            .foregroundStyle(ink)
+                    }
                 }
             }
             .confirmationDialog(
