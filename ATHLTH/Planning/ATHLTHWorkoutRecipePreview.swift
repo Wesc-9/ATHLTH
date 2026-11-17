@@ -316,6 +316,11 @@ struct ATHLTHWorkoutRecipePreview: View {
             if !embeddedInDetails {
                 introduction
             }
+            if ATHLTHThreeMinuteAllOut.isRunningTest(
+                title: title, blocks: normalizedBlocks
+            ) {
+                ATHLTHThreeMinuteAllOutProtocol()
+            }
             modeControl
             if advanced && !embeddedInDetails {
                 statistics
