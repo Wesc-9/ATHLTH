@@ -95,4 +95,11 @@ enum ATHLTHPlanEditorContinuityPolicy {
     ) -> Bool {
         !editorIsPresented && (coldMount || unexpectedlyDismissed)
     }
+
+    static func shouldKeepNestedEditor(
+        sceneIsActive: Bool,
+        incomingSelectionIsNil: Bool
+    ) -> Bool {
+        !sceneIsActive && incomingSelectionIsNil
+    }
 }
