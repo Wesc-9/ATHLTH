@@ -25,6 +25,11 @@ struct ATHLTHTrainTodayPremiumView: View {
     /// Live recorder-owned content replaces the scheduled action while active.
     let activeWorkoutCard: AnyView?
     let hasRecordedWorkoutToday: Bool
+    /// A history-backed recommendation is shown only on genuinely open days.
+    /// The parent owns its cached assessment and the existing launch flow.
+    let dailyRecommendation: HomeDailyRecommendationPolicy.Advice?
+    let onShowDailyRecommendationDetails: () -> Void
+    let onChooseDailyRecommendedWorkout: (HomeDailyRecommendationPolicy.Advice) -> Void
     /// Already filtered for a reliable, recent HealthKit baseline by the parent.
     let todaysReadiness: RecoveryReadinessSummary?
     /// Most recently registered body mass from Apple Health, when accessible.
@@ -116,9 +121,16 @@ struct ATHLTHTrainTodayPremiumView: View {
                     completedTodayCard(plan)
                 } else if let workout = primaryWorkout {
                     workoutCard(workout, plan: plan)
+                } else if !hasRecordedWorkoutToday,
+                          scheduled.isEmpty,
+                          sessions.isEmpty,
+                          let dailyRecommendation {
+                    dailyRecommendationCard(dailyRecommendation)
                 } else {
                     adaptiveOpenDayCard
                 }
+            } else if !hasRecordedWorkoutToday, let dailyRecommendation {
+                dailyRecommendationCard(dailyRecommendation)
             } else {
                 adaptiveOpenDayCard
             }
@@ -801,6 +813,93 @@ struct ATHLTHTrainTodayPremiumView: View {
         case .mobility: return .custom
         case .recovery, .custom: return .custom
         }
+    }
+
+    /// Reuse the existing open-day card footprint. A scheduled session,
+    /// explicit rest day, live workout or completed recording takes priority.
+    /// No second recommendation card is added elsewhere on Today.
+    private func dailyRecommendationCard(
+        _ advice: HomeDailyRecommendationPolicy.Advice
+    ) -> some View {
+        let hasWorkout = HomeDailyRecommendationSessionFactory.make(advice: advice) != nil
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(tr("BASED ON YOUR HISTORY", "BASERT PÅ HISTORIKKEN DIN"))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(champagne)
+                    Text(advice.suggestedTitle.isEmpty ? advice.title : advice.suggestedTitle)
+                        .font(.system(size: 25, weight: .regular, design: .serif))
+                        .foregroundStyle(ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 4)
+                Button(action: onShowDailyRecommendationDetails) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(champagne)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr(
+                    "Why today's recommendation?", "Hvorfor dagens anbefaling?"
+                ))
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 13)
+
+            VStack(alignment: .leading, spacing: 13) {
+                Text(advice.shortDescription)
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !advice.suggestedDetail.isEmpty &&
+                   advice.suggestedDetail != advice.shortDescription {
+                    Text(advice.suggestedDetail)
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 9) {
+                    Button {
+                        if hasWorkout {
+                            onChooseDailyRecommendedWorkout(advice)
+                        } else {
+                            onShowDailyRecommendationDetails()
+                        }
+                    } label: {
+                        HStack(spacing: 9) {
+                            Spacer(minLength: 0)
+                            Image(systemName: hasWorkout ? "play.fill" : "info.circle")
+                            Text(hasWorkout
+                                ? tr("Choose workout", "Velg økt")
+                                : tr("See recommendation", "Se anbefaling"))
+                            Spacer(minLength: 0)
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(minHeight: 52)
+                        .background(ink, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: onOpenLibrary) {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(ink)
+                            .frame(width: 52, height: 52)
+                            .background(ATHLTHPlanDesign.warmSurface,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr("Training library", "Treningsbibliotek"))
+                }
+            }
+            .padding(16)
+        }
+        .athlthTrainPaper(emphasized: true)
+        .accessibilityIdentifier("athlth-train-today-daily-recommendation")
     }
 
     private var adaptiveOpenDayCard: some View {
