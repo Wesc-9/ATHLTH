@@ -535,6 +535,17 @@ struct WatchStrengthReadOnlySetPage: View {
                     )
                 }
 
+                if snapshot.barWeightKilograms == nil,
+                   snapshot.loadKindRaw != "resistanceLevel",
+                   let basisLabel = ATHLTHWatchStrengthLoadBasisLabel.localized(
+                       raw: snapshot.currentCoachLoadBasisRaw
+                   ) {
+                    Text(basisLabel)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(WatchTheme.muted)
+                        .accessibilityIdentifier("watch-strength-load-basis")
+                }
+
                 if let bar = snapshot.barWeightKilograms {
                     Text(ATHLTHLocalization.choose(
                         english: "Bar \(bar.formatted()) kg · plates entered separately",
