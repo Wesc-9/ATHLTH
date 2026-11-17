@@ -470,7 +470,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             audioCoachConfiguration.enabled
 
         publish {
-            self.audioCoachConfiguration = configuration
+            self.audioCoachConfiguration = configuration.deliveryConfiguration
         }
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
@@ -526,7 +526,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             : nil
 
         publish {
-            self.audioCoachConfiguration = configuration
+            self.audioCoachConfiguration = configuration.deliveryConfiguration
         }
 
         resetAudioCoachThresholds()
