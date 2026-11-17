@@ -936,6 +936,36 @@ struct ATHLTHGlobalSearchView: View {
             case .all:
                 EmptyView()
 
+            case .exercises:
+                let items = Array(exerciseLibrary.allExercises.prefix(6))
+                if items.isEmpty {
+                    categoryHint
+                } else {
+                    resultSection(
+                        scope.localizedTitle,
+                        count: exerciseLibrary.allExercises.count,
+                        previewLimit: 6
+                    ) {
+                        ForEach(items) { entry in
+                            NavigationLink {
+                                ExerciseDetailView(
+                                    entry: entry,
+                                    selectionTitle: nil,
+                                    onSelect: nil
+                                )
+                            } label: {
+                                searchRow(
+                                    icon: "dumbbell.fill",
+                                    tint: searchWarmAccent,
+                                    title: exerciseLibrary.localizedExerciseName(entry),
+                                    subtitle: entry.bodyPart ?? scope.localizedTitle
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
             case .users:
                 let profiles = Array(
                     social.visibleProfiles
@@ -1224,6 +1254,7 @@ struct ATHLTHGlobalSearchView: View {
     @ViewBuilder
     private var searchResults: some View {
         let users = matchingUsers
+        let exercises = matchingExercises
         let eventResults = matchingEvents
         let groupResults = matchingGroups
         let routeResults = matchingRoutes
@@ -1282,6 +1313,37 @@ struct ATHLTHGlobalSearchView: View {
                             TapGesture().onEnded {
                                 rememberSearch(query)
                             }
+                        )
+                    }
+                }
+            }
+
+            if (scope == .all || scope == .exercises) &&
+                !exercises.isEmpty {
+                resultSection(
+                    ATHLTHGlobalSearchScope.exercises.localizedTitle,
+                    count: exercises.count,
+                    showAllScope: .exercises,
+                    previewLimit: 12
+                ) {
+                    ForEach(exercises.prefix(12)) { entry in
+                        NavigationLink {
+                            ExerciseDetailView(
+                                entry: entry,
+                                selectionTitle: nil,
+                                onSelect: nil
+                            )
+                        } label: {
+                            searchRow(
+                                icon: "dumbbell.fill",
+                                tint: searchWarmAccent,
+                                title: exerciseLibrary.localizedExerciseName(entry),
+                                subtitle: entry.bodyPart ?? ATHLTHGlobalSearchScope.exercises.localizedTitle
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .simultaneousGesture(
+                            TapGesture().onEnded { rememberSearch(query) }
                         )
                     }
                 }
@@ -1438,12 +1500,15 @@ struct ATHLTHGlobalSearchView: View {
         switch scope {
         case .all:
             return matchingUsers.count +
+                matchingExercises.count +
                 matchingEvents.count +
                 matchingGroups.count +
                 matchingRoutes.count +
                 matchingChallenges.count
         case .users:
             return matchingUsers.count
+        case .exercises:
+            return matchingExercises.count
         case .events:
             return matchingEvents.count
         case .groups:
@@ -1453,6 +1518,12 @@ struct ATHLTHGlobalSearchView: View {
         case .challenges:
             return matchingChallenges.count
         }
+    }
+
+    private var matchingExercises: [ExerciseLibraryEntry] {
+        guard normalizedQuery.count >= 2,
+              scope == .all || scope == .exercises else { return [] }
+        return exerciseLibrary.search(query: cleanQuery)
     }
 
     private var matchingUsers: [SocialProfileCard] {
@@ -1792,6 +1863,10 @@ struct ATHLTHGlobalSearchView: View {
 
         case .users:
             await social.search(requestedQuery)
+
+        case .exercises:
+            // Use the locally indexed exercise library, not a social API.
+            break
 
         case .routes:
             await routes.search(requestedQuery)
