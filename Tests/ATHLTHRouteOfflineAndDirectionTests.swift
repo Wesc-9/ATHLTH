@@ -47,7 +47,7 @@ final class ATHLTHRouteOfflineAndDirectionTests: XCTestCase {
         )
     }
 
-    func testOverlappingOutAndBackDoesNotInventDirection() {
+    func testRetracedOutAndBackConfirmsCanonicalDirectionWithFullGPS() {
         let course = [
             location(63.4, 10.4),
             location(63.402, 10.4),
@@ -56,6 +56,33 @@ final class ATHLTHRouteOfflineAndDirectionTests: XCTestCase {
         XCTAssertEqual(
             ATHLTHRouteAttemptDirectionPolicy.classify(
                 reference: course, actual: course
+            ),
+            .forward
+        )
+        // A truly retraced course is identical in the opposite ordering.
+        // Its canonical direction remains forward, not "unknown".
+        XCTAssertEqual(
+            ATHLTHRouteAttemptDirectionPolicy.classify(
+                reference: course, actual: Array(course.reversed())
+            ),
+            .forward
+        )
+    }
+
+    func testIncompleteRetracedGPSDoesNotQualifyJustBecauseItTouchesStart() {
+        let course = [
+            location(63.4, 10.4),
+            location(63.402, 10.4),
+            location(63.4, 10.4)
+        ]
+        let shortened = [
+            location(63.4, 10.4),
+            location(63.4005, 10.4),
+            location(63.4, 10.4)
+        ]
+        XCTAssertEqual(
+            ATHLTHRouteAttemptDirectionPolicy.classify(
+                reference: course, actual: shortened
             ),
             .unknown
         )
