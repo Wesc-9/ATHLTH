@@ -375,12 +375,14 @@ enum ATHLTHAudioCoachRuleDelivery {
         for rule in rules where (rule.scope ?? .workout) == .workout {
             // One-shot finish cues use remaining time, not elapsed-time slots.
             // A nonzero elapsed slot would otherwise suppress the first cue.
-            result[rule.id] = rule.beforeEndSeconds == nil
-                ? slot(
-                    for: rule,
-                    distanceMeters: distanceMeters,
-                    elapsedSeconds: elapsedSeconds
-                ) : 0
+            result[rule.id] = rule.trigger == .workoutStart && elapsedSeconds > 3
+                ? 1
+                : rule.trigger.isPeriodic && rule.beforeEndSeconds == nil
+                    ? slot(
+                        for: rule,
+                        distanceMeters: distanceMeters,
+                        elapsedSeconds: elapsedSeconds
+                    ) : 0
         }
         return result
     }
@@ -444,9 +446,32 @@ enum ATHLTHAudioCoachRuleDelivery {
                 segment = index
             }
             let milestone: Int
-            if let beforeEnd = rule.beforeEndSeconds {
-                // A remaining-time cue is one-shot, not a repeating cadence.
-                // In an open-ended workout no prediction means no announcement.
+            var alreadyConsumed = false
+
+            if rule.trigger.isHeartRateCondition {
+                // Each threshold crossing is one event, with a new delivery
+                // identity on later re-entry. Invalid HR samples do not reset
+                // the condition or cause spurious zone-exit announcements.
+                guard let active = heartRateCondition(
+                    rule, bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM
+                ) else { continue }
+                let previousState = lastSlots[rule.id] ?? 0
+                let wasActive = previousState % 2 == 1
+                guard active != wasActive else { continue }
+                let updatedState = previousState + 1
+                lastSlots[rule.id] = updatedState
+                alreadyConsumed = true
+                let shouldAnnounce = rule.trigger == .zoneExit
+                    ? (wasActive && !active) : (!wasActive && active)
+                guard shouldAnnounce else { continue }
+                milestone = (updatedState + 1) / 2
+            } else if rule.trigger.needsStructuredStep ||
+                      rule.trigger == .workoutStart {
+                guard let occurrence = eventOccurrence(
+                    rule, context: context, elapsedSeconds: elapsedSeconds
+                ) else { continue }
+                milestone = occurrence
+            } else if let beforeEnd = rule.beforeEndSeconds {
                 guard let remaining = context.workoutRemainingSeconds,
                       remaining.isFinite, remaining >= 0 else { continue }
                 milestone = remaining <= Double(max(1, beforeEnd)) ? 1 : 0
@@ -454,12 +479,18 @@ enum ATHLTHAudioCoachRuleDelivery {
                 milestone = slot(for: rule, distanceMeters: distance, elapsedSeconds: elapsed)
             }
             guard milestone > 0 else { continue }
-            let current = segment.map { ($0 + 1) * 100_000 + min(milestone, 99_999) } ?? milestone
+            let current = segment.map {
+                ($0 + 1) * 100_000 + min(milestone, 99_999)
+            } ?? milestone
             let previous = lastSlots[rule.id] ?? 0
-            guard current > previous else { continue }
+            if !alreadyConsumed {
+                guard current > previous else { continue }
+            }
             // Consume the crossed milestone even if a sensor value is missing.
             // It must not be announced much later after that value recovers.
-            lastSlots[rule.id] = current
+            if !alreadyConsumed {
+                lastSlots[rule.id] = current
+            }
             guard rule.isEnabled else { continue }
             // Simultaneous rules are composed into one speech event. A
             // metric already included by another rule is not repeated.
@@ -491,7 +522,8 @@ enum ATHLTHAudioCoachRuleDelivery {
             messages.append(ATHLTHAudioCoachDueAnnouncement(
                 text: message,
                 metrics: scope == .workout ? covered : covered.subtracting([.distance, .elapsedTime, .averagePace]),
-                milestoneKey: rule.id.uuidString + ":" + String(current)
+                milestoneKey: rule.id.uuidString + ":" +
+                    String(alreadyConsumed ? milestone : current)
             ))
             spokenByScope[scope, default: []].formUnion(covered)
         }
@@ -518,11 +550,107 @@ enum ATHLTHAudioCoachRuleDelivery {
         return "audio:" + String(digest, radix: 16)
     }
 
+    private static func heartRateCondition(
+        _ rule: ATHLTHAudioCoachRule,
+        bpm: Double?,
+        maximumBPM: Double?
+    ) -> Bool? {
+        guard let bpm, bpm.isFinite, (35...250).contains(bpm) else {
+            return nil
+        }
+        switch rule.trigger {
+        case .heartRateAbove: return bpm >= Double(rule.validatedInterval)
+        case .heartRateBelow: return bpm <= Double(rule.validatedInterval)
+        case .zoneEnter, .zoneExit:
+            guard let zone = ATHLTHHeartRateZones.measuredZone(
+                heartRateBPM: bpm, maximumBPM: maximumBPM
+            ) else { return nil }
+            return zone == rule.validatedInterval
+        default: return nil
+        }
+    }
+
+    private static func eventOccurrence(
+        _ rule: ATHLTHAudioCoachRule,
+        context: ATHLTHCoachReadoutContext,
+        elapsedSeconds: TimeInterval
+    ) -> Int? {
+        if rule.trigger == .workoutStart {
+            return (0...3).contains(elapsedSeconds) ? 1 : nil
+        }
+        guard let index = context.stepIndex, index >= 0,
+              context.stepCount > index else { return nil }
+
+        let phase = context.stepPhase
+        let previous = context.previousStepPhase
+        let next = context.nextStepPhase
+        let nearStart = context.stepElapsedSeconds <= 4
+        let remaining = context.stepRemainingSeconds
+        let nearEnd = remaining.map { $0.isFinite && $0 >= 0 && $0 <= 2 } == true
+        let beforeBoundary = remaining.map {
+            $0.isFinite && $0 >= 0 && $0 <= Double(rule.validatedInterval)
+        } == true
+
+        // Index of the step that caused the event (1-based). All event
+        // milestones are monotonic even when the plan contains many intervals.
+        switch rule.trigger {
+        case .stepStart:
+            return nearStart ? index + 1 : nil
+        case .effortStart:
+            return phase == "work" && nearStart ? index + 1 : nil
+        case .effortEnd:
+            if phase == "work" && nearEnd { return index + 1 }
+            return previous == "work" && nearStart ? index : nil
+        case .recoveryStart:
+            return phase == "recovery" && nearStart ? index + 1 : nil
+        case .recoveryEnd:
+            if phase == "recovery" && nearEnd { return index + 1 }
+            return previous == "recovery" && nearStart ? index : nil
+        case .activeRecoveryStart:
+            return context.isActiveRecovery && nearStart ? index + 1 : nil
+        case .activeRecoveryEnd:
+            if context.isActiveRecovery && nearEnd { return index + 1 }
+            return context.previousWasActiveRecovery && nearStart ? index : nil
+        case .warmupStart:
+            return phase == "warmup" && nearStart && previous != "warmup"
+                ? index + 1 : nil
+        case .warmupEnd:
+            if phase == "warmup" && nearEnd { return index + 1 }
+            return previous == "warmup" && phase != "warmup" && nearStart
+                ? index : nil
+        case .mainStart:
+            return (phase == "work" || phase == "recovery") && nearStart &&
+                (index == 0 || previous == "warmup") ? index + 1 : nil
+        case .mainEnd:
+            if (phase == "work" || phase == "recovery") &&
+               next == "cooldown" && nearEnd { return index + 1 }
+            return phase == "cooldown" && nearStart &&
+                (previous == "work" || previous == "recovery") ? index : nil
+        case .cooldownStart:
+            return phase == "cooldown" && nearStart && previous != "cooldown"
+                ? index + 1 : nil
+        case .cooldownEnd:
+            return phase == "cooldown" &&
+                index == context.stepCount - 1 && nearEnd ? index + 1 : nil
+        case .beforeNextStep:
+            return next != nil && beforeBoundary ? index + 1 : nil
+        case .beforeMain:
+            return phase == "warmup" &&
+                (next == "work" || next == "recovery") &&
+                beforeBoundary ? index + 1 : nil
+        case .beforeCooldown:
+            return (phase == "work" || phase == "recovery") &&
+                next == "cooldown" && beforeBoundary ? index + 1 : nil
+        default: return nil
+        }
+    }
+
     private static func slot(
         for rule: ATHLTHAudioCoachRule,
         distanceMeters: Double,
         elapsedSeconds: TimeInterval
     ) -> Int {
+        guard rule.trigger.isPeriodic else { return 0 }
         let value = rule.trigger == .distance ? distanceMeters : elapsedSeconds
         guard value.isFinite, value >= 0 else { return 0 }
         return Int(min(
