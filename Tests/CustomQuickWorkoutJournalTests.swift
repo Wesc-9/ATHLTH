@@ -100,4 +100,47 @@ final class CustomQuickWorkoutJournalTests: XCTestCase {
             ))
         }
     }
+
+    func testFreeTrainingUsesGenericOpenRecorderAndKeepsItsName() throws {
+        let setup = CustomQuickWorkoutConfiguration(
+            activity: .other,
+            method: .open,
+            durationMinutes: 20,
+            workSeconds: 40,
+            restSeconds: 20,
+            rounds: 8,
+            titleOverride: "Fri trening"
+        )
+        XCTAssertEqual(setup.title, "Fri trening")
+        XCTAssertEqual(setup.activity.watchKind, .other)
+        XCTAssertEqual(setup.method, .open)
+
+        let record = try XCTUnwrap(CustomQuickWorkoutRecord.make(
+            configuration: setup,
+            recordedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            durationSeconds: 720,
+            distanceKilometers: nil,
+            perceivedEffort: nil,
+            notes: nil,
+            evidence: .phoneTimer
+        ))
+        XCTAssertEqual(record.title, "Fri trening")
+        XCTAssertEqual(record.activity, .other)
+        let roundTrip = try JSONDecoder().decode(
+            CustomQuickWorkoutRecord.self,
+            from: JSONEncoder().encode(record)
+        )
+        XCTAssertEqual(roundTrip.title, "Fri trening")
+    }
+
+    func testCustomOtherActivityRetainsItsOwnName() {
+        let custom = CustomQuickWorkoutConfiguration(
+            activity: .other, method: .open,
+            durationMinutes: 20, workSeconds: 40, restSeconds: 20,
+            rounds: 8
+        )
+        XCTAssertEqual(custom.title, CustomQuickWorkoutActivity.other.localizedTitle)
+        XCTAssertNil(custom.titleOverride)
+    }
+
 }
