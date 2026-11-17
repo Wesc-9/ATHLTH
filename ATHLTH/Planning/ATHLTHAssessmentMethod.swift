@@ -91,6 +91,45 @@ enum ATHLTHAssessmentMethod: String, Codable, Hashable, CaseIterable, Identifiab
     }
 }
 
+/// Deliberately narrow calculators. Callers must supply measurements
+/// from the actual MAIN test block; no whole-workout aggregates or guessed
+/// values are accepted as physiological results.
+enum ATHLTHAssessmentCalculation {
+    /// Cooper 12-minute field estimate in ml/kg/min. Do not use for
+    /// six-minute tests or if the athlete stopped early.
+    static func cooperVO2Max(
+        measuredMeters: Double,
+        testDurationSeconds: Double
+    ) -> Double? {
+        guard testDurationSeconds == 720,
+              measuredMeters.isFinite, (600...6_000).contains(measuredMeters)
+        else { return nil }
+        let value = (measuredMeters - 504.9) / 44.73
+        guard value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    /// Epley estimate; valid only for a limited maximal-repetition effort.
+    /// One repetition is a directly reported top lift, not a 1RM prediction.
+    static func estimatedOneRepMax(
+        weightKilograms: Double, completedRepetitions: Int
+    ) -> Double? {
+        guard weightKilograms.isFinite, weightKilograms > 0,
+              weightKilograms <= 1_000,
+              (1...10).contains(completedRepetitions) else { return nil }
+        if completedRepetitions == 1 { return weightKilograms }
+        return weightKilograms * (1 + Double(completedRepetitions) / 30.0)
+    }
+
+    static func measuredAveragePace(
+        distanceMeters: Double, elapsedSeconds: Double
+    ) -> Double? {
+        guard distanceMeters.isFinite, elapsedSeconds.isFinite,
+              distanceMeters > 0, elapsedSeconds > 0 else { return nil }
+        return elapsedSeconds * 1_000 / distanceMeters
+    }
+}
+
 /// Shared compact picker for new exercises and individual MAIN workout steps.
 struct ATHLTHAssessmentMethodPicker: View {
     @Binding var selection: ATHLTHAssessmentMethod?
