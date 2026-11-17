@@ -93,6 +93,30 @@ enum ATHLTHRouteAttemptDirectionPolicy {
         return route.last
     }
 
+    /// All recorded workouts remain part of the athlete's history, even
+    /// when an old record has no verifiable GPS direction.
+    static func personalHistory(
+        _ attempts: [RouteAttemptRecord],
+        userID: UUID
+    ) -> [RouteAttemptRecord] {
+        attempts
+            .filter { $0.userID == userID }
+            .sorted { $0.startedAt > $1.startedAt }
+    }
+
+    /// The selected direction shows its own runs plus legacy unknown-direction
+    /// runs; leaderboard eligibility is deliberately checked elsewhere.
+    static func visiblePersonalHistory(
+        _ attempts: [RouteAttemptRecord],
+        direction: ATHLTHRouteAttemptDirection,
+        userID: UUID
+    ) -> [RouteAttemptRecord] {
+        personalHistory(attempts, userID: userID).filter {
+            $0.direction == direction ||
+                ($0.direction ?? .unknown) == .unknown
+        }
+    }
+
     static func eligible(
         _ attempts: [RouteAttemptRecord],
         direction: ATHLTHRouteAttemptDirection,
