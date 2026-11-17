@@ -241,6 +241,49 @@ final class ATHLTHTrainProgressionCoachTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
+    func testRenamedLibraryExerciseStillUsesMatchingCanonicalID() {
+        var plan = makePlan(weeks: 3)
+        let exerciseID = UUID()
+        for week in plan.weeks.indices {
+            plan.weeks[week].days[0].sessions[0]
+                .exercises[0].embeddedExercise.libraryExerciseID = exerciseID
+        }
+        let first = plan.weeks[0].days[0].sessions[0].id
+        let second = plan.weeks[1].days[0].sessions[0].id
+        var older = logged(first, offset: 0)
+        var newer = logged(second, offset: 1)
+        older.exercises[0].exercise.libraryExerciseID = exerciseID
+        newer.exercises[0].exercise.libraryExerciseID = exerciseID
+        older.exercises[0].exercise.name = "Old curl name"
+        newer.exercises[0].exercise.name = "Updated curl name"
+        let result = ATHLTHTrainProgressionCoach.suggestions(
+            plan: plan, strengthHistory: [older, newer],
+            completedSessionIDs: [first, second],
+            skippedSessionIDs: [],
+            increaseKg: 1,
+            now: date(week: 3)
+        )
+        XCTAssertEqual(result.count, 1)
+    }
+
+    func testDuplicateExerciseEntriesWithinLatestWorkoutVetoWeightReview() {
+        let plan = makePlan(weeks: 3)
+        let first = plan.weeks[0].days[0].sessions[0].id
+        let second = plan.weeks[1].days[0].sessions[0].id
+        let earlier = logged(first, offset: 0)
+        var latest = logged(second, offset: 1)
+        var duplicate = latest.exercises[0]
+        duplicate.id = UUID()
+        latest.exercises.append(duplicate)
+        let result = ATHLTHTrainProgressionCoach.suggestions(
+            plan: plan,
+            strengthHistory: [earlier, latest],
+            completedSessionIDs: [first, second],
+            skippedSessionIDs: [], now: date(week: 3)
+        )
+        XCTAssertTrue(result.isEmpty)
+    }
+
     func testRepetitionProgressionRequiresExplicitRangeAndPlanGoal() {
         var plan = makePlan(weeks: 3, load: 14)
         plan.builderProfile = TrainingPlanBuilderProfile(
