@@ -304,6 +304,10 @@ struct ProductRootTabView: View {
         guard session.signedIn else { return }
         let accountID = session.profile.userID
         guard routedInterruptedPlanAccount != accountID else { return }
+        // Cold-start tab routing is single-shot for each authenticated account.
+        // A transient session refresh on warm foreground must not redirect
+        // someone away from a card already open in the navigation stack.
+        routedInterruptedPlanAccount = accountID
         // Compatibility/preview UI must remain on its requested tab.
         guard !ProcessInfo.processInfo.arguments.contains(where: {
             $0.hasPrefix("--athlth-compatibility-tab=")
@@ -311,7 +315,6 @@ struct ProductRootTabView: View {
         guard TrainProgramCreationLaunch.interruptedDraft(
             userID: accountID, store: ATHLTHPlanCreationDraftStore()
         ) != nil else { return }
-        routedInterruptedPlanAccount = accountID
         selectedTab = 1
     }
 
@@ -498,8 +501,6 @@ struct ProductRootTabView: View {
                 goalAccountSync.scheduleSync(session: session, goals: goalStore)
                 openPendingWorkoutInviteIfNeeded()
                 restoreInterruptedPlanTabIfNeeded()
-            } else {
-                routedInterruptedPlanAccount = nil
             }
         }
         .onReceive(NotificationCenter.default.publisher(
