@@ -121,9 +121,9 @@ struct ATHLTHPlannedRunStepEditor: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("athlth-run-step-name")
 
-                if let notes = block.notes?
-                    .trimmingCharacters(in: .whitespacesAndNewlines),
-                   !notes.isEmpty {
+                if let notes = block.notes?.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ), !notes.isEmpty {
                     Text(notes)
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
