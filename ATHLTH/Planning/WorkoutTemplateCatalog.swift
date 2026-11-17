@@ -8470,9 +8470,6 @@ struct WorkoutTemplateBuilderView: View {
             block.restBetweenSetsSeconds = 90
         }
         block.exerciseID = entry.id
-        block.assessmentMethod = ATHLTHAssessmentMethod.normalized(
-            entry.exercise.assessmentMethod, for: block
-        )
         block.exerciseSnapshot = entry.source == .custom &&
             entry.exercise.isVisibleOutsideOwnerLibrary
             ? ATHLTHExerciseReferenceResolver.shareableSnapshot(entry.exercise)
@@ -8482,6 +8479,11 @@ struct WorkoutTemplateBuilderView: View {
         if groupID == nil {
             block = ATHLTHRunningLibraryExerciseAdapter.adapt(block)
         }
+        // Apply the exercise's selected method AFTER activity adaptation:
+        // a running library exercise may initially be a generic exercise.
+        block.assessmentMethod = ATHLTHAssessmentMethod.normalized(
+            entry.exercise.assessmentMethod, for: block
+        )
         if block.groupKind == .dropSet, let id = block.groupID {
             // The first picked library exercise is the base. Each subsequent
             // stage is an explicit effort with its own planned reps/load.
