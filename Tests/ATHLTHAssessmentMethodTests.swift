@@ -118,4 +118,47 @@ final class ATHLTHAssessmentMethodTests: XCTestCase {
         XCTAssertEqual(decoded.assessmentMethod, .estimatedOneRepMax)
         XCTAssertEqual(decoded.instructions, snapshot.instructions)
     }
+
+    func testCooperUsesOnlyMeasuredTwelveMinuteTestDistance() throws {
+        let result = try XCTUnwrap(ATHLTHAssessmentCalculation.cooperVO2Max(
+            measuredMeters: 2_400, testDurationSeconds: 720
+        ))
+        XCTAssertEqual(result, (2_400 - 504.9) / 44.73, accuracy: 0.001)
+        XCTAssertNil(ATHLTHAssessmentCalculation.cooperVO2Max(
+            measuredMeters: 2_400, testDurationSeconds: 360
+        ))
+        XCTAssertNil(ATHLTHAssessmentCalculation.cooperVO2Max(
+            measuredMeters: .nan, testDurationSeconds: 720
+        ))
+    }
+
+    func testStrengthEstimateRequiresValidWeightAndFewRepetitions() throws {
+        XCTAssertEqual(
+            ATHLTHAssessmentCalculation.estimatedOneRepMax(
+                weightKilograms: 100, completedRepetitions: 1
+            ), 100
+        )
+        let estimated = try XCTUnwrap(
+            ATHLTHAssessmentCalculation.estimatedOneRepMax(
+                weightKilograms: 80, completedRepetitions: 5
+            )
+        )
+        XCTAssertEqual(estimated, 80 * (1 + 5.0 / 30), accuracy: 0.001)
+        XCTAssertNil(ATHLTHAssessmentCalculation.estimatedOneRepMax(
+            weightKilograms: 80, completedRepetitions: 20
+        ))
+        XCTAssertNil(ATHLTHAssessmentCalculation.estimatedOneRepMax(
+            weightKilograms: -10, completedRepetitions: 5
+        ))
+    }
+
+    func testTimedRunPaceRequiresActualDistanceAndElapsedTime() {
+        XCTAssertEqual(ATHLTHAssessmentCalculation.measuredAveragePace(
+            distanceMeters: 1_000, elapsedSeconds: 240
+        ), 240)
+        XCTAssertNil(ATHLTHAssessmentCalculation.measuredAveragePace(
+            distanceMeters: 0, elapsedSeconds: 360
+        ))
+    }
+
 }
