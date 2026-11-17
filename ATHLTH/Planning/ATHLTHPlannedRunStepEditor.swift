@@ -23,7 +23,7 @@ struct ATHLTHPlannedRunStepEditor: View {
             "sustained maximal effort", "testløp", "time trial",
             "cooper-test", "cooper test", "shuttle test", "skytteltest",
             "conconi-test", "conconi test", "laktat-trinntest",
-            "lactate step test"
+            "lactate step test", "maf-test", "maf test"
         ]
         return !runningOnlyMarkers.contains { title.contains($0) }
     }
