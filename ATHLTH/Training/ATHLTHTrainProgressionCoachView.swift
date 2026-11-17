@@ -25,6 +25,7 @@ struct ATHLTHTrainProgressionCoachView: View {
     @State private var pendingPlanVersion = 0
     @State private var confirmationVisible = false
     @State private var resultMessage: String?
+    @State private var expandedEvidenceExerciseIDs: Set<UUID> = []
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.47, green: 0.45, blue: 0.43)
@@ -449,6 +450,12 @@ struct ATHLTHTrainProgressionCoachView: View {
             .font(.caption)
             .foregroundStyle(muted)
 
+            evidenceDisclosure(
+                exerciseID: item.exerciseID,
+                workoutIDs: item.sourceWorkoutIDs,
+                setIDs: item.sourceSetIDs
+            )
+
             Toggle(
                 isOn: Binding(
                     get: { confirmedLoadEquipment.contains(item.exerciseID) },
@@ -543,6 +550,12 @@ struct ATHLTHTrainProgressionCoachView: View {
             .font(.caption)
             .foregroundStyle(muted)
 
+            evidenceDisclosure(
+                exerciseID: item.exerciseID,
+                workoutIDs: item.sourceWorkoutIDs,
+                setIDs: item.sourceSetIDs
+            )
+
             Button {
                 guard let range = selectedRepRange else { return }
                 pendingRepetitionSuggestion = item
@@ -621,9 +634,106 @@ struct ATHLTHTrainProgressionCoachView: View {
             )
             .font(.caption)
             .foregroundStyle(muted)
+
+            evidenceDisclosure(
+                exerciseID: item.exerciseID,
+                workoutIDs: item.sourceWorkoutIDs,
+                setIDs: []
+            )
         }
         .padding(16)
         .coachSurface(border)
+    }
+
+    /// Explanations use exact logged workout and set IDs from the
+    /// deterministic Coach decision, never arbitrary similarly named lifts.
+    /// The detail stays collapsed for smooth scrolling on iPhone and iPad.
+    private func evidenceDisclosure(
+        exerciseID: UUID,
+        workoutIDs: [UUID],
+        setIDs: [UUID]
+    ) -> some View {
+        let expanded = expandedEvidenceExerciseIDs.contains(exerciseID)
+        let sourceIDs = Set(workoutIDs)
+        let exactSets = Set(setIDs)
+        return VStack(alignment: .leading, spacing: 9) {
+            Button {
+                if expanded {
+                    expandedEvidenceExerciseIDs.remove(exerciseID)
+                } else {
+                    expandedEvidenceExerciseIDs.insert(exerciseID)
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "doc.text.magnifyingglass")
+                    Text(tr("Why this suggestion?", "Hvorfor dette forslaget?"))
+                    Spacer()
+                    Text("\(sourceIDs.count)")
+                        .monospacedDigit()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(champagne)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if expanded {
+                let sourceWorkouts = strength.workoutHistory
+                    .filter { sourceIDs.contains($0.id) && $0.isFinished }
+                    .sorted {
+                        ($0.endedAt ?? $0.startedAt) >
+                        ($1.endedAt ?? $1.startedAt)
+                    }
+                if sourceWorkouts.isEmpty {
+                    Text(tr(
+                        "The source workouts are not stored locally on this device. No results have been inferred.",
+                        "Kildeøktene er ikke lagret lokalt på denne enheten. Ingen resultater er gjettet."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                } else {
+                    ForEach(sourceWorkouts, id: \.id) { workout in
+                        let included = workout.exercises.flatMap(\.sets).filter {
+                            exactSets.contains($0.id)
+                        }
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundStyle(champagne)
+                                .padding(.top, 2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(workout.title)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                Text((workout.endedAt ?? workout.startedAt)
+                                    .formatted(date: .abbreviated, time: .omitted))
+                                    .font(.caption2)
+                                    .foregroundStyle(muted)
+                                if !included.isEmpty {
+                                    Text(tr(
+                                        "\(included.count) verified working sets",
+                                        "\(included.count) kontrollerte arbeidssett"
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(muted)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    if sourceWorkouts.count < sourceIDs.count {
+                        Text(tr(
+                            "Other source workouts are not available locally.",
+                            "Andre kildeøkter er ikke tilgjengelige lokalt."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("athlth-coach-source-evidence")
     }
 
     private var infoFooter: some View {
