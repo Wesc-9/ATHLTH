@@ -531,7 +531,7 @@ struct CustomQuickStartSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             ATHLTHWorkoutDetailsCard(
                 activityTitle: tr("Free training", "Fri trening"),
-                symbol: "figure.mixed.cardio"
+                symbol: "figure.cross.training"
             ) {
                 Text(tr(
                     "No plan. No targets. Just go train.",
