@@ -254,3 +254,5 @@ ATHLTH 2.2.2 build 130 — authorized retry 2026-11-16 after Build ATHLTH 438646
 ATHLTH 2.2.3 build 131 — 2026-11-17 user-authorized recovery upload after 2.2.2 build 130 startup crashes; latest release head e3e5490d0f9ba7703d722f418775c27a25ad2c99; validate iPhone/Watch and backend then upload to TestFlight; fix failures and retry.
 
 ATHLTH 2.2.3 build 131 — retry 2026-11-17 after SwiftUI Section compiler fix 67c198885aa923fd98807583ff382654c3f227d1; user-authorized recovery upload, require same-commit build and backend success before App Store Connect.
+
+ATHLTH 2.2.3 build 131 — 2026-11-17 retry after fixing ATHLTHTrainTodayLayoutTests missing onQuickFreeTraining closure (6a56eeb82062212b539d55cc4645956849e92fbb); require same-commit Build ATHLTH and backend success, signed archive and Apple upload confirmation.
