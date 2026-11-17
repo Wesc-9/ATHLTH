@@ -10,6 +10,8 @@ struct ATHLTHTrainProgressionCoachView: View {
     let planID: UUID
 
     @State private var incrementKg = 1.0
+    // Confirmation is per exercise, never a blanket equipment assertion.
+    @State private var confirmedLoadEquipment: Set<UUID> = []
     @State private var repetitionOptionsEnabled = false
     @State private var repetitionRangeLower = 6
     @State private var repetitionRangeUpper = 12
@@ -309,6 +311,9 @@ struct ATHLTHTrainProgressionCoachView: View {
                 Text("+2,5 kg").tag(2.5)
             }
             .pickerStyle(.segmented)
+            .onChange(of: incrementKg) { _, _ in
+                confirmedLoadEquipment.removeAll()
+            }
 
             Text(tr(
                 "This is a user-adjustable option, not a medical or performance guarantee. A suggestion requires two separate completed, linked strength sessions meeting their targets.",
@@ -458,7 +463,29 @@ struct ATHLTHTrainProgressionCoachView: View {
             .font(.caption)
             .foregroundStyle(muted)
 
+            Toggle(
+                isOn: Binding(
+                    get: { confirmedLoadEquipment.contains(item.exerciseID) },
+                    set: { enabled in
+                        if enabled {
+                            confirmedLoadEquipment.insert(item.exerciseID)
+                        } else {
+                            confirmedLoadEquipment.remove(item.exerciseID)
+                        }
+                    }
+                )
+            ) {
+                Text(tr(
+                    "I confirm that the weight units match my logged workouts and this increase is available with my equipment.",
+                    "Jeg bekrefter at vekten er oppgitt på samme måte som i historikken, og at denne økningen er mulig med utstyret mitt."
+                ))
+                .font(.caption)
+                .foregroundStyle(muted)
+            }
+            .tint(champagne)
+
             Button {
+                guard confirmedLoadEquipment.contains(item.exerciseID) else { return }
                 pendingSuggestion = item
                 pendingPlanVersion = planVersion
                 confirmationVisible = true
@@ -476,6 +503,7 @@ struct ATHLTHTrainProgressionCoachView: View {
                 .background(ink, in: RoundedRectangle(cornerRadius: 11))
             }
             .buttonStyle(.plain)
+            .disabled(!confirmedLoadEquipment.contains(item.exerciseID))
         }
         .padding(16)
         .coachSurface(border)
@@ -645,7 +673,8 @@ struct ATHLTHTrainProgressionCoachView: View {
     }
 
     private func approve() {
-        guard let item = pendingSuggestion else { return }
+        guard let item = pendingSuggestion,
+              confirmedLoadEquipment.contains(item.exerciseID) else { return }
         let saved = session.applySuggestedTrainingLoad(
             planID: planID,
             workoutID: item.workoutID,
