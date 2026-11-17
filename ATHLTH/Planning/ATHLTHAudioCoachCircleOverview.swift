@@ -370,14 +370,10 @@ struct ATHLTHAudioCoachCircleOverview: View {
                             Text(group.name)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ink)
-                            Text(displayTrigger == .time
-                                 ? tr("Every \(displayInterval ?? 60) seconds · \(spokenValues + options.count) commands",
-                                      "Hvert \(displayInterval ?? 60) sekund · \(spokenValues + options.count) kommandoer")
-                                 : displayTrigger == .distance
-                                 ? tr("Every \(displayInterval ?? 1_000) metres · \(spokenValues + options.count) commands",
-                                      "Hver \(displayInterval ?? 1_000) meter · \(spokenValues + options.count) kommandoer")
-                                 : tr("\(spokenValues + options.count) commands",
-                                      "\(spokenValues + options.count) kommandoer"))
+                            Text((displayTrigger?.summary(interval: displayInterval ?? 1) ??
+                                  tr("No trigger", "Ingen trigger")) + " · " +
+                                 tr("\(spokenValues + options.count) commands",
+                                    "\(spokenValues + options.count) kommandoer"))
                             .font(.caption)
                             .foregroundStyle(dim)
                         }
