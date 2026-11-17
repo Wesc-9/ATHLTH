@@ -1706,13 +1706,6 @@ struct GoalCreationView: View {
                 // silently replace an existing main goal by default.
                 makePrimary = goalStore.primaryGoal == nil
             }
-            .onChange(of: category) { _, newValue in
-                applyDefaults(for: newValue)
-                automaticTracking = newValue != .custom
-                setupMilestones.removeAll()
-                newMilestoneTitle = ""
-                newMilestoneDetail = ""
-            }
             .onChange(of: selectedPhoto) { _, item in
                 Task {
                     imageData = try? await item?.loadTransferable(type: Data.self)
@@ -1763,7 +1756,7 @@ struct GoalCreationView: View {
 
     private var goalWizardContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 19) {
+            VStack(alignment: .leading, spacing: step == 0 ? 10 : 19) {
                 goalWizardHeader
 
                 if step == 0 {
@@ -1793,21 +1786,25 @@ struct GoalCreationView: View {
                 }
             }
             .padding(.horizontal, 18)
-            .padding(.top, 18)
-            .padding(.bottom, 32)
+            .padding(.top, step == 0 ? 10 : 18)
+            .padding(.bottom, step == 0 ? 10 : 32)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .background(goalFlowCanvas.ignoresSafeArea())
+        // Choosing a goal type advances immediately, so a pinned
+        // "Continue" button would consume room and duplicate the action.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            footer
+            if step > 0 {
+                footer
+            }
         }
     }
 
     private var goalWizardHeader: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: step == 0 ? 12 : 20) {
             HStack(spacing: 12) {
                 if step > 0 {
                     Button {
@@ -1865,7 +1862,7 @@ struct GoalCreationView: View {
             .foregroundStyle(ATHLTHPlanDesign.ink)
             .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: step == 0 ? 7 : 10) {
                 HStack {
                     Text(ATHLTHLocalization.format(
                         english: "STEP %d OF 3", norwegian: "STEG %d AV 3", step + 1
@@ -1890,14 +1887,14 @@ struct GoalCreationView: View {
                 .accessibilityHidden(true)
             }
 
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: step == 0 ? 5 : 9) {
                 Text(step == 0
                     ? ATHLTHLocalization.choose(
                         english: "What would you like to achieve?",
                         norwegian: "Hva vil du oppnå?"
                     ) : goalStepHeroTitle
                 )
-                .font(.system(size: 34, weight: .regular, design: .serif))
+                .font(.system(size: step == 0 ? 31 : 34, weight: .regular, design: .serif))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
@@ -1908,7 +1905,7 @@ struct GoalCreationView: View {
                          norwegian: "Velg det som betyr mest for deg. Vi tilpasser resten."
                      ) : goalStepHeroSubtitle
                 )
-                .font(.subheadline)
+                .font(step == 0 ? .system(size: 13) : .subheadline)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -2055,37 +2052,48 @@ struct GoalCreationView: View {
     }
 
     private var categoryStep: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 6) {
             ForEach([
                 GoalCategory.endurance, .strength, .body, .consistency,
                 .event, .recovery, .custom
             ]) { option in
                 let selected = category == option
                 Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
+                    // Do not require a second tap on the footer. Apply the
+                    // chosen defaults synchronously before step 2 appears.
+                    // Re-selecting the existing category preserves draft input.
+                    if category != option {
                         category = option
+                        applyDefaults(for: option)
+                        automaticTracking = option != .custom
+                        setupMilestones.removeAll()
+                        newMilestoneTitle = ""
+                        newMilestoneDetail = ""
+                    }
+                    withAnimation(.easeInOut(duration: 0.20)) {
+                        step = 1
                     }
                 } label: {
-                    HStack(spacing: 13) {
+                    HStack(spacing: 10) {
                         Image(systemName: option.systemImage)
-                            .font(.system(size: 19, weight: .medium))
+                            .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(selected
                                 ? ATHLTHPlanDesign.ink
                                 : goalFlowGold)
-                            .frame(width: 48, height: 48)
+                            .frame(width: 40, height: 40)
                             .background(selected
                                 ? ATHLTHPlanDesign.selectedSurface
                                 : ATHLTHPlanDesign.warmSurface,
-                                in: RoundedRectangle(cornerRadius: 15))
+                                in: RoundedRectangle(cornerRadius: 12))
 
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(option.title)
-                                .font(.system(size: 17, weight: .semibold,
+                                .font(.system(size: 16, weight: .semibold,
                                               design: .serif))
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .lineLimit(2)
                             Text(option.subtitle)
-                                .font(.system(size: 12))
+                                .font(.system(size: 11))
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -2094,27 +2102,27 @@ struct GoalCreationView: View {
                         Image(systemName: selected
                               ? "checkmark.circle.fill"
                               : "circle")
-                            .font(.system(size: 22))
+                            .font(.system(size: 19))
                             .foregroundStyle(selected
                                 ? goalFlowGold
                                 : ATHLTHPlanDesign.warmDivider)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(selected
                         ? ATHLTHPlanDesign.selectedSurface.opacity(0.42)
                         : Color.white,
-                        in: RoundedRectangle(cornerRadius: 20))
+                        in: RoundedRectangle(cornerRadius: 17))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20)
+                        RoundedRectangle(cornerRadius: 17)
                             .strokeBorder(selected
                                 ? goalFlowGold.opacity(0.78)
                                 : ATHLTHPlanDesign.warmDivider.opacity(0.62),
                                 lineWidth: selected ? 1.25 : 0.8)
                             .allowsHitTesting(false)
                     }
-                    .contentShape(RoundedRectangle(cornerRadius: 20))
+                    .contentShape(RoundedRectangle(cornerRadius: 17))
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selected ? .isSelected : [])
