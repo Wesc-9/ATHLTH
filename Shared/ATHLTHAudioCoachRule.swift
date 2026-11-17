@@ -1,5 +1,30 @@
 import Foundation
 
+/// Workout phases for named Coach groups. Existing groups remain enabled for
+/// the entire workout unless the athlete explicitly selects a phase.
+enum ATHLTHCoachWorkoutPhase: String, Codable, CaseIterable, Identifiable {
+    case warmup, main, recovery, cooldown
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .warmup: return ATHLTHLocalization.choose(english: "Warm-up", norwegian: "Oppvarming")
+        case .main: return ATHLTHLocalization.choose(english: "Main section", norwegian: "Hoveddel")
+        case .recovery: return ATHLTHLocalization.choose(english: "Recovery / rest", norwegian: "Pause")
+        case .cooldown: return ATHLTHLocalization.choose(english: "Cool-down", norwegian: "Nedjogging")
+        }
+    }
+
+    func matches(stepPhase: String?) -> Bool {
+        switch self {
+        case .warmup: return stepPhase == "warmup"
+        case .main: return stepPhase == "work" || stepPhase == "steady" || stepPhase == "main"
+        case .recovery: return stepPhase == "recovery"
+        case .cooldown: return stepPhase == "cooldown"
+        }
+    }
+}
+
 /// Independent periodic Audio Coach rules. Stored as part of the iPhone
 /// settings and copied unchanged to a Watch workout's configuration.
 struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
@@ -168,6 +193,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     /// Optional for old saved profiles and existing Watch transfers.
     /// Disabled groups remain visible/editable but never create a spoken cue.
     var enabled: Bool? = nil
+    /// Rule-effective phase selection is assembled from its Coach group when
+    /// a workout starts, leaving the saved authored rule untouched.
+    var allowedPhases: [ATHLTHCoachWorkoutPhase]? = nil
     var encouragementStyle: ATHLTHCoachEncouragementStyle? = nil
     var scope: Scope? = nil
     /// An optional single-shot cue before a planned finish. Nothing is
@@ -176,6 +204,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     var customPhrase: String? = nil
 
     var isEnabled: Bool { enabled ?? true }
+
+    func matchesPhase(_ context: ATHLTHCoachReadoutContext) -> Bool {
+        guard let allowedPhases, !allowedPhases.isEmpty else { return true }
+        return allowedPhases.contains { $0.matches(stepPhase: context.stepPhase) }
+    }
 
     var selectedMetrics: [Metric] {
         var ordered: [Metric] = [metric]
@@ -559,7 +592,7 @@ enum ATHLTHAudioCoachRuleDelivery {
             if !alreadyConsumed {
                 lastSlots[rule.id] = current
             }
-            guard rule.isEnabled else { continue }
+            guard rule.isEnabled, rule.matchesPhase(context) else { continue }
             // Simultaneous rules are composed into one speech event. A
             // metric already included by another rule is not repeated.
             let available = rule.selectedMetrics.filter { metric in
@@ -744,6 +777,8 @@ struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
     var interval: Int? = nil
     /// Nil for existing saved templates and older Watch payloads (enabled).
     var enabled: Bool? = nil
+    /// Nil means all workout phases (legacy behavior). Empty also means all.
+    var phases: [ATHLTHCoachWorkoutPhase]? = nil
 
     var isEnabled: Bool { enabled ?? true }
 }
@@ -751,10 +786,16 @@ struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
 /// Disabled groups remain editable, but their linked rules never speak.
 extension WatchAudioCoachConfiguration {
     var activeCustomRules: [ATHLTHAudioCoachRule] {
-        let muted = Set((coachGroups ?? [])
-            .filter { !$0.isEnabled }
-            .flatMap(\.ruleIDs))
-        return (customRules ?? []).filter { $0.isEnabled && !muted.contains($0.id) }
+        let groups = coachGroups ?? []
+        let muted = Set(groups.filter { !$0.isEnabled }.flatMap(\.ruleIDs))
+        return (customRules ?? []).compactMap { authored -> ATHLTHAudioCoachRule? in
+            guard authored.isEnabled && !muted.contains(authored.id) else { return nil }
+            var effective = authored
+            if let group = groups.first(where: { $0.ruleIDs.contains(authored.id) }) {
+                effective.allowedPhases = group.phases
+            }
+            return effective
+        }
     }
 }
 
@@ -801,7 +842,8 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
 
     static func needsSegmentData(_ rules: [ATHLTHAudioCoachRule]) -> Bool {
         rules.contains { rule in
-            rule.isEnabled && (rule.beforeEndSeconds != nil ||
+            rule.isEnabled && ((rule.allowedPhases?.isEmpty == false) ||
+                rule.beforeEndSeconds != nil ||
                 rule.trigger.needsStructuredStep ||
                 (rule.scope ?? .workout) != .workout ||
                 rule.selectedMetrics.contains { metric in
