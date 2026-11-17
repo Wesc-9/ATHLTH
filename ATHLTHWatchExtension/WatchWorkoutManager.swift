@@ -4782,7 +4782,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         adaptiveCoachState.reset()
         let configuration = audioCoachConfiguration
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
-            rules: configuration.customRules ?? [],
+            rules: configuration.activeCustomRules,
             distanceMeters: distanceMeters,
             elapsedSeconds: elapsedTime
         )
@@ -4888,7 +4888,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// Read only crossed rule milestones; the routine scheduler merges
     /// these with basic distance/time updates before speaking.
     private var coachReadoutContext: ATHLTHCoachReadoutContext {
-        let rules = audioCoachConfiguration.customRules ?? []
+        let rules = audioCoachConfiguration.activeCustomRules
         return ATHLTHCoachReadoutContext.make(
             plan: ATHLTHCoachReadoutContext.needsSegmentData(rules) ? structuredRunningWorkout : nil,
             index: currentCoachRunningStepIndex,
@@ -4904,7 +4904,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return []
         }
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
-            rules: audioCoachConfiguration.customRules ?? [],
+            rules: audioCoachConfiguration.activeCustomRules,
             distanceMeters: distanceMeters,
             elapsedSeconds: elapsedTime,
             paceSecondsPerKilometer:
@@ -4928,7 +4928,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // Exact scheduled motivation groups own their cadence. Do not also
         // emit the legacy approximate motivation timer for the same workout.
         var resolvedSettings = configuredSettings
-        if (audioCoachConfiguration.customRules ?? []).contains(where: {
+        if (audioCoachConfiguration.activeCustomRules).contains(where: {
             $0.isEnabled && $0.selectedMetrics.contains(.motivation)
         }) {
             resolvedSettings.motivationEnabled = false
@@ -8629,7 +8629,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             runningStepCoachBrief: currentRunningStep?.coachBrief,
             runningStepMotivation: currentRunningStep?.intervalMotivation,
             runningCoachReport: latestRunningCoachReport,
-            coachReadoutContext: ATHLTHCoachReadoutContext.needsSegmentData(audioCoachConfiguration.customRules ?? [])
+            coachReadoutContext: ATHLTHCoachReadoutContext.needsSegmentData(audioCoachConfiguration.activeCustomRules)
                 ? coachReadoutContext : nil,
             runningStepPhase: currentRunningStep?.phase,
             runningStepTargetHeartRateZone: currentRunningStep?.targetHeartRateZone,
