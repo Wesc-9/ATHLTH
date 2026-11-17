@@ -88,6 +88,73 @@ enum ATHLTHThreeMinuteAllOut {
         let rounded = Int(secondsPerKilometer.rounded())
         return String(format: "%d:%02d", rounded / 60, rounded % 60)
     }
+    static var protocolSections: [(title: String, detail: String)] {
+        [
+            (
+                localized("Location and equipment", "Underlag og utstyr"),
+                localized(
+                    "Use a flat, measured 400 m athletics track, preferably in similar conditions between tests. Avoid a treadmill because you must be free to slow down naturally. Use reliable distance measurement.",
+                    "Bruk en flat, oppmålt friidrettsbane på 400 meter, helst under sammenlignbare forhold mellom testene. Unngå tredemølle, fordi du må kunne senke farten naturlig. Bruk pålitelig distansemåling."
+                )
+            ),
+            (
+                localized("Warm-up · 15–20 min", "Oppvarming · 15–20 min"),
+                localized(
+                    "Jog easily, do dynamic mobility and running drills, then 2–3 progressive strides of about 10 seconds. Walk or jog very lightly between strides and be ready to start the test fully recovered.",
+                    "Jogg rolig, gjør dynamisk bevegelighet og løpsdriller, og avslutt med 2–3 progressive stigningsløp på omtrent 10 sekunder. Gå eller jogg svært rolig mellom dragene, slik at du er klar til testen."
+                )
+            ),
+            (
+                localized("Test effort · exactly 3:00", "Testdrag · nøyaktig 3:00"),
+                localized(
+                    "Start at maximum effort from the first second. Do not reserve energy or pace yourself. Continue to push as your speed naturally declines until 180 seconds have passed.",
+                    "Start med maksimal innsats fra første sekund. Ikke spar på kreftene eller forsøk å holde en bestemt fart. Fortsett å presse hele veien mens farten gradvis avtar, til 180 sekunder er gått."
+                )
+            ),
+            (
+                localized("Watch and audio", "Klokke og lyd"),
+                localized(
+                    "Hide current speed and pace on the watch. Use a clear sound alert to know when the 180 seconds are over. You must still collect accurate distance measurements.",
+                    "Skjul fart og tempo på klokka under testdraget. Bruk et tydelig lydvarsel når de 180 sekundene er over. Distansen må fortsatt måles nøyaktig."
+                )
+            ),
+            (
+                localized("Measurements", "Målinger"),
+                localized(
+                    "Record the distance covered during the complete 180-second test effort, and separately the distance covered from 2:30 to 3:00. Do not use the whole workout's total distance, which includes warm-up and cool-down.",
+                    "Noter distansen i selve testdraget på 180 sekunder, og separat distansen mellom 2:30 og 3:00. Ikke bruk totaldistansen for hele treningsøkten, som også inkluderer oppvarming og nedtrapping."
+                )
+            ),
+            (
+                localized("Cool-down", "Nedtrapping"),
+                localized(
+                    "Walk first and then jog very easily, following the planned cool-down. Stop if you feel unwell.",
+                    "Start med gange og fortsett med svært rolig jogg, slik nedtrappingen er planlagt. Avbryt dersom du føler deg uvel."
+                )
+            ),
+            (
+                localized("How results are calculated", "Slik beregnes resultatene"),
+                localized(
+                    "Estimated critical speed (CS) = distance covered in the final 30 seconds / 30 seconds. Estimated D′ = total test distance − CS × 180 seconds. CS is not a directly measured lactate threshold, and D′ is not a direct lactate measurement.",
+                    "Estimert kritisk hastighet (CS) = distansen de siste 30 sekundene / 30 sekunder. Estimert D′ = distansen i testdraget − CS × 180 sekunder. CS er ikke en direkte målt laktatterskel, og D′ er ikke en direkte måling av melkesyre."
+                )
+            )
+        ]
+    }
+
+
+    private static func localized(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
+    /// Persist the actual full protocol in the 3MT main-step notes, rather
+    /// than relying only on an ephemeral editor or generic title lookup.
+    static var fullProtocolNotes: String {
+        protocolSections.map { $0.title + "\n" + $0.detail }
+            .joined(separator: "\n\n")
+    }
+
+
 }
 
 /// One complete and reusable description, shown only for the ATHLTH 3MT.
@@ -101,57 +168,7 @@ struct ATHLTHThreeMinuteAllOutProtocol: View {
     }
 
     private var items: [(title: String, detail: String)] {
-        [
-            (
-                tr("Location and equipment", "Underlag og utstyr"),
-                tr(
-                    "Use a flat, measured 400 m athletics track, preferably in similar conditions between tests. Avoid a treadmill because you must be free to slow down naturally. Use reliable distance measurement.",
-                    "Bruk en flat, oppmålt friidrettsbane på 400 meter, helst under sammenlignbare forhold mellom testene. Unngå tredemølle, fordi du må kunne senke farten naturlig. Bruk pålitelig distansemåling."
-                )
-            ),
-            (
-                tr("Warm-up · 15–20 min", "Oppvarming · 15–20 min"),
-                tr(
-                    "Jog easily, do dynamic mobility and running drills, then 2–3 progressive strides of about 10 seconds. Walk or jog very lightly between strides and be ready to start the test fully recovered.",
-                    "Jogg rolig, gjør dynamisk bevegelighet og løpsdriller, og avslutt med 2–3 progressive stigningsløp på omtrent 10 sekunder. Gå eller jogg svært rolig mellom dragene, slik at du er klar til testen."
-                )
-            ),
-            (
-                tr("Test effort · exactly 3:00", "Testdrag · nøyaktig 3:00"),
-                tr(
-                    "Start at maximum effort from the first second. Do not reserve energy or pace yourself. Continue to push as your speed naturally declines until 180 seconds have passed.",
-                    "Start med maksimal innsats fra første sekund. Ikke spar på kreftene eller forsøk å holde en bestemt fart. Fortsett å presse hele veien mens farten gradvis avtar, til 180 sekunder er gått."
-                )
-            ),
-            (
-                tr("Watch and audio", "Klokke og lyd"),
-                tr(
-                    "Hide current speed and pace on the watch. Use a clear sound alert to know when the 180 seconds are over. You must still collect accurate distance measurements.",
-                    "Skjul fart og tempo på klokka under testdraget. Bruk et tydelig lydvarsel når de 180 sekundene er over. Distansen må fortsatt måles nøyaktig."
-                )
-            ),
-            (
-                tr("Measurements", "Målinger"),
-                tr(
-                    "Record the distance covered during the complete 180-second test effort, and separately the distance covered from 2:30 to 3:00. Do not use the whole workout's total distance, which includes warm-up and cool-down.",
-                    "Noter distansen i selve testdraget på 180 sekunder, og separat distansen mellom 2:30 og 3:00. Ikke bruk totaldistansen for hele treningsøkten, som også inkluderer oppvarming og nedtrapping."
-                )
-            ),
-            (
-                tr("Cool-down", "Nedtrapping"),
-                tr(
-                    "Walk first and then jog very easily, following the planned cool-down. Stop if you feel unwell.",
-                    "Start med gange og fortsett med svært rolig jogg, slik nedtrappingen er planlagt. Avbryt dersom du føler deg uvel."
-                )
-            ),
-            (
-                tr("How results are calculated", "Slik beregnes resultatene"),
-                tr(
-                    "Estimated critical speed (CS) = distance covered in the final 30 seconds / 30 seconds. Estimated D′ = total test distance − CS × 180 seconds. CS is not a directly measured lactate threshold, and D′ is not a direct lactate measurement.",
-                    "Estimert kritisk hastighet (CS) = distansen de siste 30 sekundene / 30 sekunder. Estimert D′ = distansen i testdraget − CS × 180 sekunder. CS er ikke en direkte målt laktatterskel, og D′ er ikke en direkte måling av melkesyre."
-                )
-            )
-        ]
+        ATHLTHThreeMinuteAllOut.protocolSections
     }
 
     var body: some View {
