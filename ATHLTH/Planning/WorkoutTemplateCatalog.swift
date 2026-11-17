@@ -985,6 +985,41 @@ struct PlanWorkoutPickerView: View {
     }
 }
 
+/// A–Å navigation across the complete filtered workout result, without
+/// materializing more than one 50-row page at a time.
+enum ATHLTHWorkoutAlphabetPage {
+    struct Index {
+        private(set) var targets: [String: UUID] = [:]
+        private(set) var offsets: [UUID: Int] = [:]
+
+        mutating func register(title: String, id: UUID, offset: Int) {
+            let letter = ATHLTHExerciseAlphabet.letter(for: title)
+            guard targets[letter] == nil else { return }
+            targets[letter] = id
+            offsets[id] = offset
+        }
+
+        func startIndex(for id: UUID) -> Int? { offsets[id] }
+    }
+
+    /// A group occupies [offset, offset + count) in the combined result.
+    /// Return the indices local to that group which intersect the visible page.
+    static func range(
+        startIndex: Int,
+        limit: Int,
+        offset: Int,
+        count: Int
+    ) -> Range<Int> {
+        let lower = min(count, max(0, startIndex - offset))
+        let upper = min(count, max(lower, startIndex + max(0, limit) - offset))
+        return lower..<upper
+    }
+
+    static func remainingCount(total: Int, startIndex: Int) -> Int {
+        max(0, total - max(0, startIndex))
+    }
+}
+
 struct WorkoutTemplateLibraryView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
@@ -1010,6 +1045,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var favoritesOnly = false
     @State private var mineOnly = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
+    @State private var visibleStartIndex = 0
     @State private var expandedWorkoutCardID: String?
     @State private var selectedMuscleFocus = "all"
     @State private var selectedWorkoutLevel = "all"
@@ -1686,34 +1722,33 @@ struct WorkoutTemplateLibraryView: View {
         }
     }
 
-    /// First visible item for each letter, respecting active search and
-    /// workout filters. IDs are the stable row IDs used by ScrollViewReader.
+    /// Index the complete filtered list, not just the mounted 50 cards.
+    /// Result group order matches the sections rendered below.
     private func workoutAlphabetTargets(
         entries: [WorkoutTemplateCatalogEntry],
         running: [RunningWorkoutTemplate],
         saved: [PlannedSession],
         scheduled: [PlannedSession]
-    ) -> [String: UUID] {
-        var targets: [String: UUID] = [:]
-        func register(_ title: String, id: UUID) {
-            let letter = ATHLTHExerciseAlphabet.letter(for: title)
-            if targets[letter] == nil { targets[letter] = id }
+    ) -> ATHLTHWorkoutAlphabetPage.Index {
+        var index = ATHLTHWorkoutAlphabetPage.Index()
+        var offset = 0
+        for workout in scheduled {
+            index.register(title: workout.title, id: workout.id, offset: offset)
+            offset += 1
         }
-        if onSelectPlanned != nil {
-            for workout in scheduled.prefix(50) {
-                register(workout.title, id: workout.id)
-            }
-            for workout in saved {
-                register(workout.title, id: workout.id)
-            }
+        for workout in saved {
+            index.register(title: workout.title, id: workout.id, offset: offset)
+            offset += 1
         }
         for entry in entries {
-            register(entry.title, id: entry.id)
+            index.register(title: entry.title, id: entry.id, offset: offset)
+            offset += 1
         }
         for workout in running {
-            register(workout.title, id: workout.id)
+            index.register(title: workout.title, id: workout.id, offset: offset)
+            offset += 1
         }
-        return targets
+        return index
     }
 
     private var pageFilterKey: String {
@@ -1738,29 +1773,44 @@ struct WorkoutTemplateLibraryView: View {
         // personal choices when opened as a workout selector.
         let totalResults = allEntries.count + allRunningTemplates.count +
             allSavedWorkouts.count + allScheduledWorkouts.count
-        let visibleScheduledWorkouts =
-            Array(allScheduledWorkouts.prefix(visibleLimit))
-        let visibleSavedWorkouts = Array(allSavedWorkouts.prefix(
-            max(0, visibleLimit - visibleScheduledWorkouts.count)
-        ))
-        let visibleEntries = Array(allEntries.prefix(
-            max(0, visibleLimit - visibleScheduledWorkouts.count -
-                visibleSavedWorkouts.count)
-        ))
-        let visibleRunningTemplates = Array(allRunningTemplates.prefix(
-            max(0, visibleLimit - visibleScheduledWorkouts.count -
-                visibleSavedWorkouts.count - visibleEntries.count)
-        ))
+        let scheduledOffset = 0
+        let savedOffset = allScheduledWorkouts.count
+        let catalogOffset = savedOffset + allSavedWorkouts.count
+        let runningOffset = catalogOffset + allEntries.count
+        // Virtual page across all four sections. A letter beyond the first
+        // 50 replaces the window instead of loading hundreds of cards.
+        let visibleScheduledWorkouts = Array(allScheduledWorkouts[
+            ATHLTHWorkoutAlphabetPage.range(
+                startIndex: visibleStartIndex, limit: visibleLimit,
+                offset: scheduledOffset, count: allScheduledWorkouts.count
+            )
+        ])
+        let visibleSavedWorkouts = Array(allSavedWorkouts[
+            ATHLTHWorkoutAlphabetPage.range(
+                startIndex: visibleStartIndex, limit: visibleLimit,
+                offset: savedOffset, count: allSavedWorkouts.count
+            )
+        ])
+        let visibleEntries = Array(allEntries[
+            ATHLTHWorkoutAlphabetPage.range(
+                startIndex: visibleStartIndex, limit: visibleLimit,
+                offset: catalogOffset, count: allEntries.count
+            )
+        ])
+        let visibleRunningTemplates = Array(allRunningTemplates[
+            ATHLTHWorkoutAlphabetPage.range(
+                startIndex: visibleStartIndex, limit: visibleLimit,
+                offset: runningOffset, count: allRunningTemplates.count
+            )
+        ])
         let shownResults = visibleEntries.count + visibleRunningTemplates.count +
             visibleSavedWorkouts.count + visibleScheduledWorkouts.count
-        let alphabetTargets: [String: UUID] =
-            initialCategory != nil && initialCategory != .running
-            ? workoutAlphabetTargets(
-                entries: visibleEntries,
-                running: visibleRunningTemplates,
-                saved: visibleSavedWorkouts,
-                scheduled: visibleScheduledWorkouts
-            ) : [:]
+        let alphabetIndex = workoutAlphabetTargets(
+            entries: allEntries,
+            running: allRunningTemplates,
+            saved: allSavedWorkouts,
+            scheduled: allScheduledWorkouts
+        )
         ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
@@ -2390,21 +2440,37 @@ struct WorkoutTemplateLibraryView: View {
                     }
                     }
                 }
-                ATHLTHLibraryLoadMoreButton(shown: shownResults, total: totalResults) {
+                ATHLTHLibraryLoadMoreButton(
+                    shown: shownResults,
+                    total: ATHLTHWorkoutAlphabetPage.remainingCount(
+                        total: totalResults, startIndex: visibleStartIndex
+                    )
+                ) {
                     visibleLimit += ATHLTHLibraryPagination.pageSize
                 }
             }
             .padding(.leading, 18)
-            .padding(.trailing, initialCategory == nil || initialCategory == .running ? 18 : 42)
+            .padding(.trailing, alphabetIndex.targets.isEmpty ? 18 : 42)
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity)
         }
+        // Recreate the scroll container when jumping to an unloaded letter.
+        // A fresh page begins at the top, avoiding a SwiftUI scroll race.
+        .id(visibleStartIndex)
         .overlay(alignment: .trailing) {
-            if initialCategory != nil && initialCategory != .running &&
-                !alphabetTargets.isEmpty {
-                ATHLTHExerciseAlphabetIndex(targets: alphabetTargets) { target in
-                    withAnimation(.easeInOut(duration: 0.22)) {
-                        proxy.scrollTo(target, anchor: .top)
+            if !alphabetIndex.targets.isEmpty {
+                ATHLTHExerciseAlphabetIndex(targets: alphabetIndex.targets) { target in
+                    guard let index = alphabetIndex.startIndex(for: target) else {
+                        return
+                    }
+                    if index >= visibleStartIndex &&
+                       index < visibleStartIndex + visibleLimit {
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            proxy.scrollTo(target, anchor: .top)
+                        }
+                    } else {
+                        visibleStartIndex = index
+                        visibleLimit = ATHLTHLibraryPagination.pageSize
                     }
                 }
                 .padding(.trailing, 6)
@@ -2420,6 +2486,7 @@ struct WorkoutTemplateLibraryView: View {
         ))
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: pageFilterKey) { _, _ in
+            visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .searchable(
