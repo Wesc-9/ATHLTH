@@ -8,7 +8,7 @@ enum ATHLTHWorkoutStepCopy {
     }
 
     static func title(for block: WorkoutTemplateBlock, workoutTitle: String, compact: Bool) -> String {
-        let block = ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+        let block = ATHLTHZonedLocalization.normalizeLegacyImportedStep(block)
         guard block.kind != .exercise else {
             return ATHLTHWorkoutNameSuggestion.displayStepTitle(block)
         }
