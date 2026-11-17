@@ -4047,6 +4047,15 @@ private struct HomeWeeklyProgressDaySheet: View {
         .padding(.top, 4)
     }
 
+    /// Keep the compact Coach/Favorites tiles at their existing height,
+    /// giving the time footer guaranteed space instead of clipping it.
+    private enum CoachSuggestionTileLayout {
+        static let width: CGFloat = 148
+        static let height: CGFloat = 191
+        static let imageHeight: CGFloat = 62
+        static let detailsHeight: CGFloat = height - imageHeight
+    }
+
     private func suggestionTile(_ workout: PlannedSession, index: Int) -> some View {
         let isStrength = workout.workoutCategory == "strength" || workout.kind == .strength
         let isRun = workout.workoutCategory == "running" || workout.kind == .running
@@ -4069,17 +4078,22 @@ private struct HomeWeeklyProgressDaySheet: View {
             Image(imageName)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 148, height: 78)
+                .frame(
+                    width: CoachSuggestionTileLayout.width,
+                    height: CoachSuggestionTileLayout.imageHeight
+                )
                 .clipped()
                 .overlay(alignment: .bottomLeading) {
+                    // Keep the badge inside the photo, not over the
+                    // category label when the photo becomes shorter.
                     Image(systemName: symbol)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(accent)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 34, height: 34)
                         .background(.regularMaterial,
-                                    in: RoundedRectangle(cornerRadius: 12))
-                        .offset(y: 10)
+                                    in: RoundedRectangle(cornerRadius: 11))
                         .padding(.leading, 10)
+                        .padding(.bottom, 5)
                 }
                 .overlay(alignment: .topTrailing) {
                     Image(systemName: "plus")
@@ -4090,27 +4104,29 @@ private struct HomeWeeklyProgressDaySheet: View {
                         .padding(9)
                 }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(category)
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.1)
-                    .foregroundStyle(accent)
-                    .padding(.top, 7)
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(category)
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.1)
+                        .foregroundStyle(accent)
 
-                Text(workout.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(dayInk)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.88)
-                    .frame(height: 38, alignment: .topLeading)
+                    Text(workout.title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(dayInk)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.88)
+                        .frame(height: 36, alignment: .topLeading)
 
-                Text(workout.notes?.components(separatedBy: "\n").first ?? "")
-                    .font(.system(size: 11))
-                    .foregroundStyle(dayInk.opacity(0.62))
-                    .lineLimit(2)
-                    .frame(height: 28, alignment: .topLeading)
-
-                Spacer(minLength: 0)
+                    Text(workout.notes?.components(separatedBy: "\n").first ?? "")
+                        .font(.system(size: 11))
+                        .foregroundStyle(dayInk.opacity(0.62))
+                        .lineLimit(2)
+                        .frame(height: 28, alignment: .topLeading)
+                }
+                Spacer(minLength: 2)
+                // Pin this footer inside the available detail area. It
+                // must not be pushed below the card by title or notes.
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                     Text(workout.durationMinutes.map { "~\($0) min" } ??
@@ -4120,12 +4136,21 @@ private struct HomeWeeklyProgressDaySheet: View {
                 }
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(dayInk.opacity(0.67))
+                .frame(height: 18)
             }
-            .padding(.horizontal, 11)
-            .padding(.bottom, 12)
-            .frame(width: 148, height: 113, alignment: .topLeading)
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 9)
+            .frame(
+                width: CoachSuggestionTileLayout.width,
+                height: CoachSuggestionTileLayout.detailsHeight,
+                alignment: .topLeading
+            )
         }
-        .frame(width: 148, height: 191)
+        .frame(
+            width: CoachSuggestionTileLayout.width,
+            height: CoachSuggestionTileLayout.height
+        )
         .background(ATHLTHPlanDesign.surface,
                     in: RoundedRectangle(cornerRadius: 20))
         .clipShape(RoundedRectangle(cornerRadius: 20))
