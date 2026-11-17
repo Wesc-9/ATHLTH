@@ -3123,6 +3123,14 @@ struct WorkoutTemplateDetailView: View {
 
     @discardableResult
     private func savePersonalWorkout(blocks: [WorkoutTemplateBlock]) -> Bool {
+        // Legacy quick-target flow has no name editor. It must not persist a
+        // same-named public recipe; only the full template builder can save
+        // a changed workout with a distinct title.
+        showingEditor = true
+        return false
+    }
+
+    private func legacyCopyBuilderBinding(blocks: [WorkoutTemplateBlock]) -> Bool {
         var copy = entry.plannedSession()
         copy.workoutBlocks = blocks
         let binding = ATHLTHWorkoutExerciseBinding.bind(
