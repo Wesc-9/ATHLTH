@@ -34,6 +34,22 @@ struct ATHLTHPlannedWorkoutStepRow: View {
         return abs(horizontal) >= threshold
     }
     private var isPause: Bool { block.isRestOrActiveRecovery }
+    private var isActivePause: Bool { block.isActiveRecovery }
+    private var displayedStepTitle: String {
+        if isActivePause {
+            return ATHLTHLocalization.choose(
+                english: "Active recovery", norwegian: "Aktiv pause"
+            )
+        }
+        if isPause {
+            return ATHLTHLocalization.choose(
+                english: "Rest", norwegian: "Pause"
+            )
+        }
+        return ATHLTHWorkoutNameSuggestion.displayStepTitle(
+            ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+        )
+    }
 
     private var durationSummary: String {
         if let seconds = block.durationSeconds, seconds > 0 {
@@ -171,8 +187,9 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                     isPause ? .secondary : ATHLTHTrainDesign.bronze
                                 )
                                 .frame(width: 21)
-                            Image(systemName: isPause
-                                  ? "pause.fill"
+                            Image(systemName: isActivePause
+                                  ? "figure.walk"
+                                  : isPause ? "pause.fill"
                                   : block.kind == .run &&
                                     block.treadmillInclinePercent != nil
                                         ? "figure.run.treadmill" : block.kind.systemImage)
@@ -181,13 +198,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                     isPause ? .secondary : ATHLTHTrainDesign.ink
                                 )
                                 .frame(width: 23)
-                            Text(isPause
-                                ? ATHLTHLocalization.choose(
-                                    english: "Recovery", norwegian: "Pause"
-                                )
-                                : ATHLTHWorkoutNameSuggestion.displayStepTitle(
-                                    ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
-                                ))
+                            Text(displayedStepTitle)
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(ATHLTHTrainDesign.ink)
                                 .lineLimit(1)
@@ -215,7 +226,11 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                             Text(block.targetHeartRateZone.map {
                                     (ATHLTHLocalization.isNorwegian ? "S" : "Z") + "\($0)"
                                 }
-                                ?? (isPause ? "Pause" : "–"))
+                                ?? (isActivePause
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Active", norwegian: "Aktiv"
+                                    )
+                                    : isPause ? "Pause" : "–"))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(ATHLTHTrainDesign.bronze)
                                 .frame(minWidth: 26)
