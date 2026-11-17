@@ -1,4 +1,5 @@
 import Combine
+import CryptoKit
 import Foundation
 import Supabase
 
@@ -231,6 +232,8 @@ final class ATHLTHAudioCoachAccountSyncStore: ObservableObject {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         let bytes = try encoder.encode(comparable)
-        return bytes.base64EncodedString()
+        return SHA256.hash(data: bytes).map {
+            String(format: "%02x", $0)
+        }.joined()
     }
 }
