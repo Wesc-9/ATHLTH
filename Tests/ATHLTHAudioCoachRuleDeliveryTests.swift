@@ -150,11 +150,13 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertEqual(moved?.selectedMetrics, [.heartRate])
         XCTAssertEqual(moved?.validatedInterval, 180)
 
-        XCTAssertTrue(ATHLTHAudioCoachCommandMoves.move(
+        // Commands require a trigger-bearing group. Dropping outside a
+        // group must leave the scheduled metric and its ownership intact.
+        XCTAssertFalse(ATHLTHAudioCoachCommandMoves.move(
             "metric:\(moved!.id.uuidString):heartRate",
             to: nil, draft: &draft
         ))
-        XCTAssertTrue(draft.coachGroups[0].ruleIDs.isEmpty)
+        XCTAssertEqual(draft.coachGroups[0].ruleIDs, [moved!.id])
         XCTAssertEqual(
             draft.customRules.flatMap(\.selectedMetrics)
                 .filter { $0 == .heartRate }.count,
@@ -179,10 +181,11 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertEqual(draft.coachGroups[0].optionIDs, ["workoutStart"])
         XCTAssertTrue(draft.customRules.isEmpty)
 
-        XCTAssertTrue(ATHLTHAudioCoachCommandMoves.move(
+        // Built-in options cannot be moved to an ungrouped destination.
+        XCTAssertFalse(ATHLTHAudioCoachCommandMoves.move(
             "option:workoutStart", to: nil, draft: &draft
         ))
-        XCTAssertTrue(draft.coachGroups[0].optionIDs.isEmpty)
+        XCTAssertEqual(draft.coachGroups[0].optionIDs, ["workoutStart"])
         XCTAssertTrue(draft.announceWorkoutStart)
     }
 
