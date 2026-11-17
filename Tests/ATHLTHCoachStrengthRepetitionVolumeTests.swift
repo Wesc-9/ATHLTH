@@ -55,7 +55,8 @@ final class ATHLTHCoachStrengthRepetitionVolumeTests: XCTestCase {
     }
 
     func testNoGoalOrNoRangeMeansNoUnsolicitedProgression() {
-        for goal: TrainingPlanGoalType? in [nil, .improveFitness, .maintain] {
+        let ineligibleGoals: [TrainingPlanGoalType?] = [nil, .improveFitness, .maintain]
+        for goal in ineligibleGoals {
             let result = ATHLTHCoachStrengthRepetitionVolume.assess(
                 sessions: [sample(daysAgo: 3), sample(daysAgo: 10)],
                 goal: goal,
