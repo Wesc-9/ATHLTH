@@ -108,4 +108,58 @@ final class ATHLTHPlannedRunStepEditorTests: XCTestCase {
         XCTAssertEqual(decoded.targetEffortRPE, 6)
         XCTAssertEqual(decoded.isIndoor, true)
     }
+
+    func testWholeWorkoutEnvironmentOverridesRunStepWithoutChangingTrainingTargets() {
+        var effort = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "3 min maksimaltest",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 180, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )
+        effort.targetPaceSecondsPerKilometer = 300
+        effort.targetHeartRateZone = 5
+        effort.isIndoor = true // Legacy per-step choice must not override workout.
+        effort.treadmillInclinePercent = 2.5
+
+        let outdoor = ATHLTHWorkoutRunEnvironmentSync.applying(.outdoor, to: effort)
+        XCTAssertEqual(outdoor.isIndoor, false)
+        XCTAssertNil(outdoor.treadmillInclinePercent)
+        XCTAssertEqual(outdoor.durationSeconds, 180)
+        XCTAssertEqual(outdoor.targetPaceSecondsPerKilometer, 300)
+        XCTAssertEqual(outdoor.targetHeartRateZone, 5)
+
+        let indoor = ATHLTHWorkoutRunEnvironmentSync.applying(.indoor, to: effort)
+        XCTAssertEqual(indoor.isIndoor, true)
+        XCTAssertNil(indoor.treadmillInclinePercent)
+        XCTAssertEqual(indoor.targetPaceSecondsPerKilometer, 300)
+
+        let treadmill = ATHLTHWorkoutRunEnvironmentSync.applying(.treadmill, to: effort)
+        XCTAssertEqual(treadmill.isIndoor, true)
+        XCTAssertEqual(treadmill.treadmillInclinePercent, 2.5)
+        XCTAssertEqual(treadmill.targetPaceSecondsPerKilometer, 300)
+
+        // An incline is offered only because the entire workout is on a
+        // treadmill; switching to that workout environment must not add pace.
+        var noPace = effort
+        noPace.targetPaceSecondsPerKilometer = nil
+        noPace.treadmillInclinePercent = nil
+        let updated = ATHLTHWorkoutRunEnvironmentSync.applying(.treadmill, to: noPace)
+        XCTAssertEqual(updated.treadmillInclinePercent, 0)
+        XCTAssertNil(updated.targetPaceSecondsPerKilometer)
+    }
+
+    func testWholeWorkoutEnvironmentLeavesNonRunningExerciseUntouched() {
+        var strength = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Knebøy",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: 8,
+            durationSeconds: nil, targetWeightKilograms: 40,
+            loadNote: nil, notes: nil, phase: .main
+        )
+        strength.isIndoor = nil
+        XCTAssertEqual(
+            ATHLTHWorkoutRunEnvironmentSync.applying(.treadmill, to: strength),
+            strength
+        )
+    }
+
 }
