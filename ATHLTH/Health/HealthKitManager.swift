@@ -4518,6 +4518,17 @@ final class HealthKitManager: ObservableObject {
         await workoutDetail(for: summary.id)
     }
 
+    /// Resolve a historical attempt by its original HealthKit workout ID.
+    /// The normal home-screen workout feed loads only the latest 100 workouts;
+    /// older route attempts must not lose direction reclassification for that reason.
+    func workoutSummaryForRouteAttempt(_ workoutID: UUID) async -> WorkoutSummary? {
+        guard let workout = try? await workoutForChallenge(uuid: workoutID),
+              isWorkoutAcceptedForATHLTH(workout) else { return nil }
+        cacheWorkoutObject(workout)
+        return WorkoutSummary(workout)
+    }
+
+
     func routePerformance(
         for summary: WorkoutSummary,
         against route: TrainingRoute
@@ -4542,7 +4553,11 @@ final class HealthKitManager: ObservableObject {
             return nil
         }
 
-        let reference = route.coordinates.map {
+        // Direction matching depends on path order, not the storage
+        // order returned by a route import or database lookup.
+        let reference = route.coordinates.sorted {
+            $0.sequence < $1.sequence
+        }.map {
             CLLocation(
                 latitude: $0.latitude,
                 longitude: $0.longitude
