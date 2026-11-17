@@ -82,8 +82,17 @@ enum ATHLTHCoachStrengthComparableHistory {
         for exercise: StrengthExerciseLog,
         minimumLoadKg: Double? = nil
     ) -> TargetEvidence? {
-        let working = exercise.sets.filter(\.countsTowardTrainingLoad)
-        guard working.count >= 2,
+        // A skipped/unresolved prescribed working set is not success.
+        let prescribed = exercise.sets.filter {
+            $0.isWarmUp != true &&
+            $0.plannedSetType != .warmUp &&
+            $0.hybridPhaseKind == nil
+        }
+        let working = prescribed.filter(\.countsTowardTrainingLoad)
+        guard exercise.isEmbeddedRunningInterval != true,
+              exercise.groupStyle != .dropSet,
+              prescribed.count >= 2,
+              prescribed.count == working.count,
               minimumLoadKg.map({ $0.isFinite && $0 > 0 }) ?? true else {
             return nil
         }
