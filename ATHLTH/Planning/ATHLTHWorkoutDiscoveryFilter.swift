@@ -201,3 +201,19 @@ struct ATHLTHWorkoutDiscoveryFilter {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
+
+
+// Source and favorite filters must be applied to every library section before
+// pagination, including saved and calendar workouts. "Mine" means workouts
+// saved/created in the athlete's library, not copies shown from a training plan.
+struct ATHLTHWorkoutLibrarySourceFilter {
+    var favoritesOnly = false
+    var mineOnly = false
+
+    func matches(
+        isPersonal: Bool,
+        isFavorite: @autoclosure () -> Bool
+    ) -> Bool {
+        (!mineOnly || isPersonal) && (!favoritesOnly || isFavorite())
+    }
+}
