@@ -120,6 +120,24 @@ enum ATHLTHAssessmentCalculation {
         return value
     }
 
+    /// The only safe entry point for Cooper estimates linked to a
+    /// configured workout recipe. An invalid scope suppresses the number.
+    static func validatedCooperVO2Max(
+        measuredMeters: Double,
+        measuredDurationSeconds: Double,
+        scope: ATHLTHAssessmentScope,
+        blocks: [WorkoutTemplateBlock],
+        anchorIndex: Int
+    ) -> Double? {
+        guard scope.canCalculateCooper(
+            from: blocks, anchorIndex: anchorIndex
+        ) else { return nil }
+        return cooperVO2Max(
+            measuredMeters: measuredMeters,
+            testDurationSeconds: measuredDurationSeconds
+        )
+    }
+
     /// Epley estimate; valid only for a limited maximal-repetition effort.
     /// One repetition is a directly reported top lift, not a 1RM prediction.
     static func estimatedOneRepMax(
@@ -356,7 +374,10 @@ struct ATHLTHAssessmentScope: Codable, Hashable {
               effort.cardioActivity != .walking,
               !effort.isRestOrActiveRecovery,
               effort.resolvedPhase == .main,
-              (effort.groupRounds ?? 1) <= 1 else {
+              (effort.groupRounds ?? 1) <= 1,
+              (effort.setCount ?? 1) <= 1,
+              (effort.restBetweenSetsSeconds ?? 0) <= 0,
+              effort.groupKind == nil else {
             return .invalid(
                 "\(testName) krever ett sammenhengende løpsdrag " +
                 "i hoveddelen, uten intervallpauser."
