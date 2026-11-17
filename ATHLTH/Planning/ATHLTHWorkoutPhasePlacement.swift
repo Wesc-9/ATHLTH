@@ -51,9 +51,6 @@ enum ATHLTHWorkoutPhasePlacement {
             targetPaceSecondsPerKilometer: block.targetPaceSecondsPerKilometer,
             targetHeartRateZone: block.targetHeartRateZone
         )
-        next.assessmentMethod = ATHLTHAssessmentMethod.normalized(
-            block.assessmentMethod, for: next
-        )
         next.routeID = block.routeID
         next.sourceIntensityZoneLabel = block.sourceIntensityZoneLabel
         next.targetHeartRatePercentMin = block.targetHeartRatePercentMin
@@ -86,6 +83,12 @@ enum ATHLTHWorkoutPhasePlacement {
         next.executionGroupClockSeconds = block.executionGroupClockSeconds
         next.executionStationCount = block.executionStationCount
         next.cardioActivity = block.cardioActivity
+        next.assessmentMethod = ATHLTHAssessmentMethod.normalized(
+            block.assessmentMethod, for: next
+        )
+        next.assessmentScope = next.assessmentMethod == nil
+            ? nil : block.assessmentScope
+        next.measurementStepID = block.measurementStepID
         next.isIndoor = block.isIndoor
         next.exerciseSnapshot = block.exerciseSnapshot
         next.exerciseID = block.exerciseID
@@ -124,6 +127,7 @@ enum ATHLTHWorkoutPhasePlacement {
             copy.assessmentMethod = ATHLTHAssessmentMethod.normalized(
                 copy.assessmentMethod, for: copy
             )
+            if copy.assessmentMethod == nil { copy.assessmentScope = nil }
             return copy
         }
         let affected = Set(affectedIndices)
