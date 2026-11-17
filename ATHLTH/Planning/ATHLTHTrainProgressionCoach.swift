@@ -48,19 +48,26 @@ enum ATHLTHTrainProgressionCoach {
             ($0.endedAt ?? $0.startedAt) <= now &&
             $0.plannedSessionID.map(plannedIDs.contains) == true
         }
-        var evidenceByName: [String: [Evidence]] = [:]
+        var evidenceByIdentity: [String: [Evidence]] = [:]
         var seenLogIDs = Set<UUID>()
         for log in logList {
             guard seenLogIDs.insert(log.id).inserted else { continue }
+            var grouped: [String: [StrengthExerciseLog]] = [:]
             for entry in log.exercises {
-                let key = ATHLTHTrainTrendEngine.normalize(entry.exercise.name)
-                guard !key.isEmpty else { continue }
-                // The same Coach evidence policy is used for scheduled
-                // plans and live training. Skipped or invalid working sets
-                // never qualify as successful attempts.
-                let evidence = ATHLTHCoachStrengthComparableHistory
-                    .targetEvidence(for: entry)
-                evidenceByName[key, default: []].append(Evidence(
+                guard let key = ATHLTHCoachStrengthComparableHistory
+                    .identityKey(for: entry.exercise) else { continue }
+                grouped[key, default: []].append(entry)
+            }
+            for (key, entries) in grouped {
+                guard let entry = entries.first else { continue }
+                // Repeated occurrences in one session are ambiguous and
+                // cannot be counted as successful independent evidence.
+                let evidence = entries.count == 1
+                    ? ATHLTHCoachStrengthComparableHistory.targetEvidence(
+                        for: entry
+                    )
+                    : nil
+                evidenceByIdentity[key, default: []].append(Evidence(
                     date: log.endedAt ?? log.startedAt,
                     workoutID: log.id,
                     exercise: entry.exercise,
@@ -88,23 +95,15 @@ enum ATHLTHTrainProgressionCoach {
                           !skippedSessionIDs.contains(workout.id) else { continue }
                     for exercise in workout.exercises {
                         let name = exercise.embeddedExercise.displayName
-                        let key = ATHLTHTrainTrendEngine.normalize(
-                            exercise.embeddedExercise.name
-                        )
-                        let identityKey = key + "|" +
-                            exercise.embeddedExercise.equipment
-                                .map(ATHLTHTrainTrendEngine.normalize)
-                                .sorted()
-                                .joined(separator: ";") +
-                            "|" + (exercise.embeddedExercise.libraryExerciseID?.uuidString ?? "")
-                        guard !key.isEmpty,
+                        guard let identityKey = ATHLTHCoachStrengthComparableHistory
+                            .identityKey(for: exercise.embeddedExercise),
                               !suggestedNames.contains(identityKey),
                               exercise.resolvedTargetKind == .reps,
                               exercise.resolvedLoadKind == .weightKilograms,
                               let current = plannedWorkingLoad(exercise),
                               current > 0 else { continue }
 
-                        let records = (evidenceByName[key] ?? [])
+                        let records = (evidenceByIdentity[identityKey] ?? [])
                             .filter {
                                 $0.date < now &&
                                 ATHLTHCoachStrengthComparableHistory.isSameExercise(
