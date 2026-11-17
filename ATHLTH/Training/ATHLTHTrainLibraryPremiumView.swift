@@ -18,6 +18,9 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @State private var query = ""
     @State private var queryInput = ""
     @State private var exerciseGroup = ""
+    @State private var exerciseStartIndex = 0
+    @State private var exerciseVisibleLimit = ATHLTHLibraryPagination.pageSize
+    @State private var exercisePageRevision = 0
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var libraryViewWidth: CGFloat = 390
     @State private var selectedTemplate: TrainingPlan?
@@ -143,6 +146,16 @@ struct ATHLTHTrainLibraryPremiumView: View {
         }
         .onChange(of: displayMode) { _, value in
             value.save(userID: session.profile.userID)
+        }
+        .onChange(of: query) { _, _ in
+            exerciseStartIndex = 0
+            exerciseVisibleLimit = ATHLTHLibraryPagination.pageSize
+            exercisePageRevision += 1
+        }
+        .onChange(of: exerciseGroup) { _, _ in
+            exerciseStartIndex = 0
+            exerciseVisibleLimit = ATHLTHLibraryPagination.pageSize
+            exercisePageRevision += 1
         }
         .task { await catalog.refresh() }
         .task { await exerciseLibrary.refresh() }
@@ -433,10 +446,15 @@ struct ATHLTHTrainLibraryPremiumView: View {
                        "Prøv et annet navn eller en muskelgruppe.")
                 )
             } else {
-                ScrollViewReader { proxy in
+                ScrollViewReader { _ in
                     ScrollView {
                         LazyVGrid(columns: libraryColumns, spacing: 9) {
-                            ForEach(entries) { entry in
+                            ForEach(
+                                ATHLTHLibraryAlphabetWindow.visible(
+                                    entries, start: exerciseStartIndex,
+                                    limit: exerciseVisibleLimit
+                                )
+                            ) { entry in
                                 Button { selectedExercise = entry } label: {
                                     VStack(alignment: .leading, spacing: 8) {
                                         HStack(spacing: 10) {
@@ -485,7 +503,22 @@ struct ATHLTHTrainLibraryPremiumView: View {
                         .padding(.leading, 2)
                         .padding(.trailing, 33)
                         .padding(.vertical, 6)
+                        ATHLTHLibraryLoadMoreButton(
+                            shown: min(
+                                exerciseVisibleLimit,
+                                ATHLTHLibraryAlphabetWindow.remaining(
+                                    total: entries.count, start: exerciseStartIndex
+                                )
+                            ),
+                            total: ATHLTHLibraryAlphabetWindow.remaining(
+                                total: entries.count, start: exerciseStartIndex
+                            )
+                        ) {
+                            exerciseVisibleLimit += ATHLTHLibraryPagination.pageSize
+                        }
+                        .padding(.trailing, 33)
                     }
+                    .id(exercisePageRevision)
                     .scrollIndicators(.hidden)
                     .scrollDismissesKeyboard(.interactively)
                     .frame(height: 470)
@@ -493,9 +526,12 @@ struct ATHLTHTrainLibraryPremiumView: View {
                         ATHLTHExerciseAlphabetIndex(
                             targets: exerciseLibrary.alphabetIndexTargets(for: entries),
                             onJump: { id in
-                                withAnimation(.easeOut(duration: 0.18)) {
-                                    proxy.scrollTo(id, anchor: .top)
-                                }
+                                guard let index = ATHLTHExerciseAlphabetPage.startIndex(
+                                    for: id, in: entries
+                                ) else { return }
+                                exerciseStartIndex = index
+                                exerciseVisibleLimit = ATHLTHLibraryPagination.pageSize
+                                exercisePageRevision += 1
                             }
                         )
                         .padding(.trailing, 3)
