@@ -55,11 +55,9 @@ enum ATHLTHCoachStrengthDecision {
         }
 
         var seen = Set<UUID>()
+        // Invalid most-recent measurements must veto an increase, not be
+        // discarded so that older successful sessions appear more recent.
         let recent = evidence
-            .filter {
-                $0.minimumWorkingWeightKg.isFinite &&
-                $0.minimumWorkingWeightKg >= 0
-            }
             .sorted {
                 $0.date == $1.date
                     ? $0.workoutID.uuidString < $1.workoutID.uuidString
@@ -83,7 +81,9 @@ enum ATHLTHCoachStrengthDecision {
 
         // The most recent completed session outweighs older results.
         if let first = latest.first,
-           (!first.metTargets || first.minimumWorkingWeightKg + 0.01 < prescribedLoadKg) {
+           (!first.metTargets ||
+            !first.minimumWorkingWeightKg.isFinite ||
+            first.minimumWorkingWeightKg + 0.01 < prescribedLoadKg) {
             return result(.hold, .missedLatestTarget)
         }
         guard latest.count == 2 else {
@@ -92,6 +92,7 @@ enum ATHLTHCoachStrengthDecision {
         guard latest.allSatisfy({
             $0.metTargets &&
             $0.workingSetIDs.count >= 2 &&
+            $0.minimumWorkingWeightKg.isFinite &&
             $0.minimumWorkingWeightKg + 0.01 >= prescribedLoadKg
         }) else {
             return result(.hold, .missedLatestTarget)
