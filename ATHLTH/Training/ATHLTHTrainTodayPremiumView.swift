@@ -74,6 +74,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onQuickTrain: (WorkoutKind) -> Void
     let onQuickCycling: () -> Void
     let onQuickCustom: (CustomQuickWorkoutActivity) -> Void
+    let onQuickFreeTraining: () -> Void
     let onGhostRace: () -> Void
 
     @State private var quickActivityTapCounts: [String: Int] = [:]
@@ -797,7 +798,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         case .running: return .running
         case .walking: return .walking
         case .strength: return .strength
-        case .mobility: return .yoga
+        case .mobility: return .custom
         case .recovery, .custom: return .custom
         }
     }
@@ -1240,7 +1241,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     // Click history reflects intentional entry choices, not completed
     // workout statistics. Ordering is per ATHLTH account on this device.
     private enum QuickActivity: String, CaseIterable, Identifiable {
-        case running, walking, strength, cycling, yoga, custom
+        case running, walking, strength, cycling, freeTraining, custom
         var id: String { rawValue }
 
         var image: String {
@@ -1249,7 +1250,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             case .walking: return "GoalWalking"
             case .strength: return "StrengthQuickHero"
             case .cycling: return "TrainHero"
-            case .yoga: return "GoalRelax"
+            case .freeTraining: return "GoalAdventure"
             case .custom: return "GoalAdventure"
             }
         }
@@ -1260,7 +1261,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             case .walking: return "figure.walk"
             case .strength: return "dumbbell.fill"
             case .cycling: return "bicycle"
-            case .yoga: return "figure.yoga"
+            case .freeTraining: return "figure.mixed.cardio"
             case .custom: return "figure.mixed.cardio"
             }
         }
@@ -1275,7 +1276,10 @@ struct ATHLTHTrainTodayPremiumView: View {
                 return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
             case .cycling:
                 return ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
-            case .yoga: return "Yoga"
+            case .freeTraining:
+                return ATHLTHLocalization.choose(
+                    english: "Free training", norwegian: "Fri trening"
+                )
             case .custom:
                 return ATHLTHLocalization.choose(
                     english: "Custom", norwegian: "Egendefinert"
@@ -1318,7 +1322,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         case .walking: onQuickTrain(.walking)
         case .strength: onQuickTrain(.strength)
         case .cycling: onQuickCycling()
-        case .yoga: onQuickCustom(.yoga)
+        case .freeTraining: onQuickFreeTraining()
         case .custom: onQuickCustom(.other)
         }
     }
@@ -1563,28 +1567,19 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private func quickPhotoChoice(_ activity: QuickActivity) -> some View {
         Button { openQuickActivity(activity) } label: {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 6) {
-                    quickChoiceIcon(activity)
-                    Text(activity.title)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .minimumScaleFactor(0.84)
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-
-                VStack(spacing: 5) {
-                    quickChoiceIcon(activity)
-                    Text(activity.title)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.85)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, minHeight: 70)
+            // Keep the icon on the left for all six tiles, including the
+            // longer "Egendefinert" title on compact iPhones.
+            HStack(spacing: 5) {
+                quickChoiceIcon(activity)
+                Text(activity.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.65)
+                    .multilineTextAlignment(.leading)
+                    .layoutPriority(1)
+                Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
             .foregroundStyle(ink)
             .padding(.horizontal, 8)
             .background(
