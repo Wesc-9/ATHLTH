@@ -169,6 +169,42 @@ enum ATHLTHTrainProgressionCoach {
         let supportingSets: Int
     }
 
+    struct VolumeReviewSuggestion: Identifiable, Hashable {
+        var id: UUID { exerciseID }
+        let workoutID: UUID
+        let exerciseID: UUID
+        let exerciseName: String
+        let workoutName: String
+        let scheduledDate: Date
+        let currentReps: Int
+        let currentWeightKg: Double
+        let comparableWorkouts: Int
+        let verifiedWorkingSets: Int
+        /// This is a review prompt, never an automatic set prescription.
+        let sourceWorkoutIDs: [UUID]
+    }
+
+    /// Separate entry points, one shared scan/policy for both results.
+    static func volumeReviewSuggestions(
+        plan: TrainingPlan,
+        strengthHistory: [StrengthWorkoutLog],
+        completedSessionIDs: Set<UUID>,
+        skippedSessionIDs: Set<UUID>,
+        range: ATHLTHCoachStrengthRepetitionVolume.RepRange,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [VolumeReviewSuggestion] {
+        progressionReviews(
+            plan: plan,
+            strengthHistory: strengthHistory,
+            completedSessionIDs: completedSessionIDs,
+            skippedSessionIDs: skippedSessionIDs,
+            range: range,
+            now: now,
+            calendar: calendar
+        ).volumes
+    }
+
     /// An explicit range is required; goal comes from the saved plan.
     /// No future workout, completed workout, or saved history is modified.
     static func repetitionSuggestions(
@@ -180,9 +216,29 @@ enum ATHLTHTrainProgressionCoach {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [RepetitionSuggestion] {
+        progressionReviews(
+            plan: plan,
+            strengthHistory: strengthHistory,
+            completedSessionIDs: completedSessionIDs,
+            skippedSessionIDs: skippedSessionIDs,
+            range: range,
+            now: now,
+            calendar: calendar
+        ).repetitions
+    }
+
+    private static func progressionReviews(
+        plan: TrainingPlan,
+        strengthHistory: [StrengthWorkoutLog],
+        completedSessionIDs: Set<UUID>,
+        skippedSessionIDs: Set<UUID>,
+        range: ATHLTHCoachStrengthRepetitionVolume.RepRange,
+        now: Date,
+        calendar: Calendar
+    ) -> (repetitions: [RepetitionSuggestion], volumes: [VolumeReviewSuggestion]) {
         guard let goal = plan.builderProfile?.goal,
               goal == .getStronger || goal == .buildMuscle,
-              let planStart = plan.startDate else { return [] }
+              let planStart = plan.startDate else { return ([], []) }
         let plannedIDs = Set(plan.weeks.flatMap(\.days).flatMap(\.sessions).map(\.id))
         let cutoff = now.addingTimeInterval(-56 * 86_400)
         let completed = strengthHistory.filter {
@@ -194,6 +250,7 @@ enum ATHLTHTrainProgressionCoach {
         let start = calendar.startOfDay(for: planStart)
         let today = calendar.startOfDay(for: now)
         var result: [RepetitionSuggestion] = []
+        var volumeReviews: [VolumeReviewSuggestion] = []
         var usedExerciseKeys = Set<String>()
 
         for (weekIndex, week) in plan.weeks.enumerated() {
@@ -211,7 +268,7 @@ enum ATHLTHTrainProgressionCoach {
                               planned.resolvedLoadKind == .weightKilograms,
                               let prescription = uniformRepetitionPrescription(planned),
                               range.lower <= prescription.reps,
-                              prescription.reps < range.upper,
+                              prescription.reps <= range.upper,
                               let identity = ATHLTHCoachStrengthComparableHistory
                                   .identityKey(for: planned.embeddedExercise),
                               !usedExerciseKeys.contains(identity) else { continue }
@@ -260,26 +317,45 @@ enum ATHLTHTrainProgressionCoach {
                             prescribedReps: prescription.reps,
                             prescribedLoadKg: prescription.load
                         )
-                        guard assessment.action == .reviewOneMoreRep,
-                              let next = assessment.proposedReps else { continue }
-                        usedExerciseKeys.insert(identity)
-                        result.append(RepetitionSuggestion(
-                            workoutID: workout.id,
-                            exerciseID: planned.id,
-                            exerciseName: planned.embeddedExercise.displayName,
-                            workoutName: workout.title,
-                            scheduledDate: scheduled,
-                            beforeReps: prescription.reps,
-                            proposedReps: next,
-                            prescribedWeightKg: prescription.load,
-                            supportingSessions: assessment.sourceWorkoutIDs.prefix(2).count,
-                            supportingSets: assessment.sourceSetIDs.count
-                        ))
+                        switch assessment.action {
+                        case .reviewOneMoreRep:
+                            guard let next = assessment.proposedReps else { continue }
+                            usedExerciseKeys.insert(identity)
+                            result.append(RepetitionSuggestion(
+                                workoutID: workout.id,
+                                exerciseID: planned.id,
+                                exerciseName: planned.embeddedExercise.displayName,
+                                workoutName: workout.title,
+                                scheduledDate: scheduled,
+                                beforeReps: prescription.reps,
+                                proposedReps: next,
+                                prescribedWeightKg: prescription.load,
+                                supportingSessions: min(2, assessment.sourceWorkoutIDs.count),
+                                supportingSets: assessment.sourceSetIDs.count
+                            ))
+                        case .reviewTrainingVolume:
+                            guard goal == .buildMuscle else { continue }
+                            usedExerciseKeys.insert(identity)
+                            volumeReviews.append(VolumeReviewSuggestion(
+                                workoutID: workout.id,
+                                exerciseID: planned.id,
+                                exerciseName: planned.embeddedExercise.displayName,
+                                workoutName: workout.title,
+                                scheduledDate: scheduled,
+                                currentReps: prescription.reps,
+                                currentWeightKg: prescription.load,
+                                comparableWorkouts: min(3, assessment.sourceWorkoutIDs.count),
+                                verifiedWorkingSets: assessment.sourceSetIDs.count,
+                                sourceWorkoutIDs: Array(assessment.sourceWorkoutIDs.prefix(3))
+                            ))
+                        case .collectEvidence, .hold:
+                            break
+                        }
                     }
                 }
             }
         }
-        return result
+        return (result, volumeReviews)
     }
 
     /// Reject mixed working prescriptions instead of changing unrelated sets.
