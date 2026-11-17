@@ -1655,6 +1655,7 @@ struct TrainingPlanLibraryView: View {
     @State private var showFavoritesOnly = false
     @State private var searchExpanded = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
+    @State private var visibleStartIndex = 0
     @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
@@ -1793,7 +1794,9 @@ struct TrainingPlanLibraryView: View {
 
     private var listedEntries: [TrainingPlanCatalogEntry] {
         // Search and all filters run over the complete catalog first.
-        ATHLTHLibraryPagination.visible(filteredEntries, limit: visibleLimit)
+        ATHLTHLibraryAlphabetWindow.visible(
+            filteredEntries, start: visibleStartIndex, limit: visibleLimit
+        )
     }
 
     private var pageFilterKey: String {
@@ -1805,6 +1808,10 @@ struct TrainingPlanLibraryView: View {
 
     var body: some View {
         ScrollViewReader { scroll in
+            let results = filteredEntries
+            let alphabet = ATHLTHLibraryAlphabetLookup(
+                items: results, id: { $0.id }, title: { $0.title }
+            )
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
@@ -1881,25 +1888,50 @@ struct TrainingPlanLibraryView: View {
                             spacing: 10
                         ) {
                             ForEach(listedEntries) { entry in
-                                if displayMode == .grid {
-                                    planGridItem(entry)
-                                } else {
-                                    planListItem(entry)
+                                Group {
+                                    if displayMode == .grid {
+                                        planGridItem(entry)
+                                    } else {
+                                        planListItem(entry)
+                                    }
                                 }
+                                .id(entry.id)
                             }
                         }
                         ATHLTHLibraryLoadMoreButton(
                             shown: listedEntries.count,
-                            total: filteredEntries.count
+                            total: ATHLTHLibraryAlphabetWindow.remaining(
+                                total: results.count, start: visibleStartIndex
+                            )
                         ) {
                             visibleLimit += ATHLTHLibraryPagination.pageSize
                         }
                     }
                 }
-                .padding(.horizontal, 18)
+                .padding(.leading, 18)
+                .padding(.trailing, alphabet.targets.isEmpty ? 18 : 42)
                 .padding(.top, 18)
                 .padding(.bottom, 44)
                 .frame(maxWidth: .infinity)
+            }
+            .id(visibleStartIndex)
+            .overlay(alignment: .trailing) {
+                if !alphabet.targets.isEmpty {
+                    ATHLTHExerciseAlphabetIndex(targets: alphabet.targets) { target in
+                        guard let index = alphabet.index(for: target) else { return }
+                        if index >= visibleStartIndex &&
+                           index < visibleStartIndex + visibleLimit {
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                scroll.scrollTo(target, anchor: .top)
+                            }
+                        } else {
+                            // Rebuild only the selected 50-row window.
+                            visibleStartIndex = index
+                            visibleLimit = ATHLTHLibraryPagination.pageSize
+                        }
+                    }
+                    .padding(.trailing, 6)
+                }
             }
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
@@ -1911,6 +1943,7 @@ struct TrainingPlanLibraryView: View {
         }
         .background(canvas.ignoresSafeArea())
         .onChange(of: pageFilterKey) { _, _ in
+            visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .navigationTitle(favoritePlansOnly
