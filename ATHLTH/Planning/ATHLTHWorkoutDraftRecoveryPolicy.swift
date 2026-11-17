@@ -50,9 +50,18 @@ enum ATHLTHWorkoutDraftRecoveryPolicy {
             return false
         }
 
+        // Advanced Plan Studio uses a stable plan draft UUID rather than
+        // the older "plan-" prefix. A recreated editor can have a different
+        // initial title/recipe because the parent plan saved independently.
+        // The UUID + week/day/workout context is the stable identity here.
+        let scopedNewProgram = context.hasPrefix("new-program-") &&
+            UUID(uuidString: String(
+                context.dropFirst("new-program-".count).prefix(36)
+            )) != nil
         let scoped = context.hasPrefix("plan-") ||
             context.hasPrefix("catalog-copy-") ||
-            context.hasPrefix("coach-")
+            context.hasPrefix("coach-") ||
+            scopedNewProgram
         if scoped { return true }
 
         // The shared scratch editor is reused across unrelated workouts:
