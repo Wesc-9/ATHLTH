@@ -5980,6 +5980,7 @@ struct ATHLTHTrainView: View {
     @State private var showingStrengthQuickStart = false
     @State private var showingCustomQuickStart = false
     @State private var customQuickInitialActivity: CustomQuickWorkoutActivity = .hiit
+    @State private var isFreeTrainingQuickStart = false
     @State private var pendingCustomIPhoneQuick: CustomIPhoneQuickLaunch?
     @State private var activeCustomIPhoneQuick: CustomIPhoneQuickLaunch?
     @State private var showingStrengthWorkout = false
@@ -6447,7 +6448,8 @@ struct ATHLTHTrainView: View {
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
                     watchConnected: watchConnection.isReady,
-                    initialActivity: customQuickInitialActivity
+                    initialActivity: customQuickInitialActivity,
+                    simpleFreeTraining: isFreeTrainingQuickStart
                 ) { configuration, destination in
                     let invitedFriends = social.resolvedQuickTrainPartners(
                         configuration.selectedFriendIDs
@@ -7238,6 +7240,7 @@ struct ATHLTHTrainView: View {
             onQuickTrain: { kind in handleQuickStart(kind) },
             onQuickCycling: { startCyclingQuick() },
             onQuickCustom: { activity in startCustomQuick(as: activity) },
+            onQuickFreeTraining: { startFreeTrainingQuick() },
             onGhostRace: { showingGhostHub = true }
         )
         // Reset date-specific check-in and proposed workout state exactly
@@ -9352,6 +9355,7 @@ struct ATHLTHTrainView: View {
         case .custom:
             if customQuickStartAvailable {
                 customQuickInitialActivity = .hiit
+                isFreeTrainingQuickStart = false
                 showingCustomQuickStart = true
             } else {
                 watchTransferError = ATHLTHLocalization.choose(
@@ -9377,6 +9381,22 @@ struct ATHLTHTrainView: View {
             return
         }
         customQuickInitialActivity = activity
+        isFreeTrainingQuickStart = false
+        showingCustomQuickStart = true
+    }
+
+    /// Universal, open-ended workout: reuse the custom recorder and Watch
+    /// bridge, but skip every builder/setup step in the presented sheet.
+    private func startFreeTrainingQuick() {
+        guard customQuickStartAvailable else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "Finish the active workout before starting another.",
+                norwegian: "Avslutt økten som pågår før du starter en ny."
+            )
+            return
+        }
+        customQuickInitialActivity = .other
+        isFreeTrainingQuickStart = true
         showingCustomQuickStart = true
     }
 
@@ -10042,6 +10062,7 @@ struct ATHLTHTrainView: View {
         case let .customQuickActivity(activity):
             selectedSection = .today
             customQuickInitialActivity = activity
+            isFreeTrainingQuickStart = false
             if customQuickStartAvailable {
                 showingCustomQuickStart = true
             } else {
@@ -10053,6 +10074,7 @@ struct ATHLTHTrainView: View {
 
         case .customQuick:
             selectedSection = .today
+            isFreeTrainingQuickStart = false
             if customQuickStartAvailable {
                 showingCustomQuickStart = true
             } else {
