@@ -54,6 +54,14 @@ ATHLTH Coach er **den eneste brukervendte coachen**. Vi skal ikke introdusere «
 
 - Gjenstående: Xcode-/iPhone-/iPad- og Watch-verifikasjon, full UI-testing, registrering av vektgrunnlag i øvelsesbygger/Watch og identitet på konkrete apparat, egentlig målbasert volumdosering (ikke bare vurderingskort), restitusjonskontekst, end-to-end-synkronisering og kjørt testbevis. Ingen av de fem fasene er merket ferdig.
 
+## Iterasjon 3 – Øvelsesstudio og Watch-handoff (direkte på release)
+- **Øvelsesstudio:** `CustomExerciseEditorView` viser frivillig valg for totalvekt, vekt per hånd, maskinvekt eller «ikke angitt» for styrkeøvelser. Valget forvaltes i editorens state, lagres både ved nyopprettelse (`ExerciseLibraryStore.createCustomExercise`) og redigering, og vises diskret på øvelsens detaljside når det finnes.
+- **Datamodell:** `Exercise.coachLoadBasis` og `ExerciseSnapshot.coachLoadBasis` er valgfrie, og `Exercise.snapshot` viderefører både kanonisk bibliotek-ID og valgt belastningsdefinisjon til nye økter. Eldre økter uten feltet tolkes ikke automatisk som en bestemt vektdefinisjon.
+- **Watch-protokoll:** `WatchStrengthExerciseSummary` har valgfrie `libraryExerciseID` og `coachLoadBasisRaw`. iPhone følger metadataene fra aktive styrkelogger til `WatchStrengthSessionSnapshot.exerciseQueue`, og tar dem med tilbake ved rekonstruksjon av Watch-startet/offline økt. Ukjente raw-verdier dekodes som ukjent, ikke en antatt belastningsdefinisjon.
+- **Apple Watch UI:** Gjeldende vektgrunnlag vises i styrkesidene når det er kjent og relevant. Visningen endrer ikke innloggingen av kilo eller eksisterende stang-/skivehåndtering; «stang»-visningen beholder totalvektslogikken.
+- **Tester:** `Tests/ATHLTHCoachWatchLoadBasisTests.swift` og `Tests/StrengthBarbellWatchTransferTests.swift` dekker bibliotek → snapshot, JSON rundtur på Watch, gamle/ukjente payloads og visning av aktivt øvelsesgrunnlag.
+- **Gjenstår:** UI-mulighet til å korrigere vektgrunnlag for en allerede aktiv økt uten å overskrive historikken, komplett støtte for spesifikke apparat-varianter, Watch/iPhone/iPad interaksjonstester og faktisk bestått Xcode/CI. Ikke påstå at fasen er ferdig før disse er bekreftet.
+
 ## Faser og ferdigkriterium
 - [ ] Fase 1 – grunnlagskartlegging, identitet, felles API og compile/verifikasjon (**pågår**).
 - [ ] Fase 2 – algoritmisk styrkeprogresjon med sikkerhetstester (**påbegynt: godkjente vekt- og repsforslag, volum kun review; sett-/utstyrsdosering og verifikasjon gjenstår**).
