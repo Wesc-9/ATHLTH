@@ -26,6 +26,32 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var needsStructuredStep: Bool {
             !isPeriodic && !isHeartRateCondition && self != .workoutStart
         }
+        func summary(interval: Int) -> String {
+            let value: Int
+            switch self {
+            case .time: value = min(max(interval, 15), 7_200)
+            case .distance: value = min(max(interval, 100), 42_000)
+            case .heartRateAbove, .heartRateBelow: value = min(max(interval, 40), 220)
+            case .zoneEnter, .zoneExit: value = min(max(interval, 1), 5)
+            case .beforeNextStep, .beforeMain, .beforeCooldown:
+                value = min(max(interval, 5), 60)
+            default: return title
+            }
+            switch self {
+            case .time:
+                return title + " · " + String(value) + " s"
+            case .distance:
+                return title + " · " + String(value) + " m"
+            case .heartRateAbove, .heartRateBelow:
+                return title + " · " + String(value) + " bpm"
+            case .zoneEnter, .zoneExit:
+                return title + " · S" + String(value)
+            case .beforeNextStep, .beforeMain, .beforeCooldown:
+                return title + " · " + String(value) + " s"
+            default: return title
+            }
+        }
+
         var title: String {
             func tr(_ en: String, _ no: String) -> String {
                 ATHLTHLocalization.choose(english: en, norwegian: no)
