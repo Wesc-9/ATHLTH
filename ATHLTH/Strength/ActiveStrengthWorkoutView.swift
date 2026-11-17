@@ -5749,9 +5749,9 @@ struct ActiveStrengthWorkoutView: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "Last time · \(formatWeight(suggestion.previousWeightKilograms)) kg × \(suggestion.previousReps)",
+                            "ATHLTH Coach · Last \(formatWeight(suggestion.previousWeightKilograms)) kg × \(suggestion.previousReps)",
                         norwegian:
-                            "Sist · \(formatWeight(suggestion.previousWeightKilograms)) kg × \(suggestion.previousReps)"
+                            "ATHLTH Coach · Sist \(formatWeight(suggestion.previousWeightKilograms)) kg × \(suggestion.previousReps)"
                     )
                 )
                 .font(
@@ -8704,8 +8704,8 @@ struct ActiveStrengthWorkoutView: View {
             ) {
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "Progression hint",
-                        norwegian: "Progresjonsforslag"
+                        english: "ATHLTH Coach",
+                        norwegian: "ATHLTH Coach"
                     )
                 )
                 .font(.subheadline.weight(.semibold))
