@@ -1219,7 +1219,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 // UIKit may write nil when a sheet host is suspended. This
                 // is NOT an athlete's request to close or go back a step.
                 // Keep the exact day/workout editor binding alive.
-                if destination == nil && scenePhase != .active {
+                if ATHLTHPlanEditorContinuityPolicy.shouldKeepNestedEditor(
+                    sceneIsActive: scenePhase == .active,
+                    incomingSelectionIsNil: destination == nil
+                ) {
                     return
                 }
                 composingAdvancedDay = destination
