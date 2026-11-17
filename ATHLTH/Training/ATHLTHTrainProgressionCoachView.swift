@@ -29,7 +29,7 @@ struct ATHLTHTrainProgressionCoachView: View {
 
     private var plan: TrainingPlan? { session.trainingPlan(withID: planID) }
 
-    private var suggestions: [ATHLTHTrainProgressionCoach.Suggestion] {
+    private var rawLoadSuggestions: [ATHLTHTrainProgressionCoach.Suggestion] {
         guard let plan else { return [] }
         let sessions = plan.weeks.flatMap(\.days).flatMap(\.sessions)
         let completed = Set(sessions.compactMap { workout -> UUID? in
@@ -79,16 +79,21 @@ struct ATHLTHTrainProgressionCoachView: View {
             session.isPlanSessionSkipped(planID: planID, sessionID: workout.id)
                 ? workout.id : nil
         })
-        // The same exercise should never display competing increase-load
-        // and increase-repetitions suggestions in one Coach review.
-        let weightProposals = Set(suggestions.map(\.exerciseID))
         return ATHLTHTrainProgressionCoach.repetitionSuggestions(
             plan: plan,
             strengthHistory: strength.workoutHistory,
             completedSessionIDs: completed,
             skippedSessionIDs: skipped,
             range: range
-        ).filter { !weightProposals.contains($0.exerciseID) }
+        )
+    }
+
+    private var suggestions: [ATHLTHTrainProgressionCoach.Suggestion] {
+        // Double progression: when the athlete explicitly requests a
+        // repetition range, prefer a justified rep increase at the same
+        // load over suggesting more weight for that exercise.
+        let repFirst = Set(repetitionSuggestions.map(\.exerciseID))
+        return rawLoadSuggestions.filter { !repFirst.contains($0.exerciseID) }
     }
 
     var body: some View {
