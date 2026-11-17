@@ -95,6 +95,16 @@ struct ATHLTHStudioRemoteStrengthStatusCard: View {
                 }
             }
 
+            if snapshot.plannedWeightKilograms != nil,
+               let basis = snapshot.plannedLoadBasisRaw.flatMap(
+                   ATHLTHStrengthLoadBasis.init(rawValue:)
+               ) {
+                Label(basis.localizedTitle, systemImage: "scalemass")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("athlth-ipad-private-live-strength-load-basis")
+            }
+
             ProgressView(
                 value: snapshot.totalPlannedSets > 0
                     ? Double(snapshot.completedSets + snapshot.skippedSets) /
