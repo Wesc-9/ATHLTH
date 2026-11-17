@@ -301,11 +301,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
                         Button { onEditRule(rule.id) } label: {
                             rowLabel(
                                 metric.title, symbol: "waveform",
-                                detail: rule.trigger == .time
-                                    ? tr("Every \(rule.validatedInterval) seconds",
-                                         "Hvert \(rule.validatedInterval) sekund")
-                                    : tr("Every \(rule.validatedInterval) metres",
-                                         "Hver \(rule.validatedInterval) meter")
+                                detail: rule.trigger.summary(interval: rule.validatedInterval)
                             )
                         }
                         .buttonStyle(.plain)
@@ -321,7 +317,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     .frame(width: 34, height: 34)
                     .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(tr("Active messages", "Aktive beskjeder"))
+                    Text(tr("Standalone commands", "Enkeltkommandoer"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
                     Text(tr(
@@ -426,11 +422,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                 rowLabel(
                                     metric.title,
                                     symbol: rule.beforeEndSeconds == nil ? "waveform" : "flag",
-                                    detail: rule.trigger == .time
-                                        ? tr("Every \(rule.validatedInterval) seconds",
-                                             "Hvert \(rule.validatedInterval) sekund")
-                                        : tr("Every \(rule.validatedInterval) metres",
-                                             "Hver \(rule.validatedInterval) meter")
+                                    detail: rule.trigger.summary(interval: rule.validatedInterval)
                                 )
                             }
                             .buttonStyle(.plain)
