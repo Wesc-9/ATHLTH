@@ -88,6 +88,30 @@ struct ATHLTHTrainProgressionCoachView: View {
         )
     }
 
+    private var volumeReviewSuggestions: [ATHLTHTrainProgressionCoach.VolumeReviewSuggestion] {
+        guard plan?.builderProfile?.goal == .buildMuscle,
+              let plan, let range = selectedRepRange else { return [] }
+        let sessions = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+        let completed = Set(sessions.compactMap { workout -> UUID? in
+            session.isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            ) ? workout.id : nil
+        })
+        let skipped = Set(sessions.compactMap { workout -> UUID? in
+            session.isPlanSessionSkipped(planID: planID, sessionID: workout.id)
+                ? workout.id : nil
+        })
+        return ATHLTHTrainProgressionCoach.volumeReviewSuggestions(
+            plan: plan,
+            strengthHistory: strength.workoutHistory,
+            completedSessionIDs: completed,
+            skippedSessionIDs: skipped,
+            range: range
+        )
+    }
+
     private var suggestions: [ATHLTHTrainProgressionCoach.Suggestion] {
         // Double progression: when the athlete explicitly requests a
         // repetition range, prefer a justified rep increase at the same
@@ -107,7 +131,8 @@ struct ATHLTHTrainProgressionCoachView: View {
                         repetitionControlCard
                     }
                     if let plan {
-                        if suggestions.isEmpty && repetitionSuggestions.isEmpty {
+                        if suggestions.isEmpty && repetitionSuggestions.isEmpty &&
+                            volumeReviewSuggestions.isEmpty {
                             noRecommendations
                         } else {
                             ForEach(suggestions) { suggestion in
@@ -115,6 +140,9 @@ struct ATHLTHTrainProgressionCoachView: View {
                             }
                             ForEach(repetitionSuggestions) { suggestion in
                                 repetitionSuggestionCard(suggestion, planVersion: plan.version)
+                            }
+                            ForEach(volumeReviewSuggestions) { suggestion in
+                                volumeReviewCard(suggestion)
                             }
                         }
                     }
@@ -521,6 +549,64 @@ struct ATHLTHTrainProgressionCoachView: View {
                 .background(ink, in: RoundedRectangle(cornerRadius: 11))
             }
             .buttonStyle(.plain)
+        }
+        .padding(16)
+        .coachSurface(border)
+    }
+
+    /// Read-only review prompt: it never silently adds a set or changes a
+    /// training plan. Concrete set-count changes must be made by the athlete.
+    private func volumeReviewCard(
+        _ item: ATHLTHTrainProgressionCoach.VolumeReviewSuggestion
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.bar.xaxis")
+                    .foregroundStyle(champagne)
+                Text(tr("ATHLTH COACH · VOLUME REVIEW",
+                        "ATHLTH COACH · VURDER TRENINGSMENGDE"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.2)
+                    .foregroundStyle(champagne)
+                Spacer()
+            }
+            Text(item.exerciseName)
+                .font(.system(size: 22, weight: .regular, design: .serif))
+                .foregroundStyle(ink)
+            Text(item.workoutName + " · " +
+                 item.scheduledDate.formatted(date: .abbreviated, time: .omitted))
+                .font(.caption)
+                .foregroundStyle(muted)
+
+            HStack(spacing: 10) {
+                Label(
+                    tr("\(item.comparableWorkouts) recorded sessions",
+                       "\(item.comparableWorkouts) registrerte økter"),
+                    systemImage: "calendar"
+                )
+                Label(
+                    tr("\(item.verifiedWorkingSets) working sets",
+                       "\(item.verifiedWorkingSets) arbeidssett"),
+                    systemImage: "dumbbell"
+                )
+            }
+            .font(.caption2)
+            .foregroundStyle(muted)
+
+            Text(tr(
+                "You reached the top of your chosen rep range across several comparable workouts. Review recovery, exercise variation and weekly volume before changing the number of sets.",
+                "Du ligger på toppen av det valgte repetisjonsområdet i flere sammenlignbare økter. Se på restitusjon, øvelsesvariasjon og ukentlig treningsmengde før du eventuelt endrer antall sett."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(ink)
+
+            Label(
+                tr("No automatic set increase. Adjust in Plan Studio if you choose.",
+                   "Ingen automatisk økning i sett. Du kan justere selv i Planstudio."),
+                systemImage: "hand.tap"
+            )
+            .font(.caption)
+            .foregroundStyle(muted)
         }
         .padding(16)
         .coachSurface(border)
