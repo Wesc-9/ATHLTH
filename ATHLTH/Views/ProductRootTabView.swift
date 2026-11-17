@@ -7054,14 +7054,16 @@ struct ATHLTHTrainView: View {
                 ? AnyView(activeTrainWorkoutCard) : nil,
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,
             dailyRecommendation:
-                !hasOngoingTrainWorkout &&
-                !hasRecordedWorkoutToday &&
-                HomeTodayCalendarSchedule.workouts(
-                    plan: active,
-                    standalone: session.standalonePlannedSessions,
-                    on: today
-                ).isEmpty
-                    ? trainDailyRecommendationInfo?.advice : nil,
+                ATHLTHTrainTodayDailyAdvicePolicy.isVisible(
+                    scheduledItemCount: HomeTodayCalendarSchedule.workouts(
+                        plan: active,
+                        standalone: session.standalonePlannedSessions,
+                        on: today
+                    ).count,
+                    hasRecordedWorkoutToday: hasRecordedWorkoutToday,
+                    hasActiveWorkout: hasOngoingTrainWorkout,
+                    hasPersonalizedAdvice: trainDailyRecommendationInfo != nil
+                ) ? trainDailyRecommendationInfo?.advice : nil,
             onShowDailyRecommendationDetails: {
                 selectedTrainDailyRecommendationInfo = trainDailyRecommendationInfo
             },
