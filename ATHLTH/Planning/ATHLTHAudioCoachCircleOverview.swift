@@ -494,8 +494,9 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     lineWidth: 1
                 )
         }
-        // Only the contents are desaturated; the menu remains interactive so
-        // a disabled group can be reactivated without opening another editor.
+        // Keep the entire card visibly grey, including expanded commands.
+        // The overflow menu remains fully interactive for reactivation.
+        .saturation(group.isEnabled ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: group.isEnabled)
         .dropDestination(for: String.self) { items, _ in
             guard let item = items.first else { return false }
