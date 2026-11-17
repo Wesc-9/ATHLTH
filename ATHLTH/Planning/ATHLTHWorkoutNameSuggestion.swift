@@ -65,7 +65,8 @@ enum ATHLTHWorkoutNameSuggestion {
         return label
     }
 
-    static func displayStepTitle(_ block: WorkoutTemplateBlock) -> String {
+    static func displayStepTitle(_ source: WorkoutTemplateBlock) -> String {
+        let block = ATHLTHZonedLocalization.normalizeLegacyImportedStep(source)
         if ATHLTHFreeStrengthRecipePolicy.isFreeStrength(block) {
             return ATHLTHLocalization.choose(
                 english: "Free strength training", norwegian: "Fri styrketrening"
