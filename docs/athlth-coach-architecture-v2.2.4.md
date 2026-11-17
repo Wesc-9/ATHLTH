@@ -62,10 +62,19 @@ ATHLTH Coach er **den eneste brukervendte coachen**. Vi skal ikke introdusere «
 - **Tester:** `Tests/ATHLTHCoachWatchLoadBasisTests.swift` og `Tests/StrengthBarbellWatchTransferTests.swift` dekker bibliotek → snapshot, JSON rundtur på Watch, gamle/ukjente payloads og visning av aktivt øvelsesgrunnlag.
 - **Gjenstår:** UI-mulighet til å korrigere vektgrunnlag for en allerede aktiv økt uten å overskrive historikken, komplett støtte for spesifikke apparat-varianter, Watch/iPhone/iPad interaksjonstester og faktisk bestått Xcode/CI. Ikke påstå at fasen er ferdig før disse er bekreftet.
 
+## Iterasjon 4 – aktiv styrkeøkt og iPad som fullverdig Coach-visning
+- **iPhone aktiv økt:** `StrengthWorkoutStore.setActiveExerciseCoachLoadBasis` lar brukeren korrigere hvordan kilo tolkes for én aktiv øvelse **før** første sett eller hoppet over sett. Avviser endringer etter registrering, avviser Watch-eide økter, og beholder tidligere resultater og planmål. Valget ligger som et kompakt `Menu` direkte i eksisterende styrkemotor.
+- **iPad lokal styrke:** `ATHLTHStudioLiveStrengthReadOnlyCard` viser vektgrunnlag fra den lokale øktens snapshot, uten å tillate endring av sett eller HealthKit-eierskap.
+- **iPad økt fra iPhone:** `ATHLTHCrossDeviceWorkoutSnapshot.strengthLoadBasisRaw` er et bakoverkompatibelt felt som fylles ut fra nåværende styrkeøvelse. Eksisterende eksplisitt godkjenning av akkurat den aktive økten gjelder fortsatt; `boundedSpectatorSnapshot` tillater bare gyldige vektgrunnlag for styrke. Fullskjermens `ATHLTHiPadLiveStrengthDetailsPanel` viser dette ved planlagt vekt.
+- **iPad privat styrkestatus:** Den eksisterende kontoavgrensede og tidsbegrensede kanalen `ATHLTHPrivateLiveStrengthSnapshot` tar nå med vektgrunnlag fra aktiv øvelse. `ATHLTHStudioRemoteStrengthStatusCard` viser det når det finnes, uten å sende flere helseopplysninger.
+- **iPad Coach:** `ATHLTHiPadStudioRootView` åpner nå en sammenhengende Coach-arbeidsflate med både restitusjon og **styrkeprogresjon** i hovedkolonnen. Brukeren kan velge en lagret treningsplan og bruke akkurat samme `ATHLTHTrainProgressionCoachView` og godkjenningsmotor som på iPhone, ikke en separat implementasjon. Valgt Coach-fane og plan-ID lagres per iPad-vindu; iPad bruker egen tilbakehandling og skjuler modalens Lukk-knapp.
+- **Tester:** `StrengthActiveExerciseQueueTests` dekker oppdatering før første sett, sperring etter fullført sett, uendrede registrerte kilo og sperring for Watch-eid økt. `ATHLTHiPadLiveWorkoutTests` dekker gyldig/ugyldig live-grunnlag og gammel privat iPad-status uten feltet.
+- **Gjenstår:** Bekreftet grønt Xcode-bygg, iPhone-/iPad-/Watch-smoke og UI-/synktester på enheter. Spesifikke maskinmodeller, per-økt vektproveniens for eldre data og sikker adaptiv volumdosering krever videre arbeid. Ingen steg lukkes før kvalitetssikring.
+
 ## Faser og ferdigkriterium
 - [ ] Fase 1 – grunnlagskartlegging, identitet, felles API og compile/verifikasjon (**pågår**).
 - [ ] Fase 2 – algoritmisk styrkeprogresjon med sikkerhetstester (**påbegynt: godkjente vekt- og repsforslag, volum kun review; sett-/utstyrsdosering og verifikasjon gjenstår**).
-- [ ] Fase 3 – integrert UI i Basic/Advanced, live, plan, iPad og Watch (**Coach-navn i livekort, opt-in repetisjonsforslag, manuell bekreftelse av tilgjengelig vektøkning og volumvurdering i planvisningen er på plass; full Basic/Advanced/iPad/Watch-integrasjon og QA gjenstår**).
+- [ ] Fase 3 – integrert UI i Basic/Advanced, live, plan, iPad og Watch (**iPad har egen Coach-fane for styrkeprogresjon, og tre read-only visninger med kjent vektgrunnlag; iPhone kan korrigere aktiv øvelse før første sett; full enhets-/UI-/synk-QA og videre modusdekning gjenstår**).
 - [ ] Fase 4 – innsikt og godkjente planjusteringer via Coach.
 - [ ] Fase 5 – komplett test, ytelse og TestFlight.
 
