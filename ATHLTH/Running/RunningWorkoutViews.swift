@@ -356,6 +356,7 @@ struct RunningWorkoutDetailView: View {
     let onStart: ((RunningWorkoutTemplate) -> Void)?
 
     @State private var showingDelete = false
+    @State private var copySaveError: String?
     @State private var showingIntervalEditor = false
     @State private var editingBeforeStart = false
     @State private var askingForTargets = false
@@ -384,14 +385,9 @@ struct RunningWorkoutDetailView: View {
     }
 
     private func continueWithSavedCopy() {
-        if let saved = personalCopy {
-            onSelect?(saved)
-        } else if workout.isBuiltIn {
-            let copy = library.duplicate(workout)
-            onSelect?(copy)
-        } else {
-            onSelect?(workout)
-        }
+        // Choosing the original for a plan never silently creates or
+        // switches to a personal copy. Mine is selected explicitly elsewhere.
+        onSelect?(workout)
         dismiss()
     }
 
@@ -404,8 +400,9 @@ struct RunningWorkoutDetailView: View {
             askingForTargets = true
         } else if toPlan {
             continueWithSavedCopy()
-        } else if personalCopy == nil && workout.isBuiltIn {
-            _ = library.duplicate(workout)
+        } else if workout.isBuiltIn {
+            // Saving a copy starts with actual edits and a new name.
+            editPersonalizedCopy()
         }
     }
 
@@ -476,24 +473,18 @@ struct RunningWorkoutDetailView: View {
 
                 if workout.isBuiltIn {
                     Button {
-                        handleFirstAddition(toPlan: false)
+                        editPersonalizedCopy()
                     } label: {
                         Label(
-                            personalCopy == nil
-                                ? ATHLTHLocalization.choose(
-                                    english: "Save in My Workouts",
-                                    norwegian: "Lagre i Mine økter"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Saved in My Workouts",
-                                    norwegian: "Lagret i Mine økter"
-                                ),
-                            systemImage: personalCopy == nil ? "doc.on.doc" : "checkmark.circle"
+                            ATHLTHLocalization.choose(
+                                english: "Customize and save a new workout",
+                                norwegian: "Tilpass og lagre ny variant"
+                            ),
+                            systemImage: "square.and.pencil"
                         )
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(personalCopy != nil)
                 } else {
                     Button("Delete Workout", role: .destructive) {
                         showingDelete = true
@@ -552,8 +543,8 @@ struct RunningWorkoutDetailView: View {
             )) {
                 if pendingAddToPlan {
                     continueWithSavedCopy()
-                } else if personalCopy == nil {
-                    _ = library.duplicate(workout)
+                } else {
+                    editPersonalizedCopy()
                 }
             }
             Button(ATHLTHLocalization.choose(
@@ -570,16 +561,45 @@ struct RunningWorkoutDetailView: View {
                 var personalized = edited
                 personalized.sharedSourceWorkoutID = edited.sharedSourceWorkoutID ??
                     (workout.isBuiltIn ? workout.id : workout.sharedSourceWorkoutID)
-                // A pace or incline entered before a run is personal, too.
-                // Persist it so the next library visit can restore those settings.
-                library.save(personalized)
+                // Starting an edited original does not automatically save a
+                // personal copy. Explicit library copies must be changed and
+                // renamed; rejected saves keep the original intact.
                 if editingBeforeStart, let onStart {
                     onStart(personalized)
-                } else if pendingAddToPlan {
-                    onSelect?(personalized)
+                    dismiss()
+                } else if library.save(personalized) {
+                    if pendingAddToPlan {
+                        onSelect?(personalized)
+                    }
+                    dismiss()
+                } else {
+                    let original = workout.isBuiltIn
+                        ? workout
+                        : (RunningWorkoutLibraryStore.builtInTemplates.first {
+                            $0.id == personalized.sharedSourceWorkoutID
+                          } ?? workout)
+                    copySaveError =
+                        ATHLTHRunningWorkoutCopyPolicy.saveError(
+                            personalized, comparedTo: original
+                        ) ?? ATHLTHLocalization.choose(
+                            english: "Could not save this copy.",
+                            norwegian: "Kunne ikke lagre kopien."
+                        )
                 }
-                dismiss()
             }
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Copy not saved", norwegian: "Kopien ble ikke lagret"
+            ),
+            isPresented: Binding(
+                get: { copySaveError != nil },
+                set: { if !$0 { copySaveError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(copySaveError ?? "")
         }
         .onAppear(perform: refreshLastHistory)
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
