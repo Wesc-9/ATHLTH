@@ -82,6 +82,12 @@ struct ATHLTHStudioLiveStrengthReadOnlyCard: View {
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(ink)
                         .fixedSize(horizontal: false, vertical: true)
+                    if let basis = exercise.exercise.coachLoadBasis {
+                        Label(basis.localizedTitle, systemImage: "scalemass")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("athlth-ipad-local-strength-load-basis")
+                    }
                     if let set = strength.currentSet {
                         Text(tr("Set", "Sett") + " \(set.setNumber)")
                             .font(.subheadline)
