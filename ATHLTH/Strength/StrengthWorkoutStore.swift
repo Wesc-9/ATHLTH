@@ -1948,6 +1948,13 @@ final class StrengthWorkoutStore: ObservableObject {
                             equipment:
                                 item.exercise
                                     .equipment,
+                            libraryExerciseID:
+                                item.exercise
+                                    .libraryExerciseID,
+                            coachLoadBasisRaw:
+                                item.exercise
+                                    .coachLoadBasis?
+                                    .rawValue,
                             setPlans:
                                 item.sets.map {
                                     set in
@@ -2081,6 +2088,10 @@ final class StrengthWorkoutStore: ObservableObject {
 
                     let exerciseSnapshot =
                         ExerciseSnapshot(
+                            libraryExerciseID: item.libraryExerciseID,
+                            coachLoadBasis: item.coachLoadBasisRaw.flatMap(
+                                ATHLTHStrengthLoadBasis.init(rawValue:)
+                            ),
                             name: item.name,
                             instructions:
                                 item.instructions ?? [],
