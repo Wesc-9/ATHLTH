@@ -33,9 +33,13 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
     let perceivedEffort: Int?
     let notes: String?
     let evidence: CustomQuickWorkoutEvidence
+    /// Retains "Fri trening" when a generic .other session is completed.
+    /// Optional for backward-compatible decoding of existing workout history.
+    var titleOverride: String? = nil
 
     var title: String {
-        method == .open
+        if let titleOverride, !titleOverride.isEmpty { return titleOverride }
+        return method == .open
             ? activity.localizedTitle
             : "\(activity.localizedTitle) · \(method.localizedTitle)"
     }
@@ -97,7 +101,8 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
             manualDistanceKilometers: distanceKilometers,
             perceivedEffort: perceivedEffort,
             notes: notes,
-            evidence: evidence
+            evidence: evidence,
+            titleOverride: configuration.titleOverride
         )
     }
 }
