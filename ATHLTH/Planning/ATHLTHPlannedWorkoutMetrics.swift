@@ -66,7 +66,6 @@ enum ATHLTHPlannedWorkoutMetrics {
     /// actual workout result.
     struct DistancePreview: Equatable {
         let kilometers: Double
-        let averagePaceSecondsPerKilometer: Double?
         let usesAssumedPace: Bool
         let usesEstimatedDistance: Bool
     }
@@ -142,7 +141,6 @@ enum ATHLTHPlannedWorkoutMetrics {
         let steps = blocks.expandedForExecution()
         guard !steps.isEmpty, steps.count <= 1_000 else { return nil }
         var totalMeters = 0.0
-        var movingSeconds = 0.0
         var assumed = false
         var estimatedDistance = false
         var hasMovement = false
@@ -158,49 +156,46 @@ enum ATHLTHPlannedWorkoutMetrics {
                   step.activityTag == "active_recovery"))
             guard active else { continue }
 
-            let pace: Double
-            if let prescribed = step.targetPaceSecondsPerKilometer {
-                guard prescribed.isFinite, (120...3_600).contains(prescribed) else {
-                    return nil
-                }
-                pace = prescribed
-            } else {
-                assumed = true
-                pace = fallbackPaceSecondsPerKilometer(
-                    for: step, defaultActivity: defaultActivity
-                )
+            if let prescribed = step.targetPaceSecondsPerKilometer,
+               (!prescribed.isFinite || !(120...3_600).contains(prescribed)) {
+                return nil
             }
 
             if let meters = step.distanceMeters {
+                // Explicit distances are known; don't invent a pace merely
+                // because the athlete hasn't selected a tempo target.
                 guard meters.isFinite, meters > 0 else { return nil }
-                totalMeters += meters
                 if let seconds = step.durationSeconds {
                     guard seconds.isFinite, seconds > 0 else { return nil }
-                    movingSeconds += seconds
-                } else {
-                    movingSeconds += meters / 1_000 * pace
                 }
+                totalMeters += meters
                 hasMovement = true
             } else if let seconds = step.durationSeconds {
                 guard seconds.isFinite, seconds > 0 else { return nil }
+                let pace: Double
+                if let prescribed = step.targetPaceSecondsPerKilometer {
+                    pace = prescribed
+                } else {
+                    // Internal estimate only; never expose this as a
+                    // user-selected target pace or measured result.
+                    assumed = true
+                    pace = fallbackPaceSecondsPerKilometer(
+                        for: step, defaultActivity: defaultActivity
+                    )
+                }
                 totalMeters += seconds * 1_000 / pace
-                movingSeconds += seconds
                 estimatedDistance = true
                 hasMovement = true
             } else {
                 // No bounded time or distance means no meaningful estimate.
                 return nil
             }
-            guard totalMeters.isFinite && movingSeconds.isFinite,
-                  totalMeters > 0 else { return nil }
+            guard totalMeters.isFinite, totalMeters > 0 else { return nil }
         }
 
         guard hasMovement else { return nil }
-        let kilometers = totalMeters / 1_000
-        let average = movingSeconds > 0 ? movingSeconds / kilometers : nil
         return DistancePreview(
-            kilometers: kilometers,
-            averagePaceSecondsPerKilometer: average,
+            kilometers: totalMeters / 1_000,
             usesAssumedPace: assumed,
             usesEstimatedDistance: estimatedDistance
         )
