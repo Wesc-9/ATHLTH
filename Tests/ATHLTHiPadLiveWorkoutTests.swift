@@ -142,6 +142,45 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         ).strengthLoadBasisRaw, "totalKilograms")
     }
 
+    @MainActor
+    func testPrivateIpadStrengthSyncPreservesWeightBasisWithoutGuessingLegacy() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        var exercise = Exercise(
+            id: UUID(), origin: .custom, ownerID: UUID(),
+            name: "Dumbbell Press", instructions: [],
+            primaryMuscles: ["shoulders"], secondaryMuscles: [],
+            equipment: ["dumbbells"], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        exercise.coachLoadBasis = .kilogramsPerHand
+        store.appendExercise(
+            exercise, sets: 2, reps: 8,
+            targetWeightKilograms: 20, restSeconds: 0
+        )
+        let snapshot = try XCTUnwrap(
+            ATHLTHPrivateLiveStrengthSnapshot.make(from: store)
+        )
+        XCTAssertEqual(snapshot.plannedLoadBasisRaw, "kilogramsPerHand")
+        let encoded = try JSONEncoder().encode(snapshot)
+        let decoded = try JSONDecoder().decode(
+            ATHLTHPrivateLiveStrengthSnapshot.self, from: encoded
+        )
+        XCTAssertEqual(decoded.plannedLoadBasisRaw, "kilogramsPerHand")
+
+        // A previous app version has no such field; nil is intentional.
+        var dictionary = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        dictionary.removeValue(forKey: "plannedLoadBasisRaw")
+        let legacy = try JSONDecoder().decode(
+            ATHLTHPrivateLiveStrengthSnapshot.self,
+            from: JSONSerialization.data(withJSONObject: dictionary)
+        )
+        XCTAssertNil(legacy.plannedLoadBasisRaw)
+        XCTAssertEqual(legacy.plannedWeightKilograms, 20)
+    }
+
     func testStrengthSetsAreReadOnlyAndNeverExceedTotal() {
         let workout = snapshot(completedSets: 12, totalSets: 10)
         XCTAssertEqual(ATHLTHiPadLiveMetrics.sets(workout), "10 / 10")
