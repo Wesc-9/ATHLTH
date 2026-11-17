@@ -880,7 +880,9 @@ struct ATHLTHAudioCoachActiveListView: View {
         let values = group.ruleIDs.compactMap { id in
             draft.customRules.first(where: { $0.id == id })
         }.flatMap(\.selectedMetrics)
-        return availableGroupContents.filter { values.contains($0) }
+        // Existing selections must stay visible and removable even if the
+        // current free workout cannot announce a structured metric.
+        return ATHLTHAudioCoachRule.Metric.allCases.filter { values.contains($0) }
     }
 
     /// A lightweight, immediately populated editor. No Form + menu Picker
