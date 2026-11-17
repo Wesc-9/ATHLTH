@@ -128,6 +128,98 @@ enum ATHLTHZonedLocalization {
                     norwegian: "10 hink per bein, 10 spensthopp, 8 fallhopp og 10 A-skips per side. Gjennomfør øvelsene og gå videre manuelt. Kilden oppgir ingen varighet."
                 )
             )
+        case "walking then very slow jog":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Walk, then easy jog",
+                    norwegian: "Gå, deretter rolig jogg"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Start by walking, then transition to a very easy jog. Use the prescribed duration for the whole step.",
+                    norwegian: "Start med gange, og fortsett med svært rolig jogg. Varigheten gjelder hele deløkten."
+                )
+            )
+        case "walking then recovery jog", "walk then very slow recovery jog":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Walk, then recovery jog",
+                    norwegian: "Gå, deretter restitusjonsjogg"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Begin by walking, then jog lightly to cool down.",
+                    norwegian: "Begynn med gange, og fortsett med rolig restitusjonsjogg."
+                )
+            )
+        case "walk 3min then very slow jog":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Walk 3 min, then easy jog",
+                    norwegian: "Gå 3 min, deretter rolig jogg"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Walk for the first 3 minutes, then continue with a very easy jog for the rest of this step.",
+                    norwegian: "Gå de første 3 minuttene, og fortsett deretter med svært rolig jogg resten av deløkten."
+                )
+            )
+        case "walking and recovery":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "Walking recovery", norwegian: "Rolig gange"
+                ),
+                instructions: nil
+            )
+        case "6-minute test: run the greatest distance possible":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "6 min running test", norwegian: "6 min testløp"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Run as far as possible in 6 minutes. Record the total distance.",
+                    norwegian: "Løp så langt du klarer på 6 minutter. Noter totaldistansen."
+                )
+            )
+        case "12-minute test: run the greatest distance possible at sustained effort":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "12 min Cooper test", norwegian: "12 min Cooper-test"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Cover the longest possible distance in 12 minutes at sustained effort. Record the total distance.",
+                    norwegian: "Løp så langt du klarer med jevn, høy innsats i 12 minutter. Noter totaldistansen."
+                )
+            )
+        case "1200m time trial (maximal effort)", "3600m time trial (maximal effort)":
+            let distance = input.lowercased().hasPrefix("1200")
+                ? "1200 m" : "3600 m"
+            return StepCopy(
+                title: distance + ATHLTHLocalization.choose(
+                    english: " time trial", norwegian: " testløp"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Run the full distance at maximum sustainable effort. Record your time.",
+                    norwegian: "Løp hele distansen med maksimal, jevn innsats. Noter tiden."
+                )
+            )
+        case "5000m time trial (maximal effort)":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "5 km time trial", norwegian: "5 km testløp"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Run 5 km at maximum sustainable effort. Record your finishing time.",
+                    norwegian: "Løp 5 km med maksimal, jevn innsats. Noter sluttiden."
+                )
+            )
+        case "progressive 20m shuttle test (audio beep) until failure":
+            return StepCopy(
+                title: ATHLTHLocalization.choose(
+                    english: "20 m shuttle test", norwegian: "20 m skytteltest"
+                ),
+                instructions: ATHLTHLocalization.choose(
+                    english: "Run repeated 20 m shuttles to the audio beeps as the speed increases, until you cannot keep up.",
+                    norwegian: "Løp gjentatte drag på 20 meter etter lydsignalene. Farten øker gradvis. Fortsett til du ikke klarer å følge signalene."
+                )
+            )
         case "jog down":
             return StepCopy(
                 title: ATHLTHLocalization.choose(
@@ -198,6 +290,50 @@ enum ATHLTHZonedLocalization {
         return StepCopy(title: text(input), instructions: nil)
     }
 
+    /// Correct documented legacy source phrases without altering user-written
+    /// titles or touching targets, routes, heart-rate zones or duration.
+    static func normalizeLegacyImportedStep(_ block: WorkoutTemplateBlock)
+        -> WorkoutTemplateBlock {
+        let allOut = normalizeLegacyAllOutStep(block)
+        guard allOut.kind == .run else { return allOut }
+        let raw = allOut.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        // Exact phrases from older Zoned imports, including their original
+        // mixed-language regex translations. Do not rewrite custom names.
+        let sourceEnglish: String?
+        switch raw {
+        case "walking then very slow jog",
+             "gange deretter svært langsom jogg":
+            sourceEnglish = "Walking then very slow jog"
+        case "walking then recovery jog",
+             "gange deretter restitusjonsjogg":
+            sourceEnglish = "Walking then recovery jog"
+        case "walk then very slow recovery jog",
+             "gå deretter svært langsom restitusjonsjogg":
+            sourceEnglish = "Walk then very slow recovery jog"
+        case "walk 3min then very slow jog",
+             "gå 3min deretter svært langsom jogg":
+            sourceEnglish = "Walk 3min then very slow jog"
+        default:
+            sourceEnglish = nil
+        }
+        guard let sourceEnglish else { return allOut }
+        let copy = stepCopy(
+            sourceEnglish: sourceEnglish,
+            durationSeconds: allOut.durationSeconds, isRunning: true
+        )
+        var result = allOut
+        result.title = copy.title
+        if let instructions = copy.instructions {
+            let existing = (result.notes ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            result.notes = existing.isEmpty ? instructions :
+                (existing.contains(instructions) ? existing
+                    : instructions + "\n" + existing)
+        }
+        return result
+    }
+
     /// Historical saved/personalized imports can contain the old mixed-language
     /// sentence as their title. Correct only this known catalog instruction,
     /// never replace names the athlete wrote themselves by a generic heuristic.
@@ -259,6 +395,7 @@ enum ATHLTHZonedLocalization {
         (#"\bProgressive jog\b"#, "Progressiv jogg"),
         (#"\bRecovery between blocks\b"#, "Pause mellom blokker"),
         (#"\bProgressive accelerations\b"#, "Progressive stigningsløp"),
+        (#"\baccelerations\b"#, "stigningsløp"),
         (#"\bProgressive cool.down\b"#, "Gradvis nedtrapping"),
         (#"\bEasy cool.down\b"#, "Rolig nedtrapping"),
         (#"\bCool.down\b"#, "Nedtrapping"),
