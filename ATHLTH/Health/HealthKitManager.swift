@@ -4612,7 +4612,8 @@ final class HealthKitManager: ObservableObject {
                 useReverse ? reverseEnd : forwardEnd,
             direction: ATHLTHRouteAttemptDirectionPolicy.classify(
                 reference: reference,
-                actual: actual
+                actual: actual,
+                precomputedRouteMatchPercent: match.routeMatchPercent
             )
         )
     }
