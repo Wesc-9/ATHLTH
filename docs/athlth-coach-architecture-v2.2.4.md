@@ -43,9 +43,13 @@ ATHLTH Coach er **den eneste brukervendte coachen**. Vi skal ikke introdusere «
 - Økningsforslag: kun én repetisjon av gangen ved to distinkte planlinkede og fullførte økter, med registrert innsats (RIR/RPE) og korrekt arbeidsvekt. Manglende/høy innsats, hoppede sett, ukjent vektenhet eller mismatchet øvelse skal blokkere økning.
 - I `ATHLTHTrainProgressionCoachView` aktiverer brukeren selv repetisjonsforslag og velger min/maks. Når vekt og reps begge kunne økes, prioriteres reps innen valgt område (dobbel progresjon).
 - `AppSessionStore.applySuggestedTrainingRepetitions` kontrollerer planversjonen og **beregner forslaget på nytt** ved eksplisitt godkjenning, oppdaterer kun arbeidsrepetisjonene for én fremtidig planlagt øvelse, og bevarer oppvarming, sett-ID-er og fullførte økter.
-- For muskelvekst kan tre sammenlignbare, flate økter over minst 14 dager gi `reviewTrainingVolume`. Dette er **bare et signal om å vurdere volum**, ikke en automatisk økning eller diagnose. Et eget brukervendt volumkort og målbasert volumdosering er ennå ikke på plass.
+- For muskelvekst kan tre sammenlignbare økter ved øvre repetisjonsgrense over minst 14 dager gi `reviewTrainingVolume`. Coach viser nå et eget **informasjonskort for treningsmengde** med antall relevante økter og sett; dette er verken en diagnose eller automatisk økning i sett. Målbasert volumdosering gjenstår.
 - `ATHLTHCoachStrengthIntelligence` bruker nå samme historikk-/vektbeslutning og skiller utstyrsvarianter for å unngå motstridende Coach-signaler.
 - Nye tester: `ATHLTHCoachStrengthRepetitionVolumeTests`, utvidet `ATHLTHTrainProgressionCoachTests`, `ATHLTHCoachStrengthIntelligenceTests`.
+- Sikkerhetsregler: **fullstendig hoppet over siste økt får ikke forsvinne fra sammenligningen** og eldre gode økter skal da ikke gi økningsforslag. Gjentatt samme øvelse i én økt er tvetydig og kan ikke telle som uavhengige vellykkede økter. Planlagt vektprogresjon grupperes etter kanonisk øvelses-ID der den finnes (navneendring bevares), ellers konservativt navn/utstyr.
+- Ved vektjustering krever Coach nå **eksplisitt bekreftelse per øvelse** på at historisk vektangivelse (f.eks. per manual / totalt) samsvarer og at valgt økning er tilgjengelig med utstyret. Bytte av økningssteg nullstiller bekreftelsen. Dette løser ikke behovet for framtidig strukturert belastningsproveniens i alle Watch-/treningslogger.
+- Volumkort og fremtidige repetisjonsforslag bruker samme datagrunnlag (`progressionReviews`). Ingen endring i ferdige økter eller antall sett.
+
 - Gjenstående: Xcode-/iPhone-/iPad- og Watch-verifikasjon, full UI-testing, utstyrsproveniens (total kg versus per manual, konkrete apparat), fremtidige volumforslag, restitusjonskontekst, end-to-end-synkronisering og kjørt testbevis. Ingen av de fem fasene er merket ferdig.
 
 ## Faser og ferdigkriterium
