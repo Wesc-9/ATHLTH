@@ -327,4 +327,36 @@ final class ATHLTHAssessmentMethodTests: XCTestCase {
         XCTAssertEqual(renumbered.measurementStepID, effort.measurementStepID)
     }
 
+
+    @MainActor
+    func testBuiltInCooperUsesGenericVO2NameAndCorrectTestOnlyScope() throws {
+        XCTAssertEqual(ATHLTHAssessmentMethod.estimatedVO2Max.title,
+                       "Estimert VO₂-maks")
+        XCTAssertEqual(ATHLTHAssessmentMethod.cooperTwelveMinute.title,
+                       "Estimert VO₂-maks")
+        XCTAssertTrue(ATHLTHAssessmentMethod.available(for: .running)
+            .contains(.estimatedVO2Max))
+        XCTAssertFalse(ATHLTHAssessmentMethod.available(for: .running)
+            .contains(.cooperTwelveMinute))
+
+        let source = try XCTUnwrap(
+            ATHLTHZonedPlanLibrary.workouts.first { $0.id == "ASS-005" }
+        )
+        let blocks = ATHLTHZonedPlanLibrary.blocks(for: source)
+        let index = try XCTUnwrap(blocks.firstIndex {
+            $0.assessmentMethod == .estimatedVO2Max
+        })
+        let scope = try XCTUnwrap(blocks[index].assessmentScope)
+        XCTAssertEqual(scope.vo2Protocol, .cooperTwelveMinutes)
+        XCTAssertEqual(scope.area, .currentStep)
+        XCTAssertTrue(scope.canCalculateCooper(
+            from: blocks, anchorIndex: index
+        ))
+        var invalid = scope
+        invalid.area = .entireWorkout
+        XCTAssertTrue(invalid.validate(
+            method: .estimatedVO2Max, in: blocks, anchorIndex: index
+        ).isBlocking)
+    }
+
 }
