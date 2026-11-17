@@ -136,7 +136,7 @@ final class MirroredWorkoutAudioCoach:
         measuredZoneFirstSeenAt = nil
         lastMeasuredZoneAnnouncementAt = -.infinity
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
-            rules: configuration.customRules ?? [],
+            rules: configuration.activeCustomRules,
             distanceMeters: 0,
             elapsedSeconds: 0
         )
@@ -324,7 +324,7 @@ final class MirroredWorkoutAudioCoach:
                 (floor(snapshot.elapsedTime / interval) + 1) * interval
         }
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
-            rules: configuration.customRules ?? [],
+            rules: configuration.activeCustomRules,
             distanceMeters: snapshot.distanceMeters,
             elapsedSeconds: snapshot.elapsedTime
         )
@@ -672,7 +672,7 @@ final class MirroredWorkoutAudioCoach:
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> [ATHLTHAudioCoachDueAnnouncement] {
         ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
-            rules: configuration.customRules ?? [],
+            rules: configuration.activeCustomRules,
             distanceMeters: snapshot.distanceMeters,
             elapsedSeconds: snapshot.elapsedTime,
             paceSecondsPerKilometer:
@@ -754,7 +754,7 @@ final class MirroredWorkoutAudioCoach:
         // The independent periodic group is authoritative when both
         // legacy automatic motivation and an exact timer are configured.
         var resolvedSettings = configuredSettings
-        if (configuration.customRules ?? []).contains(where: {
+        if (configuration.activeCustomRules).contains(where: {
             $0.isEnabled && $0.selectedMetrics.contains(.motivation)
         }) {
             resolvedSettings.motivationEnabled = false
