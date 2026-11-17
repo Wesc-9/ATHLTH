@@ -124,10 +124,13 @@ final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
                 ATHLTHWorkoutSearch.normalized($0.title) == "4x4 intervaller"
             })
         let store = RunningWorkoutLibraryStore()
-        let saved = store.duplicate(source)
-        XCTAssertFalse(saved.isBuiltIn)
-        XCTAssertEqual(saved.sharedSourceWorkoutID, source.id)
-        XCTAssertEqual(store.savedCopy(for: source)?.id, saved.id)
+        let draft = store.duplicate(source)
+        XCTAssertFalse(draft.isBuiltIn)
+        XCTAssertEqual(draft.sharedSourceWorkoutID, source.id)
+        // Duplicating opens an editable draft; an unchanged copy must not
+        // silently appear in Mine or hide the immutable library original.
+        XCTAssertNil(store.savedCopy(for: source))
+        XCTAssertFalse(store.allTemplates.contains(where: { $0.id == draft.id }))
         XCTAssertEqual(store.allTemplates.first(where: { $0.id == source.id })?.id,
                        source.id)
     }
