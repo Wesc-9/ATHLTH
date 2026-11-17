@@ -71,6 +71,7 @@ enum ATHLTHCoachStrengthComparableHistory {
     struct TargetEvidence {
         let workingSetIDs: [UUID]
         let maximumRecordedWeightKg: Double
+        let minimumRecordedWeightKg: Double
         let metAllTargets: Bool
     }
 
@@ -122,6 +123,7 @@ enum ATHLTHCoachStrengthComparableHistory {
         return TargetEvidence(
             workingSetIDs: working.map(\.id),
             maximumRecordedWeightKg: weights.max() ?? 0,
+            minimumRecordedWeightKg: weights.min() ?? 0,
             metAllTargets: allMet && weights.count == working.count
         )
     }
