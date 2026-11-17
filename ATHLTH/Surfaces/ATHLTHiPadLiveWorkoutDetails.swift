@@ -208,6 +208,14 @@ struct ATHLTHiPadLiveStrengthDetailsPanel: View {
                     }
                 }
             }
+            if let basis = snapshot.strengthLoadBasisRaw.flatMap(
+                ATHLTHStrengthLoadBasis.init(rawValue:)
+            ), snapshot.strengthWeightKilograms != nil {
+                Label(basis.localizedTitle, systemImage: "scalemass")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .accessibilityIdentifier("athlth-ipad-live-strength-load-basis")
+            }
             if let restEnd = snapshot.strengthRestEndsAt {
                 HStack {
                     Label(tr("Rest remaining", "Gjenstående pause"),
