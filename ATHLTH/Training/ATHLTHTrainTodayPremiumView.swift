@@ -1261,7 +1261,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             case .walking: return "figure.walk"
             case .strength: return "dumbbell.fill"
             case .cycling: return "bicycle"
-            case .freeTraining: return "figure.mixed.cardio"
+            case .freeTraining: return "figure.cross.training"
             case .custom: return "figure.mixed.cardio"
             }
         }
