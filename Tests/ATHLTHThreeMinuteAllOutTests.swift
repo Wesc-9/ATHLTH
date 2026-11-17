@@ -186,7 +186,7 @@ final class ATHLTHThreeMinuteAllOutTests: XCTestCase {
         XCTAssertTrue(description.contains("Slik beregnes resultatene"))
         XCTAssertTrue(description.contains("D′"))
         XCTAssertTrue(description.contains("400"))
-        XCTAssertTrue(description.contains("2:30 til 3:00"))
+        XCTAssertTrue(description.contains("2:30 og 3:00"))
         XCTAssertEqual(effort.durationSeconds, 180)
         XCTAssertTrue(ATHLTHThreeMinuteAllOut.isRunningTest(
             title: "3-Minute All-Out Test", blocks: steps
