@@ -82,11 +82,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     private let paper = ATHLTHPlanDesign.surface
 
     private var phases: [WorkoutPhaseKind] {
-        WorkoutPhaseKind.allCases.filter { phase in
-            visiblePhases.contains(phase) || blocks.contains {
-                presentationPhase(for: $0) == phase
-            }
-        }
+        ATHLTHWorkoutPhaseDeletionPolicy.orderedVisiblePhases(
+            for: blocks, visiblePhases: visiblePhases
+        )
     }
 
     private func presentationPhase(for block: WorkoutTemplateBlock) -> WorkoutPhaseKind {
