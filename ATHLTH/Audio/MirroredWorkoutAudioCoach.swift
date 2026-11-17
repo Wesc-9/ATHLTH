@@ -910,17 +910,15 @@ final class MirroredWorkoutAudioCoach:
         ) { result, cue in
             result.formUnion(cue.metrics)
         }
-        var parts: [String] = []
-        if due {
-            let regular = routinePhrase(snapshot, excluding: covered)
-            if !regular.isEmpty { parts.append(regular) }
-        }
-        parts.append(contentsOf: customDue.map(\.text))
-        let uniqueParts = ATHLTHCoachCueRepeatPolicy.uniqueSentences(parts)
-        guard !uniqueParts.isEmpty else { return }
+        let regular = due
+            ? routinePhrase(snapshot, excluding: covered) : ""
+        let combined = ATHLTHCoachRoutineComposition.compose(
+            regular: regular, customDue: customDue
+        )
+        guard !combined.isEmpty else { return }
 
         speak(
-            uniqueParts.joined(separator: ". "),
+            combined,
             priority: .routineCoach,
             event: ATHLTHCoachEvent(
                 kind: .routineMilestone,
