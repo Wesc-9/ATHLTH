@@ -50,7 +50,7 @@ struct ATHLTHAudioCoachTriggerEditor: View {
                         .padding(.horizontal, 2)
                     VStack(spacing: 0) {
                         ForEach(category.1, id: \.self) { item in
-                            let unavailable = item.needsStructuredStep && !supportsStructured
+                            let needsPlannedSteps = item.needsStructuredStep && !supportsStructured
                             Button {
                                 trigger = item
                                 switch item {
@@ -72,8 +72,8 @@ struct ATHLTHAudioCoachTriggerEditor: View {
                                                                  ? .semibold : .regular))
                                         .foregroundStyle(ink)
                                         .frame(maxWidth: .infinity, alignment: .leading)
-                                    if unavailable {
-                                        Image(systemName: "lock")
+                                    if needsPlannedSteps {
+                                        Image(systemName: "info.circle")
                                             .foregroundStyle(muted)
                                     }
                                 }
@@ -85,7 +85,6 @@ struct ATHLTHAudioCoachTriggerEditor: View {
                                     in: RoundedRectangle(cornerRadius: 12)
                                 )
                             }
-                            .disabled(unavailable)
                             .buttonStyle(.plain)
                             if item != category.1.last {
                                 Divider().overlay(ATHLTHPlanDesign.warmDivider)
@@ -96,6 +95,15 @@ struct ATHLTHAudioCoachTriggerEditor: View {
                     .padding(7)
                     .background(.white, in: RoundedRectangle(cornerRadius: 17))
                 }
+            }
+
+            if !supportsStructured {
+                Text(tr(
+                    "Interval and workout-section triggers can be saved now. They only speak during workouts containing matching planned steps.",
+                    "Du kan lagre triggere for drag og deløkter nå. De aktiveres bare når økten inneholder slike planlagte deler."
+                ))
+                .font(.caption)
+                .foregroundStyle(muted)
             }
 
             VStack(alignment: .leading, spacing: 10) {
