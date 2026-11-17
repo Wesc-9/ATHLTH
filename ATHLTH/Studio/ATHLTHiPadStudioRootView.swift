@@ -1248,7 +1248,10 @@ private struct ATHLTHiPadCoachWorkspaceView: View {
                     .padding(.horizontal, 22)
                     .padding(.vertical, 12)
 
-                    ATHLTHTrainProgressionCoachView(planID: selectedPlan.id)
+                    ATHLTHTrainProgressionCoachView(
+                        planID: selectedPlan.id,
+                        showsCloseButton: false
+                    )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityIdentifier("athlth-ipad-coach-strength-progression")
                 } else {
