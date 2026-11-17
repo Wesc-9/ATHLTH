@@ -4525,7 +4525,7 @@ final class HealthKitManager: ObservableObject {
         guard let workout = try? await workoutForChallenge(uuid: workoutID),
               isWorkoutAcceptedForATHLTH(workout) else { return nil }
         cacheWorkoutObject(workout)
-        return WorkoutSummary(workout)
+        return WorkoutSummary(workout: workout)
     }
 
 
