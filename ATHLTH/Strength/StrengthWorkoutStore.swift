@@ -116,6 +116,10 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var completedWorkout: StrengthWorkoutLog?
     @Published private(set) var completionSaveError: String?
     @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
+    /// Imported only after an explicit action on the Coach iPad screen.
+    /// The local workout journal is never replaced by cloud evidence.
+    @Published private(set) var coachImportedHistory: [StrengthWorkoutLog] = []
+    @Published private(set) var coachImportedAt: Date?
     @Published private(set) var lastPhoneDraftMutationAt:
         Date = .distantPast
     @Published private(set) var recoveredCheckpointSavedAt:
@@ -186,6 +190,20 @@ final class StrengthWorkoutStore: ObservableObject {
         loadingAccount = true
         defer { loadingAccount = false }
         accountID = userID
+        coachImportedHistory = userID.flatMap {
+            AccountLocalStorage.read(
+                [StrengthWorkoutLog].self,
+                name: "coachImportedStrengthHistory",
+                userID: $0
+            )
+        } ?? []
+        coachImportedAt = userID.flatMap {
+            AccountLocalStorage.read(
+                Date.self,
+                name: "coachImportedStrengthDate",
+                userID: $0
+            )
+        }
         cardioWatchCaptures = [:]
         watchCaptureNeedsBaseline = []
         completedWorkout = nil
@@ -263,6 +281,120 @@ final class StrengthWorkoutStore: ObservableObject {
         discardStaleTimedSetCountdown()
         discardStaleSetEffortClock()
         hasLegacyHistory = userID != nil && UserDefaults.standard.string(forKey: "legacy.strengthClaimedBy") == nil && !Self.loadWorkoutHistory().isEmpty
+    }
+
+    /// Only completed evidence is combined. The actual workout journal,
+    /// HealthKit sessions and live Watch state are never changed by imports.
+    /// On duplicate IDs, the device's locally recorded workout always wins.
+    var coachEvidenceHistory: [StrengthWorkoutLog] {
+        var seen = Set<UUID>()
+        return (workoutHistory + coachImportedHistory)
+            .filter { seen.insert($0.id).inserted && $0.isFinished }
+            .sorted { $0.startedAt > $1.startedAt }
+    }
+
+    enum CoachHistoryImportError: LocalizedError {
+        case accountMismatch
+        case noStrengthHistory
+        case invalidHistory
+
+        var errorDescription: String? {
+            switch self {
+            case .accountMismatch:
+                return "The backup belongs to another account or you are signed out."
+            case .noStrengthHistory:
+                return "This backup has no completed strength workouts."
+            case .invalidHistory:
+                return "The backup contains incompatible workout records."
+            }
+        }
+    }
+
+    /// Account-checked, user-triggered READ-ONLY import of the strength
+    /// portion of an EXISTING opt-in backup. No new network sync, no writes
+    /// to the saved workout journal and no creation of HealthKit records.
+    @discardableResult
+    func importCoachEvidence(
+        from row: TrainingBackupRow,
+        for userID: UUID,
+        now: Date = Date()
+    ) throws -> Int {
+        guard accountID == userID,
+              row.user_id == userID,
+              row.payload.ownerID == userID else {
+            throw CoachHistoryImportError.accountMismatch
+        }
+        try row.payload.validate(for: userID)
+        guard let bytes = row.payload.records["strengthHistory"] else {
+            throw CoachHistoryImportError.noStrengthHistory
+        }
+        guard bytes.count <= 20_000_000 else {
+            throw CoachHistoryImportError.invalidHistory
+        }
+        let records = try JSONDecoder().decode([StrengthWorkoutLog].self, from: bytes)
+        let cutoff = now.addingTimeInterval(-56 * 86_400)
+        let latest = records.filter {
+            $0.isFinished &&
+            ($0.endedAt ?? $0.startedAt) >= cutoff &&
+            ($0.endedAt ?? $0.startedAt) <= now
+        }
+        guard !latest.isEmpty else {
+            throw CoachHistoryImportError.noStrengthHistory
+        }
+        // Minimise the copy kept for local Coach evidence: no HealthKit
+        // identifiers or metrics, place, live HR zones or instructions.
+        let reduced = Array(latest.sorted {
+            $0.startedAt > $1.startedAt
+        }.prefix(300)).map { original -> StrengthWorkoutLog in
+            var workout = original
+            workout.healthMetrics = LinkedHealthWorkoutMetrics(
+                healthKitWorkoutUUID: nil, duration: nil,
+                activeCalories: nil, averageHeartRate: nil, maxHeartRate: nil
+            )
+            workout.plannedTrainingPlace = nil
+            workout.liveHeartRateTargetZone = nil
+            workout.watchSessionID = nil
+            workout.exercises = original.exercises.map { logged in
+                var copy = logged
+                copy.exercise.instructions = []
+                return copy
+            }
+            return workout
+        }
+        guard accountID == userID else {
+            throw CoachHistoryImportError.accountMismatch
+        }
+        // Persist separately under the current account, not in the
+        // workout-history or optional cloud-backup storage keys.
+        AccountLocalStorage.write(
+            reduced,
+            name: "coachImportedStrengthHistory",
+            userID: userID
+        )
+        AccountLocalStorage.write(
+            now,
+            name: "coachImportedStrengthDate",
+            userID: userID
+        )
+        coachImportedHistory = reduced
+        coachImportedAt = now
+        return reduced.count
+    }
+
+    func clearImportedCoachEvidence(for userID: UUID) {
+        guard accountID == userID else { return }
+        UserDefaults.standard.removeObject(
+            forKey: AccountLocalStorage.key(
+                "coachImportedStrengthHistory", userID: userID
+            )
+        )
+        UserDefaults.standard.removeObject(
+            forKey: AccountLocalStorage.key(
+                "coachImportedStrengthDate", userID: userID
+            )
+        )
+        coachImportedHistory = []
+        coachImportedAt = nil
     }
 
     func restoreLegacyHistory() {
