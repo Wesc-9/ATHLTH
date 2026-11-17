@@ -357,7 +357,7 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         XCTAssertEqual(effort.kind, .run)
         XCTAssertEqual(effort.durationSeconds, 180)
         XCTAssertEqual(effort.title, "3 min maksimaltest")
-        XCTAssertTrue(effort.notes?.contains("30 sekundene") == true)
+        XCTAssertTrue(effort.notes?.contains("mellom 2:30 og 3:00") == true)
         XCTAssertFalse(effort.title.contains("Record"))
         XCTAssertEqual(effort.targetHeartRateZone, 5)
         XCTAssertEqual(effort.sourceIntensityZoneLabel, "Z5")
