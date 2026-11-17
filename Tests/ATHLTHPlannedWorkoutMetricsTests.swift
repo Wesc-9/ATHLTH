@@ -258,7 +258,7 @@ final class ATHLTHPlannedWorkoutMetricsTests: XCTestCase {
         strength.kind = .exercise
         XCTAssertNil(ATHLTHPlannedWorkoutMetrics.previewDistance(for: [strength]))
         XCTAssertNil(ATHLTHPlannedWorkoutMetrics.plannedHeartRateZoneRange(for: [strength]))
-        let open = run()
+        let open = run(seconds: nil)
         XCTAssertNil(ATHLTHPlannedWorkoutMetrics.previewDistance(for: [open]))
         let invalid = run(seconds: 600, pace: 0)
         XCTAssertNil(ATHLTHPlannedWorkoutMetrics.previewDistance(for: [invalid]))
@@ -323,7 +323,7 @@ final class ATHLTHPlannedWorkoutMetricsTests: XCTestCase {
     }
 
     func testAddingTimeImprovesDistancePreviewWithoutWritingAssumedPace() throws {
-        var block = run()
+        var block = run(seconds: nil)
         XCTAssertNil(ATHLTHPlannedWorkoutMetrics.previewDistance(for: [block]))
         block.durationSeconds = 600
         let first = try XCTUnwrap(
