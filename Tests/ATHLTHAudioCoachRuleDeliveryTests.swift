@@ -789,6 +789,135 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertNotEqual(first[0].milestoneKey, second[0].milestoneKey)
     }
 
+    func testMutedGroupSurvivesTemplateAndWatchRoundTripWithoutSpeaking() throws {
+        let hidden = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .heartRate, interval: 60
+        )
+        let visible = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 1_000
+        )
+        var group = ATHLTHAudioCoachGroup(
+            name: "Min gruppe", ruleIDs: [hidden.id]
+        )
+        group.enabled = false
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.customRules = [hidden, visible]
+        config.coachGroups = [group]
+
+        let decoded = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self, from: JSONEncoder().encode(config)
+        )
+        XCTAssertEqual(decoded.coachGroups?.first?.isEnabled, false)
+        XCTAssertEqual(decoded.customRules?.count, 2)
+        XCTAssertEqual(decoded.activeCustomRules.map(\.id), [visible.id])
+
+        var draft = AudioCoachDraft()
+        draft.load(configuration: decoded)
+        XCTAssertFalse(draft.coachGroups[0].isEnabled)
+        draft.coachGroups[0].enabled = true
+        XCTAssertEqual(draft.configuration().activeCustomRules.count, 2)
+    }
+
+    func testStructuredNextExerciseAndMeasuredSummaries() {
+        let steps = [
+            WatchRunningWorkoutStep(
+                id: UUID(), title: "Oppvarming", measure: .time,
+                distanceMeters: nil, durationSeconds: 120,
+                intensityText: nil, phase: "warmup"
+            ),
+            WatchRunningWorkoutStep(
+                id: UUID(), title: "Drag", measure: .time,
+                distanceMeters: nil, durationSeconds: 120,
+                intensityText: nil, phase: "work"
+            ),
+            WatchRunningWorkoutStep(
+                id: UUID(), title: "Pause", measure: .time,
+                distanceMeters: nil, durationSeconds: 30,
+                intensityText: nil, phase: "recovery"
+            ),
+            WatchRunningWorkoutStep(
+                id: UUID(), title: "Nedjogging", measure: .open,
+                distanceMeters: nil, durationSeconds: nil,
+                intensityText: nil, phase: "cooldown"
+            )
+        ]
+        let plan = WatchRunningWorkoutTransfer(title: "Intervall", steps: steps)
+        let records = [
+            ATHLTHRecordedRunningStep(
+                index: 0, title: "Oppvarming", phase: "warmup",
+                activeSeconds: 120, distanceMeters: 280
+            ),
+            ATHLTHRecordedRunningStep(
+                index: 1, title: "Drag", phase: "work",
+                activeSeconds: 120, distanceMeters: 400
+            ),
+            ATHLTHRecordedRunningStep(
+                index: 2, title: "Pause", phase: "recovery",
+                activeSeconds: 30, distanceMeters: 70
+            )
+        ]
+
+        let effort = ATHLTHCoachReadoutContext.make(
+            plan: plan, index: 1, elapsed: 0,
+            distance: 0, recorded: Array(records.prefix(1)),
+            routeRemainingMeters: nil
+        )
+        XCTAssertEqual(effort.remainingExerciseCount, 2)
+        XCTAssertEqual(effort.nextExerciseName, "Pause")
+        XCTAssertNil(effort.previousMainSectionSeconds)
+
+        let cooldown = ATHLTHCoachReadoutContext.make(
+            plan: plan, index: 3, elapsed: 0,
+            distance: 0, recorded: records, routeRemainingMeters: nil
+        )
+        XCTAssertEqual(cooldown.previousExerciseName, "Pause")
+        XCTAssertEqual(cooldown.previousMainSectionExerciseCount, 2)
+        XCTAssertEqual(cooldown.previousMainSectionSeconds, 150)
+        XCTAssertEqual(cooldown.previousMainSectionDistanceMeters, 470)
+
+        let remaining = ATHLTHAudioCoachRule(
+            trigger: .stepStart, metric: .remainingExercises, interval: 1
+        )
+        XCTAssertTrue(remaining.phrase(
+            distanceMeters: 0, elapsedSeconds: 0,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil,
+            norwegian: true, context: effort
+        )?.contains("2 øvelser") == true)
+
+        let next = ATHLTHAudioCoachRule(
+            trigger: .stepStart, metric: .nextExercise, interval: 1
+        )
+        XCTAssertTrue(next.phrase(
+            distanceMeters: 0, elapsedSeconds: 0,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil,
+            norwegian: true, context: effort
+        )?.contains("Neste øvelse: Pause") == true)
+
+        let previous = ATHLTHAudioCoachRule(
+            trigger: .stepStart, metric: .previousExerciseSummary, interval: 1
+        )
+        XCTAssertTrue(previous.phrase(
+            distanceMeters: 0, elapsedSeconds: 0,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil,
+            norwegian: true, context: cooldown
+        )?.contains("Pause") == true)
+
+        let main = ATHLTHAudioCoachRule(
+            trigger: .stepStart, metric: .previousMainSectionSummary, interval: 1
+        )
+        XCTAssertNil(main.phrase(
+            distanceMeters: 0, elapsedSeconds: 0,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil,
+            norwegian: true, context: effort
+        ))
+        XCTAssertTrue(main.phrase(
+            distanceMeters: 0, elapsedSeconds: 0,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil,
+            norwegian: true, context: cooldown
+        )?.contains("470 meter") == true)
+    }
+
     func testOpenCooldownDoesNotInventAnEstimatedFinishTime() throws {
         let groupID = UUID()
         let steps = [
