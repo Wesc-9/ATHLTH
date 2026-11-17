@@ -6,6 +6,7 @@ struct TrainingDataSettingsView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var backups: TrainingBackupStore
     @EnvironmentObject private var studioPlanSync: ATHLTHStudioPlanSyncStore
+    @EnvironmentObject private var strengthAccountSync: ATHLTHStrengthAccountSyncStore
     @EnvironmentObject private var exercises: ExerciseLibraryStore
     @EnvironmentObject private var running: RunningWorkoutLibraryStore
     @EnvironmentObject private var phone: IPhoneWorkoutStore
@@ -95,6 +96,27 @@ struct TrainingDataSettingsView: View {
                     }
                 Text("When enabled, a summary of up to the last 28 days of workouts is sent to Groq when you ask Coach to build or adapt a plan. Routes, sleep, heart rate and other raw health data are not included. Turn this off to stop sharing in future requests.")
                     .font(.footnote)
+            }
+            Section(ATHLTHLocalization.choose(
+                english: "Automatic workout sync",
+                norwegian: "Automatisk synkronisering av økter"
+            )) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Completed strength workouts synchronize automatically between your signed-in ATHLTH devices. Apple Watch sessions join after transfer to iPhone. This does not synchronize raw Apple Health samples, heart rate, HRV, sleep, GPS or workout locations. The workout itself is still private personal training data.",
+                    norwegian: "Fullførte styrkeøkter synkroniseres automatisk mellom ATHLTH-enhetene du er logget inn på. Apple Watch-økter synkroniseres når de er overført til iPhone. Rådata fra Apple Health, puls, HRV, søvn, GPS og treningssted synkroniseres ikke. Selve treningsloggen er fortsatt private treningsopplysninger."
+                ))
+                .font(.footnote)
+                Text(strengthAccountSync.status)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let last = strengthAccountSync.lastSuccessfulSync {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Last synchronized: \(last.formatted(date: .abbreviated, time: .shortened))",
+                        norwegian: "Sist synkronisert: \(last.formatted(date: .abbreviated, time: .shortened))"
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
             }
             Section("Cloud backup") {
                 Toggle("Allow cloud backup of my training data", isOn: Binding(get: { backups.enabled }, set: { value in Task { await backups.setEnabled(value) } }))
