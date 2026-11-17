@@ -122,6 +122,15 @@ final class ATHLTHTrainProgressionCoachTests: XCTestCase {
         XCTAssertEqual(suggested.first?.beforeLoad, 14)
         XCTAssertEqual(suggested.first?.proposedLoad, 15)
         XCTAssertEqual(suggested.first?.workingSetsVerified, 4)
+        XCTAssertEqual(
+            Set(suggested[0].sourceWorkoutIDs),
+            Set(history.map(\.id))
+        )
+        XCTAssertEqual(
+            Set(suggested[0].sourceSetIDs),
+            Set(history.flatMap { $0.exercises.flatMap { $0.sets.map(\.id) } })
+        )
+        XCTAssertEqual(suggested[0].sourceSetIDs.count, 4)
     }
 
     func testOneSessionInsufficientAndFutureCompletedIsProtected() {
@@ -318,6 +327,14 @@ final class ATHLTHTrainProgressionCoachTests: XCTestCase {
         XCTAssertEqual(proposals[0].beforeReps, 10)
         XCTAssertEqual(proposals[0].proposedReps, 11)
         XCTAssertEqual(proposals[0].prescribedWeightKg, 14)
+        XCTAssertEqual(
+            Set(proposals[0].sourceWorkoutIDs),
+            Set(history.map(\.id))
+        )
+        XCTAssertEqual(
+            Set(proposals[0].sourceSetIDs),
+            Set(history.flatMap { $0.exercises.flatMap { $0.sets.map(\.id) } })
+        )
 
         plan.builderProfile?.goal = .maintain
         XCTAssertTrue(
