@@ -204,4 +204,34 @@ final class ATHLTHWorkoutDraftRecoveryPolicyTests: XCTestCase {
         ))
     }
 
+
+    func testNewPlanStudioRestoresUnsavedActivePauseAndWalkAfterRelaunch() {
+        let programID = UUID()
+        let context = "new-program-\(programID.uuidString)-week-0-day-2-workout-0"
+        XCTAssertTrue(ATHLTHWorkoutDraftRecoveryPolicy.accepts(
+            storedSignature: "Aktiv pause|old-main-phase-ids",
+            currentSignature: "Din økt|recreated-source-blocks",
+            context: context,
+            storedSourceTitle: "Aktiv pause",
+            currentSourceTitle: "Din økt",
+            storedSourceID: nil,
+            currentSourceID: nil,
+            savedAt: now.addingTimeInterval(-60),
+            now: now
+        ))
+    }
+
+    func testLegacyUnscopedPlanDraftDoesNotOverwriteDifferentWorkout() {
+        XCTAssertFalse(ATHLTHWorkoutDraftRecoveryPolicy.accepts(
+            storedSignature: "Active pause|old",
+            currentSignature: "Strength|new",
+            context: "new-program-week-0-day-2-workout-0",
+            storedSourceTitle: "Active pause",
+            currentSourceTitle: "Strength",
+            storedSourceID: nil,
+            currentSourceID: nil,
+            savedAt: now.addingTimeInterval(-60),
+            now: now
+        ))
+    }
 }
