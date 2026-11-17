@@ -24,8 +24,8 @@ enum ATHLTHTrainProgressionCoach {
         let date: Date
         let workoutID: UUID
         let exercise: ExerciseSnapshot
-        let sets: Int
-        let highestLoad: Double
+        let workingSetIDs: [UUID]
+        let minimumWorkingWeightKg: Double
         let metTargets: Bool
     }
 
@@ -64,8 +64,8 @@ enum ATHLTHTrainProgressionCoach {
                     date: log.endedAt ?? log.startedAt,
                     workoutID: log.id,
                     exercise: entry.exercise,
-                    sets: evidence?.workingSetIDs.count ?? 0,
-                    highestLoad: evidence?.maximumRecordedWeightKg ?? 0,
+                    workingSetIDs: evidence?.workingSetIDs ?? [],
+                    minimumWorkingWeightKg: evidence?.minimumRecordedWeightKg ?? 0,
                     metTargets: evidence?.metAllTargets == true
                 ))
             }
@@ -120,13 +120,21 @@ enum ATHLTHTrainProgressionCoach {
                             unique.append(record)
                             if unique.count == 2 { break }
                         }
-                        guard unique.count == 2,
-                              unique.allSatisfy({
-                                  $0.metTargets && $0.highestLoad >= current
-                              }) else { continue }
-
-                        let proposed = (current + increaseKg).rounded(toPlaces: 2)
-                        guard proposed > current else { continue }
+                        let assessment = ATHLTHCoachStrengthDecision.assess(
+                            evidence: unique.map {
+                                ATHLTHCoachStrengthDecision.Evidence(
+                                    workoutID: $0.workoutID,
+                                    date: $0.date,
+                                    workingSetIDs: $0.workingSetIDs,
+                                    minimumWorkingWeightKg: $0.minimumWorkingWeightKg,
+                                    metTargets: $0.metTargets
+                                )
+                            },
+                            prescribedLoadKg: current,
+                            incrementKg: increaseKg
+                        )
+                        guard assessment.action == .reviewSmallIncrease,
+                              let proposed = assessment.proposedWeightKg else { continue }
                         suggestedNames.insert(identityKey)
                         suggestions.append(Suggestion(
                             workoutID: workout.id,
@@ -137,9 +145,9 @@ enum ATHLTHTrainProgressionCoach {
                             weekNumber: weekIndex + 1,
                             beforeLoad: current,
                             proposedLoad: proposed,
-                            matchingFinishedWorkouts: 2,
-                            workingSetsVerified: unique.reduce(0) { $0 + $1.sets },
-                            reasoning: "Targets met in two distinct linked, completed strength sessions; next planned load is not above the recorded load."
+                            matchingFinishedWorkouts: assessment.sourceWorkoutIDs.count,
+                            workingSetsVerified: assessment.sourceSetIDs.count,
+                            reasoning: "ATHLTH Coach: targets verified in two distinct linked workouts. The proposed increase is limited and requires your approval."
                         ))
                     }
                 }
