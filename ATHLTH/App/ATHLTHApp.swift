@@ -72,6 +72,7 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var goalAccountSync = ATHLTHGoalAccountSyncStore()
     @StateObject private var trainingBackups = TrainingBackupStore()
     @StateObject private var studioPlanSync = ATHLTHStudioPlanSyncStore()
+    @StateObject private var strengthAccountSync = ATHLTHStrengthAccountSyncStore()
     @StateObject private var automaticOfflineLibrary = ATHLTHAutomaticOfflineLibraryStore()
     @StateObject private var phoneWorkout = IPhoneWorkoutStore()
     @StateObject private var profileGear = ProfileGearStore()
@@ -185,6 +186,7 @@ private struct ATHLTHSceneRootView: View {
                 .environmentObject(goalAccountSync)
                 .environmentObject(trainingBackups)
                 .environmentObject(studioPlanSync)
+                .environmentObject(strengthAccountSync)
                 .environmentObject(phoneWorkout)
                 .environmentObject(profileGear)
                 .environmentObject(pets)
@@ -240,11 +242,17 @@ private struct ATHLTHSceneRootView: View {
             studioPlanSync.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
+            strengthAccountSync.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             profileRecords.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
             if appSession.signedIn {
                 studioPlanSync.scheduleSync(session: appSession)
+                strengthAccountSync.scheduleSync(
+                    session: appSession, strength: strengthWorkout
+                )
             }
             scheduleAutomaticOfflinePreparation()
             ATHLTHAliveController.reconcile(
@@ -262,6 +270,9 @@ private struct ATHLTHSceneRootView: View {
                 // returning from an offline period.
                 appSession.checkpointTrainingContent()
                 studioPlanSync.scheduleSync(session: appSession)
+                strengthAccountSync.scheduleSync(
+                    session: appSession, strength: strengthWorkout
+                )
                 notifications.scheduleAccountSync()
                 Task { await messaging.refreshPreferences() }
             }
@@ -300,6 +311,9 @@ private struct ATHLTHSceneRootView: View {
             studioPlanSync.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
+            strengthAccountSync.switchAccount(
+                signedIn ? appSession.profile.userID : nil
+            )
             profileRecords.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
@@ -309,6 +323,9 @@ private struct ATHLTHSceneRootView: View {
             }
             if signedIn {
                 studioPlanSync.scheduleSync(session: appSession)
+                strengthAccountSync.scheduleSync(
+                    session: appSession, strength: strengthWorkout
+                )
             }
             ATHLTHAliveController.reconcile(
                 isForeground: scenePhase == .active && signedIn
@@ -328,6 +345,9 @@ private struct ATHLTHSceneRootView: View {
             guard appSession.signedIn, scenePhase == .active else { return }
             while !Task.isCancelled {
                 studioPlanSync.scheduleSync(session: appSession)
+                strengthAccountSync.scheduleSync(
+                    session: appSession, strength: strengthWorkout
+                )
                 await notifications.refreshAccountNotifications()
                 await messaging.refreshPreferences()
                 do { try await Task.sleep(for: .seconds(25)) } catch { return }
@@ -341,6 +361,9 @@ private struct ATHLTHSceneRootView: View {
                   owner == appSession.profile.userID else { return }
             scheduleAutomaticOfflinePreparation()
             studioPlanSync.scheduleSync(session: appSession)
+            strengthAccountSync.scheduleSync(
+                session: appSession, strength: strengthWorkout
+            )
             scheduleProfileRecordSummaryPublish()
         }
         .onChange(of: appSession.profile.userID) { _, _ in
@@ -351,7 +374,13 @@ private struct ATHLTHSceneRootView: View {
                 appSession.signedIn ? appSession.profile.userID : nil
             )
             studioPlanSync.switchAccount(appSession.signedIn ? appSession.profile.userID : nil)
+            strengthAccountSync.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             studioPlanSync.scheduleSync(session: appSession)
+            strengthAccountSync.scheduleSync(
+                session: appSession, strength: strengthWorkout
+            )
             // The account identity can be resolved after the signed-in
             // flag, especially when recovering an older offline install.
             profileRecords.switchAccount(
@@ -367,6 +396,9 @@ private struct ATHLTHSceneRootView: View {
             // own permission/account checks. Offline saves are never gated
             // on these network operations.
             studioPlanSync.scheduleSync(session: appSession)
+            strengthAccountSync.scheduleSync(
+                session: appSession, strength: strengthWorkout
+            )
             notifications.scheduleAccountSync()
             Task { await messaging.refreshPreferences() }
             let accountID = appSession.profile.userID
