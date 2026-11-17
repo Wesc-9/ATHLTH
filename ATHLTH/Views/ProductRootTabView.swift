@@ -7042,15 +7042,25 @@ struct ATHLTHTrainView: View {
     private func restoreInterruptedPlanDestinationIfNeeded() {
         guard isActive, session.signedIn else { return }
         let userID = session.profile.userID
-        guard coldPlanRestoreCheckedAccount != userID else { return }
+        let isFirstMount = coldPlanRestoreCheckedAccount != userID
+        guard isFirstMount else { return }
         coldPlanRestoreCheckedAccount = userID
+        guard ATHLTHPlanEditorContinuityPolicy.shouldRestore(
+            coldMount: true,
+            unexpectedlyDismissed: false,
+            editorIsPresented: trainProgramCreationLaunch != nil
+        ) else { return }
         presentInterruptedPlanIfNeeded(userID: userID)
     }
 
     /// Reserve warm recovery exclusively for a sheet that iOS actually
     /// dismissed. On a normal 10-second app switch this flag stays false.
     private func restoreUnexpectedPlanDismissalIfNeeded() {
-        guard unexpectedPlanDismissalNeedsRecovery else { return }
+        guard ATHLTHPlanEditorContinuityPolicy.shouldRestore(
+            coldMount: false,
+            unexpectedlyDismissed: unexpectedPlanDismissalNeedsRecovery,
+            editorIsPresented: trainProgramCreationLaunch != nil
+        ) else { return }
         presentInterruptedPlanIfNeeded(userID: session.profile.userID)
     }
 
