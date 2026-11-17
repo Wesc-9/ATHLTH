@@ -188,6 +188,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
             // workout. Offline completions are retried next time when online.
             // Insert individually to survive another device winning a race
             // for the same workout ID, without losing other pending records.
+            var pendingUploads = 0
             for row in missing {
                 guard accountID == owner,
                       session.signedIn,
@@ -199,7 +200,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
                 } catch {
                     // Concurrent insertion may have won this ID. Verify on
                     // the next fetch, never overwrite or discard local data.
-                    status = "Some completed workouts will retry sync."
+                    pendingUploads += 1
                 }
             }
 
@@ -214,9 +215,17 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
             let added = try strength.mergeAccountSyncedWorkouts(
                 downloads, for: owner
             )
-            lastSuccessfulSync = Date()
-            lastSyncedLocalCount = strength.workoutHistory.count
-            status = "Training history synced. \(added) new workouts received."
+            if pendingUploads > 0 {
+                // Do not claim an incomplete upload is fully synchronized.
+                lastSuccessfulSync = nil
+                lastSyncedLocalCount = -1
+                status = "\(pendingUploads) completed workouts will retry sync. " +
+                    "\(added) received."
+            } else {
+                lastSuccessfulSync = Date()
+                lastSyncedLocalCount = strength.workoutHistory.count
+                status = "Training history synced. \(added) new workouts received."
+            }
         } catch {
             if accountID == session.profile.userID {
                 status = "Offline or sync unavailable; local workouts remain safe. " +
