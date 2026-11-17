@@ -195,6 +195,11 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     /// Optional extra measurement for this main test/exercise only.
     /// Nil retains the legacy workout format and behavior.
     var assessmentMethod: ATHLTHAssessmentMethod? = nil
+    /// Optional scope for this measurement, saved with the anchored step.
+    var assessmentScope: ATHLTHAssessmentScope? = nil
+    /// Stable per-source-step key for selectively measured workout sections.
+    /// Unlike editorDragID this MUST survive saving and reordering.
+    var measurementStepID: UUID? = nil
     /// Original intensity target from Zoned (which uses six heart-rate zones).
     /// This displays normalized ATHLTH Z1-Z5 ranges; original source is in JSON.
     var sourceIntensityZoneLabel: String? = nil
@@ -277,6 +282,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.targetPaceSecondsPerKilometer == rhs.targetPaceSecondsPerKilometer &&
         lhs.targetHeartRateZone == rhs.targetHeartRateZone &&
         lhs.assessmentMethod == rhs.assessmentMethod &&
+        lhs.assessmentScope == rhs.assessmentScope &&
+        lhs.measurementStepID == rhs.measurementStepID &&
         lhs.sourceIntensityZoneLabel == rhs.sourceIntensityZoneLabel &&
         lhs.targetHeartRatePercentMin == rhs.targetHeartRatePercentMin &&
         lhs.targetHeartRatePercentMax == rhs.targetHeartRatePercentMax &&
@@ -329,6 +336,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(targetPaceSecondsPerKilometer)
         hasher.combine(targetHeartRateZone)
         hasher.combine(assessmentMethod)
+        hasher.combine(assessmentScope)
+        hasher.combine(measurementStepID)
         hasher.combine(sourceIntensityZoneLabel)
         hasher.combine(targetHeartRatePercentMin)
         hasher.combine(targetHeartRatePercentMax)
@@ -389,6 +398,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case targetPaceSecondsPerKilometer = "target_pace_seconds_per_km"
         case targetHeartRateZone = "target_hr_zone"
         case assessmentMethod = "assessment_method"
+        case assessmentScope = "assessment_scope"
+        case measurementStepID = "measurement_step_id"
         case sourceIntensityZoneLabel = "source_intensity_zone"
         case targetHeartRatePercentMin = "target_hr_percent_min"
         case targetHeartRatePercentMax = "target_hr_percent_max"
@@ -588,6 +599,8 @@ extension Array where Element == WorkoutTemplateBlock {
             item.assessmentMethod = ATHLTHAssessmentMethod.normalized(
                 source.assessmentMethod, for: item
             )
+            item.assessmentScope = source.assessmentScope
+            item.measurementStepID = source.measurementStepID
             item.exerciseID = source.exerciseID
             item.exerciseSnapshot = source.exerciseSnapshot
             item.wellnessKind = source.wellnessKind
@@ -7737,15 +7750,25 @@ struct WorkoutTemplateBuilderView: View {
                 ATHLTHAssessmentMethodPicker(
                     selection: Binding(
                         get: { blocks[index].assessmentMethod },
-                        set: {
+                        set: { selected in
                             blocks[index].assessmentMethod =
                                 ATHLTHAssessmentMethod.normalized(
-                                    $0, for: blocks[index]
+                                    selected, for: blocks[index]
                                 )
+                            if selected == nil {
+                                blocks[index].assessmentScope = nil
+                            } else if blocks[index].assessmentScope == nil {
+                                blocks[index].assessmentScope = ATHLTHAssessmentScope()
+                            }
                         }
                     ),
                     available: ATHLTHAssessmentMethod.available(for: block)
                 )
+                if blocks[index].assessmentMethod != nil {
+                    ATHLTHAssessmentScopeEditor(
+                        blocks: $blocks, anchorIndex: index
+                    )
+                }
             }
     }
 
