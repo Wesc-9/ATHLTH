@@ -67,8 +67,11 @@ struct ATHLTHTrainProgressionCoachView: View {
         )
     }
 
-    private var repetitionSuggestions: [ATHLTHTrainProgressionCoach.RepetitionSuggestion] {
-        guard let plan, let range = selectedRepRange else { return [] }
+    private var combinedRepetitionReviews: (
+        repetitions: [ATHLTHTrainProgressionCoach.RepetitionSuggestion],
+        volumes: [ATHLTHTrainProgressionCoach.VolumeReviewSuggestion]
+    ) {
+        guard let plan, let range = selectedRepRange else { return ([], []) }
         let sessions = plan.weeks.flatMap(\.days).flatMap(\.sessions)
         let completed = Set(sessions.compactMap { workout -> UUID? in
             session.isPlanSessionCompleted(
@@ -81,49 +84,27 @@ struct ATHLTHTrainProgressionCoachView: View {
             session.isPlanSessionSkipped(planID: planID, sessionID: workout.id)
                 ? workout.id : nil
         })
-        return ATHLTHTrainProgressionCoach.repetitionSuggestions(
+        return ATHLTHTrainProgressionCoach.progressionReviews(
             plan: plan,
             strengthHistory: strength.workoutHistory,
             completedSessionIDs: completed,
             skippedSessionIDs: skipped,
-            range: range
+            range: range,
+            now: Date(),
+            calendar: .current
         )
-    }
-
-    private var volumeReviewSuggestions: [ATHLTHTrainProgressionCoach.VolumeReviewSuggestion] {
-        guard plan?.builderProfile?.goal == .buildMuscle,
-              let plan, let range = selectedRepRange else { return [] }
-        let sessions = plan.weeks.flatMap(\.days).flatMap(\.sessions)
-        let completed = Set(sessions.compactMap { workout -> UUID? in
-            session.isPlanSessionCompleted(
-                planID: planID, sessionID: workout.id,
-                healthWorkouts: health.workouts,
-                strengthHistory: strength.workoutHistory
-            ) ? workout.id : nil
-        })
-        let skipped = Set(sessions.compactMap { workout -> UUID? in
-            session.isPlanSessionSkipped(planID: planID, sessionID: workout.id)
-                ? workout.id : nil
-        })
-        return ATHLTHTrainProgressionCoach.volumeReviewSuggestions(
-            plan: plan,
-            strengthHistory: strength.workoutHistory,
-            completedSessionIDs: completed,
-            skippedSessionIDs: skipped,
-            range: range
-        )
-    }
-
-    private var suggestions: [ATHLTHTrainProgressionCoach.Suggestion] {
-        // Double progression: when the athlete explicitly requests a
-        // repetition range, prefer a justified rep increase at the same
-        // load over suggesting more weight for that exercise.
-        let repFirst = Set(repetitionSuggestions.map(\.exerciseID))
-        return rawLoadSuggestions.filter { !repFirst.contains($0.exerciseID) }
     }
 
     var body: some View {
-        NavigationStack {
+        // Compute each Coach review only once per render, not repeatedly for
+        // the empty state and each list. This avoids expensive history scans
+        // while interacting with the controls.
+        let reviews = combinedRepetitionReviews
+        let repFirst = Set(reviews.repetitions.map(\.exerciseID))
+        let weightSuggestions = rawLoadSuggestions.filter {
+            !repFirst.contains($0.exerciseID)
+        }
+        return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
@@ -133,17 +114,17 @@ struct ATHLTHTrainProgressionCoachView: View {
                         repetitionControlCard
                     }
                     if let plan {
-                        if suggestions.isEmpty && repetitionSuggestions.isEmpty &&
-                            volumeReviewSuggestions.isEmpty {
+                        if weightSuggestions.isEmpty && reviews.repetitions.isEmpty &&
+                            reviews.volumes.isEmpty {
                             noRecommendations
                         } else {
-                            ForEach(suggestions) { suggestion in
+                            ForEach(weightSuggestions) { suggestion in
                                 suggestionCard(suggestion, planVersion: plan.version)
                             }
-                            ForEach(repetitionSuggestions) { suggestion in
+                            ForEach(reviews.repetitions) { suggestion in
                                 repetitionSuggestionCard(suggestion, planVersion: plan.version)
                             }
-                            ForEach(volumeReviewSuggestions) { suggestion in
+                            ForEach(reviews.volumes) { suggestion in
                                 volumeReviewCard(suggestion)
                             }
                         }
