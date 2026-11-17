@@ -10,6 +10,12 @@ struct ATHLTHTrainProgressionCoachView: View {
     let planID: UUID
 
     @State private var incrementKg = 1.0
+    @State private var repetitionOptionsEnabled = false
+    @State private var repetitionRangeLower = 6
+    @State private var repetitionRangeUpper = 12
+    @State private var pendingRepetitionSuggestion: ATHLTHTrainProgressionCoach.RepetitionSuggestion?
+    @State private var pendingRepetitionRange: ATHLTHCoachStrengthRepetitionVolume.RepRange?
+    @State private var repetitionConfirmationVisible = false
     @State private var pendingSuggestion: ATHLTHTrainProgressionCoach.Suggestion?
     @State private var pendingPlanVersion = 0
     @State private var confirmationVisible = false
@@ -46,6 +52,45 @@ struct ATHLTHTrainProgressionCoachView: View {
         )
     }
 
+    private var hasStrengthProgressionGoal: Bool {
+        plan?.builderProfile?.goal == .getStronger ||
+        plan?.builderProfile?.goal == .buildMuscle
+    }
+
+    private var selectedRepRange: ATHLTHCoachStrengthRepetitionVolume.RepRange? {
+        guard repetitionOptionsEnabled, hasStrengthProgressionGoal else { return nil }
+        return ATHLTHCoachStrengthRepetitionVolume.RepRange(
+            lower: repetitionRangeLower,
+            upper: repetitionRangeUpper
+        )
+    }
+
+    private var repetitionSuggestions: [ATHLTHTrainProgressionCoach.RepetitionSuggestion] {
+        guard let plan, let range = selectedRepRange else { return [] }
+        let sessions = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+        let completed = Set(sessions.compactMap { workout -> UUID? in
+            session.isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            ) ? workout.id : nil
+        })
+        let skipped = Set(sessions.compactMap { workout -> UUID? in
+            session.isPlanSessionSkipped(planID: planID, sessionID: workout.id)
+                ? workout.id : nil
+        })
+        // The same exercise should never display competing increase-load
+        // and increase-repetitions suggestions in one Coach review.
+        let weightProposals = Set(suggestions.map(\.exerciseID))
+        return ATHLTHTrainProgressionCoach.repetitionSuggestions(
+            plan: plan,
+            strengthHistory: strength.workoutHistory,
+            completedSessionIDs: completed,
+            skippedSessionIDs: skipped,
+            range: range
+        ).filter { !weightProposals.contains($0.exerciseID) }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -53,12 +98,18 @@ struct ATHLTHTrainProgressionCoachView: View {
                     header
                     localStrengthEvidence
                     controlCard
+                    if hasStrengthProgressionGoal {
+                        repetitionControlCard
+                    }
                     if let plan {
-                        if suggestions.isEmpty {
+                        if suggestions.isEmpty && repetitionSuggestions.isEmpty {
                             noRecommendations
                         } else {
                             ForEach(suggestions) { suggestion in
                                 suggestionCard(suggestion, planVersion: plan.version)
+                            }
+                            ForEach(repetitionSuggestions) { suggestion in
+                                repetitionSuggestionCard(suggestion, planVersion: plan.version)
                             }
                         }
                     }
@@ -96,6 +147,27 @@ struct ATHLTHTrainProgressionCoachView: View {
                     Text(tr(
                         "Change \(pendingSuggestion.exerciseName) from \(pendingSuggestion.beforeLoad.formatted()) to \(pendingSuggestion.proposedLoad.formatted()) kg in \(pendingSuggestion.workoutName). No other workouts or completed results change.",
                         "Endre \(pendingSuggestion.exerciseName) fra \(pendingSuggestion.beforeLoad.formatted()) til \(pendingSuggestion.proposedLoad.formatted()) kg i \(pendingSuggestion.workoutName). Ingen andre økter eller registrerte resultater endres."
+                    ))
+                }
+            }
+            .confirmationDialog(
+                tr("Increase the planned repetition target?", "Øke repetisjonsmålet?"),
+                isPresented: $repetitionConfirmationVisible,
+                titleVisibility: .visible
+            ) {
+                Button(tr("Update this planned exercise", "Oppdater denne øvelsen")) {
+                    approveRepetitions()
+                }
+                Button(tr("Keep current repetitions", "Behold repetisjonene"),
+                       role: .cancel) {
+                    pendingRepetitionSuggestion = nil
+                    pendingRepetitionRange = nil
+                }
+            } message: {
+                if let item = pendingRepetitionSuggestion {
+                    Text(tr(
+                        "Change only \(item.exerciseName) from \(item.beforeReps) to \(item.proposedReps) reps in \(item.workoutName). Your past workouts and other sets stay unchanged.",
+                        "Endre bare \(item.exerciseName) fra \(item.beforeReps) til \(item.proposedReps) repetisjoner i \(item.workoutName). Tidligere økter og andre sett forblir uendret."
                     ))
                 }
             }
