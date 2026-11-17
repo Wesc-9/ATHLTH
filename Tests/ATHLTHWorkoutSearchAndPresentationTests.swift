@@ -148,4 +148,70 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
         XCTAssertEqual(work.targetIntensityType, "RPE 7.5")
     }
 
+
+    func testWorkoutAlphabetIndexSeesLettersBeyondFirstFiftyResults() throws {
+        var index = ATHLTHWorkoutAlphabetPage.Index()
+        for number in 0..<120 {
+            index.register(
+                title: String(format: "A%03d", number),
+                id: UUID(), offset: number
+            )
+        }
+        let sID = UUID()
+        let aeID = UUID()
+        let oID = UUID()
+        let aRingID = UUID()
+        index.register(title: "Siste drag", id: sID, offset: 120)
+        index.register(title: "Ærlig innsats", id: aeID, offset: 121)
+        index.register(title: "Økt på mølle", id: oID, offset: 122)
+        index.register(title: "Åsen rundt", id: aRingID, offset: 123)
+
+        XCTAssertEqual(index.targets.count, 5)
+        XCTAssertEqual(index.targets["S"], sID)
+        XCTAssertEqual(index.targets["Æ"], aeID)
+        XCTAssertEqual(index.targets["Ø"], oID)
+        XCTAssertEqual(index.targets["Å"], aRingID)
+        XCTAssertEqual(index.startIndex(for: sID), 120)
+
+        let sRange = ATHLTHWorkoutAlphabetPage.range(
+            startIndex: 120, limit: 50, offset: 0, count: 124
+        )
+        XCTAssertEqual(sRange, 120..<124)
+    }
+
+    func testWorkoutAlphabetPageSavesFiftyRowBudgetAcrossAllSections() {
+        let counts = [3, 65, 42, 185] // planned, saved, catalog, running
+        let offsets = [0, 3, 68, 110]
+        func page(_ start: Int, _ limit: Int) -> [Range<Int>] {
+            counts.indices.map {
+                ATHLTHWorkoutAlphabetPage.range(
+                    startIndex: start, limit: limit,
+                    offset: offsets[$0], count: counts[$0]
+                )
+            }
+        }
+
+        let first = page(0, 50)
+        XCTAssertEqual(first, [0..<3, 0..<47, 0..<0, 0..<0])
+        XCTAssertEqual(first.reduce(0) { $0 + $1.count }, 50)
+
+        // A letter in the running templates, beyond 50 results.
+        let running = page(170, 50)
+        XCTAssertEqual(running, [3..<3, 65..<65, 42..<42, 60..<110])
+        XCTAssertEqual(running.reduce(0) { $0 + $1.count }, 50)
+
+        // A letter in Mine, then load 50 more without returning to A.
+        let mine = page(60, 50)
+        XCTAssertEqual(mine, [3..<3, 57..<65, 0..<42, 0..<0])
+        XCTAssertEqual(mine.reduce(0) { $0 + $1.count }, 50)
+        let expanded = page(60, 100)
+        XCTAssertEqual(expanded.reduce(0) { $0 + $1.count }, 100)
+        XCTAssertEqual(
+            ATHLTHWorkoutAlphabetPage.remainingCount(
+                total: counts.reduce(0, +), startIndex: 60
+            ),
+            235
+        )
+    }
+
 }
