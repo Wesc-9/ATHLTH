@@ -5763,6 +5763,10 @@ struct ATHLTHTrainView: View {
     @State private var selectedSection: ATHLTHTrainSection = .today
     @SceneStorage("athlth.train.selectedSection") private var persistedTrainSection = "today"
     @State private var restoredTrainSectionAccount: UUID?
+    // A warm foreground resume must never re-present the editor.
+    // A cold view mount is allowed to recover exactly one unfinished draft.
+    @State private var coldPlanRestoreCheckedAccount: UUID?
+    @State private var unexpectedPlanDismissalNeedsRecovery = false
     @State private var interruptedDraftResumePending = false
     @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
     @State private var preparedTrainUserID: UUID?
@@ -5953,18 +5957,27 @@ struct ATHLTHTrainView: View {
                 .presentationDragIndicator(.visible)
             }
             .athlthStudioEditor(item: $trainProgramCreationLaunch, useFullScreen: studioFullscreenEditing, onDismiss: {
-                // Switch tabs only once the creation sheet has fully closed.
-                // Updating the underlying tab while the sheet is dismissing
-                // could otherwise expose "I dag" instead of the saved plan.
+                // Only an actual dismissed presentation warrants a recovery.
+                // A normal background/foreground transition never enters here.
                 if let planID = newlyCreatedPlanToOpen {
+                    unexpectedPlanDismissalNeedsRecovery = false
                     highlightedTrainPlanID = planID
                     selectedTrainPlanWeekIndex = 0
                     selectedSection = .plan
                     newlyCreatedPlanToOpen = nil
+                } else if TrainProgramCreationLaunch.interruptedDraft(
+                    userID: session.profile.userID,
+                    store: ATHLTHPlanCreationDraftStore()
+                ) != nil {
+                    // The user neither saved-and-closed nor discarded. iOS
+                    // removed the sheet: keep the checkpoint and recover only
+                    // this presentation when the scene is active.
+                    unexpectedPlanDismissalNeedsRecovery = true
+                    if scenePhase == .active {
+                        restoreUnexpectedPlanDismissalIfNeeded()
+                    }
                 } else {
-                    // Reopen a workspace if iOS dismissed it without an
-                    // explicit Save Draft or Discard decision.
-                    restoreInterruptedPlanDestinationIfNeeded()
+                    unexpectedPlanDismissalNeedsRecovery = false
                 }
             }) { launch in
                 ATHLTHTrainProgramComposerView(
@@ -5973,8 +5986,10 @@ struct ATHLTHTrainView: View {
                 ) { planID in
                     newlyCreatedPlanToOpen = planID
                 }
-                // A different identity gives the wizard a genuinely fresh
-                // @State(.mode) on each new-plan presentation.
+                // Swipe-to-dismiss is not a valid way to lose an unsaved plan.
+                // All intentional exits use Save Draft / Discard instead.
+                .interactiveDismissDisabled()
+                // Keep this identity alive during an ordinary app switch.
                 .id(launch.id)
             }
             .sheet(isPresented: $showingTrainPlanProgress) {
@@ -6514,7 +6529,10 @@ struct ATHLTHTrainView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active, isActive {
-                    restoreInterruptedPlanDestinationIfNeeded()
+                    // Returning from a short app switch preserves the ENTIRE
+                    // existing sheet/navigation tree, including child editors.
+                    // Only if iOS actually dismissed a sheet do we recover it.
+                    restoreUnexpectedPlanDismissalIfNeeded()
                     // The first Train activation owns the heavy daily refresh
                     // in the post-transition task above.
                     if preparedTrainUserID == session.profile.userID {
@@ -7019,26 +7037,45 @@ struct ATHLTHTrainView: View {
         ))
     }
 
-    /// A plan is an editing workspace, not just the Plan tab. Restore the
-    /// actual composer sheet and its saved day/editor state after termination.
-    /// Never create a fresh UUID or overwrite the checkpoint on restoration.
+    /// Runs once on a cold Train mount. It MUST NOT run again merely because
+    /// the scene returns from background, since that would change navigation.
     private func restoreInterruptedPlanDestinationIfNeeded() {
+        guard isActive, session.signedIn else { return }
+        let userID = session.profile.userID
+        guard coldPlanRestoreCheckedAccount != userID else { return }
+        coldPlanRestoreCheckedAccount = userID
+        presentInterruptedPlanIfNeeded(userID: userID)
+    }
+
+    /// Reserve warm recovery exclusively for a sheet that iOS actually
+    /// dismissed. On a normal 10-second app switch this flag stays false.
+    private func restoreUnexpectedPlanDismissalIfNeeded() {
+        guard unexpectedPlanDismissalNeedsRecovery else { return }
+        presentInterruptedPlanIfNeeded(userID: session.profile.userID)
+    }
+
+    private func presentInterruptedPlanIfNeeded(userID: UUID) {
         guard isActive, session.signedIn, scenePhase == .active,
+              session.profile.userID == userID,
               trainProgramCreationLaunch == nil,
               !interruptedDraftResumePending else { return }
-        let userID = session.profile.userID
         guard let launch = TrainProgramCreationLaunch.interruptedDraft(
             userID: userID, store: ATHLTHPlanCreationDraftStore()
-        ) else { return }
+        ) else {
+            unexpectedPlanDismissalNeedsRecovery = false
+            return
+        }
         interruptedDraftResumePending = true
+        // This selection changes only on cold launch or actual dismissal,
+        // never on a normal foreground resume.
         selectedSection = .plan
         Task { @MainActor in
             defer { interruptedDraftResumePending = false }
-            // Let the Train tab mount before presenting its fullscreen editor.
             await Task.yield()
             guard isActive, session.signedIn, scenePhase == .active,
                   session.profile.userID == userID,
                   trainProgramCreationLaunch == nil else { return }
+            unexpectedPlanDismissalNeedsRecovery = false
             trainProgramCreationLaunch = launch
         }
     }
@@ -7047,6 +7084,8 @@ struct ATHLTHTrainView: View {
     /// and explicitly deleted drafts are never resurrected; the next tap
     /// starts a genuinely independent plan.
     private func beginFreshTrainingPlan() {
+        // Explicit user navigation owns this presentation, not scenePhase.
+        unexpectedPlanDismissalNeedsRecovery = false
         trainProgramCreationLaunch = TrainProgramCreationLaunch.reopenOrCreate(
             userID: session.profile.userID,
             store: ATHLTHPlanCreationDraftStore()
