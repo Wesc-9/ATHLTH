@@ -267,4 +267,75 @@ final class ATHLTHWorkoutDurationEstimatorTests: XCTestCase {
         ))
     }
 
+
+    func testOnlyDistanceBasedStepsReceiveUncertaintyOfAtMostTenMinutes() throws {
+        let fixed = block(.run, "3 min maksimaltest", seconds: 180)
+        XCTAssertNil(ATHLTHWorkoutDurationEstimator.previewDurationRange(for: [fixed]))
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: [fixed]),
+            180
+        )
+
+        var route = block(.run, "Langtur")
+        route.distanceMeters = 10_000
+        let range = try XCTUnwrap(
+            ATHLTHWorkoutDurationEstimator.previewDurationRange(for: [route])
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: [route]),
+            3_600
+        )
+        XCTAssertEqual(range.lowerBound, 3_000, accuracy: 0.01)
+        XCTAssertEqual(range.upperBound, 4_200, accuracy: 0.01)
+    }
+
+    func testChangingTargetPaceShiftsEstimatedDistanceRunDurationAndNarrowsMargin() throws {
+        var route = block(.run, "Fem kilometer")
+        route.distanceMeters = 5_000
+        let rough = try XCTUnwrap(
+            ATHLTHWorkoutDurationEstimator.previewDurationRange(for: [route])
+        )
+        XCTAssertEqual(rough.lowerBound, 1_350, accuracy: 0.01)
+        XCTAssertEqual(rough.upperBound, 2_250, accuracy: 0.01)
+
+        route.targetPaceSecondsPerKilometer = 300
+        let targeted = try XCTUnwrap(
+            ATHLTHWorkoutDurationEstimator.previewDurationRange(for: [route])
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: [route]), 1_500
+        )
+        XCTAssertEqual(targeted.lowerBound, 1_380, accuracy: 0.01)
+        XCTAssertEqual(targeted.upperBound, 1_620, accuracy: 0.01)
+    }
+
+    func testFixedTimeWarmupIsNotIncludedInDistanceGoalUncertainty() throws {
+        let warmup = block(.run, "Oppvarming", seconds: 600)
+        var main = block(.run, "Løp mot et mål")
+        main.distanceMeters = 5_000
+        let range = try XCTUnwrap(
+            ATHLTHWorkoutDurationEstimator.previewDurationRange(for: [warmup, main])
+        )
+        XCTAssertEqual(range.lowerBound, 1_950, accuracy: 0.01)
+        XCTAssertEqual(range.upperBound, 2_850, accuracy: 0.01)
+    }
+
+    func testZonesChangeFallbackPreviewNotPrescribedTime() {
+        var hard = block(.run, "3 min maksimaltest", seconds: 180)
+        hard.targetHeartRateZone = 5
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: [hard]), 180
+        )
+        hard.durationSeconds = nil
+        hard.distanceMeters = 1_000
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: [hard]), 270
+        )
+        hard.targetPaceSecondsPerKilometer = 240
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: [hard]), 240
+        )
+    }
+
+
 }
