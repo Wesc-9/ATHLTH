@@ -137,9 +137,6 @@ struct ProductRootTabView: View {
     @State private var showingCoachFromDock = false
     @State private var showingSideMenu = false
     @State private var sideMenuModalDestination: ATHLTHSideMenuDestination?
-    // Search is still a compact utility sheet. Messages and notifications
-    // have their own edge-to-edge presentations, not 90% detent sheets.
-    @State private var sideMenuSearchDestination: ATHLTHSideMenuDestination?
     @State private var sideMenuUtilityDestination: ATHLTHSideMenuDestination?
     @State private var pushedWorkoutInviteID: UUID?
     @State private var sideMenuFullScreenDestination: ATHLTHSideMenuDestination?
@@ -157,7 +154,6 @@ struct ProductRootTabView: View {
         pushedWorkoutInviteID = route.workoutSessionID
         showingSideMenu = false
         sideMenuModalDestination = nil
-        sideMenuSearchDestination = nil
         sideMenuFullScreenDestination = nil
         sideMenuUtilityDestination = .inbox
         pushManager.clearPendingWorkoutInviteNotification()
@@ -232,7 +228,6 @@ struct ProductRootTabView: View {
         selectedTab = 0
         showingSideMenu = false
         sideMenuModalDestination = nil
-        sideMenuSearchDestination = nil
         sideMenuUtilityDestination = nil
         sideMenuFullScreenDestination = nil
 
@@ -842,13 +837,6 @@ struct ProductRootTabView: View {
             }
             .presentationDragIndicator(.visible)
         }
-        .sheet(item: $sideMenuSearchDestination) { destination in
-            ATHLTHSideMenuUtilitiesView(destination: destination)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationContentInteraction(.scrolls)
-                .presentationCornerRadius(28)
-        }
         .fullScreenCover(item: $sideMenuUtilityDestination) { destination in
             // Reuse the exact same Inbox / Notifications screens; only the
             // host presentation changes, so Home never peeks above the card.
@@ -878,7 +866,9 @@ struct ProductRootTabView: View {
             selectedTab = 0
 
         case .search:
-            sideMenuSearchDestination = destination
+            // The search cell expands inside ATHLTHSideMenuView.
+            // No separate modal is presented for search.
+            showingSideMenu = true
 
         case .inbox, .notifications:
             pushedWorkoutInviteID = nil
