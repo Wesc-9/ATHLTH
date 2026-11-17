@@ -70,8 +70,10 @@ enum ATHLTHCoachStrengthIntelligence {
         let id: UUID
         let date: Date
         let load: Double?
+        let minimumRecordedWorkingLoad: Double?
         let oneRepMax: Double?
         let verifiedTargetSuccess: Bool
+        let workingSetIDs: [UUID]
         let workingSets: Int
     }
 
@@ -108,8 +110,8 @@ enum ATHLTHCoachStrengthIntelligence {
         for log in completed {
             let day = log.endedAt ?? log.startedAt
             for exercise in log.exercises where exercise.isEmbeddedRunningInterval != true {
-                let key = ATHLTHTrainTrendEngine.normalize(exercise.exercise.name)
-                guard !key.isEmpty else { continue }
+                guard let key = ATHLTHCoachStrengthComparableHistory
+                    .identityKey(for: exercise.exercise) else { continue }
                 let sets = exercise.sets.filter {
                     $0.countsTowardTrainingLoad &&
                         $0.resolvedLoadKind == .weightKilograms
@@ -120,13 +122,17 @@ enum ATHLTHCoachStrengthIntelligence {
                 let evidence = sets.map(setEvidence)
                 let valid = evidence.compactMap(\.estimatedOneRepMax).max()
                 let latestLoad = evidence.compactMap(\.actualWeight).max()
-                // At least two prescribed working sets must have both a
-                // verified rep target and load target before we advise adding weight.
-                let allTargetsMet = sets.count >= 2 &&
-                    evidence.allSatisfy { $0.metPlannedTarget == true }
+                // All Coach surfaces use the same verified working-set
+                // evidence. Never let a skipped set or an equipment variant
+                // create a contradictory progression signal.
+                let reviewed = ATHLTHCoachStrengthComparableHistory
+                    .targetEvidence(for: exercise)
                 let item = SessionEvidence(
                     id: log.id, date: day, load: latestLoad,
-                    oneRepMax: valid, verifiedTargetSuccess: allTargetsMet,
+                    minimumRecordedWorkingLoad: reviewed?.minimumRecordedWeightKg,
+                    oneRepMax: valid,
+                    verifiedTargetSuccess: reviewed?.metAllTargets == true,
+                    workingSetIDs: reviewed?.workingSetIDs ?? [],
                     workingSets: sets.count
                 )
                 if grouped[key] == nil {
@@ -162,12 +168,21 @@ enum ATHLTHCoachStrengthIntelligence {
 
             let recommendation: String
             let evidenceText: String
-            if records.count >= 2 &&
-               records[0].verifiedTargetSuccess &&
-               records[1].verifiedTargetSuccess &&
-               records[0].load != nil && records[1].load != nil {
+            let decision = ATHLTHCoachStrengthDecision.assess(
+                evidence: records.prefix(2).map {
+                    ATHLTHCoachStrengthDecision.Evidence(
+                        workoutID: $0.id,
+                        date: $0.date,
+                        workingSetIDs: $0.workingSetIDs,
+                        minimumWorkingWeightKg: $0.minimumRecordedWorkingLoad ?? 0,
+                        metTargets: $0.verifiedTargetSuccess
+                    )
+                },
+                prescribedLoadKg: latest.minimumRecordedWorkingLoad ?? 0
+            )
+            if decision.action == .reviewSmallIncrease {
                 recommendation = "review_small_increase"
-                evidenceText = "Targets met in two distinct completed sessions; consider a small, athlete-approved weight increase."
+                evidenceText = "Two comparable, completed sessions met their working-set targets; any increase requires athlete approval."
             } else if trend == "plateau" {
                 recommendation = "review_plateau"
                 evidenceText = "No clear estimated strength increase across at least three sessions spanning two weeks; review fatigue, load, technique and goals."
