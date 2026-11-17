@@ -578,16 +578,6 @@ struct ATHLTHRouteGuidanceStudioView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ATHLTHPlanSectionIntro(
-                eyebrow: tr("ROUTE GUIDANCE", "RUTEVEILEDNING"),
-                title: tr("Navigation & Route Coach", "Navigasjon og Rute-coach"),
-                subtitle: tr(
-                    "Stay on your route, hear upcoming bends and get calmly guided back if you stray.",
-                    "Følg ruten, få beskjed om kommende svinger og finn rolig tilbake hvis du havner utenfor."
-                ),
-                icon: "location.north.line"
-            )
-
             ATHLTHPlanSurface(ghost: false) {
                 HStack(spacing: 12) {
                     Image(systemName: "location.north.line")
