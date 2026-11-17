@@ -127,6 +127,9 @@ struct ProductRootTabView: View {
     @SceneStorage("athlth.root.openTab") private var persistedSelectedTab = 0
     @SceneStorage("athlth.root.openTabAccount") private var persistedTabAccount = ""
     @State private var hasRestoredSelectedTab = false
+    // A force-quit must not turn an actively edited plan into a Home launch.
+    // Do this once per signed-in account, never for a manually closed draft.
+    @State private var routedInterruptedPlanAccount: UUID?
     @State private var trainNavigationRequest:
         ATHLTHTrainNavigationRequest?
     @State private var showingDailyCheckInFromNotification = false
@@ -297,6 +300,21 @@ struct ProductRootTabView: View {
         )
     }
 
+    private func restoreInterruptedPlanTabIfNeeded() {
+        guard session.signedIn else { return }
+        let accountID = session.profile.userID
+        guard routedInterruptedPlanAccount != accountID else { return }
+        // Compatibility/preview UI must remain on its requested tab.
+        guard !ProcessInfo.processInfo.arguments.contains(where: {
+            $0.hasPrefix("--athlth-compatibility-tab=")
+        }) else { return }
+        guard TrainProgramCreationLaunch.interruptedDraft(
+            userID: accountID, store: ATHLTHPlanCreationDraftStore()
+        ) != nil else { return }
+        routedInterruptedPlanAccount = accountID
+        selectedTab = 1
+    }
+
     private var rootTabs: some View {
         TabView(selection: $selectedTab) {
             ATHLTHHomeView(
@@ -405,6 +423,7 @@ struct ProductRootTabView: View {
                (0...4).contains(persistedSelectedTab) {
                 selectedTab = persistedSelectedTab
             }
+            restoreInterruptedPlanTabIfNeeded()
         }
         .task {
             updateDailyCheckInReminder()
@@ -478,6 +497,9 @@ struct ProductRootTabView: View {
             if signedIn {
                 goalAccountSync.scheduleSync(session: session, goals: goalStore)
                 openPendingWorkoutInviteIfNeeded()
+                restoreInterruptedPlanTabIfNeeded()
+            } else {
+                routedInterruptedPlanAccount = nil
             }
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -486,6 +508,8 @@ struct ProductRootTabView: View {
             updateBodyGoalCheckInReminders()
         }
         .onChange(of: session.profile.userID) { _, _ in
+            routedInterruptedPlanAccount = nil
+            restoreInterruptedPlanTabIfNeeded()
             goalAccountSync.switchAccount(session.signedIn ? session.profile.userID : nil)
             goalAccountSync.scheduleSync(session: session, goals: goalStore)
             showingDailyCheckInFromNotification = false
@@ -5628,6 +5652,18 @@ struct TrainProgramCreationLaunch: Identifiable {
         Self(resumesDraft: true, draftID: nil)
     }
 
+    /// Restore an interruption, never an intentionally closed draft.
+    /// All drafts (including legacy nil-ID checkpoints) are eligible for
+    /// their full protected-file lifetime, not an arbitrary 24-hour window.
+    static func interruptedDraft(
+        userID: UUID, store: ATHLTHPlanCreationDraftStore
+    ) -> Self? {
+        guard let record = store.records(userID: userID).first(where: {
+            store.wasEditing(userID: userID, draftID: $0.draftID)
+        }) else { return nil }
+        return Self(resumesDraft: true, draftID: record.draftID)
+    }
+
     /// Returning to Create Plan reopens its last unfinished checkpoint.
     /// An explicitly new plan still gets an independent UUID via fresh.
     static func reopenOrCreate(
@@ -5719,6 +5755,7 @@ struct ATHLTHTrainView: View {
     @State private var selectedSection: ATHLTHTrainSection = .today
     @SceneStorage("athlth.train.selectedSection") private var persistedTrainSection = "today"
     @State private var restoredTrainSectionAccount: UUID?
+    @State private var resumedInterruptedDraftAccount: UUID?
     @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
     @State private var preparedTrainUserID: UUID?
     @State private var trainHistoryReconcileTask: Task<Void, Never>?
@@ -6404,6 +6441,7 @@ struct ATHLTHTrainView: View {
                 // Resolve navigation first so the selected tab can render
                 // before expensive plan reconciliation and catalog refresh.
                 handleNavigationRequest()
+                restoreInterruptedPlanDestinationIfNeeded()
                 let userID = session.profile.userID
                 // Previously plan graph reconciliation started after 160 ms,
                 // right in the native floating tab-pill animation (~300 ms).
@@ -6491,10 +6529,12 @@ struct ATHLTHTrainView: View {
                 refreshTrainDayIfChanged()
             }
             .onChange(of: isActive) { _, active in
-                // Do not normalize the entire training plan on the same
-                // frame as the native tab selection animation. The task above
-                // validates today and reconciles after the transition.
-                if active { return }
+                // A restored root tab becomes active after its child onAppear;
+                // this second entry guarantees the plan editor is presented.
+                if active {
+                    restoreInterruptedPlanDestinationIfNeeded()
+                    return
+                }
                 trainHistoryReconcileTask?.cancel()
                 trainHistoryReconcileTask = nil
                 // Preserve the viewport when leaving Train. Resetting three
@@ -6967,19 +7007,26 @@ struct ATHLTHTrainView: View {
         ))
     }
 
-    /// If the app was killed while editing the five-step plan wizard,
-    /// show the Plan workspace so its existing draft auto-resume can reopen
-    /// the saved stage and selected date. Never restart at step one.
+    /// A plan is an editing workspace, not just the Plan tab. Restore the
+    /// actual composer sheet and its saved day/editor state after termination.
+    /// Never create a fresh UUID or overwrite the checkpoint on restoration.
     private func restoreInterruptedPlanDestinationIfNeeded() {
-        guard isActive, trainProgramCreationLaunch == nil else { return }
-        let store = ATHLTHPlanCreationDraftStore()
+        guard isActive, session.signedIn, scenePhase == .active,
+              trainProgramCreationLaunch == nil else { return }
         let userID = session.profile.userID
-        let wasEditingUnfinished = store.records(userID: userID).contains { record in
-            store.wasEditing(userID: userID, draftID: record.draftID) &&
-                Date().timeIntervalSince(record.draft.savedAt) < 24 * 60 * 60
-        }
-        if wasEditingUnfinished {
-            selectedSection = .plan
+        guard resumedInterruptedDraftAccount != userID,
+              let launch = TrainProgramCreationLaunch.interruptedDraft(
+                  userID: userID, store: ATHLTHPlanCreationDraftStore()
+              ) else { return }
+        resumedInterruptedDraftAccount = userID
+        selectedSection = .plan
+        Task { @MainActor in
+            // Let the Train tab mount before presenting its fullscreen editor.
+            await Task.yield()
+            guard isActive, session.signedIn,
+                  session.profile.userID == userID,
+                  trainProgramCreationLaunch == nil else { return }
+            trainProgramCreationLaunch = launch
         }
     }
 
