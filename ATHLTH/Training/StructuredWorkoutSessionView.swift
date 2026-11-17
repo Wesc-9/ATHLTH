@@ -230,6 +230,11 @@ struct StructuredWorkoutSessionView: View {
                         }
                     }
                     sessionHeader
+                    if ATHLTHThreeMinuteAllOut.isRunningTest(
+                        title: workout.title, blocks: workout.resolvedWorkoutBlocks
+                    ) {
+                        ATHLTHThreeMinuteAllOutProtocol()
+                    }
 
                     if let currentBlock {
                         if currentBlock.executionGroupKind != nil {
