@@ -1334,7 +1334,8 @@ struct ATHLTHAudioCoachActiveListView: View {
                 ))
                 .tint(bronze)
 
-                if rule.wrappedValue.metric != .hydrationReminder {
+                if rule.wrappedValue.trigger.isPeriodic &&
+                   rule.wrappedValue.metric != .hydrationReminder {
                     ruleScopePicker(selection: Binding(
                         get: { rule.wrappedValue.scope ?? .workout },
                         set: { rule.wrappedValue.scope = $0 }
@@ -1343,9 +1344,6 @@ struct ATHLTHAudioCoachActiveListView: View {
                 Text(tr("1 · When should this message play?", "1 · Når skal beskjeden komme?"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ink)
-                Text(tr("For heart-rate zone, pace or interval events, use the event alert catalogue.", "For pulssone, tempo eller intervallhendelser bruker du hendelsesvarslene."))
-                    .font(.caption)
-                    .foregroundStyle(dim)
                 if rule.wrappedValue.beforeEndSeconds != nil {
                     Stepper(
                         value: Binding(
@@ -1373,7 +1371,19 @@ struct ATHLTHAudioCoachActiveListView: View {
                         axis: .vertical
                     )
                     .lineLimit(2...4)
-                } else if rule.wrappedValue.metric == .hydrationReminder {
+                } else if let group = draft.coachGroups.first(where: {
+                    $0.ruleIDs.contains(id)
+                }) {
+                    Text(tr("This command follows the group's trigger.",
+                            "Denne kommandoen følger gruppens trigger."))
+                        .font(.caption)
+                        .foregroundStyle(dim)
+                    Label((group.trigger ?? rule.wrappedValue.trigger).summary(
+                        interval: group.interval ?? rule.wrappedValue.interval
+                    ), systemImage: "waveform")
+                        .foregroundStyle(bronze)
+                } else if rule.wrappedValue.metric == .hydrationReminder &&
+                          rule.wrappedValue.trigger == .time {
                     Picker(tr("Remind every", "Minn meg på å drikke hvert"), selection: Binding(
                         get: { rule.wrappedValue.validatedInterval / 60 },
                         set: { minutes in
@@ -1391,27 +1401,11 @@ struct ATHLTHAudioCoachActiveListView: View {
                             "Coachen minner deg på å drikke uten å sette økten på pause."))
                         .font(.caption).foregroundStyle(dim)
                 } else {
-                    Picker(tr("Trigger", "Utløser"), selection: rule.trigger) {
-                    ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
-                        Text(trigger.title).tag(trigger)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Stepper(
-                    value: rule.interval,
-                    in: rule.wrappedValue.trigger == .time ? 15...7_200 : 100...42_000,
-                    step: rule.wrappedValue.trigger == .time ? 15 : 100
-                ) {
-                    Text(rule.wrappedValue.trigger == .time
-                         ? tr("Every \(rule.wrappedValue.validatedInterval) seconds",
-                              "Hvert \(rule.wrappedValue.validatedInterval) sekund")
-                         : tr("Every \(rule.wrappedValue.validatedInterval) metres",
-                              "Hver \(rule.wrappedValue.validatedInterval) meter"))
-                }
-                .onChange(of: rule.wrappedValue.trigger) { _, newValue in
-                    rule.wrappedValue.interval = newValue == .time ? 60 : 1_000
-                }
+                    ATHLTHAudioCoachTriggerEditor(
+                        trigger: rule.trigger,
+                        interval: rule.interval,
+                        supportsStructured: showStructuredOptions
+                    )
                 }
 
                 Text(tr("2 · What should the coach say?", "2 · Hva skal coachen si?"))
