@@ -202,8 +202,10 @@ final class ATHLTHPlannedWorkoutMetricsTests: XCTestCase {
         XCTAssertTrue(preview.usesAssumedPace)
         XCTAssertEqual(ATHLTHPlannedWorkoutMetrics.plannedHeartRateZoneRange(for: steps),
                        1...5)
-        XCTAssertEqual(preview.averagePaceSecondsPerKilometer ?? -1,
-                       1_680 / preview.kilometers, accuracy: 0.1)
+        // Estimated distances must never become displayed target pace.
+        XCTAssertNil(
+            ATHLTHPlannedWorkoutMetrics.commonPaceSecondsPerKilometer(for: steps)
+        )
     }
 
     func testAddingTargetPaceImmediatelyChangesPreviewWithoutMutatingInput() throws {
@@ -279,5 +281,84 @@ final class ATHLTHPlannedWorkoutMetricsTests: XCTestCase {
         XCTAssertFalse(preview.usesAssumedPace)
     }
 
+
+
+    func testKnownDistanceAndTimeNeedNoPaceAssumptionOrDisplayValue() throws {
+        var prescribed = run(seconds: 900, meters: 2_500)
+        // The athlete has supplied both facts, but has NOT selected tempo.
+        XCTAssertNil(prescribed.targetPaceSecondsPerKilometer)
+        let result = try XCTUnwrap(
+            ATHLTHPlannedWorkoutMetrics.previewDistance(for: [prescribed])
+        )
+        XCTAssertEqual(result.kilometers, 2.5, accuracy: 0.0001)
+        XCTAssertFalse(result.usesEstimatedDistance)
+        XCTAssertFalse(result.usesAssumedPace)
+        XCTAssertNil(
+            ATHLTHPlannedWorkoutMetrics.commonPaceSecondsPerKilometer(
+                for: [prescribed]
+            )
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: [prescribed]),
+            900
+        )
+
+        // An updated expected time affects time-based planning, not the known
+        // distance nor the unset tempo target.
+        prescribed.durationSeconds = 780
+        let updated = try XCTUnwrap(
+            ATHLTHPlannedWorkoutMetrics.previewDistance(for: [prescribed])
+        )
+        XCTAssertEqual(updated.kilometers, 2.5, accuracy: 0.0001)
+        XCTAssertFalse(updated.usesAssumedPace)
+        XCTAssertNil(
+            ATHLTHPlannedWorkoutMetrics.commonPaceSecondsPerKilometer(
+                for: [prescribed]
+            )
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: [prescribed]),
+            780
+        )
+    }
+
+    func testAddingTimeImprovesDistancePreviewWithoutWritingAssumedPace() throws {
+        var block = run()
+        XCTAssertNil(ATHLTHPlannedWorkoutMetrics.previewDistance(for: [block]))
+        block.durationSeconds = 600
+        let first = try XCTUnwrap(
+            ATHLTHPlannedWorkoutMetrics.previewDistance(for: [block])
+        )
+        XCTAssertEqual(first.kilometers, 600 / 360.0, accuracy: 0.0001)
+        XCTAssertTrue(first.usesAssumedPace)
+        XCTAssertTrue(first.usesEstimatedDistance)
+        XCTAssertNil(block.targetPaceSecondsPerKilometer)
+        XCTAssertNil(
+            ATHLTHPlannedWorkoutMetrics.commonPaceSecondsPerKilometer(
+                for: [block]
+            )
+        )
+        block.durationSeconds = 900
+        let longer = try XCTUnwrap(
+            ATHLTHPlannedWorkoutMetrics.previewDistance(for: [block])
+        )
+        XCTAssertEqual(longer.kilometers, 900 / 360.0, accuracy: 0.0001)
+        XCTAssertNil(block.targetPaceSecondsPerKilometer)
+    }
+
+    func testExplicitMixedPacesCannotBecomeOneMisleadingWorkoutTempo() {
+        let work = run(seconds: 240, pace: 300)
+        let recovery = run(seconds: 240, pace: 450)
+        XCTAssertNil(
+            ATHLTHPlannedWorkoutMetrics.commonPaceSecondsPerKilometer(
+                for: [work, recovery]
+            )
+        )
+        XCTAssertTrue(
+            ATHLTHPlannedWorkoutMetrics.hasVariablePace(
+                for: [work, recovery]
+            )
+        )
+    }
 
 }
