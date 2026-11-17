@@ -291,6 +291,7 @@ struct ExerciseSnapshot: Codable, Hashable {
     var instructions: [String]
     /// Measurement profile, never includes the athlete's recorded values.
     var assessmentMethod: ATHLTHAssessmentMethod? = nil
+    var activityCategory: ATHLTHExerciseActivity? = nil
     var primaryMuscles: [String]
     // Optional for backwards compatibility with workout logs created
     // before secondary-muscle metadata was preserved in snapshots.
@@ -416,6 +417,7 @@ struct Exercise: Identifiable, Codable, Hashable {
             name: name,
             instructions: instructions,
             assessmentMethod: assessmentMethod,
+            activityCategory: activityCategory,
             primaryMuscles: primaryMuscles,
             secondaryMuscles: secondaryMuscles,
             equipment: equipment,
