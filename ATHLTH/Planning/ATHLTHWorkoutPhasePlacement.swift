@@ -55,6 +55,16 @@ enum ATHLTHWorkoutPhasePlacement {
         next.sourceIntensityZoneLabel = block.sourceIntensityZoneLabel
         next.targetHeartRatePercentMin = block.targetHeartRatePercentMin
         next.targetHeartRatePercentMax = block.targetHeartRatePercentMax
+        next.targetVMAPercent = block.targetVMAPercent
+        next.targetIntensityType = block.targetIntensityType
+        next.targetElevationGainMeters = block.targetElevationGainMeters
+        next.targetGradientPercent = block.targetGradientPercent
+        next.targetTerrainType = block.targetTerrainType
+        next.targetRepetitionsMaximum = block.targetRepetitionsMaximum
+        next.targetRepsInReserve = block.targetRepsInReserve
+        next.targetMovementTempo = block.targetMovementTempo
+        next.sourceSupersetGroupIndex = block.sourceSupersetGroupIndex
+        next.sourceLoadAlternativesKilograms = block.sourceLoadAlternativesKilograms
         next.targetEffortRPE = block.targetEffortRPE
         next.treadmillInclinePercent = block.treadmillInclinePercent
         next.setCount = block.setCount
