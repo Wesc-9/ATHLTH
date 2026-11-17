@@ -5474,11 +5474,21 @@ struct WorkoutTemplateBuilderView: View {
                         }
                         resumeExercisePickerAfterWake = false
                         resumeRunningPickerAfterWake = false
-                        if resumeAuxiliarySheetAfterWake != nil {
-                            // Let the resumed child mount after Studio's
-                            // first layout, never during its state restore.
-                            await Task.yield()
-                            resumeAuxiliarySheetIfNeeded()
+                        if let savedAuxiliary = resumeAuxiliarySheetAfterWake {
+                            // Never replace an already-visible child card.
+                            // When the scene was merely backgrounded, its
+                            // SwiftUI presentation and scroll position live
+                            // on unchanged. Only restore a genuinely missing
+                            // child sheet after iOS removed the original.
+                            if activeAuxiliarySheetKey == nil {
+                                await Task.yield()
+                                resumeAuxiliarySheetIfNeeded()
+                            } else {
+                                // The same (or a newer) sheet is still open.
+                                // A stale wake marker must not navigate back.
+                                _ = savedAuxiliary
+                                resumeAuxiliarySheetAfterWake = nil
+                            }
                         }
                         persistWorkoutDraft()
                     }
