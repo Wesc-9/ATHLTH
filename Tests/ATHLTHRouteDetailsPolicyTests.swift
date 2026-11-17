@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import XCTest
 @testable import ATHLTH
@@ -50,6 +51,38 @@ final class ATHLTHRouteDetailsPolicyTests: XCTestCase {
                 start: "  Lade  ", finish: "  Lademoen "
             ),
             "Lade → Lademoen"
+        )
+    }
+
+    func testRouteEndpointsPreferResolvedStreetAddressOverSavedPositionPlaceholder() {
+        let coordinate = CLLocationCoordinate2D(latitude: 59.41, longitude: 9.07)
+        XCTAssertEqual(
+            ATHLTHRouteEndpointAddressPresentation.name(
+                resolvedAddress: "Bøgata 12, Bø",
+                storedName: "Min posisjon",
+                coordinate: coordinate
+            ),
+            "Bøgata 12, Bø"
+        )
+    }
+
+    func testRouteEndpointDoesNotCallCoordinatesMyPosition() {
+        let coordinate = CLLocationCoordinate2D(latitude: 59.41, longitude: 9.07)
+        XCTAssertEqual(
+            ATHLTHRouteEndpointAddressPresentation.name(
+                resolvedAddress: nil,
+                storedName: "Min posisjon",
+                coordinate: coordinate
+            ),
+            "59.41000, 9.07000"
+        )
+        XCTAssertEqual(
+            ATHLTHRouteEndpointAddressPresentation.name(
+                resolvedAddress: nil,
+                storedName: "Torvgata 4, Bø",
+                coordinate: coordinate
+            ),
+            "Torvgata 4, Bø"
         )
     }
 
