@@ -55,6 +55,9 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     var strengthSetTotal: Int? = nil
     var strengthReps: Int? = nil
     var strengthWeightKilograms: Double? = nil
+    /// Only the active exercise's user-recorded weight interpretation.
+    /// Optional to decode older owner-approved cross-device snapshots.
+    var strengthLoadBasisRaw: String? = nil
     var strengthRestEndsAt: Date? = nil
     var strengthExercises: [ATHLTHLiveStrengthExercise]? = nil
     var paceIsTreadmillTarget: Bool? = nil
@@ -377,6 +380,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 strengthReps: strength.currentSet?.plannedReps,
                 strengthWeightKilograms:
                     strength.currentSet?.plannedWeightKilograms,
+                strengthLoadBasisRaw:
+                    strength.currentExercise?.exercise.coachLoadBasis?.rawValue,
                 strengthRestEndsAt: strength.restEndsAt,
                 strengthExercises: log.exercises.prefix(30).enumerated().map {
                     index, entry in
@@ -739,6 +744,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         output.strengthWeightKilograms = finite(
             input.strengthWeightKilograms
         )
+        // Never forward arbitrary labels: only supported, explicit choices
+        // recorded on the source exercise may appear on the companion.
+        output.strengthLoadBasisRaw = input.kind == "strength"
+            ? input.strengthLoadBasisRaw.flatMap {
+                ATHLTHStrengthLoadBasis(rawValue: $0)?.rawValue
+            } : nil
         output.liveLatitude = finite(input.liveLatitude)
         output.liveLongitude = finite(input.liveLongitude)
         if output.liveLatitude == nil || output.liveLongitude == nil {
