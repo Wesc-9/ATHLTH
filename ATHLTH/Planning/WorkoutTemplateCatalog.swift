@@ -2053,7 +2053,13 @@ struct WorkoutTemplateLibraryView: View {
                                     previewedWorkoutSource = .scheduled(workout)
                                 }
                             ) {
-                                EmptyView()
+                                LibraryFavoriteButton(
+                                    kind: .workout,
+                                    itemID: workout.id.uuidString,
+                                    title: workout.title,
+                                    subtitle: workout.kind.title,
+                                    icon: workout.kind.systemImage
+                                )
                             }
                         } else {
                             Button {
@@ -2121,7 +2127,13 @@ struct WorkoutTemplateLibraryView: View {
                                     previewedWorkoutSource = .saved(workout)
                                 }
                             ) {
-                                EmptyView()
+                                LibraryFavoriteButton(
+                                    kind: .workout,
+                                    itemID: workout.id.uuidString,
+                                    title: workout.title,
+                                    subtitle: workout.kind.title,
+                                    icon: workout.kind.systemImage
+                                )
                             }
                         } else {
                             Button {
