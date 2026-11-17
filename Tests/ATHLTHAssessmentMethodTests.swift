@@ -83,7 +83,7 @@ final class ATHLTHAssessmentMethodTests: XCTestCase {
     func testPresetsAttachOnlyToOneMainTestStepAndNeverWarmup() throws {
         let cases: [(String, ATHLTHAssessmentMethod)] = [
             ("ASS-009", .threeMinuteAllOut),
-            ("ASS-005", .cooperTwelveMinute),
+            ("ASS-005", .estimatedVO2Max),
             ("ASS-001", .sixMinuteRun),
             ("ASS-003", .distanceTimeTrial),
             ("ASS-006", .conconiStep),
@@ -159,6 +159,172 @@ final class ATHLTHAssessmentMethodTests: XCTestCase {
         XCTAssertNil(ATHLTHAssessmentCalculation.measuredAveragePace(
             distanceMeters: 0, elapsedSeconds: 360
         ))
+    }
+
+
+    func testCooperRejectsWarmupPauseCooldownAndFiveMinuteDuration() {
+        var warmup = step(phase: .warmup)
+        warmup.durationSeconds = 600
+        var test = step(phase: .main)
+        test.durationSeconds = 720
+        var pause = step(phase: .recovery, kind: .rest)
+        pause.durationSeconds = 60
+        var cooldown = step(phase: .cooldown)
+        cooldown.durationSeconds = 300
+        let all = [warmup, test, pause, cooldown]
+        var scope = ATHLTHAssessmentScope(
+            vo2Protocol: .cooperTwelveMinutes
+        )
+
+        XCTAssertTrue(scope.canCalculateCooper(from: all, anchorIndex: 1))
+        XCTAssertEqual(scope.validate(
+            method: .estimatedVO2Max, in: all, anchorIndex: 1
+        ), .valid)
+        XCTAssertNotNil(ATHLTHAssessmentCalculation.validatedCooperVO2Max(
+            measuredMeters: 2_400, measuredDurationSeconds: 720,
+            scope: scope, blocks: all, anchorIndex: 1
+        ))
+        XCTAssertNil(ATHLTHAssessmentCalculation.validatedCooperVO2Max(
+            measuredMeters: 2_400, measuredDurationSeconds: 300,
+            scope: scope, blocks: all, anchorIndex: 1
+        ))
+
+        scope.area = .entireWorkout
+        var validation = scope.validate(
+            method: .estimatedVO2Max, in: all, anchorIndex: 1
+        )
+        XCTAssertTrue(validation.isBlocking)
+        XCTAssertTrue(validation.message?.contains("oppvarming") == true)
+        XCTAssertFalse(scope.canCalculateCooper(from: all, anchorIndex: 1))
+        XCTAssertNil(ATHLTHAssessmentCalculation.validatedCooperVO2Max(
+            measuredMeters: 2_400, measuredDurationSeconds: 720,
+            scope: scope, blocks: all, anchorIndex: 1
+        ))
+
+        scope.area = .mainSection
+        XCTAssertTrue(scope.canCalculateCooper(from: all, anchorIndex: 1))
+
+        scope.includePauses = true
+        validation = scope.validate(
+            method: .estimatedVO2Max, in: all, anchorIndex: 1
+        )
+        XCTAssertTrue(validation.isBlocking)
+        XCTAssertTrue(validation.message?.contains("pauser") == true)
+
+        scope.includePauses = false
+        test.durationSeconds = 300
+        let fiveMinute = [warmup, test, pause, cooldown]
+        validation = scope.validate(
+            method: .estimatedVO2Max, in: fiveMinute, anchorIndex: 1
+        )
+        XCTAssertTrue(validation.isBlocking)
+        XCTAssertTrue(validation.message?.contains("12") == true)
+        XCTAssertFalse(scope.canCalculateCooper(
+            from: fiveMinute, anchorIndex: 1
+        ))
+    }
+
+    func testUserCanSelectSpecificMainStepsButInvalidTestRemainsBlocked() {
+        var warmup = step(phase: .warmup)
+        warmup.measurementStepID = UUID()
+        var main = step(phase: .main)
+        main.durationSeconds = 720
+        main.measurementStepID = UUID()
+        var secondMain = step(phase: .main)
+        secondMain.durationSeconds = 300
+        secondMain.measurementStepID = UUID()
+        var cooldown = step(phase: .cooldown)
+        cooldown.measurementStepID = UUID()
+        let all = [warmup, main, secondMain, cooldown]
+        var scope = ATHLTHAssessmentScope(
+            area: .chosenSteps,
+            selectedStepIDs: [main.measurementStepID!],
+            vo2Protocol: .cooperTwelveMinutes
+        )
+        XCTAssertEqual(scope.includedIndices(in: all, anchorIndex: 1), [1])
+        XCTAssertTrue(scope.canCalculateCooper(from: all, anchorIndex: 1))
+
+        scope.selectedStepIDs.append(secondMain.measurementStepID!)
+        XCTAssertEqual(scope.includedIndices(in: all, anchorIndex: 1), [1, 2])
+        XCTAssertTrue(scope.validate(
+            method: .estimatedVO2Max, in: all, anchorIndex: 1
+        ).isBlocking)
+
+        scope.selectedStepIDs = [main.measurementStepID!, warmup.measurementStepID!]
+        XCTAssertTrue(scope.validate(
+            method: .estimatedVO2Max, in: all, anchorIndex: 1
+        ).message?.contains("oppvarming") == true)
+
+        scope.selectedStepIDs = [main.measurementStepID!]
+        scope.vo2Protocol = nil
+        XCTAssertFalse(scope.canCalculateCooper(from: all, anchorIndex: 1))
+        XCTAssertFalse(scope.validate(
+            method: .estimatedVO2Max, in: all, anchorIndex: 1
+        ).isValid)
+
+        scope.selectedStepIDs = []
+        XCTAssertTrue(scope.validate(
+            method: .distanceTimeTrial, in: all, anchorIndex: 1
+        ).isBlocking)
+    }
+
+    func test3MTAndSixMinuteRunAlsoRejectWrongProtocols() {
+        var main = step(phase: .main)
+        var scope = ATHLTHAssessmentScope()
+
+        main.durationSeconds = 300
+        XCTAssertTrue(scope.validate(
+            method: .threeMinuteAllOut, in: [main], anchorIndex: 0
+        ).isBlocking)
+        XCTAssertTrue(scope.validate(
+            method: .sixMinuteRun, in: [main], anchorIndex: 0
+        ).isBlocking)
+
+        main.durationSeconds = 180
+        let status = scope.validate(
+            method: .threeMinuteAllOut, in: [main], anchorIndex: 0
+        )
+        XCTAssertFalse(status.isBlocking)
+        XCTAssertNotNil(status.message) // Still needs actual last-30s data.
+        XCTAssertTrue(scope.validate(
+            method: .sixMinuteRun, in: [main], anchorIndex: 0
+        ).isBlocking)
+
+        main.durationSeconds = 360
+        XCTAssertTrue(scope.validate(
+            method: .sixMinuteRun, in: [main], anchorIndex: 0
+        ).isValid)
+        scope.includePauses = true
+        XCTAssertTrue(scope.validate(
+            method: .sixMinuteRun, in: [main], anchorIndex: 0
+        ).isBlocking)
+    }
+
+    func testMeasurementScopePersistsWithStableStepIdentities() throws {
+        var warmup = step(phase: .warmup)
+        warmup.measurementStepID = UUID()
+        var effort = step(phase: .main)
+        effort.measurementStepID = UUID()
+        effort.assessmentMethod = .estimatedVO2Max
+        effort.assessmentScope = ATHLTHAssessmentScope(
+            area: .chosenSteps,
+            selectedStepIDs: [effort.measurementStepID!, warmup.measurementStepID!],
+            vo2Protocol: .cooperTwelveMinutes
+        )
+
+        let encoded = try JSONEncoder().encode(effort)
+        let decoded = try JSONDecoder().decode(
+            WorkoutTemplateBlock.self, from: encoded
+        )
+        XCTAssertEqual(decoded.assessmentMethod, .estimatedVO2Max)
+        XCTAssertEqual(decoded.assessmentScope, effort.assessmentScope)
+        XCTAssertEqual(decoded.measurementStepID, effort.measurementStepID)
+
+        let renumbered = ATHLTHWorkoutPhasePlacement.renumbered(
+            decoded, sequence: 9
+        )
+        XCTAssertEqual(renumbered.assessmentScope, effort.assessmentScope)
+        XCTAssertEqual(renumbered.measurementStepID, effort.measurementStepID)
     }
 
 }
