@@ -5674,6 +5674,14 @@ struct TrainProgramCreationLaunch: Identifiable {
            store.load(userID: userID, draftID: recent) != nil {
             return Self(resumesDraft: true, draftID: recent)
         }
+        // Recover orphaned checkpoints as well: a missing recent-ID pointer
+        // must never make an existing plan appear deleted on next launch.
+        if let saved = store.records(userID: userID).first {
+            if let id = saved.draftID {
+                store.setRecentDraftID(id, userID: userID)
+            }
+            return Self(resumesDraft: true, draftID: saved.draftID)
+        }
         let launch = Self.fresh
         store.setRecentDraftID(launch.draftID, userID: userID)
         return launch
@@ -7018,14 +7026,17 @@ struct ATHLTHTrainView: View {
               let launch = TrainProgramCreationLaunch.interruptedDraft(
                   userID: userID, store: ATHLTHPlanCreationDraftStore()
               ) else { return }
-        resumedInterruptedDraftAccount = userID
         selectedSection = .plan
         Task { @MainActor in
             // Let the Train tab mount before presenting its fullscreen editor.
             await Task.yield()
-            guard isActive, session.signedIn,
+            guard isActive, session.signedIn, scenePhase == .active,
                   session.profile.userID == userID,
+                  resumedInterruptedDraftAccount != userID,
                   trainProgramCreationLaunch == nil else { return }
+            // Mark consumed only once the editor is actually presented.
+            // A scene that becomes inactive during the yield may retry.
+            resumedInterruptedDraftAccount = userID
             trainProgramCreationLaunch = launch
         }
     }
