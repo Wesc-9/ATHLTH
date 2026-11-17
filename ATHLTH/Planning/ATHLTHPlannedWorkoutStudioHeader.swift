@@ -229,6 +229,12 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                     }
                 }
 
+                if ATHLTHThreeMinuteAllOut.isRunningTest(
+                    title: workoutName, blocks: blocks
+                ) {
+                    ATHLTHThreeMinuteAllOutGuide()
+                }
+
                 if previewDistance?.usesAssumedPace == true {
                     Text(ATHLTHLocalization.choose(
                         english: "Distance is estimated from the available duration and intensity. Pace is shown only when you set a target.",
