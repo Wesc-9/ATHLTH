@@ -855,6 +855,57 @@ struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
 
 /// Disabled groups remain editable, but their linked rules never speak.
 extension WatchAudioCoachConfiguration {
+    /// Runtime-only view of a saved setup. Suppress built-in options owned
+    /// by a disabled group without mutating the authored configuration.
+    /// This keeps exact text, cadence, custom phrases and music settings
+    /// available when the athlete re-enables the group.
+    var deliveryConfiguration: WatchAudioCoachConfiguration {
+        let mutedOptions = Set((coachGroups ?? [])
+            .filter { !$0.isEnabled }
+            .flatMap(\.optionIDs))
+        guard !mutedOptions.isEmpty else { return self }
+        var copy = self
+        if mutedOptions.contains("distanceUpdates") { copy.distanceIntervalMeters = nil }
+        if mutedOptions.contains("timedUpdates") { copy.timeIntervalSeconds = nil }
+        if mutedOptions.contains("distance") { copy.announceDistance = false }
+        if mutedOptions.contains("elapsedTime") { copy.announceElapsedTime = false }
+        if mutedOptions.contains("averagePace") { copy.announceAveragePace = false }
+        if mutedOptions.contains("clockTime") { copy.announceClockTime = false }
+        if mutedOptions.contains("heartRate") { copy.announceHeartRate = false }
+        if mutedOptions.contains("routeRemaining") { copy.announceRemainingRouteDistance = false }
+        if mutedOptions.contains("routeETA") { copy.announceEstimatedRemainingRouteTime = false }
+        if mutedOptions.contains("currentStep") { copy.announceCurrentWorkoutStep = false }
+        if mutedOptions.contains("remainingStepTime") { copy.announceRemainingStepTime = false }
+        if mutedOptions.contains("remainingStepDistance") { copy.announceRemainingStepDistance = false }
+        if mutedOptions.contains("workoutStart") { copy.announceWorkoutStart = false }
+        if mutedOptions.contains("pauseResume") { copy.announcePauseResume = false }
+        if mutedOptions.contains("workoutFinish") { copy.announceWorkoutComplete = false }
+        var smart = copy.smartPrompts
+        if mutedOptions.contains("currentZone") {
+            smart?.announceCurrentHeartRateZone = false
+            smart?.measuredZoneAnnouncementIntervalSeconds = nil
+        }
+        if mutedOptions.contains("targetZoneCoach") {
+            smart?.targetZoneVoiceAlertsEnabled = false
+            smart?.preferredHeartRateZone = nil
+        }
+        if mutedOptions.contains("motivation") { smart?.motivationEnabled = false }
+        if mutedOptions.contains("contextual") { smart?.contextualFeedbackEnabled = false }
+        if mutedOptions.contains("adaptiveMotivation") { smart?.coachingMode = .automatic }
+        if mutedOptions.contains("randomEncouragement") { smart?.randomEncouragementEnabled = false }
+        if mutedOptions.contains("customPhrases") { smart?.customEncouragements = [] }
+        if mutedOptions.contains("landmarks") { smart?.landmarks = [] }
+        if mutedOptions.contains("scopedCountdowns") { smart?.boundaryCountdownRules = nil }
+        if mutedOptions.contains("intervalRecoveryCountdown") {
+            smart?.intervalCountdownToRecoverySeconds = nil
+            smart?.intervalCountdownFromRecoverySeconds = nil
+            copy.intervalCountdownToRecoverySeconds = nil
+            copy.intervalCountdownFromRecoverySeconds = nil
+        }
+        copy.smartPrompts = smart
+        return copy
+    }
+
     var activeCustomRules: [ATHLTHAudioCoachRule] {
         let groups = coachGroups ?? []
         let muted = Set(groups.filter { !$0.isEnabled }.flatMap(\.ruleIDs))
