@@ -1525,7 +1525,8 @@ struct WorkoutTemplateLibraryView: View {
                 clean, texts: [workout.title, workout.summary, workout.type.title]
             )
         }
-        return discoverySorted(matching, title: { $0.title }) {
+        let unique = ATHLTHRunningWorkoutDisplayDeduplication.visible(matching)
+        return discoverySorted(unique, title: { $0.title }) {
             $0.estimatedDurationSeconds.map { $0 / 60 }
         }
     }
