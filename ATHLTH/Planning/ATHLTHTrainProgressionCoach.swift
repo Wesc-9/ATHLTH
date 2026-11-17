@@ -156,6 +156,181 @@ enum ATHLTHTrainProgressionCoach {
         return suggestions
     }
 
+    struct RepetitionSuggestion: Identifiable, Hashable {
+        var id: UUID { exerciseID }
+        let workoutID: UUID
+        let exerciseID: UUID
+        let exerciseName: String
+        let workoutName: String
+        let scheduledDate: Date
+        let beforeReps: Int
+        let proposedReps: Int
+        let prescribedWeightKg: Double
+        let supportingSessions: Int
+        let supportingSets: Int
+    }
+
+    /// An explicit range is required; goal comes from the saved plan.
+    /// No future workout, completed workout, or saved history is modified.
+    static func repetitionSuggestions(
+        plan: TrainingPlan,
+        strengthHistory: [StrengthWorkoutLog],
+        completedSessionIDs: Set<UUID>,
+        skippedSessionIDs: Set<UUID>,
+        range: ATHLTHCoachStrengthRepetitionVolume.RepRange,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [RepetitionSuggestion] {
+        guard let goal = plan.builderProfile?.goal,
+              goal == .getStronger || goal == .buildMuscle,
+              let planStart = plan.startDate else { return [] }
+        let plannedIDs = Set(plan.weeks.flatMap(\.days).flatMap(\.sessions).map(\.id))
+        let cutoff = now.addingTimeInterval(-56 * 86_400)
+        let completed = strengthHistory.filter {
+            $0.isFinished &&
+            $0.plannedSessionID.map(plannedIDs.contains) == true &&
+            ($0.endedAt ?? $0.startedAt) < now &&
+            ($0.endedAt ?? $0.startedAt) >= cutoff
+        }
+        let start = calendar.startOfDay(for: planStart)
+        let today = calendar.startOfDay(for: now)
+        var result: [RepetitionSuggestion] = []
+        var usedExerciseKeys = Set<String>()
+
+        for (weekIndex, week) in plan.weeks.enumerated() {
+            for day in week.days {
+                guard let scheduled = calendar.date(
+                    byAdding: .day,
+                    value: weekIndex * 7 + day.dayIndex - 1,
+                    to: start
+                ), scheduled >= today else { continue }
+                for workout in day.sessions where workout.kind == .strength {
+                    guard !completedSessionIDs.contains(workout.id),
+                          !skippedSessionIDs.contains(workout.id) else { continue }
+                    for planned in workout.exercises {
+                        guard planned.resolvedTargetKind == .reps,
+                              planned.resolvedLoadKind == .weightKilograms,
+                              let prescription = uniformRepetitionPrescription(planned),
+                              range.lower <= prescription.reps,
+                              prescription.reps < range.upper,
+                              let identity = ATHLTHCoachStrengthComparableHistory
+                                  .identityKey(for: planned.embeddedExercise),
+                              !usedExerciseKeys.contains(identity) else { continue }
+
+                        var sessionEvidence: [ATHLTHCoachStrengthRepetitionVolume.Session] = []
+                        for logged in completed {
+                            let date = logged.endedAt ?? logged.startedAt
+                            for actual in logged.exercises where
+                                ATHLTHCoachStrengthComparableHistory.isSameExercise(
+                                    actual.exercise, planned.embeddedExercise
+                                ) {
+                                if let sample = ATHLTHCoachStrengthRepetitionVolume.evidence(
+                                    workoutID: logged.id,
+                                    date: date,
+                                    exercise: actual,
+                                    prescribedLoadKg: prescription.load
+                                ) {
+                                    sessionEvidence.append(sample)
+                                } else {
+                                    // An invalid latest attempt cannot vanish and
+                                    // reveal older successes as the most recent.
+                                    sessionEvidence.append(
+                                        ATHLTHCoachStrengthRepetitionVolume.Session(
+                                            workoutID: logged.id,
+                                            date: date,
+                                            workingSetIDs: [],
+                                            minimumReps: 0,
+                                            minimumWeightKg: 0,
+                                            allTargetsMet: false,
+                                            effortSupportsMore: false
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        let assessment = ATHLTHCoachStrengthRepetitionVolume.assess(
+                            sessions: sessionEvidence,
+                            goal: goal,
+                            range: range,
+                            prescribedReps: prescription.reps,
+                            prescribedLoadKg: prescription.load
+                        )
+                        guard assessment.action == .reviewOneMoreRep,
+                              let next = assessment.proposedReps else { continue }
+                        usedExerciseKeys.insert(identity)
+                        result.append(RepetitionSuggestion(
+                            workoutID: workout.id,
+                            exerciseID: planned.id,
+                            exerciseName: planned.embeddedExercise.displayName,
+                            workoutName: workout.title,
+                            scheduledDate: scheduled,
+                            beforeReps: prescription.reps,
+                            proposedReps: next,
+                            prescribedWeightKg: prescription.load,
+                            supportingSessions: assessment.sourceWorkoutIDs.prefix(2).count,
+                            supportingSets: assessment.sourceSetIDs.count
+                        ))
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    /// Reject mixed working prescriptions instead of changing unrelated sets.
+    static func uniformRepetitionPrescription(
+        _ exercise: PlannedExercise
+    ) -> (reps: Int, load: Double)? {
+        guard exercise.resolvedTargetKind == .reps,
+              exercise.resolvedLoadKind == .weightKilograms else { return nil }
+        if exercise.hasIndividualSetTargets {
+            let targets = exercise.resolvedSetTargets.filter {
+                $0.isWarmUp != true && $0.setType != .warmUp
+            }
+            guard targets.count >= 2,
+                  let first = targets.first,
+                  let reps = first.reps, reps > 0,
+                  let weight = first.weightKilograms, weight.isFinite, weight > 0,
+                  targets.allSatisfy({
+                      $0.reps == reps &&
+                      $0.weightKilograms == weight
+                  }) else { return nil }
+            return (reps, weight)
+        }
+        guard exercise.sets >= 2,
+              let reps = exercise.reps, reps > 0,
+              let weight = exercise.targetWeightKilograms,
+              weight.isFinite, weight > 0 else { return nil }
+        return (reps, weight)
+    }
+
+    /// Safe, approved change for *one* future planned exercise. Does not touch
+    /// other workouts, warm-ups, IDs, time-based sets or recorded history.
+    static func adjustedExerciseRepetitions(
+        _ original: PlannedExercise,
+        expectedReps: Int,
+        approvedReps: Int,
+        range: ATHLTHCoachStrengthRepetitionVolume.RepRange
+    ) -> PlannedExercise? {
+        guard let current = uniformRepetitionPrescription(original),
+              current.reps == expectedReps,
+              approvedReps == current.reps + 1,
+              approvedReps <= range.upper,
+              current.reps >= range.lower else { return nil }
+        var updated = original
+        if original.hasIndividualSetTargets {
+            updated.setTargets = original.setTargets?.map { target in
+                var copy = target
+                if target.isWarmUp != true && target.setType != .warmUp {
+                    copy.reps = approvedReps
+                }
+                return copy
+            }
+        }
+        updated.reps = approvedReps
+        return updated == original ? nil : updated
+    }
+
     static func plannedWorkingLoad(_ exercise: PlannedExercise) -> Double? {
         guard exercise.resolvedTargetKind == .reps,
               exercise.resolvedLoadKind == .weightKilograms else { return nil }
