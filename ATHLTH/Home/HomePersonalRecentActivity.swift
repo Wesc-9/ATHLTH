@@ -1205,9 +1205,10 @@ struct HomePersonalRecentActivitySection:
     }
 
     private var recentArtworkHeight: CGFloat {
+        // Compact Home-only preview: the detail screen keeps full artwork.
         ATHLTHRecentActivityLayoutPolicy.artworkHeight(
             horizontal: isWideRecentLayout
-        )
+        ) * 0.78
     }
 
     private var recentRevision:
@@ -1477,6 +1478,7 @@ struct HomePersonalRecentActivitySection:
                             displayName: session.profile.displayName,
                             partnerNames: social.acceptedTrainingPartnerNames(for: workout.id)
                                 .joined(separator: ", "),
+                            partnerUsernames: homePartnerUsernames(for: workout.id),
                             date: workout.endDate
                         )
                     }
@@ -1488,8 +1490,7 @@ struct HomePersonalRecentActivitySection:
                         durationSeconds: workout.duration,
                         exerciseCount: workout.strengthExerciseCount,
                         volumeKilograms: workout.strengthTotalVolumeKilograms,
-                        fallback: workout.activity == .running || workout.activity == .strength
-                            ? nil : workout.summaryText
+                        fallback: nil
                     )
 
                     HomeCompactActivityEngagementRow(
@@ -1530,6 +1531,7 @@ struct HomePersonalRecentActivitySection:
                                 : feedItem.actor.usernameLabel,
                             displayName: feedItem.actor.resolvedName,
                             partnerNames: feedItem.activity.metadata?["with_names"],
+                            partnerUsernames: feedItem.activity.metadata?["with_usernames"],
                             date: feedItem.activity.createdAt
                         )
                     }
@@ -1549,7 +1551,7 @@ struct HomePersonalRecentActivitySection:
                         volumeKilograms: HomeRecentCardFormat.number(
                             feedItem, key: "volume_kg"
                         ),
-                        fallback: feedItem.activity.title
+                        fallback: nil
                     )
 
                     HomeCompactActivityEngagementRow(item: feedItem)
@@ -1558,6 +1560,26 @@ struct HomePersonalRecentActivitySection:
             }
             .accessibilityIdentifier("athlth-home-recent-following-card")
         }
+    }
+
+    // Resolve only handles we actually have permission to see. A partner's
+    // display name is never guessed into a username.
+    private func homePartnerUsernames(for workoutID: UUID) -> String? {
+        guard let sessionID = social.workoutSessions.first(where: {
+            $0.creatorID == social.currentUserID &&
+            $0.sourceWorkoutID == workoutID
+        })?.id else { return nil }
+
+        let handles = social.workoutParticipants.compactMap { participant -> String? in
+            guard participant.sessionID == sessionID,
+                  participant.userID != social.currentUserID,
+                  participant.state == .accepted,
+                  let profile = social.profile(for: participant.userID),
+                  !profile.usernameLabel.isEmpty
+            else { return nil }
+            return profile.usernameLabel
+        }
+        return handles.isEmpty ? nil : handles.joined(separator: " · ")
     }
 
     // The account avatar comes from the same verified profile image source
@@ -1595,47 +1617,69 @@ struct HomePersonalRecentActivitySection:
             }
     }
 
-    /// Keep the avatar, visible handle, and posting time readable at a glance.
-    /// The profile navigation remains independent of tapping the workout art.
+    /// Use two readable name lines, genuine handles, and a compact timestamp.
+    /// The whole author area remains a single profile navigation target.
     private struct HomeRecentAuthorLine<Avatar: View>: View {
         let avatar: Avatar
         let username: String
         let displayName: String?
         let partnerNames: String?
+        let partnerUsernames: String?
         let date: Date
 
+        private var authorName: String {
+            guard let displayName, !displayName.isEmpty else { return username }
+            return displayName
+        }
+
+        private var shownHandles: String {
+            let handles = [username, partnerUsernames]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+            return handles.joined(separator: " · ")
+        }
+
         var body: some View {
-            HStack(alignment: .center, spacing: 9) {
+            HStack(alignment: .top, spacing: 9) {
                 avatar
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(
-                        (displayName?.isEmpty == false ? displayName! : username) +
-                        (partnerNames?.isEmpty == false
-                            ? ATHLTHLocalization.choose(english: " with ", norwegian: " sammen med ") + partnerNames!
-                            : "")
-                    )
-                        .font(.system(size: 14, weight: .bold))
+                    .frame(width: 36, height: 36)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(authorName)
+                        .font(.system(size: 13.5, weight: .bold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.79)
 
-                    if displayName != username && !username.isEmpty {
-                        Text(username)
+                    if let partnerNames, !partnerNames.isEmpty {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "with ", norwegian: "sammen med "
+                            ) + partnerNames
+                        )
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if !shownHandles.isEmpty && shownHandles != authorName {
+                        Text(shownHandles)
                             .font(.system(size: 10.5, weight: .medium))
                             .foregroundStyle(ATHLTHTheme.mutedText)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(HomeRecentCardFormat.date(date))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9.5, weight: .medium))
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .fixedSize(horizontal: true, vertical: false)
             }
-            .frame(minHeight: 36)
+            .frame(minHeight: 36, alignment: .top)
             .contentShape(Rectangle())
             .accessibilityElement(children: .combine)
         }
@@ -1701,13 +1745,9 @@ struct HomePersonalRecentActivitySection:
                     )
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(ATHLTHTheme.mutedText)
-                } else if activity != .strength && activity != .running,
-                          let fallback, !fallback.isEmpty {
-                    Text(fallback)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineLimit(1)
                 }
+                // Do not append the free-form summary: it repeats distance
+                // and duration already shown in the structured metric row.
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
