@@ -880,8 +880,7 @@ struct ATHLTHAudioCoachActiveListView: View {
         let values = group.ruleIDs.compactMap { id in
             draft.customRules.first(where: { $0.id == id })
         }.flatMap(\.selectedMetrics)
-        return Array(NSOrderedSet(array: values.map(\.rawValue)))
-            .compactMap { ($0 as? String).flatMap(ATHLTHAudioCoachRule.Metric.init(rawValue:)) }
+        return availableGroupContents.filter { values.contains($0) }
     }
 
     /// A lightweight, immediately populated editor. No Form + menu Picker
