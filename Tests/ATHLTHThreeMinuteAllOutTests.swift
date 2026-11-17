@@ -156,4 +156,52 @@ final class ATHLTHThreeMinuteAllOutTests: XCTestCase {
         )
     }
 
+
+    @MainActor
+    func testComplete3MTDescriptionFollowsOnlyThisAssessmentIntoRecipe() throws {
+        let earlier = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let earlier {
+                UserDefaults.standard.set(earlier, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+        let workout = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "ASS-009"
+        })
+        let steps = ATHLTHZonedPlanLibrary.blocks(for: workout)
+        let effort = try XCTUnwrap(steps.first {
+            $0.kind == .run && $0.resolvedPhase == .main
+        })
+        let description = try XCTUnwrap(effort.notes)
+        XCTAssertEqual(description, ATHLTHThreeMinuteAllOut.fullProtocolNotes)
+        XCTAssertTrue(description.contains("Underlag og utstyr"))
+        XCTAssertTrue(description.contains("Oppvarming · 15–20 min"))
+        XCTAssertTrue(description.contains("Testdrag · nøyaktig 3:00"))
+        XCTAssertTrue(description.contains("Klokke og lyd"))
+        XCTAssertTrue(description.contains("Målinger"))
+        XCTAssertTrue(description.contains("Nedtrapping"))
+        XCTAssertTrue(description.contains("Slik beregnes resultatene"))
+        XCTAssertTrue(description.contains("D′"))
+        XCTAssertTrue(description.contains("400"))
+        XCTAssertTrue(description.contains("2:30 til 3:00"))
+        XCTAssertEqual(effort.durationSeconds, 180)
+        XCTAssertTrue(ATHLTHThreeMinuteAllOut.isRunningTest(
+            title: "3-Minute All-Out Test", blocks: steps
+        ))
+
+        let another = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "ASS-005"
+        })
+        let otherSteps = ATHLTHZonedPlanLibrary.blocks(for: another)
+        XCTAssertFalse(ATHLTHThreeMinuteAllOut.isRunningTest(
+            title: another.nameEn, blocks: otherSteps
+        ))
+        XCTAssertFalse(otherSteps.contains {
+            $0.notes == ATHLTHThreeMinuteAllOut.fullProtocolNotes
+        })
+    }
+
 }
