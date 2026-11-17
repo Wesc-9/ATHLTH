@@ -14,6 +14,59 @@ enum ATHLTHRouteHeroPresentation {
     }
 }
 
+/// An endpoint is the saved route coordinate, never the user's current location.
+/// Legacy route names such as "Min posisjon" must not masquerade as addresses.
+enum ATHLTHRouteEndpointAddressPresentation {
+    static func usableStoredName(_ value: String?) -> String? {
+        guard let name = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else { return nil }
+        let key = name.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: Locale(identifier: "nb_NO")
+        )
+        let placeholders: Set<String> = [
+            "min posisjon", "my location", "current location",
+            "din posisjon", "your location", "kartposisjon",
+            "map position", "start", "finish", "mal", "mål"
+        ]
+        return placeholders.contains(key) ? nil : name
+    }
+
+    static func coordinateText(_ coordinate: CLLocationCoordinate2D?) -> String? {
+        guard let coordinate, CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+        return String(format: "%.5f, %.5f", coordinate.latitude, coordinate.longitude)
+    }
+
+    static func name(
+        resolvedAddress: String?,
+        storedName: String?,
+        coordinate: CLLocationCoordinate2D?
+    ) -> String {
+        if let resolvedAddress = usableStoredName(resolvedAddress) {
+            return resolvedAddress
+        }
+        if let storedName = usableStoredName(storedName) {
+            return storedName
+        }
+        return coordinateText(coordinate) ??
+            ATHLTHLocalization.choose(
+                english: "Address unavailable", norwegian: "Adresse ikke tilgjengelig"
+            )
+    }
+
+    static func address(from placemark: CLPlacemark) -> String? {
+        let street = [placemark.thoroughfare, placemark.subThoroughfare]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return RunRouteAddressPresentation.name(
+            street: street,
+            fallbackName: placemark.name,
+            locality: placemark.locality ?? placemark.subAdministrativeArea
+        )
+    }
+}
+
 struct RouteDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -61,6 +114,8 @@ struct RouteDetailView: View {
     @State private var showingMetadataEditor = false
     @State private var draftTags: [String] = []
     @State private var draftSurfaces: [String: Int] = [:]
+    @State private var resolvedOriginalStartAddress: String?
+    @State private var resolvedOriginalFinishAddress: String?
 
     private var currentRoute: TrainingRoute {
         session.savedRoutes.first {
@@ -134,22 +189,25 @@ struct RouteDetailView: View {
         Array(leaderboard.prefix(3))
     }
 
-    private var ownAttempts: [RouteAttemptRecord] {
+    private var allOwnAttempts: [RouteAttemptRecord] {
         allRouteAttempts
-            .filter {
-                $0.userID == session.profile.userID &&
-                $0.direction == selectedAttemptDirection
-            }
+            .filter { $0.userID == session.profile.userID }
             .sorted { $0.startedAt > $1.startedAt }
     }
 
-    private var historicalAttemptsWithoutDirection: [RouteAttemptRecord] {
-        allRouteAttempts
-            .filter {
-                $0.userID == session.profile.userID &&
+    /// The personal history includes older attempts with unknown GPS direction.
+    /// This does not change which attempts qualify for the leaderboard.
+    private var ownAttempts: [RouteAttemptRecord] {
+        allOwnAttempts.filter {
+            $0.direction == selectedAttemptDirection ||
                 ($0.direction ?? .unknown) == .unknown
-            }
-            .sorted { $0.startedAt > $1.startedAt }
+        }
+    }
+
+    private var historicalAttemptsWithoutDirection: [RouteAttemptRecord] {
+        allOwnAttempts.filter {
+            ($0.direction ?? .unknown) == .unknown
+        }
     }
 
     private var personalProgress:
@@ -340,6 +398,9 @@ struct RouteDetailView: View {
                 ATHLTHRouteDirectionGeometry.turnaroundIndex(coordinates) != nil
             routeLocation.start()
             await prepareRouteData()
+        }
+        .task(id: currentRoute.id) {
+            await resolveEndpointAddresses()
         }
         .onDisappear {
             routeLocation.stop()
@@ -587,6 +648,63 @@ struct RouteDetailView: View {
         ATHLTHRouteDetailsPolicy.ordered(directedRoute).last?.coordinate
     }
 
+    private var routeStartDisplayName: String {
+        ATHLTHRouteEndpointAddressPresentation.name(
+            resolvedAddress: selectedAttemptDirection == .reverse
+                ? resolvedOriginalFinishAddress : resolvedOriginalStartAddress,
+            storedName: directedRoute.startName,
+            coordinate: routeStartCoordinate
+        )
+    }
+
+    private var routeFinishDisplayName: String {
+        ATHLTHRouteEndpointAddressPresentation.name(
+            resolvedAddress: selectedAttemptDirection == .reverse
+                ? resolvedOriginalStartAddress : resolvedOriginalFinishAddress,
+            storedName: directedRoute.endName,
+            coordinate: routeEndCoordinate
+        )
+    }
+
+    /// Reverse-geocode the route's saved endpoints, not live GPS position.
+    /// Two lookups run once when the detail view opens; reverse direction only
+    /// swaps their labels without issuing additional requests.
+    @MainActor
+    private func resolveEndpointAddresses() async {
+        resolvedOriginalStartAddress = nil
+        resolvedOriginalFinishAddress = nil
+
+        let points = ATHLTHRouteDetailsPolicy.ordered(currentRoute)
+        guard let start = points.first?.coordinate,
+              let finish = points.last?.coordinate,
+              CLLocationCoordinate2DIsValid(start),
+              CLLocationCoordinate2DIsValid(finish) else { return }
+
+        let startAddress = await reverseGeocodeRoutePoint(start)
+        guard !Task.isCancelled else { return }
+        resolvedOriginalStartAddress = startAddress
+
+        let startLocation = CLLocation(latitude: start.latitude, longitude: start.longitude)
+        let finishLocation = CLLocation(latitude: finish.latitude, longitude: finish.longitude)
+        if startLocation.distance(from: finishLocation) < 35 {
+            resolvedOriginalFinishAddress = startAddress
+        } else {
+            let finishAddress = await reverseGeocodeRoutePoint(finish)
+            guard !Task.isCancelled else { return }
+            resolvedOriginalFinishAddress = finishAddress
+        }
+    }
+
+    @MainActor
+    private func reverseGeocodeRoutePoint(_ coordinate: CLLocationCoordinate2D) async -> String? {
+        let geocoder = CLGeocoder()
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        guard let placemark = try? await geocoder.reverseGeocodeLocation(
+            location, preferredLocale: Locale(identifier: "nb_NO")
+        ).first else { return nil }
+        return ATHLTHRouteEndpointAddressPresentation.address(from: placemark)
+    }
+
     private var distanceToStartKilometers: Double? {
         guard let location = routeLocation.location,
               let start = routeStartCoordinate,
@@ -669,7 +787,7 @@ struct RouteDetailView: View {
         guard let start = routeStartCoordinate,
               CLLocationCoordinate2DIsValid(start) else { return }
         let destination = MKMapItem(placemark: MKPlacemark(coordinate: start))
-        destination.name = currentRoute.startName ?? currentRoute.title
+        destination.name = routeStartDisplayName
         _ = destination.openInMaps(
             launchOptions: [
                 MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking
@@ -866,10 +984,7 @@ struct RouteDetailView: View {
                         ATHLTHLocalization.choose(
                             english: "Start", norwegian: "Start"
                         ),
-                        name: directedRoute.startName ??
-                            ATHLTHLocalization.choose(
-                                english: "Map position", norwegian: "Kartposisjon"
-                            )
+                        name: routeStartDisplayName
                     )
                     Image(systemName: "arrow.right")
                         .font(.caption.weight(.semibold))
@@ -878,15 +993,7 @@ struct RouteDetailView: View {
                         ATHLTHLocalization.choose(
                             english: "Finish", norwegian: "Mål"
                         ),
-                        name: ATHLTHRouteDetailsPolicy.shape(currentRoute) == .loop
-                            ? (directedRoute.startName ??
-                                ATHLTHLocalization.choose(
-                                    english: "Start", norwegian: "Start"
-                                ))
-                            : (directedRoute.endName ??
-                                ATHLTHLocalization.choose(
-                                    english: "Map position", norwegian: "Kartposisjon"
-                                ))
+                        name: routeFinishDisplayName
                     )
                 }
                 .padding(12)
@@ -1156,7 +1263,7 @@ struct RouteDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let endpoints = ATHLTHRouteHeroPresentation.endpointSubtitle(
-                        start: directedRoute.startName, finish: directedRoute.endName
+                        start: routeStartDisplayName, finish: routeFinishDisplayName
                     ) {
                         Text(endpoints)
                             .font(.subheadline)
@@ -1845,11 +1952,14 @@ struct RouteDetailView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Your performance")
+                        Text(ATHLTHLocalization.choose(english: "Your performance", norwegian: "Din prestasjon"))
                             .font(.headline)
 
                         Text(
-                            "GPS route adherence from your latest matched attempt."
+                            ATHLTHLocalization.choose(
+                                english: "GPS route adherence from your latest recorded attempt.",
+                                norwegian: "GPS-rutesamsvar fra ditt siste registrerte forsøk."
+                            )
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1863,7 +1973,8 @@ struct RouteDetailView: View {
                     }
                 }
 
-                if let progress = personalProgress.gainSeconds {
+                if ownAttempts.first?.id == ownLatest?.id,
+                   let progress = personalProgress.gainSeconds {
                     HStack(spacing: 8) {
                         Image(systemName: progress >= 0 ? "arrow.up.right" : "arrow.down.right")
                         Text(progress >= 0
@@ -1881,7 +1992,7 @@ struct RouteDetailView: View {
                         ? ATHLTHTheme.vitality : ATHLTHTheme.mutedText)
                 }
 
-                if let latest = ownLatest {
+                if let latest = ownAttempts.first {
                     LazyVGrid(
                         columns: [
                             GridItem(.flexible()),
@@ -1968,11 +2079,19 @@ struct RouteDetailView: View {
                         .padding(.top, 2)
                     }
 
+                    if (latest.direction ?? .unknown) == .unknown {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Attempt saved, but GPS direction is unverified. It does not count toward the leaderboard.",
+                            norwegian: "Forsøket er registrert, men GPS-retningen er ikke bekreftet. Det teller ikke på ledertavlen."
+                        ), systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                     if latest.routeMatchPercent < 85 {
-                        Label(
-                            "85% route match is required for leaderboard ranking.",
-                            systemImage: "info.circle"
-                        )
+                        Label(ATHLTHLocalization.choose(
+                            english: "At least 85% route match is required for the leaderboard.",
+                            norwegian: "Minst 85 % rutesamsvar kreves for ledertavlen."
+                        ), systemImage: "info.circle")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     }
@@ -1983,11 +2102,14 @@ struct RouteDetailView: View {
                             .foregroundStyle(ATHLTHTheme.accent)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("No matched attempt yet")
+                            Text(ATHLTHLocalization.choose(english: "No matched attempt yet", norwegian: "Ingen registrerte forsøk ennå"))
                                 .font(.subheadline.weight(.semibold))
 
                             Text(
-                                "Run or walk this route with GPS. ATHLTH will compare the recorded path with the saved route."
+                                ATHLTHLocalization.choose(
+                                    english: "Run or walk this route with GPS. ATHLTH will compare the recorded path with the saved route.",
+                                    norwegian: "Løp eller gå ruten med GPS. ATHLTH sammenligner sporet med den lagrede ruten."
+                                )
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -2047,7 +2169,10 @@ struct RouteDetailView: View {
                     Text(
                         isPublicTrail
                             ? "No qualifying public trail attempts yet. Complete at least 85% of the trail to set the first time."
-                            : "No qualifying route attempts yet. Be the first to complete at least 85% of the route."
+                            : ATHLTHLocalization.choose(
+                                english: "No qualifying route attempts yet. At least 85% route match and a GPS-verified direction are required.",
+                                norwegian: "Ingen kvalifiserte forsøk på ledertavlen ennå. Minst 85 % rutesamsvar og bekreftet GPS-retning kreves."
+                            )
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -2094,7 +2219,7 @@ struct RouteDetailView: View {
                     ))
                     .font(.headline)
                     Spacer()
-                    Text("\(ownAttempts.count)")
+                    Text("\(allOwnAttempts.count)")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(ATHLTHTheme.accent)
                     Button {
@@ -2112,30 +2237,48 @@ struct RouteDetailView: View {
                 }
 
                 if ownAttempts.isEmpty {
-                    Text(ATHLTHLocalization.choose(
-                        english: "No qualified attempts in this direction yet.",
-                        norwegian: "Ingen kvalifiserte forsøk i denne retningen ennå."
-                    ))
+                    Text(
+                        allOwnAttempts.isEmpty
+                            ? ATHLTHLocalization.choose(
+                                english: "No recorded attempts yet.",
+                                norwegian: "Ingen registrerte forsøk ennå."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "No attempts in this direction. See all for your other attempts.",
+                                norwegian: "Ingen forsøk i denne retningen. Se alle viser forsøk i andre retninger."
+                            )
+                    )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 } else {
                     ForEach(Array(ownAttempts.prefix(5).enumerated()),
                             id: \.element.id) { index, attempt in
-                        attemptRow(attempt)
+                        VStack(alignment: .leading, spacing: 4) {
+                            attemptRow(attempt)
+                            if (attempt.direction ?? .unknown) == .unknown {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Direction unverified · not ranked",
+                                        norwegian: "Retning ubekreftet · ikke på ledertavlen"
+                                    ),
+                                    systemImage: "info.circle"
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            } else if !attempt.leaderboardEligible {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Below 85% route match · not ranked",
+                                        norwegian: "Under 85 % rutesamsvar · ikke på ledertavlen"
+                                    ),
+                                    systemImage: "info.circle"
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
                         if index < min(ownAttempts.count, 5) - 1 { Divider() }
                     }
-                }
-                if !historicalAttemptsWithoutDirection.isEmpty {
-                    Divider()
-                    HStack(spacing: 8) {
-                        Image(systemName: "clock.arrow.circlepath")
-                        Text(ATHLTHLocalization.choose(
-                            english: "\(historicalAttemptsWithoutDirection.count) historical attempts · direction unverified",
-                            norwegian: "\(historicalAttemptsWithoutDirection.count) historiske forsøk · retning ubekreftet"
-                        ))
-                        .font(.caption)
-                    }
-                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
             }
         }
