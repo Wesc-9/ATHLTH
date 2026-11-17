@@ -288,6 +288,65 @@ struct ATHLTHTrainProgressionCoachView: View {
         .coachSurface(border)
     }
 
+    /// No range is inferred from a broad training goal. The athlete enables
+    /// this review and explicitly sets a range for the current Coach visit.
+    private var repetitionControlCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text(tr("REPETITION PROGRESSION", "PROGRESJON I REPETISJONER"))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.4)
+                .foregroundStyle(champagne)
+            Toggle(isOn: $repetitionOptionsEnabled) {
+                Text(tr("Review repetition targets", "Vurder repetisjonsmål"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+            }
+            .tint(champagne)
+
+            if repetitionOptionsEnabled {
+                Text(tr(
+                    "Choose the intended range for this review. Coach won't infer it from the goal or change any exercise until you approve.",
+                    "Velg ønsket repetisjonsområde for denne vurderingen. Coach gjetter ikke området fra målet og endrer ingen øvelse uten godkjenning."
+                ))
+                .font(.caption)
+                .foregroundStyle(muted)
+
+                Stepper(
+                    value: $repetitionRangeLower,
+                    in: 1...max(1, repetitionRangeUpper - 1)
+                ) {
+                    HStack {
+                        Text(tr("Minimum reps", "Minste antall"))
+                        Spacer()
+                        Text("\(repetitionRangeLower)")
+                            .monospacedDigit()
+                            .foregroundStyle(ink)
+                    }
+                }
+                Stepper(
+                    value: $repetitionRangeUpper,
+                    in: min(30, repetitionRangeLower + 1)...30
+                ) {
+                    HStack {
+                        Text(tr("Maximum reps", "Høyeste antall"))
+                        Spacer()
+                        Text("\(repetitionRangeUpper)")
+                            .monospacedDigit()
+                            .foregroundStyle(ink)
+                    }
+                }
+                Text(tr(
+                    "Suggestions require two linked workouts with verified reserve (RIR/RPE). Volume recommendations are review-only.",
+                    "Forslag krever to tilknyttede økter med registrert kapasitet igjen (RIR/RPE). Volumforslag er kun til vurdering."
+                ))
+                .font(.caption2)
+                .foregroundStyle(muted)
+            }
+        }
+        .padding(16)
+        .coachSurface(border)
+    }
+
     private var noRecommendations: some View {
         HStack(alignment: .top, spacing: 13) {
             Image(systemName: "checkmark.shield")
@@ -389,6 +448,79 @@ struct ATHLTHTrainProgressionCoachView: View {
         .coachSurface(border)
     }
 
+    private func repetitionSuggestionCard(
+        _ item: ATHLTHTrainProgressionCoach.RepetitionSuggestion,
+        planVersion: Int
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "repeat")
+                    .foregroundStyle(champagne)
+                Text("ATHLTH COACH · " + tr("REPETITIONS", "REPETISJONER"))
+                    .font(.caption.weight(.semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(champagne)
+                Spacer()
+            }
+            Text(item.exerciseName)
+                .font(.system(size: 21, weight: .regular, design: .serif))
+                .foregroundStyle(ink)
+            Text(item.workoutName + " · " +
+                 item.scheduledDate.formatted(date: .abbreviated, time: .omitted))
+                .font(.caption)
+                .foregroundStyle(muted)
+
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text("\(item.beforeReps)")
+                    .font(.system(size: 28, weight: .light, design: .rounded))
+                Image(systemName: "arrow.right")
+                    .foregroundStyle(champagne)
+                Text("\(item.proposedReps)")
+                    .font(.system(size: 28, weight: .light, design: .rounded))
+                Text(tr("reps", "reps"))
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                Spacer()
+                Text(item.prescribedWeightKg.formatted() + " kg")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ink)
+            }
+            .foregroundStyle(ink)
+            .padding(12)
+            .background(paper, in: RoundedRectangle(cornerRadius: 12))
+
+            Label(tr(
+                "Two completed sessions support one additional repetition at the same weight.",
+                "To fullførte økter gir grunnlag for én ekstra repetisjon med samme vekt."
+            ), systemImage: "checkmark.shield")
+            .font(.caption)
+            .foregroundStyle(muted)
+
+            Button {
+                guard let range = selectedRepRange else { return }
+                pendingRepetitionSuggestion = item
+                pendingRepetitionRange = range
+                pendingPlanVersion = planVersion
+                repetitionConfirmationVisible = true
+            } label: {
+                HStack {
+                    Spacer()
+                    Text(tr("Review repetition adjustment", "Vurder repetisjonsøkningen"))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(height: 44)
+                .padding(.horizontal, 13)
+                .background(ink, in: RoundedRectangle(cornerRadius: 11))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .coachSurface(border)
+    }
+
     private var infoFooter: some View {
         Label(tr(
             "Rule-based guidance works without AI or sharing health data. Increases apply only to prescribed positive working-set weights. Warm-ups, past results, and other sessions are preserved.",
@@ -396,6 +528,29 @@ struct ATHLTHTrainProgressionCoachView: View {
         ), systemImage: "info.circle")
         .font(.caption)
         .foregroundStyle(muted)
+    }
+
+    private func approveRepetitions() {
+        guard let item = pendingRepetitionSuggestion,
+              let range = pendingRepetitionRange else { return }
+        let saved = session.applySuggestedTrainingRepetitions(
+            planID: planID,
+            workoutID: item.workoutID,
+            exerciseID: item.exerciseID,
+            expectedVersion: pendingPlanVersion,
+            expectedBeforeReps: item.beforeReps,
+            approvedReps: item.proposedReps,
+            approvedRange: range,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        pendingRepetitionSuggestion = nil
+        pendingRepetitionRange = nil
+        resultMessage = saved
+            ? tr("The upcoming exercise's repetition target was updated.",
+                 "Repetisjonsmålet i den kommende øvelsen er oppdatert.")
+            : tr("Nothing changed. The plan or evidence may have changed. Review again.",
+                 "Ingen endringer ble lagret. Planen eller datagrunnlaget kan ha endret seg. Kontroller forslaget på nytt.")
     }
 
     private func approve() {
