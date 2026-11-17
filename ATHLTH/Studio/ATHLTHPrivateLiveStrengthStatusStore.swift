@@ -27,6 +27,9 @@ struct ATHLTHPrivateLiveStrengthSnapshot: Codable, Hashable, Identifiable {
     let restEndsAtEpoch: TimeInterval?
     let plannedReps: Int?
     let plannedWeightKilograms: Double?
+    /// Only the user-specified interpretation of kg, never inferred.
+    /// Optional for backwards-compatible account-private iPad snapshots.
+    var plannedLoadBasisRaw: String? = nil
     let exercises: [Exercise]
 
     /// Never show a disconnected athlete as actively training indefinitely.
@@ -61,6 +64,8 @@ struct ATHLTHPrivateLiveStrengthSnapshot: Codable, Hashable, Identifiable {
             restEndsAtEpoch: store.restEndsAt?.timeIntervalSince1970,
             plannedReps: currentSet?.plannedReps,
             plannedWeightKilograms: currentSet?.plannedWeightKilograms,
+            plannedLoadBasisRaw: store.currentExercise?.exercise
+                .coachLoadBasis?.rawValue,
             exercises: workout.exercises.prefix(30).enumerated().map {
                 index, entry in
                 Exercise(
