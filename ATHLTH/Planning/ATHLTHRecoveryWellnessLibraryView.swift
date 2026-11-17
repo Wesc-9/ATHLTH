@@ -63,10 +63,10 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 15) {
+            LazyVStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(tr("RECOVERY LIBRARY", "RESTITUSJONSBIBLIOTEK"))
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .tracking(1.7)
                         .foregroundStyle(bronze)
                     Text(tr("Recovery & wellness", "Restitusjon og velvære"))
@@ -84,20 +84,33 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
                 Button {
                     showingRecoveryPlanner = true
                 } label: {
-                    HStack(spacing: 9) {
+                    HStack(spacing: 12) {
                         Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(bronze)
+                            .frame(width: 42, height: 42)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
                         Text(tr("Plan a recovery day", "Planlegg en hviledag"))
-                            .font(.caption.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ink)
-                        Spacer()
+                        Spacer(minLength: 4)
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHTrainDesign.secondary)
                     }
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 42)
-                    .background(paper, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 9)
+                    .background(
+                        ATHLTHTheme.card,
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(ATHLTHTheme.premiumGold.opacity(0.14), lineWidth: 0.8)
+                    }
                 }
                 .buttonStyle(.plain)
 
@@ -122,7 +135,11 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
                 }
                 .padding(.horizontal, 13)
                 .frame(height: 46)
-                .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(ATHLTHTheme.premiumGold.opacity(0.12), lineWidth: 0.8)
+                }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 7) {
@@ -134,9 +151,18 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
                                     .font(.caption.weight(focus == key ? .semibold : .medium))
                                     .foregroundStyle(focus == key ? .white : ink)
                                     .padding(.horizontal, 14)
-                                    .frame(minHeight: 36)
-                                    .background(focus == key ? ink : Color.white,
-                                                in: Capsule())
+                                    .frame(minHeight: 37)
+                                    .background(
+                                        focus == key ? bronze : ATHLTHTheme.card,
+                                        in: Capsule()
+                                    )
+                                    .overlay {
+                                        Capsule()
+                                            .strokeBorder(
+                                                ATHLTHTheme.premiumGold.opacity(focus == key ? 0 : 0.16),
+                                                lineWidth: 0.8
+                                            )
+                                    }
                             }
                             .buttonStyle(.plain)
                             .accessibilityAddTraits(focus == key ? .isSelected : [])
@@ -232,17 +258,62 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
         }
     }
 
-    private func guideCard(_ guide: ATHLTHWellnessGuide) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 11) {
-                Image(systemName: guide.icon)
-                    .font(.system(size: 19, weight: .light))
-                    .foregroundStyle(bronze)
-                    .frame(width: 46, height: 46)
-                    .background(paper, in: RoundedRectangle(cornerRadius: 13))
-                    .accessibilityHidden(true)
+    private func guideIcon(_ guide: ATHLTHWellnessGuide) -> some View {
+        Image(systemName: guide.icon)
+            .font(.system(size: 19, weight: .light))
+            .foregroundStyle(bronze)
+            .frame(width: 46, height: 46)
+            .background(
+                ATHLTHTheme.premiumGoldSoft,
+                in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+            )
+            .accessibilityHidden(true)
+    }
 
-                VStack(alignment: .leading, spacing: 3) {
+    private func guideActions(_ guide: ATHLTHWellnessGuide) -> some View {
+        VStack(alignment: .trailing, spacing: 7) {
+            Button {
+                activeGuide = guide
+            } label: {
+                Label(tr("Start", "Start"), systemImage: "play.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 90, minHeight: 44)
+                    .background(
+                        LinearGradient(
+                            colors: [bronze, ATHLTHTheme.premiumGold],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: Capsule()
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(tr("Start exercise", "Start øvelse") + ": " + guide.title)
+
+            if let onAdd {
+                Button {
+                    onAdd(guide)
+                } label: {
+                    Label(tr("Add", "Legg til"), systemImage: "plus")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(bronze)
+                        .frame(minWidth: 90, minHeight: 40)
+                        .background(paper, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Add exercise", "Legg til øvelse") + ": " + guide.title)
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func guideCard(_ guide: ATHLTHWellnessGuide) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if displayMode == .grid && !dynamicTypeSize.isAccessibilitySize {
+                // Grid cards keep their own compact layout; actions remain right-aligned.
+                VStack(alignment: .leading, spacing: 7) {
+                    guideIcon(guide)
                     Text(guide.title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
@@ -250,9 +321,27 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
                     Text(guide.focusTitle + " · " + guide.durationText)
                         .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
-                Spacer(minLength: 0)
+            } else {
+                HStack(alignment: .center, spacing: 10) {
+                    guideIcon(guide)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(guide.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                            .lineLimit(2)
+                        Text(guide.focusTitle + " · " + guide.durationText)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        guideActions(guide)
+                    }
+                }
             }
 
             Text(guide.instructions)
@@ -261,39 +350,22 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
                 .lineLimit(displayMode == .grid ? 3 : 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 8) {
-                Button {
-                    activeGuide = guide
-                } label: {
-                    Label(tr("Start", "Start"), systemImage: "play.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 38)
-                        .background(ink, in: RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
-
-                if let onAdd {
-                    Button {
-                        onAdd(guide)
-                    } label: {
-                        Label(tr("Add", "Legg til"), systemImage: "plus")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(bronze)
-                            .frame(maxWidth: .infinity, minHeight: 38)
-                            .background(paper, in: RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
+            if displayMode == .grid || dynamicTypeSize.isAccessibilitySize {
+                HStack {
+                    Spacer(minLength: 0)
+                    guideActions(guide)
                 }
             }
         }
-        .padding(12)
+        .padding(13)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(.white.opacity(0.97),
-                    in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(cornerRadius: 19, style: .continuous)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .strokeBorder(ATHLTHTheme.premiumGold.opacity(0.16), lineWidth: 0.7)
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
+                .strokeBorder(ATHLTHTheme.premiumGold.opacity(0.15), lineWidth: 0.8)
         }
     }
 }
