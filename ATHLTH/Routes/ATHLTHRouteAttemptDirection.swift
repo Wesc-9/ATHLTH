@@ -57,17 +57,76 @@ enum ATHLTHRouteAttemptDirectionPolicy {
 
         guard reference.count >= 3, actual.count >= 3,
               observedStart.distance(from: first) <= 250,
-              observedEnd.distance(from: first) <= 350,
-              let observed = sample(actual, metersFromStart: 160),
-              let ahead = sample(reference, metersFromStart: 160),
-              let behind = sample(Array(reference.reversed()), metersFromStart: 160)
+              observedEnd.distance(from: first) <= 350
         else { return .unknown }
 
-        let forwardGap = observed.distance(from: ahead)
-        let reverseGap = observed.distance(from: behind)
-        guard min(forwardGap, reverseGap) <= 115,
-              abs(forwardGap - reverseGap) >= 55 else { return .unknown }
-        return forwardGap < reverseGap ? .forward : .reverse
+        // On a genuine A→B→A retrace the route and its reversal are
+        // geographically equivalent. The previous algorithm compared one
+        // point 160 m from the start and could NEVER confirm either
+        // direction, even with a perfect GPS track. Treat the shared path
+        // as the canonical forward direction only after confirming the
+        // full workout, not just proximity to the start.
+        let referenceLength = distance(reference)
+        if isReciprocalOutAndBack(reference, length: referenceLength) {
+            let actualLength = distance(actual)
+            guard referenceLength > 300,
+                  actualLength >= referenceLength * 0.70,
+                  actualLength <= referenceLength * 1.45,
+                  RoutePerformanceMatcher.analyze(
+                    reference: reference, actual: actual
+                  )?.routeMatchPercent ?? 0 >= 85
+            else { return .unknown }
+            return .forward
+        }
+
+        // On other closed routes early segments can overlap even though
+        // the later route branches differ. Compare several progress
+        // positions rather than deciding solely from the first 160 m.
+        let reversedReference = Array(reference.reversed())
+        let probes = [160.0, max(300, referenceLength * 0.12),
+                      max(450, referenceLength * 0.22)]
+        var forwardVotes = 0
+        var reverseVotes = 0
+        for meters in probes where meters < referenceLength * 0.48 {
+            guard let observed = sample(actual, metersFromStart: meters),
+                  let ahead = sample(reference, metersFromStart: meters),
+                  let behind = sample(reversedReference, metersFromStart: meters)
+            else { continue }
+            let forwardGap = observed.distance(from: ahead)
+            let reverseGap = observed.distance(from: behind)
+            guard min(forwardGap, reverseGap) <= 115,
+                  abs(forwardGap - reverseGap) >= 55 else { continue }
+            if forwardGap < reverseGap { forwardVotes += 1 }
+            else { reverseVotes += 1 }
+        }
+        guard forwardVotes != reverseVotes,
+              forwardVotes == 0 || reverseVotes == 0 else { return .unknown }
+        return forwardVotes > 0 ? .forward : .reverse
+    }
+
+    private static func distance(_ points: [CLLocation]) -> Double {
+        guard points.count >= 2 else { return 0 }
+        return zip(points, points.dropFirst()).reduce(0) { total, pair in
+            total + max(0, pair.0.distance(from: pair.1))
+        }
+    }
+
+    /// Detect only genuinely retraced paths. A true circuit with
+    /// separate clockwise/counter-clockwise sections must remain
+    /// direction-sensitive even when it starts and ends at one point.
+    private static func isReciprocalOutAndBack(
+        _ reference: [CLLocation], length: Double
+    ) -> Bool {
+        guard reference.count >= 3, length >= 300,
+              let first = reference.first, let last = reference.last,
+              first.distance(from: last) <= 75 else { return false }
+        let reverse = Array(reference.reversed())
+        for fraction in [0.14, 0.27, 0.39, 0.61, 0.73, 0.86] {
+            guard let ahead = sample(reference, metersFromStart: length * fraction),
+                  let behind = sample(reverse, metersFromStart: length * fraction),
+                  ahead.distance(from: behind) <= 40 else { return false }
+        }
+        return true
     }
 
     private static func sample(
