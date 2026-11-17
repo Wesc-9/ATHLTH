@@ -3130,28 +3130,6 @@ struct WorkoutTemplateDetailView: View {
         return false
     }
 
-    private func legacyCopyBuilderBinding(blocks: [WorkoutTemplateBlock]) -> Bool {
-        var copy = entry.plannedSession()
-        copy.workoutBlocks = blocks
-        let binding = ATHLTHWorkoutExerciseBinding.bind(
-            &copy, library: exerciseLibrary.allExercises
-        )
-        guard binding.isReady else {
-            shareError = tr(
-                "Choose exercises from your library before saving: ",
-                "Velg øvelser fra biblioteket før lagring: "
-            ) + binding.unresolved.prefix(4).joined(separator: ", ")
-            return false
-        }
-        if let existing = savedPersonalWorkout {
-            _ = session.updateSavedWorkoutTemplate(copy, id: existing.id)
-        } else {
-            _ = session.saveSharedWorkout(copy, sourceSessionID: entry.id)
-        }
-        saved = true
-        return true
-    }
-
     private func addToMyWorkouts() {
         // Save must go through the editor: unchanged recipes and copies with
         // the original name are not valid new library entries.
