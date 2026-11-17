@@ -46,7 +46,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
     }
 
     private var activeMessageCount: Int {
-        draft.customRules.filter(\.isEnabled).count +
+        draft.configuration().activeCustomRules.count +
         ATHLTHAudioCoachOption.allCases.filter {
             $0 != .customAnnouncements &&
             $0.isActive(in: draft) &&
@@ -380,7 +380,9 @@ struct ATHLTHAudioCoachCircleOverview: View {
                             Text((displayTrigger?.summary(interval: displayInterval ?? 1) ??
                                   tr("No trigger", "Ingen trigger")) + " · " +
                                  tr("\(spokenValues + options.count) commands",
-                                    "\(spokenValues + options.count) kommandoer"))
+                                    "\(spokenValues + options.count) kommandoer") +
+                                 (group.isEnabled ? "" : tr(" · Paused", " · Av")))
+
                             .font(.caption)
                             .foregroundStyle(dim)
                         }
@@ -393,6 +395,29 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                Toggle(
+                    tr("Group active", "Gruppe aktiv"),
+                    isOn: Binding(
+                        get: {
+                            draft.coachGroups.first(where: { $0.id == group.id })?.isEnabled ?? true
+                        },
+                        set: { active in
+                            guard let index = draft.coachGroups.firstIndex(where: { $0.id == group.id })
+                            else { return }
+                            draft.coachGroups[index].enabled = active
+                            // Built-in options have one owner; remember their
+                            // association and restore when re-enabling the group.
+                            for rawValue in group.optionIDs {
+                                ATHLTHAudioCoachOption(rawValue: rawValue)?
+                                    .setActive(active, in: &draft)
+                            }
+                        }
+                    )
+                )
+                .labelsHidden()
+                .tint(gold)
+                .accessibilityLabel(tr("Enable \(group.name)", "Aktiver \(group.name)"))
+                .accessibilityIdentifier("athlth-coach-group-enabled")
                 Menu {
                     Button(tr("Edit group trigger", "Endre gruppens trigger"),
                            systemImage: "clock.arrow.circlepath") {
@@ -540,6 +565,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
         // them to two groups when duplicating an ordinary container.
         copy.trigger = group.trigger
         copy.interval = group.interval
+        copy.enabled = group.enabled
         draft.coachGroups.append(copy)
         expandedGroups.insert(copy.id)
     }
