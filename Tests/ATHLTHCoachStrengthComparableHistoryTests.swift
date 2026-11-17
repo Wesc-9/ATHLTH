@@ -167,9 +167,15 @@ final class ATHLTHCoachStrengthComparableHistoryTests: XCTestCase {
             original, variant
         ))
         variant.libraryExerciseID = id
+        variant.name = "Updated bench press label"
+        variant.primaryMuscles = ["upper chest"]
         XCTAssertTrue(ATHLTHCoachStrengthComparableHistory.isSameExercise(
             original, variant
         ))
+        XCTAssertEqual(
+            ATHLTHCoachStrengthComparableHistory.identityKey(for: original),
+            ATHLTHCoachStrengthComparableHistory.identityKey(for: variant)
+        )
     }
 
     func testMissingEquipmentCannotJustifyWeightIncrease() {
