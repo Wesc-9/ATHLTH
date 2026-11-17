@@ -79,6 +79,9 @@ struct ATHLTHRecentActivityCardLayout<Artwork: View, Details: View>: View {
             in: RoundedRectangle(cornerRadius: 19, style: .continuous)
         )
         .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
+        // Clipping does not constrain hit-testing. Without a matching hit
+        // shape, scaled route artwork can steal taps from "See all" above.
+        .contentShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 19, style: .continuous)
                 .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.35), lineWidth: 0.8)
