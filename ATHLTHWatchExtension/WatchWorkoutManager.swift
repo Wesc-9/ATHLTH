@@ -5094,9 +5094,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 elapsedInStep: currentStructuredStepElapsedTime,
                 distanceInStepMeters: currentStructuredStepDistanceMeters
             )
-        var segments: [String] = []
+        var standard = ""
         if maySpeakRoutine {
-            var standard = metricsAnnouncement(excluding: coveredMetrics)
+            standard = metricsAnnouncement(excluding: coveredMetrics)
             if let feedback = ATHLTHCoachGoalEncouragement.phrase(
                 style: audioCoachConfiguration.speechStyle ?? .balanced,
                 step: currentStructuredRunningStep,
@@ -5109,13 +5109,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 standard += standard.isEmpty ? feedback : ". " + feedback
                 lastGoalEncouragementAt = Date()
             }
-            if !standard.isEmpty { segments.append(standard) }
         }
-        segments.append(contentsOf: customDue.map(\.text))
-        if !segments.isEmpty {
+        let combined = ATHLTHCoachRoutineComposition.compose(
+            regular: standard, customDue: customDue
+        )
+        if !combined.isEmpty {
             WKInterfaceDevice.current().play(.click)
             speak(
-                segments.joined(separator: ". "),
+                combined,
                 priority: .routineCoach,
                 event: ATHLTHCoachEvent(
                     kind: .routineMilestone,
