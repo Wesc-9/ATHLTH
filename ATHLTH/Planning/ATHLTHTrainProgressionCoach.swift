@@ -16,6 +16,9 @@ enum ATHLTHTrainProgressionCoach {
         let matchingFinishedWorkouts: Int
         let workingSetsVerified: Int
         let reasoning: String
+        /// Exact workout identifiers used for this proposal.
+        let sourceWorkoutIDs: [UUID]
+        let sourceSetIDs: [UUID]
     }
 
     /// Count distinct finished workouts where every logged working set
@@ -146,7 +149,9 @@ enum ATHLTHTrainProgressionCoach {
                             proposedLoad: proposed,
                             matchingFinishedWorkouts: assessment.sourceWorkoutIDs.count,
                             workingSetsVerified: assessment.sourceSetIDs.count,
-                            reasoning: "ATHLTH Coach: targets verified in two distinct linked workouts. The proposed increase is limited and requires your approval."
+                            reasoning: "ATHLTH Coach: targets verified in two distinct linked workouts. The proposed increase is limited and requires your approval.",
+                            sourceWorkoutIDs: assessment.sourceWorkoutIDs,
+                            sourceSetIDs: assessment.sourceSetIDs
                         ))
                     }
                 }
@@ -167,6 +172,9 @@ enum ATHLTHTrainProgressionCoach {
         let prescribedWeightKg: Double
         let supportingSessions: Int
         let supportingSets: Int
+        /// Same read-only provenance as the decision engine.
+        let sourceWorkoutIDs: [UUID]
+        let sourceSetIDs: [UUID]
     }
 
     struct VolumeReviewSuggestion: Identifiable, Hashable {
@@ -333,7 +341,9 @@ enum ATHLTHTrainProgressionCoach {
                                 proposedReps: next,
                                 prescribedWeightKg: prescription.load,
                                 supportingSessions: min(2, assessment.sourceWorkoutIDs.count),
-                                supportingSets: assessment.sourceSetIDs.count
+                                supportingSets: assessment.sourceSetIDs.count,
+                                sourceWorkoutIDs: Array(assessment.sourceWorkoutIDs.prefix(2)),
+                                sourceSetIDs: assessment.sourceSetIDs
                             ))
                         case .reviewTrainingVolume:
                             guard goal == .buildMuscle else { continue }
