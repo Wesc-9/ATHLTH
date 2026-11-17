@@ -17,21 +17,21 @@ ATHLTH Coach er **den eneste brukervendte coachen**. Vi skal ikke introdusere «
 - `ATHLTH/Strength/StrengthWorkoutModels.swift` – completed reps, weight, RPE/RIR, settype, oppvarming, innsatssegmenter, avanserte gruppetyper, motstandstrinn, måling og restitutionspauser.
 
 ### Oppdaget risiko og avgrensning
-- Historikkens `ExerciseSnapshot` lagrer navn og utstyr, **ikke** den kanoniske bibliotek-ID-en. `StrengthExerciseLog.plannedExerciseID` er knyttet til planlagt øvelse, ikke nødvendigvis global biblioteksidentitet. Dette skal **ikke** gjettes til samme ID.
+- Eldre historikk i `ExerciseSnapshot` lagrer navn og utstyr, men ikke den kanoniske bibliotek-ID-en. Nytt `Exercise.snapshot` lagrer nå valgfri `libraryExerciseID` for fremtidige økter (uten å kreve migrering av eldre data). `StrengthExerciseLog.plannedExerciseID` er knyttet til planlagt øvelse, ikke nødvendigvis global biblioteksidentitet. Dette skal **ikke** gjettes til samme ID.
 - Navn alene kan forveksle apparattyper og vektskala. Den første nye datagrensen krever likt normalisert navn, utstyr og ikke-konfliktende primærmuskel, men *kan ennå ikke* garantere identisk spesifikt apparat/lastenhet; fase 2–3 må innføre eksplisitt proveniens.
-- Eksisterende live-, plan- og coach-forslagsmotorer har ulike terskler og tidshorisonter. De er ikke konsolidert i én anbefalings-API ennå: dette skal gjøres før fase 1 kan lukkes.
+- Live- og planlagt styrke bruker nå samme evidence-policy og `ATHLTHCoachStrengthDecision` for vurdering av en eventuell økning. Andre Coach-/periodiseringssignaler er ennå ikke samlet, og endelig beslutnings-API mangler målbasert repetisjons-/volumstyring.
 - Nettverk og generativ modell skal ikke få private rå treningslogger uten gjeldende tillatelse.
 - Ingen av disse punktene begrunner automatisk planendring, eller å anta at fremtidig funksjonalitet er ferdig.
 
 ## Første leveranse direkte i release/v2.2.4
-- `ATHLTHCoachStrengthComparableHistory` er en ny skrivebeskyttet datagrense for *sammenlignbare* fullførte historiske sett. Den gir kilden og tidsvinduet uten å beregne en personlig anbefaling.
-- Live `StrengthWorkoutStore.progressionSuggestion` leser fra denne i stedet for å velge navnelike øvelser på egen hånd. Den eldre progresjonsalgoritmen brukes fortsatt; videre arbeid ligger i fase 2.
-- Nye enhetstester dekker forveksling av benkpress-varianter, utstyr, oppvarming, skip, tidsmål, motstandsnivå og ferske/eldre økter.
+- `ATHLTHCoachStrengthComparableHistory` er skrivebeskyttet datagrense for *sammenlignbare* fullførte historiske sett, med kanonisk-ID når registrert, konservativ navne-/utstyrsfallback og kontroll av hoppede/ugyldige sett. Gir også felles `TargetEvidence` for å avgjøre om planlagte arbeidssett faktisk ble gjennomført.
+- Nytt `ATHLTHCoachStrengthDecision` samler vurdering av to separate vellykkede økter, siste mislykkede økt som veto, tillitsnivå og krav om manuell godkjenning. Live `StrengthWorkoutStore.progressionSuggestion` og planforslag via `ATHLTHTrainProgressionCoach` bruker beslutningsregelen. Den eldre `AthleteStrengthProgression` beregner fortsatt det endelige live-forslaget; senere steg samordner all dosering.
+- Nye enhetstester dekker øvelsesidentitet, ulikt utstyr, oppvarming, skip, tidsmål, motstandsnivå, ferske/eldre økter, RIR, urealistiske økninger, første økt og nylig mislykkede sett. Live viser nå `ATHLTH Coach` som avsender for progresjonsforslaget.
 - Testene er lagt til i Swift-testtarget men **må kjøres i faktisk iOS/Xcode-bygg**. Ikke rapporter dem som grønne før pipeline/simulator har bekreftet det.
 - Første kodegrunnlag ble merget til release i [PR #55](https://github.com/Wesc-9/ATHLTH/pull/55), merge-commit `094e9759`. Videre Coach-arbeid gjøres direkte på `release/v2.2.4`, uten separat feature-gren, i tråd med brukerens instruks.
 
-## Planlagte beslutningskontrakter
-En framtidig `CoachRecommendation` bør inneholde:
+## Etablert delkontrakt og neste utvidelser
+`ATHLTHCoachStrengthDecision.Assessment` inneholder allerede `action`, `reason`, `confidence`, `sourceWorkoutIDs`, `sourceSetIDs`, `proposedWeightKg` og `requiresUserApproval`. En fullstendig framtidig `CoachRecommendation` må i tillegg inneholde:
 1. **Omfang:** exercise library ID hvis proven, apparat-/load-kind og mål (styrke/hypertrofi/utholdenhet).
 2. **Bevis:** distinkte workout ID-er og arbeidssett-ID-er, ferdigtidspunkt, mål vs oppnådd, enhetsdefinisjon.
 3. **Forslag:** `hold`, `increaseReps`, `increaseLoad`, `reduceLoad`, `reviewVolume`, `insufficientEvidence`.
@@ -40,9 +40,9 @@ En framtidig `CoachRecommendation` bør inneholde:
 
 ## Faser og ferdigkriterium
 - [ ] Fase 1 – grunnlagskartlegging, identitet, felles API og compile/verifikasjon (**pågår**).
-- [ ] Fase 2 – algoritmisk styrkeprogresjon med sikkerhetstester.
-- [ ] Fase 3 – integrert UI i Basic/Advanced, live, plan, iPad og Watch.
+- [ ] Fase 2 – algoritmisk styrkeprogresjon med sikkerhetstester (**påbegynt: vektreview/hold/datagrunnlag, reps/sett/utstyr gjenstår**).
+- [ ] Fase 3 – integrert UI i Basic/Advanced, live, plan, iPad og Watch (**kun avsendernavn i eksisterende livekort oppdatert**).
 - [ ] Fase 4 – innsikt og godkjente planjusteringer via Coach.
 - [ ] Fase 5 – komplett test, ytelse og TestFlight.
 
-**Oppdater dette dokumentet og #49 ved hver ferdigkontrollerte fase.** Ikke marker noen av fasene complete før sjekklistene og CI-/QA-bevis er klare.
+**Merk:** Syntaks-/bygg- og teststatus må verifiseres i GitHub Actions før noen fase lukkes. `release/v2.2.4` er riktig kodegren. Oppdater dette dokumentet og #49 ved hver ferdigkontrollerte fase. Ikke marker noen av fasene complete før sjekklistene og CI-/QA-bevis er klare.
