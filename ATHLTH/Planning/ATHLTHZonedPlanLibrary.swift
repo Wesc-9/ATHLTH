@@ -521,7 +521,20 @@ enum ATHLTHZonedPlanLibrary {
             block.targetElevationGainMeters = step.elevationGainM
             block.targetGradientPercent = step.gradientPercent
             block.targetTerrainType = step.terrainType
-            result.append(block)
+            // Some sources pack several independently executed actions
+            // (e.g. drills + 3 strides) inside one timed text segment.
+            // Materialize each action for the shared plan/live engine while
+            // preserving the exact total source duration and all zone data.
+            let children = ATHLTHZonedCompoundStepSplitter.split(
+                sourceEnglish: step.descriptionEn ?? "", block: block
+            )
+            for child in children where result.count < 900 {
+                var sequenced = ATHLTHWorkoutPhasePlacement.renumbered(
+                    child, sequence: result.count + 1
+                )
+                sequenced.editorDragID = UUID()
+                result.append(sequenced)
+            }
         }
     }
 
@@ -561,5 +574,256 @@ enum ATHLTHZonedPlanLibrary {
         case "hills": return "hill_run"
         default: return "interval_run"
         }
+    }
+}
+
+
+/// Converts unambiguously compound imported running instructions into
+/// independent, editable ATHLTH steps. Source JSON is never changed.
+/// Durations without per-action prescriptions are explicitly marked as
+/// estimated allocations of the SOURCE'S fixed total, not prescribed paces.
+enum ATHLTHZonedCompoundStepSplitter {
+    private static let numberedX = try! NSRegularExpression(
+        pattern: #"\b([2-9]|1[0-2])\s*[x×]\s*(?:(\d{1,3})\s*(?:s|sec|seconds)\s*)?[^,.;]*?\b(accelerations?|strides?|climbs?|hills?|sprints?)\b"#,
+        options: [.caseInsensitive]
+    )
+    private static let numberedWords = try! NSRegularExpression(
+        pattern: #"\b([2-9]|1[0-2])\s+(?:(?:short|progressive|gentle|running|hill|brisk|walking|jogged)\s+){0,5}(accelerations?|strides?|climbs?|hills?|sprints?)\b"#,
+        options: [.caseInsensitive]
+    )
+    private static let explicitMinutes = try! NSRegularExpression(
+        pattern: #"\b(\d{1,2})\s*min\b"#,
+        options: [.caseInsensitive]
+    )
+
+    static func split(
+        sourceEnglish: String, block: WorkoutTemplateBlock
+    ) -> [WorkoutTemplateBlock] {
+        guard block.kind == .run, block.distanceMeters == nil,
+              let total = block.durationSeconds,
+              total.isFinite, total >= 60 else { return [block] }
+        let source = sourceEnglish.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !source.isEmpty else { return [block] }
+
+        if let counted = splitNumberedActions(source: source, block: block, total: total) {
+            return counted
+        }
+        if let sequential = splitWalkAndJog(source: source, block: block, total: total) {
+            return sequential
+        }
+        if let pair = splitTwoActivities(source: source, block: block, total: total) {
+            return pair
+        }
+        return [block]
+    }
+
+    private static func translated(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
+    private static var estimateNote: String {
+        translated(
+            "The source gives total time only. These individual durations are estimated; adjust them as needed.",
+            "Kilden oppgir bare totaltid. Varighetene er estimert og kan justeres."
+        )
+    }
+
+    private static func child(
+        of source: WorkoutTemplateBlock,
+        named title: String,
+        seconds: Double,
+        walking: Bool? = nil,
+        estimated: Bool
+    ) -> WorkoutTemplateBlock {
+        var result = source
+        result.title = title
+        result.durationSeconds = seconds
+        result.cardioActivity = walking.map { $0 ? .walking : .running }
+            ?? source.cardioActivity
+        let originalNotes = (source.notes ?? "").trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        // Keep meaningful coaching detail but avoid replacing the new
+        // individual step name with the old compound source sentence.
+        result.notes = [
+            originalNotes.isEmpty ? nil : originalNotes,
+            estimated ? estimateNote : nil
+        ].compactMap { $0 }.joined(separator: "\n")
+        if result.notes?.isEmpty == true { result.notes = nil }
+        result.editorDragID = UUID()
+        return result
+    }
+
+    private static func activityName(
+        in phrase: String, isPreparation: Bool
+    ) -> String? {
+        let lower = phrase.lowercased()
+        if lower.contains("drill") {
+            return translated("Running drills", "Løpsdriller")
+        }
+        if lower.contains("stretch") {
+            return translated("Dynamic mobility", "Dynamisk bevegelighet")
+        }
+        if lower.contains("mobility") {
+            return translated("Mobility", "Mobilitet")
+        }
+        if lower.contains("walk") {
+            return translated("Brisk walking", "Rask gange")
+        }
+        if lower.contains("jog") {
+            return translated("Easy jogging", "Rolig jogg")
+        }
+        if isPreparation {
+            return translated("Easy preparation", "Rolig forberedelse")
+        }
+        return nil
+    }
+
+    private static func effortName(in source: String) -> String {
+        let lower = source.lowercased()
+        if lower.contains("climb") || lower.contains("hill") {
+            return translated("Hill effort", "Bakkedrag")
+        }
+        if lower.contains("sprint") {
+            return translated("Sprint", "Sprint")
+        }
+        return translated("Progressive stride", "Progressivt stigningsløp")
+    }
+
+    private static func splitNumberedActions(
+        source: String, block: WorkoutTemplateBlock, total: Double
+    ) -> [WorkoutTemplateBlock]? {
+        let fullRange = NSRange(source.startIndex..<source.endIndex, in: source)
+        let first = numberedX.firstMatch(in: source, range: fullRange)
+        let match = first ?? numberedWords.firstMatch(
+            in: source, range: fullRange
+        )
+        guard let match,
+              let countRange = Range(match.range(at: 1), in: source),
+              let count = Int(source[countRange]), (2...12).contains(count),
+              let matchedRange = Range(match.range, in: source) else {
+            return nil
+        }
+        let matched = String(source[matchedRange])
+        // Keep protocols with another separately counted phase untouched
+        // until both phases can be represented without loss.
+        let after = source[matchedRange.upperBound...].lowercased()
+        if after.contains("then 2") || after.contains("then 3") ||
+           after.contains("then 4") { return nil }
+
+        let explicitSeconds: Double? = {
+            guard first != nil, match.range(at: 2).location != NSNotFound,
+                  let secondsRange = Range(match.range(at: 2), in: source),
+                  let seconds = Double(source[secondsRange]) else { return nil }
+            return seconds
+        }()
+        let strideSeconds = explicitSeconds ??
+            min(30, max(15, floor(total / Double(count + 2))))
+        guard strideSeconds >= 10, total >= Double(count) * strideSeconds
+        else { return nil }
+        let remaining = total - Double(count) * strideSeconds
+        let prefix = String(source[..<matchedRange.lowerBound])
+        let name = activityName(in: prefix, isPreparation: true)
+            ?? translated("Easy preparation", "Rolig forberedelse")
+        // Strictly keep all source seconds, including preparations. No
+        // invented recovery blocks are added when source has no recoveries.
+        var pieces: [WorkoutTemplateBlock] = []
+        if remaining > 0 {
+            pieces.append(child(
+                of: block, named: name, seconds: remaining,
+                walking: prefix.lowercased().contains("walk"),
+                estimated: true
+            ))
+        }
+        for index in 1...count {
+            let label = effortName(in: matched) + " \(index)/\(count)"
+            pieces.append(child(
+                of: block, named: label,
+                seconds: strideSeconds,
+                walking: matched.lowercased().contains("walking"),
+                estimated: explicitSeconds == nil
+            ))
+        }
+        return pieces.count > 1 ? pieces : nil
+    }
+
+    private static func splitWalkAndJog(
+        source: String, block: WorkoutTemplateBlock, total: Double
+    ) -> [WorkoutTemplateBlock]? {
+        let lower = source.lowercased()
+        guard let wordRange = lower.range(of: " then ") else { return nil }
+        let before = String(lower[..<wordRange.lowerBound])
+        let after = String(lower[wordRange.upperBound...])
+        let firstIsWalk = before.contains("walk")
+        let firstIsJog = before.contains("jog")
+        let secondIsWalk = after.contains("walk")
+        let secondIsJog = after.contains("jog")
+        guard (firstIsWalk && secondIsJog) ||
+              (firstIsJog && secondIsWalk) else { return nil }
+        let searchRange = NSRange(before.startIndex..<before.endIndex, in: before)
+        let initialMinutes: Double? = {
+            guard let match = explicitMinutes.firstMatch(
+                in: before, range: searchRange
+            ), let range = Range(match.range(at: 1), in: before),
+               let minutes = Double(before[range]) else { return nil }
+            return minutes
+        }()
+        let firstTime = initialMinutes.map { $0 * 60 } ?? total / 2
+        guard firstTime >= 15, firstTime <= total - 15 else { return nil }
+        let walkTitle = translated("Walking", "Gange")
+        let jogTitle = translated("Easy jogging", "Rolig jogg")
+        let estimated = initialMinutes == nil
+        return [
+            child(
+                of: block,
+                named: firstIsWalk ? walkTitle : jogTitle,
+                seconds: firstTime, walking: firstIsWalk,
+                estimated: estimated
+            ),
+            child(
+                of: block,
+                named: secondIsWalk ? walkTitle : jogTitle,
+                seconds: total - firstTime, walking: secondIsWalk,
+                estimated: estimated
+            )
+        ]
+    }
+
+    private static func splitTwoActivities(
+        source: String, block: WorkoutTemplateBlock, total: Double
+    ) -> [WorkoutTemplateBlock]? {
+        let lower = source.lowercased()
+        let separators = [" and ", " + "]
+        guard let separator = separators.first(where: { lower.contains($0) }),
+              let cut = lower.range(of: separator) else { return nil }
+        let before = String(lower[..<cut.lowerBound])
+        let after = String(lower[cut.upperBound...])
+        // A conservative vocabulary: do not split descriptive coaching
+        // remarks, nutrition cues, or directions without separate actions.
+        guard let preparation = activityName(in: before, isPreparation: false),
+              (before.contains("drill") || before.contains("mobility") ||
+               before.contains("stretch") || before.contains("walk")),
+              (after.contains("acceleration") || after.contains("stride") ||
+               after.contains("mobility") || after.contains("stretch")) else {
+            return nil
+        }
+        let second = after.contains("acceleration") || after.contains("stride")
+            ? effortName(in: after)
+            : (activityName(in: after, isPreparation: false) ?? "")
+        guard !second.isEmpty else { return nil }
+        let firstTime = floor(total * 0.65)
+        guard firstTime >= 15, total - firstTime >= 15 else { return nil }
+        return [
+            child(
+                of: block, named: preparation, seconds: firstTime,
+                walking: before.contains("walk"), estimated: true
+            ),
+            child(
+                of: block, named: second, seconds: total - firstTime,
+                walking: after.contains("walk"), estimated: true
+            )
+        ]
     }
 }
