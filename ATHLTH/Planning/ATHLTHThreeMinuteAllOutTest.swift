@@ -55,21 +55,28 @@ enum ATHLTHThreeMinuteAllOut {
         )
     }
 
+    /// Never show this assessment on generic runs or other field tests.
+    static func isTestTitle(_ title: String) -> Bool {
+        let normalized = title.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).lowercased()
+        return normalized.contains("3-minute all-out") ||
+            normalized.contains("3-minutt all-out") ||
+            normalized.contains("3 min maksimaltest") ||
+            normalized == "3mt" ||
+            normalized.hasPrefix("3mt ·")
+    }
+
     static func isRunningTest(
         title: String, blocks: [WorkoutTemplateBlock]
     ) -> Bool {
-        let normalized = title.lowercased()
-        let knownName = normalized.contains("3-minute all-out") ||
-            normalized.contains("3-minutt all-out") ||
-            normalized.contains("3 min maksimaltest") ||
-            normalized.contains("3mt")
         let mainTest = blocks.contains {
             $0.kind == .run && $0.resolvedPhase == .main &&
                 $0.durationSeconds == testSeconds &&
                 ($0.title.lowercased().contains("maksimaltest") ||
                  $0.title.lowercased().contains("all-out"))
         }
-        return knownName && mainTest
+        return isTestTitle(title) && mainTest
     }
 
     static func paceText(secondsPerKilometer: Double) -> String {
@@ -334,6 +341,7 @@ struct ATHLTHThreeMinuteAllOutMeasurementsView: View {
                           systemImage: "checkmark")
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(ATHLTHPlanDesign.accentInk)
                 .disabled(draftResult == nil)
             }
 
