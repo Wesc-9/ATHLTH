@@ -53,6 +53,41 @@ enum ATHLTHExerciseAlphabetPage {
     }
 }
 
+/// One shared A–Å lookup for all LOCAL library collections. Build targets
+/// from the complete filtered result, not the current 50 rendered records.
+/// The stable ID→index map allows jumps without loading intermediate pages.
+struct ATHLTHLibraryAlphabetLookup {
+    let targets: [String: UUID]
+    private let indices: [UUID: Int]
+
+    init<Item>(items: [Item], id: (Item) -> UUID, title: (Item) -> String) {
+        var first: [String: UUID] = [:]
+        var positions: [UUID: Int] = [:]
+        for (offset, item) in items.enumerated() {
+            let itemID = id(item)
+            let letter = ATHLTHExerciseAlphabet.letter(for: title(item))
+            if first[letter] == nil {
+                first[letter] = itemID
+                positions[itemID] = offset
+            }
+        }
+        targets = first
+        indices = positions
+    }
+
+    func index(for targetID: UUID) -> Int? { indices[targetID] }
+}
+
+enum ATHLTHLibraryAlphabetWindow {
+    static func visible<Item>(_ items: [Item], start: Int, limit: Int) -> [Item] {
+        Array(items.dropFirst(max(0, start)).prefix(max(0, limit)))
+    }
+
+    static func remaining(total: Int, start: Int) -> Int {
+        max(0, total - max(0, start))
+    }
+}
+
 struct ATHLTHExerciseAlphabetIndex: View {
     let targets: [String: UUID]
     let onJump: (UUID) -> Void
@@ -80,10 +115,9 @@ struct ATHLTHExerciseAlphabetIndex: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(target == nil)
-                .accessibilityLabel(ATHLTHLocalization.format(
-                    english: "Jump to exercises beginning with %@",
-                    norwegian: "Hopp til øvelser som begynner på %@",
-                    letter
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Jump to items beginning with \(letter)",
+                    norwegian: "Hopp til bokstaven \(letter)"
                 ))
                 .accessibilityAddTraits(target == nil ? [] : [.isButton])
             }
