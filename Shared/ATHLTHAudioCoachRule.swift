@@ -19,8 +19,10 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var isPeriodic: Bool { self == .time || self == .distance }
         var isHeartRateCondition: Bool {
             switch self {
-            case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit: true
-            default: false
+            case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit:
+                return true
+            default:
+                return false
             }
         }
         var needsStructuredStep: Bool {
