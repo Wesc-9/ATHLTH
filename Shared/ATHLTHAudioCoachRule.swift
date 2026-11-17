@@ -490,6 +490,50 @@ struct ATHLTHAudioCoachDueAnnouncement {
     let milestoneKey: String
 }
 
+/// Keep simultaneous ordinary announcements short and deterministic.
+/// Critical navigation, target alerts and countdowns use higher-priority
+/// voice events and are handled outside this routine message composer.
+enum ATHLTHCoachRoutineComposition {
+    static let maximumParts = 3
+
+    static func compose(
+        regular: String,
+        customDue: [ATHLTHAudioCoachDueAnnouncement]
+    ) -> String {
+        let ranked = customDue.enumerated().sorted { lhs, rhs in
+            let first = rank(lhs.element.metrics)
+            let second = rank(rhs.element.metrics)
+            return first == second ? lhs.offset < rhs.offset : first > second
+        }
+        var choices: [String] = []
+        for candidate in ranked {
+            let phrase = candidate.element.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !phrase.isEmpty, !choices.contains(phrase) else { continue }
+            choices.append(phrase)
+            if choices.count == maximumParts { break }
+        }
+        if choices.count < maximumParts,
+           !regular.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            choices.append(regular)
+        }
+        // Once a milestone is consumed, omitted low-priority status is NOT
+        // queued later while the athlete is already at a new exercise.
+        return choices.joined(separator: ". ")
+    }
+
+    private static func rank(_ metrics: Set<ATHLTHAudioCoachRule.Metric>) -> Int {
+        if !metrics.isDisjoint(with: [
+            .heartRateZone, .nextExercise, .previousMainSectionSummary,
+            .previousExerciseSummary, .remainingExercises
+        ]) { return 3 }
+        if !metrics.isDisjoint(with: [.heartRate, .stepRemainingTime, .groupRemainingTime]) {
+            return 2
+        }
+        if !metrics.isDisjoint(with: [.motivation, .hydrationReminder]) { return 0 }
+        return 1
+    }
+}
+
 /// Evaluates each user's distance/time rule independently. The slot journal
 /// prevents repeats when workout snapshots arrive more than once per second.
 enum ATHLTHAudioCoachRuleDelivery {
