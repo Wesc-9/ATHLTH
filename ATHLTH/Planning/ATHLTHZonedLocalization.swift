@@ -40,8 +40,8 @@ enum ATHLTHZonedLocalization {
         }
         if workoutID == "ASS-009" {
             return ATHLTHLocalization.choose(
-                english: "A 3-minute maximum-effort test on a track. Record the total distance and pace in the final 30 seconds to assess critical speed.",
-                norwegian: "Tre minutters maksimaltest på løpebane. Noter totaldistanse og tempo de siste 30 sekundene for å vurdere kritisk fart."
+                english: "Three-minute all-out test on a measured, flat 400 m track. Run all-out from the first second without pacing or looking at live speed. Record total distance and the distance in the final 30 seconds to estimate critical speed (CS) and D′.",
+                norwegian: "Tre minutters maksimaltest på flat, oppmålt 400-metersbane. Løp maksimalt fra første sekund uten å disponere kreftene eller se på farten. Noter totaldistanse og distansen de siste 30 sekundene for å estimere kritisk hastighet (CS) og D′."
             )
         }
         guard ATHLTHLocalization.isNorwegian else { return english }
@@ -311,8 +311,8 @@ enum ATHLTHZonedLocalization {
                     norwegian: "3 min maksimaltest"
                 ),
                 instructions: ATHLTHLocalization.choose(
-                    english: "Run at maximum sustainable effort on a track for 3 minutes. Record total distance and the pace of the final 30 seconds.",
-                    norwegian: "Løp med maksimal innsats på bane i 3 minutter. Noter totaldistanse og tempo de siste 30 sekundene."
+                    english: "Run all-out from the very first second for 180 seconds on a flat, measured track. Do not pace; let speed decrease naturally. Hide live pace, use the finish audio alert and record both the total distance and the distance covered from 2:30 to 3:00.",
+                    norwegian: "Løp maksimalt fra første sekund i 180 sekunder på flat, oppmålt bane. Ikke spar på kreftene – la farten falle naturlig. Skjul live-tempo, bruk lydvarsel ved slutt og noter både totaldistanse og distansen mellom 2:30 og 3:00."
                 )
             )
         }
