@@ -1,5 +1,22 @@
 import SwiftUI
 
+/// The workout-level environment is the only authority for running steps.
+/// This preserves per-step speed, duration and existing treadmill inclines,
+/// while keeping indoor/outdoor mode consistent across the entire workout.
+enum ATHLTHWorkoutRunEnvironmentSync {
+    static func applying(
+        _ environment: RunEnvironment,
+        to block: WorkoutTemplateBlock
+    ) -> WorkoutTemplateBlock {
+        guard block.kind == .run else { return block }
+        var updated = block
+        updated.isIndoor = environment != .outdoor
+        updated.treadmillInclinePercent = environment == .treadmill
+            ? (block.treadmillInclinePercent ?? 0) : nil
+        return updated
+    }
+}
+
 /// One run/walk activity editor backed by the existing WorkoutTemplateBlock.
 /// Reused for planned workouts and saved structured workouts.
 struct ATHLTHPlannedRunStepEditor: View {
