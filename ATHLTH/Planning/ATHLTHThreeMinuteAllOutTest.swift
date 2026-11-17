@@ -78,122 +78,313 @@ enum ATHLTHThreeMinuteAllOut {
     }
 }
 
-/// Compact, opt-in 3MT protocol + manual measured-distance calculator.
-/// This doesn't alter the original workout, recorded runs or Apple Health.
-struct ATHLTHThreeMinuteAllOutGuide: View {
-    @State private var totalMeters = ""
-    @State private var lastThirtyMeters = ""
+/// One complete and reusable description, shown only for the ATHLTH 3MT.
+/// The same content follows the prescription from editor to planned summary
+/// and structured iPhone player. No new generic exercise schema is necessary.
+struct ATHLTHThreeMinuteAllOutProtocol: View {
     @State private var expanded = false
 
-    private func tr(_ english: String, _ norwegian: String) -> String {
-        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
-    private func meters(_ text: String) -> Double? {
-        Double(text.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var items: [(title: String, detail: String)] {
+        [
+            (
+                tr("Location and equipment", "Underlag og utstyr"),
+                tr(
+                    "Use a flat, measured 400 m athletics track, preferably in similar conditions between tests. Avoid a treadmill because you must be free to slow down naturally. Use reliable distance measurement.",
+                    "Bruk en flat, oppmålt friidrettsbane på 400 meter, helst under sammenlignbare forhold mellom testene. Unngå tredemølle, fordi du må kunne senke farten naturlig. Bruk pålitelig distansemåling."
+                )
+            ),
+            (
+                tr("Warm-up · 15–20 min", "Oppvarming · 15–20 min"),
+                tr(
+                    "Jog easily, do dynamic mobility and running drills, then 2–3 progressive strides of about 10 seconds. Walk or jog very lightly between strides and be ready to start the test fully recovered.",
+                    "Jogg rolig, gjør dynamisk bevegelighet og løpsdriller, og avslutt med 2–3 progressive stigningsløp på omtrent 10 sekunder. Gå eller jogg svært rolig mellom dragene, slik at du er klar til testen."
+                )
+            ),
+            (
+                tr("Test effort · exactly 3:00", "Testdrag · nøyaktig 3:00"),
+                tr(
+                    "Start at maximum effort from the first second. Do not reserve energy or pace yourself. Continue to push as your speed naturally declines until 180 seconds have passed.",
+                    "Start med maksimal innsats fra første sekund. Ikke spar på kreftene eller forsøk å holde en bestemt fart. Fortsett å presse hele veien mens farten gradvis avtar, til 180 sekunder er gått."
+                )
+            ),
+            (
+                tr("Watch and audio", "Klokke og lyd"),
+                tr(
+                    "Hide current speed and pace on the watch. Use a clear sound alert to know when the 180 seconds are over. You must still collect accurate distance measurements.",
+                    "Skjul fart og tempo på klokka under testdraget. Bruk et tydelig lydvarsel når de 180 sekundene er over. Distansen må fortsatt måles nøyaktig."
+                )
+            ),
+            (
+                tr("Measurements", "Målinger"),
+                tr(
+                    "Record the distance covered during the complete 180-second test effort, and separately the distance covered from 2:30 to 3:00. Do not use the whole workout's total distance, which includes warm-up and cool-down.",
+                    "Noter distansen i selve testdraget på 180 sekunder, og separat distansen mellom 2:30 og 3:00. Ikke bruk totaldistansen for hele treningsøkten, som også inkluderer oppvarming og nedtrapping."
+                )
+            ),
+            (
+                tr("Cool-down", "Nedtrapping"),
+                tr(
+                    "Walk first and then jog very easily, following the planned cool-down. Stop if you feel unwell.",
+                    "Start med gange og fortsett med svært rolig jogg, slik nedtrappingen er planlagt. Avbryt dersom du føler deg uvel."
+                )
+            ),
+            (
+                tr("How results are calculated", "Slik beregnes resultatene"),
+                tr(
+                    "Estimated critical speed (CS) = distance covered in the final 30 seconds / 30 seconds. Estimated D′ = total test distance − CS × 180 seconds. CS is not a directly measured lactate threshold, and D′ is not a direct lactate measurement.",
+                    "Estimert kritisk hastighet (CS) = distansen de siste 30 sekundene / 30 sekunder. Estimert D′ = distansen i testdraget − CS × 180 sekunder. CS er ikke en direkte målt laktatterskel, og D′ er ikke en direkte måling av melkesyre."
+                )
+            )
+        ]
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(item.detail)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(.top, 11)
+        } label: {
+            Label(
+                tr("Description and test protocol", "Beskrivelse og testprotokoll"),
+                systemImage: "doc.text"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+        }
+        .padding(14)
+        .background(
+            ATHLTHPlanDesign.selectedSurface,
+            in: RoundedRectangle(cornerRadius: 15)
+        )
+        .accessibilityIdentifier("athlth-3mt-full-workout-description")
+    }
+}
+
+/// The result is stored only for the matching, completed running workout.
+/// It does not replace HealthKit data and is not posted to social feeds.
+enum ATHLTHThreeMinuteAllOutMeasurementStore {
+    struct Measurement: Codable, Equatable {
+        let totalMeters: Double
+        let finalThirtyMeters: Double
+        let updatedAt: Date
+    }
+
+    private static let storageName = "threeMinuteAllOutMeasuredResults.v1"
+
+    static func load(workoutID: UUID, userID: UUID) -> Measurement? {
+        AccountLocalStorage.read(
+            [UUID: Measurement].self,
+            name: storageName,
+            userID: userID
+        )?[workoutID]
+    }
+
+    @discardableResult
+    static func save(
+        workoutID: UUID,
+        userID: UUID,
+        totalMeters: Double,
+        finalThirtyMeters: Double
+    ) -> Bool {
+        guard ATHLTHThreeMinuteAllOut.calculate(
+            totalDistanceMeters: totalMeters,
+            finalThirtySecondsMeters: finalThirtyMeters
+        ) != nil else { return false }
+        var stored = AccountLocalStorage.read(
+            [UUID: Measurement].self,
+            name: storageName,
+            userID: userID
+        ) ?? [:]
+        stored[workoutID] = Measurement(
+            totalMeters: totalMeters,
+            finalThirtyMeters: finalThirtyMeters,
+            updatedAt: Date()
+        )
+        AccountLocalStorage.write(stored, name: storageName, userID: userID)
+        return true
+    }
+}
+
+/// Standalone 3MT measurements, used in completion review AND history.
+/// A calculated result requires both manually verified test-leg distances.
+struct ATHLTHThreeMinuteAllOutMeasurementsView: View {
+    let workoutID: UUID
+    let userID: UUID
+
+    @State private var totalMeters = ""
+    @State private var lastThirtyMeters = ""
+    @State private var savedMeasurement: ATHLTHThreeMinuteAllOutMeasurementStore.Measurement?
+    @State private var editing = false
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private func measured(_ raw: String) -> Double? {
+        Double(raw.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: "."))
     }
 
-    private var calculated: ATHLTHThreeMinuteAllOut.Result? {
-        guard let total = meters(totalMeters),
-              let terminal = meters(lastThirtyMeters) else { return nil }
+    private var draftResult: ATHLTHThreeMinuteAllOut.Result? {
+        guard let total = measured(totalMeters),
+              let terminal = measured(lastThirtyMeters) else { return nil }
         return ATHLTHThreeMinuteAllOut.calculate(
             totalDistanceMeters: total,
             finalThirtySecondsMeters: terminal
         )
     }
 
+    private var savedResult: ATHLTHThreeMinuteAllOut.Result? {
+        guard let savedMeasurement else { return nil }
+        return ATHLTHThreeMinuteAllOut.calculate(
+            totalDistanceMeters: savedMeasurement.totalMeters,
+            finalThirtySecondsMeters: savedMeasurement.finalThirtyMeters
+        )
+    }
+
     var body: some View {
-        DisclosureGroup(isExpanded: $expanded) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(tr(
-                    "Use a flat, measured 400 m track. Avoid a treadmill: you must be able to slow down naturally.",
-                    "Bruk en flat, oppmålt 400-metersbane. Unngå tredemølle, slik at farten kan falle naturlig."
-                ))
-                Text(tr(
-                    "Warm up for 15–20 minutes with easy jogging, mobility and 2–3 short 10-second strides.",
-                    "Varm opp i 15–20 minutter med rolig jogg, mobilitet og 2–3 korte stigningsløp på 10 sekunder."
-                ))
-                Text(tr(
-                    "Start all-out from the first second and continue for 180 seconds. Do not pace. Hide live pace; use only the finish alert.",
-                    "Start maksimalt fra første sekund, og fortsett i 180 sekunder. Ikke spar på kreftene. Skjul fart og tempo underveis, og bruk bare sluttvarselet."
-                ))
-                Text(tr(
-                    "Record the distance covered during the entire 180-second effort and, separately, the distance during seconds 150–180.",
-                    "Noter distansen på hele testdraget (180 sekunder) og separat distansen mellom 2:30 og 3:00."
-                ))
-                .fontWeight(.medium)
+        VStack(alignment: .leading, spacing: 12) {
+            Label(tr("3MT · measurements and summary", "3MT · målinger og sammendrag"),
+                  systemImage: "stopwatch")
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
 
-                Divider()
-
-                Text(tr("Calculate after the test", "Beregn etter testen"))
-                    .font(.subheadline.weight(.semibold))
-
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("Total (m)", "Totaldistanse (m)"))
-                            .font(.caption)
-                        TextField("—", text: $totalMeters)
-                            .keyboardType(.decimalPad)
-                            .textFieldStyle(.roundedBorder)
-                            .accessibilityIdentifier("athlth-3mt-total-meters")
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("Last 30 s (m)", "Siste 30 sek (m)"))
-                            .font(.caption)
-                        TextField("—", text: $lastThirtyMeters)
-                            .keyboardType(.decimalPad)
-                            .textFieldStyle(.roundedBorder)
-                            .accessibilityIdentifier("athlth-3mt-final30-meters")
-                    }
+            if let result = savedResult, !editing {
+                HStack(alignment: .top, spacing: 14) {
+                    resultValue(
+                        tr("Critical speed (CS)", "Kritisk hastighet (CS)"),
+                        ATHLTHThreeMinuteAllOut.paceText(
+                            secondsPerKilometer: result.criticalPaceSecondsPerKilometer
+                        ) + " min/km"
+                    )
+                    resultValue(
+                        tr("D′", "D′"),
+                        String(format: "%.0f m", result.distanceAboveCriticalSpeedMeters)
+                    )
                 }
-                if let result = calculated {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(String(format: tr(
-                            "Estimated CS: %.2f m/s · %.1f km/h · %@ min/km",
-                            "Estimert CS: %.2f m/s · %.1f km/t · %@ min/km"
-                        ), result.criticalSpeedMetersPerSecond,
-                            result.criticalSpeedKilometersPerHour,
-                            ATHLTHThreeMinuteAllOut.paceText(
-                                secondsPerKilometer: result.criticalPaceSecondsPerKilometer
-                            )))
-                        Text(String(format: tr("Estimated D′: %.0f m",
-                                               "Estimert D′: %.0f m"),
-                                    result.distanceAboveCriticalSpeedMeters))
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .accessibilityIdentifier("athlth-3mt-calculated-result")
-                } else if !totalMeters.isEmpty || !lastThirtyMeters.isEmpty {
-                    Text(tr(
-                        "Enter valid, measured distances. D′ must be positive; if not, check the test or measurements.",
-                        "Oppgi gyldige, faktisk målte distanser. D′ må være positiv; ellers bør testen eller målingene kontrolleres."
-                    ))
+                Text(String(format: "%.0f m", result.totalDistanceMeters) + " · " +
+                     String(format: "%.0f m", result.finalThirtySecondsMeters) + " " +
+                     tr("in the last 30 seconds", "de siste 30 sekundene"))
                     .font(.caption)
-                }
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
+                Button(tr("Edit measurements", "Endre målinger")) {
+                    editing = true
+                }
+                .font(.subheadline.weight(.medium))
+            } else {
                 Text(tr(
-                    "CS and D′ are estimates, not a directly measured lactate threshold. This calculator does not save results or infer them from planned pace.",
-                    "CS og D′ er estimater, ikke en direkte målt laktatterskel. Beregningen lagres ikke og henter aldri tall fra planlagt tempo."
+                    "Enter measured distance from the 180-second test effort, not the full workout. The last 30 seconds must be measured separately.",
+                    "Legg inn målt distanse fra testdraget på 180 sekunder, ikke hele treningsøkten. De siste 30 sekundene må måles separat."
                 ))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                HStack(spacing: 12) {
+                    measurementInput(tr("Total test (m)", "Testdrag (m)"),
+                                     value: $totalMeters,
+                                     id: "athlth-3mt-result-total")
+                    measurementInput(tr("Last 30 s (m)", "Siste 30 sek (m)"),
+                                     value: $lastThirtyMeters,
+                                     id: "athlth-3mt-result-last30")
+                }
+                if let result = draftResult {
+                    HStack(alignment: .top, spacing: 14) {
+                        resultValue(
+                            tr("Estimated CS", "Estimert CS"),
+                            ATHLTHThreeMinuteAllOut.paceText(
+                                secondsPerKilometer: result.criticalPaceSecondsPerKilometer
+                            ) + " min/km"
+                        )
+                        resultValue(tr("Estimated D′", "Estimert D′"),
+                                    String(format: "%.0f m",
+                                           result.distanceAboveCriticalSpeedMeters))
+                    }
+                }
+                Button {
+                    guard let result = draftResult,
+                          ATHLTHThreeMinuteAllOutMeasurementStore.save(
+                            workoutID: workoutID,
+                            userID: userID,
+                            totalMeters: result.totalDistanceMeters,
+                            finalThirtyMeters: result.finalThirtySecondsMeters
+                          ) else { return }
+                    savedMeasurement = ATHLTHThreeMinuteAllOutMeasurementStore.load(
+                        workoutID: workoutID, userID: userID
+                    )
+                    editing = false
+                } label: {
+                    Label(tr("Save 3MT measurements", "Lagre 3MT-målinger"),
+                          systemImage: "checkmark")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(draftResult == nil)
             }
+
+            Text(tr(
+                "CS and D′ are physiological estimates from recorded distances. They are private to this result and do not change the recorded Apple Health workout.",
+                "CS og D′ er fysiologiske estimater basert på målte distanser. De er private for dette resultatet og endrer ikke den registrerte økten i Apple Helse."
+            ))
             .font(.caption)
-            .foregroundStyle(ATHLTHPlanDesign.ink)
-            .padding(.top, 10)
-        } label: {
-            Label(
-                tr("3MT protocol and results", "3MT · protokoll og resultat"),
-                systemImage: "stopwatch"
-            )
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
-        .padding(12)
-        .background(
-            ATHLTHPlanDesign.selectedSurface,
-            in: RoundedRectangle(cornerRadius: 14)
-        )
-        .accessibilityIdentifier("athlth-three-minute-all-out-guide")
+        .padding(16)
+        .background(.white, in: RoundedRectangle(cornerRadius: 19))
+        .accessibilityIdentifier("athlth-3mt-measurements-and-summary")
+        .task(id: workoutID) {
+            let previous = ATHLTHThreeMinuteAllOutMeasurementStore.load(
+                workoutID: workoutID, userID: userID
+            )
+            savedMeasurement = previous
+            totalMeters = previous.map { String(format: "%.1f", $0.totalMeters) } ?? ""
+            lastThirtyMeters = previous.map {
+                String(format: "%.1f", $0.finalThirtyMeters)
+            } ?? ""
+            editing = previous == nil
+        }
+    }
+
+    private func resultValue(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func measurementInput(
+        _ title: String,
+        value: Binding<String>,
+        id: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.caption)
+            TextField("–", text: value)
+                .keyboardType(.decimalPad)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier(id)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
