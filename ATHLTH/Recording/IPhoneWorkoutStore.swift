@@ -836,7 +836,7 @@ final class IPhoneWorkoutStore:
             structuredWorkoutComplete:
                 structuredWorkout?.steps.isEmpty ?? true,
             audioCoachConfiguration:
-                audioCoach,
+                audioCoach?.deliveryConfiguration,
             routeAlertConfiguration:
                 routeAlerts,
             ghostAudioConfiguration:
@@ -1007,7 +1007,7 @@ final class IPhoneWorkoutStore:
         let wasEnabled =
             workout.audioCoachConfiguration?.enabled == true
         let now = Date()
-        workout.audioCoachConfiguration = configuration
+        workout.audioCoachConfiguration = configuration.deliveryConfiguration
         workout.lastCheckpoint = now
         active = workout
 
