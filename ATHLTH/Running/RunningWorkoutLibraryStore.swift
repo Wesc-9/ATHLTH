@@ -197,6 +197,15 @@ final class RunningWorkoutLibraryStore: ObservableObject {
     func save(_ template: RunningWorkoutTemplate) -> Bool {
         guard accountID != nil else { return false }
         var copy = template
+        let isNewCopy = !customTemplates.contains(where: { $0.id == copy.id })
+        // Even manually constructed variants cannot impersonate the immutable
+        // title of a built-in workout.
+        if isNewCopy && Self.builtInTemplates.contains(where: {
+            ATHLTHRunningWorkoutCopyPolicy.normalizedName($0.title) ==
+                ATHLTHRunningWorkoutCopyPolicy.normalizedName(copy.title)
+        }) {
+            return false
+        }
         if let sourceID = copy.sharedSourceWorkoutID,
            let source = Self.builtInTemplates.first(where: { $0.id == sourceID }) ??
                 customTemplates.first(where: { $0.id == sourceID }),
