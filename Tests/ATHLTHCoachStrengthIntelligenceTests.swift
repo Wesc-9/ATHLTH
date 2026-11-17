@@ -95,6 +95,31 @@ final class ATHLTHCoachStrengthIntelligenceTests: XCTestCase {
         XCTAssertEqual(snapshot.exerciseSignals[0].recommendation, "hold_and_collect_evidence")
     }
 
+    func testDifferentEquipmentDoesNotGenerateCrossExerciseIncrease() {
+        let barbell = workout(daysAgo: 3)
+        var dumbbell = workout(daysAgo: 10)
+        dumbbell.exercises[0].exercise.equipment = ["dumbbell"]
+        let snapshot = ATHLTHCoachStrengthIntelligence.snapshot(
+            from: [barbell, dumbbell], now: now
+        )
+        XCTAssertEqual(snapshot.exerciseSignals.count, 2)
+        XCTAssertFalse(snapshot.exerciseSignals.contains {
+            $0.recommendation == "review_small_increase"
+        })
+    }
+
+    func testMostRecentNearFailureVetoesStrengthIncrease() {
+        var newest = workout(daysAgo: 3)
+        for index in newest.exercises[0].sets.indices {
+            newest.exercises[0].sets[index].rir = 0
+        }
+        let snapshot = ATHLTHCoachStrengthIntelligence.snapshot(
+            from: [newest, workout(daysAgo: 10)], now: now
+        )
+        XCTAssertEqual(snapshot.exerciseSignals.first?.recommendation,
+                       "hold_and_collect_evidence")
+    }
+
     func testOldAndUnfinishedSessionsDoNotBecomeEvidence() {
         var unfinished = workout(daysAgo: 3)
         unfinished.endedAt = nil
