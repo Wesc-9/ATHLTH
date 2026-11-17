@@ -1800,6 +1800,23 @@ struct WorkoutTemplateLibraryView: View {
                         .accessibilityAddTraits(
                             favoritesOnly ? [.isSelected] : []
                         )
+                        .accessibilityIdentifier("athlth-workout-filter-favorites")
+                        Button {
+                            mineOnly.toggle()
+                        } label: {
+                            filterChip(
+                                ATHLTHLocalization.choose(
+                                    english: "Mine", norwegian: "Mine"
+                                ),
+                                systemImage: "person.crop.circle",
+                                selected: mineOnly
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            mineOnly ? [.isSelected] : []
+                        )
+                        .accessibilityIdentifier("athlth-workout-filter-mine")
                     }
                     Spacer(minLength: 4)
                     ATHLTHLibraryDisplayPicker(
@@ -1827,6 +1844,24 @@ struct WorkoutTemplateLibraryView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-workout-filter-favorites")
+
+                        Button {
+                            mineOnly.toggle()
+                        } label: {
+                            filterChip(
+                                ATHLTHLocalization.choose(
+                                    english: "Mine", norwegian: "Mine"
+                                ),
+                                systemImage: "person.crop.circle",
+                                selected: mineOnly
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            mineOnly ? [.isSelected] : []
+                        )
+                        .accessibilityIdentifier("athlth-workout-filter-mine")
 
                         if initialCategory == .strength {
                             // One compact, horizontally scrolling tab row beside
@@ -2141,7 +2176,7 @@ struct WorkoutTemplateLibraryView: View {
                                 )
                             )
                         )
-                        if hasDiscoveryFilters {
+                        if hasDiscoveryFilters || favoritesOnly || mineOnly {
                             Button(ATHLTHLocalization.choose(
                                 english: "Clear filters", norwegian: "Nullstill filtre"
                             )) {
@@ -2152,6 +2187,8 @@ struct WorkoutTemplateLibraryView: View {
                                 selectedWorkoutLevel = "all"
                                 selectedExerciseName = nil
                                 selectedDiscoverySort = .alphabetical
+                                favoritesOnly = false
+                                mineOnly = false
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(ATHLTHTheme.accentDeep)
