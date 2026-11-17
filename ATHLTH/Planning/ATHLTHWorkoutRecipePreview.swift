@@ -356,15 +356,62 @@ struct ATHLTHWorkoutRecipePreview: View {
         .sheet(item: $inspectedCardioStep) { item in
             NavigationStack {
                 ScrollView {
-                    ATHLTHWorkoutStepDetails(
-                        block: ATHLTHZonedLocalization
-                            .normalizeLegacyAllOutStep(item.block),
-                        displayTitle: localizedTitle(item.block, compact: false),
-                        maximumHeartRateBPM: maximumHeartRateBPM,
-                        suggestion: ATHLTHWorkoutStepCopy.suggestedZone(
-                            for: item.block, workoutTitle: title
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 8) {
+                            Label(tr("Workout timeline", "Øktens tidslinje"),
+                                  systemImage: "list.number")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(recipeTint)
+                            Spacer(minLength: 6)
+                            Text("\(item.index + 1) / \(normalizedBlocks.count)")
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+
+                        ATHLTHWorkoutStepDetails(
+                            block: ATHLTHZonedLocalization
+                                .normalizeLegacyAllOutStep(item.block),
+                            displayTitle: localizedTitle(item.block, compact: false),
+                            maximumHeartRateBPM: maximumHeartRateBPM,
+                            suggestion: ATHLTHWorkoutStepCopy.suggestedZone(
+                                for: item.block, workoutTitle: title
+                            )
                         )
-                    )
+
+                        // Show the real next step, including a recovery after
+                        // an effort. Never synthesize pace or HR targets.
+                        if normalizedBlocks.indices.contains(item.index + 1) {
+                            let next = normalizedBlocks[item.index + 1]
+                            VStack(alignment: .leading, spacing: 9) {
+                                Label(tr("Up next", "Neste øktdel"),
+                                      systemImage: "arrow.right")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(recipeTint)
+                                Text(localizedTitle(next, compact: true))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                let facts = ATHLTHPlanWorkoutCardPresentation.facts(
+                                    for: next, workoutTitle: title
+                                )
+                                if !facts.isEmpty {
+                                    Text(facts.joined(separator: " · "))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(15)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 17))
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 25)
+                        }
+                    }
+                    .frame(maxWidth: 620)
+                    .frame(maxWidth: .infinity)
                 }
                 .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
                 .navigationTitle(tr("Step details", "Detaljer for øktdel"))
@@ -632,65 +679,106 @@ struct ATHLTHWorkoutRecipePreview: View {
     private func recipeStepCard(_ block: WorkoutTemplateBlock, index: Int) -> some View {
         let expanded = expandedStepIndices.contains(index)
         return VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    if expanded {
-                        expandedStepIndices.remove(index)
+            HStack(spacing: 4) {
+                Button {
+                    if block.kind == .exercise {
+                        // Exercise cards retain their inline details and library link.
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            if expanded {
+                                expandedStepIndices.remove(index)
+                            } else {
+                                expandedStepIndices.insert(index)
+                            }
+                        }
                     } else {
-                        expandedStepIndices.insert(index)
+                        // Like the training-plan timeline, tap the whole effort
+                        // or recovery row to inspect its canonical prescription.
+                        inspectedCardioStep = IndexedWorkoutStep(
+                            index: index,
+                            block: ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+                        )
                     }
-                }
-            } label: {
-                HStack(alignment: .center, spacing: 11) {
-                    thumbnail(for: block)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(localizedTitle(block, compact: true))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let target = block.targetText, !target.isEmpty {
-                            Text(target)
+                } label: {
+                    HStack(alignment: .center, spacing: 11) {
+                        thumbnail(for: block)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(localizedTitle(block, compact: true))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                            let facts = ATHLTHPlanWorkoutCardPresentation.facts(
+                                for: block, workoutTitle: title
+                            )
+                            if !facts.isEmpty {
+                                Text(facts.joined(separator: " · "))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(expanded ? nil : 2)
+                            } else {
+                                Text(
+                                    (block.kind == .run || block.kind == .rest) &&
+                                    block.durationSeconds == nil &&
+                                    block.distanceMeters == nil
+                                        ? tr("Open-ended · continue manually",
+                                             "Åpen øktdel · fortsett manuelt")
+                                        : tr("Tap for step details", "Trykk for øktdetaljer")
+                                )
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(expanded ? nil : 2)
+                            }
                             if let pulse = ATHLTHPlannedHeartRatePreview.rangeText(
                                 for: block, maximumBPM: maximumHeartRateBPM
                             ) {
                                 Text(pulse)
                                     .font(.caption2.weight(.medium))
                                     .foregroundStyle(recipeTint)
-                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                        } else {
-                            Text(
-                                (block.kind == .run || block.kind == .rest) &&
-                                block.durationSeconds == nil &&
-                                block.distanceMeters == nil
-                                    ? tr("Open-ended · continue manually",
-                                         "Åpen øktdel · fortsett manuelt")
-                                    : tr("Open to see workout instructions",
-                                         "Åpne for å se øktdetaljer")
-                            )
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
+                        Spacer(minLength: 0)
+                        Image(systemName: block.kind == .exercise
+                              ? (expanded ? "chevron.up" : "chevron.down")
+                              : "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(recipeTint)
                     }
-                    Spacer(minLength: 0)
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(recipeTint)
+                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .accessibilityLabel(localizedTitle(block, compact: true))
+                .accessibilityHint(block.kind == .exercise
+                    ? tr("Double tap to expand exercise details",
+                         "Dobbelttrykk for å utvide øvelsesdetaljer")
+                    : tr("Double tap to open all step targets",
+                         "Dobbelttrykk for å se alle mål for øktdelen"))
+                .accessibilityIdentifier("athlth-recipe-step-details-\(index)")
+
+                if block.kind != .exercise {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            if expanded {
+                                expandedStepIndices.remove(index)
+                            } else {
+                                expandedStepIndices.insert(index)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(recipeTint)
+                            .frame(width: 38, height: 48)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr(
+                        expanded ? "Collapse step preview" : "Expand step preview",
+                        expanded ? "Lukk forhåndsvisning" : "Utvid forhåndsvisning"
+                    ))
+                    .accessibilityIdentifier("athlth-recipe-step-expand-\(index)")
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(localizedTitle(block, compact: true))
-            .accessibilityValue(tr(expanded ? "Expanded" : "Collapsed",
-                                   expanded ? "Utvidet" : "Lukket"))
-            .accessibilityHint(tr("Double tap to show targets and recovery",
-                                  "Dobbelttrykk for å vise mål og pauser"))
 
             if expanded {
                 Divider()
