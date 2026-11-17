@@ -272,9 +272,7 @@ final class ATHLTHTrainProgressionCoachTests: XCTestCase {
         let second = plan.weeks[1].days[0].sessions[0].id
         let earlier = logged(first, offset: 0)
         var latest = logged(second, offset: 1)
-        var duplicate = latest.exercises[0]
-        duplicate.id = UUID()
-        latest.exercises.append(duplicate)
+        latest.exercises.append(latest.exercises[0])
         let result = ATHLTHTrainProgressionCoach.suggestions(
             plan: plan,
             strengthHistory: [earlier, latest],
