@@ -96,4 +96,64 @@ final class ATHLTHThreeMinuteAllOutTests: XCTestCase {
         XCTAssertTrue(test.notes?.contains("2:30 og 3:00") == true)
         XCTAssertNil(test.targetPaceSecondsPerKilometer)
     }
+
+    func testOnlyThreeMinuteAllOutAssessmentHasSpecialProtocolAndResults() {
+        XCTAssertTrue(ATHLTHThreeMinuteAllOut.isTestTitle("3-Minute All-Out Test"))
+        XCTAssertTrue(ATHLTHThreeMinuteAllOut.isTestTitle("3 min maksimaltest"))
+        XCTAssertTrue(ATHLTHThreeMinuteAllOut.isTestTitle("3MT"))
+        XCTAssertFalse(ATHLTHThreeMinuteAllOut.isTestTitle("3-Minute All-Out Test Demo"))
+        XCTAssertFalse(ATHLTHThreeMinuteAllOut.isTestTitle("4×4-intervaller"))
+        XCTAssertFalse(ATHLTHThreeMinuteAllOut.isTestTitle("Half-Cooper VO2-test"))
+        XCTAssertFalse(ATHLTHThreeMinuteAllOut.isTestTitle("6 min testløp"))
+        XCTAssertFalse(ATHLTHThreeMinuteAllOut.isTestTitle("Maksimaltest 5 km"))
+        XCTAssertFalse(ATHLTHThreeMinuteAllOut.isTestTitle("Løping"))
+    }
+
+    func test3MTManualResultIsIsolatedByWorkoutAndUser() throws {
+        let account = UUID()
+        let secondAccount = UUID()
+        let testID = UUID()
+        let anotherWorkout = UUID()
+
+        XCTAssertNil(ATHLTHThreeMinuteAllOutMeasurementStore.load(
+            workoutID: testID, userID: account
+        ))
+        XCTAssertFalse(ATHLTHThreeMinuteAllOutMeasurementStore.save(
+            workoutID: testID, userID: account,
+            totalMeters: 600, finalThirtyMeters: 110
+        )) // Implausible non-positive D′: no saved calculation.
+        XCTAssertNil(ATHLTHThreeMinuteAllOutMeasurementStore.load(
+            workoutID: testID, userID: account
+        ))
+
+        XCTAssertTrue(ATHLTHThreeMinuteAllOutMeasurementStore.save(
+            workoutID: testID, userID: account,
+            totalMeters: 900, finalThirtyMeters: 120
+        ))
+        let measurement = try XCTUnwrap(
+            ATHLTHThreeMinuteAllOutMeasurementStore.load(
+                workoutID: testID, userID: account
+            )
+        )
+        XCTAssertEqual(measurement.totalMeters, 900)
+        XCTAssertEqual(measurement.finalThirtyMeters, 120)
+        XCTAssertNotNil(measurement.updatedAt)
+
+        XCTAssertNil(ATHLTHThreeMinuteAllOutMeasurementStore.load(
+            workoutID: anotherWorkout, userID: account
+        ))
+        XCTAssertNil(ATHLTHThreeMinuteAllOutMeasurementStore.load(
+            workoutID: testID, userID: secondAccount
+        ))
+        XCTAssertTrue(ATHLTHThreeMinuteAllOutMeasurementStore.save(
+            workoutID: testID, userID: account,
+            totalMeters: 1_000, finalThirtyMeters: 125
+        ))
+        XCTAssertEqual(
+            ATHLTHThreeMinuteAllOutMeasurementStore.load(
+                workoutID: testID, userID: account
+            )?.totalMeters, 1_000
+        )
+    }
+
 }
