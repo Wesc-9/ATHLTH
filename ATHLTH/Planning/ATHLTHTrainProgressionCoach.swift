@@ -227,7 +227,9 @@ enum ATHLTHTrainProgressionCoach {
         ).repetitions
     }
 
-    private static func progressionReviews(
+    /// Shared evidence scan for repetition and volume suggestions.
+    /// Allows a single evaluation per Coach screen render.
+    static func progressionReviews(
         plan: TrainingPlan,
         strengthHistory: [StrengthWorkoutLog],
         completedSessionIDs: Set<UUID>,
