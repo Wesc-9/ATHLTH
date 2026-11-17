@@ -165,6 +165,93 @@ final class ATHLTHTrainingProfileAndExerciseProgressTests: XCTestCase {
         XCTAssertTrue(loaded.hasMeaningfulLoad)
     }
 
+    func testProgressChartFollowsCanonicalExerciseAcrossRenames() {
+        let libraryID = UUID()
+        var reference = ExerciseSnapshot(
+            name: "Bench Press", instructions: [],
+            primaryMuscles: ["chest"], secondaryMuscles: [],
+            equipment: ["barbell"], imageURL: nil
+        )
+        reference.libraryExerciseID = libraryID
+        var logged = strengthSession(weight: 60, days: 2)
+        logged.exercises[0].exercise.libraryExerciseID = libraryID
+        logged.exercises[0].exercise.name = "Barbell Bench Press"
+
+        let summary = ATHLTHExerciseProgress.summary(
+            exerciseID: libraryID, name: "Bench Press", isCustom: true,
+            workouts: [logged], reference: reference
+        )
+        XCTAssertEqual(summary.uses, 1)
+        XCTAssertEqual(summary.bestWeight, 60)
+    }
+
+    func testProgressChartDoesNotMixLibraryExercisesSharingSameName() {
+        let libraryID = UUID()
+        var reference = ExerciseSnapshot(
+            name: "Bench Press", instructions: [],
+            primaryMuscles: ["chest"], secondaryMuscles: [],
+            equipment: ["barbell"], imageURL: nil
+        )
+        reference.libraryExerciseID = libraryID
+        var other = strengthSession(weight: 90, days: 4)
+        other.exercises[0].exercise.libraryExerciseID = UUID()
+        let summary = ATHLTHExerciseProgress.summary(
+            exerciseID: libraryID, name: "Bench Press", isCustom: false,
+            workouts: [other], reference: reference
+        )
+        XCTAssertEqual(summary.uses, 0)
+        XCTAssertNil(summary.bestWeight)
+    }
+
+    func testProgressChartRejectsLegacyApparatusOrLoadBasisMismatch() {
+        let libraryID = UUID()
+        var reference = ExerciseSnapshot(
+            name: "Bench Press", instructions: [],
+            primaryMuscles: ["chest"], secondaryMuscles: [],
+            equipment: ["barbell"], imageURL: nil
+        )
+        reference.libraryExerciseID = libraryID
+        reference.coachLoadBasis = .totalKilograms
+        let legacy = strengthSession(weight: 50, days: 1)
+        var wrongEquipment = strengthSession(weight: 95, days: 2)
+        wrongEquipment.exercises[0].exercise.equipment = ["dumbbells"]
+        var wrongBasis = strengthSession(weight: 110, days: 3)
+        wrongBasis.exercises[0].exercise.coachLoadBasis = .kilogramsPerHand
+
+        let summary = ATHLTHExerciseProgress.summary(
+            exerciseID: libraryID, name: "Bench Press", isCustom: false,
+            workouts: [legacy, wrongEquipment, wrongBasis],
+            reference: reference
+        )
+        XCTAssertEqual(summary.uses, 0)
+
+        var compatible = legacy
+        compatible.exercises[0].exercise.coachLoadBasis = .totalKilograms
+        let matching = ATHLTHExerciseProgress.summary(
+            exerciseID: libraryID, name: "Bench Press", isCustom: false,
+            workouts: [compatible], reference: reference
+        )
+        XCTAssertEqual(matching.uses, 1)
+        XCTAssertEqual(matching.bestWeight, 50)
+    }
+
+    func testProgressChartKeepsLegacyMatchingWhenBasisUnknownBothSides() {
+        let exerciseID = UUID()
+        var reference = ExerciseSnapshot(
+            name: "Bench Press", instructions: [],
+            primaryMuscles: ["chest"], secondaryMuscles: [],
+            equipment: ["barbell"], imageURL: nil
+        )
+        reference.libraryExerciseID = exerciseID
+        let summary = ATHLTHExerciseProgress.summary(
+            exerciseID: exerciseID, name: "Bench Press", isCustom: false,
+            workouts: [strengthSession(weight: 55, days: 1)],
+            reference: reference
+        )
+        XCTAssertEqual(summary.uses, 1)
+        XCTAssertEqual(summary.bestWeight, 55)
+    }
+
     func testCustomExerciseDoesNotInheritOtherExercisesHistoryByName() {
         let summary = ATHLTHExerciseProgress.summary(
             exerciseID: UUID(), name: "Bench Press", isCustom: true,
