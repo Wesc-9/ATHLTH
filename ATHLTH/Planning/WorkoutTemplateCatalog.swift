@@ -2079,7 +2079,7 @@ struct WorkoutTemplateLibraryView: View {
                     ))
                     .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
-                    ForEach(visibleScheduledWorkouts.prefix(50)) { workout in
+                    ForEach(visibleScheduledWorkouts) { workout in
                         VStack(alignment: .leading, spacing: 0) {
                         if initialCategory != nil && displayMode == .list {
                             ATHLTHWorkoutLibraryExpandableCard(
