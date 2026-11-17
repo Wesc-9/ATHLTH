@@ -66,7 +66,8 @@ enum ATHLTHAssessmentMethod: String, Codable, Hashable, CaseIterable, Identifiab
     }
 
     static func available(for block: WorkoutTemplateBlock) -> [Self] {
-        guard block.resolvedPhase == .main else { return [] }
+        guard block.resolvedPhase == .main,
+              !block.isRestOrActiveRecovery else { return [] }
         if block.kind == .exercise { return [.estimatedOneRepMax] }
         if block.kind == .run, block.cardioActivity != .walking {
             return availableRunning
@@ -312,7 +313,10 @@ struct ATHLTHAssessmentScope: Codable, Hashable {
                 )
             }
             guard selected.count == 1,
-                  blocks[selected[0]].kind == .run else {
+                  blocks[selected[0]].kind == .run,
+                  blocks[selected[0]].resolvedPhase == .main,
+                  !blocks[selected[0]].isRestOrActiveRecovery,
+                  (blocks[selected[0]].groupRounds ?? 1) <= 1 else {
                 return .invalid(
                     "Testløp krever én sammenhengende løpedel. " +
                     "Bruk en generell tempomåling for flere deløkter."
@@ -332,6 +336,16 @@ struct ATHLTHAssessmentScope: Codable, Hashable {
                 "(maksimalt 10) for et 1RM-estimat."
             )
         case .conconiStep, .lactateStep:
+            guard selected.contains(where: {
+                blocks[$0].kind == .run &&
+                blocks[$0].resolvedPhase == .main &&
+                !blocks[$0].isRestOrActiveRecovery
+            }) else {
+                return .invalid(
+                    "Velg minst ett faktisk testtrinn i hoveddelen. " +
+                    "Kun pauser, oppvarming eller nedtrapping er ikke gyldig."
+                )
+            }
             return .needsMeasurements(
                 "Denne testen krever egne målte verdier for hvert trinn. " +
                 "Ingen terskel beregnes fra en planlagt økt alene."
@@ -476,6 +490,18 @@ struct ATHLTHAssessmentScopeEditor: View {
                     set: { included in
                         var changed = scope
                         changed.includePauses = included
+                        if !included {
+                            let pausedIDs = Set(blocks.compactMap { block -> UUID? in
+                                guard block.isRestOrActiveRecovery ||
+                                      block.resolvedPhase == .recovery else {
+                                    return nil
+                                }
+                                return block.measurementStepID
+                            })
+                            changed.selectedStepIDs.removeAll {
+                                pausedIDs.contains($0)
+                            }
+                        }
                         setScope(changed)
                     }
                 ))
