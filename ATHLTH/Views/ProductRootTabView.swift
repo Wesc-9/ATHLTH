@@ -5943,6 +5943,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
 
     @State private var selectedSection: ATHLTHTrainSection = .today
     @SceneStorage("athlth.train.selectedSection") private var persistedTrainSection = "today"
@@ -5968,6 +5969,11 @@ struct ATHLTHTrainView: View {
     @State private var selectedStrengthSession: PlannedSession?
     @State private var selectedPlanWorkout: PlannedWorkoutSelection?
     @State private var selectedSuggestedWorkout: WorkoutTemplateCatalogEntry?
+    // Recommendation snapshots are updated on source changes, never during
+    // scrolling. The detail sheet keeps the exact advice the athlete tapped.
+    @State private var trainDailyRecommendationInfo: HomeDailyRecommendationInfo?
+    @State private var selectedTrainDailyRecommendationInfo: HomeDailyRecommendationInfo?
+    @State private var trainRecommendationRefreshTask: Task<Void, Never>?
     // Reuse the immutable published catalog and search cache already shared
     // with other workout-library entry points. Avoid rebuilding all bundled
     // recipes or fetching the same remote data on the first Train tab tap.
@@ -6130,6 +6136,12 @@ struct ATHLTHTrainView: View {
                 NavigationStack {
                     WorkoutTemplateDetailView(entry: entry)
                 }
+            }
+            .sheet(item: $selectedTrainDailyRecommendationInfo) { info in
+                HomeDailyRecommendationInfoSheet(info: info)
+                    .presentationDetents([.fraction(0.82), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
             }
             .athlthStudioEditor(item: $selectedPlanWorkout, useFullScreen: studioFullscreenEditing) { selection in
                 PlannedWorkoutDetailView(
@@ -6553,7 +6565,9 @@ struct ATHLTHTrainView: View {
             }
             .onChange(of: selectedSection) { _, section in
                 switch section {
-                case .today: persistedTrainSection = "today"
+                case .today:
+                    persistedTrainSection = "today"
+                    scheduleTrainDailyRecommendationRefresh()
                 case .plan: persistedTrainSection = "plan"
                 case .progress: persistedTrainSection = "progress"
                 }
@@ -6604,14 +6618,20 @@ struct ATHLTHTrainView: View {
                         phoneWorkout.history, healthWorkouts: health.workouts
                     )
                 }
+                scheduleTrainDailyRecommendationRefresh()
             }
             // HealthKit and phone history can publish in bursts. Coalesce
             // them rather than reconciling plans repeatedly in one frame.
             .onReceive(phoneWorkout.$history) { _ in
                 scheduleTrainHistoryReconciliation()
+                scheduleTrainDailyRecommendationRefresh()
             }
             .onReceive(health.$workouts) { _ in
                 scheduleTrainHistoryReconciliation()
+                scheduleTrainDailyRecommendationRefresh()
+            }
+            .onReceive(strengthWorkout.$workoutHistory) { _ in
+                scheduleTrainDailyRecommendationRefresh()
             }
             .onChange(
                 of: navigationRequest?.id
@@ -6749,6 +6769,115 @@ struct ATHLTHTrainView: View {
         ) else { return }
         displayedTrainDay = today
         session.refreshActivePlanForToday()
+    }
+
+    /// Coalesce Health/phone/strength bursts outside the Train tab animation.
+    /// The recommendation never runs from an on-scroll view computation.
+    private func scheduleTrainDailyRecommendationRefresh() {
+        trainRecommendationRefreshTask?.cancel()
+        guard isActive, selectedSection == .today else { return }
+        let account = session.profile.userID
+        trainRecommendationRefreshTask = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(450)) }
+            catch { return }
+            guard !Task.isCancelled, isActive,
+                  selectedSection == .today,
+                  session.profile.userID == account else { return }
+
+            let history = HomeTrainingPatternAdvisor.snapshot(
+                workouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory,
+                phoneHistory: phoneWorkout.history,
+                dogs: pets.pets.filter { $0.userID == account }
+            )
+            guard history.supportsPersonalization else {
+                trainDailyRecommendationInfo = nil
+                return
+            }
+            let readiness: HomeDailyRecommendationPolicy.Readiness
+            if health.recovery.score == nil {
+                readiness = .unavailable
+            } else {
+                switch health.recovery.state {
+                case .ready: readiness = .ready
+                case .balanced: readiness = .balanced
+                case .takeItEasy: readiness = .takeItEasy
+                case .recover: readiness = .recover
+                case .buildingBaseline: readiness = .unavailable
+                }
+            }
+            let ratio: Double?
+            if health.hasRequestedAuthorization {
+                ratio = await health.recoveryTrendSnapshot(days: 14)
+                    .trainingLoad.ratio
+            } else {
+                ratio = nil
+            }
+            guard !Task.isCancelled, isActive,
+                  selectedSection == .today,
+                  session.profile.userID == account else { return }
+
+            let recorded = ATHLTHStudioRecordedWorkouts.merged(
+                health: health.workouts,
+                localStrength: strengthWorkout.workoutHistory
+            )
+            let advice = HomeDailyRecommendationPolicy.recommendation(
+                readiness: readiness,
+                hasWorkoutToday: false,
+                trainingLoadRatio: ratio,
+                trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
+                    workouts: recorded
+                ),
+                personalizedHistory: history
+            )
+            trainDailyRecommendationInfo = HomeDailyRecommendationInfo(
+                advice: advice, history: history,
+                readiness: readiness, trainingLoadRatio: ratio
+            )
+        }
+    }
+
+    /// Recommendation sessions remain independent: they must never write to
+    /// today's plan or replace an active workout. Structured blocks are kept.
+    private func openTrainDailyRecommendedWorkout(
+        _ advice: HomeDailyRecommendationPolicy.Advice
+    ) {
+        guard !hasOngoingTrainWorkout,
+              HomeTodayCalendarSchedule.workouts(
+                  plan: session.activePlan,
+                  standalone: session.standalonePlannedSessions
+              ).isEmpty,
+              !TrainTodayOverviewPolicy.hasRecordedWorkout(
+                  on: Date(),
+                  healthStartDates: health.workouts.map(\.startDate),
+                  strengthEndDates: strengthWorkout.workoutHistory.compactMap(\.endedAt),
+                  phoneCompletedDates: phoneWorkout.history.compactMap(\.end)
+              )
+        else { return }
+
+        guard let workout = HomeDailyRecommendationSessionFactory.make(
+            advice: advice
+        ) else {
+            selectedTrainDailyRecommendationInfo = trainDailyRecommendationInfo
+            return
+        }
+
+        if workout.kind == .strength {
+            selectedStrengthSession = workout
+        } else if workout.isStructuredWorkout {
+            // Never discard recommended interval phases or target RPE.
+            selectedStructuredWorkout = workout
+        } else if workout.kind == .walking {
+            showingWalkQuickStart = true
+        } else if workout.kind == .running {
+            if let template = workout.resolvedRunningWorkouts.first {
+                pendingRunningTemplate = template
+            } else {
+                showingRunQuickStart = true
+            }
+        } else {
+            showingLibrary = true
+        }
     }
 
     // Every Train section has exactly one shared navigation row, embedded
@@ -7152,6 +7281,21 @@ struct ATHLTHTrainView: View {
             activeWorkoutCard: hasOngoingTrainWorkout
                 ? AnyView(activeTrainWorkoutCard) : nil,
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,
+            dailyRecommendation:
+                !hasOngoingTrainWorkout &&
+                !hasRecordedWorkoutToday &&
+                HomeTodayCalendarSchedule.workouts(
+                    plan: active,
+                    standalone: session.standalonePlannedSessions,
+                    on: today
+                ).isEmpty
+                    ? trainDailyRecommendationInfo?.advice : nil,
+            onShowDailyRecommendationDetails: {
+                selectedTrainDailyRecommendationInfo = trainDailyRecommendationInfo
+            },
+            onChooseDailyRecommendedWorkout: { advice in
+                openTrainDailyRecommendedWorkout(advice)
+            },
             todaysReadiness: readiness,
             latestHealthWeightKilograms: health.personalDetails.weightKilograms,
             onChooseSuggestedWorkout: { selectedSuggestedWorkout = $0 },
