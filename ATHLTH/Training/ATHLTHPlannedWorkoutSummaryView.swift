@@ -21,6 +21,12 @@ struct ATHLTHPlannedWorkoutSummaryView: View {
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if ATHLTHThreeMinuteAllOut.isRunningTest(
+                title: workout.title,
+                blocks: workout.resolvedWorkoutBlocks
+            ) {
+                ATHLTHThreeMinuteAllOutProtocol()
+            }
             if let place = workout.plannedTrainingPlace {
                 Label(place.name, systemImage: "mappin.and.ellipse")
                     .font(.caption)
