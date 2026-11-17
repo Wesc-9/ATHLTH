@@ -3,16 +3,57 @@ import Foundation
 /// Independent periodic Audio Coach rules. Stored as part of the iPhone
 /// settings and copied unchanged to a Watch workout's configuration.
 struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
+    /// Persisted in the same rules transferred to Watch. Existing raw values
+    /// remain intact; newly configured event rules share the normal cue ledger.
     enum Trigger: String, Codable, CaseIterable, Identifiable {
-        case distance
-        case time
+        case distance, time
+        case heartRateAbove, heartRateBelow, zoneEnter, zoneExit
+        case workoutStart
+        case effortStart, effortEnd, recoveryStart, recoveryEnd
+        case activeRecoveryStart, activeRecoveryEnd
+        case warmupStart, warmupEnd, mainStart, mainEnd
+        case cooldownStart, cooldownEnd
+        case stepStart, beforeNextStep, beforeMain, beforeCooldown
+
         var id: String { rawValue }
-        var title: String {
+        var isPeriodic: Bool { self == .time || self == .distance }
+        var isHeartRateCondition: Bool {
             switch self {
-            case .distance: return ATHLTHLocalization.choose(
-                english: "Distance", norwegian: "Distanse")
-            case .time: return ATHLTHLocalization.choose(
-                english: "Time", norwegian: "Tid")
+            case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit: true
+            default: false
+            }
+        }
+        var needsStructuredStep: Bool {
+            !isPeriodic && !isHeartRateCondition && self != .workoutStart
+        }
+        var title: String {
+            func tr(_ en: String, _ no: String) -> String {
+                ATHLTHLocalization.choose(english: en, norwegian: no)
+            }
+            switch self {
+            case .distance: return tr("Distance", "Distanse")
+            case .time: return tr("Time", "Tid")
+            case .heartRateAbove: return tr("Heart rate above", "Puls over")
+            case .heartRateBelow: return tr("Heart rate below", "Puls under")
+            case .zoneEnter: return tr("Enter HR zone", "Inn i pulssone")
+            case .zoneExit: return tr("Leave HR zone", "Ut av pulssone")
+            case .workoutStart: return tr("Workout starts", "Økten starter")
+            case .effortStart: return tr("Effort starts", "Drag starter")
+            case .effortEnd: return tr("Effort ends", "Drag avsluttes")
+            case .recoveryStart: return tr("Recovery starts", "Pause starter")
+            case .recoveryEnd: return tr("Recovery ends", "Pause avsluttes")
+            case .activeRecoveryStart: return tr("Active recovery starts", "Aktiv pause starter")
+            case .activeRecoveryEnd: return tr("Active recovery ends", "Aktiv pause avsluttes")
+            case .warmupStart: return tr("Warm-up starts", "Oppvarming starter")
+            case .warmupEnd: return tr("Warm-up ends", "Oppvarming avsluttes")
+            case .mainStart: return tr("Main part starts", "Hoveddel starter")
+            case .mainEnd: return tr("Main part ends", "Hoveddel avsluttes")
+            case .cooldownStart: return tr("Cool-down starts", "Nedjogging starter")
+            case .cooldownEnd: return tr("Cool-down ends", "Nedjogging avsluttes")
+            case .stepStart: return tr("Each workout step starts", "Hver deløkt starter")
+            case .beforeNextStep: return tr("Before next step", "Før neste deløkt")
+            case .beforeMain: return tr("Before main part", "Før hoveddelen")
+            case .beforeCooldown: return tr("Before cool-down", "Før nedjogging")
             }
         }
     }
@@ -112,6 +153,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         switch trigger {
         case .distance: return min(max(interval, 100), 42_000)
         case .time: return min(max(interval, 15), 7_200)
+        case .heartRateAbove, .heartRateBelow: return min(max(interval, 40), 220)
+        case .zoneEnter, .zoneExit: return min(max(interval, 1), 5)
+        case .beforeNextStep, .beforeMain, .beforeCooldown:
+            return min(max(interval, 5), 60)
+        default: return 1
         }
     }
 
@@ -523,10 +569,19 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var groupRemainingSeconds: Double?
     var workoutRemainingSeconds: Double?
     var routeRemainingMeters: Double?
+    // Optional computed plan context; older Watch/iPhone snapshots decode with nil.
+    var stepPhase: String?
+    var previousStepPhase: String?
+    var nextStepPhase: String?
+    var isActiveRecovery = false
+    var previousWasActiveRecovery = false
+    var nextIsActiveRecovery = false
+    var stepCount: Int = 0
 
     static func needsSegmentData(_ rules: [ATHLTHAudioCoachRule]) -> Bool {
         rules.contains { rule in
             rule.isEnabled && (rule.beforeEndSeconds != nil ||
+                rule.trigger.needsStructuredStep ||
                 (rule.scope ?? .workout) != .workout ||
                 rule.selectedMetrics.contains { metric in
                     switch metric {
@@ -548,6 +603,17 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         let step = steps[index]
         context.stepName = step.title
         context.stepIndex = index
+        context.stepCount = steps.count
+        context.stepPhase = step.phase
+        context.previousStepPhase = index > 0 ? steps[index - 1].phase : nil
+        context.nextStepPhase = index + 1 < steps.count ? steps[index + 1].phase : nil
+        context.isActiveRecovery = step.phase == "recovery" && step.recoveryStyle == .activeJog
+        context.previousWasActiveRecovery = index > 0 &&
+            steps[index - 1].phase == "recovery" &&
+            steps[index - 1].recoveryStyle == .activeJog
+        context.nextIsActiveRecovery = index + 1 < steps.count &&
+            steps[index + 1].phase == "recovery" &&
+            steps[index + 1].recoveryStyle == .activeJog
         context.isEffort = step.phase == "work"
         context.stepElapsedSeconds = max(0, elapsed)
         context.stepDistanceMeters = max(0, distance)
