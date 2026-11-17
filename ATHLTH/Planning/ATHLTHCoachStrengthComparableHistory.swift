@@ -21,12 +21,14 @@ enum ATHLTHCoachStrengthComparableHistory {
     /// persisted for live logs, use conservative movement/equipment matching.
     private struct Signature: Equatable {
         let libraryExerciseID: UUID?
+        let loadBasis: ATHLTHStrengthLoadBasis?
         let name: String
         let equipment: [String]
         let primaryMuscles: [String]
 
         init(_ snapshot: ExerciseSnapshot) {
             libraryExerciseID = snapshot.libraryExerciseID
+            loadBasis = snapshot.coachLoadBasis
             name = Self.normalized(snapshot.name)
             equipment = Self.normalizedSet(snapshot.equipment)
             primaryMuscles = Self.normalizedSet(snapshot.primaryMuscles)
@@ -45,6 +47,11 @@ enum ATHLTHCoachStrengthComparableHistory {
         func matches(_ other: Signature) -> Bool {
             guard !equipment.isEmpty,
                   equipment == other.equipment else { return false }
+            // A known load basis must match on both sides; one unknown
+            // record cannot be assumed to use the same per-hand/total kg.
+            if loadBasis != nil || other.loadBasis != nil {
+                guard loadBasis == other.loadBasis else { return false }
+            }
             // The canonical library ID is authoritative when present on both
             // sides. Renaming an exercise does not create a different exercise.
             // A single missing ID can never be guessed from name alone.
@@ -85,8 +92,9 @@ enum ATHLTHCoachStrengthComparableHistory {
         let legacyMuscleKey = signature.libraryExerciseID == nil
             ? "|" + signature.primaryMuscles.joined(separator: ",")
             : ""
+        let basisKey = signature.loadBasis.map { "|" + $0.rawValue } ?? ""
         return identity + "|" + signature.equipment.joined(separator: ",") +
-            legacyMuscleKey
+            legacyMuscleKey + basisKey
     }
 
     struct TargetEvidence {
