@@ -5192,24 +5192,29 @@ private struct HomeWeeklyProgressDaySheet: View {
         let metrics = HomeCompletedWorkoutPresentation.metrics(
             for: workout, strengthLog: strengthLog
         )
+        let startedAt = strengthLog?.startedAt ?? workout.startDate
+        let endedAt = strengthLog?.endedAt ?? workout.endDate
+        let finishedAt = HomeCompletedWorkoutPresentation.finishTimeLabel(
+            startDate: startedAt, endDate: endedAt
+        )
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 9) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Start", norwegian: "Start"
-                    ))
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Text(startedAt.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
 
-                    Text((strengthLog?.startedAt ?? workout.startDate).formatted(
-                        date: .omitted, time: .shortened
-                    ))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    if let finishedAt {
+                        Text(finishedAt)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                    }
                 }
-                .frame(width: 49, alignment: .leading)
+                .frame(width: 79, alignment: .leading)
 
                 Image(systemName: workout.activity.icon)
                     .font(.system(size: 17, weight: .semibold))
@@ -5238,14 +5243,14 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                     .lineLimit(1)
 
-                    Text(HomeCompletedWorkoutPresentation.timeAndLocation(
-                        for: workout,
-                        strengthLog: strengthLog
-                    ))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.ink.opacity(0.85))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    if let location = HomeCompletedWorkoutPresentation.locationLabel(
+                        for: workout, strengthLog: strengthLog
+                    ) {
+                        Text(location)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink.opacity(0.85))
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer(minLength: 5)
@@ -5377,16 +5382,25 @@ enum HomeCompletedWorkoutPresentation {
             startDate: startDate, endDate: endDate, norwegian: norwegian
         ) ?? (norwegian ? "Sluttid ukjent" : "Finish time unavailable")
 
-        let location: String?
+        let location = locationLabel(
+            for: workout, strengthLog: strengthLog, norwegian: norwegian
+        )
+        return [finish, location].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    static func locationLabel(
+        for workout: WorkoutSummary,
+        strengthLog: StrengthWorkoutLog? = nil,
+        norwegian: Bool = ATHLTHLocalization.isNorwegian
+    ) -> String? {
         switch strengthLog == nil ? workout.isIndoor : true {
         case .some(true):
-            location = norwegian ? "Inne" : "Indoor"
+            return norwegian ? "Inne" : "Indoor"
         case .some(false):
-            location = norwegian ? "Ute" : "Outdoor"
+            return norwegian ? "Ute" : "Outdoor"
         case .none:
-            location = nil
+            return nil
         }
-        return [finish, location].compactMap { $0 }.joined(separator: " · ")
     }
 
     static func metrics(
