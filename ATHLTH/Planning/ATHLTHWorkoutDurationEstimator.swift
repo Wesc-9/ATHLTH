@@ -43,6 +43,44 @@ enum ATHLTHWorkoutDurationEstimator {
                          defaultActivity: defaultActivity)
     }
 
+    /// Planning range only: time-targeted intervals are fixed, while
+    /// distance-targeted cardio is uncertain even at a chosen goal pace.
+    /// For missing pace, a wider ±25% assumption (capped at ±10 min) is
+    /// shown. Specified pace narrows it to ±8%, never inventing a deadline.
+    static func previewDurationRange(
+        for blocks: [WorkoutTemplateBlock],
+        defaultActivity: WorkoutCardioActivity = .running
+    ) -> ClosedRange<TimeInterval>? {
+        guard let expected = previewSeconds(
+            for: blocks, defaultActivity: defaultActivity
+        ) else { return nil }
+        let steps = blocks.expandedForExecution()
+        guard !steps.isEmpty, steps.count <= 1_000 else { return nil }
+        var variation = 0.0
+        for step in steps where step.kind == .run && step.durationSeconds == nil {
+            guard let meters = step.distanceMeters,
+                  meters.isFinite, meters > 0 else { return nil }
+            let pace: Double
+            let uncertainty: Double
+            if let target = step.targetPaceSecondsPerKilometer {
+                guard target.isFinite, target > 0 else { return nil }
+                pace = target
+                uncertainty = 0.08
+            } else {
+                pace = ATHLTHPlannedWorkoutMetrics.fallbackPaceSecondsPerKilometer(
+                    for: step, defaultActivity: defaultActivity
+                )
+                uncertainty = 0.25
+            }
+            variation += meters / 1_000 * pace * uncertainty
+        }
+        guard variation > 0 else { return nil }
+        // Don't widen fixed-time warm-up, recovery or intervals just
+        // because a separate, distance-based part is uncertain.
+        let margin = min(variation, 10 * 60)
+        return max(0, expected - margin)...(expected + margin)
+    }
+
     /// Compact precise duration used in the workout builder and review.
     /// Display never rounds an interval up to a fictitious five-minute target.
     static func conciseDuration(_ seconds: TimeInterval) -> String {
@@ -117,8 +155,9 @@ enum ATHLTHWorkoutDurationEstimator {
                           meters.isFinite, meters > 0 {
                     let pace = block.targetPaceSecondsPerKilometer ??
                         (fallbackPace
-                            ? (block.cardioActivity ?? defaultActivity) == .walking
-                                ? 720.0 : 360.0
+                            ? ATHLTHPlannedWorkoutMetrics.fallbackPaceSecondsPerKilometer(
+                                for: block, defaultActivity: defaultActivity
+                            )
                             : nil)
                     guard let pace, pace.isFinite, pace > 0 else {
                         return nil
