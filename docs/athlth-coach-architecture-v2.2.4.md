@@ -1,6 +1,6 @@
 # ATHLTH Coach – samlet progresjons- og treningsintelligens
 
-**Utgangspunkt:** iOS-/Watch-release `release/v2.2.4`.  
+**Arbeidsgren:** `release/v2.2.4` (alle endringer implementeres direkte på gjeldende release-gren).  
 **Sporing:** [hovedsak #49](https://github.com/Wesc-9/ATHLTH/issues/49); [fase 1 #50](https://github.com/Wesc-9/ATHLTH/issues/50), [fase 2 #51](https://github.com/Wesc-9/ATHLTH/issues/51), [fase 3 #52](https://github.com/Wesc-9/ATHLTH/issues/52), [fase 4 #53](https://github.com/Wesc-9/ATHLTH/issues/53), [fase 5 #54](https://github.com/Wesc-9/ATHLTH/issues/54).
 
 ## Beslutning
@@ -23,11 +23,12 @@ ATHLTH Coach er **den eneste brukervendte coachen**. Vi skal ikke introdusere «
 - Nettverk og generativ modell skal ikke få private rå treningslogger uten gjeldende tillatelse.
 - Ingen av disse punktene begrunner automatisk planendring, eller å anta at fremtidig funksjonalitet er ferdig.
 
-## Første leveranse i arbeidsgren (ikke merged)
+## Første leveranse direkte i release/v2.2.4
 - `ATHLTHCoachStrengthComparableHistory` er en ny skrivebeskyttet datagrense for *sammenlignbare* fullførte historiske sett. Den gir kilden og tidsvinduet uten å beregne en personlig anbefaling.
 - Live `StrengthWorkoutStore.progressionSuggestion` leser fra denne i stedet for å velge navnelike øvelser på egen hånd. Den eldre progresjonsalgoritmen brukes fortsatt; videre arbeid ligger i fase 2.
 - Nye enhetstester dekker forveksling av benkpress-varianter, utstyr, oppvarming, skip, tidsmål, motstandsnivå og ferske/eldre økter.
 - Testene er lagt til i Swift-testtarget men **må kjøres i faktisk iOS/Xcode-bygg**. Ikke rapporter dem som grønne før pipeline/simulator har bekreftet det.
+- Første kodegrunnlag ble merget til release i [PR #55](https://github.com/Wesc-9/ATHLTH/pull/55), merge-commit `094e9759`. Videre Coach-arbeid gjøres direkte på `release/v2.2.4`, uten separat feature-gren, i tråd med brukerens instruks.
 
 ## Planlagte beslutningskontrakter
 En framtidig `CoachRecommendation` bør inneholde:
