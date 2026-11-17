@@ -509,7 +509,8 @@ private enum HomeActivityStreamBuilder {
     /// The underlying athlete recordings remain separate and unchanged.
     private static func uniqueFollowingFeed(
         mine: [SocialPublishableWorkout],
-        social: SocialStore
+        social: SocialStore,
+        feed: [SocialFeedItem]? = nil
     ) -> [SocialFeedItem] {
         let localWorkoutIDs = Set(mine.map(\.id))
         let ownSessionIDs = Set(
@@ -522,7 +523,7 @@ private enum HomeActivityStreamBuilder {
             }
         )
         var seenSessions = ownSessionIDs
-        return social.feed
+        return (feed ?? social.feed)
             .filter {
                 $0.activity.kind == "workout" &&
                 $0.actor.userID != social.currentUserID
@@ -541,7 +542,8 @@ private enum HomeActivityStreamBuilder {
     static func recentPreview(
         mine: [SocialPublishableWorkout],
         social: SocialStore,
-        maximumCount: Int = 6
+        maximumCount: Int = 6,
+        feed: [SocialFeedItem]? = nil
     ) -> [HomeActivityStreamItem] {
         let limit = max(0, maximumCount)
         guard limit > 0 else { return [] }
@@ -569,7 +571,7 @@ private enum HomeActivityStreamBuilder {
         for workout in mine {
             consider(HomeActivityStreamItem(source: .mine(workout)))
         }
-        for item in uniqueFollowingFeed(mine: mine, social: social) {
+        for item in uniqueFollowingFeed(mine: mine, social: social, feed: feed) {
             consider(HomeActivityStreamItem(source: .following(item)))
         }
 
@@ -1189,6 +1191,9 @@ struct HomePersonalRecentActivitySection:
 
     @State private var myWorkouts:
         [SocialPublishableWorkout] = []
+    // A snapshot changes only when actual workout/feed sources publish.
+    // Do not sort the social feed from SwiftUI's scrolling/body path.
+    @State private var visibleItems: [HomeActivityStreamItem] = []
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var availableFeedWidth: CGFloat = 0
 
@@ -1229,12 +1234,6 @@ struct HomePersonalRecentActivitySection:
     // rebuilding the full strength anatomy on every SwiftUI body update.
     @State private var recentStrengthProfiles: [UUID: StrengthMuscleProfile] = [:]
 
-    private var visibleItems: [HomeActivityStreamItem] {
-        HomeActivityStreamBuilder.recentPreview(
-            mine: myWorkouts, social: social
-        )
-    }
-
     var body: some View {
         let recent = visibleItems
         return VStack(
@@ -1265,6 +1264,8 @@ struct HomePersonalRecentActivitySection:
             rebuildRecentWorkouts()
         }
         .onAppear {
+            rebuildRecentWorkouts()
+            rebuildVisibleItems(feed: social.feed)
             // One initial/returning refresh is sufficient. The former
             // additional .task also launched this HealthKit query when Home
             // mounted, creating duplicate work on first display.
@@ -1273,6 +1274,15 @@ struct HomePersonalRecentActivitySection:
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task { await refreshRecentWorkouts() }
+        }
+        .onReceive(social.$feed) { updatedFeed in
+            // Reactions and new shared workouts still update promptly;
+            // unrelated Home observations no longer re-sort this feed.
+            rebuildVisibleItems(feed: updatedFeed)
+        }
+        .onReceive(social.$workoutSessions) { _ in
+            // Shared-session grouping can change without a new feed post.
+            rebuildVisibleItems(feed: social.feed)
         }
         .onReceive(health.$workouts.removeDuplicates()) { _ in
             // Also observes edits that retain the same workout ID and count.
@@ -1345,7 +1355,21 @@ struct HomePersonalRecentActivitySection:
             }
             recentStrengthProfiles = profiles
             myWorkouts = refreshed
+            rebuildVisibleItems(mine: refreshed, feed: social.feed)
         }
+    }
+
+    private func rebuildVisibleItems(
+        mine: [SocialPublishableWorkout]? = nil,
+        feed: [SocialFeedItem]
+    ) {
+        let refreshed = HomeActivityStreamBuilder.recentPreview(
+            mine: mine ?? myWorkouts,
+            social: social,
+            feed: feed
+        )
+        // This work is now on source updates, never on each scroll frame.
+        visibleItems = refreshed
     }
 
     private var header: some View {
