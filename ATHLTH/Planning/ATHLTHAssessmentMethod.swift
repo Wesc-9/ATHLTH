@@ -174,6 +174,30 @@ enum ATHLTHVO2Protocol: String, Codable, Hashable, CaseIterable, Identifiable {
     }
 }
 
+enum ATHLTHAssessmentValidation: Equatable {
+    case valid
+    case needsConfiguration(String)
+    case needsMeasurements(String)
+    case invalid(String)
+
+    var isValid: Bool {
+        if case .valid = self { return true }
+        return false
+    }
+    var isBlocking: Bool {
+        if case .invalid = self { return true }
+        return false
+    }
+    var message: String? {
+        switch self {
+        case .valid: return nil
+        case .needsConfiguration(let message),
+             .needsMeasurements(let message),
+             .invalid(let message): return message
+        }
+    }
+}
+
 struct ATHLTHAssessmentScope: Codable, Hashable {
     var area: ATHLTHAssessmentArea = .currentStep
     var includePauses: Bool = false
@@ -217,19 +241,149 @@ struct ATHLTHAssessmentScope: Codable, Hashable {
         }
     }
 
-    /// A formula cannot silently use a different scope or include breaks.
-    /// Cooper 12 min is valid only for a single continuous 720 s effort.
+    /// Validation never changes the user's chosen area. It only prevents
+    /// presenting invalid test data as a physiological estimate.
+    func validate(
+        method: ATHLTHAssessmentMethod,
+        in blocks: [WorkoutTemplateBlock],
+        anchorIndex: Int
+    ) -> ATHLTHAssessmentValidation {
+        guard blocks.indices.contains(anchorIndex) else {
+            return .invalid("Målingen er ikke knyttet til en gyldig deløkt.")
+        }
+        let selected = includedIndices(in: blocks, anchorIndex: anchorIndex)
+        guard !selected.isEmpty else {
+            return .invalid("Velg minst én deløkt som skal inngå i målingen.")
+        }
+
+        if method.isEstimatedVO2 {
+            guard vo2Protocol == .cooperTwelveMinutes else {
+                return .needsConfiguration(
+                    "Velg en gyldig beregningsmetode for estimert VO₂-maks. " +
+                    "Å velge et måleområde alene gir ikke et VO₂-maks-resultat."
+                )
+            }
+            return singleContinuousEffort(
+                in: blocks, selected: selected, requiredSeconds: 720,
+                testName: "Cooper-testen"
+            )
+        }
+        switch method {
+        case .threeMinuteAllOut:
+            let status = singleContinuousEffort(
+                in: blocks, selected: selected, requiredSeconds: 180,
+                testName: "3MT-testen"
+            )
+            if status.isValid {
+                return .needsMeasurements(
+                    "3MT krever målt totaldistanse fra 180 sekunder og " +
+                    "målt distanse fra 2:30 til 3:00. Planlagte verdier brukes ikke."
+                )
+            }
+            return status
+        case .sixMinuteRun:
+            return singleContinuousEffort(
+                in: blocks, selected: selected, requiredSeconds: 360,
+                testName: "6-minutterstesten"
+            )
+        case .distanceTimeTrial:
+            guard !includePauses else {
+                return .invalid(
+                    "Et testløp kan ikke bruke pauser som del av løpstiden. " +
+                    "Slå av «Inkluder pauser»."
+                )
+            }
+            guard selected.count == 1,
+                  blocks[selected[0]].kind == .run else {
+                return .invalid(
+                    "Testløp krever én sammenhengende løpedel. " +
+                    "Bruk en generell tempomåling for flere deløkter."
+                )
+            }
+            return .valid
+        case .estimatedOneRepMax:
+            guard !includePauses && selected.count == 1 &&
+                  blocks[selected[0]].kind == .exercise else {
+                return .invalid(
+                    "Estimert 1RM skal beregnes fra ett styrkesett, " +
+                    "uten pauser eller andre øvelser."
+                )
+            }
+            return .needsMeasurements(
+                "Registrer faktisk løftet vekt og antall repetisjoner " +
+                "(maksimalt 10) for et 1RM-estimat."
+            )
+        case .conconiStep, .lactateStep:
+            return .needsMeasurements(
+                "Denne testen krever egne målte verdier for hvert trinn. " +
+                "Ingen terskel beregnes fra en planlagt økt alene."
+            )
+        case .cooperTwelveMinute, .estimatedVO2Max:
+            // Handled by isEstimatedVO2 above.
+            return .invalid("Ukjent VO₂-maks-protokoll.")
+        }
+    }
+
+    private func singleContinuousEffort(
+        in blocks: [WorkoutTemplateBlock],
+        selected: [Int],
+        requiredSeconds: TimeInterval,
+        testName: String
+    ) -> ATHLTHAssessmentValidation {
+        if includePauses {
+            return .invalid(
+                "\(testName) tillater ikke pauser i målingen. " +
+                "Slå av «Inkluder pauser»."
+            )
+        }
+        if selected.contains(where: {
+            let phase = blocks[$0].resolvedPhase
+            return phase == .warmup || phase == .cooldown
+        }) {
+            return .invalid(
+                "\(testName) kan ikke inkludere oppvarming eller nedtrapping. " +
+                "Velg bare testdraget."
+            )
+        }
+        guard selected.count == 1 else {
+            return .invalid(
+                "\(testName) krever ett sammenhengende testdrag. " +
+                "Du har valgt \(selected.count) deløkter."
+            )
+        }
+        let effort = blocks[selected[0]]
+        guard effort.kind == .run,
+              effort.cardioActivity != .walking,
+              !effort.isRestOrActiveRecovery,
+              effort.resolvedPhase == .main,
+              (effort.groupRounds ?? 1) <= 1 else {
+            return .invalid(
+                "\(testName) krever ett sammenhengende løpsdrag " +
+                "i hoveddelen, uten intervallpauser."
+            )
+        }
+        guard effort.durationSeconds == requiredSeconds else {
+            let current = effort.durationSeconds.map {
+                ATHLTHWorkoutDurationEstimator.conciseDuration($0)
+            } ?? "ukjent"
+            return .invalid(
+                "\(testName) krever nøyaktig " +
+                ATHLTHWorkoutDurationEstimator.conciseDuration(requiredSeconds) +
+                ". Valgt deløkt er \(current). Endre varigheten eller " +
+                "velg en annen måling."
+            )
+        }
+        return .valid
+    }
+
     func canCalculateCooper(
         from blocks: [WorkoutTemplateBlock], anchorIndex: Int
     ) -> Bool {
-        let selected = includedIndices(in: blocks, anchorIndex: anchorIndex)
-        guard vo2Protocol == .cooperTwelveMinutes,
-              selected.count == 1, let index = selected.first else { return false }
-        let block = blocks[index]
-        return block.kind == .run && !block.isRestOrActiveRecovery &&
-            block.cardioActivity != .walking &&
-            block.durationSeconds == 720
+        validate(
+            method: .estimatedVO2Max, in: blocks, anchorIndex: anchorIndex
+        ).isValid
     }
+
 }
 
 /// Compact drop-down for the owner of one measurement, enabling cross-step
@@ -251,10 +405,7 @@ struct ATHLTHAssessmentScopeEditor: View {
             for index in blocks.indices where blocks[index].measurementStepID == nil {
                 blocks[index].measurementStepID = UUID()
             }
-            if next.selectedStepIDs.isEmpty,
-               let id = blocks[anchorIndex].measurementStepID {
-                next.selectedStepIDs = [id]
-            }
+
         }
         blocks[anchorIndex].assessmentScope = next
     }
@@ -281,6 +432,14 @@ struct ATHLTHAssessmentScopeEditor: View {
                     set: { value in
                         var changed = scope
                         changed.area = value
+                        if value == .chosenSteps && changed.selectedStepIDs.isEmpty {
+                            if blocks[anchorIndex].measurementStepID == nil {
+                                blocks[anchorIndex].measurementStepID = UUID()
+                            }
+                            if let id = blocks[anchorIndex].measurementStepID {
+                                changed.selectedStepIDs = [id]
+                            }
+                        }
                         setScope(changed)
                     }
                 )) {
@@ -343,13 +502,36 @@ struct ATHLTHAssessmentScopeEditor: View {
                     }
                     .pickerStyle(.menu)
 
-                    if scope.vo2Protocol == .cooperTwelveMinutes &&
-                       !scope.canCalculateCooper(
-                           from: blocks, anchorIndex: anchorIndex
-                       ) {
-                        Text("Cooper-formelen krever ett sammenhengende testdrag på nøyaktig 12 minutter uten pauser. Valget lagres, men det beregnes ikke VO₂-maks før datagrunnlaget oppfyller kravene.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                }
+
+                if let method = blocks[anchorIndex].assessmentMethod {
+                    let validation = scope.validate(
+                        method: method, in: blocks, anchorIndex: anchorIndex
+                    )
+                    if let message = validation.message {
+                        Label(
+                            message,
+                            systemImage: validation.isBlocking
+                                ? "exclamationmark.triangle.fill" : "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            validation.isBlocking ? Color.red : Color.secondary
+                        )
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(
+                            validation.isBlocking
+                                ? "athlth-assessment-invalid-protocol"
+                                : "athlth-assessment-requires-data"
+                        )
+                    } else {
+                        Label(
+                            "Testoppsettet oppfyller protokollkravene. " +
+                            "Resultatet krever fortsatt faktisk målte verdier.",
+                            systemImage: "checkmark.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
