@@ -11,6 +11,23 @@ struct ATHLTHPlannedRunStepEditor: View {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 
+    /// Explicit running assessments are not interchangeable with walking.
+    /// Ordinary run/walk blocks keep the activity picker. Only hide it for
+    /// recognized running-only tests, never for walking workouts.
+    static func allowsActivitySelection(for block: WorkoutTemplateBlock) -> Bool {
+        guard block.kind == .run else { return false }
+        if block.cardioActivity == .walking { return true }
+        let title = block.title.lowercased()
+        let runningOnlyMarkers = [
+            "maksimaltest", "all-out test", "all out test",
+            "sustained maximal effort", "testløp", "time trial",
+            "cooper-test", "cooper test", "shuttle test", "skytteltest",
+            "conconi-test", "conconi test", "laktat-trinntest",
+            "lactate step test"
+        ]
+        return !runningOnlyMarkers.contains { title.contains($0) }
+    }
+
     private var activity: Binding<WorkoutCardioActivity> {
         Binding(
             get: { block.cardioActivity ?? .running },
@@ -89,21 +106,41 @@ struct ATHLTHPlannedRunStepEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 17) {
-            Picker(tr("Activity", "Aktivitet"), selection: activity) {
-                Text(tr("Run", "Løp")).tag(WorkoutCardioActivity.running)
-                Text(tr("Walk", "Gå")).tag(WorkoutCardioActivity.walking)
-            }
-            .pickerStyle(.segmented)
+            // Same step editor and WorkoutTemplateBlock as the simple plan
+            // engine. One readable editable title, not the old duplicated
+            // heading followed by an ellipsized second title field.
+            VStack(alignment: .leading, spacing: 9) {
+                TextField(
+                    tr("Step name", "Navn på deløkt"),
+                    text: $block.title,
+                    axis: .vertical
+                )
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(1...4)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("athlth-run-step-name")
 
-            TextField(
-                tr("Activity (optional)", "Navn på aktivitet (valgfritt)"),
-                text: $block.title
-            )
-            .font(.subheadline.weight(.medium))
-            .padding(.horizontal, 13)
-            .frame(minHeight: 46)
-            .background(ATHLTHPlanDesign.canvas,
-                        in: RoundedRectangle(cornerRadius: 12))
+                if let notes = block.notes?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !notes.isEmpty {
+                    Text(notes)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("athlth-run-step-description")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if Self.allowsActivitySelection(for: block) {
+                Picker(tr("Activity", "Aktivitet"), selection: activity) {
+                    Text(tr("Run", "Løp")).tag(WorkoutCardioActivity.running)
+                    Text(tr("Walk", "Gå")).tag(WorkoutCardioActivity.walking)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("athlth-run-step-activity-selector")
+            }
 
             VStack(alignment: .leading, spacing: 9) {
                 Text(tr("STEP GOAL", "MÅL FOR DELØKTEN"))
