@@ -72,6 +72,7 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var goalAccountSync = ATHLTHGoalAccountSyncStore()
     @StateObject private var trainingBackups = TrainingBackupStore()
     @StateObject private var studioPlanSync = ATHLTHStudioPlanSyncStore()
+    @StateObject private var audioCoachAccountSync = ATHLTHAudioCoachAccountSyncStore()
     @StateObject private var strengthAccountSync = ATHLTHStrengthAccountSyncStore()
     @StateObject private var automaticOfflineLibrary = ATHLTHAutomaticOfflineLibraryStore()
     @StateObject private var phoneWorkout = IPhoneWorkoutStore()
@@ -186,6 +187,7 @@ private struct ATHLTHSceneRootView: View {
                 .environmentObject(goalAccountSync)
                 .environmentObject(trainingBackups)
                 .environmentObject(studioPlanSync)
+                .environmentObject(audioCoachAccountSync)
                 .environmentObject(strengthAccountSync)
                 .environmentObject(phoneWorkout)
                 .environmentObject(profileGear)
@@ -242,6 +244,9 @@ private struct ATHLTHSceneRootView: View {
             studioPlanSync.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
+            audioCoachAccountSync.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             strengthAccountSync.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
@@ -250,6 +255,7 @@ private struct ATHLTHSceneRootView: View {
             )
             if appSession.signedIn {
                 studioPlanSync.scheduleSync(session: appSession)
+                audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
                 strengthAccountSync.scheduleSync(
                     session: appSession, strength: strengthWorkout
                 )
@@ -270,12 +276,25 @@ private struct ATHLTHSceneRootView: View {
                 // returning from an offline period.
                 appSession.checkpointTrainingContent()
                 studioPlanSync.scheduleSync(session: appSession)
+                audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
                 strengthAccountSync.scheduleSync(
                     session: appSession, strength: strengthWorkout
                 )
                 notifications.scheduleAccountSync()
                 Task { await messaging.refreshPreferences() }
             }
+        }
+        .onChange(of: settings.audioCoachGroups) { _, _ in
+            audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
+        }
+        .onChange(of: settings.audioCoachCustomRules) { _, _ in
+            audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
+        }
+        .onChange(of: settings.audioCoachProfiles) { _, _ in
+            audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
+        }
+        .onChange(of: settings.activeAudioCoachProfileID) { _, _ in
+            audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
         }
         .onChange(of: pets.pets) { _, _ in
             if appSession.signedIn, let catalog = pets.makeWatchCatalog() {
@@ -311,6 +330,9 @@ private struct ATHLTHSceneRootView: View {
             studioPlanSync.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
+            audioCoachAccountSync.switchAccount(
+                signedIn ? appSession.profile.userID : nil
+            )
             strengthAccountSync.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
@@ -323,6 +345,7 @@ private struct ATHLTHSceneRootView: View {
             }
             if signedIn {
                 studioPlanSync.scheduleSync(session: appSession)
+                audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
                 strengthAccountSync.scheduleSync(
                     session: appSession, strength: strengthWorkout
                 )
@@ -345,6 +368,7 @@ private struct ATHLTHSceneRootView: View {
             guard appSession.signedIn, scenePhase == .active else { return }
             while !Task.isCancelled {
                 studioPlanSync.scheduleSync(session: appSession)
+                audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
                 strengthAccountSync.scheduleSync(
                     session: appSession, strength: strengthWorkout
                 )
@@ -361,6 +385,7 @@ private struct ATHLTHSceneRootView: View {
                   owner == appSession.profile.userID else { return }
             scheduleAutomaticOfflinePreparation()
             studioPlanSync.scheduleSync(session: appSession)
+            audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
             strengthAccountSync.scheduleSync(
                 session: appSession, strength: strengthWorkout
             )
@@ -374,10 +399,14 @@ private struct ATHLTHSceneRootView: View {
                 appSession.signedIn ? appSession.profile.userID : nil
             )
             studioPlanSync.switchAccount(appSession.signedIn ? appSession.profile.userID : nil)
+            audioCoachAccountSync.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             strengthAccountSync.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
             studioPlanSync.scheduleSync(session: appSession)
+            audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
             strengthAccountSync.scheduleSync(
                 session: appSession, strength: strengthWorkout
             )
@@ -396,6 +425,7 @@ private struct ATHLTHSceneRootView: View {
             // own permission/account checks. Offline saves are never gated
             // on these network operations.
             studioPlanSync.scheduleSync(session: appSession)
+            audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
             strengthAccountSync.scheduleSync(
                 session: appSession, strength: strengthWorkout
             )
