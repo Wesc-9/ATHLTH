@@ -255,4 +255,34 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
         XCTAssertEqual(lookup.targets["A"], all[0].id)
     }
 
+
+    func testFavoriteAlphabetLookupSupportsStableStringRecordIDs() throws {
+        struct Favorite {
+            let id: String
+            let title: String
+        }
+        let items = (0..<80).map {
+            Favorite(id: "workout|\($0)", title: String(format: "A%03d", $0))
+        } + [
+            Favorite(id: "route|stored-s", title: "Skitur"),
+            Favorite(id: "exercise|stored-oe", title: "Øvelse"),
+            Favorite(id: "plan|stored-aa", title: "Åtteukers plan")
+        ]
+        let index = ATHLTHLibraryAlphabetLookup(
+            items: items, id: { $0.id }, title: { $0.title }
+        )
+        let sID = try XCTUnwrap(index.targets["S"])
+        XCTAssertEqual(sID, "route|stored-s")
+        XCTAssertEqual(index.index(for: sID), 80)
+        XCTAssertEqual(index.targets["Ø"], "exercise|stored-oe")
+        XCTAssertEqual(index.targets["Å"], "plan|stored-aa")
+        XCTAssertNil(index.targets["Z"])
+        XCTAssertEqual(
+            ATHLTHLibraryAlphabetWindow.visible(
+                items, start: 80, limit: ATHLTHLibraryPagination.pageSize
+            ).map(\.id),
+            ["route|stored-s", "exercise|stored-oe", "plan|stored-aa"]
+        )
+    }
+
 }
