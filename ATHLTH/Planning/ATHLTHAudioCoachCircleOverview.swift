@@ -54,11 +54,9 @@ struct ATHLTHAudioCoachCircleOverview: View {
         }.count
     }
 
-    // Built-in messages predate named groups. Present them as one virtual
-    // group without rewriting the Watch payload or duplicating spoken cues.
+    // Standalone commands are not coach groups and must not inflate this count.
     private var visibleGroupCount: Int {
-        draft.coachGroups.count +
-            ((!legacyOptions.isEmpty || !ungroupedRules.isEmpty) ? 1 : 0)
+        draft.coachGroups.count
     }
 
     private var ungroupedRules: [ATHLTHAudioCoachRule] {
