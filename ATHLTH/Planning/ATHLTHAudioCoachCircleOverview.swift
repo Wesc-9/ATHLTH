@@ -116,22 +116,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
             }
 
             HStack(spacing: 8) {
-                Button { onSwitchTemplate(-1) } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: "chevron.left")
-                            .font(.headline.weight(.semibold))
-                        Text(previousTemplateName ?? " ")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(dim)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.center)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(width: 49, height: 78)
-                    .contentShape(Rectangle())
-                }
-                .accessibilityLabel(tr("Previous template", "Forrige mal"))
-                .disabled(previousTemplateName == nil)
+                templateNeighbor(previousTemplateName, step: -1)
                 Spacer(minLength: 0)
                 ZStack {
                     Circle()
@@ -179,22 +164,7 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     }
                 }
                 Spacer(minLength: 0)
-                Button { onSwitchTemplate(1) } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: "chevron.right")
-                            .font(.headline.weight(.semibold))
-                        Text(nextTemplateName ?? " ")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(dim)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.center)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(width: 49, height: 78)
-                    .contentShape(Rectangle())
-                }
-                .accessibilityLabel(tr("Next template", "Neste mal"))
-                .disabled(nextTemplateName == nil)
+                templateNeighbor(nextTemplateName, step: 1)
             }
             .foregroundStyle(gold)
 
@@ -284,6 +254,49 @@ struct ATHLTHAudioCoachCircleOverview: View {
 
     /// The standard template has enabled commands but no stored named
     /// groups. Keep all of them visible under COACH-GRUPPER, editable in place.
+    /// A small circular preview keeps the next and previous saved templates
+    /// visible beside the active ring without occupying the full screen.
+    private func templateNeighbor(_ name: String?, step: Int) -> some View {
+        Button { onSwitchTemplate(step) } label: {
+            VStack(spacing: 5) {
+                ZStack {
+                    Circle()
+                        .fill(ATHLTHPlanDesign.selectedSurface)
+                    Circle()
+                        .stroke(gold.opacity(name == nil ? 0.15 : 0.55), lineWidth: 1.5)
+                    Image(systemName: name == nil
+                          ? (step < 0 ? "chevron.left" : "chevron.right")
+                          : "waveform")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(gold.opacity(name == nil ? 0.45 : 1))
+                    Image(systemName: step < 0 ? "chevron.left" : "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(gold)
+                        .offset(x: step < 0 ? -19 : 19)
+                }
+                .frame(width: 46, height: 46)
+                Text(name ?? " ")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(dim)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 52, height: 26, alignment: .top)
+            }
+            .frame(width: 52, height: 80)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(name == nil)
+        .accessibilityLabel(
+            name == nil
+                ? tr("No adjacent template", "Ingen mal ved siden av")
+                : (step < 0
+                    ? tr("Previous template: ", "Forrige mal: ")
+                    : tr("Next template: ", "Neste mal: ")) + (name ?? "")
+        )
+    }
+
     private var builtInCoachGroupCard: some View {
         DisclosureGroup(isExpanded: $showingLegacyOptions) {
             VStack(alignment: .leading, spacing: 4) {
