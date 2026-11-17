@@ -440,6 +440,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     onQuickTrain: { _ in },
                     onQuickCycling: {},
                     onQuickCustom: { _ in },
+                    onQuickFreeTraining: {},
                     onGhostRace: {}
                 )
 
