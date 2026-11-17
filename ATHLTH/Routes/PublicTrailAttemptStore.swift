@@ -398,6 +398,20 @@ final class PublicTrailAttemptStore:
             for workout in candidates {
                 candidatesByID[workout.id] = workout
             }
+            // Recover old leaderboard rows even when their workout falls
+            // outside the recent Health feed and candidate limit.
+            let missingLegacy = existing.filter {
+                $0.userID == userID &&
+                ($0.direction ?? .unknown) == .unknown &&
+                candidatesByID[$0.workoutID] == nil
+            }
+            for attempt in missingLegacy.prefix(16) {
+                if let historical = await health.workoutSummaryForRouteAttempt(
+                    attempt.workoutID
+                ) {
+                    candidatesByID[historical.id] = historical
+                }
+            }
             for workout in candidatesByID.values.sorted(by: {
                 $0.startDate > $1.startDate
             }) {
