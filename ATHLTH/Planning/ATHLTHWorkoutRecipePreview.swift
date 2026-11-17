@@ -1308,7 +1308,22 @@ extension RunningWorkoutTemplate {
         title: String, target: RunningStepTarget, phase: WorkoutPhaseKind,
         notes: String?, sequence: Int
     ) -> WorkoutTemplateBlock {
-        WorkoutTemplateBlock(
+        // The running recipe already carries an RPE prescription. Keep it
+        // visible in the read-only detail sheet instead of showing duration
+        // alone. ATHLTH's integer RPE field can represent whole values;
+        // retain fractional source ratings as an exact text target.
+        let sourceRPE = target.intensity.kind == .rpe ? target.intensity.rpe : nil
+        let wholeRPE = sourceRPE.flatMap { value -> Int? in
+            guard value.isFinite, (1...10).contains(value),
+                  value.rounded() == value else { return nil }
+            return Int(value)
+        }
+        let fractionalRPE = sourceRPE.flatMap { value -> String? in
+            guard value.isFinite, (1...10).contains(value),
+                  value.rounded() != value else { return nil }
+            return String(format: "RPE %g", value)
+        }
+        return WorkoutTemplateBlock(
             sequence: sequence, kind: .run, title: title,
             exerciseSlug: nil, distanceMeters: target.distanceMeters,
             repetitions: nil, durationSeconds: target.durationSeconds,
@@ -1319,7 +1334,9 @@ extension RunningWorkoutTemplate {
                     ? target.intensity.paceMinSecondsPerKilometer : nil,
             targetHeartRateZone:
                 target.intensity.kind == .heartRateZone
-                    ? target.intensity.heartRateZone : nil
+                    ? target.intensity.heartRateZone : nil,
+            targetIntensityType: fractionalRPE,
+            targetEffortRPE: wholeRPE
         )
     }
 }
