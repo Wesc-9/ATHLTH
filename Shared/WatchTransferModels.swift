@@ -1439,6 +1439,32 @@ struct WatchStrengthExerciseSummary: Codable, Hashable {
     var strengthGroupStartedAt: Date? = nil
 }
 
+/// Label for known strength weight semantics on the Watch. Unknown and
+/// old payloads are left unspecified rather than guessed from a name.
+enum ATHLTHWatchStrengthLoadBasisLabel {
+    static func localized(raw: String?) -> String? {
+        switch raw {
+        case "totalKilograms":
+            return ATHLTHLocalization.choose(
+                english: "Total weight · kg",
+                norwegian: "Totalvekt · kg"
+            )
+        case "kilogramsPerHand":
+            return ATHLTHLocalization.choose(
+                english: "Weight per hand · kg",
+                norwegian: "Vekt per hånd · kg"
+            )
+        case "machineStackKilograms":
+            return ATHLTHLocalization.choose(
+                english: "Machine stack · kg",
+                norwegian: "Maskinvekt · kg"
+            )
+        default:
+            return nil
+        }
+    }
+}
+
 /// Absolute-date countdown snapshot. No display ticks are transmitted over WatchConnectivity.
 struct WatchTimedStrengthCountdown: Codable, Hashable {
     var targetSeconds: Int
@@ -1509,6 +1535,11 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var effortMetricRaw: String? = nil
     var exerciseQueue:
         [WatchStrengthExerciseSummary]? = nil
+
+    var currentCoachLoadBasisRaw: String? {
+        exerciseQueue?.first(where: { $0.index == exerciseIndex })?
+            .coachLoadBasisRaw
+    }
 
     // Offline ownership metadata. A Watch-started workout can be rebuilt on
     // iPhone from this snapshot after hours without connectivity.
