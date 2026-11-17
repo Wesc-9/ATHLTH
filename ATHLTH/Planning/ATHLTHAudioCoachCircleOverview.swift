@@ -370,13 +370,18 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "waveform")
-                            .foregroundStyle(gold)
+                            .foregroundStyle(group.isEnabled ? gold : dim)
                             .frame(width: 34, height: 34)
-                            .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                            .background(
+                                group.isEnabled
+                                    ? ATHLTHPlanDesign.selectedSurface
+                                    : Color.gray.opacity(0.12),
+                                in: Circle()
+                            )
                         VStack(alignment: .leading, spacing: 3) {
                             Text(group.name)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ink)
+                                .foregroundStyle(group.isEnabled ? ink : dim)
                             Text((displayTrigger?.summary(interval: displayInterval ?? 1) ??
                                   tr("No trigger", "Ingen trigger")) + " · " +
                                  tr("\(spokenValues + options.count) commands",
@@ -395,30 +400,17 @@ struct ATHLTHAudioCoachCircleOverview: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                Toggle(
-                    tr("Group active", "Gruppe aktiv"),
-                    isOn: Binding(
-                        get: {
-                            draft.coachGroups.first(where: { $0.id == group.id })?.isEnabled ?? true
-                        },
-                        set: { active in
-                            guard let index = draft.coachGroups.firstIndex(where: { $0.id == group.id })
-                            else { return }
-                            draft.coachGroups[index].enabled = active
-                            // Built-in options have one owner; remember their
-                            // association and restore when re-enabling the group.
-                            for rawValue in group.optionIDs {
-                                ATHLTHAudioCoachOption(rawValue: rawValue)?
-                                    .setActive(active, in: &draft)
-                            }
-                        }
-                    )
-                )
-                .labelsHidden()
-                .tint(gold)
-                .accessibilityLabel(tr("Enable \(group.name)", "Aktiver \(group.name)"))
-                .accessibilityIdentifier("athlth-coach-group-enabled")
                 Menu {
+                    Button(
+                        group.isEnabled
+                            ? tr("Deactivate group", "Deaktiver gruppe")
+                            : tr("Activate group", "Aktiver gruppe"),
+                        systemImage: group.isEnabled ? "pause.circle" : "play.circle"
+                    ) {
+                        setGroupEnabled(group.id, to: !group.isEnabled)
+                    }
+                    .accessibilityIdentifier("athlth-coach-group-toggle")
+                    Divider()
                     Button(tr("Edit group trigger", "Endre gruppens trigger"),
                            systemImage: "clock.arrow.circlepath") {
                         onEditGroupTrigger(group.id)
@@ -491,9 +483,20 @@ struct ATHLTHAudioCoachCircleOverview: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20)
-            .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1))
+        .background(
+            group.isEnabled ? Color.white : Color.gray.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 20)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    group.isEnabled ? ATHLTHPlanDesign.warmDivider : Color.gray.opacity(0.23),
+                    lineWidth: 1
+                )
+        }
+        // Only the contents are desaturated; the menu remains interactive so
+        // a disabled group can be reactivated without opening another editor.
+        .animation(.easeInOut(duration: 0.2), value: group.isEnabled)
         .dropDestination(for: String.self) { items, _ in
             guard let item = items.first else { return false }
             return onMoveCommand(item, group.id)
@@ -523,6 +526,23 @@ struct ATHLTHAudioCoachCircleOverview: View {
         }
         .frame(minHeight: 46)
         .contentShape(Rectangle())
+    }
+
+    /// Keep the group's named commands and cadence intact while muting them.
+    /// The shared audio configuration filters rules from disabled groups.
+    private func setGroupEnabled(_ id: UUID, to enabled: Bool) {
+        guard let index = draft.coachGroups.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        guard draft.coachGroups[index].isEnabled != enabled else { return }
+        let options = draft.coachGroups[index].optionIDs
+        draft.coachGroups[index].enabled = enabled
+        // Built-in options are stored outside custom rules. Match the previous
+        // toggle's behavior for those settings while retaining group membership.
+        for rawValue in options {
+            ATHLTHAudioCoachOption(rawValue: rawValue)?
+                .setActive(enabled, in: &draft)
+        }
     }
 
     private func saveGroupName() {
