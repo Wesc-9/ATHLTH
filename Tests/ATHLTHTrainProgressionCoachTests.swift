@@ -318,6 +318,67 @@ final class ATHLTHTrainProgressionCoachTests: XCTestCase {
         ))
     }
 
+    func testVolumeReviewRequiresThreeQualifiedSessionsAndNeverAddsSets() {
+        var plan = makePlan(weeks: 4, load: 14)
+        plan.builderProfile = TrainingPlanBuilderProfile(
+            mode: .advanced,
+            primaryFocus: .hypertrophy,
+            goal: .buildMuscle,
+            sessionsPerWeek: 3,
+            preferredDayIndexes: [1, 3, 5],
+            injuriesOrLimitations: nil
+        )
+        var history: [StrengthWorkoutLog] = []
+        var completed = Set<UUID>()
+        for week in 0..<3 {
+            let sessionID = plan.weeks[week].days[0].sessions[0].id
+            completed.insert(sessionID)
+            plan.weeks[week].days[0].sessions[0].exercises[0].reps = 12
+            var log = logged(sessionID, offset: week)
+            for index in log.exercises[0].sets.indices {
+                log.exercises[0].sets[index].plannedReps = 12
+                log.exercises[0].sets[index].completedReps = 12
+                log.exercises[0].sets[index].rir = 3
+            }
+            history.append(log)
+        }
+        plan.weeks[3].days[0].sessions[0].exercises[0].reps = 12
+        let range = ATHLTHCoachStrengthRepetitionVolume.RepRange(
+            lower: 8, upper: 12
+        )!
+        let reviews = ATHLTHTrainProgressionCoach.volumeReviewSuggestions(
+            plan: plan,
+            strengthHistory: history,
+            completedSessionIDs: completed,
+            skippedSessionIDs: [],
+            range: range,
+            now: date(week: 4)
+        )
+        XCTAssertEqual(reviews.count, 1)
+        XCTAssertEqual(reviews.first?.comparableWorkouts, 3)
+        XCTAssertEqual(reviews.first?.verifiedWorkingSets, 6)
+        XCTAssertEqual(reviews.first?.currentReps, 12)
+        XCTAssertEqual(Set(reviews[0].sourceWorkoutIDs).count, 3)
+        XCTAssertEqual(plan.weeks[3].days[0].sessions[0].exercises[0].sets, 2)
+
+        // A skipped latest session must suppress the review; never use
+        // two older successes as evidence that the newest was completed.
+        for i in history[2].exercises[0].sets.indices {
+            history[2].exercises[0].sets[i].completedAt = nil
+            history[2].exercises[0].sets[i].skippedAt = date(week: 3)
+        }
+        XCTAssertTrue(
+            ATHLTHTrainProgressionCoach.volumeReviewSuggestions(
+                plan: plan,
+                strengthHistory: history,
+                completedSessionIDs: completed,
+                skippedSessionIDs: [],
+                range: range,
+                now: date(week: 4)
+            ).isEmpty
+        )
+    }
+
     func testAdvancedWarmupPreservedAlongWithPerSetIdentity() throws {
         var exercise = planned(load: 14)
         let warmup = PlannedExerciseSetTarget(
