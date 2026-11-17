@@ -635,7 +635,8 @@ enum ATHLTHZonedCompoundStepSplitter {
         named title: String,
         seconds: Double,
         walking: Bool? = nil,
-        estimated: Bool
+        estimated: Bool,
+        keepsSourceNotes: Bool = false
     ) -> WorkoutTemplateBlock {
         var result = source
         result.title = title
@@ -655,10 +656,15 @@ enum ATHLTHZonedCompoundStepSplitter {
         let originalNotes = (source.notes ?? "").trimmingCharacters(
             in: .whitespacesAndNewlines
         )
-        // Keep meaningful coaching detail but avoid replacing the new
-        // individual step name with the old compound source sentence.
+        // Combined instructions often say "duration applies to the whole
+        // step". That becomes wrong after splitting. Only attach original
+        // coaching to the first part if it does not describe the old total.
+        let oldWholeStepInstruction =
+            originalNotes.lowercased().contains("whole step") ||
+            originalNotes.lowercased().contains("hele deløkten")
         result.notes = [
-            originalNotes.isEmpty ? nil : originalNotes,
+            keepsSourceNotes && !oldWholeStepInstruction &&
+                !originalNotes.isEmpty ? originalNotes : nil,
             estimated ? estimateNote : nil
         ].compactMap { $0 }.joined(separator: "\n")
         if result.notes?.isEmpty == true { result.notes = nil }
@@ -755,7 +761,8 @@ enum ATHLTHZonedCompoundStepSplitter {
             pieces.append(child(
                 of: block, named: name, seconds: remaining,
                 walking: prefix.lowercased().contains("walk"),
-                estimated: true
+                estimated: true,
+                keepsSourceNotes: true
             ))
         }
         for index in 1...count {
