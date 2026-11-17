@@ -434,6 +434,17 @@ enum ATHLTHZonedPlanLibrary {
                 result[index].notes = ATHLTHThreeMinuteAllOut.fullProtocolNotes
             }
         }
+        // Presets apply to one ACTUAL main test step, not the whole
+        // source workout. Never include warmup, rest or cool-down distances.
+        // Other workouts remain opt-in through the editor picker.
+        if let method = ATHLTHAssessmentMethod.bundledTest(for: workout.id),
+           let index = result.indices.first(where: {
+               result[$0].resolvedPhase == .main &&
+               result[$0].kind == .run
+           }) {
+            result[index].assessmentMethod =
+                ATHLTHAssessmentMethod.normalized(method, for: result[index])
+        }
         // A timed cycling segment uses a non-running block in ATHLTH.
         // Swimming stays in the source bundle but is not published as a workout
         // until a swimming engine is available.
