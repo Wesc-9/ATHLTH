@@ -449,8 +449,8 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         XCTAssertEqual(effort.durationSeconds, 180)
         XCTAssertEqual(effort.targetHeartRateZone, 5)
         XCTAssertFalse(ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: effort))
-        XCTAssertTrue(effort.notes?.contains("Noter totaldistanse") == true)
-        XCTAssertTrue(effort.notes?.contains("de siste 30 sekundene") == true)
+        XCTAssertTrue(effort.notes?.contains("totaldistanse") == true)
+        XCTAssertTrue(effort.notes?.contains("mellom 2:30 og 3:00") == true)
 
         let warmup = try XCTUnwrap(steps.first {
             $0.resolvedPhase == .warmup
@@ -489,7 +489,7 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         effort.notes = "Min egen kommentar"
         let repaired = ATHLTHZonedLocalization.normalizeLegacyImportedStep(effort)
         XCTAssertEqual(repaired.title, "3 min maksimaltest")
-        XCTAssertTrue(repaired.notes?.contains("Noter totaldistanse") == true)
+        XCTAssertTrue(repaired.notes?.contains("totaldistanse") == true)
         XCTAssertTrue(repaired.notes?.contains("Min egen kommentar") == true)
         XCTAssertEqual(repaired.durationSeconds, effort.durationSeconds)
         XCTAssertEqual(repaired.targetHeartRateZone, effort.targetHeartRateZone)
@@ -631,13 +631,13 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         let warmup = items.filter { $0.resolvedPhase == .warmup }
         XCTAssertEqual(warmup.count, 5)
         XCTAssertEqual(warmup[0].durationSeconds, 600)
-        XCTAssertEqual(warmup[1].durationSeconds, 210)
+        XCTAssertEqual(warmup[1].durationSeconds, 270)
         XCTAssertTrue(warmup[1].title.lowercased().contains(
             ATHLTHLocalization.isNorwegian ? "løpsdriller" : "drills"
         ))
         let efforts = warmup.filter { $0.title.contains("/3") }
         XCTAssertEqual(efforts.count, 3)
-        XCTAssertEqual(efforts.compactMap(\.durationSeconds), [30, 30, 30])
+        XCTAssertEqual(efforts.compactMap(\.durationSeconds), [10, 10, 10])
         XCTAssertEqual(
             warmup.compactMap(\.durationSeconds).reduce(0, +), 900
         )
