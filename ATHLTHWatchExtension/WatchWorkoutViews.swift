@@ -1049,6 +1049,17 @@ struct WatchActiveWorkoutView: View {
                         }
                     }
 
+                    if snapshot.barWeightKilograms == nil,
+                       snapshot.loadKindRaw != "resistanceLevel",
+                       let basisLabel = ATHLTHWatchStrengthLoadBasisLabel.localized(
+                           raw: snapshot.currentCoachLoadBasisRaw
+                       ) {
+                        Text(basisLabel)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(WatchTheme.muted)
+                            .accessibilityIdentifier("watch-strength-load-basis")
+                    }
+
                     if let bar = snapshot.barWeightKilograms {
                         Text(
                             ATHLTHLocalization.choose(
@@ -2131,6 +2142,17 @@ struct WatchActiveWorkoutView: View {
                                 tint: WatchTheme.slate
                             )
                         }
+                    }
+
+                    if snapshot.barWeightKilograms == nil,
+                       snapshot.loadKindRaw != "resistanceLevel",
+                       let basisLabel = ATHLTHWatchStrengthLoadBasisLabel.localized(
+                           raw: snapshot.currentCoachLoadBasisRaw
+                       ) {
+                        Text(basisLabel)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(WatchTheme.muted)
+                            .accessibilityIdentifier("watch-strength-load-basis")
                     }
 
                     if let bar = snapshot.barWeightKilograms {
