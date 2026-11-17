@@ -361,6 +361,14 @@ struct WorkoutHistoryDetailView: View {
                 }
 
                 metricGrid
+                if workout.activity == .running &&
+                   ATHLTHThreeMinuteAllOut.isTestTitle(workout.title) {
+                    ATHLTHThreeMinuteAllOutMeasurementsView(
+                        workoutID: workout.id,
+                        userID: session.profile.userID
+                    )
+                    ATHLTHThreeMinuteAllOutProtocol()
+                }
                 workoutGearCard
 
                 ATHLTHUnifiedCard {
@@ -1039,6 +1047,14 @@ struct PostWorkoutReviewView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     summaryCard
+                    if workout.activity == .running &&
+                       ATHLTHThreeMinuteAllOut.isTestTitle(workout.title) {
+                        ATHLTHThreeMinuteAllOutMeasurementsView(
+                            workoutID: workout.id,
+                            userID: session.profile.userID
+                        )
+                        ATHLTHThreeMinuteAllOutProtocol()
+                    }
                     if workout.activity != .strength {
                         resultStrip
                         if workout.activity == .running || workout.activity == .walking {
