@@ -169,16 +169,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                         showingGroupBuilder = true
                     },
                     onAddGeneralCommand: {
-                        if draft.coachGroups.isEmpty {
-                            prepareNewGroup()
-                            showingGroupBuilder = true
-                        } else if draft.coachGroups.count == 1,
-                                  let group = draft.coachGroups.first {
-                            pendingGroupCommandID = group.id
-                            showingGroupCommandBuilder = true
-                        } else {
-                            showingCommandGroupPicker = true
-                        }
+                        showingCommandGroupPicker = true
                     }
                 )
                 DisclosureGroup(isExpanded: $showingVoiceOptions) {
@@ -242,6 +233,9 @@ struct ATHLTHAudioCoachActiveListView: View {
             } else if showGroupBuilderAfterPicker {
                 showGroupBuilderAfterPicker = false
                 showingGroupBuilder = true
+            } else if let pendingGeneralOption {
+                self.pendingGeneralOption = nil
+                editingOption = pendingGeneralOption
             }
         }) {
             commandGroupPickerSheet
@@ -622,6 +616,23 @@ struct ATHLTHAudioCoachActiveListView: View {
         .presentationDragIndicator(.visible)
     }
 
+    private var eventCommandOptions: [ATHLTHAudioCoachOption] {
+        let eventOptions: Set<ATHLTHAudioCoachOption> = [
+            .currentZone, .targetZoneCoach, .motivation,
+            .contextual, .randomEncouragement, .adaptiveMotivation,
+            .workoutStart, .pauseResume, .workoutFinish,
+            .intervalRecoveryCountdown, .scopedCountdowns,
+            .routeRemaining, .routeETA, .currentStep,
+            .remainingStepTime, .remainingStepDistance,
+            .customPhrases, .landmarks
+        ]
+        return ATHLTHAudioCoachOption.allCases.filter { option in
+            eventOptions.contains(option) &&
+                option.isVisible(route: showRouteOptions,
+                                 structured: showStructuredOptions)
+        }
+    }
+
     private var availableGroupContents: [ATHLTHAudioCoachRule.Metric] {
         ATHLTHAudioCoachRule.Metric.allCases.filter { metric in
             switch metric {
@@ -679,6 +690,28 @@ struct ATHLTHAudioCoachActiveListView: View {
                             .background(.white, in: RoundedRectangle(cornerRadius: 17))
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    Text(tr("EVENT-TRIGGERED COMMANDS", "HENDELSESSTYRTE KOMMANDOER"))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(bronze)
+                        .padding(.top, 8)
+
+                    ForEach(eventCommandOptions) { option in
+                        Button {
+                            option.setActive(true, in: &draft)
+                            pendingGeneralOption = option.requiresConfiguration ? option : nil
+                            showingCommandGroupPicker = false
+                        } label: {
+                            Label(option.title, systemImage: option.symbol)
+                                .frame(maxWidth: .infinity, minHeight: 44,
+                                       alignment: .leading)
+                                .padding(.horizontal, 14)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ink)
                     }
 
                     Button {
@@ -874,20 +907,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     }
 
                     Section {
-                        ForEach(ATHLTHAudioCoachOption.allCases.filter { option in
-                            let eventOptions: Set<ATHLTHAudioCoachOption> = [
-                                .currentZone, .targetZoneCoach, .motivation,
-                                .contextual, .randomEncouragement, .adaptiveMotivation,
-                                .workoutStart, .pauseResume, .workoutFinish,
-                                .intervalRecoveryCountdown, .scopedCountdowns,
-                                .routeRemaining, .routeETA, .currentStep,
-                                .remainingStepTime, .remainingStepDistance,
-                                .customPhrases, .landmarks
-                            ]
-                            return eventOptions.contains(option) &&
-                                option.isVisible(route: showRouteOptions,
-                                                 structured: showStructuredOptions)
-                        }) { option in
+                        ForEach(eventCommandOptions) { option in
                             Button {
                                 option.setActive(true, in: &draft)
                                 pendingGeneralOption = option.requiresConfiguration ? option : nil
