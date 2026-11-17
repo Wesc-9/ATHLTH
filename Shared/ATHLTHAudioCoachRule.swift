@@ -607,7 +607,7 @@ enum ATHLTHAudioCoachRuleDelivery {
             return (0...3).contains(elapsedSeconds) ? 1 : nil
         }
         guard let index = context.stepIndex, index >= 0,
-              context.stepCount > index else { return nil }
+              (context.stepCount ?? 0) > index else { return nil }
 
         let phase = context.stepPhase
         let previous = context.previousStepPhase
@@ -635,10 +635,10 @@ enum ATHLTHAudioCoachRuleDelivery {
             if phase == "recovery" && nearEnd { return index + 1 }
             return previous == "recovery" && nearStart ? index : nil
         case .activeRecoveryStart:
-            return context.isActiveRecovery && nearStart ? index + 1 : nil
+            return context.isActiveRecovery == true && nearStart ? index + 1 : nil
         case .activeRecoveryEnd:
-            if context.isActiveRecovery && nearEnd { return index + 1 }
-            return context.previousWasActiveRecovery && nearStart ? index : nil
+            if context.isActiveRecovery == true && nearEnd { return index + 1 }
+            return context.previousWasActiveRecovery == true && nearStart ? index : nil
         case .warmupStart:
             return phase == "warmup" && nearStart && previous != "warmup"
                 ? index + 1 : nil
@@ -659,7 +659,7 @@ enum ATHLTHAudioCoachRuleDelivery {
                 ? index + 1 : nil
         case .cooldownEnd:
             return phase == "cooldown" &&
-                index == context.stepCount - 1 && nearEnd ? index + 1 : nil
+                index == (context.stepCount ?? 0) - 1 && nearEnd ? index + 1 : nil
         case .beforeNextStep:
             return next != nil && beforeBoundary ? index + 1 : nil
         case .beforeMain:
@@ -729,10 +729,11 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var stepPhase: String?
     var previousStepPhase: String?
     var nextStepPhase: String?
-    var isActiveRecovery = false
-    var previousWasActiveRecovery = false
-    var nextIsActiveRecovery = false
-    var stepCount: Int = 0
+    // Optional: older iPhone/Watch snapshots have no event metadata.
+    var isActiveRecovery: Bool? = nil
+    var previousWasActiveRecovery: Bool? = nil
+    var nextIsActiveRecovery: Bool? = nil
+    var stepCount: Int? = nil
 
     static func needsSegmentData(_ rules: [ATHLTHAudioCoachRule]) -> Bool {
         rules.contains { rule in
