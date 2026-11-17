@@ -979,14 +979,16 @@ struct PerWorkoutGhostView: View {
 
                                 Text(ATHLTHLocalization.choose(
                                     english: "Compete against your target",
-                                    norwegian: "Din egen måltid langs ruten"
+                                    norwegian: "Sammenlign deg med Ghost på ruten"
                                 ))
                                 .font(.subheadline)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                            Toggle("Target Ghost", isOn: $draft.enabled)
+                            Toggle(ATHLTHLocalization.choose(
+                                english: "Target Ghost", norwegian: "Mål-Ghost"
+                            ), isOn: $draft.enabled)
                                 .labelsHidden()
                                 .tint(ATHLTHPlanDesign.accentInk)
                                 .accessibilityIdentifier("athlth-ghost-target-enabled")
