@@ -2176,16 +2176,38 @@ struct WorkoutTemplateLibraryView: View {
                    visibleSavedWorkouts.isEmpty && visibleScheduledWorkouts.isEmpty {
                     VStack(spacing: 14) {
                         ContentUnavailableView(
-                            ATHLTHLocalization.choose(
-                                english: "No matching workouts",
-                                norwegian: "Ingen økter passer filtrene"
-                            ),
-                            systemImage: "line.3.horizontal.decrease.circle",
-                            description: Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Try a different muscle group, run type or duration.",
-                                    norwegian: "Prøv en annen muskelgruppe, økttype eller varighet."
+                            favoritesOnly
+                                ? ATHLTHLocalization.choose(
+                                    english: "No favorite workouts",
+                                    norwegian: "Ingen favorittøkter"
                                 )
+                                : mineOnly
+                                    ? ATHLTHLocalization.choose(
+                                        english: "No saved workouts",
+                                        norwegian: "Ingen egne økter"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "No matching workouts",
+                                        norwegian: "Ingen økter passer filtrene"
+                                    ),
+                            systemImage: favoritesOnly ? "star" :
+                                mineOnly ? "person.crop.circle" :
+                                "line.3.horizontal.decrease.circle",
+                            description: Text(
+                                favoritesOnly
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Mark a workout with the star to find it here. You can also turn off Favorites.",
+                                        norwegian: "Merk økter med stjernen for å finne dem her. Du kan også slå av Favoritter."
+                                    )
+                                    : mineOnly
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Save or create a workout in My Workouts, or turn off Mine.",
+                                            norwegian: "Lagre eller opprett en økt i Mine økter, eller slå av Mine."
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Try a different workout type or duration.",
+                                            norwegian: "Prøv en annen økttype eller varighet."
+                                        )
                             )
                         )
                         if hasDiscoveryFilters || favoritesOnly || mineOnly {
