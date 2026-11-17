@@ -133,6 +133,7 @@ struct ExerciseLibraryView: View {
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     // A tapped letter changes the 50-row window, not the number of mounted rows.
     @State private var visibleStartIndex = 0
+    @State private var alphabetJumpRevision = 0
     @State private var searchExpanded = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
     @State private var preferredColumns = 0
@@ -554,7 +555,7 @@ struct ExerciseLibraryView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
-                ScrollViewReader { proxy in
+                ScrollViewReader { _ in
                     ScrollView {
                         LazyVGrid(
                             columns: ATHLTHLibraryResponsiveLayout.columns(
@@ -720,10 +721,9 @@ struct ExerciseLibraryView: View {
                         .padding(.horizontal, 16)
                         .padding(.bottom, 18)
                     }
-                    // Recreate the scroll container when a letter selects a
-                    // different page. Its origin then resets to the new page's
-                    // first exercise reliably, without racing SwiftUI layout.
-                    .id(visibleStartIndex)
+                    // Even a mounted lazy-grid target can refuse scrollTo.
+                    // Rebuild at the tapped letter every time, including A.
+                    .id(alphabetJumpRevision)
                     // Refresh only the exercise results. Source tabs and
                     // display/filter controls remain outside this scroll view
                     // and do not slide down with the refresh indicator.
@@ -746,19 +746,9 @@ struct ExerciseLibraryView: View {
                                             for: id, in: entries
                                         )
                                     else { return }
-                                    let isVisible = index >= visibleStartIndex &&
-                                        index < visibleStartIndex + visibleLimit
-                                    if isVisible {
-                                        withAnimation(.easeOut(duration: 0.18)) {
-                                            proxy.scrollTo(id, anchor: .top)
-                                        }
-                                    } else {
-                                        // The page starts with the selected
-                                        // letter. Its scroll container is rebuilt
-                                        // at the top, avoiding an async scroll race.
-                                        visibleStartIndex = index
-                                        visibleLimit = ATHLTHLibraryPagination.pageSize
-                                    }
+                                    visibleStartIndex = index
+                                    visibleLimit = ATHLTHLibraryPagination.pageSize
+                                    alphabetJumpRevision += 1
                                 }
                             )
                             .padding(.trailing, 4)
@@ -841,6 +831,7 @@ struct ExerciseLibraryView: View {
         .onChange(of: pageFilterKey) { _, _ in
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
         }
         .onChange(of: selectedSection) { _, section in
             if section == .mine, scannerResultsActive {
