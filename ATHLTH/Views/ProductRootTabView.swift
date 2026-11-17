@@ -5745,6 +5745,7 @@ struct ATHLTHTrainView: View {
     // scrolling. The detail sheet keeps the exact advice the athlete tapped.
     @State private var trainDailyRecommendationInfo: HomeDailyRecommendationInfo?
     @State private var selectedTrainDailyRecommendationInfo: HomeDailyRecommendationInfo?
+    @State private var selectedTrainDailySuggestedWorkout: PlannedSession?
     @State private var trainRecommendationRefreshTask: Task<Void, Never>?
     // Reuse the immutable published catalog and search cache already shared
     // with other workout-library entry points. Avoid rebuilding all bundled
@@ -5914,6 +5915,29 @@ struct ATHLTHTrainView: View {
                     .presentationDetents([.fraction(0.82), .large])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
+            }
+            .sheet(item: $selectedTrainDailySuggestedWorkout) { workout in
+                HomeDailyRecommendedWorkoutSheet(
+                    workout: workout,
+                    isPlanWorkout: false,
+                    // This preview is reviewed before launch. A Watch
+                    // recording must be configured via its own existing
+                    // device-aware start flow rather than silently starting
+                    // the iPhone structured player.
+                    canStartWithWatch: false,
+                    onOpenPlannedWorkout: {
+                        openConfirmedTrainDailyWorkout(workout)
+                    },
+                    onStartOnPhone: {
+                        openConfirmedTrainDailyWorkout(workout)
+                    },
+                    onStartOnWatch: {
+                        openConfirmedTrainDailyWorkout(workout)
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
             }
             .athlthStudioEditor(item: $selectedPlanWorkout, useFullScreen: studioFullscreenEditing) { selection in
                 PlannedWorkoutDetailView(
@@ -6635,21 +6659,34 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        if workout.kind == .strength {
-            selectedStrengthSession = workout
-        } else if workout.isStructuredWorkout {
-            // Never discard recommended interval phases or target RPE.
-            selectedStructuredWorkout = workout
-        } else if workout.kind == .walking {
-            showingWalkQuickStart = true
-        } else if workout.kind == .running {
-            if let template = workout.resolvedRunningWorkouts.first {
-                pendingRunningTemplate = template
+        selectedTrainDailySuggestedWorkout = workout
+    }
+
+    /// Only this explicit confirmation may open the recording/setup flow.
+    /// Dismiss the review sheet first so SwiftUI never presents two sheets
+    /// from the same navigation stack in a single transaction.
+    private func openConfirmedTrainDailyWorkout(_ workout: PlannedSession) {
+        selectedTrainDailySuggestedWorkout = nil
+        Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(350)) }
+            catch { return }
+            guard !hasOngoingTrainWorkout else { return }
+            if workout.kind == .strength {
+                selectedStrengthSession = workout
+            } else if workout.isStructuredWorkout {
+                // Keep the recommended interval phases and targets intact.
+                selectedStructuredWorkout = workout
+            } else if workout.kind == .walking {
+                showingWalkQuickStart = true
+            } else if workout.kind == .running {
+                if let template = workout.resolvedRunningWorkouts.first {
+                    pendingRunningTemplate = template
+                } else {
+                    showingRunQuickStart = true
+                }
             } else {
-                showingRunQuickStart = true
+                showingLibrary = true
             }
-        } else {
-            showingLibrary = true
         }
     }
 
