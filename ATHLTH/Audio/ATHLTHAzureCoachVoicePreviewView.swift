@@ -236,16 +236,6 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 7) {
-                Image(systemName: "waveform")
-                    .foregroundStyle(ATHLTHTheme.premiumGold)
-                Text("ATHLTH+")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-            }
-            .padding(.top, 7)
-            .accessibilityAddTraits(.isHeader)
-
             if voices.isEmpty {
                 Text(tr(
                     "No Azure voices were returned for this language. Choose another language or use an installed Apple voice.",
