@@ -3,6 +3,60 @@ import SwiftUI
 @testable import ATHLTH
 
 final class ATHLTHPlanJourneyTests: XCTestCase {
+    func testBriefBackgroundForegroundKeepsExactlyTheSameEditor() {
+        // An existing card is not re-presented and must keep its identity,
+        // navigation stack, open child sheets and current scroll position.
+        XCTAssertFalse(ATHLTHPlanEditorContinuityPolicy.shouldRestore(
+            coldMount: false,
+            unexpectedlyDismissed: false,
+            editorIsPresented: true
+        ))
+        XCTAssertFalse(ATHLTHPlanEditorContinuityPolicy.shouldRestore(
+            coldMount: false,
+            unexpectedlyDismissed: false,
+            editorIsPresented: false
+        ))
+        XCTAssertFalse(ATHLTHPlanEditorContinuityPolicy.shouldRestore(
+            coldMount: true,
+            unexpectedlyDismissed: false,
+            editorIsPresented: true
+        ))
+    }
+
+    func testOnlyColdLaunchOrRealSystemDismissalRestoresPlanEditor() {
+        XCTAssertTrue(ATHLTHPlanEditorContinuityPolicy.shouldRestore(
+            coldMount: true,
+            unexpectedlyDismissed: false,
+            editorIsPresented: false
+        ))
+        XCTAssertTrue(ATHLTHPlanEditorContinuityPolicy.shouldRestore(
+            coldMount: false,
+            unexpectedlyDismissed: true,
+            editorIsPresented: false
+        ))
+        XCTAssertFalse(ATHLTHPlanEditorContinuityPolicy.shouldRestore(
+            coldMount: false,
+            unexpectedlyDismissed: true,
+            editorIsPresented: true
+        ))
+    }
+
+    func testNestedWorkoutSheetNeverClearsDuringAppSuspension() {
+        // UIKit sometimes writes nil to a sheet binding when suspended.
+        XCTAssertTrue(ATHLTHPlanEditorContinuityPolicy.shouldKeepNestedEditor(
+            sceneIsActive: false,
+            incomingSelectionIsNil: true
+        ))
+        XCTAssertFalse(ATHLTHPlanEditorContinuityPolicy.shouldKeepNestedEditor(
+            sceneIsActive: true,
+            incomingSelectionIsNil: true
+        ))
+        XCTAssertFalse(ATHLTHPlanEditorContinuityPolicy.shouldKeepNestedEditor(
+            sceneIsActive: false,
+            incomingSelectionIsNil: false
+        ))
+    }
+
     func testFreshAndResumeLaunchesAreDistinct() {
         let firstNewPlan = TrainProgramCreationLaunch.fresh
         let anotherNewPlan = TrainProgramCreationLaunch.fresh
