@@ -420,6 +420,149 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         XCTAssertTrue(copy.instructions?.contains("Record") == true)
     }
 
+
+    @MainActor
+    func testAssessmentEditorHasOneShortTitleAndCompleteNorwegianInstructions() throws {
+        let previous = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+
+        let source = try XCTUnwrap(
+            ATHLTHZonedPlanLibrary.workouts.first { $0.id == "ASS-009" }
+        )
+        let steps = ATHLTHZonedPlanLibrary.blocks(for: source)
+        let effort = try XCTUnwrap(steps.first {
+            $0.resolvedPhase == .main
+        })
+        XCTAssertEqual(effort.title, "3 min maksimaltest")
+        XCTAssertEqual(ATHLTHWorkoutNameSuggestion.displayStepTitle(effort),
+                       "3 min maksimaltest")
+        XCTAssertEqual(effort.durationSeconds, 180)
+        XCTAssertEqual(effort.targetHeartRateZone, 5)
+        XCTAssertFalse(ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: effort))
+        XCTAssertTrue(effort.notes?.contains("Noter totaldistanse") == true)
+        XCTAssertTrue(effort.notes?.contains("de siste 30 sekundene") == true)
+
+        let warmup = try XCTUnwrap(steps.first {
+            $0.resolvedPhase == .warmup
+        })
+        XCTAssertTrue(ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: warmup))
+
+        let cooldown = try XCTUnwrap(steps.last)
+        XCTAssertEqual(cooldown.title, "Gå, deretter rolig jogg")
+        XCTAssertEqual(cooldown.durationSeconds, 600)
+        XCTAssertTrue(cooldown.notes?.contains("Start med gange") == true)
+        XCTAssertTrue(cooldown.notes?.contains("Varigheten gjelder hele deløkten") == true)
+        XCTAssertTrue(ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: cooldown))
+    }
+
+    @MainActor
+    func testLegacyImportedStepRepairsMixedLanguageWithoutChangingTargets() throws {
+        let previous = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "ASS-009"
+        })
+        let steps = ATHLTHZonedPlanLibrary.blocks(for: source)
+        var effort = try XCTUnwrap(steps.first { $0.resolvedPhase == .main })
+        effort.title = "3 Minutter of sustained maximal effort på Bane. Record total distance og Fart of the last 30 Sekunder"
+        effort.notes = "Min egen kommentar"
+        let repaired = ATHLTHZonedLocalization.normalizeLegacyImportedStep(effort)
+        XCTAssertEqual(repaired.title, "3 min maksimaltest")
+        XCTAssertTrue(repaired.notes?.contains("Noter totaldistanse") == true)
+        XCTAssertTrue(repaired.notes?.contains("Min egen kommentar") == true)
+        XCTAssertEqual(repaired.durationSeconds, effort.durationSeconds)
+        XCTAssertEqual(repaired.targetHeartRateZone, effort.targetHeartRateZone)
+        XCTAssertEqual(repaired.sourceIntensityZoneLabel, effort.sourceIntensityZoneLabel)
+        XCTAssertEqual(
+            ATHLTHZonedLocalization.normalizeLegacyImportedStep(repaired),
+            repaired
+        )
+        XCTAssertFalse(ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: repaired))
+
+        var cooldown = try XCTUnwrap(steps.last)
+        cooldown.title = "Gange deretter Svært Langsom Jogg"
+        cooldown.notes = "Egen nedtrappingskommentar"
+        let normalized = ATHLTHZonedLocalization.normalizeLegacyImportedStep(cooldown)
+        XCTAssertEqual(normalized.title, "Gå, deretter rolig jogg")
+        XCTAssertEqual(normalized.durationSeconds, 600)
+        XCTAssertEqual(normalized.targetHeartRateZone, cooldown.targetHeartRateZone)
+        XCTAssertTrue(normalized.notes?.contains("Egen nedtrappingskommentar") == true)
+        XCTAssertTrue(normalized.notes?.contains("Start med gange") == true)
+        XCTAssertEqual(
+            ATHLTHZonedLocalization.normalizeLegacyImportedStep(normalized),
+            normalized
+        )
+    }
+
+    @MainActor
+    func testOtherAssessmentTitlesAreNorwegianAndUnambiguous() throws {
+        let previous = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+
+        let examples: [(String, String, Int)] = [
+            ("ASS-001", "6 min testløp", 360),
+            ("ASS-005", "12 min Cooper-test", 720)
+        ]
+        for (identifier, expectedTitle, expectedSeconds) in examples {
+            let source = try XCTUnwrap(
+                ATHLTHZonedPlanLibrary.workouts.first { $0.id == identifier }
+            )
+            let effort = try XCTUnwrap(
+                ATHLTHZonedPlanLibrary.blocks(for: source).first {
+                    $0.resolvedPhase == .main
+                }
+            )
+            XCTAssertEqual(effort.title, expectedTitle, identifier)
+            XCTAssertEqual(effort.durationSeconds, Double(expectedSeconds))
+            XCTAssertFalse(
+                ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: effort)
+            )
+            XCTAssertNotNil(effort.notes)
+        }
+    }
+
+    @MainActor
+    func testOrdinaryRunStillOffersWalkingAndUserTitleIsPreserved() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "ASS-009"
+        })
+        var ordinary = try XCTUnwrap(
+            ATHLTHZonedPlanLibrary.blocks(for: source).first {
+                $0.resolvedPhase == .warmup
+            }
+        )
+        ordinary.title = "Min egen rolige jogg"
+        ordinary.notes = "Behold teksten som skrevet"
+        XCTAssertEqual(
+            ATHLTHZonedLocalization.normalizeLegacyImportedStep(ordinary),
+            ordinary
+        )
+        XCTAssertTrue(
+            ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: ordinary)
+        )
+    }
+
     @MainActor
     func testImportedWorkoutsNeverExposeSourceZoneSix() {
         for workout in ATHLTHZonedPlanLibrary.workouts where workout.discipline != "swimming" {
