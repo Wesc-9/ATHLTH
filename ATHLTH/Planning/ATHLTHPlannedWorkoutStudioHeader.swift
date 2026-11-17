@@ -35,22 +35,41 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
 
+    private var defaultCardioActivity: WorkoutCardioActivity {
+        activity == .walking ? .walking : .running
+    }
+
     private var plannedDurationText: String {
+        if let uncertainty = ATHLTHWorkoutDurationEstimator.previewDurationRange(
+            for: blocks, defaultActivity: defaultCardioActivity
+        ) {
+            let lower = Int((uncertainty.lowerBound / 60).rounded())
+            let upper = Int((uncertainty.upperBound / 60).rounded())
+            if lower < upper {
+                return "~ \(lower)–\(upper) min"
+            }
+        }
         if let seconds = ATHLTHWorkoutDurationEstimator.previewSeconds(
-            for: blocks, defaultActivity: activity == .walking ? .walking : .running
+            for: blocks, defaultActivity: defaultCardioActivity
         ) {
             return "~ " + ATHLTHWorkoutDurationEstimator.conciseDuration(seconds)
         }
         return durationMinutes.map { "~ \($0) min" } ?? "–"
     }
 
+    private var previewDistance: ATHLTHPlannedWorkoutMetrics.DistancePreview? {
+        ATHLTHPlannedWorkoutMetrics.previewDistance(
+            for: blocks, defaultActivity: defaultCardioActivity
+        )
+    }
+
     private var distanceText: String {
-        guard let kilometers = ATHLTHPlannedWorkoutMetrics.estimatedDistanceKilometers(
-            for: blocks
-        ) else { return "–" }
-        return "~ " + kilometers.formatted(
+        guard let previewDistance else { return "–" }
+        let kilometers = previewDistance.kilometers
+        let number = kilometers.formatted(
             .number.precision(.fractionLength(1)).locale(locale)
-        ) + " km"
+        )
+        return (previewDistance.usesEstimatedDistance ? "~ " : "") + number + " km"
     }
 
     private var runningLocation: ATHLTHPlannedWorkoutMetrics.RunningLocation? {
@@ -62,10 +81,12 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     }
 
     private var paceText: String {
-        guard let commonPace else { return "–" }
-        let rounded = Int(commonPace.rounded())
+        let pace = commonPace ?? previewDistance?.averagePaceSecondsPerKilometer
+        guard let pace, pace.isFinite, pace > 0 else { return "–" }
+        let rounded = Int(pace.rounded())
         let seconds = rounded % 60
-        return "\(rounded / 60):" + (seconds < 10 ? "0" : "") + "\(seconds)"
+        let value = "\(rounded / 60):" + (seconds < 10 ? "0" : "") + "\(seconds)"
+        return commonPace == nil ? "~ " + value : value
     }
 
     private var treadmillSpeedText: String? {
@@ -102,11 +123,13 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     }
 
     private var zoneText: String {
-        let zones = blocks.compactMap(\.targetHeartRateZone)
-        guard let lowest = zones.min(), let highest = zones.max() else { return "–" }
+        guard let range = ATHLTHPlannedWorkoutMetrics.plannedHeartRateZoneRange(
+            for: blocks
+        ) else { return "–" }
         let letter = ATHLTHLocalization.isNorwegian ? "S" : "Z"
-        return lowest == highest ? "\(letter)\(lowest)" :
-            "\(letter)\(lowest)–\(letter)\(highest)"
+        return range.lowerBound == range.upperBound
+            ? "\(letter)\(range.lowerBound)"
+            : "\(letter)\(range.lowerBound)–\(letter)\(range.upperBound)"
     }
 
     private var inclineText: String {
@@ -193,13 +216,23 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                         ), inclineText)
                     } else if runningLocation != nil {
                         metric("speedometer", ATHLTHLocalization.choose(
-                            english: "Pace (min/km)", norwegian: "Tempo (min/km)"
+                            english: commonPace == nil ? "Avg. pace (min/km)" : "Pace (min/km)",
+                            norwegian: commonPace == nil ? "Snittempo (min/km)" : "Tempo (min/km)"
                         ), paceText)
                     } else {
                         metric("mountain.2", ATHLTHLocalization.choose(
                             english: "Incline", norwegian: "Stigning"
                         ), inclineText)
                     }
+                }
+
+                if previewDistance?.usesAssumedPace == true {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Distance and average pace are estimates until a target pace is chosen.",
+                        norwegian: "Distanse og snittempo er estimater til du velger måltempo."
+                    ))
+                    .font(.system(size: 10))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
 
                 if activity == .running, let runningEnvironment {
