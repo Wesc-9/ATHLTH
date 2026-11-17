@@ -17,8 +17,19 @@ struct ATHLTHWorkoutReviewSheet: View {
     private var elapsed: Double? {
         ATHLTHWorkoutDurationEstimator.previewSeconds(for: blocks)
     }
-    private var estimatedKilometers: Double? {
-        ATHLTHPlannedWorkoutMetrics.estimatedDistanceKilometers(for: blocks)
+    private var distancePreview: ATHLTHPlannedWorkoutMetrics.DistancePreview? {
+        ATHLTHPlannedWorkoutMetrics.previewDistance(for: blocks)
+    }
+
+    private var elapsedLabel: String {
+        if let range = ATHLTHWorkoutDurationEstimator.previewDurationRange(for: blocks) {
+            let low = Int((range.lowerBound / 60).rounded())
+            let high = Int((range.upperBound / 60).rounded())
+            if low < high { return "~\(low)–\(high) min" }
+        }
+        return elapsed.map {
+            "~" + ATHLTHWorkoutDurationEstimator.conciseDuration($0)
+        } ?? fallbackDurationMinutes.map { "~\($0) min" } ?? "–"
     }
     private var location: String? {
         guard let value = ATHLTHPlannedWorkoutMetrics.runningLocation(for: blocks)
@@ -62,26 +73,30 @@ struct ATHLTHWorkoutReviewSheet: View {
                     HStack(spacing: 10) {
                         statistic(
                             tr("Duration", "Varighet"),
-                            elapsed.map {
-                                "~" + ATHLTHWorkoutDurationEstimator.conciseDuration($0)
-                            } ?? fallbackDurationMinutes.map { "~\($0) min" } ?? "–",
+                            elapsedLabel,
                             symbol: "clock"
                         )
                         statistic(
                             tr("Distance", "Distanse"),
-                            estimatedKilometers.map {
-                                "~" + $0.formatted(
-                                    .number.precision(.fractionLength(1)).locale(locale)
-                                ) + " km"
+                            distancePreview.map {
+                                ($0.usesEstimatedDistance ? "~" : "") +
+                                    $0.kilometers.formatted(
+                                        .number.precision(.fractionLength(1)).locale(locale)
+                                    ) + " km"
                             } ?? "–",
                             symbol: "point.topleft.down.to.point.bottomright.curvepath"
                         )
                     }
 
-                    Text(tr(
-                        "Only explicitly entered pace and speed targets are used for distance. Unknown targets are not counted as a measured result.",
-                        "Distansen beregnes bare når nødvendige tempo- og fartsmål er kjent. Ukjente mål er ikke et registrert resultat."
-                    ))
+                    Text(distancePreview?.usesAssumedPace == true
+                         ? tr(
+                            "Distance is estimated from activity and planned intensity until you set a target pace. These are not measured results.",
+                            "Distansen er estimert fra aktivitet og planlagt intensitet til du setter måltempo. Dette er ikke målte resultater."
+                         )
+                         : tr(
+                            "Planning estimates use the pace targets you enter; actual distance and time are recorded during the workout.",
+                            "Planestimatene bruker måltempoet du legger inn. Faktisk distanse og tid registreres under økten."
+                         ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
