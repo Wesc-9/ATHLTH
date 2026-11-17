@@ -439,9 +439,10 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
     }
 
-    // Newest personal templates come first, with Standard on their right.
+    // Creation order positions the most recently created template immediately
+    // to the left of Standard; earlier personal templates remain on its left.
     private var templateIDsInCircleOrder: [UUID] {
-        Array(settings.audioCoachProfiles.map(\.id).reversed())
+        settings.audioCoachProfiles.map(\.id)
     }
 
     private var currentTemplateCircleIndex: Int {
