@@ -335,6 +335,14 @@ enum ATHLTHTrainProgressionCoach {
                             ))
                         case .reviewTrainingVolume:
                             guard goal == .buildMuscle else { continue }
+                            // The review is justified by the latest THREE
+                            // separate workouts. Do not count an optional
+                            // fourth observation in the visible set total.
+                            let sourceIDs = Array(assessment.sourceWorkoutIDs.prefix(3))
+                            let eligibleIDs = Set(sourceIDs)
+                            let verifiedSetCount = sessionEvidence
+                                .filter { eligibleIDs.contains($0.workoutID) }
+                                .reduce(0) { $0 + $1.workingSetIDs.count }
                             usedExerciseKeys.insert(identity)
                             volumeReviews.append(VolumeReviewSuggestion(
                                 workoutID: workout.id,
@@ -345,8 +353,8 @@ enum ATHLTHTrainProgressionCoach {
                                 currentReps: prescription.reps,
                                 currentWeightKg: prescription.load,
                                 comparableWorkouts: min(3, assessment.sourceWorkoutIDs.count),
-                                verifiedWorkingSets: assessment.sourceSetIDs.count,
-                                sourceWorkoutIDs: Array(assessment.sourceWorkoutIDs.prefix(3))
+                                verifiedWorkingSets: verifiedSetCount,
+                                sourceWorkoutIDs: sourceIDs
                             ))
                         case .collectEvidence, .hold:
                             break
