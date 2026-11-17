@@ -109,6 +109,7 @@ final class MirroredWorkoutAudioCoach:
         _ configuration:
             WatchAudioCoachConfiguration
     ) {
+        let configuration = configuration.deliveryConfiguration
         self.configuration =
             configuration
         guidanceGate.reset()
