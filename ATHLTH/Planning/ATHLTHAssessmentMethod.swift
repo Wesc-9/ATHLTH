@@ -83,7 +83,7 @@ enum ATHLTHAssessmentMethod: String, Codable, Hashable, CaseIterable, Identifiab
         case "ASS-009": return .threeMinuteAllOut
         case "ASS-005": return .cooperTwelveMinute
         case "ASS-001": return .sixMinuteRun
-        case "ASS-003", "ASS-007": return .distanceTimeTrial
+        case "ASS-003": return .distanceTimeTrial
         case "ASS-006": return .conconiStep
         case "ASS-010": return .lactateStep
         default: return nil
