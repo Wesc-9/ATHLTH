@@ -241,6 +241,83 @@ final class ATHLTHTrainProgressionCoachTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
+    func testRepetitionProgressionRequiresExplicitRangeAndPlanGoal() {
+        var plan = makePlan(weeks: 3, load: 14)
+        plan.builderProfile = TrainingPlanBuilderProfile(
+            mode: .advanced,
+            primaryFocus: .hypertrophy,
+            goal: .buildMuscle,
+            sessionsPerWeek: 3,
+            preferredDayIndexes: [1, 3, 5],
+            injuriesOrLimitations: nil
+        )
+        let first = plan.weeks[0].days[0].sessions[0].id
+        let second = plan.weeks[1].days[0].sessions[0].id
+        var history = [
+            logged(first, offset: 0),
+            logged(second, offset: 1)
+        ]
+        for index in history.indices {
+            for setIndex in history[index].exercises[0].sets.indices {
+                history[index].exercises[0].sets[setIndex].rir = 3
+            }
+        }
+        let range = ATHLTHCoachStrengthRepetitionVolume.RepRange(
+            lower: 8, upper: 12
+        )!
+        let proposals = ATHLTHTrainProgressionCoach.repetitionSuggestions(
+            plan: plan,
+            strengthHistory: history,
+            completedSessionIDs: [first, second],
+            skippedSessionIDs: [],
+            range: range,
+            now: date(week: 3)
+        )
+        XCTAssertEqual(proposals.count, 1)
+        XCTAssertEqual(proposals[0].beforeReps, 10)
+        XCTAssertEqual(proposals[0].proposedReps, 11)
+        XCTAssertEqual(proposals[0].prescribedWeightKg, 14)
+
+        plan.builderProfile?.goal = .maintain
+        XCTAssertTrue(
+            ATHLTHTrainProgressionCoach.repetitionSuggestions(
+                plan: plan, strengthHistory: history,
+                completedSessionIDs: [first, second],
+                skippedSessionIDs: [], range: range,
+                now: date(week: 3)
+            ).isEmpty
+        )
+    }
+
+    func testRepetitionIncreaseOnlyChangesWorkingSetsAfterApproval() {
+        var original = planned(load: 14)
+        let warmup = PlannedExerciseSetTarget(
+            reps: 5, weightKilograms: 6, isWarmUp: true, setType: .warmUp
+        )
+        let first = PlannedExerciseSetTarget(reps: 10, weightKilograms: 14)
+        let second = PlannedExerciseSetTarget(reps: 10, weightKilograms: 14)
+        original.sets = 3
+        original.setTargets = [warmup, first, second]
+        let range = ATHLTHCoachStrengthRepetitionVolume.RepRange(
+            lower: 8, upper: 12
+        )!
+        let adjusted = ATHLTHTrainProgressionCoach.adjustedExerciseRepetitions(
+            original, expectedReps: 10, approvedReps: 11, range: range
+        )
+        XCTAssertEqual(adjusted?.setTargets?.map(\\.id),
+                       [warmup.id, first.id, second.id])
+        XCTAssertEqual(adjusted?.setTargets?.map(\\.reps),
+                       [5, 11, 11])
+        XCTAssertEqual(adjusted?.reps, 11)
+        XCTAssertEqual(original.setTargets?.map(\\.reps), [5, 10, 10])
+        XCTAssertNil(ATHLTHTrainProgressionCoach.adjustedExerciseRepetitions(
+            original, expectedReps: 9, approvedReps: 11, range: range
+        ))
+        XCTAssertNil(ATHLTHTrainProgressionCoach.adjustedExerciseRepetitions(
+            original, expectedReps: 10, approvedReps: 13, range: range
+        ))
+    }
+
     func testAdvancedWarmupPreservedAlongWithPerSetIdentity() throws {
         var exercise = planned(load: 14)
         let warmup = PlannedExerciseSetTarget(
