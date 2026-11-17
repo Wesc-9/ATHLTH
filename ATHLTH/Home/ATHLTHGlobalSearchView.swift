@@ -6,6 +6,7 @@ import SwiftUI
 enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
     case all = "All"
     case users = "People"
+    case exercises = "Exercises"
     case routes = "Routes"
     case groups = "Clubs"
     case events = "Events"
@@ -24,6 +25,11 @@ enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
             return ATHLTHLocalization.format(
                 english: "People",
                 norwegian: "Personer"
+            )
+        case .exercises:
+            return ATHLTHLocalization.format(
+                english: "Exercises",
+                norwegian: "Øvelser"
             )
         case .routes:
             return ATHLTHLocalization.format(
@@ -52,6 +58,7 @@ enum ATHLTHGlobalSearchScope: String, CaseIterable, Identifiable {
         switch self {
         case .all: return "sparkles"
         case .users: return "person.2.fill"
+        case .exercises: return "dumbbell.fill"
         case .routes: return "map.fill"
         case .groups: return "person.3.fill"
         case .events: return "calendar"
@@ -156,6 +163,7 @@ private final class ATHLTHSearchRouteCityLookup: ObservableObject {
 struct ATHLTHGlobalSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var routes: RouteDiscoveryStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var challenges: ChallengeStore
@@ -173,6 +181,10 @@ struct ATHLTHGlobalSearchView: View {
     @State private var nearbyLocation: CLLocation?
     @State private var isSearchingRemote = false
     @FocusState private var searchFocused: Bool
+
+    // Inline drawer presentation reuses the canonical search and results.
+    var embeddedInSideMenu = false
+    var onClose: (() -> Void)? = nil
 
     private var cleanQuery: String {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -303,6 +315,14 @@ struct ATHLTHGlobalSearchView: View {
             .task(id: remoteSearchTaskID) {
                 await refreshRemoteSearch()
             }
+            .task(id: scope) {
+                if scope == .exercises {
+                    await exerciseLibrary.refresh()
+                }
+            }
+            .onAppear {
+                if embeddedInSideMenu { searchFocused = true }
+            }
             // Don't present the keyboard over the discovery dashboard by default.
             // The user opens it only by tapping the search field.
         }
@@ -322,14 +342,14 @@ struct ATHLTHGlobalSearchView: View {
                         norwegian: "Søk"
                     )
                 )
-                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .font(.system(size: embeddedInSideMenu ? 25 : 36, weight: .bold, design: .rounded))
                 .foregroundStyle(searchGraphite)
             }
 
             Spacer()
 
             Button {
-                dismiss()
+                if let onClose { onClose() } else { dismiss() }
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .semibold))
@@ -349,7 +369,7 @@ struct ATHLTHGlobalSearchView: View {
                 )
             )
         }
-        .frame(height: 112, alignment: .bottom)
+        .frame(height: embeddedInSideMenu ? 84 : 112, alignment: .bottom)
         .padding(.bottom, 5)
     }
 
@@ -361,8 +381,8 @@ struct ATHLTHGlobalSearchView: View {
 
             TextField(
                 ATHLTHLocalization.format(
-                    english: "Search people, routes, clubs and events",
-                    norwegian: "Søk etter personer, ruter, klubber og arrangementer"
+                    english: "Search people, exercises, routes and more",
+                    norwegian: "Søk etter personer, øvelser, ruter og mer"
                 ),
                 text: $query
             )
@@ -504,6 +524,15 @@ struct ATHLTHGlobalSearchView: View {
                     tint: searchSocialAccent
                 )
                 explorationTile(
+                    .exercises,
+                    subtitle: ATHLTHLocalization.format(
+                        english: "Find exercises",
+                        norwegian: "Finn øvelser"
+                    ),
+                    artwork: "StrengthPostWorkoutHero",
+                    tint: searchWarmAccent
+                )
+                explorationTile(
                     .routes,
                     subtitle: ATHLTHLocalization.format(
                         english: "Discover routes",
@@ -528,6 +557,15 @@ struct ATHLTHGlobalSearchView: View {
                         norwegian: "Se hva som skjer"
                     ),
                     artwork: "GoalEvent",
+                    tint: searchWarmAccent
+                )
+                explorationTile(
+                    .challenges,
+                    subtitle: ATHLTHLocalization.format(
+                        english: "Find challenges",
+                        norwegian: "Finn utfordringer"
+                    ),
+                    artwork: "GoalRunning",
                     tint: searchWarmAccent
                 )
             }
