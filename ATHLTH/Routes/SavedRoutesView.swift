@@ -85,6 +85,8 @@ struct SavedRoutesView: View {
     @State private var search = ""
     @State private var searchExpanded = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
+    @State private var visibleStartIndex = 0
+    @State private var alphabetJumpRevision = 0
     @State private var showingCustomLength = false
     @State private var previewRoute: TrainingRoute?
     @State private var routeToQuickTrain: TrainingRoute?
@@ -253,7 +255,12 @@ struct SavedRoutesView: View {
     }
 
     var body: some View {
-        ScrollView {
+        let routes = visibleRoutes
+        let alphabet = ATHLTHLibraryAlphabetLookup(
+            items: routes,
+            id: { $0.route.id }, title: { $0.route.title }
+        )
+        return ScrollView {
             LazyVStack(spacing: 10) {
                 heroHeader
                 if !session.savedRoutes.isEmpty {
@@ -280,8 +287,11 @@ struct SavedRoutesView: View {
                         ),
                         spacing: 10
                     ) {
-                        ForEach(Array(visibleRoutes.prefix(visibleLimit)),
-                                id: \.route.id) { entry in
+                        ForEach(
+                            ATHLTHLibraryAlphabetWindow.visible(
+                                routes, start: visibleStartIndex, limit: visibleLimit
+                            ), id: \.route.id
+                        ) { entry in
                             switch viewMode {
                             case .cards:
                                 compactSavedRouteTile(entry)
@@ -293,20 +303,47 @@ struct SavedRoutesView: View {
                         }
                     }
                     ATHLTHLibraryLoadMoreButton(
-                        shown: min(visibleLimit, visibleRoutes.count),
-                        total: visibleRoutes.count
+                        shown: min(
+                            visibleLimit,
+                            ATHLTHLibraryAlphabetWindow.remaining(
+                                total: routes.count, start: visibleStartIndex
+                            )
+                        ),
+                        total: ATHLTHLibraryAlphabetWindow.remaining(
+                            total: routes.count, start: visibleStartIndex
+                        )
                     ) {
                         visibleLimit += ATHLTHLibraryPagination.pageSize
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.leading, 16)
+            .padding(.trailing, alphabet.targets.isEmpty ? 16 : 40)
             .padding(.top, 14)
             .padding(.bottom, 80)
             .frame(maxWidth: .infinity)
         }
+        .id(alphabetJumpRevision)
+        .overlay(alignment: .trailing) {
+            if !alphabet.targets.isEmpty {
+                ATHLTHExerciseAlphabetIndex(targets: alphabet.targets) { target in
+                    guard let index = alphabet.index(for: target) else { return }
+                    visibleStartIndex = index
+                    visibleLimit = ATHLTHLibraryPagination.pageSize
+                    alphabetJumpRevision += 1
+                }
+                .padding(.trailing, 6)
+            }
+        }
         .onChange(of: pageFilterKey) { _, _ in
+            visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
+        }
+        .onChange(of: session.savedRoutes.count) { _, _ in
+            visibleStartIndex = 0
+            visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
         }
         .onScrollPhaseChange { _, phase in
             routeCardsScrolling = phase.isScrolling
