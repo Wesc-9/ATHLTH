@@ -957,131 +957,199 @@ struct PerWorkoutGhostView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                ATHLTHPlanSectionIntro(
-                    eyebrow: "GHOST RACE",
-                    title: ATHLTHLocalization.choose(
-                        english: "Run against a goal", norwegian: "Løp mot et mål"
-                    ),
-                    subtitle: ATHLTHLocalization.choose(
-                        english: "Your Ghost follows the chosen route and target finish time.",
-                        norwegian: "Ghost følger den valgte ruten og din måltid."
-                    ),
-                    icon: "figure.run.circle"
-                )
-
                 ATHLTHPlanSurface(ghost: false) {
-                    Toggle(isOn: $draft.enabled) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Target Ghost", norwegian: "Mål-Ghost"
-                            ))
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            Text(ATHLTHLocalization.choose(
-                                english: "Compare your progress on this route",
-                                norwegian: "Sammenlign fremdrift langs ruten"
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                    }
-                    .tint(ATHLTHPlanDesign.accentInk)
-
-                    if draft.enabled {
-                        Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                    VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "TARGET FINISH TIME",
-                                    norwegian: "MÅLTID"
-                                ))
-                                .font(.caption2.weight(.bold))
-                                .tracking(1.2)
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                TextField("1:00:00", text: targetTimeBinding)
-                                    .keyboardType(.numbersAndPunctuation)
-                                    .font(.system(size: 27, weight: .semibold,
-                                                  design: .rounded))
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                                    .monospacedDigit()
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .accessibilityLabel(ATHLTHLocalization.choose(
-                                        english: "Target finish time",
-                                        norwegian: "Måltid"
-                                    ))
-                            }
-                            Spacer()
-                            Image(systemName: "stopwatch")
+                            Image(systemName: "figure.run.circle.fill")
                                 .font(.system(size: 24, weight: .medium))
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 46, height: 46)
+                                .background(
+                                    ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 14)
+                                )
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "TARGET GHOST", norwegian: "MÅL-GHOST"
+                                ))
+                                .font(.caption2.weight(.bold))
+                                .tracking(1.6)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Compete against your target",
+                                    norwegian: "Din egen måltid langs ruten"
+                                ))
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Toggle("Target Ghost", isOn: $draft.enabled)
+                                .labelsHidden()
+                                .tint(ATHLTHPlanDesign.accentInk)
+                                .accessibilityIdentifier("athlth-ghost-target-enabled")
                         }
 
-                        if let route {
-                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "TARGET PACE",
-                                        norwegian: "MÅLTEMPO"
-                                    ))
+                        if draft.enabled {
+                            if let route {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    Text(route.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .lineLimit(1)
+                                    Spacer(minLength: 6)
+                                    Text(route.distanceKilometers.formatted(
+                                        .number.precision(.fractionLength(0...2))
+                                    ) + " km")
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                                }
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 11)
+                                .background(
+                                    ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 13)
+                                )
+                                .accessibilityIdentifier("athlth-ghost-route-summary")
+                            }
+
+                            HStack(alignment: .top, spacing: 10) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "TARGET TIME", norwegian: "MÅLTID"
+                                        ),
+                                        systemImage: "stopwatch"
+                                    )
                                     .font(.caption2.weight(.bold))
-                                    .tracking(1.2)
+                                    .tracking(0.9)
                                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                        TextField("5:30", text: targetPaceBinding)
-                                            .keyboardType(.numbersAndPunctuation)
-                                            .focused($paceFieldFocused)
-                                            .onSubmit {
-                                                draft.finalizeTargetPaceText(
-                                                    distanceKilometers: route.distanceKilometers
-                                                )
-                                            }
-                                            .onChange(of: paceFieldFocused) { _, focused in
-                                                if !focused {
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+
+                                    TextField("35:00", text: targetTimeBinding)
+                                        .keyboardType(.numbersAndPunctuation)
+                                        .font(.system(size: 26, weight: .semibold,
+                                                      design: .rounded))
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        .monospacedDigit()
+                                        .minimumScaleFactor(0.8)
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                        .accessibilityLabel(ATHLTHLocalization.choose(
+                                            english: "Target finish time", norwegian: "Måltid"
+                                        ))
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 74,
+                                       alignment: .topLeading)
+                                .padding(13)
+                                .background(
+                                    ATHLTHPlanDesign.surface,
+                                    in: RoundedRectangle(cornerRadius: 15)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 15)
+                                        .strokeBorder(
+                                            ATHLTHPlanDesign.warmDivider, lineWidth: 1
+                                        )
+                                }
+
+                                if let route {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "TARGET PACE",
+                                                norwegian: "MÅLTEMPO"
+                                            ),
+                                            systemImage: "speedometer"
+                                        )
+                                        .font(.caption2.weight(.bold))
+                                        .tracking(0.9)
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+
+                                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                                            TextField("5:30", text: targetPaceBinding)
+                                                .keyboardType(.numbersAndPunctuation)
+                                                .focused($paceFieldFocused)
+                                                .onSubmit {
                                                     draft.finalizeTargetPaceText(
-                                                        distanceKilometers: route.distanceKilometers
+                                                        distanceKilometers:
+                                                            route.distanceKilometers
                                                     )
                                                 }
-                                            }
-                                            .font(.system(size: 24, weight: .semibold,
-                                                          design: .rounded))
-                                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                                            .monospacedDigit()
-                                            .textInputAutocapitalization(.never)
-                                            .autocorrectionDisabled()
-                                            .accessibilityLabel(ATHLTHLocalization.choose(
-                                                english: "Target pace in minutes and seconds per kilometer",
-                                                norwegian: "Måltempo i minutter og sekunder per kilometer"
-                                            ))
-                                        Text("/km")
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                                .onChange(of: paceFieldFocused) { _, focused in
+                                                    if !focused {
+                                                        draft.finalizeTargetPaceText(
+                                                            distanceKilometers:
+                                                                route.distanceKilometers
+                                                        )
+                                                    }
+                                                }
+                                                .font(.system(
+                                                    size: 26, weight: .semibold,
+                                                    design: .rounded
+                                                ))
+                                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                                .monospacedDigit()
+                                                .textInputAutocapitalization(.never)
+                                                .autocorrectionDisabled()
+                                                .accessibilityLabel(
+                                                    ATHLTHLocalization.choose(
+                                                        english: "Target pace per kilometre",
+                                                        norwegian: "Måltempo per kilometer"
+                                                    )
+                                                )
+
+                                            Text("/km")
+                                                .font(.caption.weight(.medium))
+                                                .foregroundStyle(
+                                                    ATHLTHPlanDesign.secondaryInk
+                                                )
+                                                .fixedSize()
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 74,
+                                           alignment: .topLeading)
+                                    .padding(13)
+                                    .background(
+                                        ATHLTHPlanDesign.surface,
+                                        in: RoundedRectangle(cornerRadius: 15)
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 15)
+                                            .strokeBorder(
+                                                ATHLTHPlanDesign.warmDivider, lineWidth: 1
+                                            )
                                     }
                                 }
-                                Spacer()
-                                Image(systemName: "speedometer")
-                                    .font(.system(size: 22, weight: .medium))
-                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                             }
-                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                            Text(ATHLTHLocalization.choose(
-                                english: "Change either value — the other updates automatically. Calculated for the selected route of",
-                                norwegian: "Endre tid eller tempo – det andre oppdateres automatisk. Beregnet for valgt rute på"
-                            ) + " " + route.distanceKilometers.formatted(
-                                .number.precision(.fractionLength(0...2))
-                            ) + " km.")
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                            if draft.targetDuration == nil {
+
+                            HStack(alignment: .top, spacing: 7) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Enter a valid time or pace to enable Target Ghost.",
-                                    norwegian: "Skriv inn en gyldig tid eller et tempo for å bruke Mål-Ghost."
+                                    english: "Change time or pace — the other updates automatically.",
+                                    norwegian: "Endre tid eller tempo – den andre verdien oppdateres automatisk."
                                 ))
                                 .font(.caption)
-                                .foregroundStyle(.orange)
-                                .accessibilityAddTraits(.updatesFrequently)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+
+                            if draft.targetDuration == nil {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Enter a valid target time or pace.",
+                                    norwegian: "Skriv inn en gyldig måltid eller et måltempo."
+                                ), systemImage: "exclamationmark.circle")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .accessibilityAddTraits(.updatesFrequently)
                             }
                         }
                     }
@@ -1089,75 +1157,101 @@ struct PerWorkoutGhostView: View {
 
                 if draft.enabled, route != nil {
                     ATHLTHPlanSurface(ghost: false) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Label(ATHLTHLocalization.choose(
-                                english: "How should Ghost run?",
-                                norwegian: "Hvordan skal Ghost løpe?"
-                            ), systemImage: "figure.run")
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                            Text(ATHLTHLocalization.choose(
-                                english: "The selected finish time stays the same. Only how Ghost distributes its pace changes.",
-                                norwegian: "Ghost beholder samme sluttid. Du bestemmer hvordan farten fordeles underveis."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        VStack(alignment: .leading, spacing: 14) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "chart.xyaxis.line")
+                                    .font(.headline)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Pacing strategy",
+                                        norwegian: "Fartsstrategi"
+                                    ))
+                                    .font(.headline)
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Same finish time, different pace distribution",
+                                        norwegian: "Samme sluttid – ulik fordeling av farten"
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                            }
 
                             LazyVGrid(
                                 columns: [
-                                    GridItem(.flexible(), spacing: 8),
-                                    GridItem(.flexible(), spacing: 8)
+                                    GridItem(.flexible(), spacing: 9),
+                                    GridItem(.flexible(), spacing: 9)
                                 ],
-                                spacing: 8
+                                spacing: 9
                             ) {
                                 ForEach(GhostTargetPacingStrategy.allCases) { strategy in
+                                    let selected = draft.pacingStrategy == strategy
                                     Button {
-                                        draft.pacingStrategy = strategy
+                                        withAnimation(.easeInOut(duration: 0.18)) {
+                                            draft.pacingStrategy = strategy
+                                        }
                                     } label: {
-                                        VStack(alignment: .leading, spacing: 6) {
+                                        VStack(alignment: .leading, spacing: 9) {
                                             HStack {
                                                 Image(systemName: strategy.icon)
+                                                    .font(.system(
+                                                        size: 20, weight: .semibold
+                                                    ))
+                                                    .foregroundStyle(
+                                                        ATHLTHPlanDesign.accentInk
+                                                    )
                                                 Spacer()
-                                                if draft.pacingStrategy == strategy {
-                                                    Image(systemName: "checkmark.circle.fill")
-                                                }
+                                                Image(systemName:
+                                                    selected ? "checkmark.circle.fill"
+                                                             : "circle")
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(
+                                                        selected
+                                                            ? ATHLTHPlanDesign.accentInk
+                                                            : ATHLTHPlanDesign.secondaryInk
+                                                    )
                                             }
-                                            .font(.subheadline.weight(.bold))
                                             Text(strategy.title)
                                                 .font(.subheadline.weight(.semibold))
-                                                .lineLimit(2)
+                                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.8)
                                             Text(strategy.subtitle)
-                                                .font(.caption2)
-                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                                .fixedSize(horizontal: false, vertical: true)
+                                                .font(.caption)
+                                                .foregroundStyle(
+                                                    ATHLTHPlanDesign.secondaryInk
+                                                )
+                                                .lineLimit(2)
+                                                .frame(maxWidth: .infinity,
+                                                       alignment: .leading)
                                         }
-                                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                                        .frame(maxWidth: .infinity, minHeight: 89, alignment: .topLeading)
-                                        .padding(11)
+                                        .frame(maxWidth: .infinity, minHeight: 87,
+                                               alignment: .topLeading)
+                                        .padding(12)
                                         .background(
-                                            draft.pacingStrategy == strategy
-                                                ? ATHLTHTheme.accentSoft
+                                            selected
+                                                ? ATHLTHPlanDesign.selectedSurface
                                                 : ATHLTHPlanDesign.surface,
-                                            in: RoundedRectangle(cornerRadius: 14)
+                                            in: RoundedRectangle(cornerRadius: 15)
                                         )
                                         .overlay {
-                                            RoundedRectangle(cornerRadius: 14)
+                                            RoundedRectangle(cornerRadius: 15)
                                                 .strokeBorder(
-                                                    draft.pacingStrategy == strategy
+                                                    selected
                                                         ? ATHLTHPlanDesign.accentInk
                                                         : ATHLTHPlanDesign.warmDivider,
-                                                    lineWidth: 1
+                                                    lineWidth: selected ? 1.5 : 1
                                                 )
                                         }
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityAddTraits(
-                                        draft.pacingStrategy == strategy
-                                            ? [.isSelected] : []
+                                        selected ? [.isSelected] : []
                                     )
                                 }
                             }
+                            .accessibilityIdentifier("athlth-ghost-pacing-strategies")
                         }
                     }
                 }
