@@ -304,12 +304,12 @@ final class ATHLTHTrainProgressionCoachTests: XCTestCase {
         let adjusted = ATHLTHTrainProgressionCoach.adjustedExerciseRepetitions(
             original, expectedReps: 10, approvedReps: 11, range: range
         )
-        XCTAssertEqual(adjusted?.setTargets?.map(\\.id),
+        XCTAssertEqual(adjusted?.setTargets?.map(\.id),
                        [warmup.id, first.id, second.id])
-        XCTAssertEqual(adjusted?.setTargets?.map(\\.reps),
+        XCTAssertEqual(adjusted?.setTargets?.map(\.reps),
                        [5, 11, 11])
         XCTAssertEqual(adjusted?.reps, 11)
-        XCTAssertEqual(original.setTargets?.map(\\.reps), [5, 10, 10])
+        XCTAssertEqual(original.setTargets?.map(\.reps), [5, 10, 10])
         XCTAssertNil(ATHLTHTrainProgressionCoach.adjustedExerciseRepetitions(
             original, expectedReps: 9, approvedReps: 11, range: range
         ))
