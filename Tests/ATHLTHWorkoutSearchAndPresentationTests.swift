@@ -112,6 +112,8 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
         XCTAssertEqual(steps.count, 9)
         XCTAssertEqual(steps[1].durationSeconds, 4 * 60)
         XCTAssertEqual(steps[2].durationSeconds, 2 * 60)
+        XCTAssertEqual(steps[1].targetEffortRPE, 8)
+        XCTAssertNil(steps[2].targetEffortRPE)
 
         // Both the tapped drag and its next step use canonical execution order.
         XCTAssertEqual(ATHLTHWorkoutStepCopy.title(
@@ -130,6 +132,20 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
         )))
         // A suggestion in the preview is never silently written as a target.
         XCTAssertNil(steps[1].targetHeartRateZone)
+    }
+
+
+    func testFractionalRunningRPEIsNotRoundedInStepDetails() throws {
+        let workout = try XCTUnwrap(
+            RunningWorkoutLibraryStore.builtInTemplates.first {
+                $0.title == "5 × 1 km terskel"
+            }
+        )
+        let work = try XCTUnwrap(workout.recipePreviewBlocks.first {
+            $0.resolvedPhase == .main
+        })
+        XCTAssertNil(work.targetEffortRPE)
+        XCTAssertEqual(work.targetIntensityType, "RPE 7.5")
     }
 
 }
