@@ -3662,6 +3662,81 @@ final class AppSessionStore: ObservableObject {
         return true
     }
 
+    /// Apply only a user-approved repetition increase to one upcoming
+    /// strength exercise. Rebuild evidence and check the current plan version
+    /// before committing; no completed session or other exercise is modified.
+    @discardableResult
+    func applySuggestedTrainingRepetitions(
+        planID: UUID,
+        workoutID: UUID,
+        exerciseID: UUID,
+        expectedVersion: Int,
+        expectedBeforeReps: Int,
+        approvedReps: Int,
+        approvedRange: ATHLTHCoachStrengthRepetitionVolume.RepRange,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              approvedReps == expectedBeforeReps + 1 else { return false }
+
+        let workouts = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+        let completed = Set(workouts.compactMap { workout -> UUID? in
+            isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: healthWorkouts,
+                strengthHistory: strengthHistory
+            ) ? workout.id : nil
+        })
+        let skipped = Set(workouts.compactMap { workout -> UUID? in
+            isPlanSessionSkipped(planID: planID, sessionID: workout.id)
+                ? workout.id : nil
+        })
+        let suggestions = ATHLTHTrainProgressionCoach.repetitionSuggestions(
+            plan: plan,
+            strengthHistory: strengthHistory,
+            completedSessionIDs: completed,
+            skippedSessionIDs: skipped,
+            range: approvedRange
+        )
+        guard suggestions.contains(where: {
+            $0.workoutID == workoutID &&
+            $0.exerciseID == exerciseID &&
+            $0.beforeReps == expectedBeforeReps &&
+            $0.proposedReps == approvedReps
+        }) else { return false }
+
+        for weekIndex in plan.weeks.indices {
+            for dayIndex in plan.weeks[weekIndex].days.indices {
+                guard let workoutIndex = plan.weeks[weekIndex].days[dayIndex]
+                    .sessions.firstIndex(where: { $0.id == workoutID })
+                else { continue }
+                guard let exerciseIndex = plan.weeks[weekIndex].days[dayIndex]
+                    .sessions[workoutIndex].exercises.firstIndex(where: {
+                        $0.id == exerciseID
+                    }) else { return false }
+
+                let original = plan.weeks[weekIndex].days[dayIndex]
+                    .sessions[workoutIndex].exercises[exerciseIndex]
+                guard let updated = ATHLTHTrainProgressionCoach
+                    .adjustedExerciseRepetitions(
+                        original,
+                        expectedReps: expectedBeforeReps,
+                        approvedReps: approvedReps,
+                        range: approvedRange
+                    ) else { return false }
+                plan.weeks[weekIndex].days[dayIndex]
+                    .sessions[workoutIndex].exercises[exerciseIndex] = updated
+                plan.version += 1
+                plan.updatedAt = Date()
+                replaceTrainingPlan(plan)
+                return true
+            }
+        }
+        return false
+    }
+
     /// Apply only the currently previewed version. Completion is recalculated
     /// at save time rather than relying on a stale UI snapshot.
     @discardableResult
