@@ -217,6 +217,40 @@ final class ATHLTHCoachStrengthComparableHistoryTests: XCTestCase {
         XCTAssertEqual(result?.metAllTargets, true)
     }
 
+    func testFullySkippedLatestSessionIsStillVisibleAsVetoEvidence() {
+        var skipped = workingSet()
+        skipped.completedAt = nil
+        skipped.skippedAt = now
+        let prior = workout(daysAgo: 10, exercises: [
+            exercise(sets: [workingSet(), workingSet()])
+        ])
+        let latest = workout(daysAgo: 1, exercises: [
+            exercise(sets: [skipped, skipped])
+        ])
+        let sessions = ATHLTHCoachStrengthComparableHistory.sessions(
+            for: exercise(), in: [prior, latest], now: now
+        )
+        XCTAssertEqual(sessions.count, 2)
+        XCTAssertEqual(sessions.first?.workoutID, latest.id)
+        XCTAssertNil(sessions.first.flatMap {
+            ATHLTHCoachStrengthComparableHistory.targetEvidence(
+                for: $0.exercise
+            )
+        })
+    }
+
+    func testRepeatedExerciseInOneWorkoutIsAmbiguous() {
+        let repeated = workout(daysAgo: 1, exercises: [
+            exercise(sets: [workingSet(), workingSet()]),
+            exercise(sets: [workingSet(), workingSet()])
+        ])
+        let result = ATHLTHCoachStrengthComparableHistory.sessions(
+            for: exercise(), in: [repeated], now: now
+        )
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.isAmbiguous, true)
+    }
+
     func testNoEvidenceWhenCurrentTargetIsTimedOrMachineResistance() {
         var timed = workingSet()
         timed.targetKind = .time
