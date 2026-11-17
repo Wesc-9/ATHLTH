@@ -1215,11 +1215,24 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // the identical workout builder is embedded in the right-hand pane.
         .sheet(item: Binding(
             get: { studioFullscreenEditing ? nil : composingAdvancedDay },
-            set: { composingAdvancedDay = $0 }
+            set: { destination in
+                // UIKit may write nil when a sheet host is suspended. This
+                // is NOT an athlete's request to close or go back a step.
+                // Keep the exact day/workout editor binding alive.
+                if destination == nil && scenePhase != .active {
+                    return
+                }
+                composingAdvancedDay = destination
+            }
         ), onDismiss: {
-            resetWorkoutComposerContext()
+            // Do not reset the editor's selected phase, focused block or
+            // quick-add context in the middle of a background transition.
+            if scenePhase == .active {
+                resetWorkoutComposerContext()
+            }
         }) { selection in
             plannedWorkoutBuilder(for: selection)
+                .interactiveDismissDisabled()
         }
     }
 
