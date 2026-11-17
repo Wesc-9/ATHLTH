@@ -536,14 +536,9 @@ struct ATHLTHAudioCoachCircleOverview: View {
             return
         }
         guard draft.coachGroups[index].isEnabled != enabled else { return }
-        let options = draft.coachGroups[index].optionIDs
+        // Never mutate underlying options, phrases, countdowns or intervals.
+        // The effective voice configuration suppresses disabled-group cues.
         draft.coachGroups[index].enabled = enabled
-        // Built-in options are stored outside custom rules. Match the previous
-        // toggle's behavior for those settings while retaining group membership.
-        for rawValue in options {
-            ATHLTHAudioCoachOption(rawValue: rawValue)?
-                .setActive(enabled, in: &draft)
-        }
     }
 
     private func saveGroupName() {
