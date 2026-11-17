@@ -295,7 +295,6 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                  detail: option.detail(in: draft))
                     }
                     .buttonStyle(.plain)
-                    .draggable("option:\(option.rawValue)")
                 }
                 ForEach(ungroupedRules) { rule in
                     ForEach(rule.selectedMetrics) { metric in
@@ -448,7 +447,6 @@ struct ATHLTHAudioCoachCircleOverview: View {
                                      detail: option.detail(in: draft))
                         }
                         .buttonStyle(.plain)
-                        .draggable("option:\(option.rawValue)")
                     }
 
                     Button { onAddCommand(group.id) } label: {
@@ -519,6 +517,11 @@ struct ATHLTHAudioCoachCircleOverview: View {
         // A rule cannot remain without its group trigger when its group is removed.
         let ids = Set(group.ruleIDs)
         draft.customRules.removeAll { ids.contains($0.id) }
+        for rawValue in group.optionIDs {
+            if let option = ATHLTHAudioCoachOption(rawValue: rawValue) {
+                option.setActive(false, in: &draft)
+            }
+        }
         draft.coachGroups.removeAll { $0.id == group.id }
         expandedGroups.remove(group.id)
     }
