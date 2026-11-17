@@ -1046,6 +1046,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var mineOnly = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var visibleStartIndex = 0
+    @State private var alphabetJumpRevision = 0
     @State private var expandedWorkoutCardID: String?
     @State private var selectedMuscleFocus = "all"
     @State private var selectedWorkoutLevel = "all"
@@ -1811,7 +1812,7 @@ struct WorkoutTemplateLibraryView: View {
             saved: allSavedWorkouts,
             scheduled: allScheduledWorkouts
         )
-        ScrollViewReader { proxy in
+        ScrollViewReader { _ in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 9) {
@@ -2454,24 +2455,19 @@ struct WorkoutTemplateLibraryView: View {
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity)
         }
-        // Recreate the scroll container when jumping to an unloaded letter.
-        // A fresh page begins at the top, avoiding a SwiftUI scroll race.
-        .id(visibleStartIndex)
+        // Always rebuild at the tapped letter. ScrollViewReader.scrollTo
+        // may silently fail when the target is inside a lazy grid, even
+        // when it belongs to the currently loaded 50 cards.
+        .id(alphabetJumpRevision)
         .overlay(alignment: .trailing) {
             if !alphabetIndex.targets.isEmpty {
                 ATHLTHExerciseAlphabetIndex(targets: alphabetIndex.targets) { target in
                     guard let index = alphabetIndex.startIndex(for: target) else {
                         return
                     }
-                    if index >= visibleStartIndex &&
-                       index < visibleStartIndex + visibleLimit {
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            proxy.scrollTo(target, anchor: .top)
-                        }
-                    } else {
-                        visibleStartIndex = index
-                        visibleLimit = ATHLTHLibraryPagination.pageSize
-                    }
+                    visibleStartIndex = index
+                    visibleLimit = ATHLTHLibraryPagination.pageSize
+                    alphabetJumpRevision += 1
                 }
                 .padding(.trailing, 6)
             }
@@ -2488,6 +2484,7 @@ struct WorkoutTemplateLibraryView: View {
         .onChange(of: pageFilterKey) { _, _ in
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
         }
         .searchable(
             text: $query,
