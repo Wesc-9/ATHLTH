@@ -4128,13 +4128,43 @@ final class StrengthWorkoutStore: ObservableObject {
             in: workoutHistory
         )
 
-        guard let latest = sessions.first,
+        guard let latest = sessions.first else { return nil }
+        let latestEvidence = ATHLTHCoachStrengthComparableHistory
+            .targetEvidence(for: latest.exercise)
+        let baselineLoad = exercise.sets
+            .compactMap(\.plannedWeightKilograms)
+            .first(where: { $0.isFinite && $0 > 0 }) ??
+            latestEvidence?.minimumRecordedWeightKg ?? 0
+
+        let assessment = ATHLTHCoachStrengthDecision.assess(
+            evidence: sessions.map { record in
+                let data = ATHLTHCoachStrengthComparableHistory.targetEvidence(
+                    for: record.exercise
+                )
+                return ATHLTHCoachStrengthDecision.Evidence(
+                    workoutID: record.workoutID,
+                    date: record.date,
+                    workingSetIDs: data?.workingSetIDs ?? [],
+                    minimumWorkingWeightKg: data?.minimumRecordedWeightKg ?? 0,
+                    metTargets: data?.metAllTargets == true
+                )
+            },
+            prescribedLoadKg: baselineLoad
+        )
+        // No numerical progression without two recent successful sessions.
+        // The review-only decision does not edit a set until tapped by athlete.
+        guard assessment.action == .reviewSmallIncrease,
               var suggestion = AthleteStrengthProgression.suggestion(
                   sets: latest.exercise.sets.filter(
                       ATHLTHCoachStrengthComparableHistory.isComparableWorkingSet
                   ),
                   targetReps: targetReps
               ) else {
+            return nil
+        }
+        let increment = suggestion.suggestedWeightKilograms -
+            suggestion.previousWeightKilograms
+        if increment > max(0.5, baselineLoad * 0.15) || increment > 5 {
             return nil
         }
 
