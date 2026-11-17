@@ -48,14 +48,16 @@ ATHLTH Coach er **den eneste brukervendte coachen**. Vi skal ikke introdusere «
 - Nye tester: `ATHLTHCoachStrengthRepetitionVolumeTests`, utvidet `ATHLTHTrainProgressionCoachTests`, `ATHLTHCoachStrengthIntelligenceTests`.
 - Sikkerhetsregler: **fullstendig hoppet over siste økt får ikke forsvinne fra sammenligningen** og eldre gode økter skal da ikke gi økningsforslag. Gjentatt samme øvelse i én økt er tvetydig og kan ikke telle som uavhengige vellykkede økter. Planlagt vektprogresjon grupperes etter kanonisk øvelses-ID der den finnes (navneendring bevares), ellers konservativt navn/utstyr.
 - Ved vektjustering krever Coach nå **eksplisitt bekreftelse per øvelse** på at historisk vektangivelse (f.eks. per manual / totalt) samsvarer og at valgt økning er tilgjengelig med utstyret. Bytte av økningssteg nullstiller bekreftelsen. Dette løser ikke behovet for framtidig strukturert belastningsproveniens i alle Watch-/treningslogger.
-- Volumkort og fremtidige repetisjonsforslag bruker samme datagrunnlag (`progressionReviews`). Ingen endring i ferdige økter eller antall sett.
+- Volumkort og repetisjonsforslag deler én analyse av historikken (`progressionReviews`) og beregnes én gang per SwiftUI-render i Coach-visningen, for å begrense gjentatte søk. Ingen endring i ferdige økter eller antall sett.
+- `Exercise.coachLoadBasis` og `ExerciseSnapshot.coachLoadBasis` kan nå lagre eksplisitt vektgrunnlag (`totalKilograms`, `kilogramsPerHand`, `machineStackKilograms`). `ATHLTHCoachStrengthComparableHistory` nekter å slå sammen forskjellige kjente vektgrunnlag, eller én kjent og én ukjent. Feltet er valgfritt og bevarer gamle logger; begge ukjente felt er **ikke** automatisk bevis på korrekt vekttolkning. Planvisningen krever derfor særskilt bekreftelse per øvelse. Innsamling/visning i alle øvelsesbyggere og Watch gjenstår.
+- Historikk med helt hoppede arbeidssett må fortsatt være en nylig observasjon som kan blokkere økning. Dupliserte øvelser i samme økt er eksplisitt tvetydige. Nye tester dekker begge, kanonisk ID ved navnebytte og tre gyldige økter for volumvurdering.
 
-- Gjenstående: Xcode-/iPhone-/iPad- og Watch-verifikasjon, full UI-testing, utstyrsproveniens (total kg versus per manual, konkrete apparat), fremtidige volumforslag, restitusjonskontekst, end-to-end-synkronisering og kjørt testbevis. Ingen av de fem fasene er merket ferdig.
+- Gjenstående: Xcode-/iPhone-/iPad- og Watch-verifikasjon, full UI-testing, registrering av vektgrunnlag i øvelsesbygger/Watch og identitet på konkrete apparat, egentlig målbasert volumdosering (ikke bare vurderingskort), restitusjonskontekst, end-to-end-synkronisering og kjørt testbevis. Ingen av de fem fasene er merket ferdig.
 
 ## Faser og ferdigkriterium
 - [ ] Fase 1 – grunnlagskartlegging, identitet, felles API og compile/verifikasjon (**pågår**).
 - [ ] Fase 2 – algoritmisk styrkeprogresjon med sikkerhetstester (**påbegynt: godkjente vekt- og repsforslag, volum kun review; sett-/utstyrsdosering og verifikasjon gjenstår**).
-- [ ] Fase 3 – integrert UI i Basic/Advanced, live, plan, iPad og Watch (**kun avsendernavn i eksisterende livekort oppdatert**).
+- [ ] Fase 3 – integrert UI i Basic/Advanced, live, plan, iPad og Watch (**Coach-navn i livekort, opt-in repetisjonsforslag, manuell bekreftelse av tilgjengelig vektøkning og volumvurdering i planvisningen er på plass; full Basic/Advanced/iPad/Watch-integrasjon og QA gjenstår**).
 - [ ] Fase 4 – innsikt og godkjente planjusteringer via Coach.
 - [ ] Fase 5 – komplett test, ytelse og TestFlight.
 
