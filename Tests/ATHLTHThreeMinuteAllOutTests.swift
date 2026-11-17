@@ -67,6 +67,15 @@ final class ATHLTHThreeMinuteAllOutTests: XCTestCase {
 
     @MainActor
     func testThreeMinuteProtocolUsesThreeTenSecondStridesAndPreservesSourceTime() throws {
+        let previousLanguage = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let previousLanguage {
+                UserDefaults.standard.set(previousLanguage, forKey: "settings.language")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "settings.language")
+            }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
         let workout = try XCTUnwrap(
             ATHLTHZonedPlanLibrary.workouts.first { $0.id == "ASS-009" }
         )
