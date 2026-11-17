@@ -5474,7 +5474,7 @@ struct WorkoutTemplateBuilderView: View {
                         }
                         resumeExercisePickerAfterWake = false
                         resumeRunningPickerAfterWake = false
-                        if let savedAuxiliary = resumeAuxiliarySheetAfterWake {
+                        if resumeAuxiliarySheetAfterWake != nil {
                             // Never replace an already-visible child card.
                             // When the scene was merely backgrounded, its
                             // SwiftUI presentation and scroll position live
@@ -5486,7 +5486,6 @@ struct WorkoutTemplateBuilderView: View {
                             } else {
                                 // The same (or a newer) sheet is still open.
                                 // A stale wake marker must not navigate back.
-                                _ = savedAuxiliary
                                 resumeAuxiliarySheetAfterWake = nil
                             }
                         }
