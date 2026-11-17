@@ -252,3 +252,5 @@ ATHLTH 2.2.2 build 130 — user-authorized TestFlight retry 2026-11-16 (Europe/O
 ATHLTH 2.2.2 build 130 — authorized retry 2026-11-16 after Build ATHLTH 43864665748 failed two assertions in ATHLTHAIProgramWorkoutStepsTests (canonical block stores distance) and ATHLTHAzureCoachVoiceTests (en-US Azure Neural supported). Corrections 8f46ce02 and 1429a2e6; source 1429a2e62577137bc3c5e03ffa91d2ed3622d1cc. Keep 2.2.2 build 130, require same-commit Build ATHLTH and backend green, signed iOS/Watch/widgets IPA, App Store Connect confirmation. No main merge.
 
 ATHLTH 2.2.3 build 131 — 2026-11-17 user-authorized recovery upload after 2.2.2 build 130 startup crashes; latest release head e3e5490d0f9ba7703d722f418775c27a25ad2c99; validate iPhone/Watch and backend then upload to TestFlight; fix failures and retry.
+
+ATHLTH 2.2.3 build 131 — retry 2026-11-17 after SwiftUI Section compiler fix 67c198885aa923fd98807583ff382654c3f227d1; user-authorized recovery upload, require same-commit build and backend success before App Store Connect.
