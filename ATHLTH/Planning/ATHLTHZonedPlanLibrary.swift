@@ -642,6 +642,16 @@ enum ATHLTHZonedCompoundStepSplitter {
         result.durationSeconds = seconds
         result.cardioActivity = walking.map { $0 ? .walking : .running }
             ?? source.cardioActivity
+        let lowerName = title.lowercased()
+        if lowerName.contains("mobility") || lowerName.contains("bevegelighet") ||
+           lowerName.contains("stretch") || lowerName.contains("tøying") ||
+           lowerName.contains("mobilitet") {
+            // Static stretching/mobility is not GPS running. Its planned
+            // duration still belongs to the overall workout timeline.
+            result.kind = .note
+            result.cardioActivity = nil
+            result.targetPaceSecondsPerKilometer = nil
+        }
         let originalNotes = (source.notes ?? "").trimmingCharacters(
             in: .whitespacesAndNewlines
         )
@@ -707,6 +717,18 @@ enum ATHLTHZonedCompoundStepSplitter {
             return nil
         }
         let matched = String(source[matchedRange])
+        let prefix = String(source[..<matchedRange.lowerBound])
+        // A ranged count like "4-5" is not a prescription for exactly
+        // five efforts. Nor is an entire nested 30/20/10 program just
+        // the final sprint token of its parenthetical description.
+        let trimmedPrefix = prefix.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        if trimmedPrefix.last == "-" ||
+           source.lowercased().contains("blocks of") ||
+           (source.contains("(") && source.contains(" + ")) {
+            return nil
+        }
         // Keep protocols with another separately counted phase untouched
         // until both phases can be represented without loss.
         let after = source[matchedRange.upperBound...].lowercased()
@@ -724,7 +746,6 @@ enum ATHLTHZonedCompoundStepSplitter {
         guard strideSeconds >= 10, total >= Double(count) * strideSeconds
         else { return nil }
         let remaining = total - Double(count) * strideSeconds
-        let prefix = String(source[..<matchedRange.lowerBound])
         let name = activityName(in: prefix, isPreparation: true)
             ?? translated("Easy preparation", "Rolig forberedelse")
         // Strictly keep all source seconds, including preparations. No
@@ -800,6 +821,12 @@ enum ATHLTHZonedCompoundStepSplitter {
               let cut = lower.range(of: separator) else { return nil }
         let before = String(lower[..<cut.lowerBound])
         let after = String(lower[cut.upperBound...])
+        // Nutrition and recovery instructions are coaching notes, not an
+        // extra exercise; never treat them as a timed moving block.
+        if after.contains("nutrition") || after.contains("meal") ||
+           after.contains("breakfast") || after.contains("hydration") {
+            return nil
+        }
         // A conservative vocabulary: do not split descriptive coaching
         // remarks, nutrition cues, or directions without separate actions.
         guard let preparation = activityName(in: before, isPreparation: false),
