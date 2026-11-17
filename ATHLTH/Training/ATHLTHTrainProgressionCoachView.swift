@@ -246,6 +246,20 @@ struct ATHLTHTrainProgressionCoachView: View {
             Text(evidence.summary)
                 .font(.subheadline)
                 .foregroundStyle(ink)
+            if ATHLTHDeviceRole.isIPad && strength.workoutHistory.isEmpty {
+                Label(tr(
+                    "This iPad has no local structured strength history. iPhone/Watch sets are not automatically available here. Coach won't invent progression from an empty history.",
+                    "Denne iPaden har ingen lokal, strukturert styrkehistorikk. Sett fra iPhone/Watch er ikke automatisk tilgjengelige her. Coach gir ikke oppdiktede progresjonsforslag."
+                ), systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(muted)
+                .padding(10)
+                .background(
+                    paper,
+                    in: RoundedRectangle(cornerRadius: 11)
+                )
+                .accessibilityIdentifier("athlth-ipad-coach-missing-local-history")
+            }
             ForEach(Array(evidence.exerciseSignals.prefix(3)), id: \.exercise) { exercise in
                 HStack(alignment: .top, spacing: 9) {
                     Image(systemName: exercise.trend == "improving"
