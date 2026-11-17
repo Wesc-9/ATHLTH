@@ -1,5 +1,35 @@
 import Foundation
 
+/// A saved personal copy represents the same recipe as its original in the
+/// combined workout picker. Keep the personal copy visible and editable,
+/// without deleting either workout or changing their permanent IDs.
+/// Favorites and source filters run *before* this policy, so an explicitly
+/// favorited original remains selectable when its personal copy is not starred.
+enum ATHLTHRunningWorkoutDisplayDeduplication {
+    static func visible(_ templates: [RunningWorkoutTemplate]) -> [RunningWorkoutTemplate] {
+        let personal = templates.filter { !$0.isBuiltIn }
+        guard !personal.isEmpty else { return templates }
+        return templates.filter { workout in
+            guard workout.isBuiltIn else { return true }
+            let name = ATHLTHWorkoutSearch.normalized(workout.title)
+            return !personal.contains { copy in
+                guard copy.type == workout.type else { return false }
+                let copyName = ATHLTHWorkoutSearch.normalized(copy.title)
+                guard copyName == name || copyName == name + " copy" else {
+                    return false
+                }
+                // New copies retain a stable source pointer. Older saved
+                // copies can be matched only when their summary agrees.
+                if let originalID = copy.sharedSourceWorkoutID {
+                    return originalID == workout.id
+                }
+                return ATHLTHWorkoutSearch.normalized(copy.summary) ==
+                    ATHLTHWorkoutSearch.normalized(workout.summary)
+            }
+        }
+    }
+}
+
 /// Keeps the built-in running prescription, including author-provided
 /// heart-rate zones, while clearing only athlete-specific pace, ghost, and
 /// treadmill choices. A preset Z5 interval must remain Z5 when copied.
