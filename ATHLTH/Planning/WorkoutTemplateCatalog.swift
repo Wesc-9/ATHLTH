@@ -2715,7 +2715,7 @@ struct WorkoutTemplateLibraryView: View {
     @ViewBuilder
     private var activityDiscoveryFilters: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 9) {
+            HStack(spacing: 7) {
                 if isRunningScope {
                     Menu {
                         Button {
@@ -2741,16 +2741,16 @@ struct WorkoutTemplateLibraryView: View {
                             }
                         }
                     } label: {
-                        Label(
+                        filterChip(
                             selectedRunningType?.title ??
                                 ATHLTHLocalization.choose(
                                     english: "Workout type", norwegian: "Økttype"
                                 ),
-                            systemImage: "figure.run"
+                            systemImage: "figure.run",
+                            selected: selectedRunningType != nil
                         )
-                        .lineLimit(1)
-                        .frame(minHeight: 44)
                     }
+                    .frame(minHeight: 44)
                     .accessibilityIdentifier("workout-running-type-filter")
                 }
 
@@ -2767,17 +2767,17 @@ struct WorkoutTemplateLibraryView: View {
                         }
                     }
                 } label: {
-                    Label(
+                    filterChip(
                         selectedWorkoutDuration == .any
                             ? ATHLTHLocalization.choose(
                                 english: "Duration", norwegian: "Varighet"
                             )
                             : selectedWorkoutDuration.title,
-                        systemImage: "clock"
+                        systemImage: "clock",
+                        selected: selectedWorkoutDuration != .any
                     )
-                    .lineLimit(1)
-                    .frame(minHeight: 44)
                 }
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("workout-duration-filter")
 
                 Menu {
@@ -2793,17 +2793,17 @@ struct WorkoutTemplateLibraryView: View {
                         }
                     }
                 } label: {
-                    Label(
+                    filterChip(
                         selectedDiscoverySort == .alphabetical
                             ? ATHLTHLocalization.choose(
                                 english: "Sort", norwegian: "Sorter"
                             )
                             : selectedDiscoverySort.title,
-                        systemImage: "arrow.up.arrow.down"
+                        systemImage: "arrow.up.arrow.down",
+                        selected: selectedDiscoverySort != .alphabetical
                     )
-                    .lineLimit(1)
-                    .frame(minHeight: 44)
                 }
+                .frame(minHeight: 44)
                 .accessibilityIdentifier("workout-sort-filter")
 
                 if hasDiscoveryFilters {
@@ -2815,20 +2815,20 @@ struct WorkoutTemplateLibraryView: View {
                         selectedExerciseName = nil
                         selectedDiscoverySort = .alphabetical
                     } label: {
-                        Label(
+                        filterChip(
                             ATHLTHLocalization.choose(
                                 english: "Reset", norwegian: "Nullstill"
                             ),
-                            systemImage: "arrow.counterclockwise"
+                            systemImage: "arrow.counterclockwise",
+                            selected: false
                         )
-                        .frame(minHeight: 44)
                     }
+                    .frame(minHeight: 44)
                 }
             }
-            .font(.subheadline.weight(.medium))
-            .buttonStyle(.bordered)
-            .tint(ATHLTHPlanDesign.accentInk)
-            .padding(.vertical, 2)
+            .font(.caption.weight(.medium))
+            .buttonStyle(.plain)
+            .padding(.vertical, 1)
             .padding(.horizontal, 1)
         }
         .accessibilityIdentifier("workout-compact-filters")
@@ -3009,21 +3009,22 @@ struct WorkoutTemplateLibraryView: View {
         systemImage: String?,
         selected: Bool
     ) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             if let systemImage {
                 Image(systemName: systemImage)
             }
 
             Text(title)
         }
-        .font(.caption.weight(.semibold))
+        .font(.caption2.weight(.semibold))
+        .lineLimit(1)
         .foregroundStyle(
             selected
                 ? Color.white
                 : ATHLTHTheme.primaryText.opacity(0.82)
         )
-        .padding(.horizontal, 13)
-        .frame(height: 38)
+        .padding(.horizontal, 10)
+        .frame(height: 31)
         .background(
             selected
                 ? ATHLTHPlanDesign.accentInk
