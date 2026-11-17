@@ -141,6 +141,64 @@ final class ATHLTHRouteOfflineAndDirectionTests: XCTestCase {
         XCTAssertEqual(result.gainSeconds, 110)
     }
 
+    func testLegacyDirectionUnknownIsVisibleInMyAttemptsButNotLeaderboard() {
+        let userID = UUID()
+        let legacy = attempt(
+            userID: userID, seconds: 2289,
+            direction: nil, ageDays: 2
+        )
+        let other = attempt(
+            userID: UUID(), seconds: 1500,
+            direction: .forward
+        )
+        let attempts = [legacy, other]
+
+        XCTAssertEqual(
+            ATHLTHRouteAttemptDirectionPolicy.personalHistory(
+                attempts, userID: userID
+            ).map(\.id),
+            [legacy.id]
+        )
+        XCTAssertEqual(
+            ATHLTHRouteAttemptDirectionPolicy.visiblePersonalHistory(
+                attempts, direction: .forward, userID: userID
+            ).map(\.id),
+            [legacy.id]
+        )
+        XCTAssertTrue(ATHLTHRouteAttemptDirectionPolicy.eligible(
+            attempts, direction: .forward, userID: userID
+        ).isEmpty)
+    }
+
+    func testPersonalHistoryDirectionFilterKeepsUnknownButExcludesOtherDirection() {
+        let userID = UUID()
+        let forward = attempt(
+            userID: userID, seconds: 1400,
+            direction: .forward, ageDays: 4
+        )
+        let reverse = attempt(
+            userID: userID, seconds: 1200,
+            direction: .reverse, ageDays: 1
+        )
+        let legacy = attempt(
+            userID: userID, seconds: 2289,
+            direction: .unknown, ageDays: 2
+        )
+        let attempts = [forward, reverse, legacy]
+        XCTAssertEqual(
+            ATHLTHRouteAttemptDirectionPolicy.visiblePersonalHistory(
+                attempts, direction: .forward, userID: userID
+            ).map(\.id),
+            [legacy.id, forward.id]
+        )
+        XCTAssertEqual(
+            ATHLTHRouteAttemptDirectionPolicy.personalHistory(
+                attempts, userID: userID
+            ).count,
+            3
+        )
+    }
+
     func testGPXExportPreservesMeasuredGeometryAndEscapesXML() throws {
         let route = TrainingRoute(
             id: UUID(),
