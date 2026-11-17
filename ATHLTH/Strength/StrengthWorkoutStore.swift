@@ -4113,138 +4113,44 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func progressionSuggestion(
-        for exercise:
-            StrengthExerciseLog
+        for exercise: StrengthExerciseLog
     ) -> StrengthProgressionSuggestion? {
-        let name =
-            exercise.exercise.name
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-                .lowercased()
-
-        guard
-            !name.isEmpty,
-            exercise.sets.first?
-                .resolvedTargetKind !=
-                .time,
-            exercise.sets.first?
-                .resolvedLoadKind !=
-                .resistanceLevel
-        else {
-            return nil
-        }
-
+        // ATHLTH Coach owns the read-only evidence boundary. The legacy
+        // calculation remains unchanged for now, but it may only evaluate
+        // comparable, finished working sets from the same movement and
+        // apparatus type. No plan or live set is changed here.
         let targetReps =
-            exercise.sets
-                .first {
-                    $0.plannedReps != nil
-                }?
-                .plannedReps ??
+            exercise.sets.first(where: { $0.plannedReps != nil })?.plannedReps ??
             draftReps
 
-        let cutoff =
-            Date()
-                .addingTimeInterval(
-                    -56 * 86_400
-                )
+        let sessions = ATHLTHCoachStrengthComparableHistory.sessions(
+            for: exercise,
+            in: workoutHistory
+        )
 
-        let recentMatches:
-            [
-                (
-                    date: Date,
-                    exercise:
-                        StrengthExerciseLog
-                )
-            ] =
-            workoutHistory
-                .filter {
-                    $0.isFinished &&
-                    $0.startedAt >= cutoff
-                }
-                .sorted {
-                    $0.startedAt >
-                        $1.startedAt
-                }
-                .compactMap {
-                    workout in
-
-                    guard
-                        let match =
-                            workout
-                                .exercises
-                                .first(
-                                    where: {
-                                        $0.exercise
-                                            .name
-                                            .trimmingCharacters(
-                                                in:
-                                                    .whitespacesAndNewlines
-                                            )
-                                            .lowercased() ==
-                                            name &&
-                                        $0.sets
-                                            .contains {
-                                                $0
-                                                    .countsTowardTrainingLoad
-                                            }
-                                    }
-                                )
-                    else {
-                        return nil
-                    }
-
-                    return (
-                        date:
-                            workout
-                                .startedAt,
-                        exercise:
-                            match
-                    )
-                }
-                .prefix(4)
-                .map { $0 }
-
-        guard
-            let latest =
-                recentMatches.first,
-            var suggestion =
-                AthleteStrengthProgression
-                    .suggestion(
-                        sets:
-                            latest
-                                .exercise
-                                .sets,
-                        targetReps:
-                            targetReps
-                    )
-        else {
+        guard let latest = sessions.first,
+              var suggestion = AthleteStrengthProgression.suggestion(
+                  sets: latest.exercise.sets.filter(
+                      ATHLTHCoachStrengthComparableHistory.isComparableWorkingSet
+                  ),
+                  targetReps: targetReps
+              ) else {
             return nil
         }
 
-        let recentSuggestions =
-            recentMatches
-                .compactMap {
-                    AthleteStrengthProgression
-                        .suggestion(
-                            sets:
-                                $0.exercise
-                                    .sets,
-                            targetReps:
-                                targetReps
-                        )
-                }
+        let recentSuggestions = sessions.compactMap { record in
+            AthleteStrengthProgression.suggestion(
+                sets: record.exercise.sets.filter(
+                    ATHLTHCoachStrengthComparableHistory.isComparableWorkingSet
+                ),
+                targetReps: targetReps
+            )
+        }
 
-        suggestion.recentSessionCount =
-            recentSuggestions.count
-        suggestion.recentTrend =
-            AthleteStrengthProgression
-                .recentTrend(
-                    suggestions:
-                        recentSuggestions
-                )
-
+        suggestion.recentSessionCount = recentSuggestions.count
+        suggestion.recentTrend = AthleteStrengthProgression.recentTrend(
+            suggestions: recentSuggestions
+        )
         return suggestion
     }
 
