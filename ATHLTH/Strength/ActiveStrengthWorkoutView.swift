@@ -2536,6 +2536,16 @@ struct ActiveStrengthWorkoutView: View {
                         exercise: exercise
                     )
 
+                    if exercise.isEmbeddedRunningInterval != true &&
+                       exercise.sets.contains(where: {
+                           $0.resolvedLoadKind == .weightKilograms
+                       }) {
+                        focusedStrengthLoadBasisControl(
+                            workout: workout,
+                            exercise: exercise
+                        )
+                    }
+
                 if let suggestion =
                         strength
                             .progressionSuggestion(
@@ -2587,6 +2597,87 @@ struct ActiveStrengthWorkoutView: View {
                 focusedNextExercisePreview(upcoming)
             }
         }
+    }
+
+    /// Displays the exact interpretation of recorded kilograms in the
+    /// shared live strength screen. The owner can change the interpretation
+    /// only before the first set, not retroactively for completed results.
+    private func focusedStrengthLoadBasisControl(
+        workout: StrengthWorkoutLog,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        let canEdit = workout.captureDevice == .iPhone &&
+            exercise.sets.allSatisfy {
+                !$0.isCompleted && $0.skippedAt == nil
+            }
+        let basis = exercise.exercise.coachLoadBasis
+        return HStack(spacing: 10) {
+            Image(systemName: "scalemass")
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Weight registration",
+                    norwegian: "Vektregistrering"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                Text(basis?.localizedTitle ??
+                     ATHLTHLocalization.choose(
+                         english: "Not specified",
+                         norwegian: "Ikke angitt"
+                     ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            Spacer(minLength: 4)
+
+            if canEdit {
+                Menu {
+                    ForEach(ATHLTHStrengthLoadBasis.allCases, id: \.self) { option in
+                        Button(option.localizedTitle) {
+                            _ = strength.setActiveExerciseCoachLoadBasis(
+                                exercise.id, basis: option
+                            )
+                        }
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Not specified",
+                        norwegian: "Ikke angitt"
+                    )) {
+                        _ = strength.setActiveExerciseCoachLoadBasis(
+                            exercise.id, basis: nil
+                        )
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Change", norwegian: "Endre"
+                    ), systemImage: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier("active-strength-coach-load-basis")
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Only changes the unit label before any set is recorded.",
+                    norwegian: "Endrer bare vektangivelsen før du har registrert sett."
+                ))
+            } else if workout.captureDevice == .iPhone {
+                Text(ATHLTHLocalization.choose(
+                    english: "Locked after logging",
+                    norwegian: "Låst etter registrering"
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(
+            ATHLTHPlanDesign.selectedSurface,
+            in: RoundedRectangle(cornerRadius: 13)
+        )
     }
 
     /// Running-only live presentation within the active strength recording.
