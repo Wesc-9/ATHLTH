@@ -2512,6 +2512,7 @@ struct CustomExerciseEditorView: View {
             }
         ))
         _selectedEquipment = State(initialValue: editing?.exercise.equipment ?? [])
+        _coachLoadBasis = State(initialValue: editing?.exercise.coachLoadBasis)
         _instructions = State(initialValue: editing?.exercise.instructions.joined(separator: "\n") ?? "")
         _visibility = State(initialValue:
             editing?.exercise.sharedSourceExerciseID == nil
@@ -2552,6 +2553,7 @@ struct CustomExerciseEditorView: View {
     @State private var secondaryMuscles:
         Set<ExerciseMuscleGroup> = []
     @State private var selectedEquipment: [String] = []
+    @State private var coachLoadBasis: ATHLTHStrengthLoadBasis?
     @State private var equipmentQuery = ""
     @State private var equipmentPickerQuery = ""
     @State private var showingEquipmentPicker = false
@@ -2600,6 +2602,53 @@ struct CustomExerciseEditorView: View {
             items.append(item)
         }
         return items
+    }
+
+    @ViewBuilder
+    private var strengthLoadBasisEditor: some View {
+        if activityCategory == .strength {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Weight registration",
+                        norwegian: "Registrering av vekt"
+                    ),
+                    systemImage: "scalemass"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "How is the weight recorded?",
+                        norwegian: "Hvordan registreres vekten?"
+                    ),
+                    selection: $coachLoadBasis
+                ) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Not specified", norwegian: "Ikke angitt"
+                    )).tag(nil as ATHLTHStrengthLoadBasis?)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Total weight (kg)", norwegian: "Totalvekt (kg)"
+                    )).tag(ATHLTHStrengthLoadBasis.totalKilograms as ATHLTHStrengthLoadBasis?)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Weight per hand (kg)", norwegian: "Vekt per hånd (kg)"
+                    )).tag(ATHLTHStrengthLoadBasis.kilogramsPerHand as ATHLTHStrengthLoadBasis?)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Machine stack (kg)", norwegian: "Maskinvekt (kg)"
+                    )).tag(ATHLTHStrengthLoadBasis.machineStackKilograms as ATHLTHStrengthLoadBasis?)
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("exercise-studio-coach-load-basis")
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Helps ATHLTH Coach compare sessions correctly. For example, 20 kg per dumbbell is not 20 kg total. Choose only when you know how your exercise is measured.",
+                    norwegian: "Hjelper ATHLTH Coach å sammenligne økter riktig. For eksempel er 20 kg per manual ikke 20 kg totalt. Velg bare når du vet hvordan øvelsen måles."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
     }
 
     private func addEquipment(_ raw: String) {
@@ -3191,6 +3240,7 @@ struct CustomExerciseEditorView: View {
                     .accessibilityIdentifier("exercise-studio-muscles-side-by-side")
 
                     equipmentEditor
+                    strengthLoadBasisEditor
                 }
 
                 if !ATHLTHAssessmentMethod.available(for: activityCategory).isEmpty {
@@ -3537,6 +3587,7 @@ struct CustomExerciseEditorView: View {
                 updated.primaryMuscles = selectedMuscleValues(primaryMuscles)
                 updated.secondaryMuscles = selectedMuscleValues(secondaryMuscles)
                 updated.equipment = resolvedEquipment
+                updated.coachLoadBasis = activityCategory == .strength ? coachLoadBasis : nil
                 updated.activityCategory = activityCategory
                 updated.assessmentMethod = assessmentMethod.flatMap {
                     ATHLTHAssessmentMethod.available(for: activityCategory).contains($0)
@@ -3578,7 +3629,8 @@ struct CustomExerciseEditorView: View {
                         ATHLTHAssessmentMethod.available(for: activityCategory).contains($0)
                             ? $0 : nil
                     },
-                    visibility: scopedVisibility
+                    visibility: scopedVisibility,
+                    coachLoadBasis: activityCategory == .strength ? coachLoadBasis : nil
                 )
             }
 
