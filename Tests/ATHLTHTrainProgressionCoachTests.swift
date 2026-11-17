@@ -174,6 +174,56 @@ final class ATHLTHTrainProgressionCoachTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
+    func testSameExerciseNameWithDifferentEquipmentDoesNotIncrease() {
+        let plan = makePlan(weeks: 3)
+        let first = plan.weeks[0].days[0].sessions[0].id
+        let second = plan.weeks[1].days[0].sessions[0].id
+        var wrongEquipment = logged(second, offset: 1)
+        wrongEquipment.exercises[0].exercise.equipment = ["Cable"]
+        let result = ATHLTHTrainProgressionCoach.suggestions(
+            plan: plan,
+            strengthHistory: [
+                logged(first, offset: 0), wrongEquipment
+            ],
+            completedSessionIDs: [first, second],
+            skippedSessionIDs: [], now: date(week: 3)
+        )
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testLatestSkippedPrescribedSetBlocksPlanIncrease() {
+        let plan = makePlan(weeks: 3)
+        let first = plan.weeks[0].days[0].sessions[0].id
+        let second = plan.weeks[1].days[0].sessions[0].id
+        var skipped = logged(second, offset: 1)
+        skipped.exercises[0].sets[1].completedAt = nil
+        skipped.exercises[0].sets[1].skippedAt = date(week: 2)
+        let result = ATHLTHTrainProgressionCoach.suggestions(
+            plan: plan,
+            strengthHistory: [logged(first, offset: 0), skipped],
+            completedSessionIDs: [first, second],
+            skippedSessionIDs: [], now: date(week: 3)
+        )
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testExcessiveRequestedIncreaseIsNotSuggested() {
+        let plan = makePlan(weeks: 3, load: 5)
+        let first = plan.weeks[0].days[0].sessions[0].id
+        let second = plan.weeks[1].days[0].sessions[0].id
+        let result = ATHLTHTrainProgressionCoach.suggestions(
+            plan: plan,
+            strengthHistory: [
+                logged(first, offset: 0, planWeight: 5),
+                logged(second, offset: 1, planWeight: 5)
+            ],
+            completedSessionIDs: [first, second],
+            skippedSessionIDs: [], increaseKg: 2.5,
+            now: date(week: 3)
+        )
+        XCTAssertTrue(result.isEmpty)
+    }
+
     func testNoInventionOfUnprescribedOrZeroWeight() {
         var exercise = planned(load: nil)
         XCTAssertNil(ATHLTHTrainProgressionCoach.adjustedExercise(
