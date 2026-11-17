@@ -1118,7 +1118,7 @@ struct ATHLTHiPadStudioRootView: View {
             ATHLTHCommunityV5View(initialTab: communityTab)
                 .id(communityTab)
         case .coach:
-            RecoveryCoachInboxDestinationView()
+            ATHLTHiPadCoachWorkspaceView()
         case .settings:
             ATHLTHSettingsView()
         }
@@ -1176,5 +1176,149 @@ struct ATHLTHiPadStudioRootView: View {
         inspectedWeekDate = nil
         selectedWorkout = workout
         showingWorkoutDetail = true
+    }
+}
+
+
+/// iPad Coach keeps both recovery and planned strength progression in the
+/// main Studio column. It reuses the same plan IDs, stores and approval flow
+/// as iPhone; no duplicate recommendation algorithm or modal-only entry.
+private struct ATHLTHiPadCoachWorkspaceView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @SceneStorage("athlth.ipad.coach.selectedSection")
+    private var selectedSection = "recovery"
+    @SceneStorage("athlth.ipad.coach.selectedPlanID")
+    private var selectedPlanID = ""
+
+    private var selectedPlan: TrainingPlan? {
+        session.trainingPlans.first { $0.id.uuidString == selectedPlanID }
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                Image(systemName: "sparkles")
+                    .font(.title3)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text("ATHLTH Coach")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                Spacer(minLength: 12)
+
+                Picker(tr("Coach view", "Coach-visning"), selection: $selectedSection) {
+                    Text(tr("Recovery", "Restitusjon")).tag("recovery")
+                    Text(tr("Strength progression", "Styrkeprogresjon"))
+                        .tag("progression")
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 440)
+                .accessibilityIdentifier("athlth-ipad-coach-section")
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 16)
+            .background(ATHLTHPlanDesign.surface)
+
+            Divider().opacity(0.4)
+
+            if selectedSection == "progression" {
+                if let selectedPlan {
+                    HStack {
+                        Button {
+                            selectedPlanID = ""
+                        } label: {
+                            Label(
+                                tr("All training plans", "Alle treningsplaner"),
+                                systemImage: "chevron.left"
+                            )
+                            .font(.subheadline.weight(.medium))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Spacer()
+                        Text(selectedPlan.title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+
+                    ATHLTHTrainProgressionCoachView(planID: selectedPlan.id)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityIdentifier("athlth-ipad-coach-strength-progression")
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text(tr("Progression in your plans",
+                                    "Progresjon i treningsplanene dine"))
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(tr(
+                                "ATHLTH Coach reviews your actual strength history. Suggestions remain optional and require your approval.",
+                                "ATHLTH Coach vurderer gjennomført styrketrening. Forslag er valgfrie og krever din godkjenning."
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                            if session.trainingPlans.isEmpty {
+                                ContentUnavailableView(
+                                    tr("No training plans", "Ingen treningsplaner"),
+                                    systemImage: "calendar.badge.plus",
+                                    description: Text(tr(
+                                        "Create a training plan to review progression.",
+                                        "Opprett en treningsplan for å vurdere progresjon."
+                                    ))
+                                )
+                            } else {
+                                ForEach(session.trainingPlans) { plan in
+                                    Button {
+                                        selectedPlanID = plan.id.uuidString
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: "dumbbell")
+                                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(plan.title)
+                                                    .font(.subheadline.weight(.semibold))
+                                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                                Text(tr("Review Coach suggestions",
+                                                        "Se forslag fra Coach"))
+                                                    .font(.caption)
+                                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        }
+                                        .padding(16)
+                                        .background(
+                                            ATHLTHPlanDesign.surface,
+                                            in: RoundedRectangle(cornerRadius: 16)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier(
+                                        "athlth-ipad-coach-plan-\(plan.id.uuidString)"
+                                    )
+                                }
+                            }
+                        }
+                        .frame(maxWidth: 780, alignment: .leading)
+                        .frame(maxWidth: .infinity)
+                        .padding(22)
+                    }
+                }
+            } else {
+                RecoveryCoachInboxDestinationView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .accessibilityIdentifier("athlth-ipad-coach-workspace")
     }
 }
