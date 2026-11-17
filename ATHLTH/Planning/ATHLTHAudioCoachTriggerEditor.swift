@@ -40,7 +40,8 @@ struct ATHLTHAudioCoachTriggerEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ForEach(Array(categories.enumerated()), id: \.offset) { _, category in
+            ForEach(categories.indices, id: \.self) { categoryIndex in
+                let category = categories[categoryIndex]
                 VStack(alignment: .leading, spacing: 6) {
                     Text(category.0)
                         .font(.caption2.weight(.bold))
@@ -48,7 +49,7 @@ struct ATHLTHAudioCoachTriggerEditor: View {
                         .foregroundStyle(gold)
                         .padding(.horizontal, 2)
                     VStack(spacing: 0) {
-                        ForEach(Array(category.1.enumerated()), id: \.element) { index, item in
+                        ForEach(category.1, id: \.self) { item in
                             let unavailable = item.needsStructuredStep && !supportsStructured
                             Button {
                                 trigger = item
@@ -86,7 +87,7 @@ struct ATHLTHAudioCoachTriggerEditor: View {
                             }
                             .disabled(unavailable)
                             .buttonStyle(.plain)
-                            if index < category.1.count - 1 {
+                            if item != category.1.last {
                                 Divider().overlay(ATHLTHPlanDesign.warmDivider)
                                     .padding(.leading, 46)
                             }
