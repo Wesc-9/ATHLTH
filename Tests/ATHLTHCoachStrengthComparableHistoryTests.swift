@@ -153,6 +153,64 @@ final class ATHLTHCoachStrengthComparableHistoryTests: XCTestCase {
         XCTAssertGreaterThan(result[1].date, result[2].date)
     }
 
+    func testCanonicalLibraryIdentityPreventsAccidentalMatching() {
+        var original = exercise().exercise
+        var variant = original
+        let id = UUID()
+        original.libraryExerciseID = id
+        variant.libraryExerciseID = UUID()
+        XCTAssertFalse(ATHLTHCoachStrengthComparableHistory.isSameExercise(
+            original, variant
+        ))
+        variant.libraryExerciseID = nil
+        XCTAssertFalse(ATHLTHCoachStrengthComparableHistory.isSameExercise(
+            original, variant
+        ))
+        variant.libraryExerciseID = id
+        XCTAssertTrue(ATHLTHCoachStrengthComparableHistory.isSameExercise(
+            original, variant
+        ))
+    }
+
+    func testMissingEquipmentCannotJustifyWeightIncrease() {
+        let first = exercise(equipment: []).exercise
+        let second = exercise(equipment: []).exercise
+        XCTAssertFalse(ATHLTHCoachStrengthComparableHistory.isSameExercise(
+            first, second
+        ))
+    }
+
+    func testSkippedWorkingSetBlocksSuccessfulSessionEvidence() {
+        var skipped = workingSet()
+        skipped.completedAt = nil
+        skipped.skippedAt = now
+        let entry = exercise(sets: [workingSet(), workingSet(), skipped])
+        XCTAssertNil(ATHLTHCoachStrengthComparableHistory.targetEvidence(
+            for: entry
+        ))
+    }
+
+    func testVeryHardEffortCannotSupportLoadIncrease() {
+        var nearFailure = workingSet()
+        nearFailure.rir = 0
+        let entry = exercise(sets: [workingSet(), nearFailure])
+        let result = ATHLTHCoachStrengthComparableHistory.targetEvidence(
+            for: entry
+        )
+        XCTAssertEqual(result?.metAllTargets, false)
+    }
+
+    func testTwoSuccessfulSetsIncludeBothProvenanceIDs() {
+        let first = workingSet()
+        let second = workingSet()
+        let result = ATHLTHCoachStrengthComparableHistory.targetEvidence(
+            for: exercise(sets: [first, second]), minimumLoadKg: 60
+        )
+        XCTAssertEqual(result?.workingSetIDs.count, 2)
+        XCTAssertEqual(result?.minimumRecordedWeightKg, 60)
+        XCTAssertEqual(result?.metAllTargets, true)
+    }
+
     func testNoEvidenceWhenCurrentTargetIsTimedOrMachineResistance() {
         var timed = workingSet()
         timed.targetKind = .time
