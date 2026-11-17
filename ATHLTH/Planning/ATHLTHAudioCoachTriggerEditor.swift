@@ -40,7 +40,7 @@ struct ATHLTHAudioCoachTriggerEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ForEach(categories, id: \.0) { category in
+            ForEach(Array(categories.enumerated()), id: \.offset) { _, category in
                 VStack(alignment: .leading, spacing: 6) {
                     Text(category.0)
                         .font(.caption2.weight(.bold))
