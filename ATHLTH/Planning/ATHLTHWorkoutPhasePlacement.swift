@@ -165,22 +165,30 @@ enum ATHLTHWorkoutPhaseDeletionPolicy {
             ? .main : block.resolvedPhase
     }
 
-    /// Present workout sections in their first occurrence order, not in a
-    /// hard-coded Warmup/Main/Recovery order. The stored block timeline is
-    /// never reordered (important when a day starts with active recovery).
+    /// Preserve the established category ordering, except when an explicit
+    /// active-recovery step occurs before the first main step. Then show its
+    /// Pause section before Hoveddel, matching the guided day timeline.
+    /// Stored execution order never changes.
     static func orderedVisiblePhases(
         for blocks: [WorkoutTemplateBlock],
         visiblePhases: Set<WorkoutPhaseKind>
     ) -> [WorkoutPhaseKind] {
-        var ordered: [WorkoutPhaseKind] = []
-        for block in blocks {
-            let phase = presentedPhase(for: block, visiblePhases: visiblePhases)
-            if !ordered.contains(phase) { ordered.append(phase) }
+        var phases = WorkoutPhaseKind.allCases.filter { phase in
+            visiblePhases.contains(phase) || blocks.contains {
+                presentedPhase(for: $0, visiblePhases: visiblePhases) == phase
+            }
         }
-        for phase in WorkoutPhaseKind.allCases where visiblePhases.contains(phase) {
-            if !ordered.contains(phase) { ordered.append(phase) }
+        if let recoveryIndex = blocks.firstIndex(where: { $0.isActiveRecovery }),
+           let mainIndex = blocks.firstIndex(where: {
+               presentedPhase(for: $0, visiblePhases: visiblePhases) == .main
+           }), recoveryIndex < mainIndex,
+           let existingRecovery = phases.firstIndex(of: .recovery) {
+            phases.remove(at: existingRecovery)
+            if let firstMain = phases.firstIndex(of: .main) {
+                phases.insert(.recovery, at: firstMain)
+            }
         }
-        return ordered
+        return phases
     }
 
     static func removing(
