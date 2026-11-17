@@ -263,4 +263,42 @@ final class ATHLTHWorkoutPhasePlacementTests: XCTestCase {
         ))
     }
 
+
+    func testGuidedActiveRecoveryAndWalkingKeepTheirPhasesWhenStudioOpens() {
+        var activePause = block("Aktiv pause", phase: .recovery)
+        activePause.activityTag = "active_recovery"
+        activePause.cardioActivity = .running
+        var walking = block("Gå", phase: .main)
+        walking.cardioActivity = .walking
+
+        XCTAssertTrue(activePause.isActiveRecovery)
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+            for: activePause, visiblePhases: [.main]
+        ), .recovery)
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.orderedVisiblePhases(
+            for: [activePause, walking], visiblePhases: [.main]
+        ), [.recovery, .main])
+
+        let saved = ATHLTHWorkoutPhasePlacement.renumbered(
+            activePause, sequence: 1
+        )
+        XCTAssertTrue(saved.isActiveRecovery)
+        XCTAssertEqual(saved.title, "Aktiv pause")
+        XCTAssertEqual(saved.resolvedPhase, .recovery)
+
+        let daySections = ATHLTHWorkoutTimelinePresentation.sections(
+            for: [saved, walking]
+        )
+        XCTAssertEqual(daySections.map(\.phase), [.recovery, .main])
+        XCTAssertEqual(daySections[0].blocks.first?.title, "Aktiv pause")
+    }
+
+    func testOrdinaryRecoveryRestStillUsesMainWithoutSeparateCategory() {
+        var ordinaryRest = block("Pause", phase: .recovery)
+        ordinaryRest.kind = .rest
+        XCTAssertFalse(ordinaryRest.isActiveRecovery)
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+            for: ordinaryRest, visiblePhases: [.main]
+        ), .main)
+    }
 }
