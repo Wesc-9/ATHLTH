@@ -1169,7 +1169,9 @@ final class ExerciseLibraryStore: ObservableObject {
             primaryMuscles: safe.primaryMuscles,
             secondaryMuscles: safe.secondaryMuscles ?? [],
             equipment: safe.equipment,
-            isVisibleOutsideOwnerLibrary: false
+            isVisibleOutsideOwnerLibrary: false,
+            activityCategory: safe.activityCategory ?? .strength,
+            assessmentMethod: safe.assessmentMethod
         )
         var owned = imported.exercise
         owned.sharedSourceExerciseID = originalExerciseID ?? sourceExerciseID
