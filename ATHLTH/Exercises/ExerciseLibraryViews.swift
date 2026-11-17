@@ -1846,6 +1846,12 @@ struct ExerciseDetailView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+                    if let basis = currentEntry.exercise.coachLoadBasis {
+                        Label(basis.localizedTitle, systemImage: "scalemass")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .accessibilityIdentifier("exercise-detail-coach-load-basis")
+                    }
                 }
 
                 if let summary = displayedSummary, !summary.isEmpty {
