@@ -782,47 +782,38 @@ struct ATHLTHAudioCoachActiveListView: View {
     /// added afterwards so the group never schedules multiple overlapping cues.
     private var groupBuilderSheet: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField(
-                        tr("Group name (optional)", "Gruppenavn (valgfritt)"),
-                        text: $groupDraftName
+            ScrollView {
+                VStack(alignment: .leading, spacing: 17) {
+                    Text(editingGroupTriggerID == nil
+                         ? tr("New coach group", "Ny coach-gruppe")
+                         : tr("Edit group trigger", "Endre gruppens trigger"))
+                        .font(.system(size: 26, weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+                    Text(tr("One trigger can speak several values together.",
+                            "Én trigger kan lese opp flere verdier samlet."))
+                        .font(.subheadline)
+                        .foregroundStyle(dim)
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(tr("GROUP NAME", "GRUPPENAVN"))
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.3)
+                            .foregroundStyle(bronze)
+                        TextField(
+                            tr("Name (optional)", "Gruppenavn (valgfritt)"),
+                            text: $groupDraftName
+                        )
+                        .textInputAutocapitalization(.sentences)
+                        .padding(14)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    }
+
+                    ATHLTHAudioCoachTriggerEditor(
+                        trigger: $groupDraftTrigger,
+                        interval: $groupDraftInterval,
+                        supportsStructured: showStructuredOptions
                     )
-                    .textInputAutocapitalization(.sentences)
-                } header: {
-                    Text(tr("NAME", "NAVN"))
-                }
-                Section {
-                    Picker(tr("Choose trigger", "Velg trigger"),
-                           selection: $groupDraftTrigger) {
-                        ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
-                            Text(trigger.title).tag(trigger)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: groupDraftTrigger) { _, trigger in
-                        groupDraftInterval = trigger == .time ? 60 : 1_000
-                    }
-                    Stepper(
-                        value: $groupDraftInterval,
-                        in: groupDraftTrigger == .time ? 15...7_200 : 100...42_000,
-                        step: groupDraftTrigger == .time ? 15 : 100
-                    ) {
-                        Text(groupDraftTrigger == .time
-                             ? tr("Every \(groupDraftInterval) seconds",
-                                  "Hvert \(groupDraftInterval) sekund")
-                             : tr("Every \(groupDraftInterval) metres",
-                                  "Hver \(groupDraftInterval) meter"))
-                    }
-                } header: {
-                    Text(tr("1 · Choose trigger", "1 · Velg trigger"))
-                } footer: {
-                    Text(tr(
-                        "Create a group first. Then add one or more commands to be spoken together on this trigger.",
-                        "Opprett gruppen først. Legg deretter til kommandoer som leses samlet på denne triggeren."
-                    ))
-                }
-                Section {
+
                     Button(action: createCoachGroup) {
                         Label(
                             editingGroupTriggerID == nil
@@ -830,14 +821,16 @@ struct ATHLTHAudioCoachActiveListView: View {
                                 : tr("Save group trigger", "Lagre gruppens trigger"),
                             systemImage: "arrow.right"
                         )
-                            .frame(maxWidth: .infinity, minHeight: 48)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 50)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(bronze)
                     .accessibilityIdentifier("athlth-coach-save-group")
                 }
+                .padding(18)
             }
-            .scrollContentBackground(.hidden)
+            .scrollIndicators(.hidden)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .navigationTitle(
                 editingGroupTriggerID == nil
@@ -860,6 +853,11 @@ struct ATHLTHAudioCoachActiveListView: View {
            let index = draft.coachGroups.firstIndex(where: {
                $0.id == editingGroupTriggerID
            }) {
+            draft.coachGroups[index].name = String(
+                groupDraftName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60)
+            ).isEmpty ? draft.coachGroups[index].name : String(
+                groupDraftName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60)
+            )
             draft.coachGroups[index].trigger = groupDraftTrigger
             draft.coachGroups[index].interval = groupDraftInterval
             for id in draft.coachGroups[index].ruleIDs {
@@ -875,15 +873,13 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
         let name = String(groupDraftName.trimmingCharacters(
             in: .whitespacesAndNewlines).prefix(60))
-        let fallback = groupDraftTrigger == .time
-            ? tr("Time updates", "Tidsoppdateringer")
-            : tr("Distance updates", "Distanseoppdateringer")
+        let fallback = groupDraftTrigger.title
         var group = ATHLTHAudioCoachGroup(name: name.isEmpty ? fallback : name)
         group.trigger = groupDraftTrigger
         group.interval = groupDraftInterval
         draft.coachGroups.append(group)
         pendingGroupCommandID = group.id
-        groupCommandMetric = groupDraftTrigger == .time ? .elapsedTime : .distance
+        groupCommandMetric = groupDraftTrigger == .distance ? .distance : .elapsedTime
         groupCommandPhrase = ""
         showingGroupBuilder = false
     }
