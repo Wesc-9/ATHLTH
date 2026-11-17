@@ -349,7 +349,10 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
             ATHLTHZonedPlanLibrary.workouts.first { $0.id == "ASS-009" }
         )
         let original = ATHLTHZonedPlanLibrary.blocks(for: source)
-        XCTAssertEqual(original.count, 4)
+        // The source's five-minute drills + 3 strides is now executable
+        // as four distinct warm-up steps; walking and jogging cooldown
+        // are two steps, rather than two combined instructions.
+        XCTAssertEqual(original.count, 8)
         let effort = try XCTUnwrap(original.first { $0.resolvedPhase == .main })
         XCTAssertEqual(effort.kind, .run)
         XCTAssertEqual(effort.durationSeconds, 180)
@@ -454,12 +457,16 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         })
         XCTAssertTrue(ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: warmup))
 
-        let cooldown = try XCTUnwrap(steps.last)
-        XCTAssertEqual(cooldown.title, "Gå, deretter rolig jogg")
-        XCTAssertEqual(cooldown.durationSeconds, 600)
-        XCTAssertTrue(cooldown.notes?.contains("Start med gange") == true)
-        XCTAssertTrue(cooldown.notes?.contains("Varigheten gjelder hele deløkten") == true)
-        XCTAssertTrue(ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: cooldown))
+        let cooldown = steps.filter { $0.resolvedPhase == .cooldown }
+        XCTAssertEqual(cooldown.count, 2)
+        XCTAssertEqual(cooldown.map(\.title), ["Gange", "Rolig jogg"])
+        XCTAssertEqual(cooldown.compactMap(\.durationSeconds).reduce(0, +), 600)
+        XCTAssertEqual(cooldown.first?.cardioActivity, .walking)
+        XCTAssertEqual(cooldown.last?.cardioActivity, .running)
+        XCTAssertTrue(cooldown.allSatisfy { $0.targetHeartRateZone == 1 })
+        XCTAssertTrue(cooldown.allSatisfy {
+            $0.notes?.contains("estimert") == true
+        })
     }
 
     @MainActor
@@ -494,6 +501,8 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         XCTAssertFalse(ATHLTHPlannedRunStepEditor.allowsActivitySelection(for: repaired))
 
         var cooldown = try XCTUnwrap(steps.last)
+        // Simulate the unexpanded 10-minute row stored by older builds.
+        cooldown.durationSeconds = 600
         cooldown.title = "Gange deretter Svært Langsom Jogg"
         cooldown.notes = "Egen nedtrappingskommentar"
         let normalized = ATHLTHZonedLocalization.normalizeLegacyImportedStep(cooldown)
@@ -611,5 +620,177 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
             }
         }
     }
+
+
+    @MainActor
+    func testThreeMinuteAssessmentSplitsDrillsAndThreeStrides() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+            $0.id == "ASS-009"
+        })
+        let items = ATHLTHZonedPlanLibrary.blocks(for: source)
+        let warmup = items.filter { $0.resolvedPhase == .warmup }
+        XCTAssertEqual(warmup.count, 5)
+        XCTAssertEqual(warmup[0].durationSeconds, 600)
+        XCTAssertEqual(warmup[1].durationSeconds, 210)
+        XCTAssertTrue(warmup[1].title.lowercased().contains(
+            ATHLTHLocalization.isNorwegian ? "løpsdriller" : "drills"
+        ))
+        let efforts = warmup.filter { $0.title.contains("/3") }
+        XCTAssertEqual(efforts.count, 3)
+        XCTAssertEqual(efforts.compactMap(\.durationSeconds), [30, 30, 30])
+        XCTAssertEqual(
+            warmup.compactMap(\.durationSeconds).reduce(0, +), 900
+        )
+        XCTAssertTrue(efforts.allSatisfy { $0.kind == .run })
+        XCTAssertTrue(efforts.allSatisfy { $0.notes?.isEmpty == false })
+        XCTAssertEqual(
+            items.compactMap(\.durationSeconds).reduce(0, +), 1_680
+        )
+        XCTAssertEqual(Set(items.map(\.editorDragID)).count, items.count)
+        XCTAssertEqual(items.map(\.sequence), Array(1...items.count))
+    }
+
+    @MainActor
+    func testAllRecognizedCombinedDrillsAreSplitAcrossImportedCatalog() throws {
+        let cases: [(id: String, expectedEfforts: Int)] = [
+            ("ASS-001", 3),
+            ("ASS-003", 4),
+            ("ASS-005", 3),
+            ("ASS-006", 2),
+            ("ASS-007", 4),
+            ("ASS-009", 3),
+            ("HIL-019", 4),
+            ("RP-017", 3),
+            ("RP-019", 3),
+            ("THR-020", 3),
+            ("TRL-001", 2),
+            ("TRL-002", 3)
+        ]
+        for sample in cases {
+            let workout = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first {
+                $0.id == sample.id
+            })
+            let blocks = ATHLTHZonedPlanLibrary.blocks(for: workout)
+            let inWarmup = blocks.filter { $0.resolvedPhase == .warmup }
+            let expected = "/\(sample.expectedEfforts)"
+            let efforts = inWarmup.filter { $0.title.contains(expected) }
+            XCTAssertEqual(efforts.count, sample.expectedEfforts, sample.id)
+            XCTAssertTrue(efforts.allSatisfy {
+                $0.durationSeconds ?? 0 > 0
+            }, sample.id)
+            XCTAssertTrue(efforts.allSatisfy {
+                $0.phase == .warmup
+            }, sample.id)
+        }
+    }
+
+    @MainActor
+    func testCompoundSplitterNeverInventsDistanceOrChangesTotalTimeAndZones() throws {
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Drills and 3× progressive accelerations",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 300, targetWeightKilograms: nil,
+            loadNote: nil, notes: "Original coaching", phase: .warmup
+        )
+        block.targetHeartRateZone = 3
+        block.sourceIntensityZoneLabel = "Z3"
+        block.targetHeartRatePercentMin = 70
+        block.targetHeartRatePercentMax = 80
+
+        for source in [
+            "Drills and 3× progressive accelerations",
+            "Drills and 3x accelerations",
+            "Dynamic stretches and 3x progressive accelerations",
+            "Drills and 4x strides",
+            "Mobility and 2x gentle accelerations",
+            "Drills and accelerations",
+            "Drills and mobility"
+        ] {
+            let children = ATHLTHZonedCompoundStepSplitter.split(
+                sourceEnglish: source, block: block
+            )
+            XCTAssertGreaterThan(children.count, 1, source)
+            XCTAssertEqual(
+                children.compactMap(\.durationSeconds).reduce(0, +),
+                300, accuracy: 0.001, source
+            )
+            XCTAssertTrue(children.allSatisfy { $0.distanceMeters == nil }, source)
+            XCTAssertTrue(children.allSatisfy {
+                $0.targetHeartRateZone == 3 &&
+                $0.sourceIntensityZoneLabel == "Z3" &&
+                $0.targetHeartRatePercentMin == 70 &&
+                $0.targetHeartRatePercentMax == 80
+            }, source)
+            XCTAssertEqual(
+                Set(children.map(\.editorDragID)).count, children.count, source
+            )
+            XCTAssertTrue(children.allSatisfy {
+                $0.durationSeconds ?? 0 >= 15
+            }, source)
+        }
+
+        // An explicit per-stride time remains prescribed; the rest of the
+        // original five minutes is an editable preparation block.
+        let exact = ATHLTHZonedCompoundStepSplitter.split(
+            sourceEnglish: "3x30s progressive accelerations", block: block
+        )
+        XCTAssertEqual(exact.count, 4)
+        XCTAssertEqual(exact.map(\.durationSeconds), [210, 30, 30, 30])
+
+        let noTime = ATHLTHZonedCompoundStepSplitter.split(
+            sourceEnglish: "Drills and 3x progressive accelerations",
+            block: WorkoutTemplateBlock(
+                sequence: 1, kind: .run, title: "Open warmup",
+                exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+                durationSeconds: nil, targetWeightKilograms: nil,
+                loadNote: nil, notes: nil, phase: .warmup
+            )
+        )
+        XCTAssertEqual(noTime.count, 1, "Never invent total time for open steps")
+    }
+
+    @MainActor
+    func testAllRecognizedRunningSourceSegmentsConserveOriginalTime() {
+        // Audit across every bundled source workout. Apply the same
+        // splitter as the importer, including nested repeat segments.
+        var converted = 0
+        func walk(_ steps: [ATHLTHZonedPlanLibrary.Step]) {
+            for step in steps {
+                if step.kind == "segment", let duration = step.durationSec,
+                   duration > 0 {
+                    let input = WorkoutTemplateBlock(
+                        sequence: 1, kind: .run,
+                        title: step.descriptionEn ?? "Step",
+                        exerciseSlug: nil, distanceMeters: step.distanceM,
+                        repetitions: nil, durationSeconds: duration,
+                        targetWeightKilograms: nil, loadNote: nil,
+                        notes: nil, phase: .warmup
+                    )
+                    let result = ATHLTHZonedCompoundStepSplitter.split(
+                        sourceEnglish: step.descriptionEn ?? "", block: input
+                    )
+                    if result.count > 1 { converted += 1 }
+                    XCTAssertEqual(
+                        result.compactMap(\.durationSeconds).reduce(0, +),
+                        duration, accuracy: 0.001, step.descriptionEn ?? ""
+                    )
+                    XCTAssertTrue(result.allSatisfy {
+                        ($0.durationSeconds ?? 0) > 0
+                    }, step.descriptionEn ?? "")
+                }
+                walk(step.steps ?? [])
+                walk(step.between ?? [])
+            }
+        }
+        for workout in ATHLTHZonedPlanLibrary.workouts
+            where workout.discipline != "cycling" &&
+                workout.discipline != "swimming" {
+            walk(workout.warmupStructure ?? [])
+            walk(workout.mainSetStructure ?? [])
+            walk(workout.cooldownStructure ?? [])
+        }
+        XCTAssertGreaterThan(converted, 40)
+    }
+
 
 }
