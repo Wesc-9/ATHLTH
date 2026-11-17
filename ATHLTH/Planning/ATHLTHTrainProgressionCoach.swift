@@ -220,32 +220,38 @@ enum ATHLTHTrainProgressionCoach {
                         var sessionEvidence: [ATHLTHCoachStrengthRepetitionVolume.Session] = []
                         for logged in completed {
                             let date = logged.endedAt ?? logged.startedAt
-                            for actual in logged.exercises where
+                            let matches = logged.exercises.filter {
                                 ATHLTHCoachStrengthComparableHistory.isSameExercise(
-                                    actual.exercise, planned.embeddedExercise
-                                ) {
-                                if let sample = ATHLTHCoachStrengthRepetitionVolume.evidence(
+                                    $0.exercise, planned.embeddedExercise
+                                )
+                            }
+                            guard !matches.isEmpty else { continue }
+                            // Multiple occurrences in one workout are not
+                            // independent successes; require manual review.
+                            let sample = matches.count == 1 ? matches.first.flatMap {
+                                ATHLTHCoachStrengthRepetitionVolume.evidence(
                                     workoutID: logged.id,
                                     date: date,
-                                    exercise: actual,
+                                    exercise: $0,
                                     prescribedLoadKg: prescription.load
-                                ) {
-                                    sessionEvidence.append(sample)
-                                } else {
-                                    // An invalid latest attempt cannot vanish and
-                                    // reveal older successes as the most recent.
-                                    sessionEvidence.append(
-                                        ATHLTHCoachStrengthRepetitionVolume.Session(
-                                            workoutID: logged.id,
-                                            date: date,
-                                            workingSetIDs: [],
-                                            minimumReps: 0,
-                                            minimumWeightKg: 0,
-                                            allTargetsMet: false,
-                                            effortSupportsMore: false
-                                        )
+                                )
+                            } : nil
+                            if let sample {
+                                sessionEvidence.append(sample)
+                            } else {
+                                // An invalid latest attempt cannot vanish and
+                                // reveal older successes as the most recent.
+                                sessionEvidence.append(
+                                    ATHLTHCoachStrengthRepetitionVolume.Session(
+                                        workoutID: logged.id,
+                                        date: date,
+                                        workingSetIDs: [],
+                                        minimumReps: 0,
+                                        minimumWeightKg: 0,
+                                        allTargetsMet: false,
+                                        effortSupportsMore: false
                                     )
-                                }
+                                )
                             }
                         }
                         let assessment = ATHLTHCoachStrengthRepetitionVolume.assess(
