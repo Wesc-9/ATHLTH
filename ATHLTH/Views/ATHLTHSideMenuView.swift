@@ -7,6 +7,12 @@ enum ATHLTHSideMenuLayoutPolicy {
         max(0, viewportWidth * 0.575)
     }
 
+    /// Search stays inside the drawer, but needs room for filters and results.
+    /// A small visible margin preserves the swipe/tap-to-dismiss affordance.
+    static func searchWidth(for viewportWidth: CGFloat) -> CGFloat {
+        max(0, viewportWidth * 0.94)
+    }
+
     static func shouldDismiss(translation: CGSize) -> Bool {
         translation.width <= -60 &&
             abs(translation.height) <= abs(translation.width) * 0.65
@@ -77,6 +83,7 @@ struct ATHLTHSideMenuView: View {
     @GestureState private var closingDragX: CGFloat = 0
     @SceneStorage("athlth.sideMenu.trainingLibraryExpanded")
     private var isTrainingLibraryExpanded = false
+    @State private var isSearchExpanded = false
 
     let selectedTab: Int
     let onSelect: (ATHLTHSideMenuDestination) -> Void
@@ -100,75 +107,90 @@ struct ATHLTHSideMenuView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
-                header
-                    .padding(.horizontal, 15)
-                    .padding(.top, max(geometry.safeAreaInsets.top, 48) + 6)
-                    .padding(.bottom, 13)
-
-                homeUtilityActions
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 12)
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 27) {
-                        menuSection(
-                            english: "TRAINING", norwegian: "TRENING"
-                        ) {
-                            trainingLibraryMenu
-                            menuRow(
-                                .trainTogether,
-                                english: "Train Together",
-                                norwegian: "Tren sammen",
-                                icon: "person.2"
-                            )
-                            menuRow(
-                                .ghostRace,
-                                english: "Ghost Race",
-                                norwegian: "Ghost Race",
-                                icon: "figure.run"
-                            )
+                if isSearchExpanded {
+                    ATHLTHGlobalSearchView(
+                        embeddedInSideMenu: true,
+                        onClose: {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
+                                isSearchExpanded = false
+                            }
                         }
+                    )
+                    .accessibilityIdentifier("athlth-side-menu-inline-search")
+                } else {
+                    header
+                        .padding(.horizontal, 15)
+                        .padding(.top, max(geometry.safeAreaInsets.top, 48) + 6)
+                        .padding(.bottom, 13)
 
-                        menuSection(
-                            english: "COMMUNITY", norwegian: "FELLESSKAP"
-                        ) {
-                            menuRow(
-                                .challenges,
-                                english: "Challenges",
-                                norwegian: "Challenges",
-                                icon: "bolt"
-                            )
-                            menuRow(
-                                .arena,
-                                english: "Arena",
-                                norwegian: "Arena",
-                                icon: "trophy"
-                            )
-                            menuRow(
-                                .clubs,
-                                english: "Clubs",
-                                norwegian: "Klubber",
-                                icon: "person.3"
-                            )
+                    homeUtilityActions
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 12)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 27) {
+                            menuSection(
+                                english: "TRAINING", norwegian: "TRENING"
+                            ) {
+                                trainingLibraryMenu
+                                menuRow(
+                                    .trainTogether,
+                                    english: "Train Together",
+                                    norwegian: "Tren sammen",
+                                    icon: "person.2"
+                                )
+                                menuRow(
+                                    .ghostRace,
+                                    english: "Ghost Race",
+                                    norwegian: "Ghost Race",
+                                    icon: "figure.run"
+                                )
+                            }
+
+                            menuSection(
+                                english: "COMMUNITY", norwegian: "FELLESSKAP"
+                            ) {
+                                menuRow(
+                                    .challenges,
+                                    english: "Challenges",
+                                    norwegian: "Challenges",
+                                    icon: "bolt"
+                                )
+                                menuRow(
+                                    .arena,
+                                    english: "Arena",
+                                    norwegian: "Arena",
+                                    icon: "trophy"
+                                )
+                                menuRow(
+                                    .clubs,
+                                    english: "Clubs",
+                                    norwegian: "Klubber",
+                                    icon: "person.3"
+                                )
+                            }
                         }
+                        .padding(.horizontal, 11)
+                        .padding(.top, 25)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 11)
-                    .padding(.top, 25)
-                    .padding(.bottom, 16)
-                }
-                .scrollIndicators(.hidden)
+                    .scrollIndicators(.hidden)
 
-                footer
-                    .padding(.horizontal, 12)
-                    .padding(.top, 10)
-                    .padding(.bottom, max(geometry.safeAreaInsets.bottom, 20) + 5)
+                    footer
+                        .padding(.horizontal, 12)
+                        .padding(.top, 10)
+                        .padding(.bottom, max(geometry.safeAreaInsets.bottom, 20) + 5)
+                }
             }
             .frame(
-                width: ATHLTHSideMenuLayoutPolicy.width(for: geometry.size.width),
+                width: isSearchExpanded
+                    ? ATHLTHSideMenuLayoutPolicy.searchWidth(for: geometry.size.width)
+                    : ATHLTHSideMenuLayoutPolicy.width(for: geometry.size.width),
                 height: geometry.size.height
             )
             .background(menuSurface.ignoresSafeArea(edges: .vertical))
             .shadow(color: .black.opacity(0.09), radius: 18, x: 5, y: 0)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: isSearchExpanded)
             .offset(x: reduceMotion ? 0 : closingDragX)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 12)
@@ -358,7 +380,11 @@ struct ATHLTHSideMenuView: View {
 
     private var homeUtilityActions: some View {
         HStack(spacing: 6) {
-            Button { onSelect(.search) } label: {
+            Button {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
+                    isSearchExpanded = true
+                }
+            } label: {
                 HStack(spacing: 9) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 17, weight: .regular))
