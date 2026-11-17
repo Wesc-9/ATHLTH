@@ -41,14 +41,16 @@ enum ATHLTHCoachStrengthComparableHistory {
         }
 
         func matches(_ other: Signature) -> Bool {
-            guard !name.isEmpty, name == other.name,
-                  !equipment.isEmpty,
+            guard !equipment.isEmpty,
                   equipment == other.equipment else { return false }
-            // If either record supplies a canonical library ID, its partner
-            // must supply the SAME ID. Never infer that two different
-            // variants (or an unidentified legacy exercise) are one exercise.
+            // The canonical library ID is authoritative when present on both
+            // sides. Renaming an exercise does not create a different exercise.
+            // A single missing ID can never be guessed from name alone.
             if libraryExerciseID != nil || other.libraryExerciseID != nil {
-                guard libraryExerciseID == other.libraryExerciseID else { return false }
+                guard libraryExerciseID != nil,
+                      libraryExerciseID == other.libraryExerciseID else { return false }
+            } else {
+                guard !name.isEmpty, name == other.name else { return false }
             }
             // Older snapshots can omit muscle metadata; use it only to rule
             // out an explicit conflict, not invent a new identity from it.
@@ -66,6 +68,19 @@ enum ATHLTHCoachStrengthComparableHistory {
         _ rhs: ExerciseSnapshot
     ) -> Bool {
         Signature(lhs).matches(Signature(rhs))
+    }
+
+    /// Stable grouping key for Coach trend summaries and plan suggestions.
+    /// Different equipment always means different evidence, even when
+    /// exercises share the same visible name or catalog ID.
+    static func identityKey(for exercise: ExerciseSnapshot) -> String? {
+        let signature = Signature(exercise)
+        guard !signature.equipment.isEmpty else { return nil }
+        let identity = signature.libraryExerciseID?.uuidString ??
+            ("legacy:" + signature.name)
+        guard !identity.isEmpty else { return nil }
+        return identity + "|" + signature.equipment.joined(separator: ",") +
+            "|" + signature.primaryMuscles.joined(separator: ",")
     }
 
     struct TargetEvidence {
