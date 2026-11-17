@@ -863,15 +863,15 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
             distance: 0, recorded: Array(records.prefix(1)),
             routeRemainingMeters: nil
         )
-        XCTAssertEqual(effort.remainingExerciseCount, 2)
-        XCTAssertEqual(effort.nextExerciseName, "Pause")
+        XCTAssertEqual(effort.remainingExerciseCount, 1)
+        XCTAssertEqual(effort.nextExerciseName, "Nedjogging")
         XCTAssertNil(effort.previousMainSectionSeconds)
 
         let cooldown = ATHLTHCoachReadoutContext.make(
             plan: plan, index: 3, elapsed: 0,
             distance: 0, recorded: records, routeRemainingMeters: nil
         )
-        XCTAssertEqual(cooldown.previousExerciseName, "Pause")
+        XCTAssertEqual(cooldown.previousExerciseName, "Drag")
         XCTAssertEqual(cooldown.previousMainSectionExerciseCount, 1)
         XCTAssertEqual(cooldown.previousMainSectionSeconds, 150)
         XCTAssertEqual(cooldown.previousMainSectionDistanceMeters, 470)
@@ -892,7 +892,7 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
             distanceMeters: 0, elapsedSeconds: 0,
             paceSecondsPerKilometer: nil, heartRateBPM: nil,
             norwegian: true, context: effort
-        )?.contains("Neste øvelse: Pause") == true)
+        )?.contains("Neste øvelse: Nedjogging") == true)
 
         let previous = ATHLTHAudioCoachRule(
             trigger: .stepStart, metric: .previousExerciseSummary, interval: 1
@@ -901,7 +901,7 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
             distanceMeters: 0, elapsedSeconds: 0,
             paceSecondsPerKilometer: nil, heartRateBPM: nil,
             norwegian: true, context: cooldown
-        )?.contains("Pause") == true)
+        )?.contains("Drag") == true)
 
         let main = ATHLTHAudioCoachRule(
             trigger: .stepStart, metric: .previousMainSectionSummary, interval: 1
