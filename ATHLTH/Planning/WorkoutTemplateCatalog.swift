@@ -1157,30 +1157,20 @@ struct WorkoutTemplateLibraryView: View {
         defer { ATHLTHPerformance.end("LibraryAddCatalogWorkout", id: signpost) }
         var source = entry.plannedSession()
         source.workoutBlocks = blocks
-        let personalID = session.saveSharedWorkout(
-            source, sourceSessionID: entry.id
-        )
-        onSelectPlanned?(session.savedWorkoutTemplates.first {
-            $0.id == personalID
-        } ?? source)
+        // Adding an original to a plan must not create an unchanged personal
+        // library copy. The scheduled workout owns its own plan instance.
+        onSelectPlanned?(source)
     }
 
     private func addRunningToPlan(_ source: RunningWorkoutTemplate) {
-        let personal = runningLibrary.savedCopy(for: source) ??
-            (source.isBuiltIn ? runningLibrary.duplicate(source) : source)
-        onSelectPlanned?(personal.plannedSession())
+        // The athlete chose this source explicitly. Using it in a plan never
+        // saves an extra template or silently substitutes a personal variant.
+        onSelectPlanned?(source.plannedSession())
     }
 
     private func chooseCatalogForPlan(_ entry: WorkoutTemplateCatalogEntry) {
         let signpost = ATHLTHPerformance.begin("LibraryChooseCatalogWorkout")
         defer { ATHLTHPerformance.end("LibraryChooseCatalogWorkout", id: signpost) }
-        if let existing = session.savedWorkoutTemplates.first(where: {
-            $0.workoutTemplateID == entry.id ||
-                $0.sharedSourceSessionID == entry.id
-        }) {
-            onSelectPlanned?(existing)
-            return
-        }
         if ATHLTHWorkoutFirstUsePolicy.asksForTargets(
             advanced: advancedMode, hasPersonalCopy: false
         ) {
@@ -1270,16 +1260,13 @@ struct WorkoutTemplateLibraryView: View {
                 personal.workoutBlocks = ATHLTHWorkoutQuickGoalApplier.apply(
                     goal, to: pendingTargetSteps
                 )
-                let id = session.saveSharedWorkout(
-                    personal, sourceSessionID: source.id
-                )
-                onSelectPlanned?(session.savedWorkoutTemplates.first {
-                    $0.id == id
-                } ?? personal)
+                // A pace plan is a customized plan step, not an automatic
+                // saved template in Mine.
+                onSelectPlanned?(personal)
             } else {
-                let copy = runningLibrary.duplicate(source)
-                let customized = ATHLTHWorkoutQuickGoalApplier.apply(goal, to: copy)
-                runningLibrary.save(customized)
+                let customized = ATHLTHWorkoutQuickGoalApplier.apply(
+                    goal, to: source
+                )
                 onSelectPlanned?(customized.plannedSession())
             }
         }
@@ -3157,16 +3144,9 @@ struct WorkoutTemplateDetailView: View {
     }
 
     private func addToMyWorkouts() {
-        if savedPersonalWorkout != nil {
-            saved = true
-        } else if ATHLTHWorkoutFirstUsePolicy.asksForTargets(
-            advanced: advancedMode, hasPersonalCopy: false
-        ) {
-            askingForPersonalTargets = true
-        } else {
-            savePersonalWorkout(blocks:
-                ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks))
-        }
+        // Save must go through the editor: unchanged recipes and copies with
+        // the original name are not valid new library entries.
+        showingEditor = true
     }
 
     /// The library detail uses the same quick goal behavior as Plan and Train.
