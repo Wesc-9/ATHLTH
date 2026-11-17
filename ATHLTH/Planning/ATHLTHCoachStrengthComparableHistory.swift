@@ -18,11 +18,13 @@ enum ATHLTHCoachStrengthComparableHistory {
     /// underlying reusable library exercise. Until catalog-ID provenance is
     /// persisted for live logs, use conservative movement/equipment matching.
     private struct Signature: Equatable {
+        let libraryExerciseID: UUID?
         let name: String
         let equipment: [String]
         let primaryMuscles: [String]
 
         init(_ snapshot: ExerciseSnapshot) {
+            libraryExerciseID = snapshot.libraryExerciseID
             name = Self.normalized(snapshot.name)
             equipment = Self.normalizedSet(snapshot.equipment)
             primaryMuscles = Self.normalizedSet(snapshot.primaryMuscles)
@@ -40,7 +42,14 @@ enum ATHLTHCoachStrengthComparableHistory {
 
         func matches(_ other: Signature) -> Bool {
             guard !name.isEmpty, name == other.name,
+                  !equipment.isEmpty,
                   equipment == other.equipment else { return false }
+            // If either record supplies a canonical library ID, its partner
+            // must supply the SAME ID. Never infer that two different
+            // variants (or an unidentified legacy exercise) are one exercise.
+            if libraryExerciseID != nil || other.libraryExerciseID != nil {
+                guard libraryExerciseID == other.libraryExerciseID else { return false }
+            }
             // Older snapshots can omit muscle metadata; use it only to rule
             // out an explicit conflict, not invent a new identity from it.
             if !primaryMuscles.isEmpty && !other.primaryMuscles.isEmpty {
@@ -48,6 +57,64 @@ enum ATHLTHCoachStrengthComparableHistory {
             }
             return true
         }
+    }
+
+    /// Use this single provenance check across both the live Coach and
+    /// scheduled-plan Coach. It compares identity and load-equipment semantics.
+    static func isSameExercise(
+        _ lhs: ExerciseSnapshot,
+        _ rhs: ExerciseSnapshot
+    ) -> Bool {
+        Signature(lhs).matches(Signature(rhs))
+    }
+
+    struct TargetEvidence {
+        let workingSetIDs: [UUID]
+        let maximumRecordedWeightKg: Double
+        let metAllTargets: Bool
+    }
+
+    /// A verified session must contain at least two recorded working sets,
+    /// not skipped or warm-up sets, and every one must meet prescribed reps
+    /// and weight. Very hard RPE/RIR scores prevent automatic weight review.
+    /// Missing effort scores do not become invented RIR values.
+    static func targetEvidence(
+        for exercise: StrengthExerciseLog,
+        minimumLoadKg: Double? = nil
+    ) -> TargetEvidence? {
+        let working = exercise.sets.filter(\.countsTowardTrainingLoad)
+        guard working.count >= 2,
+              minimumLoadKg.map({ $0.isFinite && $0 > 0 }) ?? true else {
+            return nil
+        }
+        var weights: [Double] = []
+        var allMet = true
+        for set in working {
+            guard isComparableWorkingSet(set),
+                  let actualWeight = set.completedWeightKilograms,
+                  let targetWeight = set.plannedWeightKilograms,
+                  targetWeight.isFinite, targetWeight > 0,
+                  let actualReps = set.resolvedCompletedReps,
+                  let targetReps = set.plannedReps,
+                  targetReps > 0 else {
+                allMet = false
+                break
+            }
+            if actualReps < targetReps ||
+                actualWeight + 0.01 < targetWeight ||
+                (minimumLoadKg.map { actualWeight + 0.01 < $0 } ?? false) ||
+                (set.rpe.map { !$0.isFinite || $0 > 9 } ?? false) ||
+                (set.rir.map { !$0.isFinite || $0 < 1 } ?? false) {
+                allMet = false
+            }
+            weights.append(actualWeight)
+        }
+        guard !weights.isEmpty else { return nil }
+        return TargetEvidence(
+            workingSetIDs: working.map(\.id),
+            maximumRecordedWeightKg: weights.max() ?? 0,
+            metAllTargets: allMet && weights.count == working.count
+        )
     }
 
     /// A logged working set is eligible for weight-based progression evidence
