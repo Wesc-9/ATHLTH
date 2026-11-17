@@ -1791,7 +1791,8 @@ struct ExerciseDetailView: View {
             exerciseID: currentEntry.id,
             name: currentEntry.canonicalName,
             isCustom: currentEntry.source == .custom,
-            workouts: exerciseHistory
+            workouts: exerciseHistory,
+            reference: currentEntry.exercise.snapshot
         )
     }
 
