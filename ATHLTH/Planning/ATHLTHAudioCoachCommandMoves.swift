@@ -51,8 +51,8 @@ enum ATHLTHAudioCoachCommandMoves {
         guard destination != origin else { return false }
 
         // A moved metric inherits the target group's schedule.
-        let targetIndex = destination.flatMap { destination in
-            draft.coachGroups.firstIndex { $0.id == destination }
+        let targetIndex = draft.coachGroups.firstIndex {
+            $0.id == destination
         }
         let destinationRuleID = targetIndex.flatMap { index in
             draft.coachGroups[index].ruleIDs.first(where: { ruleID in
