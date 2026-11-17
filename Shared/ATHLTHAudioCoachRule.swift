@@ -392,7 +392,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             return norwegian ? "\(count) øvelser gjenstår" : "\(count) exercises remaining"
         case .nextExercise:
             guard let name = context.nextExerciseName, !name.isEmpty else { return nil }
-            return norwegian ? "Neste øvelse: \(name)" : "Next exercise: \(name)"
+            let detail = context.nextExerciseDetails.map { ". " + $0 } ?? ""
+            return norwegian ? "Neste øvelse: \(name)\(detail)" : "Next exercise: \(name)\(detail)"
         case .previousExerciseSummary:
             guard let name = context.previousExerciseName,
                   let seconds = context.previousExerciseSeconds,
@@ -905,6 +906,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     // Optional fields keep old Watch/phone snapshots backwards compatible.
     var remainingExerciseCount: Int? = nil
     var nextExerciseName: String? = nil
+    var nextExerciseDetails: String? = nil
     var previousExerciseName: String? = nil
     var previousExerciseSeconds: Double? = nil
     var previousExerciseDistanceMeters: Double? = nil
@@ -941,27 +943,53 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         context.stepName = step.title
         context.stepIndex = index
         context.stepCount = steps.count
-        context.remainingExerciseCount = max(0, steps.count - index - 1)
-        if index + 1 < steps.count {
-            context.nextExerciseName = steps[index + 1].title
+        // Recovery steps are pauses, not exercises. Count only actual
+        // upcoming activities (work, warm-up, cool-down, etc.).
+        let isExercise: (WatchRunningWorkoutStep) -> Bool = {
+            $0.phase != "recovery"
         }
-        if index > 0, let previous = recorded.last(where: { $0.index == index - 1 }) {
-            context.previousExerciseName = steps[index - 1].title
+        context.remainingExerciseCount = steps[(index + 1)...]
+            .filter(isExercise).count
+        if let nextIndex = ((index + 1)..<steps.count).first(where: {
+            isExercise(steps[$0])
+        }) {
+            let next = steps[nextIndex]
+            context.nextExerciseName = next.title
+            var details: [String] = []
+            if let seconds = next.durationSeconds, seconds.isFinite, seconds > 0 {
+                details.append("\(Int(seconds.rounded())) s")
+            } else if let meters = next.distanceMeters, meters.isFinite, meters > 0 {
+                details.append("\(Int(meters.rounded())) m")
+            }
+            if let zone = next.targetHeartRateZone, (1...5).contains(zone) {
+                details.append("Z\(zone)")
+            } else if let intensity = next.intensityText, !intensity.isEmpty {
+                details.append(intensity)
+            }
+            context.nextExerciseDetails = details.isEmpty ? nil : details.joined(separator: ", ")
+        }
+        if let previousIndex = (0..<index).last(where: { isExercise(steps[$0]) }),
+           let previous = recorded.last(where: { $0.index == previousIndex }) {
+            context.previousExerciseName = steps[previousIndex].title
             context.previousExerciseSeconds = previous.activeSeconds
             context.previousExerciseDistanceMeters = previous.distanceMeters
         }
         // A main-part report only exists when that section is complete.
         // Never turn planned targets into claimed achieved measurements.
         let isMain: (WatchRunningWorkoutStep) -> Bool = {
-            $0.phase == "work" || $0.phase == "recovery"
+            $0.phase == "work" || $0.phase == "recovery" ||
+                $0.phase == "steady" || $0.phase == "main"
         }
         if !isMain(step), index > 0, isMain(steps[index - 1]) {
             let completedMain = recorded.filter { entry in
                 entry.index < index && steps.indices.contains(entry.index) &&
                     isMain(steps[entry.index])
             }
+            let completedExercises = completedMain.filter {
+                steps[$0.index].phase != "recovery"
+            }
             if !completedMain.isEmpty {
-                context.previousMainSectionExerciseCount = completedMain.count
+                context.previousMainSectionExerciseCount = completedExercises.count
                 context.previousMainSectionSeconds = completedMain.reduce(0) { $0 + max(0, $1.activeSeconds) }
                 context.previousMainSectionDistanceMeters = completedMain.reduce(0) { $0 + max(0, $1.distanceMeters) }
             }
