@@ -286,11 +286,21 @@ enum ExerciseOrigin: String, Codable, Hashable {
     case custom
 }
 
+/// A kilogram number needs an explicit interpretation for safe long-term
+/// strength comparisons. Resistance-level sets remain a separate load kind.
+enum ATHLTHStrengthLoadBasis: String, Codable, Hashable, CaseIterable {
+    case totalKilograms
+    case kilogramsPerHand
+    case machineStackKilograms
+}
+
 struct ExerciseSnapshot: Codable, Hashable {
     /// Stable library exercise identity where available. Optional so every
     /// previously persisted training plan and strength log remains decodable.
     /// Never substitute a planned-set UUID for this canonical identity.
     var libraryExerciseID: UUID? = nil
+    /// Optional so legacy workouts decode without inventing a weight basis.
+    var coachLoadBasis: ATHLTHStrengthLoadBasis? = nil
     var name: String
     var instructions: [String]
     /// Measurement profile, never includes the athlete's recorded values.
@@ -371,6 +381,9 @@ struct Exercise: Identifiable, Codable, Hashable {
     /// A private import may retain the source UUID as provenance, not as a
     /// shared ownership or edit permission. Missing for legacy exercises.
     var sharedSourceExerciseID: UUID? = nil
+    /// Explicit interpretation of recorded kilograms for Coach comparisons.
+    /// Must be selected or confirmed by the athlete; nil is not inferred.
+    var coachLoadBasis: ATHLTHStrengthLoadBasis? = nil
     /// The username of the athlete who sent this private copy.
     /// Only imported exercises have attribution; older saved items decode nil.
     var sharedByUsername: String? = nil
@@ -419,6 +432,7 @@ struct Exercise: Identifiable, Codable, Hashable {
     var snapshot: ExerciseSnapshot {
         ExerciseSnapshot(
             libraryExerciseID: id,
+            coachLoadBasis: coachLoadBasis,
             name: name,
             instructions: instructions,
             assessmentMethod: assessmentMethod,
