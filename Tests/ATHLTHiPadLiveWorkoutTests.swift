@@ -77,6 +77,71 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertEqual(decoded.runningIntervalOrdinal, 2)
     }
 
+    func testIpadReceivesExplicitStrengthLoadBasisOnlyWhenKnown() throws {
+        var workout = snapshot()
+        workout.strengthLoadBasisRaw = "kilogramsPerHand"
+        workout.strengthWeightKilograms = 18
+        // Only strength workouts should carry a strength-specific weight
+        // interpretation into the spectator payload.
+        let running = ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(
+            workout
+        )
+        XCTAssertNil(running.strengthLoadBasisRaw)
+
+        let data = try JSONEncoder().encode(workout)
+        var decoded = try JSONDecoder().decode(
+            ATHLTHCrossDeviceWorkoutSnapshot.self, from: data
+        )
+        decoded = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: decoded.sessionID,
+            kind: "strength",
+            title: decoded.title,
+            startedAt: decoded.startedAt,
+            elapsedSeconds: decoded.elapsedSeconds,
+            distanceMeters: nil,
+            currentStep: "Shoulder press",
+            nextStep: nil,
+            completedSets: 1,
+            totalSets: 3,
+            strengthWeightKilograms: 18,
+            strengthLoadBasisRaw: "kilogramsPerHand"
+        )
+        let bounded = ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(
+            decoded
+        )
+        XCTAssertEqual(bounded.strengthLoadBasisRaw, "kilogramsPerHand")
+        XCTAssertEqual(
+            bounded.strengthLoadBasisRaw.flatMap(
+                ATHLTHStrengthLoadBasis.init(rawValue:)
+            ),
+            .kilogramsPerHand
+        )
+    }
+
+    func testIpadRejectsUnknownOrInventedWeightBasis() {
+        var workout = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: UUID(),
+            kind: "strength",
+            title: "Strength",
+            startedAt: Date(),
+            elapsedSeconds: 90,
+            distanceMeters: nil,
+            currentStep: "Press",
+            nextStep: nil,
+            completedSets: 0,
+            totalSets: 3
+        )
+        XCTAssertNil(workout.strengthLoadBasisRaw)
+        workout.strengthLoadBasisRaw = "unsupported"
+        XCTAssertNil(ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(
+            workout
+        ).strengthLoadBasisRaw)
+        workout.strengthLoadBasisRaw = "totalKilograms"
+        XCTAssertEqual(ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(
+            workout
+        ).strengthLoadBasisRaw, "totalKilograms")
+    }
+
     func testStrengthSetsAreReadOnlyAndNeverExceedTotal() {
         let workout = snapshot(completedSets: 12, totalSets: 10)
         XCTAssertEqual(ATHLTHiPadLiveMetrics.sets(workout), "10 / 10")
