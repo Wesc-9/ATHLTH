@@ -18,6 +18,11 @@ enum ATHLTHCoachStrengthDecision {
         case targetsMetInTwoSessions
     }
 
+    enum Confidence: String, Equatable {
+        case low
+        case moderate
+    }
+
     struct Evidence: Equatable {
         let workoutID: UUID
         let date: Date
@@ -29,6 +34,7 @@ enum ATHLTHCoachStrengthDecision {
     struct Assessment: Equatable {
         let action: Action
         let reason: Reason
+        let confidence: Confidence
         let sourceWorkoutIDs: [UUID]
         let sourceSetIDs: [UUID]
         let proposedWeightKg: Double?
@@ -47,6 +53,7 @@ enum ATHLTHCoachStrengthDecision {
             return Assessment(
                 action: .collectEvidence,
                 reason: .invalidPrescription,
+                confidence: .low,
                 sourceWorkoutIDs: [],
                 sourceSetIDs: [],
                 proposedWeightKg: nil,
@@ -72,6 +79,7 @@ enum ATHLTHCoachStrengthDecision {
             Assessment(
                 action: action,
                 reason: reason,
+                confidence: action == .reviewSmallIncrease ? .moderate : .low,
                 sourceWorkoutIDs: sourceWorkoutIDs,
                 sourceSetIDs: sourceSetIDs,
                 proposedWeightKg: proposed,
