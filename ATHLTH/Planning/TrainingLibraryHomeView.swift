@@ -3987,6 +3987,8 @@ struct MyTrainingPlansLibraryView: View {
     @State private var searchExpanded = false
     @State private var favoritesOnly = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
+    @State private var visibleStartIndex = 0
+    @State private var alphabetJumpRevision = 0
 
     private var displayedTemplates: [TrainingPlan] {
         session.planTemplates.filter {
@@ -4003,12 +4005,15 @@ struct MyTrainingPlansLibraryView: View {
     }
 
     private var pageTemplates: [TrainingPlan] {
-        ATHLTHLibraryPagination.visible(displayedTemplates, limit: visibleLimit)
+        ATHLTHLibraryAlphabetWindow.visible(
+            displayedTemplates, start: visibleStartIndex, limit: visibleLimit
+        )
     }
 
     private var pagePlans: [TrainingPlan] {
-        ATHLTHLibraryPagination.visible(
+        ATHLTHLibraryAlphabetWindow.visible(
             displayedPlans,
+            start: max(0, visibleStartIndex - displayedTemplates.count),
             limit: max(0, visibleLimit - pageTemplates.count)
         )
     }
@@ -4023,7 +4028,11 @@ struct MyTrainingPlansLibraryView: View {
     }
 
     var body: some View {
-        ScrollView {
+        let plans = displayedTemplates + displayedPlans
+        let alphabet = ATHLTHLibraryAlphabetLookup(
+            items: plans, id: { $0.id }, title: { $0.title }
+        )
+        return ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 10) {
                     Text(ATHLTHLocalization.choose(
@@ -4210,7 +4219,9 @@ struct MyTrainingPlansLibraryView: View {
 
                 ATHLTHLibraryLoadMoreButton(
                     shown: pageTemplates.count + pagePlans.count,
-                    total: displayedTemplates.count + displayedPlans.count
+                    total: ATHLTHLibraryAlphabetWindow.remaining(
+                        total: plans.count, start: visibleStartIndex
+                    )
                 ) {
                     visibleLimit += ATHLTHLibraryPagination.pageSize
                 }
@@ -4237,17 +4248,35 @@ struct MyTrainingPlansLibraryView: View {
                     .padding(.top, 36)
                 }
             }
-            .padding(18)
+            .padding(.leading, 18)
+            .padding(.trailing, alphabet.targets.isEmpty ? 18 : 42)
+            .padding(.vertical, 18)
             .frame(maxWidth: .infinity)
+        }
+        .id(alphabetJumpRevision)
+        .overlay(alignment: .trailing) {
+            if !alphabet.targets.isEmpty {
+                ATHLTHExerciseAlphabetIndex(targets: alphabet.targets) { target in
+                    guard let index = alphabet.index(for: target) else { return }
+                    visibleStartIndex = index
+                    visibleLimit = ATHLTHLibraryPagination.pageSize
+                    alphabetJumpRevision += 1
+                }
+                .padding(.trailing, 6)
+            }
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
             libraryWidth = $0
         }
         .onChange(of: query) { _, _ in
+            visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
         }
         .onChange(of: favoritesOnly) { _, _ in
+            visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
         }
         .onAppear {
             displayMode = .load(userID: session.profile.userID)
