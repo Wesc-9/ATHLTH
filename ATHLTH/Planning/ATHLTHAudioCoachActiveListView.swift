@@ -13,9 +13,13 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     // Every new workout opens the uncluttered Basic screen; the athlete's
     // actual Coach settings and profiles remain unchanged.
-    @State private var showingCommandGroupPicker = false
-    @State private var showCommandAfterGroupPicker = false
-    @State private var showGroupBuilderAfterPicker = false
+    @State private var showingStandaloneTrigger = false
+    @State private var showingStandaloneCommand = false
+    @State private var openStandaloneCommandAfterTrigger = false
+    @State private var standaloneTrigger: ATHLTHAudioCoachRule.Trigger = .time
+    @State private var standaloneInterval = 60
+    @State private var standaloneMetric: ATHLTHAudioCoachRule.Metric = .elapsedTime
+    @State private var standalonePhrase = ""
     @State private var showingGroupBuilder = false
     @State private var showingGroupCommandBuilder = false
     @State private var pendingGroupCommandID: UUID?
@@ -169,7 +173,11 @@ struct ATHLTHAudioCoachActiveListView: View {
                         showingGroupBuilder = true
                     },
                     onAddGeneralCommand: {
-                        showingCommandGroupPicker = true
+                        standaloneTrigger = .time
+                        standaloneInterval = 60
+                        standaloneMetric = .elapsedTime
+                        standalonePhrase = ""
+                        showingStandaloneTrigger = true
                     }
                 )
                 DisclosureGroup(isExpanded: $showingVoiceOptions) {
@@ -226,19 +234,16 @@ struct ATHLTHAudioCoachActiveListView: View {
         }) {
             groupCommandSheet
         }
-        .sheet(isPresented: $showingCommandGroupPicker, onDismiss: {
-            if showCommandAfterGroupPicker {
-                showCommandAfterGroupPicker = false
-                showingGroupCommandBuilder = true
-            } else if showGroupBuilderAfterPicker {
-                showGroupBuilderAfterPicker = false
-                showingGroupBuilder = true
-            } else if let pendingGeneralOption {
-                self.pendingGeneralOption = nil
-                editingOption = pendingGeneralOption
+        .sheet(isPresented: $showingStandaloneTrigger, onDismiss: {
+            if openStandaloneCommandAfterTrigger {
+                openStandaloneCommandAfterTrigger = false
+                showingStandaloneCommand = true
             }
         }) {
-            commandGroupPickerSheet
+            standaloneTriggerSheet
+        }
+        .sheet(isPresented: $showingStandaloneCommand) {
+            standaloneCommandSheet
         }
         .sheet(isPresented: $showingSaveNewProfile) {
             saveNewProfileSheet
@@ -654,89 +659,121 @@ struct ATHLTHAudioCoachActiveListView: View {
         pendingGroupCommandID = nil
     }
 
-    private var commandGroupPickerSheet: some View {
+    /// A standalone command has its own trigger; it is never an orphaned
+    /// metric. This uses the exact same trigger editor as named groups.
+    private var standaloneTriggerSheet: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 15) {
-                    Text(tr("Where should the command go?", "Hvor skal kommandoen legges?"))
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(tr("Choose when Coach should speak",
+                            "Når skal Coach snakke?"))
                         .font(.system(size: 24, weight: .medium, design: .serif))
                         .foregroundStyle(ink)
-                    Text(tr("Choose an existing trigger group, or make a new one.",
-                            "Velg en gruppe med trigger, eller opprett en ny."))
+                    Text(tr("One command gets its own trigger. In a coach group, all commands share the group's trigger.",
+                            "En enkeltkommando får sin egen trigger. I en coach-gruppe deler alle kommandoene gruppens trigger."))
                         .font(.subheadline)
                         .foregroundStyle(dim)
 
-                    ForEach(draft.coachGroups) { group in
-                        Button {
-                            pendingGroupCommandID = group.id
-                            showCommandAfterGroupPicker = true
-                            showingCommandGroupPicker = false
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: group.trigger == .time ? "clock" : "figure.run")
-                                    .foregroundStyle(bronze)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(group.name).font(.subheadline.weight(.semibold))
-                                    Text(group.trigger == .time
-                                         ? tr("Every ", "Hvert ") + String(group.interval ?? 60) + tr(" seconds", " sekund")
-                                         : tr("Every ", "Hver ") + String(group.interval ?? 1_000) + tr(" metres", " meter"))
-                                        .font(.caption)
-                                        .foregroundStyle(dim)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                            }
-                            .padding(16)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 17))
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Text(tr("EVENT-TRIGGERED COMMANDS", "HENDELSESSTYRTE KOMMANDOER"))
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.2)
-                        .foregroundStyle(bronze)
-                        .padding(.top, 8)
-
-                    ForEach(eventCommandOptions) { option in
-                        Button {
-                            option.setActive(true, in: &draft)
-                            pendingGeneralOption = option.requiresConfiguration ? option : nil
-                            showingCommandGroupPicker = false
-                        } label: {
-                            Label(option.title, systemImage: option.symbol)
-                                .frame(maxWidth: .infinity, minHeight: 44,
-                                       alignment: .leading)
-                                .padding(.horizontal, 14)
-                                .background(.white, in: RoundedRectangle(cornerRadius: 13))
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(ink)
-                    }
+                    ATHLTHAudioCoachTriggerEditor(
+                        trigger: $standaloneTrigger,
+                        interval: $standaloneInterval,
+                        supportsStructured: showStructuredOptions
+                    )
 
                     Button {
-                        prepareNewGroup()
-                        showGroupBuilderAfterPicker = true
-                        showingCommandGroupPicker = false
+                        openStandaloneCommandAfterTrigger = true
+                        showingStandaloneTrigger = false
                     } label: {
-                        Label(tr("Create new trigger group", "Opprett ny triggergruppe"),
-                              systemImage: "plus.circle.fill")
-                            .frame(maxWidth: .infinity, minHeight: 48)
+                        Label(tr("Choose what Coach says", "Velg hva Coach sier"),
+                              systemImage: "arrow.right")
+                            .frame(maxWidth: .infinity, minHeight: 50)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(bronze)
+                    .accessibilityIdentifier("athlth-coach-standalone-trigger-next")
                 }
                 .padding(18)
             }
             .scrollIndicators(.hidden)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("Add command", "Legg til kommando"))
+            .navigationTitle(tr("New command", "Ny kommando"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Close", "Lukk")) { showingCommandGroupPicker = false }
+                    Button(tr("Cancel", "Avbryt")) { showingStandaloneTrigger = false }
                 }
             }
+        }
+        .presentationDetents([.large])
+    }
+
+    private var standaloneCommandSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Label(standaloneTrigger.title, systemImage: "waveform")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(bronze)
+                    Text(tr("What should Coach say?", "Hva skal Coach si?"))
+                        .font(.system(size: 24, weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Picker(tr("Content", "Innhold"), selection: $standaloneMetric) {
+                            ForEach(availableGroupContents) { metric in
+                                Text(metric.title).tag(metric)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        if standaloneMetric == .motivation {
+                            TextField(tr("Personal message (optional)", "Egen melding (valgfritt)"),
+                                      text: $standalonePhrase, axis: .vertical)
+                                .lineLimit(2...4)
+                        }
+                    }
+                    .padding(16)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 17))
+
+                    Button {
+                        guard draft.customRules.count < 20 else { return }
+                        var rule = ATHLTHAudioCoachRule(
+                            trigger: standaloneTrigger,
+                            metric: standaloneMetric,
+                            interval: standaloneInterval,
+                            scope: .workout
+                        )
+                        if standaloneMetric == .motivation {
+                            let phrase = String(standalonePhrase.trimmingCharacters(
+                                in: .whitespacesAndNewlines).prefix(180))
+                            if !phrase.isEmpty { rule.customPhrase = phrase }
+                        }
+                        draft.customRules.append(rule)
+                        showingStandaloneCommand = false
+                    } label: {
+                        Label(tr("Add command", "Legg til kommando"),
+                              systemImage: "checkmark")
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(bronze)
+                    .disabled(draft.customRules.count >= 20)
+                    .accessibilityIdentifier("athlth-coach-standalone-command-save")
+
+                    Button {
+                        showingStandaloneCommand = false
+                    } label: {
+                        Text(tr("Cancel", "Avbryt"))
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(18)
+            }
+            .scrollIndicators(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("Command content", "Kommandoinnhold"))
+            .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
     }
