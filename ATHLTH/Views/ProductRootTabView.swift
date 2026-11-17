@@ -5766,6 +5766,10 @@ struct ATHLTHTrainView: View {
         PlannedSession?
     @State private var showingGhostHub = false
     @State private var showingLibrary = false
+    @State private var showingAllWorkoutCategories = false
+    @State private var pendingWorkoutCategoryAction: ATHLTHTrainAllWorkoutCategoriesSheet.Action?
+    @State private var showingTrainIntervalComposer = false
+    @State private var savedTrainIntervalTemplate: RunningWorkoutTemplate?
     @State private var personalLibrarySection: ATHLTHPersonalLibrarySection?
     @State private var showingTrainPlanWorkspace = false
     @State private var showingTrainAllPlans = false
@@ -5877,6 +5881,31 @@ struct ATHLTHTrainView: View {
             .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingTrainAllPlans) {
                 AllTrainingPlansView()
+            }
+            .sheet(isPresented: $showingAllWorkoutCategories, onDismiss: {
+                guard let action = pendingWorkoutCategoryAction else { return }
+                pendingWorkoutCategoryAction = nil
+                handleWorkoutCategoryAction(action)
+            }) {
+                ATHLTHTrainAllWorkoutCategoriesSheet { action in
+                    pendingWorkoutCategoryAction = action
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
+            }
+            .sheet(isPresented: $showingTrainIntervalComposer, onDismiss: {
+                // The interval editor closes before the running quick-start
+                // sheet is presented. Preserve the newly built interval steps.
+                guard let template = savedTrainIntervalTemplate else { return }
+                savedTrainIntervalTemplate = nil
+                pendingRunningTemplate = template
+            }) {
+                ATHLTHTrainIntervalComposerView { template in
+                    savedTrainIntervalTemplate = template
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
             .athlthStudioEditor(item: $trainProgramCreationLaunch, useFullScreen: studioFullscreenEditing, onDismiss: {
                 // Switch tabs only once the creation sheet has fully closed.
@@ -7114,8 +7143,8 @@ struct ATHLTHTrainView: View {
             onCreatePlan: { beginFreshTrainingPlan() },
             onOpenLibrary: { showingLibrary = true },
             onOpenWorkouts: {
-                showingLibrary = false
-                personalLibrarySection = .workouts
+                guard !hasOngoingTrainWorkout else { return }
+                showingAllWorkoutCategories = true
             },
             onStartWorkout: { workout, healthCompleted in
                 guard let active else { return }
@@ -9340,19 +9369,60 @@ struct ATHLTHTrainView: View {
         showingCustomQuickStart = true
     }
 
-    /// Universal, open-ended workout: reuse the custom recorder and Watch
-    /// bridge, but skip every builder/setup step in the presented sheet.
+    /// One-tap free training starts the existing open-ended iPhone timer.
+    /// No setup sheet, no invented workouts and no automatic retrospective log.
+    /// The user's finish/discard action still owns whether the workout saves.
     private func startFreeTrainingQuick() {
-        guard customQuickStartAvailable else {
+        guard customQuickStartAvailable,
+              !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive else {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "Finish the active workout before starting another.",
                 norwegian: "Avslutt økten som pågår før du starter en ny."
             )
             return
         }
-        customQuickInitialActivity = .other
-        isFreeTrainingQuickStart = true
-        showingCustomQuickStart = true
+        social.quickTrainFriendIDs.removeAll()
+        social.discardPreparedQuickTrainFriends()
+        activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+            configuration: CustomQuickWorkoutConfiguration(
+                activity: .other,
+                method: .open,
+                durationMinutes: 45,
+                workSeconds: 40,
+                restSeconds: 20,
+                rounds: 8,
+                titleOverride: ATHLTHLocalization.choose(
+                    english: "Free training",
+                    norwegian: "Fri trening"
+                )
+            ),
+            mode: .timed
+        )
+    }
+
+    private func handleWorkoutCategoryAction(
+        _ action: ATHLTHTrainAllWorkoutCategoriesSheet.Action
+    ) {
+        guard !hasOngoingTrainWorkout else { return }
+        switch action {
+        case .freeRun:
+            handleQuickStart(.running)
+        case .runIntervals:
+            savedTrainIntervalTemplate = nil
+            showingTrainIntervalComposer = true
+        case .freeWalk:
+            handleQuickStart(.walking)
+        case .freeStrength:
+            handleQuickStart(.strength)
+        case .strengthLibrary:
+            personalLibrarySection = .workouts
+        case .cycling:
+            startCyclingQuick()
+        case .freeTraining:
+            startFreeTrainingQuick()
+        case .custom(let activity):
+            startCustomQuick(as: activity)
+        }
     }
 
     private var quickStrengthSession:
