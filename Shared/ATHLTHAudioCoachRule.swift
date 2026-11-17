@@ -661,7 +661,7 @@ enum ATHLTHAudioCoachRuleDelivery {
             return phase == "cooldown" &&
                 index == (context.stepCount ?? 0) - 1 && nearEnd ? index + 1 : nil
         case .beforeNextStep:
-            return next != nil && beforeBoundary ? index + 1 : nil
+            return context.hasNextStep == true && beforeBoundary ? index + 1 : nil
         case .beforeMain:
             return phase == "warmup" &&
                 (next == "work" || next == "recovery") &&
@@ -729,6 +729,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var stepPhase: String?
     var previousStepPhase: String?
     var nextStepPhase: String?
+    var hasNextStep: Bool? = nil
     // Optional: older iPhone/Watch snapshots have no event metadata.
     var isActiveRecovery: Bool? = nil
     var previousWasActiveRecovery: Bool? = nil
@@ -764,6 +765,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         context.stepPhase = step.phase
         context.previousStepPhase = index > 0 ? steps[index - 1].phase : nil
         context.nextStepPhase = index + 1 < steps.count ? steps[index + 1].phase : nil
+        context.hasNextStep = index + 1 < steps.count
         context.isActiveRecovery = step.phase == "recovery" && step.recoveryStyle == .activeJog
         context.previousWasActiveRecovery = index > 0 &&
             steps[index - 1].phase == "recovery" &&
