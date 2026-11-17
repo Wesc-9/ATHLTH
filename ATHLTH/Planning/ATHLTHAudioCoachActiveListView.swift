@@ -21,9 +21,8 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var standaloneMetric: ATHLTHAudioCoachRule.Metric = .elapsedTime
     @State private var standalonePhrase = ""
     @State private var showingGroupBuilder = false
-    @State private var showingGroupCommandBuilder = false
+    @State private var selectedCommandGroup: SelectedCommandGroup?
     @State private var pendingGroupCommandID: UUID?
-    @State private var groupCommandMetric: ATHLTHAudioCoachRule.Metric = .heartRate
     @State private var groupCommandPhrase = ""
     @State private var showingVoiceOptions = false
     @State private var showingSaveChoices = false
@@ -46,6 +45,13 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var creatingBlankTemplate = false
 
     private struct SelectedRule: Identifiable {
+        let id: UUID
+    }
+
+    /// Use an item-based sheet so the group ID is assigned before the
+    /// editor is built. A boolean sheet previously rendered an empty Form
+    /// while its optional group ID was still nil.
+    private struct SelectedCommandGroup: Identifiable {
         let id: UUID
     }
     @State private var pendingRemoval: ATHLTHAudioCoachOption?
@@ -148,10 +154,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     onResetStandard: { showingResetStandardPrompt = true },
                     isDirty: hasUnsavedTemplateChanges,
                     onAddCommand: { groupID in
-                        pendingGroupCommandID = groupID
-                        groupCommandMetric = .heartRate
-                        groupCommandPhrase = ""
-                        showingGroupCommandBuilder = true
+                        openGroupCommands(groupID)
                     },
                     onEditGroupTrigger: { groupID in
                         guard let group = draft.coachGroups.first(where: { $0.id == groupID }) else { return }
@@ -218,16 +221,15 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
         .tint(bronze)
         .sheet(isPresented: $showingGroupBuilder, onDismiss: {
-            if pendingGroupCommandID != nil {
-                showingGroupCommandBuilder = true
+            if let groupID = pendingGroupCommandID {
+                pendingGroupCommandID = nil
+                openGroupCommands(groupID)
             }
         }) {
             groupBuilderSheet
         }
-        .sheet(isPresented: $showingGroupCommandBuilder, onDismiss: {
-            pendingGroupCommandID = nil
-        }) {
-            groupCommandSheet
+        .sheet(item: $selectedCommandGroup) { selection in
+            groupCommandSheet(groupID: selection.id)
         }
         .sheet(isPresented: $showingStandaloneTrigger, onDismiss: {
             if openStandaloneCommandAfterTrigger {
@@ -620,7 +622,9 @@ struct ATHLTHAudioCoachActiveListView: View {
     private var availableGroupContents: [ATHLTHAudioCoachRule.Metric] {
         ATHLTHAudioCoachRule.Metric.allCases.filter { metric in
             switch metric {
-            case .stepName, .stepRemainingTime, .groupRemainingTime:
+            case .stepName, .stepRemainingTime, .groupRemainingTime,
+                 .remainingExercises, .nextExercise, .previousExerciseSummary,
+                 .previousMainSectionSummary:
                 return showStructuredOptions
             case .routeRemainingDistance, .estimatedRouteTime:
                 return showRouteOptions
@@ -858,124 +862,259 @@ struct ATHLTHAudioCoachActiveListView: View {
         group.interval = groupDraftInterval
         draft.coachGroups.append(group)
         pendingGroupCommandID = group.id
-        groupCommandMetric = groupDraftTrigger == .distance ? .distance : .elapsedTime
         groupCommandPhrase = ""
         showingGroupBuilder = false
     }
 
-    private var groupCommandSheet: some View {
-        NavigationStack {
-            Form {
-                if let group = draft.coachGroups.first(where: {
-                    $0.id == pendingGroupCommandID
-                }) {
-                    Section {
-                        Label(
-                            (group.trigger ?? .time).summary(interval: group.interval ?? 60),
-                            systemImage: group.trigger == .time ? "clock" :
-                                group.trigger == .distance ? "figure.run" : "waveform"
-                        )
-                        .foregroundStyle(bronze)
-                    } header: {
-                        Text(tr("GROUP TRIGGER", "GRUPPENS TRIGGER"))
-                    }
+    private func openGroupCommands(_ groupID: UUID) {
+        guard draft.coachGroups.contains(where: { $0.id == groupID }) else { return }
+        let group = draft.coachGroups.first { $0.id == groupID }
+        groupCommandPhrase = group?.ruleIDs.compactMap { id in
+            draft.customRules.first(where: { $0.id == id })?.customPhrase
+        }.first ?? ""
+        selectedCommandGroup = SelectedCommandGroup(id: groupID)
+    }
 
-                    Section {
-                        Picker(tr("What should Coach say?", "Hva skal Coach si?"),
-                               selection: $groupCommandMetric) {
-                            ForEach(availableGroupContents) { metric in
-                                Text(metric.title).tag(metric)
+    private func groupMetrics(_ groupID: UUID) -> [ATHLTHAudioCoachRule.Metric] {
+        guard let group = draft.coachGroups.first(where: { $0.id == groupID }) else { return [] }
+        let values = group.ruleIDs.compactMap { id in
+            draft.customRules.first(where: { $0.id == id })
+        }.flatMap(\.selectedMetrics)
+        return Array(NSOrderedSet(array: values.map(\.rawValue)))
+            .compactMap { ($0 as? String).flatMap(ATHLTHAudioCoachRule.Metric.init(rawValue:)) }
+    }
+
+    /// A lightweight, immediately populated editor. No Form + menu Picker
+    /// and no intermediate blank modal while constructing a long menu.
+    private func groupCommandSheet(groupID: UUID) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if let group = draft.coachGroups.first(where: { $0.id == groupID }) {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(group.name)
+                                .font(.system(size: 25, weight: .semibold, design: .serif))
+                                .foregroundStyle(ink)
+                            Label(
+                                (group.trigger ?? .time).summary(interval: group.interval ?? 60),
+                                systemImage: "waveform"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(bronze)
+                            Text(tr(
+                                "Select commands one by one. All selected values are read together when the group trigger fires.",
+                                "Velg én og én kommando. Alle valgte verdier leses samlet når gruppens trigger aktiveres."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(dim)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+
+                        Text(tr("COMMANDS IN THIS GROUP", "KOMMANDOER I GRUPPEN"))
+                            .font(.caption.weight(.bold))
+                            .tracking(1.4)
+                            .foregroundStyle(bronze)
+                        let selected = groupMetrics(groupID)
+                        if selected.isEmpty && group.optionIDs.isEmpty {
+                            Text(tr(
+                                "No commands selected yet. Select one below to begin.",
+                                "Ingen kommandoer valgt ennå. Velg den første nedenfor."
+                            ))
+                            .font(.subheadline)
+                            .foregroundStyle(dim)
+                            .padding(15)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(selected) { metric in
+                                    HStack(spacing: 11) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(bronze)
+                                        Text(metric.title)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(ink)
+                                        Spacer(minLength: 6)
+                                        Button {
+                                            removeCommandFromGroup(metric, groupID: groupID)
+                                        } label: {
+                                            Image(systemName: "minus.circle")
+                                                .frame(width: 44, height: 44)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel(tr("Remove", "Fjern") + " " + metric.title)
+                                    }
+                                    .padding(.horizontal, 14)
+                                    if metric != selected.last { Divider().padding(.leading, 42) }
+                                }
+                                ForEach(group.optionIDs, id: \.self) { rawValue in
+                                    if let option = ATHLTHAudioCoachOption(rawValue: rawValue) {
+                                        HStack {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(bronze)
+                                            Text(option.title).font(.subheadline)
+                                            Spacer()
+                                        }
+                                        .padding(15)
+                                    }
+                                }
+                            }
+                            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                        }
+
+                        if selected.contains(.motivation) {
+                            VStack(alignment: .leading, spacing: 9) {
+                                Text(tr("Personal motivation message", "Egen motivasjonsmelding"))
+                                    .font(.subheadline.weight(.semibold))
+                                TextField(
+                                    tr("Message (optional)", "Melding (valgfritt)"),
+                                    text: $groupCommandPhrase,
+                                    axis: .vertical
+                                )
+                                .lineLimit(2...4)
+                                .padding(11)
+                                .background(ATHLTHPlanDesign.selectedSurface,
+                                            in: RoundedRectangle(cornerRadius: 12))
+                                Button(tr("Save message", "Lagre melding")) {
+                                    saveGroupMotivationPhrase(groupID)
+                                }
+                                .font(.caption.weight(.semibold))
+                                .tint(bronze)
+                            }
+                            .padding(15)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+                        }
+
+                        Text(tr("ADD COMMAND", "LEGG TIL KOMMANDO"))
+                            .font(.caption.weight(.bold))
+                            .tracking(1.4)
+                            .foregroundStyle(bronze)
+                        LazyVStack(spacing: 8) {
+                            ForEach(availableGroupContents.filter { !selected.contains($0) }) { metric in
+                                Button {
+                                    addCommandToGroup(metric, groupID: groupID)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.title3)
+                                            .foregroundStyle(bronze)
+                                        Text(metric.title)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(ink)
+                                        Spacer(minLength: 5)
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.medium))
+                                            .foregroundStyle(dim)
+                                    }
+                                    .padding(.horizontal, 14)
+                                    .frame(minHeight: 52)
+                                    .frame(maxWidth: .infinity)
+                                    .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(draft.customRules.count >= 20 && group.ruleIDs.isEmpty)
+                                .accessibilityIdentifier("athlth-coach-group-add-\(metric.rawValue)")
                             }
                         }
-                        .pickerStyle(.menu)
-                        if groupCommandMetric == .motivation {
-                            TextField(
-                                tr("Personal phrase (optional)",
-                                   "Egen setning (valgfritt)"),
-                                text: $groupCommandPhrase,
-                                axis: .vertical
-                            )
-                            .lineLimit(2...4)
+                        if selected.count == availableGroupContents.count {
+                            Text(tr("All available commands are selected.",
+                                    "Alle tilgjengelige kommandoer er valgt."))
+                                .font(.caption)
+                                .foregroundStyle(dim)
                         }
-                    } header: {
-                        Text(tr("ADD ONE COMMAND", "LEGG TIL ÉN KOMMANDO"))
-                    } footer: {
-                        Text(tr(
-                            "Add as many commands as you wish, one at a time. They share the group's trigger and play as one message.",
-                            "Legg til én kommando om gangen. Alle bruker gruppens trigger og leses som én beskjed."
-                        ))
-                    }
-
-                    Section {
-                        Button(action: addCommandToGroup) {
-                            Label(tr("Add command", "Legg til kommando"),
-                                  systemImage: "plus.circle")
-                                .frame(maxWidth: .infinity, minHeight: 48)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(bronze)
-                        .disabled(draft.customRules.count >= 20 &&
-                                  group.ruleIDs.isEmpty)
+                    } else {
+                        ContentUnavailableView(
+                            tr("Group unavailable", "Gruppen finnes ikke"),
+                            systemImage: "waveform.slash",
+                            description: Text(tr("Close and choose another group.",
+                                                 "Lukk og velg en annen gruppe."))
+                        )
                     }
                 }
+                .padding(18)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
             }
-            .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.interactively)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .navigationTitle(tr("Group commands", "Gruppekommandoer"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(tr("Done", "Ferdig")) {
-                        pendingGroupCommandID = nil
-                        showingGroupCommandBuilder = false
+                        saveGroupMotivationPhrase(groupID)
+                        selectedCommandGroup = nil
                     }
                 }
             }
         }
         .presentationDetents([.large])
+        .accessibilityIdentifier("athlth-coach-group-commands")
     }
 
-    private func addCommandToGroup() {
-        guard let groupID = pendingGroupCommandID,
-              let groupIndex = draft.coachGroups.firstIndex(where: {
-                  $0.id == groupID
-              })
-        else { return }
+    private func addCommandToGroup(
+        _ metric: ATHLTHAudioCoachRule.Metric,
+        groupID: UUID
+    ) {
+        guard let groupIndex = draft.coachGroups.firstIndex(where: { $0.id == groupID }) else { return }
         let group = draft.coachGroups[groupIndex]
-        let metric = groupCommandMetric
-        let phrase = String(groupCommandPhrase.trimmingCharacters(
-            in: .whitespacesAndNewlines).prefix(180))
-        let existingID = group.ruleIDs.first(where: { id in
-            draft.customRules.contains {
-                $0.id == id && $0.beforeEndSeconds == nil
-            }
-        })
-
-        if let existingID,
-           let index = draft.customRules.firstIndex(where: { $0.id == existingID }) {
-            if !draft.customRules[index].selectedMetrics.contains(metric) {
-                draft.customRules[index].additionalMetrics =
-                    (draft.customRules[index].additionalMetrics ?? []) + [metric]
-            }
-            if metric == .motivation && !phrase.isEmpty {
-                draft.customRules[index].customPhrase = phrase
-            }
+        guard !groupMetrics(groupID).contains(metric) else { return }
+        if let existingID = group.ruleIDs.first(where: { id in
+            draft.customRules.contains { $0.id == id && $0.beforeEndSeconds == nil }
+        }), let index = draft.customRules.firstIndex(where: { $0.id == existingID }) {
+            draft.customRules[index].additionalMetrics =
+                (draft.customRules[index].additionalMetrics ?? []) + [metric]
         } else {
             guard draft.customRules.count < 20 else { return }
-            var rule = ATHLTHAudioCoachRule(
+            let rule = ATHLTHAudioCoachRule(
                 trigger: group.trigger ?? .time,
                 metric: metric,
                 interval: group.interval ?? 60,
                 scope: .workout
             )
-            if metric == .motivation && !phrase.isEmpty {
-                rule.customPhrase = phrase
-            }
             draft.customRules.append(rule)
             draft.coachGroups[groupIndex].ruleIDs.append(rule.id)
         }
-        groupCommandPhrase = ""
-        // Keep this sheet open so the next command can be added immediately.
+    }
+
+    private func removeCommandFromGroup(
+        _ metric: ATHLTHAudioCoachRule.Metric,
+        groupID: UUID
+    ) {
+        guard let groupIndex = draft.coachGroups.firstIndex(where: { $0.id == groupID }) else { return }
+        for id in draft.coachGroups[groupIndex].ruleIDs {
+            guard let index = draft.customRules.firstIndex(where: { $0.id == id }),
+                  draft.customRules[index].selectedMetrics.contains(metric) else { continue }
+            var metrics = draft.customRules[index].selectedMetrics
+            metrics.removeAll { $0 == metric }
+            if let first = metrics.first {
+                draft.customRules[index].metric = first
+                draft.customRules[index].additionalMetrics = Array(metrics.dropFirst())
+                if metric == .motivation {
+                    draft.customRules[index].customPhrase = nil
+                }
+            } else {
+                draft.customRules.remove(at: index)
+                draft.coachGroups[groupIndex].ruleIDs.removeAll { $0 == id }
+            }
+            break
+        }
+    }
+
+    private func saveGroupMotivationPhrase(_ groupID: UUID) {
+        guard let group = draft.coachGroups.first(where: { $0.id == groupID }),
+              let id = group.ruleIDs.first(where: { id in
+                  draft.customRules.contains {
+                      $0.id == id && $0.selectedMetrics.contains(.motivation)
+                  }
+              }),
+              let index = draft.customRules.firstIndex(where: { $0.id == id }) else { return }
+        let phrase = String(groupCommandPhrase.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).prefix(180))
+        draft.customRules[index].customPhrase = phrase.isEmpty ? nil : phrase
     }
 
     private var standardMetricsEditor: some View {
