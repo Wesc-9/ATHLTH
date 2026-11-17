@@ -261,6 +261,7 @@ enum ATHLTHExerciseReferenceResolver {
         return ExerciseSnapshot(
             name: name,
             instructions: words(exercise.instructions, maxItems: 12),
+            assessmentMethod: exercise.assessmentMethod,
             primaryMuscles: words(exercise.primaryMuscles, maxItems: 12),
             secondaryMuscles: words(exercise.secondaryMuscles, maxItems: 12),
             equipment: words(exercise.equipment, maxItems: 12),
@@ -285,6 +286,7 @@ enum ATHLTHExerciseReferenceResolver {
         return ExerciseSnapshot(
             name: name,
             instructions: clean(source.instructions),
+            assessmentMethod: source.assessmentMethod,
             primaryMuscles: clean(source.primaryMuscles),
             secondaryMuscles: clean(source.secondaryMuscles ?? []),
             equipment: clean(source.equipment),
