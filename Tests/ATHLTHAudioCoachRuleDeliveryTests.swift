@@ -883,7 +883,7 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
             distanceMeters: 0, elapsedSeconds: 0,
             paceSecondsPerKilometer: nil, heartRateBPM: nil,
             norwegian: true, context: effort
-        )?.contains("2 øvelser") == true)
+        )?.contains("1 øvelse") == true)
 
         let next = ATHLTHAudioCoachRule(
             trigger: .stepStart, metric: .nextExercise, interval: 1
