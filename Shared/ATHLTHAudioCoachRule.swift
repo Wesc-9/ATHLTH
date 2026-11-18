@@ -968,7 +968,46 @@ enum ATHLTHAudioCoachGroupPreview {
                 context: context
             )
         }
-        let sample = messages.joined(separator: ". ")
+        // Standard/built-in voice options can also belong to a named
+        // Coach group. Preview those as sample readouts instead of playing
+        // a generic sentence that hides the group's actual contents.
+        var allMessages = messages
+        for raw in group.optionIDs {
+            let phrase: String?
+            switch raw {
+            case "distanceUpdates", "distance":
+                phrase = norwegian ? "Distanse 2 kilometer" : "Distance 2 kilometers"
+            case "timedUpdates", "elapsedTime":
+                phrase = norwegian ? "Tid 12 minutter" : "Time 12 minutes"
+            case "averagePace":
+                phrase = norwegian ? "Gjennomsnittstempo 5 minutter og 30 sekunder per kilometer"
+                                   : "Average pace 5 minutes 30 seconds per kilometer"
+            case "heartRate":
+                phrase = norwegian ? "Puls 145" : "Heart rate 145"
+            case "currentZone", "targetZoneCoach":
+                phrase = norwegian ? "Pulssone 3" : "Heart-rate zone 3"
+            case "workoutStart":
+                phrase = norwegian ? "Økten har startet" : "Workout started"
+            case "workoutFinish":
+                phrase = norwegian ? "Økten er fullført" : "Workout completed"
+            case "remainingStepTime":
+                phrase = norwegian ? "25 sekunder igjen av draget"
+                                   : "25 seconds remaining in the effort"
+            case "currentStep":
+                phrase = norwegian ? "Neste drag: Intervall 2" : "Next effort: Interval 2"
+            case "motivation", "randomEncouragement", "adaptiveMotivation":
+                phrase = norwegian ? "Du holder god fart. Fortsett slik!" : "Strong pace. Keep going!"
+            case "routeRemaining":
+                phrase = norwegian ? "2,1 kilometer igjen av ruten"
+                                   : "2.1 kilometers remaining on the route"
+            default:
+                phrase = nil
+            }
+            if let phrase, !allMessages.contains(phrase) {
+                allMessages.append(phrase)
+            }
+        }
+        let sample = allMessages.joined(separator: ". ")
         return sample.isEmpty
             ? (norwegian ? "Dette er en test av gruppens stemme." : "This is a preview of the group's voice.")
             : sample
