@@ -4908,6 +4908,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 lastKilometerPaceSecondsPerKilometer
             context.targetPaceSecondsPerKilometer =
                 currentStructuredRunningStep?.targetPaceMinSecondsPerKilometer ??
+                currentStructuredRunningStep?.targetPaceMaxSecondsPerKilometer ??
+                treadmillTargetPaceSecondsPerKilometer
+            context.targetSlowestPaceSecondsPerKilometer =
+                currentStructuredRunningStep?.targetPaceMaxSecondsPerKilometer ??
+                currentStructuredRunningStep?.targetPaceMinSecondsPerKilometer ??
                 treadmillTargetPaceSecondsPerKilometer
         }
         return context
