@@ -11,6 +11,7 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
     case strengthReady
     case strengthWorking
     case strengthRest
+    case strengthExerciseRest
     case strengthNextExercise
     case strengthAddExercise
     case strengthFinish
@@ -29,6 +30,10 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
         case .strengthRest:
             return ATHLTHLocalization.choose(
                 english: "REST", norwegian: "PAUSE")
+        case .strengthExerciseRest:
+            return ATHLTHLocalization.choose(
+                english: "REST BEFORE NEXT EXERCISE",
+                norwegian: "PAUSE FØR NESTE ØVELSE")
         case .strengthNextExercise:
             return ATHLTHLocalization.choose(
                 english: "NEXT EXERCISE", norwegian: "NESTE ØVELSE")
@@ -64,7 +69,7 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
         case .strengthRest:
             return ATHLTHLocalization.choose(
                 english: "Start next set", norwegian: "Start neste sett")
-        case .strengthNextExercise:
+        case .strengthNextExercise, .strengthExerciseRest:
             return ATHLTHLocalization.choose(
                 english: "Next exercise", norwegian: "Neste øvelse")
         case .strengthAddExercise:
@@ -82,7 +87,7 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
             return "plus.circle.fill"
         case .runningMain, .runningInterval, .strengthReady, .strengthRest:
             return "play.fill"
-        case .runningNext, .strengthNextExercise:
+        case .runningNext, .strengthNextExercise, .strengthExerciseRest:
             return "arrow.right.circle.fill"
         case .strengthWorking:
             return "checkmark.circle.fill"
@@ -93,7 +98,7 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var secondaryTitle: String? {
         switch self {
-        case .strengthRest:
+        case .strengthRest, .strengthExerciseRest:
             return ATHLTHLocalization.choose(
                 english: "+30 sec", norwegian: "+30 sek")
         case .strengthReady, .strengthWorking, .strengthNextExercise,
@@ -108,7 +113,7 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var secondarySymbol: String? {
         switch self {
-        case .strengthRest: "plus"
+        case .strengthRest, .strengthExerciseRest: "plus"
         case .strengthReady, .strengthWorking, .strengthNextExercise,
              .strengthFinish: "list.bullet"
         case .runningMain, .runningInterval, .runningNext, .runningFree,

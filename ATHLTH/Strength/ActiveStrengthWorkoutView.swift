@@ -6029,6 +6029,19 @@ struct ActiveStrengthWorkoutView: View {
                 ) {
                     EmptyView()
                 }
+            } else if strength.currentExerciseAllSetsCompleted &&
+                      strength.isResting {
+                // A completed exercise may still have an active rest clock.
+                // Next exercise never records or starts a completed set.
+                ATHLTHLiveWorkoutBottomDock(
+                    mode: .strengthExerciseRest,
+                    subtitle: strength.nextPendingExercise?.exercise.name,
+                    primaryDisabled: !strength.hasNextExercise,
+                    onPrimary: { strength.moveToNextExercise() },
+                    onSecondary: { strength.addRest(seconds: 30) }
+                ) {
+                    strengthRestTimeDetail
+                }
             } else if strength.currentExerciseAllSetsCompleted {
                 ATHLTHLiveWorkoutBottomDock(
                     mode: .strengthNextExercise,

@@ -22,6 +22,7 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
         XCTAssertTrue(ATHLTHLiveWorkoutBottomMode.strengthWorking.recordsCompletedSet)
         XCTAssertFalse(ATHLTHLiveWorkoutBottomMode.strengthReady.recordsCompletedSet)
         XCTAssertFalse(ATHLTHLiveWorkoutBottomMode.strengthRest.recordsCompletedSet)
+        XCTAssertFalse(ATHLTHLiveWorkoutBottomMode.strengthExerciseRest.recordsCompletedSet)
         XCTAssertFalse(ATHLTHLiveWorkoutBottomMode.strengthNextExercise.recordsCompletedSet)
         XCTAssertFalse(ATHLTHLiveWorkoutBottomMode.strengthFinish.recordsCompletedSet)
     }
@@ -31,6 +32,10 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
             ATHLTHLiveWorkoutBottomMode.strengthRest.secondarySymbol, "plus")
         XCTAssertEqual(ATHLTHLiveWorkoutBottomMode.strengthRest.primarySymbol,
                        "play.fill")
+        XCTAssertEqual(ATHLTHLiveWorkoutBottomMode.strengthExerciseRest.primarySymbol,
+                       "arrow.right.circle.fill")
+        XCTAssertEqual(ATHLTHLiveWorkoutBottomMode.strengthExerciseRest.secondarySymbol,
+                       "plus")
         XCTAssertNotNil(ATHLTHLiveWorkoutBottomMode.strengthRest.secondaryTitle)
     }
 

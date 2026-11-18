@@ -242,3 +242,8 @@ som ferdige før egne faser og reelle tester er fullført.
   kompatibilitet, skjermlås, frie styrkeøkter, komplette økter,
   tids- og vektbaserte sett før fase 2 godkjennes.
 - **Ingen ny TestFlight-opplasting**, og fase 3 er ikke startet.
+
+- Etter siste sett i en øvelse kan pausen fortsatt telles ned i den samme
+  bunnflaten. «Neste øvelse» går videre uten å fullføre uregistrerte sett,
+  mens «+30 sek» utvider faktisk hvile. Dette er ikke samme handling som
+  «Start neste sett» midt i en øvelse.
