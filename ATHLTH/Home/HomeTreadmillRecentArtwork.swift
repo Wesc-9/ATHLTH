@@ -76,7 +76,7 @@ struct HomeTreadmillRecentArtwork: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottomLeading) {
-                Image(Self.backgroundAssetName)
+                treadmillImage
                     .resizable()
                     .scaledToFill()
                     .frame(
