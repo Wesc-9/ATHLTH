@@ -812,7 +812,13 @@ enum ATHLTHAudioCoachRuleDelivery {
             slowerThan = false
         case .paceFasterThanTarget, .paceSlowerThanTarget:
             pace = measuredPace
-            threshold = context.targetPaceSecondsPerKilometer
+            // A prescribed 4:40–5:00 range warns faster than 4:40 or
+            // slower than 5:00, never against the wrong side of the range.
+            threshold = rule.trigger == .paceSlowerThanTarget
+                ? (context.targetSlowestPaceSecondsPerKilometer ??
+                   context.targetPaceSecondsPerKilometer)
+                : (context.targetPaceSecondsPerKilometer ??
+                   context.targetSlowestPaceSecondsPerKilometer)
             slowerThan = rule.trigger == .paceSlowerThanTarget
         default:
             return nil
@@ -1141,7 +1147,10 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     // available after a full kilometre of monotonic recorded distance.
     var overallPaceSecondsPerKilometer: Double? = nil
     var lastKilometerPaceSecondsPerKilometer: Double? = nil
+    // Faster and slower edges of an authored target range. For an exact
+    // target, both values are equal.
     var targetPaceSecondsPerKilometer: Double? = nil
+    var targetSlowestPaceSecondsPerKilometer: Double? = nil
     var verifiedPersonalRecordEnglish: String? = nil
     var verifiedPersonalRecordNorwegian: String? = nil
     // Optional computed plan context; older Watch/iPhone snapshots decode with nil.
