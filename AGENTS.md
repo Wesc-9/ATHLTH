@@ -1,3 +1,10 @@
+# ACTIVE ATHLTH DEVELOPMENT (2026-11-18 — 2.2.5)
+
+- **CURRENT ACTIVE DEVELOPMENT: `release/v2.2.5`**. This instruction supersedes older 2.2.x active-branch instructions below. Make all changes directly on this release branch; do not open a parallel feature branch. Preserve previously frozen versions.
+- **UNIFIED WORKOUT ENGINE:** Phase 1 implements the read-only shared workout-session projection, a single date-based clock policy, the same checkpoint-recovery decision for running and strength, and launch guards that prevent an existing local workout from being overwritten. Refer to `docs/athlth-unified-workout-engine.md` for phase gates and cleanup ledger.
+- **NO PARALLEL RECORDING:** PhoneWorkout and StrengthWorkoutLog remain authoritative for their existing recordings and history until a tested migration can replace them; never add a shadow workout, duplicate HealthKit capture, or destructive migration. Delete superseded view/control logic in the phase that replaces it, after its replacement passes tests.
+- **No new TestFlight upload without explicit authorization**. Verify code and CI status before claiming a build is completed. Future phases require individual verification before progression.
+
 # ACTIVE ATHLTH DEVELOPMENT (2026-11-16)
 
 - **CURRENT ACTIVE VERSION: 2.2.3 (build 131)** on `release/v2.2.3`, created from the exact verified ATHLTH 2.2.2 TestFlight source `f1b94ac9ae738888333e0aede33e5d3f5a1e2d31`. Make ALL new ATHLTH source, UI, tests and workflow changes only on `release/v2.2.3`; older versions must remain unchanged.
