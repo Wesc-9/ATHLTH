@@ -580,10 +580,10 @@ final class IPhoneWorkoutStore:
                 )
             } ?? [:]
         if let active,
-           active.end != nil ||
-            history.contains(
-                where: { $0.id == active.id }
-            ) {
+           !ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
+                hasEnded: active.end != nil,
+                alreadyCommitted: history.contains { $0.id == active.id }
+           ) {
             self.active = nil
             persistActiveCheckpoint(force: true)
         }
