@@ -2055,6 +2055,10 @@ final class CommunityGroupStore: ObservableObject {
     /// Last known chat activity for joined clubs. Lightweight metadata only,
     /// used by the inbox recent-conversations shortcuts.
     @Published private(set) var recentChatActivityByGroup: [UUID: Date] = [:]
+    /// Latest visible chat message for each joined club; the inbox never
+    /// needs to download a club's complete chat history for a preview.
+    @Published private(set) var recentClubMessagesByGroup: [UUID: CommunityGroupMessageRecord] = [:]
+    @Published private(set) var unreadClubGroupIDs: Set<UUID> = []
     @Published private(set) var eventsByGroup: [UUID: [CommunityGroupEventRecord]] = [:]
     // Home only needs a tiny future-events summary, not the entire
     // club calendar (which can contain thousands of past RSVPs).
@@ -2084,15 +2088,6 @@ final class CommunityGroupStore: ObservableObject {
     private var isRefreshingRecentChatActivity = false
     private var groupFetchLimit = 40
 
-    private struct RecentChatActivityRecord: Decodable {
-        let groupID: UUID
-        let createdAt: Date
-
-        enum CodingKeys: String, CodingKey {
-            case groupID = "group_id"
-            case createdAt = "created_at"
-        }
-    }
     @Published private(set) var canLoadMoreGroups = true
     @Published private(set) var isLoadingMoreGroups = false
 
@@ -2281,6 +2276,8 @@ final class CommunityGroupStore: ObservableObject {
     func refreshRecentChatActivity(force: Bool = false) async {
         guard let userID = currentUserID else {
             recentChatActivityByGroup = [:]
+            recentClubMessagesByGroup = [:]
+            unreadClubGroupIDs = []
             recentChatActivityUserID = nil
             lastRecentChatRefreshAt = nil
             return
@@ -2288,6 +2285,8 @@ final class CommunityGroupStore: ObservableObject {
 
         if recentChatActivityUserID != userID {
             recentChatActivityByGroup = [:]
+            recentClubMessagesByGroup = [:]
+            unreadClubGroupIDs = []
             recentChatActivityUserID = userID
             lastRecentChatRefreshAt = nil
         }
@@ -2295,6 +2294,8 @@ final class CommunityGroupStore: ObservableObject {
         let groupIDs = joinedGroupIDs
         guard !groupIDs.isEmpty else {
             recentChatActivityByGroup = [:]
+            recentClubMessagesByGroup = [:]
+            unreadClubGroupIDs = []
             lastRecentChatRefreshAt = nil
             return
         }
@@ -2309,11 +2310,12 @@ final class CommunityGroupStore: ObservableObject {
         defer { isRefreshingRecentChatActivity = false }
 
         do {
-            // Only read timestamps for groups that the current user joined.
-            // Never download message bodies just to build shortcut ordering.
-            let rows: [RecentChatActivityRecord] = try await client
+            // Membership-scoped and RLS-protected. Read one bounded newest
+            // page for previews (not full per-club histories). The first
+            // message encountered for each club is its latest.
+            let rows: [CommunityGroupMessageRecord] = try await client
                 .from("community_group_messages")
-                .select("group_id,created_at")
+                .select("id,group_id,sender_id,sender_name,body,image_url,created_at")
                 .in("group_id", values: groupIDs.map(\.uuidString))
                 .order("created_at", ascending: false)
                 .limit(400)
@@ -2323,13 +2325,37 @@ final class CommunityGroupStore: ObservableObject {
             guard !Task.isCancelled,
                   currentUserID == userID else { return }
 
-            var latest: [UUID: Date] = [:]
+            var latest: [UUID: CommunityGroupMessageRecord] = [:]
             for row in rows where groupIDs.contains(row.groupID) {
                 if latest[row.groupID] == nil {
-                    latest[row.groupID] = row.createdAt
+                    latest[row.groupID] = row
                 }
             }
-            recentChatActivityByGroup = latest
+            recentClubMessagesByGroup = latest
+            recentChatActivityByGroup = latest.mapValues(\.createdAt)
+            var unread: Set<UUID> = []
+            for (groupID, message) in latest {
+                let key = clubChatLastReadKey(userID: userID, groupID: groupID)
+                // The first launch after this feature is installed starts
+                // with no artificial backlog of unread club messages.
+                if UserDefaults.standard.object(forKey: key) == nil {
+                    UserDefaults.standard.set(
+                        message.createdAt.timeIntervalSince1970, forKey: key
+                    )
+                } else {
+                    let lastReadAt = Date(
+                        timeIntervalSince1970: UserDefaults.standard.double(forKey: key)
+                    )
+                    if ATHLTHClubInboxPolicy.isUnread(
+                        message: message,
+                        lastReadAt: lastReadAt,
+                        viewerID: userID
+                    ) {
+                        unread.insert(groupID)
+                    }
+                }
+            }
+            unreadClubGroupIDs = unread
             lastRecentChatRefreshAt = Date()
         } catch is CancellationError {
             return
@@ -2337,6 +2363,26 @@ final class CommunityGroupStore: ObservableObject {
             // A shortcut refresh must not block inbox conversations.
             // Keep previously known club activity if the network fails.
         }
+    }
+
+    /// Record the latest club message read while its chat is actually open.
+    /// Read markers are account-scoped and store timestamps only, not bodies.
+    func markClubChatRead(_ groupID: UUID) {
+        guard let userID = currentUserID,
+              joinedGroupIDs.contains(groupID) else { return }
+        let latest = messagesByGroup[groupID]?.last?.createdAt ??
+            recentClubMessagesByGroup[groupID]?.createdAt
+        guard let latest else { return }
+        let key = clubChatLastReadKey(userID: userID, groupID: groupID)
+        let previous = UserDefaults.standard.double(forKey: key)
+        if latest.timeIntervalSince1970 > previous {
+            UserDefaults.standard.set(latest.timeIntervalSince1970, forKey: key)
+        }
+        unreadClubGroupIDs.remove(groupID)
+    }
+
+    private func clubChatLastReadKey(userID: UUID, groupID: UUID) -> String {
+        "athlth.club-chat.last-read." + userID.uuidString + "." + groupID.uuidString
     }
 
     func events(in groupID: UUID) -> [CommunityGroupEventRecord] {
@@ -2689,6 +2735,10 @@ final class CommunityGroupStore: ObservableObject {
             recentChatActivityByGroup = recentChatActivityByGroup.filter {
                 stillJoined.contains($0.key)
             }
+            recentClubMessagesByGroup = recentClubMessagesByGroup.filter {
+                stillJoined.contains($0.key)
+            }
+            unreadClubGroupIDs.formIntersection(stillJoined)
             canLoadMoreGroups =
                 discoveryGroups.count >= groupFetchLimit
             lastRefreshAt = Date()
@@ -4407,6 +4457,7 @@ final class CommunityGroupStore: ObservableObject {
                 .execute()
 
             await refreshMessages(groupID)
+            markClubChatRead(groupID)
             await refreshLeaderboard(groupID)
             return true
         } catch {
@@ -11312,9 +11363,8 @@ struct CommunityGroupDetailView: View {
             }
 
             while !Task.isCancelled {
-                await groups.refreshMessages(
-                    group.id
-                )
+                await groups.refreshMessages(group.id)
+                groups.markClubChatRead(group.id)
                 try? await Task.sleep(
                     for: .seconds(5)
                 )
