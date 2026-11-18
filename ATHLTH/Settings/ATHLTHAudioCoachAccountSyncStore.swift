@@ -25,7 +25,7 @@ struct ATHLTHAudioCoachAccountSnapshot: Codable, Hashable {
 }
 
 enum ATHLTHAudioCoachAccountSyncDecision {
-    enum Action { case unchanged, upload, download }
+    enum Action: Equatable { case unchanged, upload, download }
     static func choose(
         local: String, remote: String, lastAcknowledged: String?,
         localEditedAt: Date, remoteEditedAt: Date
