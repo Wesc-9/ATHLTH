@@ -1491,6 +1491,25 @@ struct ATHLTHAudioCoachActiveListView: View {
                                         rule.validatedInterval % 60))
                                 .monospacedDigit()
                         }
+                    } else if rule.trigger == .heartRateAbove ||
+                              rule.trigger == .heartRateBelow {
+                        Stepper(value: $rule.interval, in: 40...220, step: 5) {
+                            Text("\(rule.validatedInterval) bpm")
+                        }
+                    } else if rule.trigger == .zoneEnter ||
+                              rule.trigger == .zoneExit {
+                        Picker(tr("Heart-rate zone", "Pulssone"),
+                               selection: $rule.interval) {
+                            ForEach(1...5, id: \.self) { zone in
+                                Text("S\(zone)").tag(zone)
+                            }
+                        }
+                    } else if rule.trigger == .beforeNextStep ||
+                              rule.trigger == .beforeMain ||
+                              rule.trigger == .beforeCooldown {
+                        Stepper(value: $rule.interval, in: 5...60, step: 5) {
+                            Text("\(rule.validatedInterval) s")
+                        }
                     } else if rule.trigger.isPaceCondition {
                         Text(tr("Uses the active exercise pace target.",
                                 "Bruker målfarten for den aktive øvelsen."))
@@ -1542,6 +1561,14 @@ struct ATHLTHAudioCoachActiveListView: View {
                 } else if kind == .paceFasterOverall ||
                           kind == .paceFasterLastKilometer {
                     newRuleInterval = 300
+                } else if kind == .heartRateAbove ||
+                          kind == .heartRateBelow {
+                    newRuleInterval = 150
+                } else if kind == .zoneEnter || kind == .zoneExit {
+                    newRuleInterval = 3
+                } else if kind == .beforeNextStep ||
+                          kind == .beforeMain || kind == .beforeCooldown {
+                    newRuleInterval = 10
                 } else {
                     newRuleInterval = 1
                 }
@@ -1564,6 +1591,25 @@ struct ATHLTHAudioCoachActiveListView: View {
                     Text(String(format: "%d:%02d min/km",
                                 newRuleInterval / 60, newRuleInterval % 60))
                         .monospacedDigit()
+                }
+            } else if newRuleTrigger == .heartRateAbove ||
+                      newRuleTrigger == .heartRateBelow {
+                Stepper(value: $newRuleInterval, in: 40...220, step: 5) {
+                    Text("\(newRuleInterval) bpm")
+                }
+            } else if newRuleTrigger == .zoneEnter ||
+                      newRuleTrigger == .zoneExit {
+                Picker(tr("Heart-rate zone", "Pulssone"),
+                       selection: $newRuleInterval) {
+                    ForEach(1...5, id: \.self) { zone in
+                        Text("S\(zone)").tag(zone)
+                    }
+                }
+            } else if newRuleTrigger == .beforeNextStep ||
+                      newRuleTrigger == .beforeMain ||
+                      newRuleTrigger == .beforeCooldown {
+                Stepper(value: $newRuleInterval, in: 5...60, step: 5) {
+                    Text("\(newRuleInterval) s")
                 }
             } else if newRuleTrigger.isPaceCondition {
                 Text(tr("Follows the pace target on the current exercise.",
