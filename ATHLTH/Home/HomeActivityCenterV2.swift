@@ -4490,10 +4490,10 @@ private struct HomeRecentActivityTileV4:
                 if workoutActivity == .running {
                     ATHLTHHomeRunningFeedPhoto(height: 68)
                 } else {
-                LinearGradient(
-                    colors: [
-                        ATHLTHTheme
-                            .accentSoft
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme
+                                .accentSoft
                             .opacity(
                                 0.72
                             ),
@@ -4513,10 +4513,9 @@ private struct HomeRecentActivityTileV4:
                         .bottomTrailing
                 )
 
-                HomeActivityMotionArtworkV3(
-                    activity:
-                        workoutActivity
-                )
+                    HomeActivityMotionArtworkV3(
+                        activity: workoutActivity
+                    )
                 }
             }
             .frame(height: 68)

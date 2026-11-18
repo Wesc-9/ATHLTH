@@ -3,11 +3,10 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHHomeFeedArtworkTests: XCTestCase {
-    func testRunningWithoutGPSUsesExistingOfflineArtwork() {
-        let name = ATHLTHHomeFeedFallbackPolicy.imageName(for: .running)
+    func testRunningWithoutGPSUsesExistingOfflineArtwork() throws {
+        let name = try XCTUnwrap(ATHLTHHomeFeedFallbackPolicy.imageName(for: .running))
         XCTAssertEqual(name, ATHLTHPlanWorkoutArtwork.asset(for: .easyRun))
-        XCTAssertNotNil(name)
-        XCTAssertNotNil(UIImage(named: try! XCTUnwrap(name)),
+        XCTAssertNotNil(UIImage(named: name),
                         "The running fallback must ship in Assets.xcassets")
     }
 

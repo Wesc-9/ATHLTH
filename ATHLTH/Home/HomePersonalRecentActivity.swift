@@ -4799,10 +4799,10 @@ private struct HomePersonalWorkoutVisual:
         if ATHLTHHomeFeedFallbackPolicy.imageName(for: workout.activity) != nil {
             ATHLTHHomeRunningFeedPhoto(height: height)
         } else {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    visualAccent.opacity(
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        visualAccent.opacity(
                         0.88
                     ),
                     Color(
@@ -4840,7 +4840,7 @@ private struct HomePersonalWorkoutVisual:
                 )
             )
             .offset(x: 94)
-        }
+            }
         }
     }
 
