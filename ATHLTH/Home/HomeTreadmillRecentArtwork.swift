@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Data-backed treadmill hero for the light-theme Recent Activity cards.
 /// The gym artwork is intentionally free of fixed workout numbers; every
