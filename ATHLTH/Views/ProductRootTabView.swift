@@ -11461,6 +11461,9 @@ struct ATHLTHProfileView: View {
                 )
         }
         .refreshable {
+            // Pull-to-refresh bypasses the short cloud preview cache so
+            // updates completed on iPad appear on iPhone immediately.
+            lastMostTrainedSyncAt = nil
             await refreshProfile(forceRefresh: true)
             scheduleMostTrainedRefresh()
             scheduleFeaturedRecordRefresh()
@@ -11484,6 +11487,7 @@ struct ATHLTHProfileView: View {
             scheduleFeaturedRecordRefresh()
         }
         .onChange(of: session.signedIn) { _, _ in
+            lastMostTrainedSyncAt = nil
             scheduleMostTrainedRefresh()
         }
         .onChange(of: featuredRecordSelectionRaw) { _, _ in
@@ -12181,6 +12185,8 @@ struct ATHLTHProfileView: View {
 
     @MainActor
     private func refreshMostTrained() {
+        let signpost = ATHLTHPerformance.begin("ProfileMostTrainedCompute")
+        defer { ATHLTHPerformance.end("ProfileMostTrainedCompute", id: signpost) }
         let accountID = session.profile.userID
         let running = ATHLTHRunningPerformanceHistory.load(userID: accountID)
         let phone = AccountLocalStorage.read(
@@ -12248,6 +12254,8 @@ struct ATHLTHProfileView: View {
 
     @MainActor
     private func refreshFeaturedRecordValues() {
+        let signpost = ATHLTHPerformance.begin("ProfileRecordTileCompute")
+        defer { ATHLTHPerformance.end("ProfileRecordTileCompute", id: signpost) }
         // Read the currently selected PRs once rather than rebuilding a
         // full weekly/monthly history for every SwiftUI body evaluation.
         let workouts = profilePerformanceWorkoutHistory.isEmpty
@@ -13530,6 +13538,8 @@ struct ATHLTHProfileView: View {
         guard !loadingProfileData else {
             return
         }
+        let signpost = ATHLTHPerformance.begin("OwnerProfileRefresh")
+        defer { ATHLTHPerformance.end("OwnerProfileRefresh", id: signpost) }
 
         loadingProfileData = true
         defer {

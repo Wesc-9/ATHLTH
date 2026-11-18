@@ -54,6 +54,8 @@ enum ATHLTHProfileHighlights {
         athleteID: UUID,
         since: Date?
     ) -> CompetitionSnapshot {
+        let signpost = ATHLTHPerformance.begin("ProfileCompetitionCompute")
+        defer { ATHLTHPerformance.end("ProfileCompetitionCompute", id: signpost) }
         var won = 0, drawn = 0, lost = 0
         var opponentIDs = Set<UUID>()
         for challenge in store.challenges where challenge.status == .completed {
