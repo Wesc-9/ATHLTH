@@ -15,10 +15,14 @@ enum HealthSex: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .female: return "Female"
-        case .male: return "Male"
-        case .other: return "Other"
-        case .preferNotToSay: return "Prefer not to say"
+        case .female:
+            return ATHLTHLocalization.choose(english: "Female", norwegian: "Kvinne")
+        case .male:
+            return ATHLTHLocalization.choose(english: "Male", norwegian: "Mann")
+        case .other:
+            return ATHLTHLocalization.choose(english: "Other", norwegian: "Annet")
+        case .preferNotToSay:
+            return ATHLTHLocalization.choose(english: "Prefer not to say", norwegian: "Ønsker ikke å oppgi")
         }
     }
 }
