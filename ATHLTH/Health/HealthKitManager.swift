@@ -1622,6 +1622,31 @@ final class HealthKitManager: ObservableObject {
             .sorted { $0.startDate > $1.startDate }
     }
 
+    /// Read only the maximum pulse for one workout. HKStatisticsQuery keeps
+    /// thousands of raw heart-rate samples out of memory and off the UI path.
+    private func fetchWorkoutHeartRatePeak(for workout: HKWorkout) async -> Int? {
+        guard let type = HKObjectType.quantityType(forIdentifier: .heartRate)
+        else { return nil }
+
+        let unit = HKUnit.count().unitDivided(by: .minute())
+        let measured = await withCheckedContinuation {
+            (continuation: CheckedContinuation<Double?, Never>) in
+
+            let query = HKStatisticsQuery(
+                quantityType: type,
+                quantitySamplePredicate: HKQuery.predicateForObjects(from: workout),
+                options: .discreteMax
+            ) { _, statistics, _ in
+                continuation.resume(
+                    returning: statistics?.maximumQuantity()?.doubleValue(for: unit)
+                )
+            }
+            healthStore.execute(query)
+        }
+
+        return measured.flatMap(ATHLTHWorkoutHeartRatePeakPolicy.validPeak)
+    }
+
     /// Scan only the last twelve calendar months of HealthKit workouts.
     /// This is a recorded training pulse, not laboratory-measured HRmax,
     /// and requires explicit opt-in before being used for zones.
@@ -1679,7 +1704,7 @@ final class HealthKitManager: ObservableObject {
         )
         let unit = HKUnit.count().unitDivided(by: .minute())
         var records: [ATHLTHWorkoutHeartRatePeak] = []
-        var fallbackChecks = 0
+        var fallbackWorkouts: [HKWorkout] = []
 
         for workout in workouts {
             try Task.checkCancellation()
@@ -1692,30 +1717,54 @@ final class HealthKitManager: ObservableObject {
                 .flatMap { Self.safeDoubleValue(
                     $0.maximumQuantity(), unit: unit
                 ) }
-            let peak: Int?
-            if let cachedPeak {
-                peak = ATHLTHWorkoutHeartRatePeakPolicy.validPeak(
-                    cachedPeak
-                )
-            } else if fallbackChecks < fallbackLimit {
-                fallbackChecks += 1
-                let sampleStats = try? await fetchHeartRateStats(
-                    for: workout
-                )
-                peak = sampleStats?.1.flatMap {
-                    ATHLTHWorkoutHeartRatePeakPolicy.validPeak($0)
-                }
-            } else {
-                peak = nil
-            }
 
-            guard let peak else { continue }
-            records.append(ATHLTHWorkoutHeartRatePeak(
-                beatsPerMinute: peak,
-                workoutID: workout.uuid,
-                workoutDate: workout.startDate,
-                workoutTitle: WorkoutSummary(workout: workout).activity.rawValue
-            ))
+            if let cachedPeak,
+               let peak = ATHLTHWorkoutHeartRatePeakPolicy.validPeak(cachedPeak) {
+                records.append(ATHLTHWorkoutHeartRatePeak(
+                    beatsPerMinute: peak,
+                    workoutID: workout.uuid,
+                    workoutDate: workout.startDate,
+                    workoutTitle: WorkoutSummary(workout: workout).activity.rawValue
+                ))
+            } else if fallbackWorkouts.count < fallbackLimit {
+                fallbackWorkouts.append(workout)
+            }
+        }
+
+        // In groups of six, let HealthKit aggregate peaks concurrently.
+        // Never load each workout's complete heart-rate sample history.
+        // The twelve-month predicate and the existing fallback cap remain.
+        let batchSize = 6
+        for start in stride(from: 0, to: fallbackWorkouts.count, by: batchSize) {
+            try Task.checkCancellation()
+            let batch = Array(
+                fallbackWorkouts[start..<min(start + batchSize, fallbackWorkouts.count)]
+            )
+            let found = await withTaskGroup(
+                of: ATHLTHWorkoutHeartRatePeak?.self,
+                returning: [ATHLTHWorkoutHeartRatePeak].self
+            ) { group in
+                for workout in batch {
+                    group.addTask { [weak self] in
+                        guard let self,
+                              let peak = await self.fetchWorkoutHeartRatePeak(
+                                for: workout
+                              ) else { return nil }
+                        return ATHLTHWorkoutHeartRatePeak(
+                            beatsPerMinute: peak,
+                            workoutID: workout.uuid,
+                            workoutDate: workout.startDate,
+                            workoutTitle: WorkoutSummary(workout: workout).activity.rawValue
+                        )
+                    }
+                }
+                var values: [ATHLTHWorkoutHeartRatePeak] = []
+                for await value in group {
+                    if let value { values.append(value) }
+                }
+                return values
+            }
+            records.append(contentsOf: found)
         }
 
         records.sort {
