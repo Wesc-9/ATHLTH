@@ -11499,6 +11499,8 @@ struct ATHLTHProfileView: View {
         .onDisappear {
             mostTrainedRefreshTask?.cancel()
             mostTrainedSyncTask?.cancel()
+            mostTrainedPendingItems = nil
+            mostTrainedPendingUserID = nil
             featuredRecordRefreshTask?.cancel()
         }
         .onReceive(
@@ -12370,7 +12372,14 @@ struct ATHLTHProfileView: View {
 
     private var workoutMomentsSection:
         some View {
-        profileSection(
+        let media = profileMedia
+        let highlights = recentWorkoutHighlights
+        let workoutIDs = Set(media.map(\.workoutID))
+        let matchingWorkouts = Dictionary(
+            health.workouts.filter { workoutIDs.contains($0.id) }.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        return profileSection(
             title:
                 ATHLTHLocalization.choose(
                     english:
@@ -12390,8 +12399,7 @@ struct ATHLTHProfileView: View {
                     ProfileHighlightsManagerView()
                 )
         ) {
-            if profileMedia.isEmpty &&
-                recentWorkoutHighlights.isEmpty {
+            if media.isEmpty && highlights.isEmpty {
                 HStack(spacing: 12) {
                     Image(
                         systemName:
@@ -12452,15 +12460,11 @@ struct ATHLTHProfileView: View {
                     showsIndicators: false
                 ) {
                     HStack(spacing: 8) {
-                        ForEach(
-                            profileMedia
-                        ) { media in
-                            mediaTile(media)
+                        ForEach(media) { item in
+                            mediaTile(item, workout: matchingWorkouts[item.workoutID])
                         }
 
-                        ForEach(
-                            recentWorkoutHighlights
-                        ) { highlight in
+                        ForEach(highlights) { highlight in
                             highlightTile(
                                 highlight
                             )
@@ -12756,7 +12760,8 @@ struct ATHLTHProfileView: View {
     }
 
     private func mediaTile(
-        _ media: WorkoutMediaRecord
+        _ media: WorkoutMediaRecord,
+        workout: WorkoutSummary?
     ) -> some View {
         ZStack(alignment: .bottomLeading) {
             ATHLTHStorageImage(
@@ -12808,8 +12813,7 @@ struct ATHLTHProfileView: View {
                 endPoint: .bottom
             )
 
-            if let workout =
-                workoutForMedia(media) {
+            if let workout {
                 Text(
                     momentTitle(
                         for: workout
@@ -12976,10 +12980,11 @@ struct ATHLTHProfileView: View {
 
     private var profileMedia:
         [WorkoutMediaRecord] {
-        Array(
+        let favorites = favoriteMomentTokens
+        return Array(
             social.workoutMedia
                 .filter { media in
-                    favoriteMomentTokens
+                    favorites
                         .contains(
                             ProfileMomentFavorites
                                 .mediaToken(
@@ -13109,14 +13114,6 @@ struct ATHLTHProfileView: View {
         case .signature:
             return ATHLTHTheme
                 .premiumGold
-        }
-    }
-
-    private func workoutForMedia(
-        _ media: WorkoutMediaRecord
-    ) -> WorkoutSummary? {
-        health.workouts.first {
-            $0.id == media.workoutID
         }
     }
 
@@ -13512,6 +13509,15 @@ struct ATHLTHProfileView: View {
     }
 
     @MainActor
+    private func refreshSocialForProfile(forceRefresh: Bool) async {
+        if forceRefresh {
+            await social.refresh()
+        } else {
+            await social.refreshIfStale(maxAge: 180)
+        }
+    }
+
+    @MainActor
     private func refreshProfile(
         forceRefresh: Bool = false
     ) async {
@@ -13524,12 +13530,17 @@ struct ATHLTHProfileView: View {
             loadingProfileData = false
         }
 
-        async let socialRefresh: Void =
-            social.refresh()
-        async let gearRefresh: Void =
-            gear.refresh()
-        async let mediaRefresh: Void =
-            social.refreshWorkoutMedia()
+        // Keep already available account data visible while the profile
+        // refreshes. Do not reload the entire inbox/feed on every entry.
+        async let socialRefresh: Void = refreshSocialForProfile(
+            forceRefresh: forceRefresh
+        )
+        async let gearRefresh: Void = gear.refreshForProfile(
+            forceRefresh: forceRefresh
+        )
+        async let mediaRefresh: Void = social.refreshWorkoutMediaIfNeeded(
+            forceRefresh: forceRefresh
+        )
 
         if health.hasRequestedAuthorization {
             async let statsTask =

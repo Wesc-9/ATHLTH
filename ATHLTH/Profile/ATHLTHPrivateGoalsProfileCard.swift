@@ -33,7 +33,8 @@ struct ATHLTHPrivateGoalsProfileCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let activeGoals = orderedActiveGoals
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 10) {
                 Image(systemName: "target")
                     .font(.system(size: 17, weight: .semibold))
@@ -55,7 +56,7 @@ struct ATHLTHPrivateGoalsProfileCard: View {
 
                 Spacer(minLength: 0)
 
-                Text("\(orderedActiveGoals.count) " + tr("active", "aktive"))
+                Text("\(activeGoals.count) " + tr("active", "aktive"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .lineLimit(1)
@@ -141,7 +142,7 @@ struct ATHLTHPrivateGoalsProfileCard: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
-            if orderedActiveGoals.isEmpty {
+            if activeGoals.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(tr("Your next chapter starts here", "Neste mål starter her"))
                         .font(.subheadline.weight(.semibold))
@@ -156,7 +157,7 @@ struct ATHLTHPrivateGoalsProfileCard: View {
                 .background(ATHLTHPlanDesign.selectedSurface.opacity(0.45),
                             in: RoundedRectangle(cornerRadius: 16))
             } else {
-                ForEach(Array(orderedActiveGoals.prefix(3))) { goal in
+                ForEach(Array(activeGoals.prefix(3))) { goal in
                     NavigationLink {
                         GoalDetailView(goalID: goal.id)
                     } label: {

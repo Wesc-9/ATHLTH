@@ -50,6 +50,8 @@ final class SocialStore: ObservableObject {
     private var lastHomeSocialStatusAccountID: UUID?
     private var isHomeSocialStatusRefreshing = false
     private var lastFullRefreshAt: Date?
+    private var lastWorkoutMediaRefreshAt: Date?
+    private var lastWorkoutMediaUserID: UUID?
     private var profileCache: [UUID: SocialFriendProfile] = [:]
     private let activationDate: Date
 
@@ -421,10 +423,10 @@ final class SocialStore: ObservableObject {
         notificationStore: ATHLTHNotificationStore? = nil,
         deliverSystemAlertsForImportedInbox: Bool = true
     ) async {
+        // An empty friends list is a valid result, not a cache miss.
         if let lastFullRefreshAt,
            Date().timeIntervalSince(lastFullRefreshAt) < maxAge,
-           privacy != nil,
-           !visibleProfiles.isEmpty {
+           privacy != nil {
             return
         }
 
@@ -2039,6 +2041,18 @@ final class SocialStore: ObservableObject {
         try? await service.workoutActivity(for: workoutID)
     }
 
+    /// A short account-scoped cache avoids re-fetching the same gallery
+    /// on every profile visit. Pull-to-refresh still forces a reload.
+    func refreshWorkoutMediaIfNeeded(forceRefresh: Bool = false) async {
+        guard let userID = currentUserID else { return }
+        if !forceRefresh, lastWorkoutMediaUserID == userID,
+           let lastWorkoutMediaRefreshAt,
+           Date().timeIntervalSince(lastWorkoutMediaRefreshAt) < 180 {
+            return
+        }
+        await refreshWorkoutMedia(for: userID)
+    }
+
     func refreshWorkoutMedia(
         for userID: UUID? = nil
     ) async {
@@ -2050,10 +2064,15 @@ final class SocialStore: ObservableObject {
         }
 
         do {
-            workoutMedia =
-                try await service.loadWorkoutMedia(
-                    for: resolvedUserID
-                )
+            let loaded = try await service.loadWorkoutMedia(
+                for: resolvedUserID
+            )
+            // A signed-out or switched account must never receive a stale
+            // gallery response from its previous profile session.
+            guard currentUserID == resolvedUserID else { return }
+            workoutMedia = loaded
+            lastWorkoutMediaUserID = resolvedUserID
+            lastWorkoutMediaRefreshAt = Date()
         } catch is CancellationError {
             return
         } catch {
@@ -3667,6 +3686,9 @@ final class SocialStore: ObservableObject {
         currentJoinedWorkoutSessionID = nil
         privacy = nil
         workoutMedia = []
+        lastWorkoutMediaRefreshAt = nil
+        lastWorkoutMediaUserID = nil
+        lastFullRefreshAt = nil
         profileCache = [:]
     }
 

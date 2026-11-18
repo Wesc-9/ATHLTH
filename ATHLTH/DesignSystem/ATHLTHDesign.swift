@@ -1456,7 +1456,9 @@ private struct ATHLTHOptionalScrollFadeMask: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if !enabled {
+        // Solid-black masks are completely opaque and cost an extra GPU
+        // compositing pass. Only scroll-driven fades need the mask.
+        if !enabled || !scrollFadeTransition {
             content
         } else {
             content.mask {

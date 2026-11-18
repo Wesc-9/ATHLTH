@@ -54,8 +54,9 @@ struct ATHLTHPetProfileSection: View {
     @EnvironmentObject private var pets: ATHLTHPetStore
 
     var body: some View {
-        Group {
-            if !pets.visiblePets.isEmpty {
+        let visiblePets = pets.visiblePets
+        return Group {
+            if !visiblePets.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Image(systemName: "pawprint.fill")
@@ -73,12 +74,12 @@ struct ATHLTHPetProfileSection: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(ATHLTHPetStyle.ink)
                         Spacer(minLength: 0)
-                        Text("\(pets.visiblePets.count)")
+                        Text("\(visiblePets.count)")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHPetStyle.muted)
                     }
 
-                    ForEach(pets.visiblePets) { pet in
+                    ForEach(visiblePets) { pet in
                         NavigationLink {
                             ATHLTHPetDetailView(petID: pet.id)
                         } label: {

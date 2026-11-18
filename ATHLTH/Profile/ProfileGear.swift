@@ -390,6 +390,8 @@ final class ProfileGearStore: ObservableObject {
 
     private let client: SupabaseClient
     private let defaults = UserDefaults.standard
+    private var lastProfileRefreshUserID: UUID?
+    private var lastProfileRefreshAt: Date?
     private var hasPreparedWorkoutGearSelection = false
     private var preparedWorkoutGearAt: Date?
 
@@ -568,8 +570,24 @@ final class ProfileGearStore: ObservableObject {
         clearPreparedWorkoutGear()
     }
 
+    func refreshForProfile(forceRefresh: Bool = false) async {
+        guard let userID = currentUserID else {
+            await refresh()
+            return
+        }
+        if !forceRefresh, lastProfileRefreshUserID == userID,
+           let lastProfileRefreshAt,
+           Date().timeIntervalSince(lastProfileRefreshAt) < 180 {
+            return
+        }
+        guard !isLoading else { return }
+        await refresh()
+    }
+
     func refresh() async {
         guard let userID = currentUserID else {
+            lastProfileRefreshUserID = nil
+            lastProfileRefreshAt = nil
             items = []
             detailRecords = [:]
             usageRecords = []
@@ -602,7 +620,10 @@ final class ProfileGearStore: ObservableObject {
                 .execute()
                 .value
 
+            guard currentUserID == userID else { return }
             items = rows
+            lastProfileRefreshUserID = userID
+            lastProfileRefreshAt = Date()
             detailRecords = Dictionary(
                 uniqueKeysWithValues: details.map { ($0.gearID, $0) }
             )
