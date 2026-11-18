@@ -6228,10 +6228,13 @@ struct ActiveStrengthWorkoutView: View {
                         )
                     }
                     if currentStrengthTargetKind == .time {
+                        // The canonical set target remains seconds, including
+                        // 15/30/45-second holds and timed strength intervals.
+                        // Only the obsolete footer rounded this up to minutes.
                         compactLiveIntegerMetric(
                             title: ATHLTHLocalization.choose(
-                                english: "Minutes", norwegian: "Minutter"),
-                            value: draftDurationMinutesBinding, step: 1
+                                english: "Seconds", norwegian: "Sekunder"),
+                            value: draftDurationSecondsBinding, step: 15
                         )
                     } else {
                         compactLiveIntegerMetric(
@@ -6263,6 +6266,74 @@ struct ActiveStrengthWorkoutView: View {
                             norwegian: "Total belastning med stang, \(formatWeight(strength.draftWeightKilograms)) kilo"
                         )
                     )
+                }
+
+                // Show the current execution group inside the fixed
+                // controls too. The real EMOM/AMRAP clock remains in the
+                // existing hero; no parallel group clock is introduced.
+                if let kind = exercise.groupStyle,
+                   let groupID = exercise.groupID {
+                    let stations = strength.activeWorkout?.exercises.filter {
+                        $0.groupID == groupID
+                    } ?? []
+                    let position = stations.firstIndex(where: {
+                        $0.id == exercise.id
+                    }) ?? 0
+                    HStack(spacing: 8) {
+                        Label(kind.title, systemImage: kind == .emom
+                              ? "clock.arrow.circlepath"
+                              : kind == .amrap ? "timer"
+                              : kind == .dropSet ? "arrow.down.right"
+                              : "square.stack.3d.up")
+                            .font(.caption.weight(.semibold))
+                        Spacer(minLength: 6)
+                        Text(ATHLTHLocalization.format(
+                            english: "Station %d of %d",
+                            norwegian: "Stasjon %d av %d",
+                            position + 1, max(stations.count, 1)
+                        ))
+                        .font(.caption2.weight(.medium))
+                        .monospacedDigit()
+                    }
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .accessibilityElement(children: .combine)
+                }
+
+                // Reuse the existing per-set draft bindings and checkpoint.
+                // Only one configured effort metric is available at a time.
+                // The choice of warm-up vs work is deliberately independent
+                // from the exercise's saved prescription.
+                if strength.activeWorkout?.trackingMode == .advanced {
+                    HStack(alignment: .center, spacing: 12) {
+                        Toggle(isOn: draftWarmUpBinding) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Warm-up set",
+                                    norwegian: "Oppvarmingssett"
+                                ),
+                                systemImage: "flame"
+                            )
+                            .font(.caption.weight(.medium))
+                        }
+                        .tint(ATHLTHPlanDesign.accentInk)
+                        .accessibilityIdentifier("strength-live-warm-up-toggle")
+
+                        if currentEffortMetric == .rpe {
+                            compactLiveDecimalMetric(
+                                title: "RPE",
+                                value: draftRPEBinding, step: 0.5
+                            )
+                            .frame(maxWidth: 148)
+                            .accessibilityIdentifier("strength-live-rpe")
+                        } else if currentEffortMetric == .rir {
+                            compactLiveDecimalMetric(
+                                title: "RIR",
+                                value: draftRIRBinding, step: 0.5
+                            )
+                            .frame(maxWidth: 148)
+                            .accessibilityIdentifier("strength-live-rir")
+                        }
+                    }
                 }
 
                 // One timer in one fixed place: the active countdown
@@ -9324,6 +9395,15 @@ struct ActiveStrengthWorkoutView: View {
 
     private func loadDefaultsFromCurrentSet() {
         strength.reloadDraftFromCurrentSet()
+    }
+
+    /// The live dock edits real seconds without converting to whole
+    /// minutes. Timed-set countdown and persistence already use seconds.
+    private var draftDurationSecondsBinding: Binding<Int> {
+        Binding(
+            get: { strength.draftDurationSeconds },
+            set: { strength.setDraft(durationSeconds: $0) }
+        )
     }
 
     private var draftRPEBinding: Binding<Double> {

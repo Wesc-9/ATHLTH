@@ -247,3 +247,23 @@ som ferdige før egne faser og reelle tester er fullført.
   bunnflaten. «Neste øvelse» går videre uten å fullføre uregistrerte sett,
   mens «+30 sek» utvider faktisk hvile. Dette er ikke samme handling som
   «Start neste sett» midt i en øvelse.
+
+
+### Fase 3 — avanserte styrkesett (første del, bygg/verifisering pågår)
+
+- Eksisterende `StrengthWorkoutStore`, `StrengthSetLog` og
+  `StrengthAdvancedConfiguration` beholder eierskap til sett, RPE/RIR,
+  oppvarming og timer. Ingen ny opptaksmotor eller dublerte settmodeller.
+- Felles live-bunnfelt viser den konfigurerte *én* innsatsmålingen (RPE
+  **eller** RIR, aldri begge) samt oppvarmingsvalg i Advanced. Resultatet
+  skrives gjennom eksisterende `setDraft` og `completeCurrentDraftSet`.
+- Tidsbaserte sett justeres nå direkte i sekunder (15 sek per hurtigtrykk);
+  dette unngår avrunding til minutter for 15/30/45 sekunder.
+- Gruppetypen og stasjonsnummeret vises i samme bunnfelt, men EMOM/AMRAP
+  beholder sin eksisterende autoritative gruppetimer og grensekontroller.
+- Barbell-/skivematematikk, motstandsnivå, sett-ID og Watch-overføring er
+  uendret og må bestå eksisterende regresjoner.
+- Nye regresjonstester verifiserer RPE/RIR, faktisk oppvarmingsmerking,
+  eksakt settid og bevaring av økt-/øvelse-/sett-ID-er. Full fase 3
+  omfatter også gjennomgang av gruppemodus og overgangskontroller før
+  endelig godkjenning.
