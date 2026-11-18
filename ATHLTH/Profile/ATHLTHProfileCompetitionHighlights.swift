@@ -187,6 +187,9 @@ enum ATHLTHProfileHighlights {
 struct ATHLTHProfileCompetitionCard: View {
     @EnvironmentObject private var challenges: ChallengeStore
     let userID: UUID
+    /// Another athlete's statistics are limited to competitions loaded for
+    /// the current viewer, not their complete private challenge history.
+    var limitedToVisibleCompetitions = false
     @State private var period: Period = .month
 
     private enum Period: String, CaseIterable, Identifiable {
@@ -267,6 +270,16 @@ struct ATHLTHProfileCompetitionCard: View {
                      label: tr("Win rate", "Vinnprosent"),
                      fraction: stats.winPercent / 100,
                      tint: gold, percent: true)
+            }
+
+            if limitedToVisibleCompetitions {
+                Text(tr(
+                    "Only competitions visible to you are included.",
+                    "Kun konkurranser du har tilgang til, er inkludert."
+                ))
+                .font(.caption)
+                .foregroundStyle(dim)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             Rectangle().fill(ATHLTHPlanDesign.warmDivider).frame(height: 0.7)
