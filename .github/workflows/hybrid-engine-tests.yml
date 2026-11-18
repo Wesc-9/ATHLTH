@@ -201,12 +201,19 @@ jobs:
           UDID=$(head -n 1 "$DEVICE_MATRIX" | cut -d'|' -f2)
           test -n "$UDID"
           echo "Running hybrid XCTest on simulator $UDID"
+          # Boot one registered simulator explicitly: xcodebuild's default
+          # parallel-test clones intermittently hang before connecting.
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$UDID" \
+            -parallel-testing-enabled NO \
+            -maximum-concurrent-test-simulator-destinations 1 \
+            -jobs 3 \
             -derivedDataPath "$RUNNER_TEMP/HybridDerivedData" \
             -resultBundlePath "$RUNNER_TEMP/HybridTests.xcresult" \
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
