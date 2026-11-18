@@ -460,6 +460,7 @@ final class IPhoneWorkoutStore:
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var customAudioCoachLastSlots: [UUID: Int] = [:]
+    private var audioCoachRollingKilometer = ATHLTHAudioCoachRollingKilometer()
     private var nextFuelAnnouncementSeconds: TimeInterval?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
@@ -2891,6 +2892,7 @@ final class IPhoneWorkoutStore:
     }
 
     private func resetRouteRuntime() {
+        audioCoachRollingKilometer.reset()
         plannedRouteLocations = []
         plannedRouteCumulativeMeters = []
         plannedRouteGeometryMeters = 0
@@ -4869,7 +4871,7 @@ final class IPhoneWorkoutStore:
             configuration: configuration
         ) == "no"
         let rules = configuration.activeCustomRules
-        let context = ATHLTHCoachReadoutContext.make(
+        var context = ATHLTHCoachReadoutContext.make(
             plan: ATHLTHCoachReadoutContext.needsSegmentData(rules) ? workout.structuredRunningWorkout : nil,
             index: currentCoachRunningStepIndex,
             elapsed: elapsed - (workout.structuredStepStartElapsedTime ?? 0),
@@ -4877,6 +4879,25 @@ final class IPhoneWorkoutStore:
             recorded: workout.recordedRunningSteps ?? [],
             routeRemainingMeters: workout.routeRemainingMeters
         )
+        context.overallPaceSecondsPerKilometer = workout.distanceMeters >= 1_000
+            ? ATHLTHRunningPace.average(
+                elapsedSeconds: elapsed, distanceMeters: workout.distanceMeters
+            ) : nil
+        // Phone outdoor routes use GPS-measured distance. An entered treadmill
+        // speed is an estimate and MUST NOT be represented as measured pace.
+        if workout.runEnvironment == .outdoor && workout.resumedAt != nil {
+            audioCoachRollingKilometer.record(
+                distanceMeters: workout.distanceMeters, activeSeconds: elapsed
+            )
+            context.lastKilometerPaceSecondsPerKilometer =
+                audioCoachRollingKilometer.paceSecondsPerKilometer
+        }
+        if let plan = workout.structuredRunningWorkout,
+           let stepIndex = workout.structuredStepIndex,
+           plan.steps.indices.contains(stepIndex) {
+            context.targetPaceSecondsPerKilometer =
+                plan.steps[stepIndex].targetPaceMinSecondsPerKilometer
+        }
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: rules,
             distanceMeters: workout.distanceMeters,
