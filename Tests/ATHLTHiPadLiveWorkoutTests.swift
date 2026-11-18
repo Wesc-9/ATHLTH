@@ -77,6 +77,7 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertEqual(decoded.runningIntervalOrdinal, 2)
     }
 
+    @MainActor
     func testIpadReceivesExplicitStrengthLoadBasisOnlyWhenKnown() throws {
         var workout = snapshot()
         workout.strengthLoadBasisRaw = "kilogramsPerHand"
@@ -118,6 +119,7 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testIpadRejectsUnknownOrInventedWeightBasis() {
         var workout = ATHLTHCrossDeviceWorkoutSnapshot(
             sessionID: UUID(),
