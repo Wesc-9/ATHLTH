@@ -11363,6 +11363,14 @@ struct ATHLTHProfileView: View {
         [WorkoutSummary] = []
     @State private var mostTrainedItems: [ATHLTHProfileHighlights.TrainedItem] = []
     @State private var mostTrainedSyncTask: Task<Void, Never>?
+    @State private var mostTrainedRefreshTask: Task<Void, Never>?
+    @State private var featuredRecordRefreshTask: Task<Void, Never>?
+    @State private var mostTrainedPendingItems: [ATHLTHProfileHighlights.TrainedItem]?
+    @State private var mostTrainedPendingUserID: UUID?
+    @State private var lastSyncedMostTrainedItems: [ATHLTHProfileHighlights.TrainedItem] = []
+    @State private var lastMostTrainedSyncAt: Date?
+    @State private var lastMostTrainedSyncUserID: UUID?
+    @State private var cachedFeaturedRecordValues: [ProfileFeaturedRecordKind: String] = [:]
     @State private var loadingProfileData = false
     @State private var showingProfilePhotoPicker =
         false
@@ -11454,27 +11462,52 @@ struct ATHLTHProfileView: View {
         }
         .refreshable {
             await refreshProfile(forceRefresh: true)
-            refreshMostTrained()
-        }
-        .task {
-            refreshMostTrained()
-            await refreshProfile()
-            refreshMostTrained()
+            scheduleMostTrainedRefresh()
+            scheduleFeaturedRecordRefresh()
             await pets.refresh()
         }
+        .task {
+            // Keep the first frame free of disk decoding and full history
+            // aggregation. The pet card loads its own data when necessary.
+            scheduleMostTrainedRefresh()
+            scheduleFeaturedRecordRefresh()
+            await refreshProfile()
+        }
         .onChange(of: session.profile.userID) { _, _ in
-            refreshMostTrained()
+            cachedFeaturedRecordValues = [:]
+            mostTrainedItems = []
+            mostTrainedSyncTask?.cancel()
+            mostTrainedPendingItems = nil
+            mostTrainedPendingUserID = nil
+            lastMostTrainedSyncAt = nil
+            scheduleMostTrainedRefresh()
+            scheduleFeaturedRecordRefresh()
         }
         .onChange(of: session.signedIn) { _, _ in
-            refreshMostTrained()
+            scheduleMostTrainedRefresh()
+        }
+        .onChange(of: featuredRecordSelectionRaw) { _, _ in
+            scheduleFeaturedRecordRefresh()
+        }
+        .onChange(of: health.workouts.count) { _, _ in
+            scheduleFeaturedRecordRefresh()
+        }
+        .onChange(of: strengthWorkout.workoutHistory.count) { _, _ in
+            scheduleMostTrainedRefresh()
+            scheduleFeaturedRecordRefresh()
         }
         .onDisappear {
+            mostTrainedRefreshTask?.cancel()
             mostTrainedSyncTask?.cancel()
+            featuredRecordRefreshTask?.cancel()
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)
-        ) { _ in
-            refreshMostTrained()
+        ) { notification in
+            guard let userID = notification.object as? UUID,
+                  userID == session.profile.userID else { return }
+            scheduleMostTrainedRefresh()
+            scheduleFeaturedRecordRefresh()
         }
         .photosPicker(
             isPresented:
@@ -12133,6 +12166,18 @@ struct ATHLTHProfileView: View {
     }
 
     @MainActor
+    private func scheduleMostTrainedRefresh() {
+        mostTrainedRefreshTask?.cancel()
+        mostTrainedRefreshTask = Task { @MainActor in
+            // Coalesce bursts of training/import notifications.
+            do { try await Task.sleep(for: .milliseconds(180)) }
+            catch { return }
+            guard !Task.isCancelled else { return }
+            refreshMostTrained()
+        }
+    }
+
+    @MainActor
     private func refreshMostTrained() {
         let accountID = session.profile.userID
         let running = ATHLTHRunningPerformanceHistory.load(userID: accountID)
@@ -12144,14 +12189,28 @@ struct ATHLTHProfileView: View {
             running: running,
             phone: phone
         )
-        if mostTrainedItems != localItems {
-            mostTrainedItems = localItems
+        if mostTrainedItems != localItems { mostTrainedItems = localItems }
+
+        guard session.signedIn else {
+            mostTrainedSyncTask?.cancel()
+            mostTrainedPendingItems = nil
+            mostTrainedPendingUserID = nil
+            return
         }
+        if mostTrainedPendingUserID == accountID,
+           mostTrainedPendingItems == localItems { return }
+        guard ATHLTHProfileRefreshPolicy.shouldSyncMostTrained(
+            userID: accountID,
+            local: localItems,
+            previousUserID: lastMostTrainedSyncUserID,
+            previousLocal: lastSyncedMostTrainedItems,
+            lastSyncedAt: lastMostTrainedSyncAt
+        ) else { return }
+
         mostTrainedSyncTask?.cancel()
-        guard session.signedIn else { return }
+        mostTrainedPendingUserID = accountID
+        mostTrainedPendingItems = localItems
         mostTrainedSyncTask = Task { @MainActor in
-            // Coalesce repeated workout updates and never upload a blank
-            // HealthKit history as a replacement for the cloud preview.
             do { try await Task.sleep(for: .milliseconds(650)) }
             catch { return }
             let merged = await ATHLTHProfileMostTrainedSyncService.synchronize(
@@ -12159,9 +12218,45 @@ struct ATHLTHProfileView: View {
             )
             guard !Task.isCancelled, session.signedIn,
                   session.profile.userID == accountID else { return }
-            if mostTrainedItems != merged {
-                mostTrainedItems = merged
-            }
+            lastMostTrainedSyncUserID = accountID
+            lastSyncedMostTrainedItems = localItems
+            lastMostTrainedSyncAt = Date()
+            mostTrainedPendingUserID = nil
+            mostTrainedPendingItems = nil
+            if mostTrainedItems != merged { mostTrainedItems = merged }
+        }
+    }
+
+    @MainActor
+    private func scheduleFeaturedRecordRefresh() {
+        featuredRecordRefreshTask?.cancel()
+        featuredRecordRefreshTask = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(150)) }
+            catch { return }
+            guard !Task.isCancelled else { return }
+            refreshFeaturedRecordValues()
+        }
+    }
+
+    @MainActor
+    private func refreshFeaturedRecordValues() {
+        // Read the currently selected PRs once rather than rebuilding a
+        // full weekly/monthly history for every SwiftUI body evaluation.
+        let workouts = profilePerformanceWorkoutHistory.isEmpty
+            ? health.workouts : profilePerformanceWorkoutHistory
+        var updated: [ProfileFeaturedRecordKind: String] = [:]
+        for kind in featuredRecordKinds {
+            updated[kind] = kind.displayValue(
+                healthRecords: personalRecords,
+                stats: performanceStats,
+                strengthRecords: strengthWorkout.personalRecords,
+                strengthRepRecords: strengthWorkout.repPersonalRecords,
+                performanceWorkouts: workouts,
+                strengthWorkouts: strengthWorkout.workoutHistory
+            )
+        }
+        if cachedFeaturedRecordValues != updated {
+            cachedFeaturedRecordValues = updated
         }
     }
 
@@ -12486,15 +12581,7 @@ struct ATHLTHProfileView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(profileRecords.value(
                     for: kind,
-                    local: kind.displayValue(
-                        healthRecords: personalRecords,
-                        stats: performanceStats,
-                        strengthRecords: strengthWorkout.personalRecords,
-                        strengthRepRecords: strengthWorkout.repPersonalRecords,
-                        performanceWorkouts: profilePerformanceWorkoutHistory.isEmpty
-                            ? health.workouts : profilePerformanceWorkoutHistory,
-                        strengthWorkouts: strengthWorkout.workoutHistory
-                    )
+                    local: cachedFeaturedRecordValues[kind] ?? "—"
                 ))
                 .font(.system(size: 17, weight: .bold, design: .rounded))
                 .monospacedDigit()
@@ -13485,6 +13572,8 @@ struct ATHLTHProfileView: View {
             personalRecords = []
             profilePerformanceWorkoutHistory = []
         }
+
+        scheduleFeaturedRecordRefresh()
 
         await trophyStore.refresh(
             health: health,

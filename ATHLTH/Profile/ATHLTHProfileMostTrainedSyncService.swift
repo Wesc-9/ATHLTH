@@ -108,8 +108,9 @@ enum ATHLTHProfileMostTrainedSyncService {
             )
             // Home displays at most three, but keep a small account-backed
             // candidate set for each filter without saving full history.
+            let localIDs = Set(local.map(\.id))
             let candidates = best.filter { item in
-                guard local.contains(where: { $0.id == item.id }) else {
+                guard localIDs.contains(item.id) else {
                     return false
                 }
                 guard let old = remoteByID[item.id] else { return true }

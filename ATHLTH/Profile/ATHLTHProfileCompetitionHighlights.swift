@@ -224,7 +224,8 @@ struct ATHLTHProfileCompetitionCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        let snapshot = stats
+        return VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 8) {
                 Image(systemName: "trophy.fill")
                     .foregroundStyle(gold)
@@ -257,18 +258,18 @@ struct ATHLTHProfileCompetitionCard: View {
             }
 
             HStack(alignment: .center, spacing: 5) {
-                ring(value: stats.wins, label: tr("Wins", "Seire"),
-                     fraction: Double(stats.wins) / Double(max(stats.finished, 1)),
+                ring(value: snapshot.wins, label: tr("Wins", "Seire"),
+                     fraction: Double(snapshot.wins) / Double(max(snapshot.finished, 1)),
                      tint: Color(red: 0.20, green: 0.62, blue: 0.42))
-                ring(value: stats.draws, label: tr("Draws", "Uavgjort"),
-                     fraction: Double(stats.draws) / Double(max(stats.finished, 1)),
+                ring(value: snapshot.draws, label: tr("Draws", "Uavgjort"),
+                     fraction: Double(snapshot.draws) / Double(max(snapshot.finished, 1)),
                      tint: Color.gray)
-                ring(value: stats.losses, label: tr("Losses", "Tap"),
-                     fraction: Double(stats.losses) / Double(max(stats.finished, 1)),
+                ring(value: snapshot.losses, label: tr("Losses", "Tap"),
+                     fraction: Double(snapshot.losses) / Double(max(snapshot.finished, 1)),
                      tint: Color(red: 0.82, green: 0.30, blue: 0.31))
-                ring(value: Int(stats.winPercent.rounded()),
+                ring(value: Int(snapshot.winPercent.rounded()),
                      label: tr("Win rate", "Vinnprosent"),
-                     fraction: stats.winPercent / 100,
+                     fraction: snapshot.winPercent / 100,
                      tint: gold, percent: true)
             }
 
@@ -284,10 +285,10 @@ struct ATHLTHProfileCompetitionCard: View {
 
             Rectangle().fill(ATHLTHPlanDesign.warmDivider).frame(height: 0.7)
             HStack(spacing: 6) {
-                metric(icon: "bolt.fill", value: "\(stats.finished)",
+                metric(icon: "bolt.fill", value: "\(snapshot.finished)",
                        label: tr("Finished", "Fullførte"))
                 Rectangle().fill(ATHLTHPlanDesign.warmDivider).frame(width: 1, height: 34)
-                metric(icon: "person.2.fill", value: "\(stats.uniqueOpponents)",
+                metric(icon: "person.2.fill", value: "\(snapshot.uniqueOpponents)",
                        label: tr("Opponents", "Konkurrenter"))
                 Rectangle().fill(ATHLTHPlanDesign.warmDivider).frame(width: 1, height: 34)
                 metric(icon: "star.fill", value: "—",
