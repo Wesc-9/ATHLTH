@@ -2936,7 +2936,9 @@ struct WorkoutTemplateLibraryView: View {
             entry: entry,
             catalogRevision: catalog.contentRevision,
             compact: displayMode == .grid,
-            includePreview: initialCategory != .running,
+            // Browse cards stay concise across Offentlig, Mine and Favoritter.
+            // Workout steps are presented only after opening a workout.
+            includePreview: false,
             history: catalogHistoryIndex[entry.id]
         )
         .equatable()
@@ -3063,13 +3065,6 @@ struct WorkoutTemplateLibraryView: View {
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .padding(.top, 2)
-
-                if initialCategory != .running {
-                    ATHLTHWorkoutContentsPreview(
-                        workout: workout.plannedSession()
-                    )
-                    .padding(.top, 7)
-                }
 
                 if let last = runningHistoryIndex[workout.id] {
                     ATHLTHLastWorkoutHistoryLabel(summary: last)
