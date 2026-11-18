@@ -35,10 +35,9 @@ private enum MessageInboxFilter: String, CaseIterable, Identifiable {
     case groups
     case archive
 
-    // Inbox is the single destination for conversations and invitations.
-    // Keep invitations ahead of messages without mixing them into DMs.
+    // Unread first, then people, groups and invitations.
     static let mainFilters: [MessageInboxFilter] = [
-        .all, .invitations, .direct, .unread, .groups
+        .unread, .all, .groups, .invitations, .direct
     ]
 
     var id: String { rawValue }
@@ -46,7 +45,7 @@ private enum MessageInboxFilter: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .all:
-            return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
+            return ATHLTHLocalization.choose(english: "People", norwegian: "Folk")
         case .unread:
             return ATHLTHLocalization.choose(english: "Unread", norwegian: "Uleste")
         case .direct:
@@ -62,7 +61,7 @@ private enum MessageInboxFilter: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .all: return "tray.full"
+        case .all: return "person.2"
         case .unread: return "envelope.badge"
         case .direct: return "bubble.left"
         case .invitations: return "envelope.open"
@@ -93,6 +92,7 @@ struct MessageInboxView: View {
     @State private var showingSearch = false
     @State private var selectedFilter:
         MessageInboxFilter = .all
+    @State private var clubSectionExpanded = false
     @State private var selectedWorkoutInvite:
         SocialWorkoutInviteDisplay?
     @State private var coachPinned = true
@@ -151,23 +151,6 @@ struct MessageInboxView: View {
                     }
                 }
 
-                if selectedFilter == .groups {
-                    ATHLTHCommunityClubInboxSection()
-                }
-
-                if selectedFilter == .all || selectedFilter == .groups {
-                    ATHLTHClubChatInboxSection(searchText: searchText)
-                }
-
-                ATHLTHArenaInboxSection(
-                    filterKey: selectedFilter.rawValue,
-                    onVisibleCountChanged: { arenaInboxVisibleCount = $0 }
-                )
-
-                if let error = displayableError {
-                    inboxErrorCard(error)
-                }
-
                 if !regularPersonItems.isEmpty ||
                     shouldShowCoachConversation {
                     inboxSectionLabel(
@@ -202,6 +185,48 @@ struct MessageInboxView: View {
                             coachInboxLink
                         }
                     }
+                }
+
+
+                // New club messages share the normal white conversation-row
+                // presentation; the club-name prefix identifies the source.
+                if !unreadClubs.isEmpty {
+                    inboxSectionLabel(
+                        ATHLTHLocalization.choose(
+                            english: "NEW CLUB MESSAGES",
+                            norwegian: "NYE KLUBBMELDINGER"
+                        ),
+                        count: unreadClubs.count
+                    )
+                    LazyVStack(spacing: 10) {
+                        ForEach(unreadClubs) { club in
+                            if let message = groups.recentClubMessagesByGroup[club.id] {
+                                ATHLTHUnreadClubMessageRow(
+                                    group: club, message: message
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if selectedFilter == .groups {
+                    ATHLTHCommunityClubInboxSection()
+                }
+
+                if selectedFilter == .all || selectedFilter == .groups {
+                    ATHLTHClubChatInboxSection(
+                        searchText: searchText,
+                        isExpanded: $clubSectionExpanded
+                    )
+                }
+
+                ATHLTHArenaInboxSection(
+                    filterKey: selectedFilter.rawValue,
+                    onVisibleCountChanged: { arenaInboxVisibleCount = $0 }
+                )
+
+                if let error = displayableError {
+                    inboxErrorCard(error)
                 }
 
                 if shouldShowEmptyState {
@@ -249,6 +274,19 @@ struct MessageInboxView: View {
                 selectedFilter = .invitations
             }
             refreshCoachInboxState()
+        }
+        .onChange(of: selectedFilter) { _, next in
+            if next == .groups { clubSectionExpanded = true }
+            else if next == .all { clubSectionExpanded = false }
+        }
+        .task {
+            // Poll only while Inbox is on screen; do not treat club
+            // invitations as direct messages.
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(45)) }
+                catch { break }
+                await groups.refreshRecentChatActivity(force: true)
+            }
         }
         .onChange(of: initialWorkoutInviteID) { _, inviteID in
             if inviteID != nil {
@@ -1353,6 +1391,27 @@ struct MessageInboxView: View {
         }
     }
 
+    private var unreadClubs: [CommunityGroupRecord] {
+        guard selectedFilter == .all || selectedFilter == .unread else { return [] }
+        let query = normalizedSearch
+        return groups.joinedGroups.filter { club in
+            guard groups.unreadClubGroupIDs.contains(club.id),
+                  let message = groups.recentClubMessagesByGroup[club.id] else {
+                return false
+            }
+            return query.isEmpty ||
+                club.name.localizedCaseInsensitiveContains(query) ||
+                message.body.localizedCaseInsensitiveContains(query)
+        }
+        .sorted {
+            let left = groups.recentClubMessagesByGroup[$0.id]?.createdAt ??
+                .distantPast
+            let right = groups.recentClubMessagesByGroup[$1.id]?.createdAt ??
+                .distantPast
+            return left > right
+        }
+    }
+
     private var hasVisibleClubChats: Bool {
         guard selectedFilter == .all || selectedFilter == .groups else {
             return false
@@ -1376,6 +1435,7 @@ struct MessageInboxView: View {
             arenaInboxVisibleCount == 0 &&
             !hasClubInvites &&
             !hasVisibleClubChats &&
+            unreadClubs.isEmpty &&
             !shouldShowCoachConversation
     }
 
