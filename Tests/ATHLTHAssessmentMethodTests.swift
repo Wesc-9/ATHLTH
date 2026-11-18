@@ -37,6 +37,8 @@ final class ATHLTHAssessmentMethodTests: XCTestCase {
         let running = step(phase: .main)
         let strength = step(phase: .main, kind: .exercise)
         XCTAssertTrue(ATHLTHAssessmentMethod.available(for: running)
+            .contains(.estimatedVO2Max))
+        XCTAssertFalse(ATHLTHAssessmentMethod.available(for: running)
             .contains(.cooperTwelveMinute))
         XCTAssertFalse(ATHLTHAssessmentMethod.available(for: running)
             .contains(.estimatedOneRepMax))
