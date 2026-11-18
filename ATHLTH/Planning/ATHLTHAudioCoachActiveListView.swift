@@ -1475,12 +1475,30 @@ struct ATHLTHAudioCoachActiveListView: View {
                             Text(trigger.title).tag(trigger)
                         }
                     }
-                    Stepper(value: $rule.interval,
-                            in: rule.trigger == .time
-                                ? 15...7_200 : 100...42_000,
-                            step: rule.trigger == .time ? 15 : 100) {
-                        Text("\(rule.validatedInterval) " +
-                            (rule.trigger == .time ? "s" : "m"))
+                    if rule.trigger == .time {
+                        Stepper(value: $rule.interval, in: 15...7_200, step: 15) {
+                            Text("\(rule.validatedInterval) s")
+                        }
+                    } else if rule.trigger == .distance {
+                        Stepper(value: $rule.interval, in: 100...42_000, step: 100) {
+                            Text("\(rule.validatedInterval) m")
+                        }
+                    } else if rule.trigger == .paceFasterOverall ||
+                              rule.trigger == .paceFasterLastKilometer {
+                        Stepper(value: $rule.interval, in: 120...1_800, step: 5) {
+                            Text(String(format: "%d:%02d min/km",
+                                        rule.validatedInterval / 60,
+                                        rule.validatedInterval % 60))
+                                .monospacedDigit()
+                        }
+                    } else if rule.trigger.isPaceCondition {
+                        Text(tr("Uses the active exercise pace target.",
+                                "Bruker målfarten for den aktive øvelsen."))
+                            .font(.caption).foregroundStyle(dim)
+                    } else if rule.trigger == .personalRecordConfirmed {
+                        Text(tr("Only after a verified completed running record.",
+                                "Kun etter bekreftet rekord fra en fullført løpetur."))
+                            .font(.caption).foregroundStyle(dim)
                     }
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 }
@@ -1517,12 +1535,44 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
             }
             .onChange(of: newRuleTrigger) { _, kind in
-                newRuleInterval = kind == .time ? 60 : 1_000
+                if kind == .time {
+                    newRuleInterval = 60
+                } else if kind == .distance {
+                    newRuleInterval = 1_000
+                } else if kind == .paceFasterOverall ||
+                          kind == .paceFasterLastKilometer {
+                    newRuleInterval = 300
+                } else {
+                    newRuleInterval = 1
+                }
+                if kind == .personalRecordConfirmed {
+                    newRuleMetric = .personalRecord
+                    newRuleScope = .workout
+                }
             }
-            Stepper(value: $newRuleInterval,
-                    in: newRuleTrigger == .time ? 15...7_200 : 100...42_000,
-                    step: newRuleTrigger == .time ? 15 : 100) {
-                Text("\(newRuleInterval) " + (newRuleTrigger == .time ? "s" : "m"))
+            if newRuleTrigger == .time {
+                Stepper(value: $newRuleInterval, in: 15...7_200, step: 15) {
+                    Text("\(newRuleInterval) s")
+                }
+            } else if newRuleTrigger == .distance {
+                Stepper(value: $newRuleInterval, in: 100...42_000, step: 100) {
+                    Text("\(newRuleInterval) m")
+                }
+            } else if newRuleTrigger == .paceFasterOverall ||
+                      newRuleTrigger == .paceFasterLastKilometer {
+                Stepper(value: $newRuleInterval, in: 120...1_800, step: 5) {
+                    Text(String(format: "%d:%02d min/km",
+                                newRuleInterval / 60, newRuleInterval % 60))
+                        .monospacedDigit()
+                }
+            } else if newRuleTrigger.isPaceCondition {
+                Text(tr("Follows the pace target on the current exercise.",
+                        "Følger målfarten på den aktive øvelsen."))
+                    .font(.caption).foregroundStyle(dim)
+            } else if newRuleTrigger == .personalRecordConfirmed {
+                Text(tr("Only confirmed, completed personal records.",
+                        "Kun bekreftede personlige rekorder fra fullførte økter."))
+                    .font(.caption).foregroundStyle(dim)
             }
             Button {
                 guard draft.customRules.count < 20 else { return }
