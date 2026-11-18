@@ -2080,11 +2080,9 @@ if session.currentRole.canAccessControlCenter {
             profileTitle = settings.profileVisibility.title
         }
 
-        let routeTitle = settings.hideRouteStartAndEnd
-            ? "route endpoints hidden"
-            : "full routes"
-
-        return "\(profileTitle) profile · \(routeTitle)"
+        // Route-end hiding is configured for each shared route,
+        // never as an account-wide privacy switch.
+        return "\(profileTitle) profile"
     }
 
     private var trainingDeviceSubtitle: String {

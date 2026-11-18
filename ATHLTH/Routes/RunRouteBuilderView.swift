@@ -37,6 +37,8 @@ struct RunRouteBuilderView: View {
 
     @State private var title = ""
     @State private var visibility: ProfileVisibility = .privateOnly
+    @State private var hideSharedStartNearHome = false
+    @State private var hideSharedEndNearHome = false
     @State private var draftTags: [String] = []
     @State private var draftSurfaces: [String: Int] = [:]
     @State private var showingRouteMetadataEditor = false
@@ -106,6 +108,9 @@ struct RunRouteBuilderView: View {
                 }
                 .buttonStyle(.plain)
                 routeNameCard
+                if visibility != .privateOnly {
+                    homePrivacyCard
+                }
                 endpointsCard
                 // Keep all variable-height lists below the map. Adding a via
                 // point must never change the layout above the map viewport.
@@ -416,6 +421,45 @@ struct RunRouteBuilderView: View {
                     .font(.caption2)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
+        }
+        .padding(15)
+        .routeBuilderCard()
+    }
+
+    private var homePrivacyCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Protect your home on this route",
+                    norwegian: "Skjul hjemmepunkt på denne ruten"
+                ),
+                systemImage: "house.fill"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Start is at home · hide 250 m",
+                    norwegian: "Start ved hjemmet · skjul 250 m"
+                ),
+                isOn: $hideSharedStartNearHome
+            )
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Finish is at home · hide 250 m",
+                    norwegian: "Slutt ved hjemmet · skjul 250 m"
+                ),
+                isOn: $hideSharedEndNearHome
+            )
+
+            Text(ATHLTHLocalization.choose(
+                english: "Select only the route ends near your home. Shared maps will remove the surrounding 250 m; your private original stays complete. Check that your route name does not reveal your address.",
+                norwegian: "Marker bare endene som ligger ved hjemmet. 250 m rundt disse skjules på den delte ruten, men din egen rute beholdes. Kontroller at rutenavnet ikke avslører adressen."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(15)
         .routeBuilderCard()
@@ -1547,8 +1591,15 @@ struct RunRouteBuilderView: View {
             routeSource: returnOnSamePath
                 ? "apple_maps_walking_out_and_back" : "apple_maps_walking",
             tags: ATHLTHRouteDetailsPolicy.cleanedTags(draftTags),
-            surfacePercentages: ATHLTHRouteDetailsPolicy.cleanedSurfaces(draftSurfaces)
+            surfacePercentages: ATHLTHRouteDetailsPolicy.cleanedSurfaces(draftSurfaces),
+            hideSharedStartNearHome: hideSharedStartNearHome,
+            hideSharedEndNearHome: hideSharedEndNearHome
         )
+
+        guard ATHLTHRouteHomePrivacyPolicy.sharedVersion(of: route) != nil else {
+            errorMessage = ATHLTHRouteHomePrivacyError.insufficientSafeRoute.localizedDescription
+            return
+        }
 
         session.addImportedRoute(route)
         onRouteSaved?()

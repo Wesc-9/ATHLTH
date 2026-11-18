@@ -1693,6 +1693,11 @@ struct TrainingRoute: Identifiable, Codable, Hashable {
     var surfacePercentages: [String: Int]? = nil
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceRouteID: UUID? = nil
+    // Owner-only route sharing preferences. Optional fields preserve
+    // decoding of older routes and do not require a cloud schema change.
+    // Never publish these home markers as route metadata.
+    var hideSharedStartNearHome: Bool? = nil
+    var hideSharedEndNearHome: Bool? = nil
 }
 
 struct ActivityRecord: Identifiable, Codable, Hashable {

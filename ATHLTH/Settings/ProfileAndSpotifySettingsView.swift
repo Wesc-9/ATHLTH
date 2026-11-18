@@ -2903,7 +2903,6 @@ struct ATHLTHPrivacyCenterView: View {
 
     @State private var draft: SocialPrivacySettings?
     @State private var saving = false
-    @State private var saved = false
     @State private var saveError: String?
     @State private var showingAutoShareConsent = false
     @State private var showingProfileHighlightsConsent = false
@@ -3055,25 +3054,22 @@ struct ATHLTHPrivacyCenterView: View {
                     }
                 }
 
-                Section {
-                    if saving {
-                        ProgressView("Saving…")
-                    } else if let saveError {
-                        Label("Changes could not be saved", systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
-                        Text(saveError)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Button("Retry") {
-                            schedulePrivacySave()
+                // Only surface actionable saving or error feedback.
+                // No static "changes save automatically" row.
+                if saving || saveError != nil {
+                    Section {
+                        if saving {
+                            ProgressView("Saving…")
+                        } else if let saveError {
+                            Label("Changes could not be saved", systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.red)
+                            Text(saveError)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("Retry") {
+                                schedulePrivacySave()
+                            }
                         }
-                    } else if saved {
-                        Label("Saved", systemImage: "checkmark.circle")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Changes save automatically")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                 }
             } else {
@@ -3137,34 +3133,6 @@ struct ATHLTHPrivacyCenterView: View {
                     english: "Automatic workout sharing is friends-only. GPS routes are never added automatically.",
                     norwegian: "Automatisk øktdeling er kun for venner. GPS-ruter legges aldri ved automatisk."
                 ), systemImage: "lock.shield")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Section("Routes") {
-                Toggle(
-                    "Hide route start & end",
-                    isOn: $settings.hideRouteStartAndEnd
-                )
-
-                Text(
-                    settings.hideRouteStartAndEnd
-                        ? ATHLTHLocalization.choose(
-                            english: "Recommended · ATHLTH removes roughly 250 m from both ends before a route is shared.",
-                            norwegian: "Anbefalt · ATHLTH fjerner omtrent 250 m fra begge ender før en rute deles."
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Shared routes include their full start and end points.",
-                            norwegian: "Delte ruter inkluderer hele start- og sluttpunktet."
-                        )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-                Label(
-                    "Routes are shared only when you explicitly choose to share them.",
-                    systemImage: "hand.raised.fill"
-                )
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -3312,7 +3280,6 @@ struct ATHLTHPrivacyCenterView: View {
             settings.workoutSharingChoiceCompleted = true
             FriendFeedSharingPreference.setEnabled(true, userID: userID)
             settings.autoPublishCompletedWorkouts = true
-            saved = true
         case .failure(let error):
             FriendFeedSharingPreference.setEnabled(false, userID: userID)
             settings.autoPublishCompletedWorkouts = false
@@ -3322,7 +3289,6 @@ struct ATHLTHPrivacyCenterView: View {
 
     @MainActor
     private func schedulePrivacySave() {
-        saved = false
         saveError = nil
         guard !saving, draft != nil else { return }
         saving = true
@@ -3350,7 +3316,6 @@ struct ATHLTHPrivacyCenterView: View {
                     enabled: snapshot.showOnlineStatus
                 )
                 draft = social.privacy ?? snapshot
-                saved = true
                 return
             }
         }

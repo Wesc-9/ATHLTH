@@ -335,27 +335,31 @@ final class SupabaseRouteDiscoveryService {
     }
 
     func publish(_ route: TrainingRoute) async throws {
-        guard let center = route.discoveryCenterCoordinate else {
+        // Sanitize at the final outbound boundary. UI-only cropping would
+        // still expose the original GPS trace through community_routes.
+        guard let shared = ATHLTHRouteHomePrivacyPolicy.sharedVersion(of: route)
+        else { throw ATHLTHRouteHomePrivacyError.insufficientSafeRoute }
+        guard let center = shared.discoveryCenterCoordinate else {
             return
         }
 
         let payload = CommunityRouteWrite(
-            id: route.id,
-            ownerID: route.ownerID,
-            title: route.title,
-            visibility: route.visibility,
-            coordinates: route.coordinates,
-            distanceKilometers: route.distanceKilometers,
-            elevationGainMeters: route.elevationGainMeters,
-            startName: route.startName,
-            endName: route.endName,
-            expectedTravelTimeSeconds: route.expectedTravelTimeSeconds,
-            routeSource: route.routeSource,
-            tags: route.tags ?? [],
-            surfacePercentages: route.surfacePercentages ?? [:],
+            id: shared.id,
+            ownerID: shared.ownerID,
+            title: shared.title,
+            visibility: shared.visibility,
+            coordinates: shared.coordinates,
+            distanceKilometers: shared.distanceKilometers,
+            elevationGainMeters: shared.elevationGainMeters,
+            startName: shared.startName,
+            endName: shared.endName,
+            expectedTravelTimeSeconds: shared.expectedTravelTimeSeconds,
+            routeSource: shared.routeSource,
+            tags: shared.tags ?? [],
+            surfacePercentages: shared.surfacePercentages ?? [:],
             centerLatitude: center.latitude,
             centerLongitude: center.longitude,
-            createdAt: route.createdAt,
+            createdAt: shared.createdAt,
             updatedAt: Date()
         )
 

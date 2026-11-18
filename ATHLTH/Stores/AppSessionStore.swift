@@ -1227,7 +1227,9 @@ final class AppSessionStore: ObservableObject {
     func updateSavedRoute(
         _ routeID: UUID,
         title: String? = nil,
-        visibility: ProfileVisibility? = nil
+        visibility: ProfileVisibility? = nil,
+        hideSharedStartNearHome: Bool? = nil,
+        hideSharedEndNearHome: Bool? = nil
     ) {
         guard let index = savedRoutes.firstIndex(
             where: { $0.id == routeID }
@@ -1246,6 +1248,12 @@ final class AppSessionStore: ObservableObject {
 
         if let visibility {
             savedRoutes[index].visibility = visibility
+        }
+        if let hideSharedStartNearHome {
+            savedRoutes[index].hideSharedStartNearHome = hideSharedStartNearHome
+        }
+        if let hideSharedEndNearHome {
+            savedRoutes[index].hideSharedEndNearHome = hideSharedEndNearHome
         }
     }
 

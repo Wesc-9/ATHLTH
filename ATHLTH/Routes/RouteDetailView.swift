@@ -112,6 +112,10 @@ struct RouteDetailView: View {
     @State private var routeToStart: TrainingRoute?
     @State private var selectedAttemptDirection: ATHLTHRouteAttemptDirection = .forward
     @State private var showingMetadataEditor = false
+    @State private var showingRouteSharingOptions = false
+    @State private var pendingRouteVisibility: ProfileVisibility?
+    @State private var pendingHideSharedStart = false
+    @State private var pendingHideSharedEnd = false
     @State private var draftTags: [String] = []
     @State private var draftSurfaces: [String: Int] = [:]
     @State private var resolvedOriginalStartAddress: String?
@@ -444,6 +448,9 @@ struct RouteDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Choose the name shown in Routes and challenges.")
+        }
+        .sheet(isPresented: $showingRouteSharingOptions) {
+            routeSharingOptionsSheet
         }
         .sheet(isPresented: $showingMetadataEditor) {
             NavigationStack {
@@ -1904,7 +1911,82 @@ struct RouteDetailView: View {
                     .tag(ProfileVisibility.publicProfile)
                 }
                 .pickerStyle(.segmented)
+
+                if currentRoute.visibility != .privateOnly {
+                    Divider()
+                    routeHomePrivacyToggles(
+                        start: Binding(
+                            get: { currentRoute.hideSharedStartNearHome == true },
+                            set: { updateHomePrivacy(start: $0) }
+                        ),
+                        end: Binding(
+                            get: { currentRoute.hideSharedEndNearHome == true },
+                            set: { updateHomePrivacy(end: $0) }
+                        )
+                    )
+                }
             }
+        }
+    }
+
+    private var routeSharingOptionsSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    routeHomePrivacyToggles(
+                        start: $pendingHideSharedStart,
+                        end: $pendingHideSharedEnd
+                    )
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Before sharing", norwegian: "Før du deler"
+                    ))
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Share route", norwegian: "Del rute"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) {
+                        showingRouteSharingOptions = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Share", norwegian: "Del"
+                    )) {
+                        commitRouteSharing()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func routeHomePrivacyToggles(
+        start: Binding<Bool>,
+        end: Binding<Bool>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Toggle(ATHLTHLocalization.choose(
+                english: "Start is at home · hide 250 m",
+                norwegian: "Start ved hjemmet · skjul 250 m"
+            ), isOn: start)
+            Toggle(ATHLTHLocalization.choose(
+                english: "Finish is at home · hide 250 m",
+                norwegian: "Slutt ved hjemmet · skjul 250 m"
+            ), isOn: end)
+            Text(ATHLTHLocalization.choose(
+                english: "Only mark endpoints at your home. ATHLTH removes those 250 m zones from the shared map, while keeping your complete route private. Check the title for your address.",
+                norwegian: "Marker bare endepunkter ved hjemmet. ATHLTH fjerner de valgte 250 m-sonene fra delt kart, mens hele ruten beholdes privat. Sjekk rutenavnet for adressen din."
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -2815,20 +2897,62 @@ struct RouteDetailView: View {
         }
     }
 
-    private func updateVisibility(
-        _ visibility: ProfileVisibility
-    ) {
-        guard isOwner,
-              visibility != currentRoute.visibility
-        else {
+    private func updateVisibility(_ visibility: ProfileVisibility) {
+        guard isOwner, visibility != currentRoute.visibility else { return }
+
+        if visibility != .privateOnly {
+            // Do not publish an existing private route before the athlete
+            // confirms which end(s) are near home.
+            pendingRouteVisibility = visibility
+            pendingHideSharedStart = currentRoute.hideSharedStartNearHome == true
+            pendingHideSharedEnd = currentRoute.hideSharedEndNearHome == true
+            showingRouteSharingOptions = true
             return
         }
 
+        session.updateSavedRoute(currentRoute.id, visibility: .privateOnly)
+        publishRoutePrivacyChange()
+    }
+
+    private func commitRouteSharing() {
+        guard isOwner, let visibility = pendingRouteVisibility else { return }
+        var candidate = currentRoute
+        candidate.visibility = visibility
+        candidate.hideSharedStartNearHome = pendingHideSharedStart
+        candidate.hideSharedEndNearHome = pendingHideSharedEnd
+        guard ATHLTHRouteHomePrivacyPolicy.sharedVersion(of: candidate) != nil else {
+            watchError = ATHLTHRouteHomePrivacyError.insufficientSafeRoute.localizedDescription
+            return
+        }
         session.updateSavedRoute(
             currentRoute.id,
-            visibility: visibility
+            visibility: visibility,
+            hideSharedStartNearHome: pendingHideSharedStart,
+            hideSharedEndNearHome: pendingHideSharedEnd
         )
+        showingRouteSharingOptions = false
+        pendingRouteVisibility = nil
+        publishRoutePrivacyChange()
+    }
 
+    private func updateHomePrivacy(start: Bool? = nil, end: Bool? = nil) {
+        guard isOwner, currentRoute.visibility != .privateOnly else { return }
+        var candidate = currentRoute
+        if let start { candidate.hideSharedStartNearHome = start }
+        if let end { candidate.hideSharedEndNearHome = end }
+        guard ATHLTHRouteHomePrivacyPolicy.sharedVersion(of: candidate) != nil else {
+            watchError = ATHLTHRouteHomePrivacyError.insufficientSafeRoute.localizedDescription
+            return
+        }
+        session.updateSavedRoute(
+            currentRoute.id,
+            hideSharedStartNearHome: start,
+            hideSharedEndNearHome: end
+        )
+        publishRoutePrivacyChange()
+    }
+
+    private func publishRoutePrivacyChange() {
         if let updated = session.savedRoutes.first(
             where: { $0.id == currentRoute.id }
         ) {
