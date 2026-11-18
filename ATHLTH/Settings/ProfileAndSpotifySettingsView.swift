@@ -3063,8 +3063,8 @@ struct ATHLTHPrivacyCenterView: View {
                             .tint(ATHLTHPlanDesign.accentInk)
 
                             Text(tr(
-                                "Only sections you enable are shown, subject to profile visibility. Existing choices are not reset.",
-                                "Bare seksjoner du aktiverer vises, innenfor profilsynligheten. Tidligere valg endres ikke automatisk."
+                                "Performance data stays private until you enable it. Gear can default to friends for new accounts; earlier privacy choices are never reset.",
+                                "Prestasjonsdata forblir private til du aktiverer deling selv. Utstyr kan være på for venner som ny kontostandard. Tidligere personvernvalg endres aldri automatisk."
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
