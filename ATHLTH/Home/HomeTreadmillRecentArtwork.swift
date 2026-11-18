@@ -10,10 +10,10 @@ struct HomeTreadmillRecentArtwork: View {
 
     private let mint = Color(red: 0.67, green: 0.96, blue: 0.79)
 
-    /// Reuse the full-resolution running photograph already bundled for
-    /// Training Plans and outdoor running feed. The old treadmill image is
-    /// too small for full-width cards and should not be scaled up.
-    static let backgroundAssetName = ATHLTHPlanWorkoutArtwork.asset(for: .easyRun)
+    /// The original tiny treadmill artwork has been replaced in-place by
+    /// a high-resolution 1536 x 1024 treadmill photograph. Keep the treadmill
+    /// identity instead of reusing an outdoor running photo in the feed.
+    static let backgroundAssetName = "TreadmillRecentCardHero"
 
     private var distance: Double? {
         guard let meters = workout.distanceMeters,
