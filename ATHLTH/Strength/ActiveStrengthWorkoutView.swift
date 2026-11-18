@@ -742,14 +742,8 @@ struct ActiveStrengthWorkoutView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let workout = strength.activeWorkout,
-               let exercise = strength.currentExercise,
-               !workout.exercises.allSatisfy({ $0.isCompleted }),
-               !strength.currentExerciseAllSetsCompleted,
-               !strength.isFreeTrainingBetweenExercises,
-               exercise.isEmbeddedRunningInterval != true,
-               canLogOnIPhone(workout) {
-                compactLiveStrengthDock(exercise: exercise)
+            if let workout = strength.activeWorkout, canLogOnIPhone(workout) {
+                strengthLiveDock(workout: workout)
             }
         }
         // A strength workout is a true full-screen surface. Spotify can
@@ -6007,85 +6001,143 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
-    /// The focused set stays in a single compact surface at the bottom of
-    /// the device, independent of scrolling and the instruction gallery.
-    /// Larger horizontal buttons replace the unstable vertical chevrons.
+    /// A single shared action surface is used for runs and strength.
+    /// Strength-specific load/repetition editors remain inside its content
+    /// slot, while the same main and secondary buttons handle progression.
+    /// No new recording, clock or completed set is created by the dock.
     @ViewBuilder
-    private func compactLiveStrengthDock(
-        exercise: StrengthExerciseLog
+    private func strengthLiveDock(
+        workout: StrengthWorkoutLog
     ) -> some View {
-        VStack(spacing: 10) {
-            if strength.isResting, let end = strength.restEndsAt {
-                let upcomingSet = strength.currentSet?.setNumber ?? min(strength.currentSetIndex + 1, exercise.sets.count)
-                let totalSets = max(exercise.sets.count, 1)
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "NEXT SET · \(upcomingSet) OF \(totalSets)",
-                            norwegian: "NESTE SETT · \(upcomingSet) AV \(totalSets)"
-                        ))
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        .accessibilityAddTraits(.isHeader)
-                        Text(ATHLTHLocalization.choose(
-                            english: "REST · REMAINING",
-                            norwegian: "PAUSE · GJENSTÅR"
-                        ))
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(1.2)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            let remaining = end.timeIntervalSince(context.date)
-                            Text(remaining > 0
-                                 ? max(0, remaining).clockDuration
-                                 : "+" + max(0, -remaining).clockDuration)
-                                .font(.system(
-                                    size: 34, weight: .semibold, design: .rounded
-                                ))
-                                .monospacedDigit()
-                                .foregroundStyle(remaining > 0
-                                    ? ATHLTHPlanDesign.ink
-                                    : ATHLTHPlanDesign.accentInk)
-                                .contentTransition(.numericText())
-                                .accessibilityLabel(remaining > 0
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Time remaining in rest",
-                                        norwegian: "Tid igjen av pausen"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english: "Extra rest time",
-                                        norwegian: "Ekstra pausetid"
-                                    ))
-                        }
-                    }
-                    Spacer()
-                    Button {
+        if strength.isFreeTrainingBetweenExercises || workout.exercises.isEmpty {
+            ATHLTHLiveWorkoutBottomDock(
+                mode: .strengthAddExercise,
+                subtitle: workout.title,
+                onPrimary: { showingExerciseLibrary = true }
+            ) {
+                EmptyView()
+            }
+        } else if let exercise = strength.currentExercise,
+                  exercise.isEmbeddedRunningInterval != true {
+            if workout.exercises.allSatisfy(\.isCompleted) {
+                ATHLTHLiveWorkoutBottomDock(
+                    mode: .strengthFinish,
+                    subtitle: workout.title,
+                    primaryDisabled: finishInProgress,
+                    onPrimary: { showingFinishConfirmation = true },
+                    onSecondary: { showingExerciseQueue = true }
+                ) {
+                    EmptyView()
+                }
+            } else if strength.currentExerciseAllSetsCompleted {
+                ATHLTHLiveWorkoutBottomDock(
+                    mode: .strengthNextExercise,
+                    subtitle: strength.nextPendingExercise?.exercise.name,
+                    primaryDisabled: !strength.hasNextExercise,
+                    onPrimary: { strength.moveToNextExercise() },
+                    onSecondary: { showingExerciseQueue = true }
+                ) {
+                    EmptyView()
+                }
+            } else if strength.isResting {
+                ATHLTHLiveWorkoutBottomDock(
+                    mode: .strengthRest,
+                    subtitle: ATHLTHLocalization.format(
+                        english: "Set %d of %d",
+                        norwegian: "Sett %d av %d",
+                        strength.currentSet?.setNumber ??
+                            min(strength.currentSetIndex + 1, exercise.sets.count),
+                        max(exercise.sets.count, 1)
+                    ),
+                    onPrimary: {
                         strength.skipRest()
-                        // "Start next set" is an actual start, not only closing
-                        // the rest sheet. Timed sets begin counting down here.
+                        // A timed set also needs the countdown. A rep-based
+                        // set only starts its effort clock through skipRest.
                         if strength.currentSet?.resolvedTargetKind == .time {
                             strength.startOrResumeTimedSet()
                         }
-                    } label: {
-                        VStack(spacing: 2) {
-                            Label(ATHLTHLocalization.choose(
-                                english: "Start next set",
-                                norwegian: "Start neste sett"
-                            ), systemImage: "play.fill")
-                            Text("\(upcomingSet) / \(totalSets)")
-                                .font(.caption2.weight(.bold).monospacedDigit())
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .frame(minHeight: 50)
-                    }
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Start set \(upcomingSet) of \(totalSets)",
-                        norwegian: "Start sett \(upcomingSet) av \(totalSets)"
-                    ))
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHPlanDesign.accentInk)
+                    },
+                    onSecondary: { strength.addRest(seconds: 30) }
+                ) {
+                    strengthRestTimeDetail
                 }
             } else {
+                let needsStart = strength.currentSetEffortClock == nil ||
+                    (currentStrengthTargetKind == .time &&
+                     strength.currentTimedSetCountdown?.isRunning != true)
+                ATHLTHLiveWorkoutBottomDock(
+                    mode: needsStart ? .strengthReady : .strengthWorking,
+                    subtitle: ATHLTHLocalization.format(
+                        english: "Set %d of %d",
+                        norwegian: "Sett %d av %d",
+                        strength.currentSet?.setNumber ?? 1,
+                        max(exercise.sets.count, 1)
+                    ),
+                    primaryDisabled: strength.currentSet == nil,
+                    onPrimary: {
+                        if needsStart {
+                            if currentStrengthTargetKind == .time {
+                                strength.startOrResumeTimedSet()
+                            } else {
+                                strength.startCurrentSetEffort()
+                            }
+                        } else {
+                            strength.completeCurrentDraftSet()
+                        }
+                    },
+                    onSecondary: { showingExerciseQueue = true }
+                ) {
+                    strengthEditableSetDetails(exercise: exercise)
+                }
+            }
+        }
+        // An embedded treadmill/running interval keeps its specialized
+        // controls until hybrid execution is migrated in a later phase.
+    }
+
+    /// The one date-anchored rest countdown is read from StrengthWorkoutStore.
+    /// Rest is a manual gate: zero does not auto-complete or start a new set.
+    private var strengthRestTimeDetail: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { tick in
+            let remaining = (strength.restEndsAt ?? tick.date)
+                .timeIntervalSince(tick.date)
+            HStack(spacing: 10) {
+                Image(systemName: "hourglass")
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                Text(ATHLTHLocalization.choose(
+                    english: "Remaining rest", norwegian: "Gjenstående pause"
+                ))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Spacer(minLength: 6)
+                Text(remaining >= 0
+                    ? remaining.clockDuration
+                    : "+" + abs(remaining).clockDuration)
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .accessibilityLabel(remaining >= 0
+                        ? ATHLTHLocalization.choose(
+                            english: "Time remaining in rest",
+                            norwegian: "Tid igjen av pausen"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Extra rest time",
+                            norwegian: "Ekstra pausetid"
+                        ))
+            }
+            .padding(.vertical, 4)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    /// Keep the existing workout-specific inputs when replacing the old
+    /// strength footer. Load editing, resistance, barbell/plate totals,
+    /// actual effort and timed-set countdown retain their original stores.
+    private func strengthEditableSetDetails(
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Text(ATHLTHLocalization.format(
                         english: "Set %d / %d",
@@ -6205,72 +6257,6 @@ struct ActiveStrengthWorkoutView: View {
                 // Timed holds without a countdown and rep-based sets show
                 // the actual set-effort clock here.
                 focusedSetTimingRow
-
-                let needsStart = strength.currentSetEffortClock == nil ||
-                    (currentStrengthTargetKind == .time &&
-                     strength.currentTimedSetCountdown?.isRunning != true)
-                Button {
-                    if needsStart {
-                        if currentStrengthTargetKind == .time {
-                            strength.startOrResumeTimedSet()
-                        } else {
-                            strength.startCurrentSetEffort()
-                        }
-                    } else {
-                        strength.completeCurrentDraftSet()
-                    }
-                } label: {
-                    Label(
-                        needsStart
-                            ? ATHLTHLocalization.choose(
-                                english: "Start set", norwegian: "Start sett"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Complete set", norwegian: "Fullfør sett"
-                            ),
-                        systemImage: needsStart ? "play.fill" : "checkmark.circle.fill"
-                    )
-                    .font(.subheadline.weight(.bold))
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHPlanDesign.ink)
-
-                if strength.hasNextExercise {
-                    Button {
-                        strength.skipRest()
-                        strength.moveToNextExercise()
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Next exercise",
-                            norwegian: "Neste øvelse"
-                        ), systemImage: "arrow.right")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(minHeight: 27)
-                    .accessibilityHint(ATHLTHLocalization.choose(
-                        english: "Skips ahead without completing unrecorded sets",
-                        norwegian: "Går videre uten å registrere resterende sett"
-                    ))
-                }
-            }
-        }
-        .padding(.horizontal, 17)
-        .padding(.top, 13)
-        .padding(.bottom, 8)
-        .frame(maxWidth: .infinity)
-        .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(ATHLTHPlanDesign.surface)
-                .ignoresSafeArea(edges: .bottom)
-                .shadow(color: .black.opacity(0.11), radius: 17, y: -4)
-        }
-        .overlay(alignment: .top) {
-            Capsule()
-                .fill(ATHLTHPlanDesign.outline.opacity(0.65))
-                .frame(height: 1)
         }
     }
 
@@ -6348,478 +6334,6 @@ struct ActiveStrengthWorkoutView: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
-    }
-
-    private func focusedSetEntry(
-        exercise: StrengthExerciseLog
-    ) -> some View {
-        ATHLTHUnifiedCard {
-            VStack(
-                alignment: .leading,
-                spacing: 16
-            ) {
-                HStack {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text(
-                            ATHLTHLocalization.format(
-                                english:
-                                    "Set %d of %d",
-                                norwegian:
-                                    "Sett %d av %d",
-                                strength
-                                    .currentSet?
-                                    .setNumber ??
-                                    1,
-                                max(
-                                    exercise
-                                        .sets
-                                        .count,
-                                    1
-                                )
-                            )
-                        )
-                        .font(
-                            .title3
-                                .weight(.bold)
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Enter what you actually completed.",
-                                norwegian:
-                                    "Registrer det du faktisk gjennomførte."
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(
-                                ATHLTHTheme
-                                    .premiumGold
-                            )
-                            .frame(
-                                width: 5,
-                                height: 5
-                            )
-
-                        Text(
-                            "\(strength.draftRestSeconds)s"
-                        )
-                        .font(
-                            .caption
-                                .monospacedDigit()
-                                .weight(.semibold)
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                    }
-                }
-
-                if currentStrengthLoadKind == .weightKilograms && !isCurrentStrengthTreadmill {
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Record weight for this set",
-                            norwegian: "Registrer vekt på dette settet"
-                        ),
-                        isOn: Binding(
-                            get: { strength.currentSetRecordsWeight },
-                            set: { strength.setCurrentSetRecordsWeight($0) }
-                        )
-                    )
-                    .tint(ATHLTHPlanDesign.accent)
-                    .font(.subheadline.weight(.medium))
-                }
-
-                if isCurrentStrengthTreadmill {
-                    HStack(spacing: 10) {
-                        focusedNumberField(
-                            title: ATHLTHLocalization.choose(
-                                english: "Speed", norwegian: "Fart"
-                            ),
-                            value: treadmillSpeedBinding,
-                            suffix: "km/t"
-                        )
-                        focusedNumberField(
-                            title: ATHLTHLocalization.choose(
-                                english: "Incline", norwegian: "Stigning"
-                            ),
-                            value: treadmillInclineBinding,
-                            suffix: "%"
-                        )
-                    }
-                    focusedDurationField
-                    if strength.draftTreadmillSpeedKilometersPerHour > 0,
-                       let pace = ATHLTHRunningPace.paceForManualTreadmillSpeed(
-                           kilometersPerHour: strength.draftTreadmillSpeedKilometersPerHour
-                       ) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Manual speed · estimated pace ",
-                            norwegian: "Manuell fart · estimert tempo "
-                        ) + pace.clockDuration + " min/km")
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    }
-                } else {
-                HStack(spacing: 10) {
-                    if currentStrengthLoadKind ==
-                        .resistanceLevel {
-                        focusedIntegerField(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: "Resistance",
-                                    norwegian: "Motstand"
-                                ),
-                            value:
-                                draftResistanceBinding
-                        )
-                    } else if strength.currentSetRecordsWeight {
-                        focusedNumberField(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: currentBarWeightKilograms == nil
-                                        ? "Weight" : "Plates total",
-                                    norwegian: currentBarWeightKilograms == nil
-                                        ? "Vekt" : "Skiver totalt"
-                                ),
-                            value:
-                                draftPlateWeightBinding,
-                            suffix: "kg"
-                        )
-                    }
-
-                    if currentStrengthTargetKind == .time {
-                        focusedDurationField
-                    } else {
-                        focusedIntegerField(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: "Reps",
-                                    norwegian:
-                                        "Repetisjoner"
-                                ),
-                            value:
-                                draftRepsBinding
-                        )
-                    }
-                }
-
-                }
-
-                if let active = strength.currentExercise,
-                   StrengthBarbellExercisePolicy.usesBar(active),
-                   currentStrengthLoadKind == .weightKilograms,
-                   strength.currentSetRecordsWeight {
-                    HStack(spacing: 9) {
-                        Image(systemName: "scalemass")
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Bar weight",
-                                norwegian: "Stangvekt"
-                            ))
-                            .font(.caption.weight(.semibold))
-                            Text(ATHLTHLocalization.choose(
-                                english: "Enter plates separately (both sides combined)",
-                                norwegian: "Legg inn skivene separat (begge sider samlet)"
-                            ))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Menu {
-                            Button {
-                                editingBarMass = StrengthBarMassEditTarget(
-                                    exerciseID: active.id,
-                                    kilograms: active.barWeightKilograms ??
-                                        strength.suggestedBarWeight(for: active)
-                                )
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Enter bar weight",
-                                        norwegian: "Angi stangvekt"
-                                    ),
-                                    systemImage: "pencil"
-                                )
-                            }
-                            Button {
-                                _ = strength.rememberBarWeightForExercise(
-                                    active.id,
-                                    kilograms: active.barWeightKilograms ??
-                                        strength.suggestedBarWeight(for: active)
-                                )
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Save as exercise default",
-                                        norwegian: "Lagre som standard for øvelsen"
-                                    ),
-                                    systemImage: "bookmark"
-                                )
-                            }
-                            Divider()
-                            ForEach(
-                                StrengthBarWeightPreferences.supportedMasses,
-                                id: \.self
-                            ) { kg in
-                                Button(String(format: "%g kg", kg)) {
-                                    _ = strength.setActiveExerciseBarWeight(
-                                        active.id, kilograms: kg
-                                    )
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 5) {
-                                Text(String(
-                                    format: "%.0f kg",
-                                    active.barWeightKilograms ??
-                                        strength.suggestedBarWeight(for: active)
-                                ))
-                                Image(systemName: "chevron.up.chevron.down")
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        }
-                    }
-                    .padding(.vertical, 5)
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Plates + bar = total: ",
-                            norwegian: "Skiver + stang = total: "
-                        ) +
-                        "\(formatWeight(draftPlateWeightBinding.wrappedValue)) + " +
-                        "\(formatWeight(active.barWeightKilograms ?? strength.suggestedBarWeight(for: active))) = " +
-                        "\(formatWeight(strength.draftWeightKilograms)) kg"
-                    )
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    .monospacedDigit()
-                }
-
-                if currentStrengthTargetKind == .time {
-                    timedSetCountdownCard
-                }
-
-                HStack(spacing: 10) {
-                    Image(
-                        systemName: "timer"
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .premiumGold
-                    )
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 1
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Rest after set",
-                                norwegian:
-                                    "Pause etter sett"
-                            )
-                        )
-                        .font(
-                            .subheadline
-                                .weight(.semibold)
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Starts automatically when the set is completed.",
-                                norwegian:
-                                    "Starter automatisk når settet fullføres."
-                            )
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                    }
-
-                    Spacer()
-
-                    Button {
-                        strength.setDraft(
-                            restSeconds:
-                                max(
-                                    0,
-                                    strength
-                                        .draftRestSeconds -
-                                        15
-                                )
-                        )
-                    } label: {
-                        Image(
-                            systemName: "minus"
-                        )
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    Text(
-                        "\(strength.draftRestSeconds)s"
-                    )
-                    .font(
-                        .subheadline
-                            .monospacedDigit()
-                            .weight(.bold)
-                    )
-                    .frame(minWidth: 46)
-
-                    Button {
-                        strength.setDraft(
-                            restSeconds:
-                                min(
-                                    600,
-                                    strength
-                                        .draftRestSeconds +
-                                        15
-                                )
-                        )
-                    } label: {
-                        Image(
-                            systemName: "plus"
-                        )
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-
-                if strength.currentSet?.isCompleted == false &&
-                   !strength.isResting {
-                    Button {
-                        showingSkipCurrentSetConfirmation = true
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Skip this set",
-                                norwegian: "Hopp over dette settet"
-                            ),
-                            systemImage: "forward.end"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHPlanDesign.ink)
-                    .confirmationDialog(
-                        ATHLTHLocalization.choose(
-                            english: "Skip the current set?",
-                            norwegian: "Hoppe over dette settet?"
-                        ),
-                        isPresented: $showingSkipCurrentSetConfirmation,
-                        titleVisibility: .visible
-                    ) {
-                        Button(
-                            ATHLTHLocalization.choose(
-                                english: "Skip set",
-                                norwegian: "Hopp over sett"
-                            ),
-                            role: .destructive
-                        ) {
-                            _ = strength.skipCurrentSet()
-                        }
-                    } message: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "The set will be omitted, not marked completed. Your training volume and records remain correct.",
-                            norwegian: "Sett hoppes over og blir ikke registrert som utført. Treningsvolum og rekorder blir ikke påvirket."
-                        ))
-                    }
-                }
-
-                if exercise.sets.contains(where: { $0.isCompleted }) &&
-                   exercise.sets.contains(where: { !$0.isCompleted }) {
-                    Button {
-                        showingOmitRemainingSetsConfirmation = true
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Skip remaining planned sets",
-                                norwegian: "Hopp over resterende sett"
-                            ),
-                            systemImage: "forward.end"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHPlanDesign.accentInk)
-                    .confirmationDialog(
-                        ATHLTHLocalization.choose(
-                            english: "End this exercise without the remaining sets?",
-                            norwegian: "Avslutte øvelsen uten de resterende settene?"
-                        ),
-                        isPresented: $showingOmitRemainingSetsConfirmation,
-                        titleVisibility: .visible
-                    ) {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Skip remaining sets",
-                            norwegian: "Hopp over resterende sett"
-                        )) {
-                            _ = strength.omitRemainingSetsOfCurrentExercise()
-                        }
-                    } message: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Completed sets are kept. The remaining sets are recorded as omitted, not completed.",
-                            norwegian: "Fullførte sett beholdes. Resten registreres som hoppet over, ikke fullført."
-                        ))
-                    }
-                }
-
-                Button {
-                    strength
-                        .completeCurrentDraftSet()
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Complete set",
-                            norwegian:
-                                "Fullfør sett"
-                        ),
-                        systemImage:
-                            "checkmark.circle.fill"
-                    )
-                    .font(
-                        .headline
-                    )
-                    .frame(
-                        maxWidth: .infinity
-                    )
-                    .frame(height: 52)
-                }
-                .buttonStyle(
-                    .borderedProminent
-                )
-                .tint(ATHLTHPlanDesign.accentInk)
-                .clipShape(Capsule())
-                .shadow(
-                    color: ATHLTHPlanDesign.accentInk.opacity(0.12),
-                    radius: 14,
-                    x: 0,
-                    y: 7
-                )
-            }
-        }
     }
 
     private func focusedNumberField(
