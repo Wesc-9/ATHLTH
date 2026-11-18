@@ -258,3 +258,5 @@ ATHLTH 2.2.3 build 131 — retry 2026-11-17 after SwiftUI Section compiler fix 6
 ATHLTH 2.2.3 build 131 — 2026-11-17 retry after fixing ATHLTHTrainTodayLayoutTests missing onQuickFreeTraining closure (6a56eeb82062212b539d55cc4645956849e92fbb); require same-commit Build ATHLTH and backend success, signed archive and Apple upload confirmation.
 
 ATHLTH 2.2.3 build 131 recovery retry after running-library unsaved draft regression fix 44d7b3601c5b146e77241e0b418107a2f0bdd822; upload only after same-commit build and backend checks pass; user authorized 2026-11-17.
+
+ATHLTH 2.2.4 build 132 — TestFlight upload user-authorized 2026-11-18. Source c34df9b085e8afd739247673ea82b4bc2784c7c6. Start release workflow for iOS + iPad + Apple Watch companion, keep previous releases locked and do not open PR/merge main. Require same-commit Build ATHLTH and backend green, explicit signed archive + App Store Connect upload; retry fixable failures under hourly monitoring until successfully processed.
