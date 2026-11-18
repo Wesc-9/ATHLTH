@@ -126,8 +126,11 @@ final class ATHLTHAudioCoachPreviewSpeaker:
         // Premium voices use their real configured Azure voice, not an
         // unrelated local voice. If Azure is offline/denied, fallback to
         // Apple's selected voice without delaying the UI.
-        let startedAzure = azureSpeech.begin(
-            String(preview.prefix(220)),
+        // Azure's TTS request has a 220-character limit. Never cut off
+        // part of the athlete's group preview; for longer groups use the
+        // local voice for the complete message instead.
+        let startedAzure = preview.count <= 220 && azureSpeech.begin(
+            preview,
             voiceIdentifier: voiceIdentifier,
             duckMusic: duckOtherAudio,
             onFallback: { [weak self] in
