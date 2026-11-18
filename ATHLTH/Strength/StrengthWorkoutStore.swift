@@ -28,7 +28,11 @@ struct StrengthTimedSetCountdown: Codable, Equatable {
     var resumedAt: Date?
 
     func remaining(at date: Date = Date()) -> TimeInterval {
-        max(secondsAtPause - (resumedAt.map { max(date.timeIntervalSince($0), 0) } ?? 0), 0)
+        max(ATHLTHWorkoutSessionClock.remaining(
+            secondsAtPause: secondsAtPause,
+            resumedAt: resumedAt,
+            at: date
+        ), 0)
     }
 
     func secondsRemaining(at date: Date = Date()) -> Int {
@@ -42,8 +46,12 @@ struct StrengthTimedSetCountdown: Codable, Equatable {
     /// Actual duration continues after the target reaches zero. A paused
     /// countdown retains negative secondsAtPause so overtime is not lost.
     func elapsedSeconds(at date: Date = Date()) -> Int {
-        let activeElapsed = resumedAt.map { max(date.timeIntervalSince($0), 0) } ?? 0
-        return max(Int((Double(targetSeconds) - secondsAtPause + activeElapsed).rounded(.down)), 0)
+        let remaining = ATHLTHWorkoutSessionClock.remaining(
+            secondsAtPause: secondsAtPause,
+            resumedAt: resumedAt,
+            at: date
+        )
+        return max(Int((Double(targetSeconds) - remaining).rounded(.down)), 0)
     }
 
     func overtimeSeconds(at date: Date = Date()) -> Int {
@@ -70,8 +78,12 @@ struct StrengthSetEffortClock: Codable, Equatable {
     var totalPausedSeconds: TimeInterval? = nil
 
     func elapsedSeconds(at now: Date = Date()) -> TimeInterval {
-        max((pausedAt ?? now).timeIntervalSince(startedAt) -
-            (totalPausedSeconds ?? 0), 0)
+        ATHLTHWorkoutSessionClock.elapsed(
+            startedAt: startedAt,
+            pausedAt: pausedAt,
+            excludedPauseSeconds: totalPausedSeconds ?? 0,
+            at: now
+        )
     }
 
     mutating func pause(at now: Date) {
@@ -90,6 +102,18 @@ struct StrengthSetEffortClock: Codable, Equatable {
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { scheduleCheckpointPersist() } }
+
+    /// Same session-state contract as running, derived from the strength
+    /// checkpoint. It cannot create an extra HealthKit session or log.
+    var activeSessionState: ATHLTHWorkoutSessionState? {
+        activeWorkout.map {
+            ATHLTHWorkoutSessionFoundation.strength(
+                $0,
+                exerciseIndex: currentExerciseIndex,
+                isResting: isResting
+            )
+        }
+    }
     @Published private(set) var currentExerciseIndex = 0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var currentSetIndex = 0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var restEndsAt: Date? { didSet { scheduleCheckpointPersist() } }
@@ -2591,6 +2615,8 @@ final class StrengthWorkoutStore: ObservableObject {
         advancedConfiguration:
             StrengthAdvancedConfiguration? = nil
     ) {
+        // Never overwrite an unfinished workout or its account checkpoint.
+        guard activeWorkout == nil else { return }
         recoveredCheckpointSavedAt = nil
         setEffortClock = nil
         cardioWatchCaptures = [:]
@@ -3264,6 +3290,9 @@ final class StrengthWorkoutStore: ObservableObject {
         advancedConfiguration:
             StrengthAdvancedConfiguration? = nil
     ) {
+        // Existing or recovered strength work must not be silently discarded
+        // by a duplicate start action.
+        guard activeWorkout == nil else { return }
         recoveredCheckpointSavedAt = nil
         setEffortClock = nil
         cardioWatchCaptures = [:]
