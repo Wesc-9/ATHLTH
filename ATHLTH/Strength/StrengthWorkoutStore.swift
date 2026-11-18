@@ -246,10 +246,12 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = checkpoint?.workout
         cardioWatchCaptures = checkpoint?.cardioWatchCaptures ?? [:]
         if let workout = activeWorkout,
-           workout.endedAt != nil ||
-            workoutHistory.contains(
-                where: { $0.id == workout.id }
-            ) {
+           !ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
+                hasEnded: workout.endedAt != nil,
+                alreadyCommitted: workoutHistory.contains {
+                    $0.id == workout.id
+                }
+           ) {
             activeWorkout = nil
         }
         recoveredCheckpointSavedAt =
