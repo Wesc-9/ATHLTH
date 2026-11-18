@@ -2908,6 +2908,7 @@ struct ATHLTHPrivacyCenterView: View {
     @State private var enablingAutoShare = false
     @State private var autoShareError: String?
     @State private var showMoreSharing = false
+    @State private var showingRecommendedSharingConsent = false
 
     var body: some View {
         ZStack {
@@ -3004,6 +3005,25 @@ struct ATHLTHPrivacyCenterView: View {
                             ))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            if !binding.wrappedValue.sharePerformanceStats ||
+                                !binding.wrappedValue.shareGear {
+                                Button {
+                                    showingRecommendedSharingConsent = true
+                                } label: {
+                                    Label(
+                                        tr("Enable recommended sharing", "Aktiver anbefalt deling"),
+                                        systemImage: "checkmark.shield"
+                                    )
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    .frame(maxWidth: .infinity, minHeight: 38)
+                                    .background(
+                                        ATHLTHPlanDesign.selectedSurface.opacity(0.55),
+                                        in: RoundedRectangle(cornerRadius: 12)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
                             privacyToggle(
                                 tr("Performance stats", "Prestasjonsstatistikk"),
                                 icon: "chart.bar.fill",
@@ -3058,6 +3078,18 @@ struct ATHLTHPrivacyCenterView: View {
                                     )
                                     .font(.subheadline.weight(.medium))
                                     Spacer(minLength: 6)
+                                    let otherCount = [
+                                        binding.wrappedValue.shareTrophyCabinet,
+                                        binding.wrappedValue.shareRunningPRs,
+                                        binding.wrappedValue.shareStrengthPRs,
+                                        binding.wrappedValue.shareGoals,
+                                        binding.wrappedValue.shareWorkoutTotals
+                                    ].filter { $0 }.count
+                                    if otherCount > 0 {
+                                        Text("\(otherCount) " + tr("on", "på"))
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
                                 }
                             }
                             .tint(ATHLTHPlanDesign.accentInk)
@@ -3205,6 +3237,22 @@ struct ATHLTHPrivacyCenterView: View {
             norwegian: "Deling og personvern"
         ))
         .confirmationDialog(
+            tr("Share performance and gear with friends?",
+               "Dele prestasjoner og utstyr med venner?"),
+            isPresented: $showingRecommendedSharingConsent,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Enable for friends", "Aktiver for venner")) {
+                enableRecommendedProfileSharing()
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        } message: {
+            Text(tr(
+                "Only summary statistics and gear become available to approved friends. Your HealthKit samples, heart rate and GPS routes stay private.",
+                "Bare oppsummerte prestasjoner og utstyr blir tilgjengelig for godkjente venner. Apple Helse-målinger, puls og GPS-ruter forblir private."
+            ))
+        }
+        .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Share future workouts with friends?",
                 norwegian: "Dele fremtidige treningsøkter med venner?"
@@ -3337,6 +3385,19 @@ struct ATHLTHPrivacyCenterView: View {
                 schedulePrivacySave()
             }
         )
+    }
+
+    @MainActor
+    private func enableRecommendedProfileSharing() {
+        guard var updated = draft else { return }
+        // Explicit per-account opt-in. Never change unrelated privacy
+        // choices or silently publish data from older accounts.
+        updated.sharePerformanceStats = true
+        updated.performanceStatsVisibility = "friends"
+        updated.shareGear = true
+        updated.gearVisibility = "friends"
+        draft = updated
+        schedulePrivacySave()
     }
 
     @MainActor
