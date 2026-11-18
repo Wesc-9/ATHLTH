@@ -56,7 +56,13 @@ struct ATHLTHPrivateGoalsProfileCard: View {
 
                 Spacer(minLength: 0)
 
-                Text("\(activeGoals.count) " + tr("active", "aktive"))
+                Text(ATHLTHLocalization.counted(
+                    activeGoals.count,
+                    englishSingular: "active goal",
+                    englishPlural: "active goals",
+                    norwegianSingular: "aktivt mål",
+                    norwegianPlural: "aktive mål"
+                ))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .lineLimit(1)
