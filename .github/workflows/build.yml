@@ -184,8 +184,10 @@ jobs:
       - name: Audit Watch Always-On visual and power rules
         run: python3 scripts/audit_watch_visual_power.py
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install XcodeGen and iPad screenshot validator
+        run: |
+          brew install xcodegen
+          brew install imagemagick
       - name: Regenerate and validate approved app icons
         shell: bash
         run: |
@@ -283,6 +285,7 @@ jobs:
           print(f"::notice::Selected XCTest simulator {name} (iOS {version})", file=sys.stderr)
           ')
           echo "Booting XCTest host simulator $DEVICE_ID"
+          printf '%s\n' "$DEVICE_ID" > "$RUNNER_TEMP/athlth-test-iphone-udid"
           xcrun simctl boot "$DEVICE_ID" || true
           xcrun simctl bootstatus "$DEVICE_ID" -b
           xcodebuild -project ATHLTH.xcodeproj -scheme ATHLTH \
@@ -291,7 +294,34 @@ jobs:
             -parallel-testing-enabled NO \
             -maximum-concurrent-test-simulator-destinations 1 \
             -resultBundlePath "$RUNNER_TEMP/ATHLTHTests.xcresult" \
+            -derivedDataPath "$RUNNER_TEMP/ATHLTHDerivedData" \
             CODE_SIGNING_ALLOWED=NO test
+
+
+      # iOS XCTest already compiled a simulator app. Rebuilding it for iPad
+      # took more than 90 minutes and never reached the visual checks.
+      # Reuse this exact binary to verify iPad onboarding, libraries,
+      # side-panel profile and 11-/13-inch layouts.
+      - name: Validate built app on iPad simulators
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/ATHLTHDerivedData/Build/Products/Debug-iphonesimulator/ATHLTH.app"
+          test -d "$APP"
+          if [ -f "$RUNNER_TEMP/athlth-test-iphone-udid" ]; then
+            xcrun simctl shutdown "$(cat "$RUNNER_TEMP/athlth-test-iphone-udid")" >/dev/null 2>&1 || true
+          fi
+          ATHLTH_IPAD_SMOKE_APP="$APP" bash scripts/run_ipad_smoke.sh
+
+      - name: Preserve iPad smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-ipad-smoke-screenshots
+          path: ${{ runner.temp }}/athlth-ipad-*.png
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Preserve XCTest diagnostics on failure
         if: failure()
