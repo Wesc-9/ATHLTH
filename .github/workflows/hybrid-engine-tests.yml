@@ -99,6 +99,8 @@ on:
       - Tests/ATHLTHWorkoutLibraryPersonalizationTests.swift
       - Shared/WatchTransferModels.swift
       - Shared/ATHLTHWorkoutSessionClock.swift
+      - ATHLTH/Backend/SupabaseBackendModels.swift
+      - Tests/WorkoutLaunchHardeningTests.swift
       - ATHLTH/Training/**
       - ATHLTH/DesignSystem/ATHLTHTrainDesign.swift
       - ATHLTH/Planning/ATHLTHWorkoutPhasePlacement.swift
@@ -218,6 +220,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHPublicTrailDiskCacheTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutSessionFoundationTests \
+            -only-testing:ATHLTHTests/WorkoutLaunchHardeningTests \
             -only-testing:ATHLTHTests/StrengthTimedSetCountdownTests \
             -only-testing:ATHLTHTests/ATHLTHHybridStrengthSessionTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutHealthKitContinuityPolicyTests \
