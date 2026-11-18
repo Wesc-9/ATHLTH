@@ -136,7 +136,9 @@ enum ATHLTHLiveWorkoutEngineRouter {
     ) -> ATHLTHLiveWorkoutTransition? {
         // Moving between two different workout IDs is not a motor switch.
         // It would require an explicitly separate recording lifecycle.
-        guard previous.workoutID == next.workoutID else { return nil }
+        guard ATHLTHWorkoutSessionFoundation.preservesWorkoutID(
+            previous.workoutID, next.workoutID
+        ) else { return nil }
         return ATHLTHLiveWorkoutTransition(
             previous: previous,
             next: next
