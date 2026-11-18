@@ -47,6 +47,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     enum Trigger: String, Codable, CaseIterable, Identifiable {
         case distance, time
         case heartRateAbove, heartRateBelow, zoneEnter, zoneExit
+        // Thresholds are expressed in seconds per kilometre (300 = 5:00).
+        case paceFasterOverall, paceFasterLastKilometer
+        // The currently planned exercise/treadmill pace target is consulted live.
+        case paceFasterThanTarget, paceSlowerThanTarget
+        case personalRecordConfirmed
         case workoutStart
         case effortStart, effortEnd, recoveryStart, recoveryEnd
         case activeRecoveryStart, activeRecoveryEnd
@@ -56,6 +61,13 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
 
         var id: String { rawValue }
         var isPeriodic: Bool { self == .time || self == .distance }
+        var isPaceCondition: Bool {
+            switch self {
+            case .paceFasterOverall, .paceFasterLastKilometer,
+                 .paceFasterThanTarget, .paceSlowerThanTarget: return true
+            default: return false
+            }
+        }
         var isHeartRateCondition: Bool {
             switch self {
             case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit:
@@ -65,7 +77,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             }
         }
         var needsStructuredStep: Bool {
-            !isPeriodic && !isHeartRateCondition && self != .workoutStart
+            !isPeriodic && !isHeartRateCondition && !isPaceCondition &&
+                self != .personalRecordConfirmed && self != .workoutStart
         }
         func summary(interval: Int) -> String {
             let value: Int
@@ -73,6 +86,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .time: value = min(max(interval, 15), 7_200)
             case .distance: value = min(max(interval, 100), 42_000)
             case .heartRateAbove, .heartRateBelow: value = min(max(interval, 40), 220)
+            case .paceFasterOverall, .paceFasterLastKilometer: value = min(max(interval, 120), 1_800)
             case .zoneEnter, .zoneExit: value = min(max(interval, 1), 5)
             case .beforeNextStep, .beforeMain, .beforeCooldown:
                 value = min(max(interval, 5), 60)
@@ -85,6 +99,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 return title + " · " + String(value) + " m"
             case .heartRateAbove, .heartRateBelow:
                 return title + " · " + String(value) + " bpm"
+            case .paceFasterOverall, .paceFasterLastKilometer:
+                return title + " · " + String(format: "%d:%02d min/km", value / 60, value % 60)
             case .zoneEnter, .zoneExit:
                 return title + " · S" + String(value)
             case .beforeNextStep, .beforeMain, .beforeCooldown:
@@ -102,6 +118,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .time: return tr("Time", "Tid")
             case .heartRateAbove: return tr("Heart rate above", "Puls over")
             case .heartRateBelow: return tr("Heart rate below", "Puls under")
+            case .paceFasterOverall: return tr("Total pace faster than", "Snittempo raskere enn")
+            case .paceFasterLastKilometer: return tr("Last-km pace faster than", "Siste kilometer raskere enn")
+            case .paceFasterThanTarget: return tr("Faster than exercise target", "Raskere enn målfart")
+            case .paceSlowerThanTarget: return tr("Slower than exercise target", "Saktere enn målfart")
+            case .personalRecordConfirmed: return tr("Confirmed personal record", "Bekreftet personlig rekord")
             case .zoneEnter: return tr("Enter HR zone", "Inn i pulssone")
             case .zoneExit: return tr("Leave HR zone", "Ut av pulssone")
             case .workoutStart: return tr("Workout starts", "Økten starter")
@@ -134,6 +155,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case motivation
         case hydrationReminder
         case averagePace
+        case lastKilometerPace
+        case personalRecord
         case speed
         case clockTime
         case date
@@ -156,6 +179,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                  .remainingExercises, .nextExercise, .previousExerciseSummary,
                  .previousMainSectionSummary: return .exercises
             case .motivation, .hydrationReminder: return .motivation
+            case .personalRecord: return .workout
             case .routeRemainingDistance, .estimatedRouteTime: return .navigation
             default: return .workout
             }
@@ -176,7 +200,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 english: "Motivation", norwegian: "Motivasjon")
             case .hydrationReminder: return ATHLTHLocalization.choose(
                 english: "Hydration reminder", norwegian: "Drikkepåminnelse")
-            case .averagePace: return ATHLTHLocalization.choose(english: "Average pace", norwegian: "Snittempo")
+            case .averagePace: return ATHLTHLocalization.choose(english: "Overall average pace", norwegian: "Snittempo hele løpet")
+            case .lastKilometerPace: return ATHLTHLocalization.choose(english: "Last-kilometre pace", norwegian: "Tempo siste kilometer")
+            case .personalRecord: return ATHLTHLocalization.choose(english: "New personal record", norwegian: "Ny personlig rekord")
             case .speed: return ATHLTHLocalization.choose(english: "Speed", norwegian: "Hastighet")
             case .clockTime: return ATHLTHLocalization.choose(english: "Clock time", norwegian: "Klokkeslett")
             case .date: return ATHLTHLocalization.choose(english: "Date", norwegian: "Dato")
@@ -248,6 +274,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case .distance: return min(max(interval, 100), 42_000)
         case .time: return min(max(interval, 15), 7_200)
         case .heartRateAbove, .heartRateBelow: return min(max(interval, 40), 220)
+        case .paceFasterOverall, .paceFasterLastKilometer: return min(max(interval, 120), 1_800)
         case .zoneEnter, .zoneExit: return min(max(interval, 1), 5)
         case .beforeNextStep, .beforeMain, .beforeCooldown:
             return min(max(interval, 5), 60)
@@ -340,6 +367,16 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 heartRateBPM: heartRateBPM, maximumBPM: maximumHeartRateBPM
             ) else { return nil }
             return norwegian ? "Pulssone \(zone)" : "Heart-rate zone \(zone)"
+        case .lastKilometerPace:
+            guard let pace = context.lastKilometerPaceSecondsPerKilometer,
+                  pace.isFinite, (120...1_800).contains(pace) else { return nil }
+            let seconds = Int(pace.rounded())
+            return norwegian
+                ? String(format: "Tempo siste kilometer %d:%02d minutter per kilometer", seconds / 60, seconds % 60)
+                : String(format: "Last kilometre pace %d:%02d minutes per kilometre", seconds / 60, seconds % 60)
+        case .personalRecord:
+            let phrase = norwegian ? context.verifiedPersonalRecordNorwegian : context.verifiedPersonalRecordEnglish
+            return phrase?.isEmpty == false ? phrase : nil
         case .averagePace:
             guard distanceMeters >= 100 else { return nil }
             return component(.pace, distanceMeters: distanceMeters, elapsedSeconds: elapsedSeconds,
@@ -627,13 +664,23 @@ enum ATHLTHAudioCoachRuleDelivery {
             let milestone: Int
             var alreadyConsumed = false
 
-            if rule.trigger.isHeartRateCondition {
+            if rule.trigger.isHeartRateCondition || rule.trigger.isPaceCondition {
                 // Each threshold crossing is one event, with a new delivery
                 // identity on later re-entry. Invalid HR samples do not reset
                 // the condition or cause spurious zone-exit announcements.
-                guard let active = heartRateCondition(
-                    rule, bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM
-                ) else { continue }
+                let state: Bool?
+                if rule.trigger.isPaceCondition {
+                    state = paceCondition(
+                        rule, context: context,
+                        measuredPace: paceSecondsPerKilometer,
+                        previousActive: (lastSlots[rule.id] ?? 0) % 2 == 1
+                    )
+                } else {
+                    state = heartRateCondition(
+                        rule, bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM
+                    )
+                }
+                guard let active = state else { continue }
                 let previousState = lastSlots[rule.id] ?? 0
                 let wasActive = previousState % 2 == 1
                 guard active != wasActive else { continue }
@@ -644,6 +691,10 @@ enum ATHLTHAudioCoachRuleDelivery {
                     ? (wasActive && !active) : (!wasActive && active)
                 guard shouldAnnounce else { continue }
                 milestone = (updatedState + 1) / 2
+            } else if rule.trigger == .personalRecordConfirmed {
+                guard context.verifiedPersonalRecordEnglish != nil ||
+                      context.verifiedPersonalRecordNorwegian != nil else { continue }
+                milestone = 1
             } else if rule.trigger.needsStructuredStep ||
                       rule.trigger == .workoutStart {
                 guard let occurrence = eventOccurrence(
@@ -682,6 +733,11 @@ enum ATHLTHAudioCoachRuleDelivery {
                         maximumBPM: maximumHeartRateBPM
                     ) != nil
                 case .pace: return paceSecondsPerKilometer != nil
+                case .lastKilometerPace:
+                    return context.lastKilometerPaceSecondsPerKilometer != nil
+                case .personalRecord:
+                    return context.verifiedPersonalRecordEnglish != nil ||
+                           context.verifiedPersonalRecordNorwegian != nil
                 default: return true
                 }
             }
@@ -727,6 +783,43 @@ enum ATHLTHAudioCoachRuleDelivery {
             digest = (digest ^ UInt64(byte)) &* 0x100000001b3
         }
         return "audio:" + String(digest, radix: 16)
+    }
+
+    /// Faster means fewer seconds/km. Ten seconds/km of hysteresis lets the
+    /// athlete cross back before the same alert can fire again.
+    /// A missing/unreliable sensor never changes the latched state.
+    private static func paceCondition(
+        _ rule: ATHLTHAudioCoachRule,
+        context: ATHLTHCoachReadoutContext,
+        measuredPace: Double?,
+        previousActive: Bool
+    ) -> Bool? {
+        let pace: Double?
+        let threshold: Double?
+        let slowerThan: Bool
+        switch rule.trigger {
+        case .paceFasterOverall:
+            pace = context.overallPaceSecondsPerKilometer
+            threshold = Double(rule.validatedInterval)
+            slowerThan = false
+        case .paceFasterLastKilometer:
+            pace = context.lastKilometerPaceSecondsPerKilometer
+            threshold = Double(rule.validatedInterval)
+            slowerThan = false
+        case .paceFasterThanTarget, .paceSlowerThanTarget:
+            pace = measuredPace
+            threshold = context.targetPaceSecondsPerKilometer
+            slowerThan = rule.trigger == .paceSlowerThanTarget
+        default:
+            return nil
+        }
+        guard let pace, pace.isFinite, (120...1_800).contains(pace),
+              let threshold, threshold.isFinite,
+              (120...1_800).contains(threshold) else { return nil }
+        if slowerThan {
+            return previousActive ? pace > threshold - 10 : pace > threshold
+        }
+        return previousActive ? pace < threshold + 10 : pace < threshold
     }
 
     private static func heartRateCondition(
@@ -1035,6 +1128,13 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var groupRemainingSeconds: Double?
     var workoutRemainingSeconds: Double?
     var routeRemainingMeters: Double?
+    // Measured values, not prescribed pace. The rolling kilometre is only
+    // available after a full kilometre of monotonic recorded distance.
+    var overallPaceSecondsPerKilometer: Double? = nil
+    var lastKilometerPaceSecondsPerKilometer: Double? = nil
+    var targetPaceSecondsPerKilometer: Double? = nil
+    var verifiedPersonalRecordEnglish: String? = nil
+    var verifiedPersonalRecordNorwegian: String? = nil
     // Optional computed plan context; older Watch/iPhone snapshots decode with nil.
     var stepPhase: String?
     var previousStepPhase: String?
@@ -1060,6 +1160,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     static func needsSegmentData(_ rules: [ATHLTHAudioCoachRule]) -> Bool {
         rules.contains { rule in
             rule.isEnabled && ((rule.allowedPhases?.isEmpty == false) ||
+                rule.trigger.isPaceCondition ||
                 rule.beforeEndSeconds != nil ||
                 rule.trigger.needsStructuredStep ||
                 (rule.scope ?? .workout) != .workout ||
