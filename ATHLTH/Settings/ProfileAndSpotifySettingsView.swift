@@ -2905,272 +2905,305 @@ struct ATHLTHPrivacyCenterView: View {
     @State private var saving = false
     @State private var saveError: String?
     @State private var showingAutoShareConsent = false
-    @State private var showingProfileHighlightsConsent = false
     @State private var enablingAutoShare = false
     @State private var autoShareError: String?
+    @State private var showMoreSharing = false
 
     var body: some View {
-        Form {
-            if let binding = draftBinding {
-                Section("Social & Messages") {
-                    Picker(
-                        "Profile visibility",
-                        selection: binding.profileVisibility
-                    ) {
-                        Text("Private").tag("private")
-                        Text("Friends").tag("friends")
-                        Text("Public").tag("public")
-                    }
-
-                    Toggle(
-                        "Allow friend requests",
-                        isOn: binding.allowFriendRequests
-                    )
-
-                    Picker(
-                        "Who can message me",
-                        selection: binding.allowDirectMessages
-                    ) {
-                        Text("Friends + requests").tag("requests")
-                        Text("Friends only").tag("friends")
-                        Text("Nobody").tag("nobody")
-                    }
-
-                    Text(
-                        "Message requests allow one initial message from people who are not yet your friends. Blocking always stops messaging."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section("Activity status") {
-                    Toggle("Show when I'm online", isOn: binding.showOnlineStatus)
-                    Toggle("Show when I'm training", isOn: binding.shareTrainingPresence)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Only mutual friends can see your status. Live location and heart rate remain off.",
-                        norwegian: "Bare gjensidige venner ser statusen din. Posisjon og puls under økten deles ikke."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "You control what you share",
-                            norwegian:
-                                "Du bestemmer hva du deler"
-                        ),
-                        systemImage:
-                            "lock.fill"
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Choose which profile sections your friends may see. Nothing is unlocked without your choice.",
-                            norwegian:
-                                "Velg hva vennene dine får se. Ingenting åpnes uten at du velger det."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } header: {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Profile privacy",
-                            norwegian:
-                                "Personvern på profil"
-                        )
-                    )
-                }
-
-                Section("What Others Can See") {
-                    Button {
-                        showingProfileHighlightsConsent = true
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Share safe profile highlights with friends",
-                            norwegian: "Del trygge profilhøydepunkter med venner"
-                        ), systemImage: "person.2.badge.gearshape")
-                    }
-
-                    Toggle(
-                        "Performance stats",
-                        isOn: binding.sharePerformanceStats
-                    )
-                    Toggle(
-                        "Trophy cabinet",
-                        isOn: binding.shareTrophyCabinet
-                    )
-                    Toggle(
-                        "Running PRs",
-                        isOn: binding.shareRunningPRs
-                    )
-                    Toggle(
-                        "Strength PRs",
-                        isOn: binding.shareStrengthPRs
-                    )
-                    Toggle(
-                        "Completed goals",
-                        isOn: binding.shareGoals
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Gear",
-                            norwegian: "Utstyr"
-                        ),
-                        isOn: binding.shareGear
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Workout totals",
-                            norwegian: "Treningssummer"
-                        ),
-                        isOn: binding.shareWorkoutTotals
-                    )
-
-                    Text(
-                        "These controls decide which profile sections are shared with viewers allowed by your profile visibility."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section("Challenges") {
-                    Picker(
-                        "Challenge invites",
-                        selection: binding.allowChallengeInvites
-                    ) {
-                        Text("Friends").tag("friends")
-                        Text("Everyone").tag("everyone")
-                        Text("Nobody").tag("nobody")
-                    }
-                }
-
-                // Only surface actionable saving or error feedback.
-                // No static "changes save automatically" row.
-                if saving || saveError != nil {
-                    Section {
-                        if saving {
-                            ProgressView("Saving…")
-                        } else if let saveError {
-                            Label("Changes could not be saved", systemImage: "exclamationmark.triangle")
-                                .foregroundStyle(.red)
-                            Text(saveError)
+        ZStack {
+            ATHLTHTrainDesign.canvas.ignoresSafeArea()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    if let binding = draftBinding {
+                        privacyPanel(
+                            title: tr("Social & messages", "Sosialt og meldinger"),
+                            icon: "person.2.fill"
+                        ) {
+                            HStack(spacing: 10) {
+                                Text(tr("Profile visibility", "Profilsynlighet"))
+                                    .font(.subheadline.weight(.medium))
+                                Spacer(minLength: 6)
+                                Picker(
+                                    tr("Profile visibility", "Profilsynlighet"),
+                                    selection: binding.profileVisibility
+                                ) {
+                                    Text(tr("Private", "Privat")).tag("private")
+                                    Text(tr("Friends", "Venner")).tag("friends")
+                                    Text(tr("Public", "Offentlig")).tag("public")
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .tint(ATHLTHPlanDesign.accentInk)
+                            }
+                            Divider().padding(.vertical, 8)
+                            privacyToggle(
+                                tr("Allow friend requests", "Tillat venneforespørsler"),
+                                icon: "person.badge.plus",
+                                isOn: binding.allowFriendRequests
+                            )
+                            Divider().padding(.vertical, 8)
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 10) {
+                                    Text(tr("Messages from", "Meldinger fra"))
+                                        .font(.subheadline.weight(.medium))
+                                    Spacer(minLength: 6)
+                                    Picker(
+                                        tr("Messages from", "Meldinger fra"),
+                                        selection: binding.allowDirectMessages
+                                    ) {
+                                        Text(tr("Friends + requests", "Venner + forespørsler"))
+                                            .tag("requests")
+                                        Text(tr("Friends only", "Kun venner")).tag("friends")
+                                        Text(tr("Nobody", "Ingen")).tag("nobody")
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .tint(ATHLTHPlanDesign.accentInk)
+                                }
+                                Text(tr(
+                                    "Message requests allow one first message. Blocking always stops messages.",
+                                    "Meldingsforespørsler tillater én første melding. Blokkerte brukere kan aldri sende meldinger."
+                                ))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Button("Retry") {
-                                schedulePrivacySave()
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             }
                         }
-                    }
-                }
-            } else {
-                Section("Social & Messages") {
-                    HStack {
-                        Spacer()
-                        ProgressView("Loading privacy settings…")
-                        Spacer()
-                    }
-                }
-            }
 
-            Section(ATHLTHLocalization.choose(
-                english: "Friends feed", norwegian: "Vennefeed"
-            )) {
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Automatically share completed workouts with friends",
-                        norwegian: "Del fullførte økter automatisk med venner"
-                    ),
-                    isOn: Binding(
-                        get: {
-                            guard let userID = social.currentUserID else { return false }
-                            return FriendFeedSharingPreference.isEnabled(userID: userID)
-                        },
-                        set: { wantsToShare in
-                            if wantsToShare {
-                                showingAutoShareConsent = true
-                            } else {
-                                if let userID = social.currentUserID {
-                                    FriendFeedSharingPreference.setEnabled(false, userID: userID)
+                        privacyPanel(
+                            title: tr("Activity status", "Aktivitetsstatus"),
+                            icon: "bolt.fill"
+                        ) {
+                            HStack(alignment: .top, spacing: 10) {
+                                statusTile(
+                                    title: tr("Online", "Pålogget"),
+                                    icon: "circle.fill",
+                                    isOn: binding.showOnlineStatus
+                                )
+                                statusTile(
+                                    title: tr("Training", "Trener"),
+                                    icon: "figure.run",
+                                    isOn: binding.shareTrainingPresence
+                                )
+                            }
+                            Text(tr(
+                                "Only mutual friends see your status. Live position and heart rate are never shown here.",
+                                "Kun gjensidige venner ser statusen din. Liveposisjon og puls vises ikke her."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .padding(.top, 4)
+                        }
+
+                        privacyPanel(
+                            title: tr("What others can see", "Dette kan andre se"),
+                            icon: "eye.fill"
+                        ) {
+                            Text(tr(
+                                "Recommended profile sections",
+                                "Anbefalte profilseksjoner"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            privacyToggle(
+                                tr("Performance stats", "Prestasjonsstatistikk"),
+                                icon: "chart.bar.fill",
+                                isOn: binding.sharePerformanceStats
+                            )
+                            Divider()
+                            privacyToggle(
+                                tr("Gear", "Utstyr"),
+                                icon: "shoeprints.fill",
+                                isOn: binding.shareGear
+                            )
+                            Divider().padding(.vertical, 5)
+
+                            DisclosureGroup(isExpanded: $showMoreSharing) {
+                                VStack(spacing: 0) {
+                                    privacyToggle(
+                                        tr("Trophy cabinet", "Troféskap"),
+                                        icon: "trophy.fill",
+                                        isOn: binding.shareTrophyCabinet
+                                    )
+                                    Divider()
+                                    privacyToggle(
+                                        tr("Running records", "Løperekorder"),
+                                        icon: "figure.run",
+                                        isOn: binding.shareRunningPRs
+                                    )
+                                    Divider()
+                                    privacyToggle(
+                                        tr("Strength records", "Styrkerekorder"),
+                                        icon: "dumbbell.fill",
+                                        isOn: binding.shareStrengthPRs
+                                    )
+                                    Divider()
+                                    privacyToggle(
+                                        tr("Completed goals", "Fullførte mål"),
+                                        icon: "target",
+                                        isOn: binding.shareGoals
+                                    )
+                                    Divider()
+                                    privacyToggle(
+                                        tr("Workout totals", "Treningssummer"),
+                                        icon: "chart.pie.fill",
+                                        isOn: binding.shareWorkoutTotals
+                                    )
                                 }
-                                settings.autoPublishCompletedWorkouts = false
-                                settings.workoutSharingChoiceCompleted = true
-                                if var updated = draft {
-                                    updated.shareRecentActivity = false
-                                    updated.recentActivityVisibility = "private"
-                                    draft = updated
-                                    schedulePrivacySave()
+                                .padding(.top, 8)
+                            } label: {
+                                HStack {
+                                    Label(
+                                        tr("More sharing options", "Flere delingsvalg"),
+                                        systemImage: "slider.horizontal.3"
+                                    )
+                                    .font(.subheadline.weight(.medium))
+                                    Spacer(minLength: 6)
+                                }
+                            }
+                            .tint(ATHLTHPlanDesign.accentInk)
+
+                            Text(tr(
+                                "Only sections you enable are shown, subject to profile visibility. Existing choices are not reset.",
+                                "Bare seksjoner du aktiverer vises, innenfor profilsynligheten. Tidligere valg endres ikke automatisk."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .padding(.top, 8)
+                        }
+
+                        privacyPanel(
+                            title: tr("Challenges", "Utfordringer"),
+                            icon: "trophy.fill"
+                        ) {
+                            HStack(spacing: 10) {
+                                Text(tr("Invitations from", "Invitasjoner fra"))
+                                    .font(.subheadline.weight(.medium))
+                                Spacer(minLength: 6)
+                                Picker(
+                                    tr("Challenge invites", "Utfordringsinvitasjoner"),
+                                    selection: binding.allowChallengeInvites
+                                ) {
+                                    Text(tr("Friends", "Venner")).tag("friends")
+                                    Text(tr("Everyone", "Alle")).tag("everyone")
+                                    Text(tr("Nobody", "Ingen")).tag("nobody")
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .tint(ATHLTHPlanDesign.accentInk)
+                            }
+                        }
+
+                        if saving || saveError != nil {
+                            privacyPanel(
+                                title: tr("Saving", "Lagring"),
+                                icon: "arrow.triangle.2.circlepath"
+                            ) {
+                                if saving {
+                                    ProgressView(tr("Saving changes…", "Lagrer endringer…"))
+                                } else if let saveError {
+                                    Label(
+                                        tr("Could not save", "Kunne ikke lagre"),
+                                        systemImage: "exclamationmark.triangle"
+                                    )
+                                    .foregroundStyle(.red)
+                                    Text(saveError)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    Button(tr("Retry", "Prøv igjen")) {
+                                        schedulePrivacySave()
+                                    }
                                 }
                             }
                         }
-                    )
-                )
-                .disabled(enablingAutoShare || saving || draft == nil)
+                    } else {
+                        ProgressView(tr("Loading privacy settings…", "Laster personvern…"))
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 70)
+                    }
 
-                Text(ATHLTHLocalization.choose(
-                    english: "After you agree, completed workout summaries appear in your friends' feed. Turning this off hides your existing shared workouts from friends; you can also make individual workouts private. HealthKit metrics are never posted.",
-                    norwegian: "Etter at du samtykker vises øktoppsummeringer i vennefeeden. Slår du av, skjules også tidligere delte økter for venner. Du kan skjule enkeltøkter. Apple Helse-målinger publiseres aldri."
-                ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                    privacyPanel(
+                        title: tr("Friends feed", "Vennefeed"),
+                        icon: "person.2.wave.2.fill"
+                    ) {
+                        Toggle(
+                            tr("Share completed workouts automatically with friends",
+                               "Del fullførte økter automatisk med venner"),
+                            isOn: Binding(
+                                get: {
+                                    guard let userID = social.currentUserID else { return false }
+                                    return FriendFeedSharingPreference.isEnabled(userID: userID)
+                                },
+                                set: { wantsToShare in
+                                    if wantsToShare {
+                                        showingAutoShareConsent = true
+                                    } else {
+                                        if let userID = social.currentUserID {
+                                            FriendFeedSharingPreference.setEnabled(
+                                                false, userID: userID
+                                            )
+                                        }
+                                        settings.autoPublishCompletedWorkouts = false
+                                        settings.workoutSharingChoiceCompleted = true
+                                        if var updated = draft {
+                                            updated.shareRecentActivity = false
+                                            updated.recentActivityVisibility = "private"
+                                            draft = updated
+                                            schedulePrivacySave()
+                                        }
+                                    }
+                                }
+                            )
+                        )
+                        .tint(ATHLTHPlanDesign.accentInk)
+                        .disabled(enablingAutoShare || saving || draft == nil)
 
-                if let autoShareError {
-                    Text(autoShareError)
+                        Text(tr(
+                            "Only workout summaries are shared, and only after consent. Turning this off also hides previously shared workouts from friends. GPS routes and HealthKit measurements are never attached automatically.",
+                            "Bare øktoppsummeringer deles, og først etter samtykke. Slår du av, skjules også tidligere delte økter for venner. GPS-ruter og Apple Helse-målinger legges aldri ved automatisk."
+                        ))
                         .font(.caption)
-                        .foregroundStyle(.red)
-                }
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        if let autoShareError {
+                            Text(autoShareError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
 
-                Label(ATHLTHLocalization.choose(
-                    english: "Automatic workout sharing is friends-only. GPS routes are never added automatically.",
-                    norwegian: "Automatisk øktdeling er kun for venner. GPS-ruter legges aldri ved automatisk."
-                ), systemImage: "lock.shield")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Section("Safety") {
-                NavigationLink {
-                    BlockedUsersView()
-                } label: {
-                    Label(
-                        "Blocked users",
-                        systemImage: "person.crop.circle.badge.xmark"
-                    )
+                    privacyPanel(
+                        title: tr("Security", "Sikkerhet"),
+                        icon: "lock.shield.fill"
+                    ) {
+                        NavigationLink {
+                            BlockedUsersView()
+                        } label: {
+                            HStack {
+                                Label(
+                                    tr("Blocked users", "Blokkerte brukere"),
+                                    systemImage: "person.crop.circle.badge.xmark"
+                                )
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .frame(minHeight: 42)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 22)
+                .padding(.bottom, 110)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
             }
+            .scrollIndicators(.hidden)
         }
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Sharing & privacy",
             norwegian: "Deling og personvern"
         ))
-        .alert(
-            ATHLTHLocalization.choose(
-                english: "Share safe profile highlights?",
-                norwegian: "Dele profilhøydepunkter med venner?"
-            ),
-            isPresented: $showingProfileHighlightsConsent
-        ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Enable for friends", norwegian: "Aktiver for venner"
-            )) { enableFriendsProfileHighlights() }
-            Button(ATHLTHLocalization.choose(
-                english: "Cancel", norwegian: "Avbryt"
-            ), role: .cancel) {}
-        } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "Your training milestones, gear, goals, workout summaries and online status become visible to friends. Previously shared workouts may become visible. Heart rate, sleep, recovery, live location and medical data remain private.",
-                norwegian: "Treningsmilepæler, utstyr, mål, øktoppsummeringer og påloggingsstatus blir synlig for venner. Tidligere delte økter kan bli synlige. Puls, søvn, restitusjon, liveposisjon og medisinske data forblir private."
-            ))
-        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Share future workouts with friends?",
@@ -3205,6 +3238,86 @@ struct ATHLTHPrivacyCenterView: View {
         }
     }
 
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
+    private func privacyPanel<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .padding(.leading, 3)
+            VStack(alignment: .leading, spacing: 10) {
+                content()
+            }
+            .padding(17)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                ATHLTHTrainDesign.paper,
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(
+                        ATHLTHPlanDesign.warmDivider.opacity(0.68),
+                        lineWidth: 0.8
+                    )
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private func privacyToggle(
+        _ title: String,
+        icon: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            Label(title, systemImage: icon)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .tint(ATHLTHPlanDesign.accentInk)
+        .frame(minHeight: 40)
+    }
+
+    private func statusTile(
+        title: String,
+        icon: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            Spacer(minLength: 0)
+            Toggle(title, isOn: isOn)
+                .labelsHidden()
+                .tint(ATHLTHPlanDesign.accentInk)
+                .accessibilityLabel(title)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, minHeight: 62)
+        .background(
+            ATHLTHPlanDesign.selectedSurface.opacity(0.53),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
     private var draftBinding: Binding<SocialPrivacySettings>? {
         guard draft != nil else {
             return nil
@@ -3224,36 +3337,6 @@ struct ATHLTHPrivacyCenterView: View {
                 schedulePrivacySave()
             }
         )
-    }
-
-    @MainActor
-    private func enableFriendsProfileHighlights() {
-        guard var updated = draft else { return }
-        updated.profileVisibility = "friends"
-        updated.showOnlineStatus = true
-        updated.shareTrainingPresence = true
-        updated.trainingPresenceVisibility = "friends"
-        updated.trainingFocusVisibility = "friends"
-        updated.sharePerformanceStats = true
-        updated.performanceStatsVisibility = "friends"
-        updated.shareTrophyCabinet = true
-        updated.trophyCabinetVisibility = "friends"
-        updated.shareGoals = true
-        updated.goalsVisibility = "friends"
-        updated.shareGear = true
-        updated.gearVisibility = "friends"
-        updated.shareRecentActivity = true
-        updated.recentActivityVisibility = "friends"
-        updated.shareRunningPRs = true
-        updated.runningPRsVisibility = "friends"
-        updated.shareStrengthPRs = true
-        updated.strengthPRsVisibility = "friends"
-        updated.shareWorkoutTotals = true
-        // Location and physiology are never enabled by a bulk social action.
-        updated.shareLiveWorkoutLocation = false
-        updated.shareLiveWorkoutHeartRate = false
-        draft = updated
-        schedulePrivacySave()
     }
 
     @MainActor
