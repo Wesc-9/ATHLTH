@@ -595,7 +595,7 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         store.save(draft(name: "New plan"), userID: user, draftID: newID)
         store.save(draft(name: "   "), userID: user, draftID: newID)
 
-        XCTAssertNil(store.load(userID: user, draftID: newID))
+        XCTAssertEqual(store.load(userID: user, draftID: newID)?.title, "New plan")
         XCTAssertEqual(store.load(userID: user)?.title, "Keep this")
     }
 
