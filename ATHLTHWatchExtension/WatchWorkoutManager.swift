@@ -8282,6 +8282,25 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                               for: savedResult
                           )
                     else { return }
+                    var lastSlots: [UUID: Int] = [:]
+                    var context = ATHLTHCoachReadoutContext()
+                    context.verifiedPersonalRecordEnglish = records.english
+                    context.verifiedPersonalRecordNorwegian = records.norwegian
+                    context.overallPaceSecondsPerKilometer = ATHLTHRunningPace.average(
+                        elapsedSeconds: savedResult.duration,
+                        distanceMeters: savedResult.distanceMeters
+                    )
+                    let preferred = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+                        rules: self.audioCoachConfiguration.activeCustomRules.filter {
+                            $0.trigger == .personalRecordConfirmed
+                        },
+                        distanceMeters: savedResult.distanceMeters,
+                        elapsedSeconds: savedResult.duration,
+                        paceSecondsPerKilometer: nil,
+                        heartRateBPM: nil,
+                        norwegian: self.coachPhrase(english: "en", norwegian: "no") == "no",
+                        context: context, lastSlots: &lastSlots
+                    ).map(\.text).joined(separator: ". ")
                     for _ in 0..<60 {
                         guard self.state == .completed,
                               self.completedResult?.id == savedResult.id,
@@ -8289,10 +8308,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         if !self.speechSynthesizer.isSpeaking &&
                             self.audioCoachActivationTask == nil {
                             self.speak(
-                                self.coachPhrase(
-                                    english: records.english,
-                                    norwegian: records.norwegian
-                                ),
+                                preferred.isEmpty
+                                    ? self.coachPhrase(
+                                        english: records.english,
+                                        norwegian: records.norwegian
+                                      )
+                                    : preferred,
                                 priority: .structuredStep,
                                 forceLocal: true,
                                 rememberForReplay: false
