@@ -10,6 +10,11 @@ struct HomeTreadmillRecentArtwork: View {
 
     private let mint = Color(red: 0.67, green: 0.96, blue: 0.79)
 
+    /// Reuse the full-resolution running photograph already bundled for
+    /// Training Plans and outdoor running feed. The old treadmill image is
+    /// too small for full-width cards and should not be scaled up.
+    static let backgroundAssetName = ATHLTHPlanWorkoutArtwork.asset(for: .easyRun)
+
     private var distance: Double? {
         guard let meters = workout.distanceMeters,
               meters.isFinite, meters > 0 else {
@@ -52,7 +57,7 @@ struct HomeTreadmillRecentArtwork: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottomLeading) {
-                Image("TreadmillRecentCardHero")
+                Image(Self.backgroundAssetName)
                     .resizable()
                     .scaledToFill()
                     .frame(
@@ -70,6 +75,27 @@ struct HomeTreadmillRecentArtwork: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
+
+                VStack {
+                    HStack {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Treadmill",
+                                norwegian: "Tredemølle"
+                            ),
+                            systemImage: "figure.run"
+                        )
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .frame(height: 26)
+                        .background(.black.opacity(0.38), in: Capsule())
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
+                    Spacer(minLength: 0)
+                }
 
                 HStack(alignment: .bottom, spacing: 6) {
                     VStack(alignment: .leading, spacing: 3) {

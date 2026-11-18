@@ -843,7 +843,7 @@ struct ATHLTHWorkoutReplayCard: View {
 
     private var replayArtwork: String {
         if workout.isIndoor == true && workout.activity == .running {
-            return "TreadmillRecentCardHero"
+            return HomeTreadmillRecentArtwork.backgroundAssetName
         }
         if isStrength { return "StrengthPostWorkoutHero" }
         switch workout.activity {
