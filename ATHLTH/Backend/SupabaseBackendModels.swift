@@ -62,8 +62,24 @@ struct BackendSubscriptionEntitlement: Codable, Sendable {
     }
 }
 
+/// Complimentary ATHLTH+ is independent of verified App Store receipts.
+struct BackendAdminPlusGrant: Decodable, Sendable {
+    let expiresAt: Date?
+    let revokedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case expiresAt = "expires_at"
+        case revokedAt = "revoked_at"
+    }
+
+    var isActive: Bool {
+        revokedAt == nil && (expiresAt.map { $0 > Date() } ?? true)
+    }
+}
+
 struct BackendUserBootstrap: Sendable {
     let profile: BackendProfile
     let role: BackendAccountRole
     let entitlement: BackendSubscriptionEntitlement
+    let adminPlusGrant: BackendAdminPlusGrant?
 }
