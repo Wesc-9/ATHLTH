@@ -138,3 +138,71 @@ planlegging er ikke dokumentasjon på at sensorkoblingen virker.
 
 Dette dokumentet beskriver arkitektur og krav. Det er **ikke** en påstand om
 at sensorbasert hybridmotor eller automatisk Watch-overgang er ferdig.
+
+
+## 2.2.5 — ny felles motor: gjennomføringsplan og oppryddingslogg (18.11.2026)
+
+Den eldre 1.9.1-beskrivelsen over er bevart som historikk. Dette er den aktive
+migreringsplanen for styrke og løping på `release/v2.2.5`. Gjennomfør endringene
+**direkte på release-grenen**, fasevis, uten en annen parallell opptaksmotor.
+
+### Fase 1 — fundament (kode lagt inn; iOS/Watch-bygg må verifiseres)
+
+- `ATHLTHWorkoutSessionClock`: én absolutt datobasert klokke for aktiv løping,
+  styrkesett og nedtelling. Gammel duplisert tidsmatematikk er erstattet på
+  de eksisterende kodebanene. Den må tåle skjermlås, pauser og overtid.
+- `ATHLTHWorkoutSessionFoundation`: én normalisert, **avledet** visning av
+  aktiv økt-ID, plan-ID, registreringsansvar (iPhone/Watch), fase, motor,
+  framdrift og faktisk tid. Verdiene leses fra `PhoneWorkout` eller
+  `StrengthWorkoutLog`; de journalføres ikke dobbelt.
+- Felles policy for gjenoppretting: et aktivt sjekkpunkt skal ikke reaktiveres
+  når avslutningen allerede er lagret i historikken.
+- Oppstart av løping, gåing og styrke avviser en ny start i samme lokale motor
+  mens den motoren allerede har en aktiv/restituert økt. Planlagt styrke og
+  fri styrke skal aldri kunne overskrive et eksisterende aktivt styrkesett.
+- `ATHLTHLiveWorkoutEngineRouter` bruker samme økt-ID-policy ved fasebytte.
+  Ingen ny HealthKit-økt startes når bare livevisningen bytter motor.
+- Nye tester: `ATHLTHWorkoutSessionFoundationTests`; eksisterende tester for
+  Watch, styrkesett, hybrid, kontinuitet, klokker og historikk beholdes.
+
+**Avgrensning:** Fase 1 samler kontrakter, klokker og kontrollregler; den
+erstatter *ikke* ennå alle opptaksimplementasjonene med én fysisk HealthKit-
+koordinator. Global gjensidig sperre mellom alle opptaksveier, GPS-hybrid,
+automatisk live-UI-overgang og nye Watch-styringskommandoer må ikke markeres
+som ferdige før egne faser og reelle tester er fullført.
+
+### Faser 2–8 (vent til forrige fase er verifisert)
+
+2. Felles fast bunnkontroll for løp/styrke, men behold styrkens media-/øvelseskort.
+   La arbeid, hvile og overgang ha egne tilstander. Slett først det gamle
+   `compactLiveStrengthDock` og gammel selvstendig løpe-bunnkontroll **når**
+   én ny kontroll faktisk brukes fra begge livevisninger og har bestått tester.
+3. Avanserte sett/øvelser: RPE/RIR, vektskiver/stang, tid, motstand, warmup,
+   supersett, sirkel, EMOM, AMRAP og dropsett; bevar stabile sett-/øvelse-ID-er.
+4. Watch + iPad: synk, kommando-ID/idempotens, offline journal og samtykkebasert
+   livevisning. Utvid opptakskoordinatoren stegvis med én aktiv HealthKit-eier.
+5. Audio Coach: samordne eksisterende trigger-/kommando-regler med felles
+   tids- og fasehendelser, uten ekstra stemmer eller dobbelt tale.
+6. Live Activity/Widget/Dynamic Island: del samme fase-/klokkekilde og test
+   låseskjerm, telefonlås, avbrudd og sen Watch-status.
+7. Samlet resultat/HealthKit: én historikkpost/HealthKit-workout, med
+   segmentvise mål, korrekt arbeidstid/hvile og PR-evidens.
+8. Full regresjon og ytelse: iPhone, iPad, Apple Watch, skjermlås, Spotify,
+   HealthKit, gamle treningsplaner og lange aktive styrkeøkter.
+
+### Sletting og migrering — obligatorisk regel
+
+- **Erstatt → test → slett**, aldri slett aktiv opptaks-, synk- eller
+  historikklogikk bare for å «rydde» før erstatningen er bevist.
+- Fase 1 fjernet overlappende regne-/gjenopprettingslogikk på kodebanene,
+  men **beholdt** historiske `PhoneWorkout`, `StrengthWorkoutLog`,
+  `StrengthTimedSetCountdown` og `StrengthSetEffortClock` for kompatibel
+  dekoding av tidligere lagrede sjekkpunkter.
+- Fase 2 rydder bort de gamle bunnkontrollene etter at nye er operative.
+  Fase 3–7 fjerner utgåtte lokale statuskopier, dupliserte eventhåndterere
+  og ubrukte modeller etter at alle oppslag/migreringer er kontrollert.
+- Ingen sletting av brukernes historikk eller original-HealthKit-poster.
+  Kontroller at aktive økter etter appstart ikke blir fullført eller erstattet
+  uten brukerhandling. Test overgang til nytt skjema med gamle JSON-filer.
+- Hver fase får egne tester, konkret kodegjennomgang, CI-status og
+  oppryddingsdiff før vi starter neste fase.
