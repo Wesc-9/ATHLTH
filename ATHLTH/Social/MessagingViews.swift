@@ -775,6 +775,18 @@ struct MessageInboxView: View {
                             .font(.system(size: 12, weight: .medium))
                         Text(filter.title)
                             .lineLimit(1)
+                        if filter == .unread {
+                            let unreadCount = messaging.unreadCount +
+                                groups.unreadClubGroupIDs.count
+                            if unreadCount > 0 {
+                                Text("\(min(unreadCount, 99))")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(ATHLTHTheme.accentSoft, in: Capsule())
+                            }
+                        }
                         if filter == .invitations {
                             let unansweredCount = social.workoutInvites.filter {
                                 $0.participant.state == .invited
@@ -830,8 +842,8 @@ struct MessageInboxView: View {
                     } label: {
                         Label(
                             ATHLTHLocalization.choose(
-                                english: "Back to all messages",
-                                norwegian: "Tilbake til alle meldinger"
+                                english: "Back to people",
+                                norwegian: "Tilbake til folk"
                             ),
                             systemImage: "tray.full"
                         )

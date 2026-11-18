@@ -55,6 +55,16 @@ struct ATHLTHClubChatInboxSection: View {
                         .tracking(1.1)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         Spacer()
+                        let unreadClubCount = visibleClubs.filter {
+                            groups.unreadClubGroupIDs.contains($0.id)
+                        }.count
+                        if unreadClubCount > 0 {
+                            Text("\(unreadClubCount)")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                                .frame(minWidth: 20, minHeight: 20)
+                                .background(Color.orange, in: Capsule())
+                        }
                         Text("\(visibleClubs.count)")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHTheme.mutedText)

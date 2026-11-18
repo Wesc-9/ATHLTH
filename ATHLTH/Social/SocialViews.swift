@@ -365,6 +365,7 @@ struct ATHLTHWorkoutInvitationSection: View {
 struct SocialHubView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
     let initialTab: SocialHubTab
@@ -419,7 +420,8 @@ struct SocialHubView: View {
 
                                 let messageBadgeCount =
                                     messaging.unreadCount +
-                                    messaging.messageRequestCount
+                                    messaging.messageRequestCount +
+                                    groups.unreadClubGroupIDs.count
                                 if tab == .messages, messageBadgeCount > 0 {
                                     Text("\(messageBadgeCount)")
                                         .font(.caption2.bold())
