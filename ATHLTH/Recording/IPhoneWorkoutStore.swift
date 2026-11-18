@@ -4923,6 +4923,10 @@ final class IPhoneWorkoutStore:
            let stepIndex = workout.structuredStepIndex,
            plan.steps.indices.contains(stepIndex) {
             context.targetPaceSecondsPerKilometer =
+                plan.steps[stepIndex].targetPaceMinSecondsPerKilometer ??
+                plan.steps[stepIndex].targetPaceMaxSecondsPerKilometer
+            context.targetSlowestPaceSecondsPerKilometer =
+                plan.steps[stepIndex].targetPaceMaxSecondsPerKilometer ??
                 plan.steps[stepIndex].targetPaceMinSecondsPerKilometer
         }
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
