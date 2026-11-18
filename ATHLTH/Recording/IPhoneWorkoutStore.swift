@@ -1715,30 +1715,57 @@ final class IPhoneWorkoutStore:
         // Deliver the completion recap while the finished workout is still
         // the active coach context. Previously active became nil before
         // speak(), so its voice policy silently rejected the announcement.
-        if let coach = workout.audioCoachConfiguration,
-           coach.enabled, coach.shouldAnnounceWorkoutComplete {
+        if let coach = workout.audioCoachConfiguration, coach.enabled {
             let records = ATHLTHPhoneRunningRecordEvidence.announcement(
-                current: workout,
-                history: history
+                current: workout, history: history
             )
-            let highlights = ATHLTHWorkoutCompletionSpokenSummary.make(
-                elapsedSeconds: workout.elapsed(at: workout.end ?? Date()),
-                distanceMeters: workout.distanceMeters,
-                verifiedRecordEnglish: records?.english,
-                verifiedRecordNorwegian: records?.norwegian
-            )
-            deactivateCoachAudioSession()
-            // Local playback is deliberate here: an asynchronous Azure
-            // fallback can otherwise arrive after active has been cleared
-            // and be rejected by the active-workout voice policy.
-            speakFinishedWorkoutRecap(
-                localizedCoachPhrase(
-                    english: highlights.english,
-                    norwegian: highlights.norwegian,
-                    configuration: coach
-                ),
-                configuration: coach
-            )
+            var recordAnnouncement: String?
+            if let records {
+                var context = ATHLTHCoachReadoutContext()
+                context.verifiedPersonalRecordEnglish = records.english
+                context.verifiedPersonalRecordNorwegian = records.norwegian
+                context.overallPaceSecondsPerKilometer = ATHLTHRunningPace.average(
+                    elapsedSeconds: workout.elapsed(at: workout.end ?? Date()),
+                    distanceMeters: workout.distanceMeters
+                )
+                var completedSlots: [UUID: Int] = [:]
+                recordAnnouncement = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+                    rules: coach.activeCustomRules.filter {
+                        $0.trigger == .personalRecordConfirmed
+                    },
+                    distanceMeters: workout.distanceMeters,
+                    elapsedSeconds: workout.elapsed(at: workout.end ?? Date()),
+                    paceSecondsPerKilometer: nil,
+                    heartRateBPM: nil,
+                    norwegian: localizedCoachPhrase(
+                        english: "en", norwegian: "no", configuration: coach
+                    ) == "no",
+                    context: context, lastSlots: &completedSlots
+                ).map(\.text).joined(separator: ". ")
+            }
+            let hasPRCommand = recordAnnouncement?.isEmpty == false
+            if coach.shouldAnnounceWorkoutComplete || hasPRCommand {
+                let highlights = ATHLTHWorkoutCompletionSpokenSummary.make(
+                    elapsedSeconds: workout.elapsed(at: workout.end ?? Date()),
+                    distanceMeters: workout.distanceMeters,
+                    verifiedRecordEnglish: hasPRCommand ? nil : records?.english,
+                    verifiedRecordNorwegian: hasPRCommand ? nil : records?.norwegian
+                )
+                let summary = coach.shouldAnnounceWorkoutComplete
+                    ? localizedCoachPhrase(
+                        english: highlights.english, norwegian: highlights.norwegian,
+                        configuration: coach
+                    ) : ""
+                let phrase = [summary, recordAnnouncement].compactMap { text -> String? in
+                    guard let text, !text.isEmpty else { return nil }
+                    return text
+                }.joined(separator: ". ")
+                deactivateCoachAudioSession()
+                // Spoken only after the completed workout was saved.
+                speakFinishedWorkoutRecap(phrase, configuration: coach)
+            } else {
+                deactivateCoachAudioSession()
+            }
         } else {
             deactivateCoachAudioSession()
         }
