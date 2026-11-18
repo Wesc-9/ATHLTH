@@ -10,33 +10,30 @@ struct ATHLTHSideMenuDeepLinkView: View {
     @ViewBuilder
     var body: some View {
         if destination == .profile {
-            // Keep the *existing* profile appearance edge-to-edge. The only
-            // new control is a floating close affordance above the hero.
+            // Attach the dismissal control to the profile ROOT destination,
+            // not to the full-screen host overlay. NavigationStack then
+            // removes it on Edit Profile and every pushed detail screen,
+            // leaving the back button and Save as the only actions there.
             NavigationStack {
                 ATHLTHProfileView()
-            }
-            // Anchor the close control to the full-screen container, not
-            // the profile's scrolling hero, so it stays in the top-right.
-            .overlay(alignment: .topTrailing) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            Color.black.opacity(0.32),
-                            in: Circle()
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Close profile",
-                    norwegian: "Lukk profil"
-                ))
-                .padding(.trailing, 18)
-                .padding(.top, 16)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                dismiss()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 44, height: 44)
+                                    .background(Color.black.opacity(0.32), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Close profile",
+                                norwegian: "Lukk profil"
+                            ))
+                        }
+                    }
             }
         } else {
             VStack(spacing: 0) {
