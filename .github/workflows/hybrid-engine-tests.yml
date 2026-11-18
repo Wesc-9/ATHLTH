@@ -80,6 +80,10 @@ on:
       - Tests/ATHLTHPlannedHybridLaunchTests.swift
       - Tests/ATHLTHUnifiedMixedWorkoutPlanTests.swift
       - Tests/ATHLTHLiveWorkoutEngineRouterTests.swift
+      - Tests/ATHLTHWorkoutSessionFoundationTests.swift
+      - Tests/StrengthTimedSetCountdownTests.swift
+      - Tests/ATHLTHHybridStrengthSessionTests.swift
+      - Tests/ATHLTHWorkoutHealthKitContinuityPolicyTests.swift
       - Tests/StrengthActiveExerciseQueueTests.swift
       - ATHLTH/Strength/ActiveStrengthWorkoutView.swift
       - ATHLTH/Strength/StrengthWorkoutModels.swift
@@ -94,6 +98,7 @@ on:
       - Tests/ATHLTHWorkoutMirrorContinuityTests.swift
       - Tests/ATHLTHWorkoutLibraryPersonalizationTests.swift
       - Shared/WatchTransferModels.swift
+      - Shared/ATHLTHWorkoutSessionClock.swift
       - ATHLTH/Training/**
       - ATHLTH/DesignSystem/ATHLTHTrainDesign.swift
       - ATHLTH/Planning/ATHLTHWorkoutPhasePlacement.swift
@@ -212,6 +217,10 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHLibraryResponsiveLayoutTests \
             -only-testing:ATHLTHTests/ATHLTHPublicTrailDiskCacheTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutSessionFoundationTests \
+            -only-testing:ATHLTHTests/StrengthTimedSetCountdownTests \
+            -only-testing:ATHLTHTests/ATHLTHHybridStrengthSessionTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutHealthKitContinuityPolicyTests \
             -only-testing:ATHLTHTests/ATHLTHUnifiedMixedWorkoutPlanTests \
             -only-testing:ATHLTHTests/StrengthActiveExerciseQueueTests \
             -only-testing:ATHLTHTests/ATHLTHRecordedWorkoutIndexTests \
