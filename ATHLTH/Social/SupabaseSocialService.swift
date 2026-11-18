@@ -543,6 +543,17 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
+        async let publicPetsTask: [SocialSharedPet] = client
+            .from("profile_pets")
+            .select("id,name,species")
+            .eq("user_id", value: userID)
+            .eq("is_public", value: true)
+            .eq("show_on_profile", value: true)
+            .order("created_at", ascending: false)
+            .limit(3)
+            .execute()
+            .value
+
         async let workoutMediaTask: [WorkoutMediaRecord] = client
             .from("workout_media")
             .select()
@@ -557,23 +568,7 @@ final class SupabaseSocialService: Sendable {
             .select()
             .eq("actor_id", value: userID)
             .order("created_at", ascending: false)
-            .limit(20)
-            .execute()
-            .value
-
-        async let reactionsTask: [SocialActivityReactionRecord] = client
-            .from("social_activity_reactions")
-            .select()
-            .order("created_at", ascending: false)
-            .limit(1_000)
-            .execute()
-            .value
-
-        async let commentsTask: [SocialActivityCommentRecord] = client
-            .from("social_activity_comments")
-            .select()
-            .order("created_at", ascending: true)
-            .limit(600)
+            .limit(40)
             .execute()
             .value
 
@@ -586,8 +581,7 @@ final class SupabaseSocialService: Sendable {
             gearRows,
             workoutMedia,
             activities,
-            reactions,
-            comments
+            publicPets
         ) = try await (
             focusRowsTask,
             presenceRowsTask,
@@ -597,9 +591,36 @@ final class SupabaseSocialService: Sendable {
             gearRowsTask,
             workoutMediaTask,
             activitiesTask,
-            reactionsTask,
-            commentsTask
+            publicPetsTask
         )
+
+        // Do not load reactions/comments from every athlete in Community.
+        // Only records for activities the viewer can already read.
+        let ids = activities.map(\.id)
+        let reactions: [SocialActivityReactionRecord]
+        let comments: [SocialActivityCommentRecord]
+        if ids.isEmpty {
+            reactions = []
+            comments = []
+        } else {
+            async let scopedReactions: [SocialActivityReactionRecord] = client
+                .from("social_activity_reactions")
+                .select()
+                .in("activity_id", values: ids)
+                .order("created_at", ascending: false)
+                .limit(800)
+                .execute()
+                .value
+            async let scopedComments: [SocialActivityCommentRecord] = client
+                .from("social_activity_comments")
+                .select()
+                .in("activity_id", values: ids)
+                .order("created_at", ascending: true)
+                .limit(400)
+                .execute()
+                .value
+            (reactions, comments) = try await (scopedReactions, scopedComments)
+        }
 
         let grouped = Dictionary(grouping: reactions, by: \.activityID)
         let commentsByActivity = Dictionary(grouping: comments, by: \.activityID)
@@ -622,7 +643,8 @@ final class SupabaseSocialService: Sendable {
             gear: gearRows,
             workoutMedia: workoutMedia,
             recentActivities: feed,
-            trainingFocuses: focusRows.first?.focuses ?? []
+            trainingFocuses: focusRows.first?.focuses ?? [],
+            publicPets: publicPets
         )
     }
 

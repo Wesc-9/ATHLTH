@@ -981,6 +981,14 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
     }
 }
 
+/// Public pet identity only. Private pet weight, age, GPS history and
+/// workout usage never belong to a visited profile.
+struct SocialSharedPet: Identifiable, Codable, Hashable {
+    let id: UUID
+    let name: String
+    let species: String
+}
+
 struct SocialFriendProfile: Hashable {
     let card: SocialProfileCard
     let trainingFocus: TrainingFocus?
@@ -992,6 +1000,7 @@ struct SocialFriendProfile: Hashable {
     let workoutMedia: [WorkoutMediaRecord]
     let recentActivities: [SocialFeedItem]
     var trainingFocuses: [String] = []
+    var publicPets: [SocialSharedPet] = []
 }
 
 struct SocialBlockedUser: Identifiable, Hashable {

@@ -1532,6 +1532,7 @@ struct FriendProfileView: View {
     @State private var followOverview = SocialFollowOverview.empty
     @State private var followActionInProgress = false
     @State private var followActionError: String?
+    @State private var showAllSharedWorkouts = false
 
     var body: some View {
         ATHLTHPinnedHeroLayout(
@@ -1562,55 +1563,56 @@ struct FriendProfileView: View {
                         !social.isFollowing(userID) {
                         privateProfileNotice
                     } else {
-                        // Only visible, accepted competitions count for
-                        // another athlete; private profiles stay gated above.
+                        // The friend's profile uses the same warm paper cards
+                        // as My Profile, led by their *consented* workout feed.
+                        let workouts = profile.recentActivities.filter {
+                            $0.activity.kind == "workout"
+                        }
+                        workoutHistoryCard(workouts)
+
+                        if let performance = profile.performance {
+                            performanceCard(
+                                performance,
+                                activities: profile.recentActivities
+                            )
+                        } else {
+                            remoteEmptySection(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Performance stats",
+                                    norwegian: "Prestasjonsstatistikk"
+                                ),
+                                icon: "chart.bar.fill",
+                                message: ATHLTHLocalization.choose(
+                                    english: "No performance data is shared.",
+                                    norwegian: "Ingen prestasjonsdata er delt."
+                                )
+                            )
+                        }
+
+                        // Gear has the same prominence as on My Profile.
+                        // The backend only supplies rows the viewer may see.
+                        remoteGearCard(profile.gear)
+
                         ATHLTHProfileCompetitionCard(
                             userID: profile.card.userID,
                             limitedToVisibleCompetitions: true
                         )
 
-                        trophyCard(profile.trophies)
-
-                        let sharedStrengthRecords =
-                            profile.recentActivities.filter {
-                                $0.activity.kind ==
-                                    "personal_record" &&
-                                $0.activity.metadata?[
-                                    "pr_type"
-                                ] == "strength"
-                            }
-
-                        if profile.performance != nil ||
-                            !sharedStrengthRecords.isEmpty {
-                            performanceCard(
-                                profile.performance,
-                                activities:
-                                    profile.recentActivities
-                            )
-                        } else {
-                            remoteEmptySection(
-                                title:
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Personal records",
-                                        norwegian:
-                                            "Personlige rekorder"
-                                    ),
-                                icon:
-                                    "chart.bar.fill",
-                                message:
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "No shared records yet.",
-                                        norwegian:
-                                            "Ingen delte rekorder ennå."
-                                    )
-                            )
+                        if !profile.trophies.isEmpty {
+                            trophyCard(profile.trophies)
                         }
 
-                        remoteHighlightsCard(
-                            profile.workoutMedia
-                        )
+                        if !profile.publicPets.isEmpty {
+                            remotePetsCard(profile.publicPets)
+                        }
+
+                        if !profile.goals.isEmpty {
+                            remoteGoalsCard(profile.goals)
+                        }
+
+                        if !profile.workoutMedia.isEmpty {
+                            remoteHighlightsCard(profile.workoutMedia)
+                        }
 
                     }
                 } else {
@@ -2796,6 +2798,46 @@ struct FriendProfileView: View {
         )
     }
 
+    private func remotePetsCard(_ pets: [SocialSharedPet]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "pawprint.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(ATHLTHLocalization.choose(
+                    english: "Training companions", norwegian: "Turkamerater"
+                ))
+                .font(.system(size: 17, weight: .medium, design: .serif))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer()
+            }
+            HStack(spacing: 8) {
+                ForEach(pets.prefix(3)) { pet in
+                    HStack(spacing: 6) {
+                        Image(systemName: pet.species == "horse"
+                              ? "figure.equestrian.sports" : "pawprint.fill")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Text(pet.name)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface.opacity(0.5),
+                        in: Capsule()
+                    )
+                }
+            }
+        }
+        .padding(14)
+        .athlthTrainPaper()
+        .accessibilityIdentifier("athlth-friend-profile-pets")
+    }
+
     private func remoteHighlightsCard(
         _ media: [WorkoutMediaRecord]
     ) -> some View {
@@ -2928,131 +2970,84 @@ struct FriendProfileView: View {
         )
     }
 
-    private func workoutHistoryCard(
-        _ items: [SocialFeedItem]
-    ) -> some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 13) {
-                HStack(
-                    alignment: .firstTextBaseline
-                ) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text("Recent Activity")
-                            .font(
-                                .title3.weight(.bold)
-                            )
-
-                        Text(
-                            items.isEmpty
-                                ? "No shared workouts yet."
-                                : "Latest workouts shared on this profile."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                    }
-
-                    Spacer()
-
-                    if items.count > 3 {
-                        Text(
-                            ATHLTHLocalization.format(
-                            english: "%d shared",
-                            norwegian: "%d delt",
-                            items.count
-                        )
-                        )
-                        .font(
-                            .caption2.weight(
-                                .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                    }
+    private func workoutHistoryCard(_ items: [SocialFeedItem]) -> some View {
+        let visible = Array(items.prefix(showAllSharedWorkouts ? 20 : 4))
+        return VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 8) {
+                Image(systemName: "figure.run.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Training feed", norwegian: "Treningsfeed"
+                    ))
+                    .font(.system(size: 18, weight: .medium, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Workouts shared with you", 
+                        norwegian: "Økter som er delt med deg"
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
-
-                if items.isEmpty {
-                    HStack(spacing: 12) {
-                        Image(
-                            systemName:
-                                "figure.run.circle"
-                        )
-                        .font(
-                            .system(
-                                size: 22,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .frame(width: 44, height: 44)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 14,
-                                style: .continuous
-                            )
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 3
-                        ) {
-                            Text(
-                                "Nothing shared yet"
-                            )
-                            .font(
-                                .subheadline
-                                    .weight(.semibold)
-                            )
-
-                            Text(
-                                "Public workouts will appear here when this athlete shares them."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
-                            .fixedSize(
-                                horizontal: false,
-                                vertical: true
-                            )
+                Spacer(minLength: 4)
+                if items.count > 4 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAllSharedWorkouts.toggle()
                         }
-
-                        Spacer()
-                    }
-                    .padding(13)
-                    .background(
-                        Color.primary.opacity(0.025),
-                        in: RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
+                    } label: {
+                        Label(
+                            showAllSharedWorkouts
+                                ? ATHLTHLocalization.choose(
+                                    english: "Show fewer", norwegian: "Vis færre"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "See all", norwegian: "Se alle"
+                                  ),
+                            systemImage: showAllSharedWorkouts
+                                ? "chevron.up" : "chevron.down"
                         )
-                    )
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(
-                            Array(items.prefix(4))
-                        ) { item in
-                            remoteActivityRow(item)
-
-                            if item.id !=
-                                items.prefix(4).last?.id {
-                                Divider()
-                                    .padding(.leading, 50)
-                            }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if visible.isEmpty {
+                HStack(spacing: 11) {
+                    Image(systemName: "figure.run")
+                        .font(.title3)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 43, height: 43)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface.opacity(0.7),
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
+                    Text(ATHLTHLocalization.choose(
+                        english: "No workouts shared with you yet.",
+                        norwegian: "Ingen treningsøkter er delt med deg ennå."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                .padding(.vertical, 8)
+            } else {
+                LazyVStack(spacing: 1) {
+                    ForEach(visible) { item in
+                        remoteActivityRow(item)
+                        if item.id != visible.last?.id {
+                            Divider()
+                                .overlay(ATHLTHPlanDesign.warmDivider)
+                                .padding(.leading, 50)
                         }
                     }
                 }
             }
         }
+        .padding(15)
+        .athlthTrainPaper()
+        .accessibilityIdentifier("athlth-friend-profile-training-feed")
     }
 
     private func remoteActivityRow(
