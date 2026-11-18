@@ -15,6 +15,7 @@ struct ATHLTHAdminUserDirectoryView: View {
     @State private var directorySort: DirectorySort = .joinedNewest
     @State private var selectedAction: DirectoryAction?
     @State private var actionReason = ""
+    @State private var grantDuration: GrantDuration = .thirtyDays
     @State private var confirmUsername = ""
     @State private var actionError: String?
     @State private var isChangingAccount = false
@@ -42,15 +43,41 @@ struct ATHLTHAdminUserDirectoryView: View {
         }
     }
 
+    private enum GrantDuration: String, CaseIterable, Identifiable {
+        case sevenDays, thirtyDays, ninetyDays, oneYear, unlimited
+        var id: String { rawValue }
+
+        var days: Int? {
+            switch self {
+            case .sevenDays: 7
+            case .thirtyDays: 30
+            case .ninetyDays: 90
+            case .oneYear: 365
+            case .unlimited: nil
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .sevenDays: ATHLTHLocalization.choose(english: "7 days", norwegian: "7 dager")
+            case .thirtyDays: ATHLTHLocalization.choose(english: "30 days", norwegian: "30 dager")
+            case .ninetyDays: ATHLTHLocalization.choose(english: "90 days", norwegian: "90 dager")
+            case .oneYear: ATHLTHLocalization.choose(english: "365 days", norwegian: "365 dager")
+            case .unlimited: ATHLTHLocalization.choose(english: "No end date", norwegian: "Uten sluttdato")
+            }
+        }
+    }
+
     private struct DirectoryAction: Identifiable {
         enum Kind: String {
-            case promote, demote, suspend, restore, requestDeletion
+            case promote, demote, suspend, restore, requestDeletion, grantPlus, revokePlus
         }
         let user: DirectoryUser
         let kind: Kind
         var id: String { user.userID.uuidString + "-" + kind.rawValue }
 
         var isRoleChange: Bool { kind == .promote || kind == .demote }
+        var isPlusChange: Bool { kind == .grantPlus || kind == .revokePlus }
         var title: String {
             switch kind {
             case .promote: return ATHLTHLocalization.choose(
@@ -63,6 +90,10 @@ struct ATHLTHAdminUserDirectoryView: View {
                 english: "Reactivate account", norwegian: "Aktiver konto")
             case .requestDeletion: return ATHLTHLocalization.choose(
                 english: "Request deletion review", norwegian: "Be om sletting")
+            case .grantPlus: return ATHLTHLocalization.choose(
+                english: "Grant ATHLTH+", norwegian: "Tildel ATHLTH+")
+            case .revokePlus: return ATHLTHLocalization.choose(
+                english: "Revoke granted ATHLTH+", norwegian: "Trekk tilbake tildelt ATHLTH+")
             }
         }
     }
@@ -83,6 +114,8 @@ struct ATHLTHAdminUserDirectoryView: View {
         let subscriptionTier: String
         let subscriptionStatus: String
         let accountState: String
+        let adminPlusGrantActive: Bool
+        let adminPlusGrantExpiresAt: Date?
         let joinedAt: Date
         let totalCount: Int
 
@@ -97,6 +130,8 @@ struct ATHLTHAdminUserDirectoryView: View {
             case subscriptionTier = "subscription_tier"
             case subscriptionStatus = "subscription_status"
             case accountState = "account_state"
+            case adminPlusGrantActive = "admin_plus_grant_active"
+            case adminPlusGrantExpiresAt = "admin_plus_grant_expires_at"
             case joinedAt = "joined_at"
             case totalCount = "total_count"
         }
@@ -269,8 +304,8 @@ struct ATHLTHAdminUserDirectoryView: View {
 
             Label(
                 tr(
-                    "Read-only. Health information, messages and private workouts are not shown.",
-                    "Kun lesetilgang. Helseopplysninger, meldinger og private treningsøkter vises ikke."
+                    "Account and subscription management only. Health information, messages and private workouts are not shown.",
+                    "Kun administrasjon av konto og abonnement. Helseopplysninger, meldinger og private treningsøkter vises ikke."
                 ),
                 systemImage: "lock.shield"
             )
@@ -402,6 +437,11 @@ struct ATHLTHAdminUserDirectoryView: View {
                     accountStatusDetail(user)
                 }
             }
+
+            if canManagePlus(for: user) &&
+                (user.adminPlusGrantActive || user.subscriptionStatus != "active") {
+                plusGrantControls(for: user)
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -411,6 +451,56 @@ struct ATHLTHAdminUserDirectoryView: View {
                 .strokeBorder(outline.opacity(0.48), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
+    }
+
+    /// The backend repeats these access checks before applying any mutation.
+    private func canManagePlus(for user: DirectoryUser) -> Bool {
+        guard session.currentRole.canAccessControlCenter,
+              user.userID != session.profile.userID,
+              user.accountRole.lowercased() != "owner" else { return false }
+        return session.currentRole.canManageAdmins ||
+            user.accountRole.lowercased() == "user"
+    }
+
+    @ViewBuilder
+    private func plusGrantControls(for user: DirectoryUser) -> some View {
+        HStack(spacing: 10) {
+            if user.adminPlusGrantActive {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(tr("ATHLTH+ granted", "ATHLTH+ tildelt"),
+                          systemImage: "sparkles")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(gold)
+                    Text(user.adminPlusGrantExpiresAt.map {
+                        tr("Expires", "Utløper") + " " +
+                        $0.formatted(date: .abbreviated, time: .omitted)
+                    } ?? tr("No end date", "Uten sluttdato"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button(tr("Change", "Endre")) {
+                    prepare(.grantPlus, user: user)
+                }
+                .accessibilityIdentifier("admin-edit-plus-grant")
+                Button(tr("Revoke", "Trekk tilbake"), role: .destructive) {
+                    prepare(.revokePlus, user: user)
+                }
+                .accessibilityIdentifier("admin-revoke-plus-grant")
+            } else {
+                Spacer()
+                Button {
+                    prepare(.grantPlus, user: user)
+                } label: {
+                    Label(tr("Grant ATHLTH+", "Tildel ATHLTH+"),
+                          systemImage: "sparkles")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .accessibilityIdentifier("admin-grant-plus")
+            }
+        }
+        .buttonStyle(.bordered)
+        .tint(gold)
     }
 
     private func subscriptionDetail(
@@ -497,9 +587,13 @@ struct ATHLTHAdminUserDirectoryView: View {
     }
 
     private func prepare(_ kind: DirectoryAction.Kind, user: DirectoryUser) {
-        guard session.currentRole.canManageAdmins,
-              user.userID != session.profile.userID,
-              user.accountRole.lowercased() != "owner" else { return }
+        guard kind == .grantPlus || kind == .revokePlus
+            ? canManagePlus(for: user)
+            : (session.currentRole.canManageAdmins &&
+               user.userID != session.profile.userID &&
+               user.accountRole.lowercased() != "owner")
+        else { return }
+        grantDuration = .thirtyDays
         actionReason = ""
         confirmUsername = ""
         actionError = nil
@@ -510,6 +604,31 @@ struct ATHLTHAdminUserDirectoryView: View {
         let p_target: UUID
         let p_role: String
         let p_reason: String
+    }
+
+    private struct PlusGrantRequest: Encodable {
+        let p_target: UUID
+        let p_action: String
+        let p_duration_days: Int?
+        let p_reason: String
+        let p_confirm_username: String
+
+        // RPC expects the nullable duration argument even for unlimited grants.
+        private enum CodingKeys: String, CodingKey {
+            case p_target, p_action, p_duration_days, p_reason, p_confirm_username
+        }
+        func encode(to encoder: Encoder) throws {
+            var values = encoder.container(keyedBy: CodingKeys.self)
+            try values.encode(p_target, forKey: .p_target)
+            try values.encode(p_action, forKey: .p_action)
+            if let p_duration_days {
+                try values.encode(p_duration_days, forKey: .p_duration_days)
+            } else {
+                try values.encodeNil(forKey: .p_duration_days)
+            }
+            try values.encode(p_reason, forKey: .p_reason)
+            try values.encode(p_confirm_username, forKey: .p_confirm_username)
+        }
     }
 
     private struct AccountSupportRequest: Encodable {
@@ -542,10 +661,33 @@ struct ATHLTHAdminUserDirectoryView: View {
                     Text(action.title)
                         .font(.headline)
                 } footer: {
-                    Text(tr(
-                        "Only the owner can change access. The action is recorded for security auditing. No health information or messages are accessed.",
-                        "Bare eier kan endre tilgangen. Handlingen loggføres av sikkerhetshensyn. Helseopplysninger og meldinger åpnes ikke."
-                    ))
+                    Text(action.isPlusChange
+                        ? tr(
+                            "Admins can grant Plus to users; the owner may also grant it to admins. App Store purchases are not changed. Every action is audited.",
+                            "Administratorer kan tildele Plus til brukere, og eier kan også tildele administratorer. App Store-kjøp endres ikke. Alle handlinger loggføres."
+                          )
+                        : tr(
+                            "Only the owner can change access. The action is recorded for security auditing. No health information or messages are accessed.",
+                            "Bare eier kan endre tilgangen. Handlingen loggføres av sikkerhetshensyn. Helseopplysninger og meldinger åpnes ikke."
+                          ))
+                }
+
+                if action.kind == .grantPlus {
+                    Section {
+                        Picker(tr("Access duration", "Varighet på tilgangen"),
+                               selection: $grantDuration) {
+                            ForEach(GrantDuration.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(gold)
+                    } footer: {
+                        Text(tr(
+                            "Access begins immediately when confirmed and expires automatically on the selected date. Unlimited grants can be revoked later.",
+                            "Tilgangen starter ved bekreftelse og utløper automatisk på valgt dato. Tildelinger uten sluttdato kan trekkes tilbake senere."
+                        ))
+                    }
                 }
 
                 Section {
@@ -626,16 +768,29 @@ struct ATHLTHAdminUserDirectoryView: View {
 
     @MainActor
     private func perform(_ action: DirectoryAction) async {
-        guard session.currentRole.canManageAdmins,
-              action.user.accountRole.lowercased() != "owner",
-              action.user.userID != session.profile.userID,
+        guard (action.isPlusChange
+                  ? canManagePlus(for: action.user)
+                  : (session.currentRole.canManageAdmins &&
+                     action.user.accountRole.lowercased() != "owner" &&
+                     action.user.userID != session.profile.userID)),
               !isChangingAccount else { return }
         isChangingAccount = true
         actionError = nil
         defer { isChangingAccount = false }
 
         do {
-            if action.isRoleChange {
+            if action.isPlusChange {
+                let changed: Bool = try await SupabaseEnvironment.client
+                    .rpc("athlth_admin_manage_plus_grant", params: PlusGrantRequest(
+                        p_target: action.user.userID,
+                        p_action: action.kind == .grantPlus ? "grant" : "revoke",
+                        p_duration_days: action.kind == .grantPlus ? grantDuration.days : nil,
+                        p_reason: actionReason.trimmingCharacters(in: .whitespacesAndNewlines),
+                        p_confirm_username: confirmUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+                    ))
+                    .execute().value
+                guard changed else { throw DirectoryActionError.failed }
+            } else if action.isRoleChange {
                 let role = action.kind == .promote ? "admin" : "user"
                 let changed: Bool = try await SupabaseEnvironment.client
                     .rpc("athlth_admin_change_role", params: RoleChangeRequest(
@@ -651,6 +806,8 @@ struct ATHLTHAdminUserDirectoryView: View {
                 case .suspend: operation = "suspend"
                 case .restore: operation = "restore"
                 case .requestDeletion: operation = "request_deletion"
+                case .grantPlus, .revokePlus, .promote, .demote:
+                    throw DirectoryActionError.failed
                 default: throw DirectoryActionError.failed
                 }
                 let response: AccountSupportResponse = try await SupabaseEnvironment.client.functions
@@ -733,7 +890,7 @@ struct ATHLTHAdminUserDirectoryView: View {
         defer { isLoading = false }
         do {
             let result: [DirectoryUser] = try await SupabaseEnvironment.client
-                .rpc("athlth_admin_directory_v2", params: Query(
+                .rpc("athlth_admin_directory_v3", params: Query(
                     p_search: submittedSearch,
                     p_sort: directorySort.rawValue,
                     p_limit: pageSize,
