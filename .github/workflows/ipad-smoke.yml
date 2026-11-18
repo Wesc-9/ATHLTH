@@ -43,6 +43,7 @@ on:
       - release/v2.2.2
       - release/v2.2.3
       - release/v2.2.4
+      - release/v2.2.5
     paths:
       - ATHLTH/Planning/ATHLTHIntervalGroupAdjustmentView.swift
       - ATHLTH/Planning/ATHLTHPlannedWorkoutStudioView.swift
