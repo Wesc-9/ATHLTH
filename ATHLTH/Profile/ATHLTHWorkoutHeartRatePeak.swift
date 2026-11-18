@@ -21,6 +21,39 @@ enum ATHLTHWorkoutHeartRatePeakPolicy {
         return Int(beatsPerMinute.rounded())
     }
 
+    /// Exactly twelve calendar months, measured from the moment the
+    /// HealthKit query is issued. Ignore historical and future samples.
+    static func windowStart(
+        asOf date: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Date {
+        calendar.date(byAdding: .month, value: -12, to: date)
+            ?? date.addingTimeInterval(-366 * 24 * 60 * 60)
+    }
+
+    static func isWithinLast12Months(
+        workoutDate: Date,
+        asOf date: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        workoutDate >= windowStart(asOf: date, calendar: calendar) &&
+            workoutDate <= date
+    }
+
+    static func recent(
+        among candidates: [ATHLTHWorkoutHeartRatePeak],
+        asOf date: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [ATHLTHWorkoutHeartRatePeak] {
+        candidates.filter {
+            isWithinLast12Months(
+                workoutDate: $0.workoutDate,
+                asOf: date,
+                calendar: calendar
+            )
+        }
+    }
+
     static func highest(
         among candidates: [ATHLTHWorkoutHeartRatePeak]
     ) -> ATHLTHWorkoutHeartRatePeak? {

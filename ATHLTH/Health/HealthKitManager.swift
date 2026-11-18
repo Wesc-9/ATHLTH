@@ -1622,12 +1622,11 @@ final class HealthKitManager: ObservableObject {
             .sorted { $0.startDate > $1.startDate }
     }
 
-    /// Scan the athlete's HealthKit workout library for the highest
-    /// recorded workout heart rate. The peak is not a measured HRmax and
-    /// never changes training zones without the user's explicit opt-in.
-    /// Existing HKWorkout statistics are read without per-workout queries;
-    /// for older imports missing those statistics, try up to 100 recent
-    /// workouts with the established sample-based fallback.
+    /// Scan only the last twelve calendar months of HealthKit workouts.
+    /// This is a recorded training pulse, not laboratory-measured HRmax,
+    /// and requires explicit opt-in before being used for zones.
+    /// Existing HKWorkout statistics avoid per-workout sample queries;
+    /// where missing, the fallback is bounded to eligible recent workouts.
     func highestRecordedWorkoutHeartRates(
         limit: Int = 5,
         forceRefresh: Bool = false,
@@ -1641,20 +1640,25 @@ final class HealthKitManager: ObservableObject {
                 forIdentifier: .heartRate
               ) else { return [] }
 
-        // A foreground refresh must not wait for up to 100 sequential
-        // HKSampleQuery fallbacks. The full profile picker still uses the
-        // exhaustive historical search, including older imported workouts.
+        let now = Date()
+        let startDate = ATHLTHWorkoutHeartRatePeakPolicy.windowStart(asOf: now)
+        // A lightweight foreground refresh avoids sequential sample queries;
+        // the picker scans eligible workouts more exhaustively.
         let fallbackLimit = min(max(sampleFallbackLimit, 0), 100)
         if !forceRefresh,
            let cache = workoutPeakCache,
            Date().timeIntervalSince(cache.generatedAt) < 600 {
-            return Array(cache.records.prefix(max(1, limit)))
+            return Array(ATHLTHWorkoutHeartRatePeakPolicy.recent(
+                among: cache.records, asOf: now
+            ).prefix(max(1, limit)))
         }
         if fallbackLimit < 100 {
             if !forceRefresh,
                let light = workoutPeakLightCache,
                Date().timeIntervalSince(light.generatedAt) < 600 {
-                return Array(light.records.prefix(max(1, limit)))
+                return Array(ATHLTHWorkoutHeartRatePeakPolicy.recent(
+                    among: light.records, asOf: now
+                ).prefix(max(1, limit)))
             }
             // Two foreground observers may ask for the same results together.
             // The first owner will apply the result; the second avoids
@@ -1668,8 +1672,10 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
-        let workouts = try await fetchAllWorkoutsCached(
-            forceRefresh: forceRefresh
+        // Query HealthKit with a date predicate rather than loading every
+        // historical workout into memory just to filter it afterwards.
+        let workouts = try await fetchWorkouts(
+            startDate: startDate, endDate: now
         )
         let unit = HKUnit.count().unitDivided(by: .minute())
         var records: [ATHLTHWorkoutHeartRatePeak] = []
@@ -1677,7 +1683,10 @@ final class HealthKitManager: ObservableObject {
 
         for workout in workouts {
             try Task.checkCancellation()
-            guard workout.duration >= 60 else { continue }
+            guard workout.duration >= 60,
+                  ATHLTHWorkoutHeartRatePeakPolicy.isWithinLast12Months(
+                    workoutDate: workout.startDate, asOf: now
+                  ) else { continue }
 
             let cachedPeak = workout.statistics(for: heartRateType)
                 .flatMap { Self.safeDoubleValue(

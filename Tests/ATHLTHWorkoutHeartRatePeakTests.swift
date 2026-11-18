@@ -51,6 +51,57 @@ final class ATHLTHWorkoutHeartRatePeakTests: XCTestCase {
         )
     }
 
+    func testRollingTwelveCalendarMonthsExcludesHistoricalPeaks() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 18, hour: 13
+        ))!
+        func peak(_ year: Int, _ month: Int, _ day: Int, _ bpm: Int)
+            -> ATHLTHWorkoutHeartRatePeak {
+            ATHLTHWorkoutHeartRatePeak(
+                beatsPerMinute: bpm,
+                workoutID: UUID(),
+                workoutDate: calendar.date(from: DateComponents(
+                    year: year, month: month, day: day, hour: 13
+                ))!,
+                workoutTitle: "Running"
+            )
+        }
+        let oldHigh = peak(2023, 6, 5, 194)
+        let oldBoundary = peak(2025, 11, 17, 200)
+        let exactStart = peak(2025, 11, 18, 175)
+        let within = peak(2026, 8, 27, 192)
+        let future = peak(2026, 11, 19, 230)
+        let recent = ATHLTHWorkoutHeartRatePeakPolicy.recent(
+            among: [oldHigh, oldBoundary, exactStart, within, future],
+            asOf: now, calendar: calendar
+        )
+        XCTAssertEqual(Set(recent.map(\.workoutID)), Set([
+            exactStart.workoutID, within.workoutID
+        ]))
+        XCTAssertEqual(
+            ATHLTHWorkoutHeartRatePeakPolicy.highest(among: recent)?.beatsPerMinute,
+            192
+        )
+    }
+
+    func testWindowUsesCalendarMonthsNotFixedNumberOfDays() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 3, day: 1
+        ))!
+        let cutoff = ATHLTHWorkoutHeartRatePeakPolicy.windowStart(
+            asOf: now, calendar: calendar
+        )
+        XCTAssertEqual(calendar.dateComponents(
+            [.year, .month, .day], from: cutoff
+        ).year, 2025)
+        XCTAssertEqual(calendar.component(.month, from: cutoff), 3)
+        XCTAssertEqual(calendar.component(.day, from: cutoff), 1)
+    }
+
     func testWorkoutPeakOptInAndSourceSurviveProfileSerialization() throws {
         let workoutID = UUID()
         let date = Date(timeIntervalSince1970: 1_800_000_000)

@@ -589,19 +589,32 @@ final class AppSessionStore: ObservableObject {
 
 
 
-    /// Never downgrade a user-entered or age-estimated HRmax based on a
-    /// workout. An opted-in peak can only be raised by a validated new peak.
+    /// The opted-in auto source follows the most recent 12-month peak.
+    /// An older peak expires from the rolling window instead of permanently
+    /// keeping a historic high. Manual and age-estimated HRmax never change.
     func adoptHigherWorkoutHeartRatePeak(
         _ peak: ATHLTHWorkoutHeartRatePeak
     ) {
+        let now = Date()
         guard var profile = onboardingProfile,
               profile.maximumHeartRateUsesWorkoutPeak == true,
               (100...240).contains(peak.beatsPerMinute),
-              peak.beatsPerMinute >= (profile.maximumHeartRateBPM ?? 0)
+              ATHLTHWorkoutHeartRatePeakPolicy.isWithinLast12Months(
+                workoutDate: peak.workoutDate, asOf: now
+              )
         else { return }
-        let isNewSource = profile.maximumHeartRateWorkoutID != peak.workoutID
-        guard peak.beatsPerMinute > (profile.maximumHeartRateBPM ?? 0)
-                || (profile.maximumHeartRateWorkoutID == nil && isNewSource)
+
+        let previousIsRecent = profile.maximumHeartRateWorkoutDate.map {
+            ATHLTHWorkoutHeartRatePeakPolicy.isWithinLast12Months(
+                workoutDate: $0, asOf: now
+            )
+        } ?? false
+
+        // With a valid in-window maximum, only higher values can replace
+        // it. Once its source falls outside the window, adopt the current
+        // peak even if it is lower, as requested for a rolling 12 months.
+        guard !previousIsRecent ||
+              peak.beatsPerMinute > (profile.maximumHeartRateBPM ?? 0)
         else { return }
 
         profile.maximumHeartRateBPM = peak.beatsPerMinute
