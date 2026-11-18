@@ -8253,29 +8253,34 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // The metrics recap must be immediate and offline. A potentially
         // slow HealthKit history query must never delay basic completion
         // narration after the recording session ends.
-        if audioCoachConfiguration.enabled,
-           audioCoachConfiguration.shouldAnnounceWorkoutComplete {
+        if audioCoachConfiguration.enabled {
             let savedResult = result
-            let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
-                elapsedSeconds: savedResult.duration,
-                distanceMeters: savedResult.distanceMeters,
-                averageHeartRateBPM: savedResult.averageHeartRate
-            )
-            guidancePriorityGate.reset()
-            speak(
-                coachPhrase(
-                    english: recap.english,
-                    norwegian: recap.norwegian
-                ),
-                priority: .structuredStep,
-                forceLocal: true,
-                rememberForReplay: false
-            )
+            if audioCoachConfiguration.shouldAnnounceWorkoutComplete {
+                let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
+                    elapsedSeconds: savedResult.duration,
+                    distanceMeters: savedResult.distanceMeters,
+                    averageHeartRateBPM: savedResult.averageHeartRate
+                )
+                guidancePriorityGate.reset()
+                speak(
+                    coachPhrase(
+                        english: recap.english,
+                        norwegian: recap.norwegian
+                    ),
+                    priority: .structuredStep,
+                    forceLocal: true,
+                    rememberForReplay: false
+                )
+            }
 
             // A separate, truthful PB addendum is spoken only after reading
             // complete, older Apple Health workout evidence. Wait until the
             // metrics narration finishes rather than talking over it.
-            if savedResult.kind == .running {
+            if savedResult.kind == .running &&
+               (audioCoachConfiguration.shouldAnnounceWorkoutComplete ||
+                audioCoachConfiguration.activeCustomRules.contains {
+                    $0.trigger == .personalRecordConfirmed
+                }) {
                 Task { @MainActor [weak self] in
                     guard let self,
                           let records = await self.verifiedWatchRunningRecords(
