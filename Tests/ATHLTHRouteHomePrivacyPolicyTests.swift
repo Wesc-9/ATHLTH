@@ -39,7 +39,25 @@ final class ATHLTHRouteHomePrivacyPolicyTests: XCTestCase {
         XCTAssertNotNil(publicCopy)
         XCTAssertEqual(original.coordinates.count, 11)
         XCTAssertGreaterThan(publicCopy!.coordinates.first!.latitude, 63.402)
-        XCTAssertEqual(publicCopy!.coordinates.last, original.coordinates.last)
+        // The published track deliberately reindexes its safe segment:
+        // original sequence numbers must not reveal how many home points
+        // were removed. Compare geographic endpoints, not private indices.
+        XCTAssertEqual(
+            publicCopy!.coordinates.last?.latitude,
+            original.coordinates.last?.latitude
+        )
+        XCTAssertEqual(
+            publicCopy!.coordinates.last?.longitude,
+            original.coordinates.last?.longitude
+        )
+        XCTAssertEqual(
+            publicCopy!.coordinates.map(\.sequence),
+            Array(0..<publicCopy!.coordinates.count)
+        )
+        XCTAssertNotEqual(
+            publicCopy!.coordinates.last?.sequence,
+            original.coordinates.last?.sequence
+        )
         XCTAssertEqual(publicCopy!.startName, "Skjult start")
         XCTAssertFalse(publicCopy!.title.contains("Hjem"))
         XCTAssertNil(publicCopy!.hideSharedStartNearHome)
