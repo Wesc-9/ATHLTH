@@ -1,0 +1,189 @@
+import Foundation
+import XCTest
+@testable import ATHLTH
+
+/// Phase 1 guardrails: a normalized session must not add a HealthKit session,
+/// rewrite an existing set, or move a lock-screen clock independently.
+final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
+    private let start = Date(timeIntervalSince1970: 1_900_000_000)
+
+    private func phone(walking: Bool = false) -> PhoneWorkout {
+        PhoneWorkout(
+            walking: walking,
+            start: start,
+            resumedAt: start,
+            lastCheckpoint: start
+        )
+    }
+
+    func testSharedActiveClockMatchesExistingRunningElapsed() {
+        var workout = phone()
+        let later = start.addingTimeInterval(90)
+        XCTAssertEqual(workout.elapsed(at: later), 90, accuracy: 0.001)
+
+        // Restore a paused workout from its persisted checkpoint. Neither
+        // session nor pace advance while the phone is backgrounded.
+        workout.accumulatedSeconds = 90
+        workout.resumedAt = nil
+        XCTAssertEqual(workout.elapsed(at: start.addingTimeInterval(600)),
+                       90, accuracy: 0.001)
+
+        workout.resumedAt = start.addingTimeInterval(600)
+        XCTAssertEqual(workout.elapsed(at: start.addingTimeInterval(650)),
+                       140, accuracy: 0.001)
+    }
+
+    func testSharedStrengthEffortClockExcludesOnlyExplicitPause() {
+        let clock = StrengthSetEffortClock(
+            workoutID: UUID(),
+            exerciseID: UUID(),
+            setID: UUID(),
+            startedAt: start,
+            pausedAt: start.addingTimeInterval(40),
+            totalPausedSeconds: 10
+        )
+        XCTAssertEqual(clock.elapsedSeconds(at: start.addingTimeInterval(100)),
+                       30, accuracy: 0.001)
+        XCTAssertEqual(ATHLTHWorkoutSessionClock.elapsed(
+            startedAt: start, pausedAt: nil,
+            excludedPauseSeconds: 10,
+            at: start.addingTimeInterval(100)
+        ), 90, accuracy: 0.001)
+    }
+
+    func testCountdownRetainsOvertimeAndDoesNotDependOnForegroundTicks() {
+        XCTAssertEqual(ATHLTHWorkoutSessionClock.remaining(
+            secondsAtPause: 300,
+            resumedAt: start,
+            at: start.addingTimeInterval(340)
+        ), -40, accuracy: 0.001)
+        XCTAssertEqual(ATHLTHWorkoutSessionClock.remaining(
+            secondsAtPause: -40,
+            resumedAt: nil,
+            at: start.addingTimeInterval(900)
+        ), -40, accuracy: 0.001)
+    }
+
+    func testRunningSessionProjectionUsesOriginalIdentity() {
+        var workout = phone(walking: true)
+        let sourceID = UUID()
+        workout.plannedSessionID = sourceID
+        let context = ATHLTHWorkoutSessionFoundation.running(
+            workout, at: start.addingTimeInterval(30)
+        )
+        XCTAssertEqual(context.workoutID, workout.id)
+        XCTAssertEqual(context.plannedSessionID, sourceID)
+        XCTAssertEqual(context.recordingOwner, .iPhone)
+        XCTAssertEqual(context.activity, .walking)
+        XCTAssertEqual(context.engine, .endurance)
+        XCTAssertEqual(context.phase, .work)
+        XCTAssertEqual(context.activeElapsedSeconds, 30, accuracy: 0.001)
+        XCTAssertNil(context.stageIndex)
+        XCTAssertNil(context.stageCount)
+    }
+
+    func testPausedRunningIsNotRecoveryAndDoesNotMoveClock() {
+        var workout = phone()
+        workout.accumulatedSeconds = 125
+        workout.resumedAt = nil
+        let context = ATHLTHWorkoutSessionFoundation.running(
+            workout, at: start.addingTimeInterval(1000)
+        )
+        XCTAssertEqual(context.phase, .paused)
+        XCTAssertEqual(context.activeElapsedSeconds, 125, accuracy: 0.001)
+        XCTAssertEqual(context.workoutID, workout.id)
+    }
+
+    func testPhaseChangesCannotChangeRecordingIdentity() {
+        let id = UUID()
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.preservesWorkoutID(id, id))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.preservesWorkoutID(id, UUID()))
+    }
+
+    func testRecoveryNeverResurrectsCompletedHistory() {
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
+            hasEnded: false, alreadyCommitted: false
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
+            hasEnded: true, alreadyCommitted: false
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
+            hasEnded: false, alreadyCommitted: true
+        ))
+    }
+
+    func testSecondLaunchIsRejectedWithoutDiscardingFirst() {
+        let workout = phone()
+        let live = ATHLTHWorkoutSessionFoundation.running(workout, at: start)
+        XCTAssertNoThrow(try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(nil))
+        XCTAssertThrowsError(
+            try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(live)
+        )
+    }
+
+    @MainActor
+    func testStrengthProjectionKeepsWatchOwnershipThroughInternalRest() throws {
+        let store = StrengthWorkoutStore()
+        let plan = PlannedSession(
+            id: UUID(),
+            title: "Strength",
+            kind: .strength,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: ""
+        )
+        store.start(
+            session: plan,
+            watchSessionID: UUID(),
+            trackingMode: .advanced,
+            captureDevice: .appleWatch
+        )
+        let workout = try XCTUnwrap(store.activeWorkout)
+        let context = try XCTUnwrap(store.activeSessionState)
+        XCTAssertEqual(context.workoutID, workout.id)
+        XCTAssertEqual(context.plannedSessionID, plan.id)
+        XCTAssertEqual(context.recordingOwner, .appleWatch)
+        XCTAssertEqual(context.phase, .work)
+        XCTAssertEqual(context.engine, .strength)
+        let resting = ATHLTHWorkoutSessionFoundation.strength(
+            workout, exerciseIndex: 0, isResting: true,
+            at: workout.startedAt.addingTimeInterval(90)
+        )
+        XCTAssertEqual(resting.phase, .recovery)
+        XCTAssertEqual(resting.engine, .recovery)
+        XCTAssertEqual(resting.workoutID, context.workoutID)
+        XCTAssertEqual(resting.activeElapsedSeconds, 90, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testStartingAnotherStrengthWorkoutCannotOverwriteActiveCheckpoint() {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let firstID = store.activeWorkout?.id
+        XCTAssertNotNil(firstID)
+
+        store.startFreestyle(watchSessionID: UUID())
+        XCTAssertEqual(store.activeWorkout?.id, firstID)
+        XCTAssertEqual(store.activeWorkout?.captureDevice, .iPhone)
+
+        let other = PlannedSession(
+            id: UUID(), title: "Another",
+            kind: .strength, scheduledStart: nil,
+            durationMinutes: nil, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil, routeID: nil,
+            exercises: [], notes: ""
+        )
+        store.start(
+            session: other,
+            watchSessionID: nil,
+            trackingMode: .simple,
+            captureDevice: .iPhone
+        )
+        XCTAssertEqual(store.activeWorkout?.id, firstID)
+        XCTAssertNil(store.activeWorkout?.plannedSessionID)
+    }
+}
