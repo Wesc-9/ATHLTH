@@ -1472,16 +1472,22 @@ struct WatchTimedStrengthCountdown: Codable, Hashable {
     var resumedAt: Date?
 
     func remaining(at date: Date = Date()) -> TimeInterval {
-        max(secondsAtPause - (resumedAt.map {
-            max(date.timeIntervalSince($0), 0)
-        } ?? 0), 0)
+        max(ATHLTHWorkoutSessionClock.remaining(
+            secondsAtPause: secondsAtPause,
+            resumedAt: resumedAt,
+            at: date
+        ), 0)
     }
 
     /// Actual elapsed active time, including overtime, across Watch pauses.
-    /// A planned duration is never substituted for a set finished early.
+    /// The same clock policy is used by iPhone; no duplicate tick logic.
     func elapsed(at date: Date = Date()) -> TimeInterval {
-        let active = resumedAt.map { max(date.timeIntervalSince($0), 0) } ?? 0
-        return max(TimeInterval(targetSeconds) - secondsAtPause + active, 0)
+        max(TimeInterval(targetSeconds) -
+            ATHLTHWorkoutSessionClock.remaining(
+                secondsAtPause: secondsAtPause,
+                resumedAt: resumedAt,
+                at: date
+            ), 0)
     }
 
     var isRunning: Bool { resumedAt != nil }
