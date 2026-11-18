@@ -64,6 +64,15 @@ enum ATHLTHWorkoutSessionFoundation {
         }
     }
 
+    /// Completion must win over a stale active checkpoint after a crash.
+    /// No history item or HealthKit UUID is regenerated during recovery.
+    static func mayRecoverCheckpoint(
+        hasEnded: Bool,
+        alreadyCommitted: Bool
+    ) -> Bool {
+        !hasEnded && !alreadyCommitted
+    }
+
     /// A phase transition is always inside the same HealthKit recording.
     static func preservesWorkoutID(_ previous: UUID, _ next: UUID) -> Bool {
         previous == next
