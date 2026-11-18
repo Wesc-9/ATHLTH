@@ -1656,6 +1656,7 @@ struct TrainingPlanLibraryView: View {
     @State private var searchExpanded = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var visibleStartIndex = 0
+    @State private var alphabetJumpRevision = 0
     @State private var displayMode: ATHLTHLibraryDisplayMode = .grid
     @State private var preferredColumns = 0
     @State private var libraryViewWidth: CGFloat = 390
@@ -1763,15 +1764,22 @@ struct TrainingPlanLibraryView: View {
                 searchMatches
         }
 
-        guard let weeklySortAscending else { return results }
-        return results.sorted { left, right in
+        // Alphabetize the full filtered catalog, not just the first 50.
+        // Weekly-frequency sorting remains available only when explicitly
+        // chosen in the filters; title is the deterministic tie-breaker.
+        let alphabetical = ATHLTHLibraryAlphabetSort.sorted(results) { $0.title }
+        guard let weeklySortAscending else { return alphabetical }
+        return alphabetical.sorted { left, right in
             if left.sessionsPerWeek != right.sessionsPerWeek {
                 return weeklySortAscending
                     ? left.sessionsPerWeek < right.sessionsPerWeek
                     : left.sessionsPerWeek > right.sessionsPerWeek
             }
-            if left.sortOrder == right.sortOrder { return left.slug < right.slug }
-            return left.sortOrder < right.sortOrder
+            return left.title.compare(
+                right.title,
+                options: [.caseInsensitive, .numeric],
+                locale: ATHLTHExerciseAlphabet.locale
+            ) == .orderedAscending
         }
     }
 
@@ -1807,11 +1815,11 @@ struct TrainingPlanLibraryView: View {
     }
 
     var body: some View {
-        ScrollViewReader { scroll in
-            let results = filteredEntries
-            let alphabet = ATHLTHLibraryAlphabetLookup(
-                items: results, id: { $0.id }, title: { $0.title }
-            )
+        let results = filteredEntries
+        let alphabet = ATHLTHLibraryAlphabetLookup(
+            items: results, id: { $0.id }, title: { $0.title }
+        )
+        return ZStack(alignment: .trailing) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
@@ -1914,25 +1922,9 @@ struct TrainingPlanLibraryView: View {
                 .padding(.bottom, 44)
                 .frame(maxWidth: .infinity)
             }
-            .id(visibleStartIndex)
-            .overlay(alignment: .trailing) {
-                if !alphabet.targets.isEmpty {
-                    ATHLTHExerciseAlphabetIndex(targets: alphabet.targets) { target in
-                        guard let index = alphabet.index(for: target) else { return }
-                        if index >= visibleStartIndex &&
-                           index < visibleStartIndex + visibleLimit {
-                            withAnimation(.easeOut(duration: 0.18)) {
-                                scroll.scrollTo(target, anchor: .top)
-                            }
-                        } else {
-                            // Rebuild only the selected 50-row window.
-                            visibleStartIndex = index
-                            visibleLimit = ATHLTHLibraryPagination.pageSize
-                        }
-                    }
-                    .padding(.trailing, 6)
-                }
-            }
+            // Force the list back to the first visible item after an
+            // A–Å jump, including targets beyond the initial 50 plans.
+            .id(alphabetJumpRevision)
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -1940,11 +1932,24 @@ struct TrainingPlanLibraryView: View {
             } action: { _, isPulling in
                 if isPulling { searchExpanded = true }
             }
+
+            if !alphabet.targets.isEmpty {
+                ATHLTHExerciseAlphabetIndex(targets: alphabet.targets) { target in
+                    guard let index = alphabet.index(for: target) else { return }
+                    visibleStartIndex = index
+                    visibleLimit = ATHLTHLibraryPagination.pageSize
+                    alphabetJumpRevision += 1
+                }
+                .padding(.trailing, 6)
+                .zIndex(2)
+                .accessibilityIdentifier("training-plans-alphabet-index")
+            }
         }
         .background(canvas.ignoresSafeArea())
         .onChange(of: pageFilterKey) { _, _ in
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
+            alphabetJumpRevision += 1
         }
         .navigationTitle(favoritePlansOnly
             ? tr("Favorite plans", "Favorittplaner")
@@ -3991,17 +3996,21 @@ struct MyTrainingPlansLibraryView: View {
     @State private var alphabetJumpRevision = 0
 
     private var displayedTemplates: [TrainingPlan] {
-        session.planTemplates.filter {
-            $0.title.localizedStandardContains(query) &&
-            (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
-        }
+        ATHLTHLibraryAlphabetSort.sorted(
+            session.planTemplates.filter {
+                $0.title.localizedStandardContains(query) &&
+                (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
+            }
+        ) { $0.title }
     }
 
     private var displayedPlans: [TrainingPlan] {
-        session.trainingPlans.filter {
-            $0.title.localizedStandardContains(query) &&
-            (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
-        }
+        ATHLTHLibraryAlphabetSort.sorted(
+            session.trainingPlans.filter {
+                $0.title.localizedStandardContains(query) &&
+                (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
+            }
+        ) { $0.title }
     }
 
     private var pageTemplates: [TrainingPlan] {
@@ -5446,12 +5455,18 @@ struct LibraryFavoritesView: View {
             $0.title.localizedStandardContains(searchQuery) ||
             ($0.subtitle ?? "").localizedStandardContains(searchQuery)
         }
-        guard ownExerciseFavoritesOnly && initialKind == nil else { return searchMatches }
-        let ownedIDs = Set(exerciseLibrary.customExercises.map(\.id))
-        return searchMatches.filter {
-            $0.itemType == .exercise &&
-                UUID(uuidString: $0.itemID).map { ownedIDs.contains($0) } == true
+        let visible: [LibraryFavoriteRecord]
+        if ownExerciseFavoritesOnly && initialKind == nil {
+            let ownedIDs = Set(exerciseLibrary.customExercises.map(\.id))
+            visible = searchMatches.filter {
+                $0.itemType == .exercise &&
+                    UUID(uuidString: $0.itemID).map { ownedIDs.contains($0) } == true
+            }
+        } else {
+            visible = searchMatches
         }
+        // Favorites also uses alphabetic order across the complete collection.
+        return ATHLTHLibraryAlphabetSort.sorted(visible) { $0.title }
     }
 
     private var pageFavorites: [LibraryFavoriteRecord] {

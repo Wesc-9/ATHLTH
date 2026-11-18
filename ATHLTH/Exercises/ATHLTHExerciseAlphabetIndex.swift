@@ -53,6 +53,26 @@ enum ATHLTHExerciseAlphabetPage {
     }
 }
 
+/// Locale-aware, stable A–Å ordering for entire library datasets, BEFORE
+/// filtering to a 50-row display window. Retain original order for ties.
+enum ATHLTHLibraryAlphabetSort {
+    static func sorted<Item>(
+        _ items: [Item],
+        title: (Item) -> String
+    ) -> [Item] {
+        items.enumerated().sorted { lhs, rhs in
+            let comparison = title(lhs.element).compare(
+                title(rhs.element),
+                options: [.caseInsensitive, .numeric],
+                locale: ATHLTHExerciseAlphabet.locale
+            )
+            return comparison == .orderedSame
+                ? lhs.offset < rhs.offset
+                : comparison == .orderedAscending
+        }.map(\.element)
+    }
+}
+
 /// One shared A–Å lookup for all LOCAL library collections. Build targets
 /// from the complete filtered result, not the current 50 rendered records.
 /// The stable ID→index map allows jumps without loading intermediate pages.

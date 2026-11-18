@@ -160,6 +160,55 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
     }
 
 
+    func testPlansSortBeforeAlphabetLookupAndPagination() throws {
+        struct PlanItem {
+            let id: UUID
+            let title: String
+        }
+        let original = [
+            PlanItem(id: UUID(), title: "Marathon Build"),
+            PlanItem(id: UUID(), title: "First 5K"),
+            PlanItem(id: UUID(), title: "Ærlig treningsplan"),
+            PlanItem(id: UUID(), title: "Half Marathon Foundation"),
+            PlanItem(id: UUID(), title: "Åtte uker"),
+            PlanItem(id: UUID(), title: "Øktplan")
+        ]
+        let sorted = ATHLTHLibraryAlphabetSort.sorted(original) { $0.title }
+        XCTAssertEqual(sorted.map(\.title), [
+            "First 5K", "Half Marathon Foundation", "Marathon Build",
+            "Ærlig treningsplan", "Øktplan", "Åtte uker"
+        ])
+        let lookup = ATHLTHLibraryAlphabetLookup(
+            items: sorted, id: { $0.id }, title: { $0.title }
+        )
+        XCTAssertEqual(lookup.index(for: try XCTUnwrap(lookup.targets["M"])), 2)
+        XCTAssertEqual(lookup.index(for: try XCTUnwrap(lookup.targets["Ø"])), 4)
+        XCTAssertEqual(lookup.index(for: try XCTUnwrap(lookup.targets["Å"])), 5)
+    }
+
+    func testPlanLetterJumpFindsItemsBeyondFirstFifty() throws {
+        struct PlanItem {
+            let id: UUID
+            let title: String
+        }
+        let source = [PlanItem(id: UUID(), title: "Åsen Plan")] +
+            (0..<85).map {
+                PlanItem(id: UUID(), title: String(format: "A Plan %03d", $0))
+            } + [PlanItem(id: UUID(), title: "Styrkestart")]
+        let sorted = ATHLTHLibraryAlphabetSort.sorted(source) { $0.title }
+        let lookup = ATHLTHLibraryAlphabetLookup(
+            items: sorted, id: { $0.id }, title: { $0.title }
+        )
+        let sIndex = try XCTUnwrap(
+            lookup.index(for: try XCTUnwrap(lookup.targets["S"]))
+        )
+        XCTAssertEqual(sIndex, 85)
+        let page = ATHLTHLibraryAlphabetWindow.visible(
+            sorted, start: sIndex, limit: ATHLTHLibraryPagination.pageSize
+        )
+        XCTAssertEqual(page.map(\.title), ["Styrkestart", "Åsen Plan"])
+    }
+
     func testSharedAlphabetLookupCanJumpToSAfterHundredItems() throws {
         struct Item {
             let id: UUID
