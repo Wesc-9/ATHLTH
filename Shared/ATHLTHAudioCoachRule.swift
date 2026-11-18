@@ -430,7 +430,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                                   norwegian: norwegian)
         case .remainingExercises:
             guard let count = context.remainingExerciseCount else { return nil }
-            return norwegian ? "\(count) øvelser gjenstår" : "\(count) exercises remaining"
+            return norwegian
+                ? (count == 1 ? "1 øvelse gjenstår" : "\(count) øvelser gjenstår")
+                : (count == 1 ? "1 exercise remaining" : "\(count) exercises remaining")
         case .nextExercise:
             guard let name = context.nextExerciseName, !name.isEmpty else { return nil }
             let detail = context.nextExerciseDetails.map { ". " + $0 } ?? ""
