@@ -82,4 +82,18 @@ struct BackendUserBootstrap: Sendable {
     let role: BackendAccountRole
     let entitlement: BackendSubscriptionEntitlement
     let adminPlusGrant: BackendAdminPlusGrant?
+
+    /// Older session bootstrap callers and fixtures have no manual grant.
+    /// The absence of a grant must preserve the existing verified entitlement.
+    init(
+        profile: BackendProfile,
+        role: BackendAccountRole,
+        entitlement: BackendSubscriptionEntitlement,
+        adminPlusGrant: BackendAdminPlusGrant? = nil
+    ) {
+        self.profile = profile
+        self.role = role
+        self.entitlement = entitlement
+        self.adminPlusGrant = adminPlusGrant
+    }
 }
