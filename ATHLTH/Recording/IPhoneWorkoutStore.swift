@@ -258,7 +258,11 @@ struct PhoneWorkout: Codable, Identifiable {
     }
 
     func elapsed(at date: Date) -> TimeInterval {
-        accumulatedSeconds + (resumedAt.map { max(0, date.timeIntervalSince($0)) } ?? 0)
+        ATHLTHWorkoutSessionClock.elapsed(
+            activeBeforeResume: accumulatedSeconds,
+            resumedAt: resumedAt,
+            at: date
+        )
     }
 }
 
@@ -345,6 +349,11 @@ final class IPhoneWorkoutStore:
     AVSpeechSynthesizerDelegate
 {
     @Published private(set) var active: PhoneWorkout?
+
+    /// Projection of the existing persisted workout; not a second live store.
+    var activeSessionState: ATHLTHWorkoutSessionState? {
+        active.map { ATHLTHWorkoutSessionFoundation.running($0) }
+    }
     @Published private(set) var history: [PhoneWorkout] = []
     @Published private(set) var treadmillInclineOverrides:
         [UUID: Double] = [:]
