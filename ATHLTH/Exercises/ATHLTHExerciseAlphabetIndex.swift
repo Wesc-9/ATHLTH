@@ -69,7 +69,7 @@ enum ATHLTHLibraryAlphabetSort {
             return comparison == .orderedSame
                 ? lhs.offset < rhs.offset
                 : comparison == .orderedAscending
-        }.map(\.element)
+        }.map { $0.element }
     }
 }
 
