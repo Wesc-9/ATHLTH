@@ -664,6 +664,9 @@ struct ATHLTHAudioCoachActiveListView: View {
                     )
 
                     Button {
+                        if standaloneTrigger == .personalRecordConfirmed {
+                            standaloneMetric = .personalRecord
+                        }
                         openStandaloneCommandAfterTrigger = true
                         showingStandaloneTrigger = false
                     } label: {
@@ -1060,6 +1063,12 @@ struct ATHLTHAudioCoachActiveListView: View {
                                         Text(metric.title)
                                             .font(.subheadline.weight(.medium))
                                             .foregroundStyle(ink)
+                                        if metric.requiresInternet {
+                                            Image(systemName: "wifi")
+                                                .font(.caption2)
+                                                .foregroundStyle(dim)
+                                                .accessibilityLabel(tr("Requires internet", "Krever internett"))
+                                        }
                                         Spacer(minLength: 5)
                                         Image(systemName: "chevron.right")
                                             .font(.caption.weight(.medium))
@@ -1082,6 +1091,17 @@ struct ATHLTHAudioCoachActiveListView: View {
                                 .font(.caption)
                                 .foregroundStyle(dim)
                         }
+                        HStack(alignment: .firstTextBaseline, spacing: 5) {
+                            Image(systemName: "wifi")
+                                .font(.caption2)
+                            Text(tr(
+                                "A Wi-Fi symbol marks commands needing internet. Measured pace and locally verified PRs also work offline.",
+                                "Wi-Fi-symbolet viser kommandoer som trenger nett. Målt tempo og lokalt bekreftede rekorder virker også uten nett."
+                            ))
+                            .font(.caption2)
+                        }
+                        .foregroundStyle(dim)
+                        .padding(.horizontal, 3)
                     } else {
                         ContentUnavailableView(
                             tr("Group unavailable", "Gruppen finnes ikke"),
