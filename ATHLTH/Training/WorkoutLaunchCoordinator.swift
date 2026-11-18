@@ -779,6 +779,12 @@ enum WorkoutLaunchCoordinator {
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil
     ) async throws {
+        // Do not hand a second run to Watch while a local run is active or
+        // recovered. The existing workout remains the source of truth.
+        try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+            phoneWorkout.activeSessionState
+        )
+
         // Validate the shared timeline before handing a workout to iPad,
         // HealthKit, Apple Watch or the iPhone recording store.
         if let advanced = configuration.advancedWorkout,
@@ -1253,6 +1259,9 @@ enum WorkoutLaunchCoordinator {
         plannedSessionID: UUID? = nil,
         session: AppSessionStore? = nil
     ) async throws {
+        try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+            phoneWorkout.activeSessionState
+        )
         if ATHLTHDeviceRole.isIPad {
             let envelope =
                 WorkoutDeviceRelayEnvelope(
@@ -1471,6 +1480,11 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws -> Bool {
+        // Fail before launching HealthKit on Watch. A start command must
+        // never replace an active/recovered strength checkpoint.
+        try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+            strengthWorkout.activeSessionState
+        )
         try await watchConnection.requireNoActiveWatchWorkout()
 
         // Basic tracking can still opt into voice guidance. Keep the
