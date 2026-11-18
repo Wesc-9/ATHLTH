@@ -1535,13 +1535,14 @@ struct FriendProfileView: View {
 
     var body: some View {
         ATHLTHPinnedHeroLayout(
-            accent: ATHLTHTheme.premiumGold.opacity(0.34),
-            immersiveTransition: true,
-            // Match the owner's profile transition: keep the sheet below
-            // the hero and use the same short, restrained fade instead of
-            // the stronger white glow previously shown on other profiles.
-            sheetOverlapOverride: 0,
-            transitionFadeHeightOverride: 22
+            // Use exactly the same hero-to-paper treatment as the owner:
+            // warm palette, subtle pull-down fade, and 8pt sheet overlap.
+            accent: ATHLTHTrainDesign.gold.opacity(0.16),
+            softTransition: true,
+            pullDownFadeBridge: true,
+            warmHomePalette: true,
+            sheetOverlapOverride: 8,
+            fadeBridgeIntensity: 0.58
         ) {
             if let profile {
                 remoteProfileHero(profile)
@@ -1561,8 +1562,13 @@ struct FriendProfileView: View {
                         !social.isFollowing(userID) {
                         privateProfileNotice
                     } else {
-                        // Other profiles deliberately use the same section
-                        // order and visual rhythm as the owner's profile.
+                        // Only visible, accepted competitions count for
+                        // another athlete; private profiles stay gated above.
+                        ATHLTHProfileCompetitionCard(
+                            userID: profile.card.userID,
+                            limitedToVisibleCompetitions: true
+                        )
+
                         trophyCard(profile.trophies)
 
                         let sharedStrengthRecords =
@@ -1619,9 +1625,8 @@ struct FriendProfileView: View {
                 }
             }
             .padding(.horizontal, 14)
-            // Keep the action row comfortably below the same short hero
-            // fade used by the owner's profile.
-            .padding(.top, 22)
+            // Match the owner's hero-to-content spacing.
+            .padding(.top, 24)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -1630,6 +1635,7 @@ struct FriendProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             if profile != nil {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -1834,17 +1840,17 @@ struct FriendProfileView: View {
                     stops: [
                         .init(
                             color:
-                                Color.black.opacity(0.04),
+                                Color.black.opacity(0.06),
                             location: 0
                         ),
                         .init(
                             color:
-                                Color.black.opacity(0.10),
+                                Color.black.opacity(0.12),
                             location: 0.42
                         ),
                         .init(
                             color:
-                                Color.black.opacity(0.76),
+                                Color.black.opacity(0.74),
                             location: 1
                         )
                     ],
@@ -1895,7 +1901,7 @@ struct FriendProfileView: View {
                 .padding(.bottom, 18)
                 .shadow(
                     color:
-                        Color.black.opacity(0.24),
+                        Color.black.opacity(0.28),
                     radius: 12,
                     y: 5
                 )
