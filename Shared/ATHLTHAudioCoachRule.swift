@@ -1039,6 +1039,11 @@ enum ATHLTHAudioCoachGroupPreview {
         context.groupRemainingSeconds = 180
         context.workoutRemainingSeconds = 900
         context.routeRemainingMeters = 2100
+        context.overallPaceSecondsPerKilometer = 330
+        context.lastKilometerPaceSecondsPerKilometer = 285
+        context.targetPaceSecondsPerKilometer = 300
+        context.verifiedPersonalRecordEnglish = "New verified personal best at 5 kilometres"
+        context.verifiedPersonalRecordNorwegian = "Ny bekreftet personlig rekord på 5 kilometer"
         context.remainingExerciseCount = 2
         context.nextExerciseName = norwegian ? "Knebøy" : "Squats"
         context.previousExerciseName = norwegian ? "Utfall" : "Lunges"
@@ -1169,7 +1174,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
                     case .stepName, .stepRemainingTime, .groupRemainingTime,
                          .workoutRemainingTime, .estimatedFinishTime,
                          .remainingExercises, .nextExercise, .previousExerciseSummary,
-                         .previousMainSectionSummary: return true
+                         .previousMainSectionSummary, .lastKilometerPace: return true
                     default: return false
                     }
                 })
