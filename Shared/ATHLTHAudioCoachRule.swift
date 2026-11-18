@@ -172,6 +172,10 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case previousExerciseSummary
         case previousMainSectionSummary
         var id: String { rawValue }
+        /// Sensor readings, measured pace and device-verified records do not
+        /// require connectivity. When online commands are introduced, flag
+        /// ONLY those commands rather than incorrectly marking local PRs.
+        var requiresInternet: Bool { false }
         var category: ATHLTHCoachMetricCategory {
             switch self {
             case .heartRate, .heartRateZone: return .heartRate
