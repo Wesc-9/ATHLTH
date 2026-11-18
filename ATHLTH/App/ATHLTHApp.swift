@@ -2560,6 +2560,22 @@ struct AppRootView: View {
 
     private var productionRootContent: some View {
         lifecycleContent
+        // Reconcile account entitlements after foregrounding iPhone or iPad.
+        // A manual ATHLTH+ grant/revocation must not require a reinstall,
+        // logout, purchase, or a user-initiated sync.
+        .task(id: "\(signedInUserID?.uuidString ?? "none")-\(startupAuthenticationResolved)-\(scenePhase == .active)") {
+            guard appSession.signedIn,
+                  startupAuthenticationResolved,
+                  scenePhase == .active,
+                  !appSession.previewModeEnabled,
+                  let signedInUserID else { return }
+            guard let bootstrap = try? await accountService.loadCurrentUser(),
+                  !Task.isCancelled,
+                  appSession.signedIn,
+                  appSession.profile.userID == signedInUserID,
+                  bootstrap.profile.id == signedInUserID else { return }
+            appSession.applyBackendBootstrap(bootstrap)
+        }
         .task(id: "\(signedInUserID?.uuidString ?? "none")-\(startupAuthenticationResolved)-\(scenePhase == .active)") {
             // First authenticated, foreground app opening after the free
             // trial. Server atomically records the one-time presentation.
