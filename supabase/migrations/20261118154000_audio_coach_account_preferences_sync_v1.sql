@@ -8,6 +8,10 @@ create table if not exists public.audio_coach_account_state (
 );
 
 alter table public.audio_coach_account_state enable row level security;
+-- Safe to replay if the migration was already applied through Supabase.
+drop policy if exists "audio_coach_read_own" on public.audio_coach_account_state;
+drop policy if exists "audio_coach_create_own" on public.audio_coach_account_state;
+drop policy if exists "audio_coach_update_own" on public.audio_coach_account_state;
 create policy "audio_coach_read_own" on public.audio_coach_account_state
   for select to authenticated using ((select auth.uid()) = user_id);
 create policy "audio_coach_create_own" on public.audio_coach_account_state
