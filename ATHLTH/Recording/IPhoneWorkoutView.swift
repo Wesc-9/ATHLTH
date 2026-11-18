@@ -3168,55 +3168,38 @@ struct IPhoneWorkoutView: View {
         )
     }
 
-    /// One primary progression action, separate from the stop confirmation.
+    /// Running and strength now use the same anchored action surface.
+    /// Running continues to own its structured-step progression and
+    /// Apple Health recording; this view only dispatches the Next command.
     private func runningNextControl(_ workout: PhoneWorkout) -> some View {
-        let hasNext = recorder.nextStructuredStep != nil ||
-            workout.awaitingMainStart == true
-        // Every explicit Next press must be actionable. Automatic advancement
-        // is controlled independently in the recording engine.
-        let mayAdvance = hasNext
-        return Button {
-            if mayAdvance {
-                recorder.advanceStructuredStepManually()
-            } else {
-                showingAddRunningWorkout = true
-            }
-        } label: {
-            HStack(spacing: 11) {
-                Image(systemName: mayAdvance ? "arrow.right.circle.fill" : "plus.circle.fill")
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(mayAdvance
-                         ? (workout.awaitingMainStart == true
-                            ? ATHLTHLocalization.choose(english: "Start main section", norwegian: "Start hoveddel")
-                            : ATHLTHLocalization.choose(
-                                english: (recorder.nextStructuredStep?.phase == "interval" ||
-                                 recorder.nextStructuredStep?.phase == "work")
-                                    ? "Start interval" : "Next step",
-                                norwegian: (recorder.nextStructuredStep?.phase == "interval" ||
-                                 recorder.nextStructuredStep?.phase == "work")
-                                    ? "Start intervall" : "Neste steg"
-                            ))
-                         : ATHLTHLocalization.choose(english: "Add an interval", norwegian: "Legg til intervall"))
-                        .font(.headline.weight(.semibold))
-                    if mayAdvance, let next = recorder.nextStructuredStep {
-                        Text(next.title).font(.caption).lineLimit(1)
-                    }
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.right")
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .background(ATHLTHTheme.accentDeep,
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        let next = recorder.nextStructuredStep
+        let hasNext = next != nil || workout.awaitingMainStart == true
+        let mode: ATHLTHLiveWorkoutBottomMode
+        if workout.awaitingMainStart == true {
+            mode = .runningMain
+        } else if let next,
+                  next.phase == "interval" || next.phase == "work" {
+            mode = .runningInterval
+        } else if hasNext {
+            mode = .runningNext
+        } else {
+            mode = .runningFree
         }
-        .buttonStyle(.plain)
-        .disabled(recorder.saving || workout.resumedAt == nil)
-        .padding(.horizontal, 14)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
-        .background(.ultraThinMaterial)
+
+        return ATHLTHLiveWorkoutBottomDock(
+            mode: mode,
+            subtitle: hasNext ? next?.title : nil,
+            primaryDisabled: recorder.saving || workout.resumedAt == nil,
+            onPrimary: {
+                if hasNext {
+                    recorder.advanceStructuredStepManually()
+                } else {
+                    showingAddRunningWorkout = true
+                }
+            }
+        ) {
+            EmptyView()
+        }
     }
 
     private func displayRouteCoordinates(
