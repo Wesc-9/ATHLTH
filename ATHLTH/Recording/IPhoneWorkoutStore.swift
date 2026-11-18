@@ -4906,7 +4906,8 @@ final class IPhoneWorkoutStore:
             recorded: workout.recordedRunningSteps ?? [],
             routeRemainingMeters: workout.routeRemainingMeters
         )
-        context.overallPaceSecondsPerKilometer = workout.distanceMeters >= 1_000
+        context.overallPaceSecondsPerKilometer =
+            workout.runEnvironment == .outdoor && workout.distanceMeters >= 1_000
             ? ATHLTHRunningPace.average(
                 elapsedSeconds: elapsed, distanceMeters: workout.distanceMeters
             ) : nil
