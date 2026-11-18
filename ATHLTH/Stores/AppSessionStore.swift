@@ -388,6 +388,17 @@ final class AppSessionStore: ObservableObject {
         default:
             backendSubscriptionAccess = .free
         }
+
+        // A manually granted Plus entitlement is an overlay. The real
+        // subscription_entitlements record (including App Store receipt)
+        // stays untouched and returns automatically if the grant is revoked.
+        if let grant = bootstrap.adminPlusGrant, grant.isActive {
+            backendSubscriptionAccess = SubscriptionAccess(
+                state: .paid,
+                source: .serverVerified,
+                currentPeriodEndsAt: grant.expiresAt
+            )
+        }
         recomputeSubscriptionAccess()
 
         onboardingCompleted = bootstrap.profile.onboardingCompleted
