@@ -206,3 +206,39 @@ som ferdige før egne faser og reelle tester er fullført.
   uten brukerhandling. Test overgang til nytt skjema med gamle JSON-filer.
 - Hver fase får egne tester, konkret kodegjennomgang, CI-status og
   oppryddingsdiff før vi starter neste fase.
+
+
+### Fase 2 — felles bunnkontroll (kode implementert, verifisering pågår)
+
+- `ATHLTHLiveWorkoutBottomMode` beskriver klart én primær handling per fase:
+  start hoveddel, neste drag, legg til intervall, start sett, fullfør sett,
+  start neste sett, neste øvelse, legg til styrkeøvelse og avslutt økt.
+  Rest +30 sekunder er en sekundær handling.
+- `ATHLTHLiveWorkoutBottomDock` brukes av både
+  `IPhoneWorkoutView.runningNextControl` og
+  `ActiveStrengthWorkoutView.strengthLiveDock`. Den viser samme faste
+  bunnflate, primærknapp, valgfrie sekundærknapper og valgfritt
+  aktivitetsspesifikt datainnhold.
+- Styrkens eksisterende liveøvelseskort, øvelsesbilde, instruksjoner,
+  volum, motstandsnivå, vekt inkl. stang/skiver, repetisjoner og
+  tidtaking er beholdt. Alle settdata skrives fremdeles bare gjennom
+  `StrengthWorkoutStore` og den autoritative økt-ID-en.
+- En hvileperiode slutter først når brukeren velger «Start neste sett»;
+  `+30 sek` forlenger hvilen. Tidsbaserte sett starter nedtelling på
+  neste sett, men når ikke «fullført» uten eksplisitt brukerhandling.
+- Neste øvelse tilbys i den faste bunnflaten først når alle sett er
+  fullført eller bevisst hoppet over via eksisterende bekreftelsesflyt.
+  Ingen manglende sett markeres utført ved øvelsesbytte.
+- **Slettet faktisk ubrukt kode:** den gamle styrkesatte
+  `compactLiveStrengthDock`, den gamle løpeknappen nederst og
+  `focusedSetEntry` (ubrukt alternativ visning med ekstra
+  «Fullfør sett»-knapp). Ingen modell-/historikkmigrering er utført.
+- Spesialtilfellet *løpeintervall inne i styrke* beholder sin
+  tidligere kontrollerlogikk foreløpig. Watch-styrt setregistrering
+  beholder eksisterende tillatelser; den nye iPhone-bunnflaten blir
+  ikke en alternativ skrivetilgang til en Watch-styrt økt.
+- Nye tester: `ATHLTHLiveWorkoutBottomModeTests` inngår i målrettet
+  hybrid-test og full XCTest. Sjekk full iOS, watchOS, iPhone/iPad-
+  kompatibilitet, skjermlås, frie styrkeøkter, komplette økter,
+  tids- og vektbaserte sett før fase 2 godkjennes.
+- **Ingen ny TestFlight-opplasting**, og fase 3 er ikke startet.
