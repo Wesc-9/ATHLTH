@@ -184,10 +184,8 @@ jobs:
       - name: Audit Watch Always-On visual and power rules
         run: python3 scripts/audit_watch_visual_power.py
 
-      - name: Install XcodeGen and iPad screenshot validator
-        run: |
-          brew install xcodegen
-          brew install imagemagick
+      - name: Install XcodeGen
+        run: brew install xcodegen
       - name: Regenerate and validate approved app icons
         shell: bash
         run: |
@@ -298,30 +296,30 @@ jobs:
             CODE_SIGNING_ALLOWED=NO test
 
 
-      # iOS XCTest already compiled a simulator app. Rebuilding it for iPad
-      # took more than 90 minutes and never reached the visual checks.
-      # Reuse this exact binary to verify iPad onboarding, libraries,
-      # side-panel profile and 11-/13-inch layouts.
-      - name: Validate built app on iPad simulators
+      # Share the EXACT simulator app that passed the full XCTest suite.
+      # Upload a tarball to preserve executable permissions and framework
+      # symlinks. iPad launch runs on a FRESH macOS runner, not the XCTest
+      # runner that has already exercised thousands of tests and simulators.
+      - name: Package XCTest-tested app for iPad
+        if: github.ref == 'refs/heads/release/v2.2.5'
         shell: bash
-        timeout-minutes: 30
         run: |
           set -euo pipefail
-          APP="$RUNNER_TEMP/ATHLTHDerivedData/Build/Products/Debug-iphonesimulator/ATHLTH.app"
-          test -d "$APP"
-          if [ -f "$RUNNER_TEMP/athlth-test-iphone-udid" ]; then
-            xcrun simctl shutdown "$(cat "$RUNNER_TEMP/athlth-test-iphone-udid")" >/dev/null 2>&1 || true
-          fi
-          ATHLTH_IPAD_SMOKE_APP="$APP" bash scripts/run_ipad_smoke.sh
+          PRODUCT_DIR="$RUNNER_TEMP/ATHLTHDerivedData/Build/Products/Debug-iphonesimulator"
+          test -d "$PRODUCT_DIR/ATHLTH.app"
+          tar -czf "$RUNNER_TEMP/athlth-ipad-simulator-app.tar.gz" \
+            -C "$PRODUCT_DIR" ATHLTH.app
+          ls -lh "$RUNNER_TEMP/athlth-ipad-simulator-app.tar.gz"
 
-      - name: Preserve iPad smoke screenshots
-        if: always()
+      - name: Upload XCTest-tested simulator app
+        if: github.ref == 'refs/heads/release/v2.2.5'
         uses: actions/upload-artifact@v4
         with:
-          name: athlth-ipad-smoke-screenshots
-          path: ${{ runner.temp }}/athlth-ipad-*.png
-          if-no-files-found: warn
-          retention-days: 7
+          name: athlth-ipad-simulator-app
+          path: ${{ runner.temp }}/athlth-ipad-simulator-app.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Preserve XCTest diagnostics on failure
         if: failure()
@@ -331,3 +329,56 @@ jobs:
           path: ${{ runner.temp }}/ATHLTHTests.xcresult
           if-no-files-found: warn
           retention-days: 14
+
+  # This isolated runner prevents CoreSimulator left over by the XCTest
+  # simulator from stalling iPad creation and application installation.
+  # No second Xcode compilation; the app is identical to the tested binary.
+  ipad-smoke:
+    if: github.ref == 'refs/heads/release/v2.2.5'
+    needs: build
+    runs-on: xcode-27
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install screenshot validation tool
+        run: brew install imagemagick
+
+      - name: Download tested simulator app
+        uses: actions/download-artifact@v4
+        with:
+          name: athlth-ipad-simulator-app
+          path: ${{ runner.temp }}/athlth-ipad-test-input
+
+      - name: Extract identical tested simulator build
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/athlth-ipad-test-app"
+          tar -xzf "$RUNNER_TEMP/athlth-ipad-test-input/athlth-ipad-simulator-app.tar.gz" \
+            -C "$RUNNER_TEMP/athlth-ipad-test-app"
+          test -d "$RUNNER_TEMP/athlth-ipad-test-app/ATHLTH.app"
+          test -x "$RUNNER_TEMP/athlth-ipad-test-app/ATHLTH.app/ATHLTH"
+          echo "::notice::iPad validates the same app that passed XCTest."
+
+      - name: Open the app across iPad layouts
+        shell: bash
+        timeout-minutes: 30
+        env:
+          ATHLTH_IPAD_SMOKE_APP: ${{ runner.temp }}/athlth-ipad-test-app/ATHLTH.app
+        run: bash scripts/run_ipad_smoke.sh
+
+      - name: Upload iPad screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-ipad-smoke-screenshots
+          path: |
+            ${{ runner.temp }}/athlth-ipad-*.png
+            ${{ runner.temp }}/athlth-ipad-diagnostics.txt
+          if-no-files-found: warn
+          retention-days: 7

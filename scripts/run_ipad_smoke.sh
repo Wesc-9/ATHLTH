@@ -3,6 +3,34 @@
 # Do not build the app here: pass ATHLTH_IPAD_SMOKE_APP from the build job.
 set -euo pipefail
 
+# Log every CoreSimulator transition, and fail an individual stuck command
+# rather than silently consuming the entire runner's job timeout.
+simctl_bounded() {
+  local step="$1" seconds="$2"
+  shift 2
+  python3 - "$step" "$seconds" "$@" <<'PY'
+import subprocess, sys
+step = sys.argv[1]
+timeout = int(sys.argv[2])
+command = ["xcrun", "simctl", *sys.argv[3:]]
+print(f"::notice::iPad simulator: {step} (limit {timeout}s)", file=sys.stderr, flush=True)
+try:
+    result = subprocess.run(
+        command, capture_output=True, text=True, timeout=timeout, check=False
+    )
+except subprocess.TimeoutExpired:
+    print(f"::error::iPad simulator timed out at: {step} after {timeout}s", file=sys.stderr, flush=True)
+    raise SystemExit(124)
+if result.stdout:
+    print(result.stdout, end="", flush=True)
+if result.stderr:
+    print(result.stderr, end="", file=sys.stderr, flush=True)
+if result.returncode:
+    print(f"::error::iPad simulator: {step} failed ({result.returncode})", file=sys.stderr, flush=True)
+raise SystemExit(result.returncode)
+PY
+}
+
 RUNTIME=$(xcrun simctl list runtimes -j | python3 -c '
 import json,sys
 data=json.load(sys.stdin)
@@ -76,7 +104,7 @@ print(chosen["identifier"])
 PY
 )
 
-UDID=$(xcrun simctl create "ATHLTH-iPad" "$DEVICE_TYPE" "$RUNTIME")
+UDID=$(simctl_bounded "create 11-inch iPad" 260 create "ATHLTH-iPad" "$DEVICE_TYPE" "$RUNTIME")
 
 cleanup() {
   xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
@@ -84,9 +112,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-xcrun simctl boot "$UDID"
-xcrun simctl bootstatus "$UDID" -b
-xcrun simctl install "$UDID" "$APP"
+simctl_bounded "boot 11-inch iPad" 100 boot "$UDID"
+simctl_bounded "wait for 11-inch iPad boot" 160 bootstatus "$UDID" -b
+simctl_bounded "install ATHLTH on 11-inch iPad" 180 install "$UDID" "$APP"
 
 validate_screen() {
   local label="$1"
@@ -226,10 +254,10 @@ if [ -n "$LARGE_DEVICE_TYPE" ]; then
   echo "Rendering the first Studio screen on a 13-inch iPad."
   xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
   xcrun simctl delete "$UDID" >/dev/null 2>&1 || true
-  UDID=$(xcrun simctl create "ATHLTH-iPad-13" "$LARGE_DEVICE_TYPE" "$RUNTIME")
-  xcrun simctl boot "$UDID"
-  xcrun simctl bootstatus "$UDID" -b
-  xcrun simctl install "$UDID" "$APP"
+  UDID=$(simctl_bounded "create 13-inch iPad" 260 create "ATHLTH-iPad-13" "$LARGE_DEVICE_TYPE" "$RUNTIME")
+  simctl_bounded "boot 13-inch iPad" 100 boot "$UDID"
+  simctl_bounded "wait for 13-inch iPad boot" 160 bootstatus "$UDID" -b
+  simctl_bounded "install ATHLTH on 13-inch iPad" 180 install "$UDID" "$APP"
   xcrun simctl launch "$UDID" com.wesc9.athlth \
     --athlth-compatibility-preview \
     "--athlth-compatibility-tab=0"
