@@ -12191,7 +12191,13 @@ struct ATHLTHProfileView: View {
             running: running,
             phone: phone
         )
-        if mostTrainedItems != localItems { mostTrainedItems = localItems }
+        // A different device may have more complete history. Keep the
+        // richer already merged snapshot when local inputs are unchanged.
+        if mostTrainedItems != localItems &&
+            (lastMostTrainedSyncUserID != accountID ||
+             lastSyncedMostTrainedItems != localItems) {
+            mostTrainedItems = localItems
+        }
 
         guard session.signedIn else {
             mostTrainedSyncTask?.cancel()

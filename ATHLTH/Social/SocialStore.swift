@@ -2056,8 +2056,8 @@ final class SocialStore: ObservableObject {
     func refreshWorkoutMedia(
         for userID: UUID? = nil
     ) async {
-        guard let resolvedUserID =
-                userID ?? currentUserID
+        guard let resolvedUserID = userID ?? currentUserID,
+              let viewerID = currentUserID
         else {
             workoutMedia = []
             return
@@ -2069,7 +2069,9 @@ final class SocialStore: ObservableObject {
             )
             // A signed-out or switched account must never receive a stale
             // gallery response from its previous profile session.
-            guard currentUserID == resolvedUserID else { return }
+            // Allow other athletes' explicitly requested galleries, but
+            // never apply a response after the signed-in viewer changes.
+            guard currentUserID == viewerID else { return }
             workoutMedia = loaded
             lastWorkoutMediaUserID = resolvedUserID
             lastWorkoutMediaRefreshAt = Date()
