@@ -1880,10 +1880,14 @@ private enum HealthProfileField: String, Identifiable {
 
     var title: String {
         switch self {
-        case .dateOfBirth: return "Date of birth"
-        case .healthSex: return "Sex for health calculations"
-        case .weight: return "Weight"
-        case .height: return "Height"
+        case .dateOfBirth:
+            return ATHLTHLocalization.choose(english: "Date of birth", norwegian: "Fødselsdato")
+        case .healthSex:
+            return ATHLTHLocalization.choose(english: "Sex for health calculations", norwegian: "Kjønn for helseberegninger")
+        case .weight:
+            return ATHLTHLocalization.choose(english: "Weight", norwegian: "Vekt")
+        case .height:
+            return ATHLTHLocalization.choose(english: "Height", norwegian: "Høyde")
         case .maximumHeartRate:
             return ATHLTHLocalization.choose(
                 english: "Maximum heart rate", norwegian: "Makspuls"
@@ -1968,7 +1972,7 @@ struct PersonalHealthProfileView: View {
 
     private var sourceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("APPLE HEALTH SOURCE")
+            sectionTitle(ATHLTHLocalization.choose(english: "APPLE HEALTH SOURCE", norwegian: "APPLE HEALTH-KILDE"))
 
             ATHLTHCard {
                 HStack(spacing: 14) {
@@ -1998,7 +2002,7 @@ struct PersonalHealthProfileView: View {
 
                     if refreshingAppleHealth {
                         ProgressView()
-                            .tint(ATHLTHTheme.accent)
+                            .tint(ATHLTHTheme.premiumGold)
                     } else {
                         Image(
                             systemName: health.hasRequestedAuthorization
@@ -2008,7 +2012,7 @@ struct PersonalHealthProfileView: View {
                         .font(.title3)
                         .foregroundStyle(
                             health.hasRequestedAuthorization
-                                ? ATHLTHTheme.accentDeep
+                                ? ATHLTHTheme.premiumGold
                                 : Color.secondary.opacity(0.5)
                         )
                     }
@@ -2023,8 +2027,8 @@ struct PersonalHealthProfileView: View {
                     HStack {
                         Label(
                             health.hasRequestedAuthorization
-                                ? "Refresh Apple Health"
-                                : "Connect Apple Health",
+                                ? ATHLTHLocalization.choose(english: "Refresh Apple Health", norwegian: "Oppdater Apple Health")
+                                : ATHLTHLocalization.choose(english: "Connect Apple Health", norwegian: "Koble til Apple Health"),
                             systemImage: "arrow.triangle.2.circlepath"
                         )
                         .font(.subheadline.weight(.semibold))
@@ -2034,13 +2038,16 @@ struct PersonalHealthProfileView: View {
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.bold))
                     }
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
                 }
                 .buttonStyle(.plain)
                 .disabled(refreshingAppleHealth)
 
                 Text(
-                    "ATHLTH uses only profile values Apple Health makes available. You can add or edit missing values below."
+                    ATHLTHLocalization.choose(
+                        english: "ATHLTH uses only profile values Apple Health makes available. You can add or edit missing values below.",
+                        norwegian: "ATHLTH bruker bare profilverdier Apple Health gjør tilgjengelige. Du kan legge til eller endre manglende verdier nedenfor."
+                    )
                 )
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2052,7 +2059,7 @@ struct PersonalHealthProfileView: View {
 
     private var detailsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("HEALTH DETAILS")
+            sectionTitle(ATHLTHLocalization.choose(english: "HEALTH DETAILS", norwegian: "HELSEOPPLYSNINGER"))
 
             ATHLTHCard {
                 healthDetailRow(
@@ -2065,7 +2072,7 @@ struct PersonalHealthProfileView: View {
 
                 healthDetailRow(
                     .healthSex,
-                    value: includeSex ? healthSex.title : "Add",
+                    value: includeSex ? healthSex.title : ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til"),
                     isSet: includeSex
                 )
 
@@ -2073,7 +2080,7 @@ struct PersonalHealthProfileView: View {
 
                 healthDetailRow(
                     .weight,
-                    value: includeWeight ? weightDisplay : "Add",
+                    value: includeWeight ? weightDisplay : ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til"),
                     isSet: includeWeight
                 )
 
@@ -2081,7 +2088,7 @@ struct PersonalHealthProfileView: View {
 
                 healthDetailRow(
                     .height,
-                    value: includeHeight ? heightDisplay : "Add",
+                    value: includeHeight ? heightDisplay : ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til"),
                     isSet: includeHeight
                 )
 
@@ -2101,13 +2108,16 @@ struct PersonalHealthProfileView: View {
                                         english: " · Est.", norwegian: " · Est."
                                       )
                                     : "")
-                            : "Add",
+                            : ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til"),
                     isSet: includeMaximumHeartRate
                 )
             }
 
             Text(
-                "These values are used only for ATHLTH health and training calculations. A known maximum heart rate becomes the source of truth for heart-rate zones and workout alerts. They are not shown on your public profile."
+                ATHLTHLocalization.choose(
+                    english: "These values are used only for ATHLTH health and training calculations. A known maximum heart rate becomes the source of truth for heart-rate zones and workout alerts. They are not shown on your public profile.",
+                    norwegian: "Verdiene brukes bare til helse- og treningsberegninger i ATHLTH. Lagret makspuls styrer pulssoner og øktvarsler. Opplysningene vises ikke på den offentlige profilen din."
+                )
             )
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2117,16 +2127,16 @@ struct PersonalHealthProfileView: View {
 
     private var privacySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("PRIVACY")
+            sectionTitle(ATHLTHLocalization.choose(english: "PRIVACY", norwegian: "PERSONVERN"))
 
             ATHLTHCard {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: "lock.shield.fill")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
                         .frame(width: 44, height: 44)
                         .background(
-                            ATHLTHTheme.accentSoft,
+                            ATHLTHTheme.premiumGoldSoft,
                             in: RoundedRectangle(
                                 cornerRadius: 14,
                                 style: .continuous
@@ -2134,12 +2144,15 @@ struct PersonalHealthProfileView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Private health profile")
+                        Text(ATHLTHLocalization.choose(english: "Private health profile", norwegian: "Privat helseprofil"))
                             .font(.headline)
                             .foregroundStyle(ATHLTHTheme.primaryText)
 
                         Text(
-                            "Date of birth, sex, weight, height and maximum heart rate stay private. Sharing health metrics always requires a separate explicit action."
+                            ATHLTHLocalization.choose(
+                                english: "Date of birth, sex, weight, height and maximum heart rate stay private. Sharing health metrics always requires a separate explicit action.",
+                                norwegian: "Fødselsdato, kjønn, vekt, høyde og makspuls er private. Deling av helsedata krever alltid et eget, uttrykkelig valg."
+                            )
                         )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2156,7 +2169,7 @@ struct PersonalHealthProfileView: View {
         Text(title)
             .font(.caption.weight(.semibold))
             .tracking(2.4)
-            .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+            .foregroundStyle(ATHLTHTheme.premiumGold.opacity(0.82))
             .padding(.leading, 16)
     }
 
@@ -2171,7 +2184,7 @@ struct PersonalHealthProfileView: View {
             HStack(spacing: 12) {
                 Image(systemName: field.systemImage)
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
                     .frame(width: 34)
 
                 Text(field.title)
@@ -2185,7 +2198,7 @@ struct PersonalHealthProfileView: View {
                     .foregroundStyle(
                         isSet
                             ? ATHLTHTheme.primaryText
-                            : ATHLTHTheme.accentDeep
+                            : ATHLTHTheme.premiumGold
                     )
                     .multilineTextAlignment(.trailing)
                     .lineLimit(1)
@@ -2210,7 +2223,7 @@ struct PersonalHealthProfileView: View {
                     switch field {
                     case .dateOfBirth:
                         DatePicker(
-                            "Date of birth",
+                            ATHLTHLocalization.choose(english: "Date of birth", norwegian: "Fødselsdato"),
                             selection: $dateOfBirth,
                             in: ...Date(),
                             displayedComponents: .date
@@ -2219,7 +2232,7 @@ struct PersonalHealthProfileView: View {
 
                     case .healthSex:
                         Picker(
-                            "Sex for health calculations",
+                            ATHLTHLocalization.choose(english: "Sex for health calculations", norwegian: "Kjønn for helseberegninger"),
                             selection: $healthSex
                         ) {
                             ForEach(HealthSex.allCases) { value in
@@ -2237,8 +2250,8 @@ struct PersonalHealthProfileView: View {
 
                             Stepper(
                                 settings.measurementPreference == .metric
-                                    ? "Adjust by 0.5 kg"
-                                    : "Adjust by 1 lb",
+                                    ? ATHLTHLocalization.choose(english: "Adjust by 0.5 kg", norwegian: "Juster med 0,5 kg")
+                                    : ATHLTHLocalization.choose(english: "Adjust by 1 lb", norwegian: "Juster med 1 pund"),
                                 value: weightBinding,
                                 in: weightRange,
                                 step: settings.measurementPreference == .metric
@@ -2257,8 +2270,8 @@ struct PersonalHealthProfileView: View {
 
                             Stepper(
                                 settings.measurementPreference == .metric
-                                    ? "Adjust by 1 cm"
-                                    : "Adjust by 1 in",
+                                    ? ATHLTHLocalization.choose(english: "Adjust by 1 cm", norwegian: "Juster med 1 cm")
+                                    : ATHLTHLocalization.choose(english: "Adjust by 1 in", norwegian: "Juster med 1 tomme"),
                                 value: heightBinding,
                                 in: heightRange,
                                 step: 1
@@ -2316,7 +2329,7 @@ struct PersonalHealthProfileView: View {
                                     systemImage: "heart.text.square"
                                 )
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .foregroundStyle(ATHLTHTheme.premiumGold)
 
                                 ForEach(1...5, id: \.self) { zone in
                                     if let range = ATHLTHHeartRateZones.range(
@@ -2341,7 +2354,7 @@ struct PersonalHealthProfileView: View {
                                         norwegian: "Eksempel Z1–Z2: \(combined.lowerBound)–\(combined.upperBound) slag/min."
                                     ))
                                     .font(.caption.weight(.medium))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .foregroundStyle(ATHLTHTheme.premiumGold)
                                 }
                                 Text(ATHLTHLocalization.choose(
                                     english: "Preview calculated from the value above. Saved HRmax drives targets on iPhone, Watch and iPad. Age-based values are only estimates.",
@@ -2352,7 +2365,7 @@ struct PersonalHealthProfileView: View {
                             }
                             .padding(14)
                             .background(
-                                ATHLTHTheme.accentSoft.opacity(0.4),
+                                ATHLTHTheme.premiumGold.opacity(0.08),
                                 in: RoundedRectangle(cornerRadius: 16)
                             )
                             .accessibilityIdentifier("athlth-profile-hrmax-zone-preview")
@@ -2365,25 +2378,26 @@ struct PersonalHealthProfileView: View {
 
                 if isFieldSet(field) {
                     Section {
-                        Button("Remove value", role: .destructive) {
+                        Button(ATHLTHLocalization.choose(english: "Remove value", norwegian: "Fjern verdi"), role: .destructive) {
                             remove(field)
                         }
                     }
                 }
             }
             .athlthBrandedForm()
+            .tint(ATHLTHTheme.premiumGold)
             .navigationTitle(field.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
                         loadFromSession()
                         editingField = nil
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) {
                         setFieldIncluded(field)
                         persistManualDetails()
                         editingField = nil
@@ -2433,7 +2447,7 @@ struct PersonalHealthProfileView: View {
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 5) {
                 Image(systemName: "calendar")
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
                 Text(ATHLTHLocalization.choose(
                     english: "AGE ESTIMATE", norwegian: "ALDERSBASERT"
                 ))
@@ -2443,7 +2457,7 @@ struct PersonalHealthProfileView: View {
                 Spacer(minLength: 0)
                 if selected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
                 }
             }
             .font(.system(size: 10, weight: .semibold))
@@ -2489,10 +2503,10 @@ struct PersonalHealthProfileView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(estimate == nil
                         ? ATHLTHTheme.mutedText
-                        : ATHLTHTheme.accentDeep)
+                        : ATHLTHTheme.primaryText)
                     .frame(maxWidth: .infinity, minHeight: 40)
                     .background(
-                        ATHLTHTheme.premiumGoldSoft.opacity(0.8),
+                        ATHLTHTheme.premiumGold,
                         in: RoundedRectangle(cornerRadius: 12)
                     )
             }
@@ -2503,13 +2517,13 @@ struct PersonalHealthProfileView: View {
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
         .background(
-            ATHLTHTheme.accentSoft.opacity(selected ? 0.83 : 0.36),
+            ATHLTHTheme.premiumGold.opacity(selected ? 0.17 : 0.08),
             in: RoundedRectangle(cornerRadius: 18)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(
-                    ATHLTHTheme.accentDeep.opacity(selected ? 0.55 : 0.08),
+                    ATHLTHTheme.premiumGold.opacity(selected ? 0.55 : 0.08),
                     lineWidth: selected ? 1.4 : 0.8
                 )
         }
@@ -2521,7 +2535,7 @@ struct PersonalHealthProfileView: View {
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 5) {
                 Image(systemName: "waveform.path.ecg")
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
                 Text(ATHLTHLocalization.choose(
                     english: "WORKOUTS",
                     norwegian: "TRENINGSØKTER"
@@ -2541,7 +2555,7 @@ struct PersonalHealthProfileView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
                     .disabled(!health.hasRequestedAuthorization)
                     .accessibilityLabel(ATHLTHLocalization.choose(
                         english: "Refresh recorded pulse",
@@ -2607,10 +2621,10 @@ struct PersonalHealthProfileView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(best == nil
                         ? ATHLTHTheme.mutedText
-                        : ATHLTHTheme.accentDeep)
+                        : ATHLTHTheme.primaryText)
                     .frame(maxWidth: .infinity, minHeight: 40)
                     .background(
-                        ATHLTHTheme.premiumGoldSoft.opacity(0.8),
+                        ATHLTHTheme.premiumGold,
                         in: RoundedRectangle(cornerRadius: 12)
                     )
             }
@@ -2621,13 +2635,13 @@ struct PersonalHealthProfileView: View {
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
         .background(
-            ATHLTHTheme.accentSoft.opacity(selected ? 0.83 : 0.36),
+            ATHLTHTheme.premiumGold.opacity(selected ? 0.17 : 0.08),
             in: RoundedRectangle(cornerRadius: 18)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(
-                    ATHLTHTheme.accentDeep.opacity(selected ? 0.55 : 0.08),
+                    ATHLTHTheme.premiumGold.opacity(selected ? 0.55 : 0.08),
                     lineWidth: selected ? 1.4 : 0.8
                 )
         }
@@ -2712,7 +2726,7 @@ struct PersonalHealthProfileView: View {
     }
 
     private var dateOfBirthDisplay: String {
-        guard includeDateOfBirth else { return "Add" }
+        guard includeDateOfBirth else { return ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til") }
         return dateOfBirth.formatted(
             .dateTime
                 .day()
