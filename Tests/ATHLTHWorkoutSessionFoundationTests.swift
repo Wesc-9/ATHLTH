@@ -64,6 +64,39 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         ), -40, accuracy: 0.001)
     }
 
+    func testWatchAndIPhoneTimedStrengthClocksStayIdentical() {
+        var watch = WatchTimedStrengthCountdown(
+            targetSeconds: 300, secondsAtPause: 300, resumedAt: start
+        )
+        var phone = StrengthTimedSetCountdown(
+            workoutID: UUID(), exerciseID: UUID(), setID: UUID(),
+            targetSeconds: 300, secondsAtPause: 300, resumedAt: start
+        )
+        let early = start.addingTimeInterval(125)
+        XCTAssertEqual(watch.remaining(at: early),
+                       phone.remaining(at: early), accuracy: 0.001)
+        XCTAssertEqual(watch.elapsed(at: early),
+                       Double(phone.elapsedSeconds(at: early)), accuracy: 0.001)
+
+        // After the phone locks, Watch and phone preserve the same remaining
+        // seconds from the checkpoint, without a foreground timer.
+        watch.secondsAtPause = watch.remaining(at: early)
+        phone.secondsAtPause = phone.remaining(at: early)
+        watch.resumedAt = nil
+        phone.resumedAt = nil
+        XCTAssertEqual(watch.remaining(at: start.addingTimeInterval(500)),
+                       phone.remaining(at: start.addingTimeInterval(500)),
+                       accuracy: 0.001)
+
+        watch.resumedAt = start.addingTimeInterval(500)
+        phone.resumedAt = start.addingTimeInterval(500)
+        let late = start.addingTimeInterval(725)
+        XCTAssertEqual(watch.remaining(at: late),
+                       phone.remaining(at: late), accuracy: 0.001)
+        XCTAssertEqual(watch.elapsed(at: late),
+                       Double(phone.elapsedSeconds(at: late)), accuracy: 0.001)
+    }
+
     func testRunningSessionProjectionUsesOriginalIdentity() {
         var workout = phone(walking: true)
         let sourceID = UUID()
