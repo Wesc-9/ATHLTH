@@ -1884,7 +1884,10 @@ private enum HealthProfileField: String, Identifiable {
         case .healthSex: return "Sex for health calculations"
         case .weight: return "Weight"
         case .height: return "Height"
-        case .maximumHeartRate: return "Maximum heart rate"
+        case .maximumHeartRate:
+            return ATHLTHLocalization.choose(
+                english: "Maximum heart rate", norwegian: "Makspuls"
+            )
         }
     }
 
@@ -2354,89 +2357,7 @@ struct PersonalHealthProfileView: View {
                             )
                             .accessibilityIdentifier("athlth-profile-hrmax-zone-preview")
 
-                            if let estimate = maximumHeartRateEstimate {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack {
-                                        Label(
-                                            ATHLTHLocalization.choose(
-                                                english: "Don't know your max?",
-                                                norwegian: "Vet du ikke makspulsen?"
-                                            ),
-                                            systemImage: "heart.text.square"
-                                        )
-                                        .font(.subheadline.weight(.semibold))
-                                        Spacer()
-                                        Text("\(estimate.beatsPerMinute) bpm")
-                                            .font(.headline.monospacedDigit())
-                                    }
-
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "Calculated for age \(estimate.ageYears) based on your health profile. This is a population estimate, not a measurement.",
-                                        norwegian: "Beregnet for alder \(estimate.ageYears) år ut fra helseprofilen din. Dette er et befolkningsestimat, ikke en måling."
-                                    ))
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                                    .fixedSize(horizontal: false, vertical: true)
-
-                                    Text(estimate.usesFemaleEquation
-                                        ? ATHLTHLocalization.choose(
-                                            english: "Formula for women: 206 − 0.88 × age.",
-                                            norwegian: "Formel for kvinner: 206 − 0,88 × alder."
-                                          )
-                                        : ATHLTHLocalization.choose(
-                                            english: "General adult formula: 208 − 0.7 × age.",
-                                            norwegian: "Generell voksenformel: 208 − 0,7 × alder."
-                                          ))
-                                        .font(.caption2)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-
-                                    Button {
-                                        maximumHeartRateBPM = estimate.beatsPerMinute
-                                        maximumHeartRateIsEstimated = true
-                                        maximumHeartRateUsesWorkoutPeak = false
-                                        maximumHeartRateWorkoutID = nil
-                                        maximumHeartRateWorkoutDate = nil
-                                    } label: {
-                                        Label(
-                                            ATHLTHLocalization.choose(
-                                                english: "Use estimated max heart rate",
-                                                norwegian: "Bruk estimert makspuls"
-                                            ),
-                                            systemImage: "wand.and.stars"
-                                        )
-                                        .font(.subheadline.weight(.semibold))
-                                        .frame(maxWidth: .infinity, minHeight: 42)
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .tint(ATHLTHTheme.accentDeep)
-                                }
-                                .padding(14)
-                                .background(
-                                    ATHLTHTheme.accentSoft.opacity(0.65),
-                                    in: RoundedRectangle(cornerRadius: 16)
-                                )
-                            } else {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Add your date of birth to calculate an estimate (adults 18+).",
-                                        norwegian: "Legg inn fødselsdato for å beregne et estimat (18 år eller eldre)."
-                                    ),
-                                    systemImage: "info.circle"
-                                )
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            workoutHeartRatePeakSection
-
-                            Text(ATHLTHLocalization.choose(
-                                english: "A tested maximum heart rate is more reliable. Workout peaks may contain sensor errors. Manual changes override the selected source. ATHLTH uses the saved value for heart-rate zones.",
-                                norwegian: "En testet makspuls er mer pålitelig. Treningspulser kan inneholde sensorfeil. Manuelle endringer overstyrer valgt kilde. ATHLTH bruker den lagrede verdien til pulssonene."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            maximumHeartRateSourceCards
                         }
                         .padding(.vertical, 8)
                     }
@@ -2478,107 +2399,236 @@ struct PersonalHealthProfileView: View {
         }
     }
 
-    private var workoutHeartRatePeakSection: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "From recorded workouts",
-                        norwegian: "Fra registrerte treningsøkter"
-                    ),
-                    systemImage: "waveform.path.ecg"
+    /// Keep the two optional HRmax sources compact and equally weighted.
+    /// Choosing either only updates the editor's draft until Save is tapped.
+    private var maximumHeartRateSourceCards: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(ATHLTHLocalization.choose(
+                english: "CHOOSE A SOURCE",
+                norwegian: "VELG KILDE"
+            ))
+            .font(.caption2.weight(.bold))
+            .tracking(1.3)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+
+            HStack(alignment: .top, spacing: 10) {
+                estimatedHeartRateSourceCard
+                recentWorkoutHeartRateSourceCard
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Age is a population estimate. Workout pulse is the highest registered value during the past 12 months, not a verified physiological maximum. Sensor errors are possible.",
+                norwegian: "Alder gir et befolkningsestimat. Treningspuls er høyeste registrerte verdi de siste 12 månedene, ikke en testet makspuls. Sensorfeil kan forekomme."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityIdentifier("athlth-hrmax-source-choices")
+    }
+
+    private var estimatedHeartRateSourceCard: some View {
+        let estimate = maximumHeartRateEstimate
+        let selected = maximumHeartRateIsEstimated
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 5) {
+                Image(systemName: "calendar")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "AGE ESTIMATE", norwegian: "ALDERSBASERT"
+                ))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+            .font(.system(size: 10, weight: .semibold))
+
+            Text(estimate.map { "\($0.beatsPerMinute) bpm" } ?? "—")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .minimumScaleFactor(0.75)
+                .lineLimit(1)
+
+            Text(estimate.map {
+                ATHLTHLocalization.choose(
+                    english: "Estimated for age \($0.ageYears)",
+                    norwegian: "Estimat for \($0.ageYears) år"
                 )
-                .font(.subheadline.weight(.semibold))
-                Spacer()
+            } ?? ATHLTHLocalization.choose(
+                english: "Add date of birth",
+                norwegian: "Legg inn fødselsdato"
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+
+            Button {
+                guard let estimate else { return }
+                maximumHeartRateBPM = estimate.beatsPerMinute
+                maximumHeartRateIsEstimated = true
+                maximumHeartRateUsesWorkoutPeak = false
+                maximumHeartRateWorkoutID = nil
+                maximumHeartRateWorkoutDate = nil
+            } label: {
+                Text(selected
+                    ? ATHLTHLocalization.choose(
+                        english: "Selected", norwegian: "Valgt"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Use estimate", norwegian: "Bruk estimat"
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(estimate == nil
+                        ? ATHLTHTheme.mutedText
+                        : ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft.opacity(0.8),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(estimate == nil || selected)
+            .accessibilityIdentifier("athlth-use-estimated-hrmax")
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
+        .background(
+            ATHLTHTheme.accentSoft.opacity(selected ? 0.83 : 0.36),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    ATHLTHTheme.accentDeep.opacity(selected ? 0.55 : 0.08),
+                    lineWidth: selected ? 1.4 : 0.8
+                )
+        }
+    }
+
+    private var recentWorkoutHeartRateSourceCard: some View {
+        let best = workoutHeartRatePeaks.first
+        let selected = maximumHeartRateUsesWorkoutPeak
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 5) {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "WORKOUTS",
+                    norwegian: "TRENINGSØKTER"
+                ))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+                Spacer(minLength: 0)
                 if loadingWorkoutHeartRatePeaks {
-                    ProgressView().tint(ATHLTHTheme.accentDeep)
+                    ProgressView().controlSize(.mini)
                 } else {
                     Button {
                         Task { await refreshWorkoutHeartRatePeaks(force: true) }
                     } label: {
                         Image(systemName: "arrow.clockwise")
-                            .font(.subheadline.weight(.medium))
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
                     }
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Refresh workout heart rates",
-                        norwegian: "Oppdater treningspuls"
-                    ))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
                     .disabled(!health.hasRequestedAuthorization)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Refresh recorded pulse",
+                        norwegian: "Oppdater registrert puls"
+                    ))
                 }
             }
+            .font(.system(size: 10, weight: .semibold))
 
-            if let best = workoutHeartRatePeaks.first {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(best.beatsPerMinute) bpm")
-                        .font(.title2.weight(.bold))
-                        .monospacedDigit()
-                    Spacer()
-                    Text(best.workoutDate, format: .dateTime.day().month().year())
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                }
-                Text(best.workoutTitle)
-                    .font(.caption)
+            Text(best.map { "\($0.beatsPerMinute) bpm" } ?? "—")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .minimumScaleFactor(0.75)
+                .lineLimit(1)
+
+            Text(ATHLTHLocalization.choose(
+                english: "Last 12 months",
+                norwegian: "Siste 12 måneder"
+            ))
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+
+            if let best {
+                Text(best.workoutDate, format: .dateTime.day().month(.abbreviated).year())
+                    .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
-
-                Button {
-                    maximumHeartRateBPM = best.beatsPerMinute
-                    maximumHeartRateIsEstimated = false
-                    maximumHeartRateUsesWorkoutPeak = true
-                    maximumHeartRateWorkoutID = best.workoutID
-                    maximumHeartRateWorkoutDate = best.workoutDate
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Use highest workout pulse · Auto-update",
-                            norwegian: "Bruk høyeste treningspuls · Oppdater automatisk"
-                        ),
-                        systemImage: "checkmark.circle"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 42)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
-
-                if workoutHeartRatePeaks.count > 1 {
-                    ForEach(workoutHeartRatePeaks.dropFirst().prefix(3)) { peak in
-                        HStack(spacing: 6) {
-                            Text("\(peak.beatsPerMinute) bpm")
-                                .monospacedDigit()
-                            Spacer()
-                            Text(peak.workoutDate, format: .dateTime.day().month().year())
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                        .font(.caption)
-                    }
-                }
-                Text(ATHLTHLocalization.choose(
-                    english: "A higher peak from a future Apple Health workout will update your selected training maximum. Existing manually entered or estimated values are never replaced automatically.",
-                    norwegian: "En høyere puls i en senere Apple Health-økt vil oppdatere valgt treningsmakspuls. Manuelle og estimerte verdier endres aldri automatisk."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             } else {
-                Text(workoutHeartRatePeakError ?? ATHLTHLocalization.choose(
-                    english: loadingWorkoutHeartRatePeaks
-                        ? "Checking Apple Health workouts…"
-                        : "No workout heart-rate measurements found. Connect Apple Health and try again.",
-                    norwegian: loadingWorkoutHeartRatePeaks
-                        ? "Sjekker treningsøkter i Apple Health …"
-                        : "Fant ingen pulsmålinger fra treningsøkter. Koble til Apple Health og prøv igjen."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .fixedSize(horizontal: false, vertical: true)
+                Text(workoutHeartRatePeakError ??
+                    ATHLTHLocalization.choose(
+                        english: loadingWorkoutHeartRatePeaks
+                            ? "Checking workouts…"
+                            : "No recorded pulse in this period",
+                        norwegian: loadingWorkoutHeartRatePeaks
+                            ? "Sjekker økter …"
+                            : "Ingen pulsdata i perioden"
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer(minLength: 0)
+
+            Button {
+                guard let best else { return }
+                maximumHeartRateBPM = best.beatsPerMinute
+                maximumHeartRateIsEstimated = false
+                maximumHeartRateUsesWorkoutPeak = true
+                maximumHeartRateWorkoutID = best.workoutID
+                maximumHeartRateWorkoutDate = best.workoutDate
+            } label: {
+                Text(selected && best != nil
+                    ? ATHLTHLocalization.choose(
+                        english: "Auto selected", norwegian: "Auto valgt"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Use & update", norwegian: "Bruk · auto"
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(best == nil
+                        ? ATHLTHTheme.mutedText
+                        : ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft.opacity(0.8),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(best == nil || selected && maximumHeartRateWorkoutID == best?.workoutID)
+            .accessibilityIdentifier("athlth-use-workout-hrmax")
         }
-        .padding(14)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
         .background(
-            ATHLTHTheme.accentSoft.opacity(0.45),
-            in: RoundedRectangle(cornerRadius: 16)
+            ATHLTHTheme.accentSoft.opacity(selected ? 0.83 : 0.36),
+            in: RoundedRectangle(cornerRadius: 18)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(
+                    ATHLTHTheme.accentDeep.opacity(selected ? 0.55 : 0.08),
+                    lineWidth: selected ? 1.4 : 0.8
+                )
+        }
     }
 
     private func refreshWorkoutHeartRatePeaks(force: Bool = false) async {
@@ -2589,15 +2639,18 @@ struct PersonalHealthProfileView: View {
         do {
             workoutHeartRatePeaks = try await health
                 .highestRecordedWorkoutHeartRates(forceRefresh: force)
-            // A previously opted-in workout HRmax is automatically raised,
-            // never replaced with a lower peak or a manual override.
+            // Auto mode follows the rolling twelve-month peak. A source
+            // that ages out can be replaced by a lower, newer recorded peak.
+            // The session method never changes manual or age-based values.
             if let best = workoutHeartRatePeaks.first {
                 session.adoptHigherWorkoutHeartRatePeak(best)
                 if maximumHeartRateUsesWorkoutPeak,
-                   best.beatsPerMinute > maximumHeartRateBPM {
-                    maximumHeartRateBPM = best.beatsPerMinute
-                    maximumHeartRateWorkoutID = best.workoutID
-                    maximumHeartRateWorkoutDate = best.workoutDate
+                   session.onboardingProfile?.maximumHeartRateUsesWorkoutPeak == true,
+                   let saved = session.onboardingProfile,
+                   let savedBPM = saved.maximumHeartRateBPM {
+                    maximumHeartRateBPM = savedBPM
+                    maximumHeartRateWorkoutID = saved.maximumHeartRateWorkoutID
+                    maximumHeartRateWorkoutDate = saved.maximumHeartRateWorkoutDate
                 }
             }
         } catch {
