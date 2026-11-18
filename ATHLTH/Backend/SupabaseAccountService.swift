@@ -328,10 +328,21 @@ final class SupabaseAccountService: ObservableObject {
             .execute()
             .value
 
+        // Optional owner/admin Plus grants do not overwrite App Store proof.
+        // If the grants migration is unavailable, authentication still works.
+        let grantRows: [BackendAdminPlusGrant]? = try? await client
+            .from("athlth_admin_plus_grants")
+            .select("expires_at,revoked_at")
+            .eq("user_id", value: userID)
+            .limit(1)
+            .execute()
+            .value
+
         return try await BackendUserBootstrap(
             profile: profile,
             role: role,
-            entitlement: entitlement
+            entitlement: entitlement,
+            adminPlusGrant: grantRows?.first
         )
     }
 
