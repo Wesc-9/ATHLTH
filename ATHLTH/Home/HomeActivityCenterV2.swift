@@ -1559,6 +1559,8 @@ private struct HomeActivityFriendFeatureCardV3:
                     startPoint: .top,
                     endPoint: .bottom
                 )
+            } else if workoutActivity == .running {
+                ATHLTHHomeRunningFeedPhoto(height: 142)
             } else {
                 LinearGradient(
                     colors: artworkColors,
@@ -4485,6 +4487,9 @@ private struct HomeRecentActivityTileV4:
             }
 
             ZStack {
+                if workoutActivity == .running {
+                    ATHLTHHomeRunningFeedPhoto(height: 68)
+                } else {
                 LinearGradient(
                     colors: [
                         ATHLTHTheme
@@ -4512,6 +4517,7 @@ private struct HomeRecentActivityTileV4:
                     activity:
                         workoutActivity
                 )
+                }
             }
             .frame(height: 68)
             .clipShape(

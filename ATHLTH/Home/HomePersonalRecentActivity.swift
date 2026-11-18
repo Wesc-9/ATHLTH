@@ -2430,6 +2430,39 @@ private enum HomeFollowingWorkoutPresentation {
     }
 }
 
+/// A single, already bundled ATHLTH running photo for feed workouts
+/// without a usable GPS map or attached media. No network fetch, bitmap
+/// resizing or additional image assets are needed.
+enum ATHLTHHomeFeedFallbackPolicy {
+    static func imageName(for activity: WorkoutActivity) -> String? {
+        guard activity == .running else { return nil }
+        return ATHLTHPlanWorkoutArtwork.asset(for: .easyRun)
+    }
+}
+
+struct ATHLTHHomeRunningFeedPhoto: View {
+    let height: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            Image(ATHLTHPlanWorkoutArtwork.asset(for: .easyRun))
+                .resizable()
+                .scaledToFill()
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+                .overlay {
+                    LinearGradient(
+                        colors: [.clear, Color.black.opacity(0.15)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct HomeFollowingWorkoutArtwork:
     View {
     let item: SocialFeedItem
@@ -2491,6 +2524,8 @@ private struct HomeFollowingWorkoutArtwork:
                     compact: true,
                     showsCompletionLabel: false
                 )
+            } else if ATHLTHHomeFeedFallbackPolicy.imageName(for: activity) != nil {
+                ATHLTHHomeRunningFeedPhoto(height: height)
             } else {
                 genericArtwork
             }
@@ -4739,6 +4774,9 @@ private struct HomePersonalWorkoutVisual:
                     .scaledToFill()
                     .athlthBoundedFill()
             } else {
+                // The GPS route may be available while its map snapshot is
+                // still loading or could not render. Never show the dark
+                // generic banner for a run in that state.
                 genericBackground
             }
         }
@@ -4755,8 +4793,12 @@ private struct HomePersonalWorkoutVisual:
         }
     }
 
+    @ViewBuilder
     private var genericBackground:
         some View {
+        if ATHLTHHomeFeedFallbackPolicy.imageName(for: workout.activity) != nil {
+            ATHLTHHomeRunningFeedPhoto(height: height)
+        } else {
         ZStack {
             LinearGradient(
                 colors: [
@@ -4798,6 +4840,7 @@ private struct HomePersonalWorkoutVisual:
                 )
             )
             .offset(x: 94)
+        }
         }
     }
 
