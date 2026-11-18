@@ -1921,16 +1921,26 @@ struct ATHLTHAudioCoachActiveListView: View {
 
                 Divider().overlay(ATHLTHPlanDesign.warmDivider)
 
-                Text(tr("AZURE VOICES · ATHLTH+", "AZURE-STEMMER · ATHLTH+"))
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.3)
-                    .foregroundStyle(bronze)
+                HStack(spacing: 5) {
+                    Text(tr("AZURE VOICES · ATHLTH+", "AZURE-STEMMER · ATHLTH+"))
+                        .tracking(1.3)
+                    Image(systemName: "wifi")
+                        .accessibilityLabel(tr("Requires internet", "Krever internett"))
+                }
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(bronze)
 
                 ATHLTHAzureCoachVoicePreviewView(
                     selectedIdentifier: $draft.voiceIdentifier,
                     language: $draft.language,
                     duckOtherAudio: draft.duckOtherAudio
                 )
+                Label(tr(
+                    "Online voices need internet. Offline Apple speech is the fallback.",
+                    "Nettstemmer trenger internett. Apple-stemme brukes uten nett."
+                ), systemImage: "info.circle")
+                .font(.caption2)
+                .foregroundStyle(dim)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
