@@ -1059,6 +1059,8 @@ struct WorkoutTemplateLibraryView: View {
 
     @ObservedObject private var catalog = WorkoutTemplateCatalogStore.shared
     @State private var query = ""
+    @State private var searchExpanded = false
+    @FocusState private var searchFocused: Bool
     /// Search text the result engine sees after a brief, cancellable pause.
     /// Typing updates the field immediately without sorting all recipes.
     @State private var committedQuery = ""
@@ -1837,6 +1839,57 @@ struct WorkoutTemplateLibraryView: View {
         ScrollViewReader { _ in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
+                if searchExpanded {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Search workouts",
+                                norwegian: "Søk etter treningsøkter"
+                            ),
+                            text: $query
+                        )
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                        .focused($searchFocused)
+                        .onSubmit { searchFocused = false }
+                        .accessibilityIdentifier("athlth-workout-text-search")
+
+                        if !query.isEmpty {
+                            Button {
+                                query = ""
+                                searchFocused = true
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Clear search",
+                                norwegian: "Tøm søket"
+                            ))
+                        }
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 48)
+                    .background(
+                        ATHLTHPlanDesign.surface,
+                        in: RoundedRectangle(cornerRadius: 16)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(
+                                ATHLTHTheme.premiumGold.opacity(0.20),
+                                lineWidth: 1
+                            )
+                    }
+                    .onAppear { searchFocused = true }
+                }
+
                 HStack(spacing: 9) {
                     if initialCategory != .running {
                         Text(ATHLTHLocalization.choose(
@@ -2503,15 +2556,39 @@ struct WorkoutTemplateLibraryView: View {
             english: "Workouts", norwegian: "Treningsøkter"
         ))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    searchExpanded.toggle()
+                    if !searchExpanded { searchFocused = false }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(
+                            query.isEmpty
+                                ? ATHLTHPlanDesign.ink
+                                : ATHLTHTheme.premiumGold
+                        )
+                        .frame(minWidth: 36, minHeight: 36)
+                }
+                .accessibilityLabel(
+                    searchExpanded
+                        ? ATHLTHLocalization.choose(
+                            english: "Hide workout search",
+                            norwegian: "Skjul søk etter treningsøkter"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Search workouts",
+                            norwegian: "Søk etter treningsøkter"
+                        )
+                )
+                .accessibilityIdentifier("athlth-workout-search-toggle")
+            }
+        }
         .onChange(of: pageFilterKey) { _, _ in
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
             alphabetJumpRevision += 1
         }
-        .searchable(
-            text: $query,
-            prompt: ATHLTHLocalization.choose(english: "Search workouts", norwegian: "Søk etter treningsøkter")
-        )
         .sheet(item: $previewedWorkoutSource, onDismiss: {
             if let source = workoutSourceAfterPreviewDismiss {
                 workoutSourceAfterPreviewDismiss = nil
