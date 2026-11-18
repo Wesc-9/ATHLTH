@@ -2473,6 +2473,7 @@ struct PersonalHealthProfileView: View {
             Button {
                 guard let estimate else { return }
                 maximumHeartRateBPM = estimate.beatsPerMinute
+                includeMaximumHeartRate = true
                 maximumHeartRateIsEstimated = true
                 maximumHeartRateUsesWorkoutPeak = false
                 maximumHeartRateWorkoutID = nil
@@ -2590,6 +2591,7 @@ struct PersonalHealthProfileView: View {
             Button {
                 guard let best else { return }
                 maximumHeartRateBPM = best.beatsPerMinute
+                includeMaximumHeartRate = true
                 maximumHeartRateIsEstimated = false
                 maximumHeartRateUsesWorkoutPeak = true
                 maximumHeartRateWorkoutID = best.workoutID
@@ -2675,6 +2677,7 @@ struct PersonalHealthProfileView: View {
             get: { maximumHeartRateBPM },
             set: {
                 maximumHeartRateBPM = $0
+                includeMaximumHeartRate = true
                 maximumHeartRateIsEstimated = false
                 maximumHeartRateUsesWorkoutPeak = false
                 maximumHeartRateWorkoutID = nil
