@@ -31,24 +31,71 @@ raise SystemExit(result.returncode)
 PY
 }
 
-RUNTIME=$(xcrun simctl list runtimes -j | python3 -c '
-import json,sys
-data=json.load(sys.stdin)
-runtimes=[
-    r for r in data["runtimes"]
-    if r.get("isAvailable")
-    and r.get("platform")=="iOS"
+# Prefer iPad models that can actually be created by the installed runtime.
+# simctl lists new models even when the local iOS runtime rejects them (403).
+create_compatible_ipad() {
+  python3 - "$1" "$2" <<'PY'
+import json, subprocess, sys
+size, name = int(sys.argv[1]), sys.argv[2]
+def listing(kind):
+    result = subprocess.run(["xcrun", "simctl", "list", kind, "-j"],
+                            capture_output=True, text=True, check=True, timeout=35)
+    return json.loads(result.stdout)
+runtimes = [r for r in listing("runtimes").get("runtimes", [])
+            if r.get("isAvailable") and
+            (r.get("platform") == "iOS" or "iOS" in r.get("name", ""))]
+def version(r):
+    parts = [int(x) for x in str(r.get("version", "0")).split(".") if x.isdigit()]
+    return tuple((parts + [0, 0, 0])[:3])
+runtimes.sort(key=version, reverse=True)
+preferred = (
+    ["iPad Pro 11-inch (M4)", "iPad Air 11-inch (M3)",
+     "iPad Air 11-inch (M2)", "iPad (A16)",
+     "iPad (10th generation)", "iPad Pro 11-inch (M5)"]
+    if size == 11 else
+    ["iPad Pro 13-inch (M4)", "iPad Air 13-inch (M3)",
+     "iPad Air 13-inch (M2)", "iPad Pro 13-inch (M5)"]
+)
+devices = [
+    d for d in listing("devicetypes").get("devicetypes", [])
+    if d.get("name", "").startswith("iPad") and (
+        ("11-inch" in d["name"] or "11 inch" in d["name"] or
+         d["name"] in ("iPad (A16)", "iPad (10th generation)"))
+        if size == 11 else
+        ("13-inch" in d["name"] or "13 inch" in d["name"])
+    )
 ]
+rank = {name: idx for idx, name in enumerate(preferred)}
+devices.sort(key=lambda d: (rank.get(d["name"], len(preferred)), d["name"]))
+if not devices:
+    print(f"::warning::No {size}-inch iPad type installed", file=sys.stderr)
+    sys.exit(66)
 if not runtimes:
-    runtimes=[
-        r for r in data["runtimes"]
-        if r.get("isAvailable")
-        and "iOS" in r.get("name","")
-    ]
-if not runtimes:
-    raise SystemExit("No iOS runtime is available")
-print(runtimes[-1]["identifier"])
-')
+    print("::error::No iOS runtime is available", file=sys.stderr)
+    sys.exit(67)
+for runtime in runtimes:
+    for device in devices:
+        try:
+            result = subprocess.run(
+                ["xcrun", "simctl", "create", name,
+                 device["identifier"], runtime["identifier"]],
+                capture_output=True, text=True, check=False, timeout=45
+            )
+        except subprocess.TimeoutExpired:
+            print(f"::warning::Timed out creating {device['name']}", file=sys.stderr)
+            continue
+        if result.returncode == 0 and result.stdout.strip():
+            print(f"::notice::Using {device['name']} on {runtime['identifier']}",
+                  file=sys.stderr)
+            print(result.stdout.strip())
+            sys.exit(0)
+        reason = " ".join(result.stderr.split())[:220]
+        print(f"::warning::Rejected {device['name']} on {runtime['identifier']}: "
+              f"{reason}", file=sys.stderr)
+print(f"::error::No compatible {size}-inch iPad/runtime pair", file=sys.stderr)
+sys.exit(67)
+PY
+}
 
 # Use an app already compiled and XCTest-verified by Build ATHLTH.
 # A manual/legacy run can still use its local build.
@@ -61,50 +108,7 @@ test -n "$APP"
 test -d "$APP"
 echo "Launching prebuilt simulator app: $APP"
 
-DEVICE_TYPES_JSON="$RUNNER_TEMP/ipad-device-types.json"
-xcrun simctl list devicetypes -j > "$DEVICE_TYPES_JSON"
-
-DEVICE_TYPE=$(python3 - "$DEVICE_TYPES_JSON" <<'PY'
-import json,sys
-
-with open(sys.argv[1]) as fh:
-    data=json.load(fh)
-
-ipads=[
-    d for d in data["devicetypes"]
-    if d.get("name","").startswith("iPad")
-]
-
-if not ipads:
-    raise SystemExit("No iPad simulator device type is available")
-
-preferred_names=[
-    "iPad Pro 11-inch (M5)",
-    "iPad Pro 11-inch (M4)",
-    "iPad Air 11-inch (M3)",
-    "iPad Air 11-inch (M2)",
-    "iPad (A16)",
-    "iPad (10th generation)",
-]
-
-by_name={d["name"]:d for d in ipads}
-
-for name in preferred_names:
-    if name in by_name:
-        print(by_name[name]["identifier"])
-        raise SystemExit(0)
-
-eleven=[
-    d for d in ipads
-    if "11-inch" in d["name"]
-    or "11 inch" in d["name"]
-]
-chosen=(eleven or ipads)[-1]
-print(chosen["identifier"])
-PY
-)
-
-UDID=$(simctl_bounded "create 11-inch iPad" 260 create "ATHLTH-iPad" "$DEVICE_TYPE" "$RUNTIME")
+UDID=$(create_compatible_ipad 11 "ATHLTH-iPad")
 
 cleanup() {
   xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
@@ -225,36 +229,11 @@ xcrun simctl terminate "$UDID" com.wesc9.athlth || true
 # Check the actual first logged-in Studio frame on a larger iPad,
 # in addition to the 11-inch device tested above. Keep the PNG for
 # visual inspection; entropy alone cannot prove layout quality.
-LARGE_DEVICE_TYPE=$(python3 - "$DEVICE_TYPES_JSON" <<'PY'
-import json,sys
-with open(sys.argv[1]) as fh:
-    devices=json.load(fh)["devicetypes"]
-preferred=[
-    "iPad Pro 13-inch (M5)",
-    "iPad Pro 13-inch (M4)",
-    "iPad Air 13-inch (M3)",
-    "iPad Air 13-inch (M2)",
-]
-by_name={item["name"]:item["identifier"] for item in devices}
-for name in preferred:
-    if name in by_name:
-        print(by_name[name])
-        break
-else:
-    options=[
-        item["identifier"] for item in devices
-        if item["name"].startswith("iPad")
-        and ("13-inch" in item["name"] or "13 inch" in item["name"])
-    ]
-    print(options[-1] if options else "")
-PY
-)
-
-if [ -n "$LARGE_DEVICE_TYPE" ]; then
+if UDID_13=$(create_compatible_ipad 13 "ATHLTH-iPad-13"); then
   echo "Rendering the first Studio screen on a 13-inch iPad."
   xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
   xcrun simctl delete "$UDID" >/dev/null 2>&1 || true
-  UDID=$(simctl_bounded "create 13-inch iPad" 260 create "ATHLTH-iPad-13" "$LARGE_DEVICE_TYPE" "$RUNTIME")
+  UDID="$UDID_13"
   simctl_bounded "boot 13-inch iPad" 100 boot "$UDID"
   simctl_bounded "wait for 13-inch iPad boot" 160 bootstatus "$UDID" -b
   simctl_bounded "install ATHLTH on 13-inch iPad" 180 install "$UDID" "$APP"
@@ -264,7 +243,13 @@ if [ -n "$LARGE_DEVICE_TYPE" ]; then
   validate_screen "13-inch-home"
   xcrun simctl terminate "$UDID" com.wesc9.athlth || true
 else
-  echo "::warning::No 13-inch iPad simulator exists on this runner; 11-inch screenshots are available."
+  code=$?
+  if [ "$code" -eq 66 ]; then
+    echo "::warning::No 13-inch iPad simulator type available; 11-inch tested."
+  else
+    echo "::error::13-inch iPad simulator setup failed (exit $code)"
+    exit "$code"
+  fi
 fi
 
 echo "ATHLTH onboarding, five tabs, five inline library pages and 13-inch Home checked for blank frames."
