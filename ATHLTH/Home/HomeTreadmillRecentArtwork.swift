@@ -15,6 +15,25 @@ struct HomeTreadmillRecentArtwork: View {
     /// identity instead of reusing an outdoor running photo in the feed.
     static let backgroundAssetName = "TreadmillRecentCardHero"
 
+    /// Use the original photo rather than the possibly downsampled UIKit
+    /// asset rendition. Loaded once and reused across Recent Activity cards.
+    /// The build validates its dimensions before bundling it.
+    private static let originalPhoto: UIImage? = {
+        guard let url = Bundle.main.url(
+            forResource: "TreadmillRecentCardHeroFull",
+            withExtension: "jpg"
+        ) else { return nil }
+        return UIImage(contentsOfFile: url.path)
+    }()
+
+    private var treadmillImage: Image {
+        if let originalPhoto = Self.originalPhoto {
+            Image(uiImage: originalPhoto)
+        } else {
+            Image(Self.backgroundAssetName)
+        }
+    }
+
     private var distance: Double? {
         guard let meters = workout.distanceMeters,
               meters.isFinite, meters > 0 else {
