@@ -20,11 +20,16 @@ struct ATHLTHAudioCoachTriggerEditor: View {
             (tr("TIME & DISTANCE", "TID OG DISTANSE"), [
                 .time, .distance
             ]),
+            (tr("PACE & TARGET", "TEMPO OG MÅLFART"), [
+                .paceFasterOverall, .paceFasterLastKilometer,
+                .paceFasterThanTarget, .paceSlowerThanTarget
+            ]),
             (tr("HEART RATE", "PULS OG PULSSONE"), [
                 .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit
             ]),
             (tr("WORKOUT EVENTS", "ØKTHENDELSER"), [
-                .workoutStart, .stepStart, .beforeNextStep
+                .workoutStart, .stepStart, .beforeNextStep,
+                .personalRecordConfirmed
             ]),
             (tr("EFFORT & RECOVERY", "DRAG OG PAUSER"), [
                 .effortStart, .effortEnd, .recoveryStart, .recoveryEnd,
@@ -57,6 +62,8 @@ struct ATHLTHAudioCoachTriggerEditor: View {
                                 case .time: interval = 60
                                 case .distance: interval = 1_000
                                 case .heartRateAbove, .heartRateBelow: interval = 150
+                                case .paceFasterOverall, .paceFasterLastKilometer: interval = 300
+                                case .paceFasterThanTarget, .paceSlowerThanTarget: interval = 1
                                 case .zoneEnter, .zoneExit: interval = 3
                                 case .beforeNextStep, .beforeMain, .beforeCooldown: interval = 10
                                 default: interval = 1
@@ -122,6 +129,28 @@ struct ATHLTHAudioCoachTriggerEditor: View {
                         Text(tr("Every ", "Hver ") + String(interval) +
                              tr(" metres", " meter"))
                     }
+                case .paceFasterOverall, .paceFasterLastKilometer:
+                    Stepper(value: $interval, in: 120...1_800, step: 5) {
+                        Text(String(format: "%d:%02d min/km", interval / 60, interval % 60))
+                            .monospacedDigit()
+                    }
+                    Text(tr(
+                        "Notifies on the transition to a faster pace, with a 10 s/km reset margin. Last-kilometre pace requires a complete measured kilometre.",
+                        "Varsler ved overgang til raskere tempo, med 10 sek/km margin før nytt varsel. Siste kilometer krever én hel registrert kilometer."
+                    ))
+                    .font(.caption).foregroundStyle(muted)
+                case .paceFasterThanTarget, .paceSlowerThanTarget:
+                    Text(tr(
+                        "Uses the current workout step's pace target. No notification when a target or fresh measured pace is unavailable.",
+                        "Bruker målfarten for aktiv deløvelse. Ingen varsling uten målfart eller en fersk målt hastighet."
+                    ))
+                    .font(.caption).foregroundStyle(muted)
+                case .personalRecordConfirmed:
+                    Text(tr(
+                        "Triggered only after a saved workout is compared against previous completed running results.",
+                        "Utløses først når en lagret økt er kontrollert mot tidligere gjennomførte løp."
+                    ))
+                    .font(.caption).foregroundStyle(muted)
                 case .heartRateAbove, .heartRateBelow:
                     Stepper(value: $interval, in: 40...220, step: 5) {
                         Text(String(interval) + " bpm")
