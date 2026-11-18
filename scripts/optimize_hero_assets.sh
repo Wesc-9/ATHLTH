@@ -67,6 +67,28 @@ resize_if_needed() {
   fi
 }
 
+# Preserve the original high-resolution treadmill image as a bundled
+# resource. Asset catalog compilation may choose a 260x164 optimized
+# rendition for small cards; loading the original avoids blurry retina
+# rendering. The source stays canonical and is never upscaled.
+treadmill_source="ATHLTH/Assets.xcassets/TreadmillRecentCardHero.imageset/TreadmillRecentCardHero.jpg"
+treadmill_resource="ATHLTH/Resources/TreadmillRecentCardHeroFull.jpg"
+if [ ! -f "$treadmill_source" ]; then
+  echo "::error::Missing full-resolution treadmill hero: $treadmill_source"
+  exit 1
+fi
+treadmill_width=$(sips -g pixelWidth "$treadmill_source" | awk '/pixelWidth/ {print $2}')
+treadmill_height=$(sips -g pixelHeight "$treadmill_source" | awk '/pixelHeight/ {print $2}')
+echo "Treadmill hero source dimensions: ${treadmill_width}x${treadmill_height}"
+if [ "$treadmill_width" -lt 1400 ] || [ "$treadmill_height" -lt 900 ]; then
+  echo "::error::Original treadmill photo is below 1400x900; do not upscale a thumbnail."
+  exit 1
+fi
+mkdir -p "$(dirname "$treadmill_resource")"
+if ! cmp -s "$treadmill_source" "$treadmill_resource"; then
+  cp "$treadmill_source" "$treadmill_resource"
+fi
+
 # Keep runtime artwork bounded even when a replacement image was uploaded
 # directly to an image set. The dedicated asset workflow handles format
 # conversion and thumbnails; this build-time guard prevents oversized source
