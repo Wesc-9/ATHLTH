@@ -2005,9 +2005,7 @@ struct FriendProfileView: View {
 
             remoteHeroStat(
                 value:
-                    (profile.performance?
-                        .totalWorkoutCount ?? 0)
-                        .formatted(),
+                    (profile.performance?.totalWorkoutCount).map { $0.formatted() } ?? "—",
                 title:
                     ATHLTHLocalization.choose(
                         english: "Workouts",
@@ -2101,7 +2099,7 @@ struct FriendProfileView: View {
                 performance?
                     .totalRunningDistanceMeters,
               meters > 0 else {
-            return "0"
+            return "—"
         }
 
         let kilometers =
@@ -2535,11 +2533,16 @@ struct FriendProfileView: View {
                 .font(.title3)
                 .foregroundStyle(ATHLTHTheme.accentDeep)
 
-            Text("This profile is private")
+            Text(ATHLTHLocalization.choose(
+                english: "This profile is private", norwegian: "Denne profilen er privat"
+            ))
                 .font(.headline)
 
             Text(
-                "Send a follow request to unlock the profile sections this athlete shares with approved followers."
+                ATHLTHLocalization.choose(
+                    english: "Send a follow request to view what this athlete shares with followers.",
+                    norwegian: "Send en følgeforespørsel for å se innholdet personen deler med godkjente følgere."
+                )
             )
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2679,9 +2682,15 @@ struct FriendProfileView: View {
                 )
                 .padding(.vertical, 6)
             } else {
-                HStack(spacing: 8) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8)
+                    ],
+                    spacing: 8
+                ) {
                     ForEach(
-                        Array(items.prefix(3))
+                        Array(items.prefix(4))
                     ) { item in
                     HStack(spacing: 7) {
                         Image(
@@ -2723,7 +2732,7 @@ struct FriendProfileView: View {
                             Text(item.name)
                                 .font(
                                     .system(
-                                        size: 9,
+                                        size: 11,
                                         weight:
                                             .semibold
                                     )
@@ -2861,22 +2870,9 @@ struct FriendProfileView: View {
                 )
 
                 Spacer()
-
-                HStack(spacing: 3) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "See all",
-                            norwegian: "Se alle"
-                        )
-                    )
-                    Image(systemName: "chevron.right")
-                }
-                .font(
-                    .caption.weight(.semibold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
+                Text("\(media.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
             if media.isEmpty {
@@ -3181,9 +3177,9 @@ struct FriendProfileView: View {
                 Label(
                     ATHLTHLocalization.choose(
                         english:
-                            "Personal records",
+                            "Performance & records",
                         norwegian:
-                            "Personlige rekorder"
+                            "Prestasjoner og rekorder"
                     ),
                     systemImage:
                         "chart.bar.fill"
@@ -3193,25 +3189,21 @@ struct FriendProfileView: View {
                 )
 
                 Spacer()
-
-                HStack(spacing: 3) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "See all",
-                            norwegian: "Se alle"
-                        )
-                    )
-                    Image(systemName: "chevron.right")
-                }
-                .font(
-                    .caption.weight(.semibold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
+                Text(ATHLTHLocalization.choose(
+                    english: "Selected results",
+                    norwegian: "Utvalgte resultater"
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
-            HStack(spacing: 6) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8)
+                ],
+                spacing: 8
+            ) {
                 remoteRecordTile(
                     title:
                         ATHLTHLocalization.choose(
@@ -3224,7 +3216,7 @@ struct FriendProfileView: View {
                                 .fastest1KSeconds
                         ),
                     icon: "figure.run",
-                    tint: .blue
+                    tint: ATHLTHPlanDesign.accentInk
                 )
 
                 remoteRecordTile(
@@ -3239,7 +3231,7 @@ struct FriendProfileView: View {
                                 .fastest5KSeconds
                         ),
                     icon: "5.circle.fill",
-                    tint: .green
+                    tint: ATHLTHPlanDesign.accentInk
                 )
 
                 remoteRecordTile(
@@ -3255,7 +3247,7 @@ struct FriendProfileView: View {
                         ),
                     icon:
                         "flag.checkered",
-                    tint: .indigo
+                    tint: ATHLTHPlanDesign.accentInk
                 )
 
                 remoteRecordTile(
@@ -3273,7 +3265,7 @@ struct FriendProfileView: View {
                         ),
                     icon:
                         "point.topleft.down.to.point.bottomright.curvepath",
-                    tint: .purple
+                    tint: ATHLTHPlanDesign.accentInk
                 )
             }
         }
@@ -3336,7 +3328,7 @@ struct FriendProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 8.0,
+                        size: 10.5,
                         weight: .semibold
                     )
                 )
@@ -3350,8 +3342,8 @@ struct FriendProfileView: View {
             Text(value)
                 .font(
                     .system(
-                        size: 13,
-                        weight: .bold,
+                        size: 17,
+                        weight: .semibold,
                         design: .rounded
                     )
                 )
@@ -3362,7 +3354,7 @@ struct FriendProfileView: View {
         .padding(8)
         .frame(
             maxWidth: .infinity,
-            minHeight: 78,
+            minHeight: 94,
             alignment: .topLeading
         )
         .background(
@@ -3420,24 +3412,9 @@ struct FriendProfileView: View {
                 )
 
                 Spacer()
-
-                HStack(spacing: 3) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "See all",
-                            norwegian: "Se alle"
-                        )
-                    )
-                    Image(systemName: "chevron.right")
-                }
-                .font(
-                    .caption.weight(
-                        .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
+                Text("\(items.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
             HStack(
