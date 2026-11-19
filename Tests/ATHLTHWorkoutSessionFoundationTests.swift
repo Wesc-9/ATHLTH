@@ -190,6 +190,34 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         ))
     }
 
+    func testRecoveryRejectsCommittedWorkoutEvenWhenCheckpointIsActive() {
+        let workout = phone()
+        let active = ATHLTHWorkoutSessionFoundation.running(workout, at: start)
+        XCTAssertNotNil(ATHLTHWorkoutSessionFoundation.recoverableSession(
+            active, alreadyCommittedWorkoutIDs: []
+        ))
+        XCTAssertNil(ATHLTHWorkoutSessionFoundation.recoverableSession(
+            active, alreadyCommittedWorkoutIDs: [workout.id]
+        ))
+    }
+
+    func testLateDeviceSnapshotCannotChangeRecordingOwnershipOrIdentity() {
+        let workout = phone()
+        let current = ATHLTHWorkoutSessionFoundation.running(workout, at: start)
+        let other = ATHLTHWorkoutSessionState(
+            workoutID: UUID(), plannedSessionID: nil,
+            recordingOwner: .iPhone, activity: .running,
+            phase: .work, engine: .endurance, startedAt: start,
+            activeElapsedSeconds: 30, stageIndex: nil, stageCount: nil
+        )
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.acceptsDeviceSnapshot(
+            current: current, incoming: current
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.acceptsDeviceSnapshot(
+            current: current, incoming: other
+        ))
+    }
+
     func testRecoveryNeverResurrectsCompletedHistory() {
         XCTAssertTrue(ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
             hasEnded: false, alreadyCommitted: false
