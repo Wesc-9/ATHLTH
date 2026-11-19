@@ -212,6 +212,24 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
     }
 
     @MainActor
+    func testCurrentSessionReadsActualStrengthStoreWithoutCreatingRecording() throws {
+        let phone = IPhoneWorkoutStore()
+        let strength = StrengthWorkoutStore()
+        XCTAssertNil(try ATHLTHWorkoutSessionFoundation.currentSession(
+            phone: phone, strength: strength
+        ))
+        strength.startFreestyle(watchSessionID: nil)
+        let originalID = try XCTUnwrap(strength.activeWorkout?.id)
+        XCTAssertEqual(try ATHLTHWorkoutSessionFoundation.currentSession(
+            phone: phone, strength: strength
+        )?.workoutID, originalID)
+        XCTAssertThrowsError(try ATHLTHWorkoutSessionFoundation.requireAvailableRecordingSlot(
+            phone: phone, strength: strength
+        ))
+        XCTAssertEqual(strength.activeWorkout?.id, originalID)
+    }
+
+    @MainActor
     func testStrengthProjectionKeepsWatchOwnershipThroughInternalRest() throws {
         let store = StrengthWorkoutStore()
         let plan = PlannedSession(
