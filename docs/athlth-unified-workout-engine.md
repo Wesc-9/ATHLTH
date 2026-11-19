@@ -1334,3 +1334,14 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   endret lokal økt-ID. Dette er en sikkerhetsgrense på lokal eksport,
   ikke en fysisk test av HealthKit eller garanti mot kontobytte mens
   selve HealthKit-operasjonen pågår.
+
+### Fase 8 – immutable HealthKit-kobling (19.11.2026)
+
+- Eksisterende iPhone-løp/gå-resultater med lagret HealthKit-UUID kan ikke
+  endres til en ny HealthKit-UUID ved forsinket retry. Hvis historikken
+  allerede har en UUID, men det eksakte HealthKit-oppslaget ikke finner
+  opptaket, stoppes eksporten i stedet for å lage et nytt opptak.
+- En idempotent gjentatt kvittering for samme HealthKit-UUID aksepteres.
+  To forskjellige lokale treninger får ikke lov å ta samme UUID.
+  `ATHLTHPhoneHealthExportPolicy.canLinkHealthKitWorkout` er testbar uten
+  faktisk helseautorisasjon; fysiske telefon-/Watch-tester må fortsatt kjøres.

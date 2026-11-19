@@ -176,4 +176,32 @@ final class ATHLTHPhoneCompletionJournalTests: XCTestCase {
         uncommitted.id = UUID()
         XCTAssertFalse(allowed(uncommitted, history: [finished]))
     }
+
+    func testHealthKitExportCannotChangePreviouslyLinkedWorkoutIdentity() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        var first = workout(start: start, end: start.addingTimeInterval(300))
+        let linked = UUID()
+        let different = UUID()
+        first.healthID = linked
+        let second = workout(
+            start: start.addingTimeInterval(500),
+            end: start.addingTimeInterval(900)
+        )
+
+        XCTAssertTrue(ATHLTHPhoneHealthExportPolicy.canLinkHealthKitWorkout(
+            linked, to: first.id, history: [first, second]
+        ))
+        XCTAssertFalse(ATHLTHPhoneHealthExportPolicy.canLinkHealthKitWorkout(
+            different, to: first.id, history: [first, second]
+        ))
+        XCTAssertFalse(ATHLTHPhoneHealthExportPolicy.canLinkHealthKitWorkout(
+            linked, to: second.id, history: [first, second]
+        ))
+        XCTAssertTrue(ATHLTHPhoneHealthExportPolicy.canLinkHealthKitWorkout(
+            different, to: second.id, history: [first, second]
+        ))
+        XCTAssertFalse(ATHLTHPhoneHealthExportPolicy.canLinkHealthKitWorkout(
+            different, to: UUID(), history: [first, second]
+        ))
+    }
 }

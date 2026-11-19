@@ -373,6 +373,25 @@ enum ATHLTHPhoneHealthExportPolicy {
             saved.end == workout.end
         }
     }
+
+    static func canLinkHealthKitWorkout(
+        _ healthKitID: UUID,
+        to workoutID: UUID,
+        history: [PhoneWorkout]
+    ) -> Bool {
+        guard let current = history.first(where: {
+            $0.id == workoutID && $0.end != nil
+        }) else { return false }
+
+        // A previously linked HealthKit UUID is immutable. Repeated callbacks
+        // can confirm the same ID but cannot silently replace it.
+        if let original = current.healthID, original != healthKitID {
+            return false
+        }
+        return !history.contains {
+            $0.id != workoutID && $0.healthID == healthKitID
+        }
+    }
 }
 
 
@@ -2070,6 +2089,16 @@ final class IPhoneWorkoutStore:
                 saved = existing
                 distanceWritten = true
             } else {
+                // A linked local workout may have been deleted from Health
+                // by the athlete or be temporarily unavailable to queries.
+                // Never silently create a second HealthKit recording with
+                // a new UUID or overwrite the existing binding.
+                guard history.first(where: {
+                    $0.id == workout.id
+                })?.healthID == nil else {
+                    message = "This workout is already linked to Apple Health. No duplicate was created."
+                    return
+                }
                 let result = try await buildHealthWorkout(
                     workout,
                     end: end
@@ -2109,12 +2138,12 @@ final class IPhoneWorkoutStore:
                 ),
                 history: history
             ) else { return }
-            // A HealthKit recording cannot be attributed to two different
-            // phone workouts, including when a delayed callback arrives.
-            guard !history.contains(where: {
-                $0.id != workout.id && $0.healthID == saved.uuid
-            }) else {
-                message = "Apple Health recording is already linked to another workout."
+            // A HealthKit UUID is immutable once linked and cannot be
+            // attributed to another local phone workout.
+            guard ATHLTHPhoneHealthExportPolicy.canLinkHealthKitWorkout(
+                saved.uuid, to: workout.id, history: history
+            ) else {
+                message = "Apple Health recording identity conflicts with saved workout history."
                 return
             }
 
