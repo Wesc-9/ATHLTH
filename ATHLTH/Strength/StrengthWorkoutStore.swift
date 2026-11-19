@@ -432,10 +432,23 @@ final class StrengthWorkoutStore: ObservableObject {
             throw AccountSyncMergeError.accountChanged
         }
         var seen = Set(workoutHistory.map(\.id))
-        let newWorkouts = incoming.filter {
-            $0.isFinished &&
-            $0.endedAt != nil &&
-            seen.insert($0.id).inserted
+        var seenHealthKitUUIDs = Set(workoutHistory.compactMap {
+            $0.healthMetrics.healthKitWorkoutUUID
+        })
+        // Remote history is evidence, never a second recording. Reject
+        // invalid intervals and duplicate HealthKit ownership while keeping
+        // all existing local records authoritative.
+        let newWorkouts = incoming.filter { workout in
+            guard workout.isFinished,
+                  let endedAt = workout.endedAt,
+                  endedAt >= workout.startedAt,
+                  !seen.contains(workout.id) else { return false }
+            if let uuid = workout.healthMetrics.healthKitWorkoutUUID {
+                guard !seenHealthKitUUIDs.contains(uuid) else { return false }
+                seenHealthKitUUIDs.insert(uuid)
+            }
+            seen.insert(workout.id)
+            return true
         }
         guard !newWorkouts.isEmpty else { return 0 }
         let combined = (workoutHistory + newWorkouts)
