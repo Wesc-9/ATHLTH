@@ -72,6 +72,37 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
         XCTAssertFalse(transition.switchesEngine)
     }
 
+    func testCaptureAwareRouteRejectsSilentOwnerHandoff() throws {
+        let id = UUID()
+        let blocks = [
+            block("Run", kind: .run, sequence: 1),
+            block("Strength", kind: .exercise, sequence: 2)
+        ]
+        let first = try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
+            workoutID: id, blocks: blocks, index: 0
+        ))
+        let next = try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
+            workoutID: id, blocks: blocks, index: 1
+        ))
+        func session(_ owner: ATHLTHWorkoutRecordingOwner) -> ATHLTHWorkoutSessionState {
+            ATHLTHWorkoutSessionState(
+                workoutID: id, plannedSessionID: nil,
+                recordingOwner: owner, activity: .strength,
+                phase: .work, engine: .strength,
+                startedAt: Date(timeIntervalSince1970: 1_900_000_000),
+                activeElapsedSeconds: 20, stageIndex: nil, stageCount: nil
+            )
+        }
+        XCTAssertNotNil(ATHLTHLiveWorkoutEngineRouter.transition(
+            from: first, to: next,
+            previousSession: session(.appleWatch), nextSession: session(.appleWatch)
+        ))
+        XCTAssertNil(ATHLTHLiveWorkoutEngineRouter.transition(
+            from: first, to: next,
+            previousSession: session(.appleWatch), nextSession: session(.iPhone)
+        ))
+    }
+
     func testDifferentWorkoutCannotBeTreatedAsMotorTransition() throws {
         let blocks = [block("Squat", kind: .exercise, sequence: 1)]
         let first = try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
