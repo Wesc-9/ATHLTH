@@ -162,6 +162,9 @@ struct PhoneWorkout: Codable, Identifiable {
     // Explicit plan origin, optional to preserve previous history.
     var plannedPlanID: UUID? = nil
     var plannedSessionID: UUID? = nil
+    // Exact iPad relay identity, never inferred from a reused plan/title.
+    // Optional to preserve historical workout decoding.
+    var relayRequestID: UUID? = nil
     // Optional route metadata keeps older TestFlight recordings decodable
     // while allowing iPhone route runs to use the same selected route as Watch.
     var plannedRouteID: UUID? = nil
@@ -357,6 +360,8 @@ final class IPhoneWorkoutStore:
 
     /// A permission prompt is an in-flight launch until explicitly resolved.
     var hasPendingLaunch: Bool { pendingWalking != nil }
+    // Expose ownership only for exact remote-launch reconciliation.
+    var recordingAccountID: UUID? { accountID }
     @Published private(set) var history: [PhoneWorkout] = []
     @Published private(set) var treadmillInclineOverrides:
         [UUID: Double] = [:]
@@ -431,6 +436,7 @@ final class IPhoneWorkoutStore:
     private var pendingWalking: Bool?
     private var pendingPlannedPlanID: UUID?
     private var pendingPlannedSessionID: UUID?
+    private var pendingRelayRequestID: UUID?
     private var pendingRunEnvironment: RunEnvironment = .outdoor
     private var pendingTreadmillInclinePercent: Double?
     private var pendingTreadmillSpeedKilometersPerHour: Double?
@@ -523,6 +529,7 @@ final class IPhoneWorkoutStore:
         pendingWalking = nil
         pendingPlannedPlanID = nil
         pendingPlannedSessionID = nil
+        pendingRelayRequestID = nil
         pendingRunEnvironment = .outdoor
         pendingTreadmillInclinePercent = nil
         pendingTreadmillSpeedKilometersPerHour = nil
@@ -700,7 +707,8 @@ final class IPhoneWorkoutStore:
             WatchGhostRaceAudioConfiguration? = nil,
         autoPauseEnabled: Bool = false,
         plannedPlanID: UUID? = nil,
-        plannedSessionID: UUID? = nil
+        plannedSessionID: UUID? = nil,
+        relayRequestID: UUID? = nil
     ) {
         guard accountID != nil, !saving, pendingWalking == nil,
               ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
@@ -721,6 +729,7 @@ final class IPhoneWorkoutStore:
         pendingWalking = walking
         pendingPlannedPlanID = plannedPlanID
         pendingPlannedSessionID = plannedSessionID
+        pendingRelayRequestID = relayRequestID
         pendingRunEnvironment = environment
         pendingTreadmillInclinePercent =
             environment == .treadmill
@@ -759,6 +768,7 @@ final class IPhoneWorkoutStore:
         pendingWalking = nil
         pendingPlannedPlanID = nil
         pendingPlannedSessionID = nil
+        pendingRelayRequestID = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
         pendingAudioCoach = nil
@@ -803,6 +813,7 @@ final class IPhoneWorkoutStore:
         let workoutTitle = pendingWorkoutTitle
         let plannedPlanID = pendingPlannedPlanID
         let plannedSessionID = pendingPlannedSessionID
+        let relayRequestID = pendingRelayRequestID
         let audioCoach = pendingAudioCoach
         let structuredWorkout =
             pendingStructuredWorkout
@@ -848,6 +859,7 @@ final class IPhoneWorkoutStore:
                 treadmillInclinePercent,
             plannedPlanID: plannedPlanID,
             plannedSessionID: plannedSessionID,
+            relayRequestID: relayRequestID,
             plannedRouteID: route?.id,
             plannedComparisonRouteID:
                 route?.sharedSourceRouteID ??
