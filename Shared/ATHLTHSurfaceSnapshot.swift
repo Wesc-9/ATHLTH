@@ -8,6 +8,9 @@ struct ATHLTHSurfaceSnapshot: Codable, Equatable {
     var primaryGoalTitle: String?
     var primaryGoalProgress: Double?
     var activeWorkout: ATHLTHSurfaceWorkoutSnapshot?
+    // Durable, account-scoped presentation tombstone. Never stores health
+    // samples or a second workout recording; legacy snapshots decode nil.
+    var lastFinishedWorkout: ATHLTHSurfaceWorkoutTerminalMarker? = nil
     var updatedAt: Date
 
     static let empty = ATHLTHSurfaceSnapshot(
@@ -42,6 +45,82 @@ struct ATHLTHSurfaceWorkoutSnapshot: Codable, Equatable {
     var strengthRestEndsAt: Date? = nil
     var strengthSetIndex: Int? = nil
     var strengthSetCount: Int? = nil
+}
+
+/// Only the session identifier needed to stop late Watch/relay telemetry
+/// from resurrecting a previously finished widget workout.
+struct ATHLTHSurfaceWorkoutTerminalMarker: Codable, Equatable {
+    let systemImage: String
+    let startedAt: Date?
+    let fallbackTitle: String
+    let finishedAt: Date
+
+    init(workout: ATHLTHSurfaceWorkoutSnapshot, finishedAt: Date) {
+        systemImage = workout.systemImage
+        startedAt = workout.startedAt
+        fallbackTitle = workout.title
+        self.finishedAt = finishedAt
+    }
+}
+
+enum ATHLTHSurfaceWorkoutOrdering {
+    static func sameSession(
+        _ lhs: ATHLTHSurfaceWorkoutSnapshot,
+        _ rhs: ATHLTHSurfaceWorkoutSnapshot
+    ) -> Bool {
+        guard lhs.systemImage == rhs.systemImage else { return false }
+        switch (lhs.startedAt, rhs.startedAt) {
+        case let (one?, two?):
+            return abs(one.timeIntervalSince(two)) < 2
+        case (nil, nil):
+            return lhs.title == rhs.title
+        default:
+            return false
+        }
+    }
+
+    static func matchesTerminal(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot,
+        marker: ATHLTHSurfaceWorkoutTerminalMarker?
+    ) -> Bool {
+        guard let marker,
+              workout.systemImage == marker.systemImage else { return false }
+        switch (workout.startedAt, marker.startedAt) {
+        case let (one?, two?):
+            return abs(one.timeIntervalSince(two)) < 2
+        case (nil, nil):
+            return workout.title == marker.fallbackTitle
+        default:
+            return false
+        }
+    }
+
+    /// The widgets and spectator iPad must respect the same record clock as
+    /// Live Activity. Neither equal/older samples nor older sessions may
+    /// rewind a newer workout, and a closed session cannot reappear.
+    static func accepts(
+        incoming: ATHLTHSurfaceWorkoutSnapshot,
+        current: ATHLTHSurfaceWorkoutSnapshot?,
+        terminal: ATHLTHSurfaceWorkoutTerminalMarker?,
+        now: Date = Date()
+    ) -> Bool {
+        let timestamp = incoming.updatedAt.timeIntervalSince1970
+        guard timestamp.isFinite,
+              now.timeIntervalSince(incoming.updatedAt) >= -10,
+              !matchesTerminal(incoming, marker: terminal)
+        else { return false }
+        guard let current else { return true }
+        if sameSession(current, incoming) {
+            return incoming.updatedAt >= current.updatedAt
+        }
+        // Different workouts are ordered by their actual start, not message
+        // arrival time. An old terminal packet must not hide a new workout.
+        if let previousStart = current.startedAt,
+           let incomingStart = incoming.startedAt {
+            return incomingStart > previousStart
+        }
+        return false
+    }
 }
 
 enum ATHLTHSurfaceSharedStore {
