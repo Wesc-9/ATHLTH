@@ -115,6 +115,14 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         )
     }
 
+    func testRelayClaimRejectsMultipleServerRows() {
+        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(0))
+        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(1))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(2))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(12))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(-1))
+    }
+
     func testReceiptRequiresExactlyOneMatchingServerRow() {
         let commandID = UUID()
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.confirmsReceipt(
