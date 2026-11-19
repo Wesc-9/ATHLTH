@@ -1307,3 +1307,14 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
 - Dette er ikke en godkjent fase 4. Full startveidekning, Watch-avklaring,
   iPad-samtykke, servermigrasjoner og fysisk iPhone/iPad/Watch-test må
   fremdeles bekreftes på samme commit. Ingen TestFlight.
+
+### Fase 8 – HealthKit-ID i personlige rekorder på tvers av enheter (19.11.2026)
+
+- `ATHLTHRunningPerformanceHistory.reconciledRecord` beskytter
+  `savePhone`, `saveWatch` og `backfillPhoneHistory` mot ulike lokale
+  progresjons-ID-er for samme HealthKit-UUID. Eksisterende UUID kan
+  ikke overskrives eller mistes ved forsinket Watch/iPhone-pakke.
+- Sen gyldig HealthKit-ID for samme opprinnelig ukoblede økt tillates.
+  Regresjonstester dekker identitetskollisjon, sen backfill og ugyldig
+  Watch-sluttid/varighet. Ingen ny database eller treningsopptak.
+- Same-commit CI og fysisk iPhone/Watch HealthKit-verifisering gjenstår.

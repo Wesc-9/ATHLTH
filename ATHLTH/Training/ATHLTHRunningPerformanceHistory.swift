@@ -176,6 +176,29 @@ enum ATHLTHRunningPerformanceHistory {
         return matches.count == 1 ? matches[0] : nil
     }
 
+    /// One HealthKit workout belongs to one local progression result.
+    /// Preserve verified UUIDs across delayed phone/Watch callbacks.
+    static func reconciledRecord(
+        _ incoming: ATHLTHCompletedRunningPerformance,
+        with existing: [ATHLTHCompletedRunningPerformance]
+    ) -> ATHLTHCompletedRunningPerformance? {
+        var result = incoming
+        if let previous = existing.first(where: { $0.id == incoming.id }),
+           let saved = previous.healthWorkoutUUID {
+            if let newLink = incoming.healthWorkoutUUID, newLink != saved {
+                return nil
+            }
+            result.healthWorkoutUUID = saved
+        }
+        if let linked = result.healthWorkoutUUID,
+           existing.contains(where: {
+               $0.id != result.id && $0.healthWorkoutUUID == linked
+           }) {
+            return nil
+        }
+        return result
+    }
+
     static func load(userID: UUID) -> [ATHLTHCompletedRunningPerformance] {
         AccountLocalStorage.read(
             [ATHLTHCompletedRunningPerformance].self, name: name, userID: userID
@@ -196,7 +219,10 @@ enum ATHLTHRunningPerformanceHistory {
         var byID = Dictionary(uniqueKeysWithValues: stored.map { ($0.id, $0) })
         var changed = false
         for workout in completed {
-            guard let record = ATHLTHCompletedRunningPerformance(phone: workout)
+            guard let proposed = ATHLTHCompletedRunningPerformance(phone: workout),
+                  let record = reconciledRecord(
+                      proposed, with: Array(byID.values)
+                  )
             else { continue }
             if byID[record.id] != record {
                 byID[record.id] = record
@@ -211,10 +237,11 @@ enum ATHLTHRunningPerformanceHistory {
     }
 
     static func savePhone(_ completed: PhoneWorkout, userID: UUID) {
-        guard let record = ATHLTHCompletedRunningPerformance(phone: completed) else {
-            return
-        }
+        guard let proposed = ATHLTHCompletedRunningPerformance(phone: completed)
+        else { return }
         var history = load(userID: userID)
+        guard let record = reconciledRecord(proposed, with: history)
+        else { return }
         if let index = history.firstIndex(where: { $0.id == record.id }) {
             if history[index] == record { return }
             history[index] = record
@@ -241,8 +268,10 @@ enum ATHLTHRunningPerformanceHistory {
         } ?? false
         guard recognizedPlan || recognizedHealth else { return }
         var history = load(userID: userID)
-        // A late HealthKit export may supply its workout UUID after the
-        // first Watch result. Update the existing session without duplicates.
+        // A late HealthKit export may add the UUID; a delayed packet must
+        // never erase it or create another result for the same recording.
+        guard let record = reconciledRecord(record, with: history)
+        else { return }
         if let index = history.firstIndex(where: { $0.id == record.id }) {
             if history[index] == record { return }
             history[index] = record

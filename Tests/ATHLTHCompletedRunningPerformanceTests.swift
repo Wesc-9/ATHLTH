@@ -208,4 +208,72 @@ final class ATHLTHCompletedRunningPerformanceTests: XCTestCase {
             candidates: [first, conflicted]
         ))
     }
+
+    func testProgressionHistoryNeverDuplicatesOneHealthKitWorkout() throws {
+        let finished = Date(timeIntervalSince1970: 1_900_000_000)
+        let healthID = UUID()
+        func sampleRecord(id: UUID, healthID: UUID?)
+            throws -> ATHLTHCompletedRunningPerformance {
+            var result = WatchWorkoutResult(
+                id: id, kind: .running, healthKitWorkoutUUID: healthID,
+                startedAt: finished.addingTimeInterval(-600),
+                endedAt: finished, duration: 600, activeCalories: 80,
+                distanceMeters: 1600, averageHeartRate: nil,
+                maxHeartRate: nil, routePointCount: 0
+            )
+            result.structuredWorkoutFullyCompleted = true
+            result.recordedRunningSteps = [
+                sample(0, phase: "warmup"), sample(1, phase: "main")
+            ]
+            return try XCTUnwrap(ATHLTHCompletedRunningPerformance(watch: result))
+        }
+
+        let first = try sampleRecord(id: UUID(), healthID: healthID)
+        let separateLocal = try sampleRecord(id: UUID(), healthID: healthID)
+        XCTAssertNil(ATHLTHRunningPerformanceHistory.reconciledRecord(
+            separateLocal, with: [first]
+        ), "Two local results must not claim the same HealthKit workout")
+
+        let delayedUnlinked = try sampleRecord(id: first.id, healthID: nil)
+        XCTAssertEqual(
+            ATHLTHRunningPerformanceHistory.reconciledRecord(
+                delayedUnlinked, with: [first]
+            )?.healthWorkoutUUID, healthID
+        )
+
+        let conflict = try sampleRecord(id: first.id, healthID: UUID())
+        XCTAssertNil(ATHLTHRunningPerformanceHistory.reconciledRecord(
+            conflict, with: [first]
+        ))
+
+        let unlinked = try sampleRecord(id: UUID(), healthID: nil)
+        let validBackfill = try sampleRecord(id: unlinked.id, healthID: UUID())
+        XCTAssertEqual(
+            ATHLTHRunningPerformanceHistory.reconciledRecord(
+                validBackfill, with: [unlinked]
+            )?.healthWorkoutUUID,
+            validBackfill.healthWorkoutUUID
+        )
+    }
+
+    func testInvalidWatchCompletionCannotCreateProgressionRecord() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        var result = WatchWorkoutResult(
+            id: UUID(), kind: .running, healthKitWorkoutUUID: UUID(),
+            startedAt: start, endedAt: start.addingTimeInterval(600),
+            duration: .infinity, activeCalories: 80,
+            distanceMeters: 1600, averageHeartRate: nil,
+            maxHeartRate: nil, routePointCount: 0
+        )
+        result.structuredWorkoutFullyCompleted = true
+        result.recordedRunningSteps = [
+            sample(0, phase: "warmup"), sample(1, phase: "main")
+        ]
+        XCTAssertNil(ATHLTHCompletedRunningPerformance(watch: result))
+        result.duration = 600
+        result.endedAt = start.addingTimeInterval(-1)
+        XCTAssertNil(ATHLTHCompletedRunningPerformance(watch: result))
+        result.endedAt = start.addingTimeInterval(600)
+        XCTAssertNotNil(ATHLTHCompletedRunningPerformance(watch: result))
+    }
 }
