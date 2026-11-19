@@ -78,6 +78,17 @@ enum ATHLTHWorkoutSessionFoundation {
         previous == next
     }
 
+    /// A change of activity or live engine is not permission to transfer
+    /// HealthKit ownership. Explicit owner handoff needs its own verified
+    /// recording lifecycle and cannot happen as a side effect of routing.
+    static func preservesRecordingOwnership(
+        _ previous: ATHLTHWorkoutSessionState,
+        _ next: ATHLTHWorkoutSessionState
+    ) -> Bool {
+        previous.workoutID == next.workoutID &&
+            previous.recordingOwner == next.recordingOwner
+    }
+
     static func running(
         _ workout: PhoneWorkout,
         at now: Date = Date()
