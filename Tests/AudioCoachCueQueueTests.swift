@@ -215,4 +215,45 @@ final class AudioCoachCueQueueTests: XCTestCase {
             .targetCritical
         )
     }
+    func testPauseDropsStalePaceRouteIntervalAndRestCues() {
+        var queue = ATHLTHCoachCueQueue()
+        let queued: [(ATHLTHCoachEventKind, ATHLTHGuidancePriority)] = [
+            (.runningStep, .structuredStep),
+            (.targetAlert, .targetCritical),
+            (.routeAlert, .routeCritical),
+            (.ghostUpdate, .ghostImportant),
+            (.strengthSet, .structuredStep),
+            (.strengthRest, .structuredStep),
+            (.workoutPause, .structuredStep),
+            (.manualStatus, .structuredStep)
+        ]
+        for (index, item) in queued.enumerated() {
+            XCTAssertTrue(queue.enqueue(
+                cue(item.0, key: String(index), priority: item.1),
+                now: origin
+            ))
+        }
+        queue.discardWorkoutMotionCues()
+        XCTAssertEqual(
+            Set(queue.pending.map(\.event.kind)),
+            Set([.workoutPause, .manualStatus])
+        )
+    }
+
+    func testCompletionDropsPendingCueAndNextWorkoutStartsWithEmptyQueue() {
+        var queue = ATHLTHCoachCueQueue()
+        XCTAssertTrue(queue.enqueue(
+            cue(.strengthRest, key: "old-rest", priority: .structuredStep),
+            now: origin
+        ))
+        queue.discardForWorkoutCompletion()
+        XCTAssertNil(queue.popNext(now: origin))
+        XCTAssertTrue(queue.enqueue(
+            cue(.runningStep, key: "next-workout", priority: .structuredStep),
+            now: origin
+        ))
+        XCTAssertEqual(queue.popNext(now: origin)?.event.key, "next-workout")
+    }
+
+
 }
