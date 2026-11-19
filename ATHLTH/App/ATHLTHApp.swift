@@ -2037,6 +2037,23 @@ struct AppRootView: View {
                 )
             }
         }
+        // A delayed GPS permission or account restore may create the real
+        // iPhone recording only after the original network claim returned.
+        // Retry reconciliation when an authoritative recording/history ID
+        // becomes available, without replaying the start command.
+        .task(
+            id: "\(signedInUserID?.uuidString ?? "none")-\(phoneWorkout.active?.relayRequestID?.uuidString ?? "none")-\(strengthWorkout.activeWorkout?.relayRequestID?.uuidString ?? "none")-\(phoneWorkout.history.count)-\(strengthWorkout.workoutHistory.count)"
+        ) {
+            guard ATHLTHDeviceRole.isIPhone,
+                  appSession.signedIn,
+                  scenePhase == .active
+            else { return }
+            await deviceRelay.reconcileUncertainWorkoutStarts(
+                watchConnection: watchConnection,
+                phoneWorkout: phoneWorkout,
+                strengthWorkout: strengthWorkout
+            )
+        }
         // An explicitly chosen workout-peak source follows new higher
         // measurements. It never changes a manually entered or age-estimated
         // maximum. Re-check on foreground and when the user opts in.
