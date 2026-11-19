@@ -2,6 +2,112 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHWidgetPresentationPolicyTests: XCTestCase {
+    private func surfaceWorkout(
+        startedAt: Date,
+        capturedAt: Date,
+        title: String = "Run",
+        state: String = "running",
+        systemImage: String = "figure.run"
+    ) -> ATHLTHSurfaceWorkoutSnapshot {
+        ATHLTHSurfaceWorkoutSnapshot(
+            title: title, systemImage: systemImage,
+            state: state, startedAt: startedAt,
+            elapsedTime: 120, distanceMeters: 500,
+            heartRate: 140, updatedAt: capturedAt
+        )
+    }
+
+    func testWidgetRejectsDelayedWatchStatusAndAcceptsNewerIntervalState() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let old = surfaceWorkout(
+            startedAt: start, capturedAt: start.addingTimeInterval(15)
+        )
+        let latest = surfaceWorkout(
+            startedAt: start, capturedAt: start.addingTimeInterval(30)
+        )
+        let now = start.addingTimeInterval(35)
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: old, current: latest, terminal: nil, now: now
+        ))
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: latest, current: old, terminal: nil, now: now
+        ))
+    }
+
+    func testWidgetTerminalWatermarkCannotReopenOldWorkout() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let workout = surfaceWorkout(
+            startedAt: start, capturedAt: start.addingTimeInterval(80)
+        )
+        let ended = ATHLTHSurfaceWorkoutTerminalMarker(
+            workout: workout, finishedAt: start.addingTimeInterval(90)
+        )
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: workout, current: nil,
+            terminal: ended, now: start.addingTimeInterval(95)
+        ))
+        var renamed = workout
+        renamed.title = "Evening intervals"
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: renamed, current: nil,
+            terminal: ended, now: start.addingTimeInterval(95)
+        ))
+        let next = surfaceWorkout(
+            startedAt: start.addingTimeInterval(150),
+            capturedAt: start.addingTimeInterval(155)
+        )
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: next, current: nil,
+            terminal: ended, now: start.addingTimeInterval(160)
+        ))
+    }
+
+    func testOlderWorkoutCannotReplaceNewerWidgetAfterDeviceSwitch() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let old = surfaceWorkout(
+            startedAt: start, capturedAt: start.addingTimeInterval(60)
+        )
+        let newPhone = surfaceWorkout(
+            startedAt: start.addingTimeInterval(120),
+            capturedAt: start.addingTimeInterval(140)
+        )
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: old, current: newPhone,
+            terminal: nil, now: start.addingTimeInterval(145)
+        ))
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: newPhone, current: old,
+            terminal: nil, now: start.addingTimeInterval(145)
+        ))
+    }
+
+    func testInvalidFutureWidgetCaptureIsRejected() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let now = start.addingTimeInterval(100)
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: surfaceWorkout(
+                startedAt: start, capturedAt: now.addingTimeInterval(30)
+            ), current: nil, terminal: nil, now: now
+        ))
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: surfaceWorkout(
+                startedAt: start,
+                capturedAt: Date(timeIntervalSince1970: .infinity)
+            ), current: nil, terminal: nil, now: now
+        ))
+    }
+
+    func testOldWidgetSnapshotDecodesWithoutTerminalWatermark() throws {
+        let oldJSON = """
+        {"recoveryState":"Ready","updatedAt":0}
+        """
+        let old = try JSONDecoder().decode(
+            ATHLTHSurfaceSnapshot.self, from: Data(oldJSON.utf8)
+        )
+        XCTAssertNil(old.lastFinishedWorkout)
+        XCTAssertNil(old.activeWorkout)
+    }
+
     func testFourByFourShowsActualEffortIntervals() {
         XCTAssertEqual(
             ATHLTHWidgetPresentationPolicy.intervalLabel(
