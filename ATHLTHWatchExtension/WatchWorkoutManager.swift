@@ -2956,6 +2956,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         _ rawCommand: WatchStrengthCommand
     ) -> Bool {
         var command = rawCommand
+        // Pin ownership to the workout's original account, not whoever
+        // happens to be signed in on iPhone when an offline packet arrives.
+        command.accountOwnerID = workoutOwnerID
         if command.kind == .requestSnapshot,
            command.bootstrapSnapshot == nil,
            workoutInitiatedLocallyOnWatch {

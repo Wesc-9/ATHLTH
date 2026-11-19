@@ -1736,6 +1736,10 @@ struct WatchStrengthCommand: Codable, Hashable {
     // The first durable request from a standalone Watch carries enough state
     // for iPhone to recreate the strength log before replaying queued actions.
     var bootstrapSnapshot: WatchStrengthSessionSnapshot? = nil
+    /// Account which owned the workout when Watch started recording.
+    /// Optional for older queued WatchConnectivity payloads; missing does
+    /// not grant authority to bootstrap a workout under another account.
+    var accountOwnerID: UUID? = nil
 }
 
 /// Recorded, not prescribed, performance for a complete structured run.

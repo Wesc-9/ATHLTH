@@ -30,6 +30,27 @@ enum ATHLTHStrengthWatchControlPolicy {
     }
 }
 
+
+/// A Watch request received after account sign-out or switching accounts
+/// cannot automatically bootstrap a new workout for a different athlete.
+/// The ownership ID is bound to the Watch workout's recording start.
+enum ATHLTHStrengthWatchBootstrapOwnershipPolicy {
+    static func permitsBootstrap(
+        _ command: WatchStrengthCommand, currentAccountID: UUID
+    ) -> Bool {
+        guard command.kind == .requestSnapshot,
+              command.initiatedOnWatch == true,
+              let owner = command.accountOwnerID,
+              owner == currentAccountID
+        else { return false }
+        // A supplied snapshot must match the command workout ID exactly.
+        if let snapshot = command.bootstrapSnapshot {
+            return command.workoutID == snapshot.workoutID
+        }
+        return command.workoutID != nil
+    }
+}
+
 /// Keeps the high-frequency strength <-> Apple Watch synchronization out of
 /// AppRootView so reps/weight/rest edits do not invalidate the entire app
 /// hierarchy.
@@ -157,6 +178,14 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                     // Keep the request queued until account restoration has
                     // selected the correct per-user strength checkpoint.
                     return false
+                }
+                guard ATHLTHStrengthWatchBootstrapOwnershipPolicy.permitsBootstrap(
+                    command, currentAccountID: appSession.profile.userID
+                ) else {
+                    // Never reinterpret a legacy/unowned Watch request as
+                    // consent to record under a different signed-in account.
+                    // Watch keeps its durable journal and final result.
+                    return true
                 }
 
                 if let bootstrap =

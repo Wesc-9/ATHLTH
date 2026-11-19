@@ -364,3 +364,12 @@ som ferdige før egne faser og reelle tester er fullført.
   Begge har begrenset størrelse og endrer ikke HealthKit-opptaket.
 - Privat, lesbar iPad-styrkestatus teller beholdte gruppesett med
   `skippedAt` nøyaktig én gang, både totalt og per øvelse.
+
+- **Fase 4 / Watch-opptakseier etter kontobytte:** Hvert nytt
+  `WatchStrengthCommand` merkes nå med kontoen som eide den aktive
+  Watch-treningen ved oppstart. En Watch-startet styrkeøkt kan kun
+  gjenopprettes automatisk på iPhone hvis den innloggede kontoen,
+  økt-ID-en og eventuelt bootstrap-snapshot har matchende eierskap.
+  Legacy-kommandoer uten eier-ID dekodes fortsatt, men kan ikke
+  opprette en ny styrkeøkt på en vilkårlig konto. Den opprinnelige
+  Watch-journalen og fullføringsresultatet beholdes på Watch.

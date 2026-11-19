@@ -243,4 +243,47 @@ final class StrengthSkipSetWatchTests: XCTestCase {
         ))
     }
 
+
+    func testOfflineWatchBootstrapCannotCrossAccountsOrUseLegacyUnownedRequest() throws {
+        let owner = UUID()
+        let workoutID = UUID()
+        var command = WatchStrengthCommand(
+            id: UUID(), workoutID: workoutID, kind: .requestSnapshot,
+            reps: nil, weightKilograms: nil, restSeconds: nil,
+            addRestSeconds: nil, sentAt: Date(),
+            initiatedOnWatch: true
+        )
+        XCTAssertFalse(ATHLTHStrengthWatchBootstrapOwnershipPolicy.permitsBootstrap(
+            command, currentAccountID: owner
+        ))
+        command.accountOwnerID = owner
+        XCTAssertTrue(ATHLTHStrengthWatchBootstrapOwnershipPolicy.permitsBootstrap(
+            command, currentAccountID: owner
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchBootstrapOwnershipPolicy.permitsBootstrap(
+            command, currentAccountID: UUID()
+        ))
+        command.workoutID = nil
+        XCTAssertFalse(ATHLTHStrengthWatchBootstrapOwnershipPolicy.permitsBootstrap(
+            command, currentAccountID: owner
+        ))
+
+        // Legacy Watch payloads without accountOwnerID still decode.
+        command.workoutID = workoutID
+        let encoded = try JSONEncoder().encode(command)
+        var legacy = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        legacy.removeValue(forKey: "accountOwnerID")
+        let restored = try JSONDecoder().decode(
+            WatchStrengthCommand.self,
+            from: JSONSerialization.data(withJSONObject: legacy)
+        )
+        XCTAssertNil(restored.accountOwnerID)
+        XCTAssertFalse(ATHLTHStrengthWatchBootstrapOwnershipPolicy.permitsBootstrap(
+            restored, currentAccountID: owner
+        ))
+    }
+
+
 }
