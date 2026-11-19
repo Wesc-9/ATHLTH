@@ -230,4 +230,36 @@ final class AppleWatchConnectionPolicyTests: XCTestCase {
         XCTAssertNil(WatchRemoteLaunchCompletionReceipt(result: decoded))
     }
 
+    func testConflictingSavedWatchWorkoutsNeverSelectOneAsProof() throws {
+        let start = Date()
+        let requestID = UUID(), ownerID = UUID()
+        var result = WatchWorkoutResult(
+            id: UUID(), kind: .strength, healthKitWorkoutUUID: UUID(),
+            startedAt: start, endedAt: start.addingTimeInterval(45),
+            duration: 45, activeCalories: 9, distanceMeters: 0,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+        )
+        result.relayRequestID = requestID
+        result.accountOwnerID = ownerID
+        let first = try XCTUnwrap(
+            WatchRemoteLaunchCompletionReceipt(result: result)
+        )
+        XCTAssertEqual(
+            WatchRemoteLaunchCompletionPolicy.uniqueReceipt(
+                [first], requestID: requestID, ownerID: ownerID
+            ), first
+        )
+        result.id = UUID()
+        result.healthKitWorkoutUUID = UUID()
+        let second = try XCTUnwrap(
+            WatchRemoteLaunchCompletionReceipt(result: result)
+        )
+        XCTAssertNil(WatchRemoteLaunchCompletionPolicy.uniqueReceipt(
+            [first, second], requestID: requestID, ownerID: ownerID
+        ))
+        XCTAssertNil(WatchRemoteLaunchCompletionPolicy.uniqueReceipt(
+            [first], requestID: requestID, ownerID: UUID()
+        ))
+    }
+
 }
