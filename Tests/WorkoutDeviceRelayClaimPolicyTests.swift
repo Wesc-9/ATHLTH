@@ -129,6 +129,63 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         ))
     }
 
+    func testCompletedWatchResultResolvesOnlyMatchingAccountKindAndRequest() {
+        let now = Date()
+        let id = UUID(), owner = UUID()
+        var result = WatchWorkoutResult(
+            id: UUID(), kind: .running, healthKitWorkoutUUID: UUID(),
+            startedAt: now, endedAt: now.addingTimeInterval(120),
+            duration: 120, activeCalories: 20, distanceMeters: 450,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+        )
+        result.relayRequestID = id
+        result.accountOwnerID = owner
+        let receipt = WatchRemoteLaunchCompletionReceipt(result: result)
+        let policy = WorkoutDeviceRelayClaimPolicy.self
+        func verified(
+            target: String = "apple_watch", kind: String = "run",
+            request: UUID = id, signedIn: UUID = owner,
+            failure: Date? = nil, createdAt: Date? = nil
+        ) -> Bool {
+            policy.confirmsCompletedWatchLaunch(
+                target: target, kind: kind,
+                serverRequestID: request,
+                serverCreatedAt: createdAt ?? now.addingTimeInterval(-5),
+                signedInOwnerID: signedIn, receipt: receipt, failedAt: failure
+            )
+        }
+        XCTAssertNotNil(receipt)
+        XCTAssertTrue(verified())
+        XCTAssertFalse(verified(target: "iphone"))
+        XCTAssertFalse(verified(kind: "walk"))
+        XCTAssertFalse(verified(kind: "strength"))
+        XCTAssertFalse(verified(request: UUID()))
+        XCTAssertFalse(verified(signedIn: UUID()))
+        XCTAssertFalse(verified(failure: now))
+        XCTAssertFalse(verified(createdAt: now.addingTimeInterval(300)))
+    }
+
+    func testCompletionProofRequiresSavedHealthKitUUIDAndOwner() {
+        let now = Date()
+        var result = WatchWorkoutResult(
+            id: UUID(), kind: .strength, healthKitWorkoutUUID: nil,
+            startedAt: now, endedAt: now.addingTimeInterval(20),
+            duration: 20, activeCalories: 12, distanceMeters: 0,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+        )
+        result.relayRequestID = UUID()
+        result.accountOwnerID = UUID()
+        XCTAssertNil(WatchRemoteLaunchCompletionReceipt(result: result))
+        result.healthKitWorkoutUUID = UUID()
+        result.accountOwnerID = nil
+        XCTAssertNil(WatchRemoteLaunchCompletionReceipt(result: result))
+        result.accountOwnerID = UUID()
+        result.relayRequestID = nil
+        XCTAssertNil(WatchRemoteLaunchCompletionReceipt(result: result))
+        result.relayRequestID = UUID()
+        XCTAssertNotNil(WatchRemoteLaunchCompletionReceipt(result: result))
+    }
+
     func testUnknownWatchStartRequiresExactLiveRequestIdentity() {
         let request = UUID()
         let confirm = WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch
