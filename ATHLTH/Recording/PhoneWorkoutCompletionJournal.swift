@@ -13,6 +13,13 @@ enum PhoneWorkoutCompletionJournal {
     }
 
     static func save(_ workout: PhoneWorkout, userID: UUID) throws {
+        guard let endedAt = workout.end, endedAt >= workout.start else {
+            throw CocoaError(.fileWriteInapplicableStringEncoding)
+        }
+        // Late completion callbacks must not replace a newer durable receipt.
+        if let previous = read(userID: userID),
+           let previousEnd = previous.end,
+           previousEnd > endedAt { return }
         let data = try JSONEncoder().encode(workout)
         let target = try url(userID: userID)
         try FileManager.default.createDirectory(
@@ -25,7 +32,8 @@ enum PhoneWorkoutCompletionJournal {
         guard let target = try? url(userID: userID),
               let data = try? Data(contentsOf: target),
               let workout = try? JSONDecoder().decode(PhoneWorkout.self, from: data),
-              workout.end != nil else { return nil }
+              let endedAt = workout.end,
+              endedAt >= workout.start else { return nil }
         return workout
     }
 
