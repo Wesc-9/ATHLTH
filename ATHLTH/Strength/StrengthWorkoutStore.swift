@@ -1345,7 +1345,7 @@ final class StrengthWorkoutStore: ObservableObject {
         Self.beginStrengthGroup(&workout, selected: target)
         currentExerciseIndex = target
         currentSetIndex = workout.exercises[target].sets
-            .firstIndex(where: { !$0.isCompleted }) ?? 0
+            .firstIndex(where: { !$0.isResolved }) ?? 0
         activeWorkout = workout
         if let id = currentSet?.id {
             watchCaptureNeedsBaseline.insert(id)
@@ -1369,7 +1369,7 @@ final class StrengthWorkoutStore: ObservableObject {
                   $0.id == exerciseID
               }),
               let setIndex = workout.exercises[exerciseIndex].sets.firstIndex(
-                  where: { $0.id == setID && !$0.isCompleted }
+                  where: { $0.id == setID && !$0.isResolved }
               )
         else { return false }
 
@@ -2095,7 +2095,7 @@ final class StrengthWorkoutStore: ObservableObject {
                                 item.sets
                                     .firstIndex(
                                         where: {
-                                            !$0.isCompleted
+                                            !$0.isResolved
                                         }
                                     ),
                             skippedSets: item.skippedPlannedSetCount,
@@ -5140,9 +5140,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 .contains(
                     currentExerciseIndex
                 ),
-            workout.exercises[
-                currentExerciseIndex
-            ].sets.allSatisfy(\.isCompleted),
+            currentExerciseAllSetsCompleted,
             hasNextExercise
         else {
             return
@@ -5195,7 +5193,7 @@ final class StrengthWorkoutStore: ObservableObject {
             workout.exercises[nextIndex]
                 .sets.firstIndex(
                     where: {
-                        !$0.isCompleted
+                        !$0.isResolved
                     }
                 ) ?? 0
         restEndsAt = nil

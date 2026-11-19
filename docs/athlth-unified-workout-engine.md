@@ -294,3 +294,11 @@ som ferdige før egne faser og reelle tester er fullført.
   speilet skip-tall fra faktiske ekstra utelatte sett, også i
   andre gruppemoduser enn EMOM. Testene kontrollerer faste sett-ID-er,
   ett skip, null utført volum og riktig neste stasjon.
+
+- **Fase 3 / Watch og valg av neste steg:** Watch-snapshot og manuell
+  øvelse-/settvelger bruker nå `isResolved` for å finne neste åpne sett,
+  slik at et bevart gruppesett med `skippedAt` aldri tilbys for registrering
+  på nytt. Overgangen «Neste øvelse» godtar også en gruppe som ble
+  uttrykkelig avsluttet ved å hoppe over siste sett (`completedAt`), uten
+  at manglende repetisjoner telles som utført. Egne regresjonstester dekker
+  både sperre mot gjenvalg og faktisk overgang til neste øvelse.

@@ -439,4 +439,45 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
     }
 
 
+
+    func testSkippingLastGroupedSlotAllowsExplicitMoveToNextExercise() throws {
+        let id = UUID()
+        var grouped = exercise(10, weight: 25, sets: 1)
+        grouped.groupID = id
+        grouped.groupKind = .superset
+        grouped.groupRounds = 1
+        var next = exercise(12, weight: 15, sets: 1)
+        next.title = "Next exercise after group"
+        var plan = PlannedSession(
+            id: UUID(), title: "Group followed by exercise",
+            kind: .strength, scheduledStart: nil,
+            durationMinutes: 10,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        plan.workoutBlocks = [grouped, next]
+        let store = StrengthWorkoutStore()
+        store.start(
+            session: plan, watchSessionID: nil,
+            trackingMode: .advanced, captureDevice: .iPhone
+        )
+        let skippedSet = try XCTUnwrap(store.currentSet?.id)
+        let selectedExercise = try XCTUnwrap(store.currentExercise?.id)
+        XCTAssertTrue(store.skipCurrentSet())
+        XCTAssertTrue(store.currentExerciseAllSetsCompleted)
+        XCTAssertTrue(store.hasNextExercise)
+        XCTAssertFalse(store.selectSetForNow(
+            exerciseID: selectedExercise, setID: skippedSet
+        ), "An intentionally skipped slot must not become a new pending set.")
+
+        store.moveToNextExercise()
+        XCTAssertEqual(store.currentExercise?.exercise.name, "Next exercise after group")
+        XCTAssertFalse(store.currentSet?.isResolved ?? true)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 0)
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.auditedSkippedSets, 1)
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.sets.first?.id, skippedSet)
+    }
+
+
 }
