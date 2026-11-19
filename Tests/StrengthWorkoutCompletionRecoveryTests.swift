@@ -72,6 +72,27 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         XCTAssertFalse(store.attachFinishedWatchMetrics(
             measured, workoutID: nextID, ownerID: owner
         ))
+        // A later callback without HealthKit identity must not clear the
+        // already linked UUID from a completed Watch workout.
+        let missingIdentity = LinkedHealthWorkoutMetrics(
+            healthKitWorkoutUUID: nil,
+            duration: 125, activeCalories: 63,
+            averageHeartRate: 121, maxHeartRate: 146
+        )
+        XCTAssertFalse(store.attachFinishedWatchMetrics(
+            missingIdentity, workoutID: originalID, ownerID: owner
+        ))
+        XCTAssertEqual(
+            store.workoutHistory.first(where: { $0.id == originalID })?
+                .healthMetrics.healthKitWorkoutUUID,
+            result.healthKitWorkoutUUID
+        )
+        // Reusing this HealthKit recording for a second completed session
+        // would double-count the original Apple Health workout.
+        XCTAssertTrue(store.finish())
+        XCTAssertFalse(store.attachFinishedWatchMetrics(
+            measured, workoutID: nextID, ownerID: owner
+        ))
     }
 
     @MainActor
@@ -179,6 +200,9 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         XCTAssertFalse(store.attachFinishedWorkoutHealthKitUUID(
             UUID(), workoutID: UUID(), ownerID: owner
         ))
+        XCTAssertFalse(store.attachFinishedWorkoutHealthKitUUID(
+            uuid, workoutID: secondID, ownerID: owner
+        ), "One HealthKit workout UUID cannot identify two finished sessions")
 
         XCTAssertEqual(
             store.workoutHistory.first(where: { $0.id == firstID })?
