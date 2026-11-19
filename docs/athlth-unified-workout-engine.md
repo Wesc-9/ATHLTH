@@ -1134,3 +1134,11 @@ fysisk kontroll av låseskjerm/Dynamic Island, skjermlås, fem minutters
 tredemølle uten GPS, gjenoppkobling og iPad-samtykke gjenstår.
 Ingen TestFlight-opplasting. Fase 6 er implementert i kildekode,
 men ikke release-/fysisk godkjent.
+
+
+### Fase 7 – varig fullføringsjournal for løp/gå og styrke (19.11.2026)
+
+- `PhoneWorkoutCompletionJournal` og `StrengthWorkoutCompletionJournal` avviser nå resultater hvor sluttid er før starttid. Journalene kan ikke lenger erstattes av en eldre, forsinket fullføringscallback etter en nyere økt. Eksisterende account-scoped filformat, HealthKit-opptakseier, workout-ID og historikk beholdes uendret; ingen datamigrasjon.
+- Leseveien ignorerer også ugyldige tidsintervaller fra gamle/ødelagte journalfiler. Eldre gyldige filer dekodes som før.
+- `ATHLTHPhoneCompletionJournalTests` tester kronologisk monotoni, ugyldig sluttid og isolasjon mellom kontoer. Den målrettede hybrid-XCTest-workflowen er oppdatert for å kjøre disse ved endring av journalene.
+- Dette er en avgrenset fase-7-hardening, **ikke** godkjenning av HealthKit/resultater/historikk. Gjenstår: samme-commit bygg/XCTest, styrkejournalens integrasjonsregresjon, reell HealthKit-UUID-korrelasjon, gjenoppretting etter prosesskrasj, og fysisk test av løp/gå/styrke med Watch og iPhone.
