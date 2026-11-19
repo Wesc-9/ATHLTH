@@ -251,4 +251,69 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertEqual(snapshot.completedSets, 0)
     }
 
+
+    func testIpadReconnectAcceptsOnlyFreshOwnerApprovedTelemetry() {
+        let now = Date(timeIntervalSince1970: 2_100_000_000)
+        var remote = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: UUID(), kind: "strength", title: "Strength",
+            startedAt: now.addingTimeInterval(-600), elapsedSeconds: 600,
+            distanceMeters: nil, currentStep: "Squat", nextStep: nil,
+            completedSets: 2, totalSets: 6
+        )
+        remote.capturedAt = now.addingTimeInterval(-3)
+        XCTAssertTrue(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            remote,
+            updatedAt: now.addingTimeInterval(-2),
+            expiresAt: now.addingTimeInterval(28),
+            at: now
+        ))
+        remote.capturedAt = now.addingTimeInterval(-80)
+        XCTAssertFalse(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            remote,
+            updatedAt: now.addingTimeInterval(-1),
+            expiresAt: now.addingTimeInterval(28),
+            at: now
+        ), "A relay heartbeat must not revive an old Watch sensor snapshot.")
+        remote.capturedAt = now.addingTimeInterval(-2)
+        XCTAssertFalse(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            remote,
+            updatedAt: now.addingTimeInterval(-40),
+            expiresAt: now.addingTimeInterval(28),
+            at: now
+        ))
+        XCTAssertFalse(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            remote,
+            updatedAt: now.addingTimeInterval(-1),
+            expiresAt: now.addingTimeInterval(-1),
+            at: now
+        ))
+    }
+
+    func testLegacyIpadSnapshotWithoutCaptureDateUsesOnlyFreshHeartbeat() {
+        let now = Date(timeIntervalSince1970: 2_100_000_000)
+        let old = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: UUID(), kind: "running", title: "Run",
+            startedAt: now.addingTimeInterval(-120),
+            elapsedSeconds: 120, distanceMeters: 500,
+            currentStep: nil, nextStep: nil,
+            completedSets: nil, totalSets: nil
+        )
+        XCTAssertNil(old.capturedAt)
+        XCTAssertTrue(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            old, updatedAt: now.addingTimeInterval(-5),
+            expiresAt: now.addingTimeInterval(25), at: now
+        ))
+        XCTAssertFalse(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            old, updatedAt: now.addingTimeInterval(-50),
+            expiresAt: now.addingTimeInterval(25), at: now
+        ))
+        var invalid = old
+        invalid.elapsedSeconds = .infinity
+        XCTAssertFalse(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            invalid, updatedAt: now.addingTimeInterval(-1),
+            expiresAt: now.addingTimeInterval(25), at: now
+        ))
+    }
+
+
 }

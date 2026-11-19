@@ -143,6 +143,29 @@ struct ATHLTHLocalStructuredWorkoutStatus {
 /// Polling deliberately shares only a compact spectator state; no second
 /// HKWorkoutSession, no mirrored GPS track, no public/social presence.
 /// Server-side RLS additionally enforces user_id = auth.uid().
+
+/// A reconnecting iPad must not render stale, wrong-account or expired
+/// workout telemetry. The iPad remains read-only and never opens HealthKit.
+/// Legacy snapshots without capturedAt use the server row heartbeat.
+enum ATHLTHCrossDeviceLiveReadPolicy {
+    static func accepts(
+        _ snapshot: ATHLTHCrossDeviceWorkoutSnapshot,
+        updatedAt: Date,
+        expiresAt: Date,
+        at now: Date = Date()
+    ) -> Bool {
+        let rowAge = now.timeIntervalSince(updatedAt)
+        let sampleAge = now.timeIntervalSince(snapshot.capturedAt ?? updatedAt)
+        let startAge = now.timeIntervalSince(snapshot.startedAt)
+        return expiresAt > now &&
+            rowAge >= -10 && rowAge <= 35 &&
+            sampleAge >= -10 && sampleAge <= 35 &&
+            startAge >= -10 &&
+            snapshot.elapsedSeconds.isFinite &&
+            snapshot.elapsedSeconds >= 0
+    }
+}
+
 @MainActor
 final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     static let shared = ATHLTHCrossDeviceWorkoutStore()
@@ -895,7 +918,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
               trackingAccountID == accountID,
               client.auth.currentUser?.id == accountID else { return }
         await readPresence(accountID: accountID)
-        guard trackingAccountID == accountID else { return }
+        guard trackingAccountID == accountID,
+              client.auth.currentUser?.id == accountID else { return }
         await readRemote(accountID: accountID)
     }
 
@@ -908,7 +932,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
-            guard trackingAccountID == accountID, !Task.isCancelled else {
+            guard trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID,
+                  !Task.isCancelled else {
                 return
             }
             let valid = rows.first.flatMap { $0.expiresAt > .now ? $0 : nil }
@@ -917,7 +943,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             presenceConnectionIssue = false
             hasCheckedPresence = true
         } catch {
-            guard trackingAccountID == accountID, !Task.isCancelled else {
+            guard trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID,
+                  !Task.isCancelled else {
                 return
             }
             hasCheckedPresence = true
@@ -952,12 +980,18 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             try await client.from("private_live_view_requests")
                 .upsert(request, onConflict: "user_id")
                 .execute()
+            guard trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID,
+                  !Task.isCancelled else { return }
             outgoingRequestID = request.id
             outgoingRequestState = .pending
             // Best effort APNs only. Sending the request is independent from
             // notification permissions and never grants spectator access.
             Task { await notifyIPhoneAboutRequest(id: request.id, accountID: accountID) }
         } catch {
+            guard trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID,
+                  !Task.isCancelled else { return }
             outgoingRequestState = .failed
             requestError = ATHLTHLocalization.choose(
                 english: "Unable to send the viewing request. Try again.",
@@ -1082,6 +1116,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
+            guard trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID,
+                  outgoingRequestID == requestID,
+                  !Task.isCancelled else { return }
             guard let row = rows.first, row.id == requestID else {
                 outgoingRequestState = .expired
                 outgoingRequestID = nil
@@ -1113,12 +1151,16 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
-            guard trackingAccountID == accountID, !Task.isCancelled else {
-                return
-            }
+            guard trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID,
+                  !Task.isCancelled else { return }
             let row = rows.first
             let next = row.flatMap {
-                $0.expiresAt > Date() ? $0.snapshot : nil
+                ATHLTHCrossDeviceLiveReadPolicy.accepts(
+                    $0.snapshot,
+                    updatedAt: $0.updatedAt,
+                    expiresAt: $0.expiresAt
+                ) ? $0.snapshot : nil
             }
             let previous = remote?.id
             if previous != next?.id {
@@ -1154,9 +1196,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 )
             })
         } catch {
-            guard trackingAccountID == accountID, !Task.isCancelled else {
-                return
-            }
+            guard trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID,
+                  !Task.isCancelled else { return }
             presenceConnectionIssue = true
             // An offline spectator must not appear permanently live.
             if lastRemoteExpiry.map({ $0 <= Date() }) ?? true {

@@ -391,3 +391,16 @@ som ferdige før egne faser og reelle tester er fullført.
   med en annen UUID er fjernet. Ufullstendige forespørsler beholdes
   ubehandlet for sikker gjenoppretting, uten å produsere falske
   treningsresultater.
+
+- **Fase 4 / iPad-gjenoppkobling og stale data:** iPad oppdaterer ikke
+  lenger livekort fra asynkrone Supabase-svar dersom kontoen ble
+  endret under forespørselen. Også innkommende
+  godkjennings-/tilgangsstatus blir avvist etter kontobytte.
+  Tidsstempelpolicyen krever gyldig, ferskt heartbeat,
+  utløpstid og (når kjent) fersk `capturedAt` fra Watch/iPhone.
+  En gammel Watch-snapshot kan derfor ikke bli fremstilt som live
+  bare fordi iPhone fortsatt sender heartbeat. Eldre payloads uten
+  `capturedAt` kan fremdeles vises når server-heartbeat er ferskt.
+- iPad er fortsatt **read-only** og starter aldri et HealthKit-opptak.
+  Ny `ATHLTHiPadLiveWorkoutTests` dekker frakoblet sensor,
+  gammelt heartbeat, utløpt tillatelsessnapshot og eldre payloads.
