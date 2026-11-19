@@ -417,6 +417,16 @@ private final class ATHLTHLiveActivityController {
     func sync(
         with snapshot: WatchWorkoutLiveSnapshot?
     ) async {
+        if let snapshot {
+            // Invalid or outdated nonterminal packets must not cancel an
+            // in-flight valid ActivityKit update just by increasing revision.
+            guard ATHLTHLiveActivityDisplayPolicy.acceptsActivityCapture(
+                updatedAt: snapshot.capturedAt,
+                isTerminal: ATHLTHLiveActivityStopPolicy.shouldDismiss(
+                    snapshot.state
+                )
+            ) else { return }
+        }
         syncRevision &+= 1
         let revision = syncRevision
 
@@ -632,7 +642,9 @@ private final class ATHLTHLiveActivityController {
 
         let content = ActivityContent(
             state: contentState,
-            staleDate: Date().addingTimeInterval(90)
+            // A delayed Watch packet should not be marked fresh for another
+            // 90 seconds merely because the phone finally received it.
+            staleDate: snapshot.capturedAt.addingTimeInterval(90)
         )
 
         let phaseChanged =
