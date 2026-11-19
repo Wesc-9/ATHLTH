@@ -383,3 +383,11 @@ som ferdige før egne faser og reelle tester er fullført.
   eksisterende** aktiv økt med samme UUID, men ikke starte en økt.
   Oppstartsforespørsler med feil/manglende eier beholdes i køen
   for senere kontroll i stedet for å bli kvittert ut feilaktig.
+
+- **Fase 4 / ikke opprett tom erstatningsøkt:** En frakoblet
+  Watch-forespørsel må dessuten inneholde den originale
+  `WatchStrengthSessionSnapshot` med **samme workoutID**.
+  Den gamle fallbacken som kunne starte en ny tom freestyle-økt
+  med en annen UUID er fjernet. Ufullstendige forespørsler beholdes
+  ubehandlet for sikker gjenoppretting, uten å produsere falske
+  treningsresultater.

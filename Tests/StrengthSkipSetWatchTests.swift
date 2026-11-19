@@ -244,9 +244,13 @@ final class StrengthSkipSetWatchTests: XCTestCase {
     }
 
 
+    @MainActor
     func testOfflineWatchBootstrapCannotCrossAccountsOrUseLegacyUnownedRequest() throws {
         let owner = UUID()
-        let workoutID = UUID()
+        let recording = StrengthWorkoutStore()
+        recording.startFreestyle(watchSessionID: nil, captureDevice: .appleWatch)
+        let snapshot = try XCTUnwrap(recording.watchSnapshot)
+        let workoutID = snapshot.workoutID
         var command = WatchStrengthCommand(
             id: UUID(), workoutID: workoutID, kind: .requestSnapshot,
             reps: nil, weightKilograms: nil, restSeconds: nil,
@@ -257,6 +261,10 @@ final class StrengthSkipSetWatchTests: XCTestCase {
             command, currentAccountID: owner
         ))
         command.accountOwnerID = owner
+        XCTAssertFalse(ATHLTHStrengthWatchBootstrapOwnershipPolicy.permitsBootstrap(
+            command, currentAccountID: owner
+        ), "A Watch UUID without its original state cannot bootstrap a replacement.")
+        command.bootstrapSnapshot = snapshot
         XCTAssertTrue(ATHLTHStrengthWatchBootstrapOwnershipPolicy.permitsBootstrap(
             command, currentAccountID: owner
         ))

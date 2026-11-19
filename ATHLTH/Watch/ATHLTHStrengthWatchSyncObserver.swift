@@ -43,11 +43,13 @@ enum ATHLTHStrengthWatchBootstrapOwnershipPolicy {
               let owner = command.accountOwnerID,
               owner == currentAccountID
         else { return false }
-        // A supplied snapshot must match the command workout ID exactly.
-        if let snapshot = command.bootstrapSnapshot {
-            return command.workoutID == snapshot.workoutID
-        }
-        return command.workoutID != nil
+        // Without a real authoritative snapshot, starting a new freestyle
+        // workout here would generate a different UUID and strand the
+        // original Watch journal. Require both exact identity and state.
+        guard let snapshot = command.bootstrapSnapshot,
+              command.workoutID == snapshot.workoutID
+        else { return false }
+        return true
     }
 }
 
@@ -216,33 +218,12 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                     return false
                 }
 
-                if let bootstrap =
-                        command
-                            .bootstrapSnapshot {
-                    strengthWorkout
-                        .startFromWatchSnapshot(
-                            bootstrap,
-                            watchSessionID:
-                                command.id
-                        )
-                } else {
-                    var configuration =
-                        StrengthAdvancedConfiguration
-                            .savedDefaults()
-                    configuration.inputMode =
-                        .both
-
-                    strengthWorkout.startFreestyle(
-                        watchSessionID:
-                            command.id,
-                        trackingMode:
-                            .advanced,
-                        captureDevice:
-                            .appleWatch,
-                        advancedConfiguration:
-                            configuration
-                    )
+                guard let bootstrap = command.bootstrapSnapshot else {
+                    return false
                 }
+                strengthWorkout.startFromWatchSnapshot(
+                    bootstrap, watchSessionID: command.id
+                )
             }
 
             sendSnapshotNow()
