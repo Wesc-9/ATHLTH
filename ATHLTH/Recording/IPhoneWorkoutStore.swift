@@ -1489,6 +1489,7 @@ final class IPhoneWorkoutStore:
         guard var workout = active else {
             return
         }
+        coachCueQueue.discardWorkoutMotionCues()
 
         let now = Date()
 
