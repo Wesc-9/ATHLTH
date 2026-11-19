@@ -135,6 +135,34 @@ enum ATHLTHWorkoutSessionFoundation {
         try requireNoActiveRecording(currentSession(phone: phone, strength: strength))
     }
 
+    /// Verify a restored checkpoint before exposing it as the active session.
+    /// A completed record must never be resurrected by a late Watch or iPad
+    /// snapshot, even if the snapshot has a matching workout identifier.
+    static func recoverableSession(
+        _ session: ATHLTHWorkoutSessionState?,
+        alreadyCommittedWorkoutIDs: Set<UUID>
+    ) -> ATHLTHWorkoutSessionState? {
+        guard let session,
+              mayRecoverCheckpoint(
+                  hasEnded: session.isFinished,
+                  alreadyCommitted: alreadyCommittedWorkoutIDs.contains(session.workoutID)
+              ) else { return nil }
+        return session
+    }
+
+    /// An incoming device snapshot can update the current workout only when
+    /// both immutable identity and capture ownership match. This check does
+    /// not grant iPad write access or transfer a HealthKit session.
+    static func acceptsDeviceSnapshot(
+        current: ATHLTHWorkoutSessionState,
+        incoming: ATHLTHWorkoutSessionState
+    ) -> Bool {
+        !current.isFinished && !incoming.isFinished &&
+            preservesRecordingOwnership(current, incoming) &&
+            current.plannedSessionID == incoming.plannedSessionID &&
+            incoming.startedAt == current.startedAt
+    }
+
     static func running(
         _ workout: PhoneWorkout,
         at now: Date = Date()
