@@ -1160,3 +1160,17 @@ men ikke release-/fysisk godkjent.
   fysisk bare lagret én workout, og ikke en komplett PR-/segmentmotor.
   Samme-commit iOS/iPad/watchOS-build, XCTest/CI, reelle opptak og
   gjenoppretting på fysiske enheter er fortsatt nødvendig. Ingen TestFlight.
+
+### Fase 7 – kontosynkronisert styrkehistorikk (19.11.2026)
+
+- `StrengthWorkoutStore.mergeAccountSyncedWorkouts` avviser nå eksterne
+  historikkposter med sluttid før starttid og poster som ville gitt samme
+  HealthKit-UUID to ulike styrkeøkt-ID-er. Opprinnelige lokale poster
+  har prioritet; gyldige distinkte økter importeres som før.
+- En målrettet regresjonstest bruker to ulike trenings-ID-er med
+  samme HealthKit-UUID for å kontrollere at den dupliserte posten
+  ikke importeres, og sjekker ugyldig tidsintervall.
+- Dette beskytter styrkekontohistorikken mot doble HealthKit-referanser,
+  men beviser **ikke** fysisk HealthKit-idempotens på iPhone/Watch.
+  Resultat-/PR-aggregasjon for alle treningsformer og release-kontroll
+  gjenstår. Ingen TestFlight-opplasting.
