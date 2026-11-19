@@ -123,9 +123,11 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  # Once TestFlight is requested, preserve same-commit iOS verification
-  # despite follow-up development pushes to the active release branch.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/release/v1.8.8' && github.ref != 'refs/heads/release/v1.8.9' && github.ref != 'refs/heads/release/v2.0.2' && github.ref != 'refs/heads/release/v2.2.5' }}
+  # Prefer the newest release/v2.2.5 commit: a stale 2,930-test
+  # workflow otherwise holds this concurrency group indefinitely, leaving
+  # the new independent iPad matrix queued even after its code has changed.
+  # Other explicitly protected historical releases stay unchanged.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/release/v1.8.8' && github.ref != 'refs/heads/release/v1.8.9' && github.ref != 'refs/heads/release/v2.0.2' }}
 
 jobs:
   build:
