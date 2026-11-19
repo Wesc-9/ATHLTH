@@ -2274,10 +2274,24 @@ struct WatchHomeAssistantConfiguration: Codable, Hashable {
     }
 }
 
+/// The identity belongs to one remotely requested recording, never to a
+/// nearby Watch session inferred from time, title, or activity category.
+struct WatchRemoteLaunchIdentity: Codable, Hashable {
+    let requestID: UUID
+    let kind: WatchWorkoutKind
+    let issuedAt: Date
+
+    func isFresh(at date: Date = Date()) -> Bool {
+        abs(date.timeIntervalSince(issuedAt)) <= 45
+    }
+}
+
 struct WatchWorkoutActivityState: Codable, Hashable {
     let isActive: Bool
     let title: String?
     let updatedAt: Date
+    // Optional for older Watch installations and locally started workouts.
+    var relayRequestID: UUID? = nil
 
     /// A saved result is authoritative completion evidence. Never clear a
     /// newer recording when an older result arrives late.
@@ -2328,6 +2342,7 @@ enum WatchTransferKind: String {
     case workoutResult
     case workoutActivityState
     case workoutActivityQuery
+    case workoutRemoteLaunchIdentity
     case workoutStartGuard
     case workoutCommand
     case workoutRouteSelection
@@ -2369,6 +2384,7 @@ enum WatchTransferMetadataKey {
     static let payload = "payload"
     static let command = "command"
     static let workoutID = "workoutID"
+    static let relayRequestID = "relayRequestID"
     static let workoutStartedAt = "workoutStartedAt"
     static let probeID = "probeID"
     static let sentAt = "sentAt"
