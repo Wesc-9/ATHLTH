@@ -797,3 +797,17 @@ serverkvittering som feiler må aldri automatisk føre til ny HealthKit-start.
 lokal journalføring kan fortsatt gi uavklart server-claim. Ikke innfør
 automatisk gjenkjøring av slike claims uten verifisert Watch-/HealthKit-status.
 Krev iPhone/iPad/Watch-akseptanse og samme-commit grønne CI-jobber før release.
+
+
+### Fase 4 – crash-vindu ved fjernstart (19.11.2026)
+
+Før iPhone suspenderer i asynkron Watch-/HealthKit-start journalføres kommando-ID
+som **usikker start** per konto og fysisk enhet. Ved vellykket start flyttes
+ID-en til den eksisterende kvitteringsjournalen før serverkall. Ved eksplisitt
+startfeil kan den usikre posten fjernes; ved prosessdød, kansellering eller
+kontobytte kan utfallet **ikke** antas å være feil. Køen blokkeres derfor til
+faktisk Watch-/HealthKit-status er rekonsiliert. Dette er en bevisst
+fail-closed-sperre: den hindrer dobbeltopptak, men kan kreve manuell avklaring
+etter krasj. Automatisk, verifisert rekonsiliering av usikre starter er fortsatt
+**ikke implementert** og må på plass før fase 4 godkjennes. Ingen ny
+HealthKit-opptakstype, historikkpost eller datamigrering er innført.
