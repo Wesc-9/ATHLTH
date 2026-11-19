@@ -41,6 +41,10 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         XCTAssertNil(store.completionSaveError)
         XCTAssertEqual(store.workoutHistory.filter { $0.id == activeID }.count, 1)
         XCTAssertEqual(StrengthWorkoutCompletionJournal.read(userID: userID)?.id, activeID)
+        let finished = try XCTUnwrap(store.workoutHistory.first { $0.id == activeID })
+        let ended = try XCTUnwrap(finished.endedAt)
+        XCTAssertGreaterThanOrEqual(ended, finished.startedAt)
+        XCTAssertLessThanOrEqual(abs(ended.timeIntervalSinceNow), 5)
 
         // Simulate UserDefaults history not surviving a process exit while
         // the atomic journal did. The active checkpoint may still exist.

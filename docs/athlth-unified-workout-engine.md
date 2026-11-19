@@ -458,3 +458,13 @@ som ferdige før egne faser og reelle tester er fullført.
   oppdateringsbegrensning. En ny økt får sitt eget klokkevannmerke.
 - Tester dekker nyere/eldre pakker, neste økt og ugyldig tidspunkt.
   Dette verifiserer ikke automatisk faktisk låseskjerm på iPhone.
+
+### Fase 7 — avslutningstid fra virkelig brukerhandling
+
+- `StrengthWorkoutStore.finish` bruker nå samme lokale `finishDate`
+  for avslutning av faktisk pause og lagret sluttidspunkt, i stedet
+  for å bruke et eldre gjenopprettingssjekkpunkt som sluttidspunkt.
+  Det eksisterende historikkformatet og stabil økt-ID beholdes.
+- Felles policy hindrer negativ varighet ved justert systemklokke.
+  Testene verifiserer korrekt tidsstempel og lagret resultat.
+  Samlet HealthKit-resultat/-PR og fysisk enhetsverifisering gjenstår.

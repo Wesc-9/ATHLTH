@@ -118,6 +118,15 @@ enum ATHLTHWorkoutSessionFoundation {
         }
     }
 
+    /// A recovered checkpoint records *when it was saved*, not when the
+    /// athlete tapped Finish. Never use that old timestamp as endedAt.
+    static func completionTimestamp(
+        startedAt: Date,
+        finishedAt: Date
+    ) -> Date {
+        max(startedAt, finishedAt)
+    }
+
     /// Completion must win over a stale active checkpoint after a crash.
     /// No history item or HealthKit UUID is regenerated during recovery.
     static func mayRecoverCheckpoint(

@@ -273,6 +273,21 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         ))
     }
 
+    func testCompletionTimeUsesActualFinishNotRecoveredCheckpoint() {
+        let checkpoint = start.addingTimeInterval(90)
+        let athleteFinishedAt = start.addingTimeInterval(360)
+        XCTAssertEqual(ATHLTHWorkoutSessionFoundation.completionTimestamp(
+            startedAt: start,
+            finishedAt: athleteFinishedAt
+        ), athleteFinishedAt)
+        XCTAssertNotEqual(checkpoint, athleteFinishedAt)
+        // Clock rollback cannot generate a negative-length workout.
+        XCTAssertEqual(ATHLTHWorkoutSessionFoundation.completionTimestamp(
+            startedAt: start,
+            finishedAt: start.addingTimeInterval(-10)
+        ), start)
+    }
+
     func testRecoveryNeverResurrectsCompletedHistory() {
         XCTAssertTrue(ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
             hasEnded: false, alreadyCommitted: false

@@ -5330,19 +5330,21 @@ final class StrengthWorkoutStore: ObservableObject {
         averageHeartRate: Double? = nil,
         maxHeartRate: Double? = nil
     ) -> Bool {
-        finalizeActualRestIfNeeded()
+        guard activeWorkout != nil else { return false }
+        let finishDate = Date()
+        finalizeActualRestIfNeeded(at: finishDate)
         restStartedAt = nil
         restEndsAt = nil
 
         guard var workout = activeWorkout else { return false }
         completionSaveError = nil
 
-        workout.endedAt =
-            max(
-                recoveredCheckpointSavedAt ??
-                    Date(),
-                workout.startedAt
-            )
+        // A restored checkpoint can be hours old. Its save timestamp
+        // must not truncate the real workout's duration on completion.
+        workout.endedAt = ATHLTHWorkoutSessionFoundation.completionTimestamp(
+            startedAt: workout.startedAt,
+            finishedAt: finishDate
+        )
 
         let existingMetrics = workout.healthMetrics
         workout.healthMetrics = LinkedHealthWorkoutMetrics(
