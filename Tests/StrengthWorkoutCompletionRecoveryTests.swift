@@ -344,4 +344,52 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         XCTAssertEqual(StrengthWorkoutCompletionJournal.read(userID: firstAccount)?.id,
                        completed.id)
     }
+
+    @MainActor
+    func testAccountHistoryMergeDoesNotDuplicateHealthKitRecording() throws {
+        let localOwner = UUID()
+        let remoteOwner = UUID()
+        defer {
+            for owner in [localOwner, remoteOwner] {
+                StrengthWorkoutCompletionJournal.remove(userID: owner)
+                UserDefaults.standard.removeObject(
+                    forKey: AccountLocalStorage.key("strengthHistory", userID: owner)
+                )
+                UserDefaults.standard.removeObject(
+                    forKey: AccountLocalStorage.key("strengthActive", userID: owner)
+                )
+            }
+        }
+
+        let sharedHealthKitUUID = UUID()
+        let local = StrengthWorkoutStore()
+        local.switchAccount(localOwner)
+        local.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        XCTAssertTrue(local.finish(healthKitWorkoutUUID: sharedHealthKitUUID))
+        let saved = try XCTUnwrap(local.workoutHistory.first)
+
+        let remote = StrengthWorkoutStore()
+        remote.switchAccount(remoteOwner)
+        remote.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        XCTAssertTrue(remote.finish(healthKitWorkoutUUID: sharedHealthKitUUID))
+        let duplicate = try XCTUnwrap(remote.workoutHistory.first)
+        XCTAssertNotEqual(saved.id, duplicate.id)
+
+        XCTAssertEqual(
+            try local.mergeAccountSyncedWorkouts([duplicate], for: localOwner), 0
+        )
+        XCTAssertEqual(local.workoutHistory.count, 1)
+        XCTAssertEqual(local.workoutHistory.first?.id, saved.id)
+        XCTAssertEqual(
+            local.workoutHistory.first?.healthMetrics.healthKitWorkoutUUID,
+            sharedHealthKitUUID
+        )
+
+        var invalidInterval = duplicate
+        invalidInterval.endedAt = invalidInterval.startedAt.addingTimeInterval(-1)
+        XCTAssertEqual(
+            try local.mergeAccountSyncedWorkouts([invalidInterval], for: localOwner), 0
+        )
+        XCTAssertEqual(local.workoutHistory.count, 1)
+    }
 }
