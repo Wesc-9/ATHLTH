@@ -27,6 +27,25 @@ private final class WatchWorkoutActivityQueryReply: @unchecked Sendable {
     }
 }
 
+// The WatchConnectivity callback crosses an actor boundary only after the
+// pending launch identity is durably staged by WatchWorkoutManager.
+private final class WatchRemoteLaunchIdentityReply: @unchecked Sendable {
+    private let callback: ([String: Any]) -> Void
+
+    init(_ callback: @escaping ([String: Any]) -> Void) {
+        self.callback = callback
+    }
+
+    func send(requestID: UUID, accepted: Bool) {
+        callback([
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.workoutRemoteLaunchIdentity.rawValue,
+            WatchTransferMetadataKey.relayRequestID: requestID.uuidString,
+            WatchTransferMetadataKey.workoutAllowed: accepted
+        ])
+    }
+}
+
 @MainActor
 final class WatchRouteStore: NSObject, ObservableObject {
     // One WCSession delegate and prepared-workout cache shared by the Watch
@@ -757,6 +776,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
              .aiCoachConversationRequest,
              .workoutResult,
              .workoutActivityQuery,
+             .workoutRemoteLaunchIdentity,
              .workoutStartGuard,
              .workoutCommand,
              .workoutRouteSelection,
@@ -981,6 +1001,25 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 ] as? String
         else {
             replyHandler?([:])
+            return
+        }
+
+        if rawKind == WatchTransferKind.workoutRemoteLaunchIdentity.rawValue {
+            guard let replyHandler,
+                  let data = payload[WatchTransferMetadataKey.payload] as? Data,
+                  let identity = try? JSONDecoder().decode(
+                    WatchRemoteLaunchIdentity.self, from: data
+                  )
+            else {
+                replyHandler?([:])
+                return
+            }
+            let reply = WatchRemoteLaunchIdentityReply(replyHandler)
+            Task { @MainActor in
+                let accepted = WatchWorkoutManager.shared
+                    .stageRemoteLaunchIdentity(identity)
+                reply.send(requestID: identity.requestID, accepted: accepted)
+            }
             return
         }
 
