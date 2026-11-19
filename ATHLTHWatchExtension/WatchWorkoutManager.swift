@@ -7830,7 +7830,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // The activation task rechecks its generation before it can speak.
         speak(
             String(number), priority: .targetCritical,
-            forceLocal: true, rememberForReplay: false
+            forceLocal: true, rememberForReplay: false,
+            deadline: deadline
         )
     }
 
@@ -7841,11 +7842,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 .routineCoach,
         event: ATHLTHCoachEvent? = nil,
         forceLocal: Bool = false,
-        rememberForReplay: Bool = true
+        rememberForReplay: Bool = true,
+        deadline: Date? = nil
     ) {
         if let countdownPriorityEndsAt, Date() < countdownPriorityEndsAt,
            priority < .targetCritical { return }
-        guard !text.isEmpty,
+        guard ATHLTHCoachCountdownSpeechDeadline.permitsPlayback(
+                  deadline: deadline
+              ),
+              !text.isEmpty,
               ATHLTHCoachVoicePausePolicy.allowsSpeech(
                   coachEnabled: audioCoachConfiguration.enabled,
                   speechPaused: coachSpeechPaused,
@@ -7969,6 +7974,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 if let event,
                    (!event.isFresh() || (event.runningStepIndex != nil &&
                        event.runningStepIndex != self.currentCoachRunningStepIndex)) {
+                    self.guidancePriorityGate.voiceDidFinish()
+                    self.deactivateAudioCoachAudioSession()
+                    return
+                }
+
+                // A one-second countdown cannot survive a slow audio route
+                // activation, even when it has no normal event expiry.
+                guard ATHLTHCoachCountdownSpeechDeadline.permitsPlayback(
+                    deadline: deadline
+                ) else {
                     self.guidancePriorityGate.voiceDidFinish()
                     self.deactivateAudioCoachAudioSession()
                     return
