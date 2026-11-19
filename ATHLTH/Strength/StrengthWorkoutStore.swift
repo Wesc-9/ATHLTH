@@ -1045,7 +1045,11 @@ final class StrengthWorkoutStore: ObservableObject {
                 workoutHistory
                     .filter {
                         $0.isFinished &&
-                        $0.id != workout.id
+                        $0.id != workout.id &&
+                        // A record must be compared only with training
+                        // evidence available before this workout began.
+                        // Later sessions must not change historical PRs.
+                        ($0.endedAt ?? .distantFuture) <= workout.startedAt
                     }
                     .flatMap {
                         $0.exercises
