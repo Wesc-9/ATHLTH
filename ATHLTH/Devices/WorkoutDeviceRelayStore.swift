@@ -505,7 +505,16 @@ final class WorkoutDeviceRelayStore:
             WorkoutDeviceRelayEnvelope
     ) async throws {
         guard ATHLTHDeviceRole.isIPad else {
-            return
+            // A no-op falsely tells the launch coordinator that a workout
+            // was handed off. Only iPad may create this remote command.
+            throw NSError(
+                domain: "ATHLTH.DeviceRelay", code: 403,
+                userInfo: [NSLocalizedDescriptionKey:
+                    ATHLTHLocalization.choose(
+                        english: "Only iPad can send workouts to another device.",
+                        norwegian: "Kun iPad kan sende treningsøkter til en annen enhet."
+                    )]
+            )
         }
 
         guard let userID =
