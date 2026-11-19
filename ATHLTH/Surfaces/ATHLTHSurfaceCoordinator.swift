@@ -464,6 +464,27 @@ private final class ATHLTHLiveActivityController {
             incomingCapturedAt: snapshot.capturedAt
         ) else { return }
 
+        // The App Group marker survives iPhone process termination. A
+        // delayed Watch .running snapshot cannot reopen the same Activity
+        // even if ActivityKit's in-memory controller was recreated.
+        let persistedTerminal =
+            ATHLTHSurfaceSharedStore.load().lastFinishedWorkout
+        if !ATHLTHLiveActivityStopPolicy.shouldDismiss(snapshot.state) {
+            let candidate = ATHLTHSurfaceWorkoutSnapshot(
+                title: identity.fallbackTitle,
+                systemImage: identity.systemImage,
+                state: snapshot.state.rawValue,
+                startedAt: identity.startedAt,
+                elapsedTime: snapshot.elapsedTime,
+                distanceMeters: snapshot.distanceMeters,
+                heartRate: snapshot.heartRate,
+                updatedAt: snapshot.capturedAt
+            )
+            guard !ATHLTHSurfaceWorkoutOrdering.matchesTerminal(
+                candidate, marker: persistedTerminal
+            ) else { return }
+        }
+
         // The Watch's .ending means recording has stopped and only saving
         // remains. End the lock-screen timer immediately, not after the
         // completion import/summary pipeline finishes.
