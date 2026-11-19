@@ -145,6 +145,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var pendingLocalCoachEvent: (
         utterance: AVSpeechUtterance, event: ATHLTHCoachEvent
     )?
+    private var pendingWatchCoachReplay: (
+        utterance: AVSpeechUtterance,
+        text: String,
+        priority: ATHLTHGuidancePriority,
+        remember: Bool,
+        generation: UUID
+    )?
     private var coachAudioSessionIsActive = false
     private var audioCoachRestorationTask: Task<Void, Never>?
     private var audioCoachSpeechWatchdog: Task<Void, Never>?
@@ -1088,6 +1095,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         coachCueQueue.reset()
         guidancePriorityGate.reset()
         if paused {
+            pendingWatchCoachReplay = nil
+            pendingLocalCoachEvent = nil
+            audioCoachActivationGeneration = UUID()
             audioCoachActivationTask?.cancel()
             audioCoachActivationTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
@@ -4135,6 +4145,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func reset() {
+        pendingWatchCoachReplay = nil
+        pendingLocalCoachEvent = nil
+        audioCoachActivationGeneration = UUID()
         activeRelayRequestID = nil
         UserDefaults.standard.removeObject(forKey: pendingRelayIdentityKey)
         setAIConversationVoiceSuppressed(false)
@@ -7810,6 +7823,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         audioCoachActivationTask?.cancel()
         audioCoachActivationTask = nil
         audioCoachActivationGeneration = UUID()
+        pendingWatchCoachReplay = nil
+        pendingLocalCoachEvent = nil
         speechSynthesizer.stopSpeaking(at: .immediate)
         guidancePriorityGate.voiceDidFinish()
         // The activation task rechecks its generation before it can speak.
@@ -7978,17 +7993,25 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 self.pendingLocalCoachEvent = event.map {
                     (utterance: utterance, event: $0)
                 }
+                self.pendingWatchCoachReplay = (
+                    utterance, spokenText, priority,
+                    rememberForReplay, activationGeneration
+                )
                 self.speechSynthesizer.speak(utterance)
                 self.watchCoachSpeechCompletion(utterance)
-                if rememberForReplay,
-                   ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
-                    self.coachReplayMemory.remember(
-                        spokenText,
-                        priority: priority
-                    )
-                    self.lastCoachMessage = self.coachReplayMemory.text
-                }
             }
+    }
+
+    private func confirmWatchCoachReplay(
+        _ text: String,
+        priority: ATHLTHGuidancePriority,
+        remember: Bool
+    ) {
+        guard remember,
+              ATHLTHCoachReplayMemory.mayRemember(priority: priority)
+        else { return }
+        coachReplayMemory.remember(text, priority: priority)
+        lastCoachMessage = coachReplayMemory.text
     }
 
     private func shouldSpeakLocally(
@@ -9387,13 +9410,24 @@ extension WatchWorkoutManager:
         didStart utterance: AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
-            guard let self,
-                  let pending = self.pendingLocalCoachEvent,
-                  pending.utterance === utterance else { return }
-            self.pendingLocalCoachEvent = nil
-            guard self.coachEventLedger.canDeliver(pending.event) else { return }
-            self.coachEventLedger.didDeliver(pending.event)
-            self.reportWatchSpokenEventAttempt(pending.event)
+            guard let self else { return }
+            if let pending = self.pendingLocalCoachEvent,
+               pending.utterance === utterance {
+                self.pendingLocalCoachEvent = nil
+                if self.coachEventLedger.canDeliver(pending.event) {
+                    self.coachEventLedger.didDeliver(pending.event)
+                    self.reportWatchSpokenEventAttempt(pending.event)
+                }
+            }
+            if let replay = self.pendingWatchCoachReplay,
+               replay.utterance === utterance,
+               replay.generation == self.audioCoachActivationGeneration {
+                self.pendingWatchCoachReplay = nil
+                self.confirmWatchCoachReplay(
+                    replay.text, priority: replay.priority,
+                    remember: replay.remember
+                )
+            }
         }
     }
 
