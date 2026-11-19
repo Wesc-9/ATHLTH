@@ -8283,6 +8283,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
 
         result.accountOwnerID = workoutOwnerID
+        // Do not publish an identity on a prepared/failed activity. This
+        // result exists only after HealthKit finishWorkout() succeeded.
+        result.relayRequestID = activeRelayRequestID
         result.plannedCalendarSessionID = plannedCalendarSessionID
         result.petSegments = WatchRouteStore.shared.completedPetSegments()
         if kind == .running || kind == .walking {
