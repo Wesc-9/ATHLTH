@@ -957,6 +957,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
             requestSpotifyPlaybackState()
             WatchWorkoutManager.shared
                 .syncWorkoutActivityStateToPhone()
+            WatchWorkoutManager.shared
+                .replayRelayCompletionProofs(durable: false)
         } else if activated {
             companionLinked = false
             // WCSession reachability is false when the companion iPhone
