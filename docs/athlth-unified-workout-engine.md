@@ -1318,3 +1318,19 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   Regresjonstester dekker identitetskollisjon, sen backfill og ugyldig
   Watch-sluttid/varighet. Ingen ny database eller treningsopptak.
 - Same-commit CI og fysisk iPhone/Watch HealthKit-verifisering gjenstår.
+
+### Fase 8 – HealthKit eksport etter gjenoppretting og kontobytte (19.11.2026)
+
+- `IPhoneWorkoutStore.retryHealthSave` slår nå opp økten på nytt i
+  autoritativ, kontoavgrenset `phoneHistory` før forsøket starter. En
+  gammel visningssnapshot fra en annen konto, en slettet økt, en aktiv
+  eller ugyldig økt, eller en snapshot med avvikende start/slutt kan
+  ikke eksporteres til Apple Health.
+- `saveToHealth` validerer den eksakte eksisterende økten og kontoen
+  før HK-kall, etter asynkron HK-oppslag og før lokal kobling av HK-ID.
+  En annen lagret telefonøkt får ikke overta samme HealthKit-UUID.
+- Tester dekker gyldig fullført økt, manglende lokal historikk,
+  kontobytte, slettet konto, feil sluttid, ugyldig intervalldata og
+  endret lokal økt-ID. Dette er en sikkerhetsgrense på lokal eksport,
+  ikke en fysisk test av HealthKit eller garanti mot kontobytte mens
+  selve HealthKit-operasjonen pågår.

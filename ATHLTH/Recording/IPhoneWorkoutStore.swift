@@ -347,6 +347,35 @@ struct ATHLTHPhoneWorkoutResultBreakdown {
 }
 
 
+
+/** A HealthKit retry is permitted only for a durable completed workout on
+ * the currently loaded account. Never trust an old view's workout object
+ * after account switch, deletion or a recovered checkpoint.
+ */
+enum ATHLTHPhoneHealthExportPolicy {
+    static func canExport(
+        _ workout: PhoneWorkout,
+        ownerID: UUID,
+        loadedAccountID: UUID?,
+        accountDeleted: Bool,
+        history: [PhoneWorkout]
+    ) -> Bool {
+        guard loadedAccountID == ownerID,
+              !accountDeleted,
+              let end = workout.end,
+              end >= workout.start,
+              end.timeIntervalSince1970.isFinite,
+              workout.start.timeIntervalSince1970.isFinite
+        else { return false }
+        return history.contains { saved in
+            saved.id == workout.id &&
+            saved.start == workout.start &&
+            saved.end == workout.end
+        }
+    }
+}
+
+
 /// Verified against previously saved ATHLTH iPhone workouts only.
 /// The coach must not describe these as lifetime Apple Health records.
 enum ATHLTHPhoneRunningRecordEvidence {
@@ -1961,11 +1990,32 @@ final class IPhoneWorkoutStore:
     }
 
     func retryHealthSave(_ workout: PhoneWorkout) async {
-        guard let accountID, !saving else { return }
-        await saveToHealth(workout, userID: accountID)
+        guard let accountID, !saving,
+              !UserDefaults.standard.bool(
+                  forKey: AccountLocalStorage.key("deleted", userID: accountID)
+              ),
+              // Use the saved record, not the potentially stale SwiftUI
+              // snapshot supplied by the Retry button.
+              let saved = history.first(where: { $0.id == workout.id }),
+              ATHLTHPhoneHealthExportPolicy.canExport(
+                  workout, ownerID: accountID, loadedAccountID: accountID,
+                  accountDeleted: false, history: history
+              )
+        else { return }
+        await saveToHealth(saved, userID: accountID)
     }
 
     private func saveToHealth(_ workout: PhoneWorkout, userID: UUID) async {
+        // Reject late completion callbacks that belong to a deleted or
+        // switched account before starting any HealthKit side effects.
+        guard ATHLTHPhoneHealthExportPolicy.canExport(
+            workout, ownerID: userID, loadedAccountID: accountID,
+            accountDeleted: UserDefaults.standard.bool(
+                forKey: AccountLocalStorage.key("deleted", userID: userID)
+            ),
+            history: history
+        ) else { return }
+
         saving = true
         defer { saving = false }
 
@@ -2005,7 +2055,13 @@ final class IPhoneWorkoutStore:
                 )
             }
 
-            guard accountID == userID else { return }
+            guard ATHLTHPhoneHealthExportPolicy.canExport(
+                workout, ownerID: userID, loadedAccountID: accountID,
+                accountDeleted: UserDefaults.standard.bool(
+                    forKey: AccountLocalStorage.key("deleted", userID: userID)
+                ),
+                history: history
+            ) else { return }
 
             let saved: HKWorkout
             let distanceWritten: Bool
@@ -2046,7 +2102,21 @@ final class IPhoneWorkoutStore:
                 }
             }
 
-            guard accountID == userID else { return }
+            guard ATHLTHPhoneHealthExportPolicy.canExport(
+                workout, ownerID: userID, loadedAccountID: accountID,
+                accountDeleted: UserDefaults.standard.bool(
+                    forKey: AccountLocalStorage.key("deleted", userID: userID)
+                ),
+                history: history
+            ) else { return }
+            // A HealthKit recording cannot be attributed to two different
+            // phone workouts, including when a delayed callback arrives.
+            guard !history.contains(where: {
+                $0.id != workout.id && $0.healthID == saved.uuid
+            }) else {
+                message = "Apple Health recording is already linked to another workout."
+                return
+            }
 
             if let index = history.firstIndex(
                 where: { $0.id == workout.id }

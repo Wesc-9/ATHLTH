@@ -134,4 +134,46 @@ final class ATHLTHPhoneCompletionJournalTests: XCTestCase {
         // The total is independent of the phase list: the result must
         // not add interval distances to the workout's overall distance.
     }
+
+    func testHealthKitRetryUsesOnlyDurableCompletedWorkoutOfLoadedAccount() {
+        let owner = UUID()
+        let other = UUID()
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        let finished = workout(
+            start: start, end: start.addingTimeInterval(180)
+        )
+        func allowed(
+            _ candidate: PhoneWorkout,
+            history: [PhoneWorkout],
+            loaded: UUID? = nil,
+            deleted: Bool = false
+        ) -> Bool {
+            ATHLTHPhoneHealthExportPolicy.canExport(
+                candidate, ownerID: owner,
+                loadedAccountID: loaded ?? owner,
+                accountDeleted: deleted, history: history
+            )
+        }
+        XCTAssertTrue(allowed(finished, history: [finished]))
+        XCTAssertFalse(allowed(finished, history: []))
+        XCTAssertFalse(allowed(finished, history: [finished], loaded: other))
+        XCTAssertFalse(allowed(finished, history: [finished], deleted: true))
+
+        var unfinished = finished
+        unfinished.end = nil
+        XCTAssertFalse(allowed(unfinished, history: [finished]))
+        var wrongFinish = finished
+        wrongFinish.end = start.addingTimeInterval(181)
+        XCTAssertFalse(allowed(wrongFinish, history: [finished]))
+        var corrupt = finished
+        corrupt.end = start.addingTimeInterval(-1)
+        XCTAssertFalse(allowed(corrupt, history: [corrupt]))
+
+        var wrongStart = finished
+        wrongStart.start = start.addingTimeInterval(-60)
+        XCTAssertFalse(allowed(wrongStart, history: [finished]))
+        var uncommitted = finished
+        uncommitted.id = UUID()
+        XCTAssertFalse(allowed(uncommitted, history: [finished]))
+    }
 }
