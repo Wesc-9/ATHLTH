@@ -614,3 +614,23 @@ som ferdige før egne faser og reelle tester er fullført.
   eksisterende kø slik at en retry ikke lager dobbelt resultat.
 - Regresjonstester dekker avvikende økt-ID, ny aktiv økt,
   HealthKit-backfill på eldre fullført økt og faktisk sluttid.
+
+### Fase 4 – varig kvitteringsjournal for iPad-fjernstart (19.11.2026)
+
+- `WorkoutDeviceRelayStore` journalfører ID-en til en **allerede vellykket**
+  fjernstart lokalt før nettverkskvitteringen. Journalen er avgrenset til
+  innlogget bruker og fysisk iPhone. Den lagrer **ikke** øktoppskrift,
+  helseverdier eller et alternativt HealthKit-opptak.
+- Ved oppstart, sanntids-reconnect og manuell innhenting forsøkes utestående
+  kvitteringer sendt til serveren **før** nye startkommandoer hentes.
+  En kvitteringsfeil beholder journalposten; selve Watch-/iPhone-starten
+  blir aldri spilt av på nytt bare for å kvittere.
+- Kommandoer valideres mot avsender, målenhet, type, skjema og utløpstid
+  før noen HealthKit-sideeffekt. Regresjonstesten
+  `WorkoutDeviceRelayClaimPolicyTests` er koblet inn i målrettet XCTest-CI.
+- **Begrensning:** lokal UserDefaults-journal er en ekstra
+  krasj-/nettverksbeskyttelse, ikke en distribuert eksakt-én-gang-garanti.
+  Dersom prosessen avsluttes akkurat mellom en vellykket ekstern
+  Watch-start og lokal journalføring, kreves fortsatt en autoritativ
+  Watch-status-/serverrekonsiliering før kommandoen kan anses endelig
+  ferdig. Fysisk Watch/iPad-testing og grønn samme-commit CI gjenstår.
