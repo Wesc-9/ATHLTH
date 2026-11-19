@@ -2284,8 +2284,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               let distanceType = HKObjectType.quantityType(
                   forIdentifier: .distanceWalkingRunning
               ) else { return }
-        let shouldCollect = strengthSession?.isEmbeddedRunningInterval == true
+        let shouldCollect =
+            strengthSession?.isEmbeddedRunningInterval == true &&
+            strengthSession?.isResting == false &&
+            strengthSession?.currentExerciseComplete == false
         guard shouldCollect != collectingHybridTreadmillDistance else { return }
+        // Do not bridge GPS or pace across a strength set or between runs.
+        // The total measured distance remains cumulative in HealthKit.
+        lastAcceptedOutdoorLocation = nil
+        lastRenderedRouteLocation = nil
         if shouldCollect {
             source.enableCollection(for: distanceType, predicate: nil)
         } else {
@@ -5940,7 +5947,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                    ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
                        isOutdoor: usesOutdoorGPS,
                        isEmbeddedRunningInterval:
-                           strengthSession?.isEmbeddedRunningInterval == true
+                           strengthSession?.isEmbeddedRunningInterval == true,
+                       isResting: strengthSession?.isResting == true,
+                       isExerciseComplete:
+                           strengthSession?.currentExerciseComplete == true,
+                       isWorkoutRunning: state == .running
                    ))),
               usesOutdoorGPS,
               ATHLTHCoachSensorFreshness.isFresh(
@@ -9860,7 +9871,11 @@ private extension WatchWorkoutManager {
             guard ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
                 isOutdoor: usesOutdoorGPS,
                 isEmbeddedRunningInterval:
-                    strengthSession?.isEmbeddedRunningInterval == true
+                    strengthSession?.isEmbeddedRunningInterval == true,
+                isResting: strengthSession?.isResting == true,
+                isExerciseComplete:
+                    strengthSession?.currentExerciseComplete == true,
+                isWorkoutRunning: state == .running
             ) else { return }
         }
 
@@ -10057,7 +10072,11 @@ private extension WatchWorkoutManager {
                  ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
                      isOutdoor: usesOutdoorGPS,
                      isEmbeddedRunningInterval:
-                         strengthSession?.isEmbeddedRunningInterval == true
+                         strengthSession?.isEmbeddedRunningInterval == true,
+                     isResting: strengthSession?.isResting == true,
+                     isExerciseComplete:
+                         strengthSession?.currentExerciseComplete == true,
+                     isWorkoutRunning: state == .running
                  )))
         else {
             return

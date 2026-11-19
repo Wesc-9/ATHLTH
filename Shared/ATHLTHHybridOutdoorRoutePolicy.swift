@@ -6,8 +6,12 @@ import Foundation
 enum ATHLTHHybridOutdoorRoutePolicy {
     static func mayCaptureStrengthRoute(
         isOutdoor: Bool,
-        isEmbeddedRunningInterval: Bool
+        isEmbeddedRunningInterval: Bool,
+        isResting: Bool = false,
+        isExerciseComplete: Bool = false,
+        isWorkoutRunning: Bool = true
     ) -> Bool {
-        isOutdoor && isEmbeddedRunningInterval
+        isOutdoor && isEmbeddedRunningInterval &&
+            !isResting && !isExerciseComplete && isWorkoutRunning
     }
 }

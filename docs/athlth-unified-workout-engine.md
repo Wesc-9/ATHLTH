@@ -1453,3 +1453,16 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
 - **Koden er ikke en fysisk verifisert GPS/HealthKit-funksjon.**
   Samme-commit CI/iOS/iPad/watchOS og reelle Watch-sensorprøver er
   obligatoriske før release-godkjenning.
+
+### Fase 8 – GPS-pause og fasegrenser for utendørs hybrid (19.11.2026)
+
+- Ruteopptak i Watch-styrke-hybrid krever nå både `outdoor`, aktivt
+  løpedrag, ingen hvile, ikke fullført øvelse og en `running` Watch-session.
+  Pause, overgangen til styrke og siste fullførte drag kan ikke legge til
+  GPS-punkter eller endre utendørs pace.
+- Når HealthKit-sensorkilden bytter mellom løpe- og styrkefase nullstilles
+  lokal GPS-forrige-punkt-basis slik at «hopp» over styrkesettet ikke blir
+  registrert som en løpedistanse. Den autoritative akkumulerte målingen
+  nullstilles **ikke**.
+- Tester dekker paused/resting/completed og vanlig aktiv utendørsfase.
+  Reelle GPS-prøver på Watch er fortsatt nødvendig før endelig godkjenning.
