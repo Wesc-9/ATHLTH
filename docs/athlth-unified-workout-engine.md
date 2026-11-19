@@ -446,3 +446,15 @@ som ferdige før egne faser og reelle tester er fullført.
   ved forsinket levering.
 - Dette er et sikkerhetssteg, ikke ferdig fase 5 eller 6. Fysisk
   Watch/AirPods/Spotify og widget-regresjon gjenstår.
+
+### Fase 6 — låseskjerm og Dynamic Island: eldre status skal ikke vinne
+
+- Speilet HealthKit-økt i tilstanden `ending` kan ikke gjenåpnes
+  med forsinket `running`, `paused` eller `preparing`. Nyere
+  sluttstatus kan fortsatt nå frem og avslutte riktig.
+- ActivityKit-kontrolleren husker nå siste faktisk aksepterte
+  `capturedAt` for samme økt. En eldre pakke kan ikke oppdatere
+  låseskjerm/Island etter en nyere pakke, selv ved 5-sekunders
+  oppdateringsbegrensning. En ny økt får sitt eget klokkevannmerke.
+- Tester dekker nyere/eldre pakker, neste økt og ugyldig tidspunkt.
+  Dette verifiserer ikke automatisk faktisk låseskjerm på iPhone.

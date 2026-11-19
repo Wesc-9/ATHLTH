@@ -326,6 +326,7 @@ private final class ATHLTHLiveActivityController {
     private var lastPhase: WatchWorkoutMirrorState?
     private var lastStrengthPresentationKey: String?
     private var lastSessionIdentity: ATHLTHLiveActivitySessionIdentity?
+    private var lastSourceCapturedAt: Date?
     /// Never re-create an already stopped Watch session from a delayed
     /// .running snapshot delivered after the terminal result.
     private var lastFinishedSessionIdentity: ATHLTHLiveActivitySessionIdentity?
@@ -349,6 +350,7 @@ private final class ATHLTHLiveActivityController {
             lastUpdateAt = nil
             lastStrengthPresentationKey = nil
             lastSessionIdentity = nil
+            lastSourceCapturedAt = nil
             return
         }
         guard ActivityAuthorizationInfo()
@@ -368,6 +370,7 @@ private final class ATHLTHLiveActivityController {
             lastUpdateAt = nil
             lastStrengthPresentationKey = nil
             lastSessionIdentity = nil
+            lastSourceCapturedAt = nil
             return
         }
 
@@ -377,6 +380,13 @@ private final class ATHLTHLiveActivityController {
             fallbackTitle: snapshot.workoutDisplayTitle ??
                 snapshot.kind.title
         )
+
+        guard ATHLTHLiveActivitySessionIdentity.acceptsCapturedAt(
+            currentIdentity: lastSessionIdentity,
+            incomingIdentity: identity,
+            currentCapturedAt: lastSourceCapturedAt,
+            incomingCapturedAt: snapshot.capturedAt
+        ) else { return }
 
         // The Watch's .ending means recording has stopped and only saving
         // remains. End the lock-screen timer immediately, not after the
@@ -407,7 +417,13 @@ private final class ATHLTHLiveActivityController {
             lastUpdateAt = nil
             lastPhase = nil
             lastStrengthPresentationKey = nil
+            lastSourceCapturedAt = nil
         }
+        // A newer sample wins before ActivityKit awaits. Even when pulse
+        // updates are throttled, old captures must not rewind the display.
+        lastSessionIdentity = identity
+        lastSourceCapturedAt = snapshot.capturedAt
+
 
         let storedLiveContext =
             ATHLTHLiveWorkoutContextStore.load()

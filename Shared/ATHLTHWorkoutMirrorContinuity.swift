@@ -43,6 +43,14 @@ enum ATHLTHWorkoutMirrorContinuity {
         if previous.state == .completed || previous.state == .failed {
             return false
         }
+        // Stopping HealthKit is irreversible for this session: a queued
+        // running/paused update cannot restart its timer while saving.
+        if previous.state == .ending &&
+            (incoming.state == .running ||
+             incoming.state == .paused ||
+             incoming.state == .preparing) {
+            return false
+        }
         // Never rewind even when the new payload is a valid terminal state:
         // an already newer capture must keep ownership of the screen.
         return incoming.capturedAt >= previous.capturedAt

@@ -115,6 +115,19 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testWatchMirrorCannotReenterRunningAfterEnding() {
+        let ending = snapshot(state: .ending)
+        var late = snapshot(state: .running)
+        late.capturedAt = ending.capturedAt.addingTimeInterval(1)
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: ending, incoming: late
+        ))
+        late.state = .completed
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: ending, incoming: late
+        ))
+    }
+
     func testWatchMirrorCannotResurrectCompletedSession() {
         let completed = snapshot(state: .completed)
         var late = snapshot()
