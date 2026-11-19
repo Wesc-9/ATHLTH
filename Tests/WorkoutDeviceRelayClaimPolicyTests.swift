@@ -123,6 +123,19 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(-1))
     }
 
+    func testServerCompletionReconciliationRequiresConfirmedMatchingRow() {
+        let id = UUID()
+        let now = Date()
+        let verify = WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion
+        XCTAssertTrue(verify([(id: id, completedAt: now, failedAt: nil)], commandID: id))
+        XCTAssertFalse(verify([], commandID: id))
+        XCTAssertFalse(verify([(id: UUID(), completedAt: now, failedAt: nil)], commandID: id))
+        XCTAssertFalse(verify([(id: id, completedAt: nil, failedAt: nil)], commandID: id))
+        XCTAssertFalse(verify([(id: id, completedAt: now, failedAt: now)], commandID: id))
+        XCTAssertFalse(verify([(id: id, completedAt: now, failedAt: nil),
+                               (id: id, completedAt: now, failedAt: nil)], commandID: id))
+    }
+
     func testReceiptRequiresExactlyOneMatchingServerRow() {
         let commandID = UUID()
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.confirmsReceipt(
