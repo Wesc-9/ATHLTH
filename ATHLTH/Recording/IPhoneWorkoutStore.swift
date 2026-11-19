@@ -5213,7 +5213,8 @@ final class IPhoneWorkoutStore:
                 )
             },
             onFinished: { [weak self] in
-                guard let self else { return }
+                guard let self,
+                      self.coachPlaybackGeneration == generation else { return }
                 self.guidancePriorityGate.voiceDidFinish()
                 self.deliverNextQueuedCoachCue()
             }
