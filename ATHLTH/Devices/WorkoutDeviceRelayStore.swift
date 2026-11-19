@@ -221,15 +221,26 @@ enum WorkoutDeviceRelayClaimPolicy {
             completedAt == nil && failedAt == nil
     }
 
-    /// A previously launched command must never be executed again, even if
-    /// its server receipt could not be committed and the same claim returns.
-    static func mayExecuteClaim(
+    enum LaunchDecision: Equatable {
+        case retryConfirmedReceipt
+        case holdForDeviceReconciliation
+        case validateNewLaunch
+    }
+
+    /// The pre-launch marker is NOT proof of a successful recording.
+    /// Only a completed local launch may receive a success receipt.
+    static func launchDecision(
         commandID: UUID,
         unacknowledgedLaunchIDs: [UUID],
-        uncertainLaunchIDs: [UUID] = []
-    ) -> Bool {
-        !unacknowledgedLaunchIDs.contains(commandID) &&
-            !uncertainLaunchIDs.contains(commandID)
+        uncertainLaunchIDs: [UUID]
+    ) -> LaunchDecision {
+        if uncertainLaunchIDs.contains(commandID) {
+            return .holdForDeviceReconciliation
+        }
+        if unacknowledgedLaunchIDs.contains(commandID) {
+            return .retryConfirmedReceipt
+        }
+        return .validateNewLaunch
     }
 }
 
@@ -639,8 +650,13 @@ final class WorkoutDeviceRelayStore:
             // A server claim can reappear when its completion receipt fails.
             // The locally durable launch journal is authoritative for this
             // device: repair the receipt, never replay Watch/HealthKit start.
-            if unacknowledgedLaunchIDs(userID: processingUserID)
-                .contains(record.id) {
+            let launchDecision = WorkoutDeviceRelayClaimPolicy.launchDecision(
+                commandID: record.id,
+                unacknowledgedLaunchIDs:
+                    unacknowledgedLaunchIDs(userID: processingUserID),
+                uncertainLaunchIDs: uncertainLaunchIDs(userID: processingUserID)
+            )
+            if launchDecision == .retryConfirmedReceipt {
                 do {
                     try await markCompleted(record.id)
                     guard currentUserID == processingUserID,
@@ -656,8 +672,7 @@ final class WorkoutDeviceRelayStore:
             // An uncertain pre-launch marker does not prove that a workout
             // started. It must never be transformed into a success receipt
             // until the original Watch/HealthKit status is reconciled.
-            guard !uncertainLaunchIDs(userID: processingUserID)
-                .contains(record.id) else {
+            guard launchDecision == .validateNewLaunch else {
                 errorMessage = ATHLTHLocalization.choose(
                     english: "Remote start requires device reconciliation.",
                     norwegian: "Fjernstart må avklares mot enhetens opptak."
