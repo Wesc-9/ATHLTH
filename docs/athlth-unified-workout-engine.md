@@ -1402,3 +1402,24 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   negativ indeks/tid) filtreres før treningshistorikken lagres.
   Nye regresjonstester dekker delvis Watch-overføring, gyldig
   minuttbevis og ugyldige prøver.
+
+### Fase 8 – kalenderstart, Watch-asynkronitet og bekreftet øktopptak (19.11.2026)
+
+- Kalenderens styrke- og innendørs hybridstart bruker nå samme
+  `ATHLTHWorkoutRecordingArbiter.reserveLaunch` før asynkront Watch-
+  HealthKit-kall som øvrige startmotorer. Reservasjonen beholdes helt
+  frem til lokal øktidentitet er verifisert; en parallell Run/Walk/Strength
+  kan ikke starte under ventetiden.
+- Etter Watch-svar kontrolleres samme innloggede bruker og kontoens
+  styrkelogg før en styrke- eller hybridøkt opprettes lokalt.
+- `StrengthWorkoutStore.matchesStartedPlannedWorkout` verifiserer
+  **planlagt økt-ID, aktiv status, opptaksenhet og Watch-korrelasjon**.
+  Hjem/kalender kan ikke registrere startet trening bare fordi
+  `StrengthWorkoutStore.start` (som returnerer `Void`) ble kalt.
+  Den samme regelen gjelder direkte iPhone-start.
+- Hvis Watch har bekreftet start, men iPhone ikke har et matchende
+  checkpoint, får brukeren beskjed om å sjekke Watch. Appen starter
+  **aldri automatisk en ny HealthKit-økt** for å skjule usikkerheten.
+- Tester dekker faktisk bekreftet iPhone-/Watch-eier, feil plan-ID,
+  feil Watch-session-ID og avvist konkurrerende start.
+- Fullført CI og fysisk Watch-/iPad-korrelasjon kreves fortsatt.

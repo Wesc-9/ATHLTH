@@ -3470,6 +3470,23 @@ final class StrengthWorkoutStore: ObservableObject {
         return true
     }
 
+
+    /// Confirm the exact recording after starting either Phone or Watch.
+    /// A void start() can be rejected during account recovery or a late
+    /// competing launch. A UI must never mark the calendar session started
+    /// merely because the function returned.
+    func matchesStartedPlannedWorkout(
+        sessionID: UUID,
+        captureDevice: WorkoutCaptureDevice,
+        watchSessionID: UUID?
+    ) -> Bool {
+        guard let activeWorkout else { return false }
+        return activeWorkout.endedAt == nil &&
+            activeWorkout.plannedSessionID == sessionID &&
+            activeWorkout.captureDevice == captureDevice &&
+            activeWorkout.watchSessionID == watchSessionID
+    }
+
     func start(
         session: PlannedSession,
         watchSessionID: UUID?,

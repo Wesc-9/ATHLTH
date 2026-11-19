@@ -4944,7 +4944,21 @@ struct ATHLTHHomeView: View {
         device: WorkoutCaptureDevice,
         hybridParts: [PlannedSession]? = nil
     ) {
-        guard strengthWorkout.activeWorkout == nil else {
+        // This entry point also serves calendar and iPad handoffs. Do not
+        // launch a new remote HealthKit session if its account-owned local
+        // checkpoint is still loading, another recording is active, or the
+        // athlete has already initiated this calendar start.
+        guard !homeDirectStartInProgress,
+              strengthWorkout.isLoaded(for: session.profile.userID),
+              strengthWorkout.activeWorkout == nil,
+              phoneWorkout.active == nil,
+              !watchConnection.hasActiveWatchWorkout,
+              !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+        else {
+            homeWatchTransferError = ATHLTHLocalization.choose(
+                english: "A workout is already starting, active, or your training data is still loading.",
+                norwegian: "En økt er allerede i ferd med å starte, pågår, eller treningsdataene lastes fortsatt."
+            )
             return
         }
 
@@ -4971,30 +4985,48 @@ struct ATHLTHHomeView: View {
                 defer {
                     homeDirectStartInProgress = false
                 }
-
+                var watchStartAcknowledged = false
                 do {
-                    try await watchConnection
-                        .startWorkoutOnWatch(.strength)
+                    // Hold one global launch reservation across the Watch
+                    // request and the authoritative strength-store start.
+                    // No second Run, Walk or Strength launch can pass while
+                    // the HealthKit acknowledgement is pending.
+                    let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+                    defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+                    let initiatingAccount = session.profile.userID
+                    try await watchConnection.startWorkoutOnWatch(.strength)
+                    watchStartAcknowledged = true
 
-                    let launched: Bool
+                    guard session.profile.userID == initiatingAccount,
+                          strengthWorkout.isLoaded(for: initiatingAccount),
+                          strengthWorkout.activeWorkout == nil,
+                          phoneWorkout.active == nil
+                    else {
+                        throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+                    }
+
+                    let remoteSessionID = UUID()
                     if let hybridParts {
-                        launched = strengthWorkout.startPlannedHybrid(
+                        _ = strengthWorkout.startPlannedHybrid(
                             session: workout,
                             validatedParts: hybridParts,
-                            watchSessionID: UUID(),
+                            watchSessionID: remoteSessionID,
                             trackingMode: trackingMode,
                             captureDevice: .appleWatch
                         )
                     } else {
                         strengthWorkout.start(
                             session: workout,
-                            watchSessionID: UUID(),
+                            watchSessionID: remoteSessionID,
                             trackingMode: trackingMode,
                             captureDevice: .appleWatch
                         )
-                        launched = true
                     }
-                    guard launched else {
+                    guard strengthWorkout.matchesStartedPlannedWorkout(
+                        sessionID: workout.id,
+                        captureDevice: .appleWatch,
+                        watchSessionID: remoteSessionID
+                    ) else {
                         throw NSError(
                             domain: "ATHLTH.HybridLaunch",
                             code: 1,
@@ -5014,6 +5046,7 @@ struct ATHLTHHomeView: View {
                         startedOnWatch: true
                     )
                     _ = await social.confirmCurrentJoinedWorkoutStarted()
+                    guard session.profile.userID == initiatingAccount else { return }
                     WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
                         session: session,
@@ -5024,14 +5057,27 @@ struct ATHLTHHomeView: View {
                     showingHomeStrengthWorkout = true
                 } catch {
                     await social.markCurrentJoinedWorkoutLaunchFailed()
-                    homeWatchTransferError =
-                        error.localizedDescription
+                    // A Watch acknowledgement without an iPhone checkpoint
+                    // is *not* a failed Watch recording. Do not silently
+                    // restart or claim no HealthKit capture exists.
+                    if watchStartAcknowledged &&
+                        !strengthWorkout.matchesStartedPlannedWorkout(
+                            sessionID: workout.id,
+                            captureDevice: .appleWatch,
+                            watchSessionID: strengthWorkout.activeWorkout?.watchSessionID
+                        ) {
+                        homeWatchTransferError = ATHLTHLocalization.choose(
+                            english: "Apple Watch may still be recording. Check the workout on Watch before trying again.",
+                            norwegian: "Apple Watch kan fortsatt registrere økten. Kontroller økten på klokken før du prøver igjen."
+                        )
+                    } else {
+                        homeWatchTransferError = error.localizedDescription
+                    }
                 }
             }
         } else {
-            let launched: Bool
             if let hybridParts {
-                launched = strengthWorkout.startPlannedHybrid(
+                _ = strengthWorkout.startPlannedHybrid(
                     session: workout,
                     validatedParts: hybridParts,
                     watchSessionID: nil,
@@ -5045,9 +5091,12 @@ struct ATHLTHHomeView: View {
                     trackingMode: trackingMode,
                     captureDevice: .iPhone
                 )
-                launched = true
             }
-            guard launched else {
+            guard strengthWorkout.matchesStartedPlannedWorkout(
+                sessionID: workout.id,
+                captureDevice: .iPhone,
+                watchSessionID: nil
+            ) else {
                 homeDirectStartInProgress = false
                 homeWatchTransferError = ATHLTHLocalization.choose(
                     english: "Could not prepare the combined workout. No recording was started.",

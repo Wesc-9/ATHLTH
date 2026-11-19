@@ -727,4 +727,89 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
             13_590
         )
     }
+
+    @MainActor
+    func testPlannedStrengthStartOnlyConfirmsExactWatchOwnerAndSession() throws {
+        let store = StrengthWorkoutStore()
+        let planned = PlannedSession(
+            id: UUID(), title: "Strength",
+            kind: .strength, scheduledStart: nil,
+            durationMinutes: nil, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil, routeID: nil,
+            exercises: [], notes: ""
+        )
+        let watchID = UUID()
+        XCTAssertFalse(store.matchesStartedPlannedWorkout(
+            sessionID: planned.id, captureDevice: .appleWatch,
+            watchSessionID: watchID
+        ))
+        store.start(
+            session: planned, watchSessionID: watchID,
+            trackingMode: .advanced, captureDevice: .appleWatch
+        )
+        XCTAssertTrue(store.matchesStartedPlannedWorkout(
+            sessionID: planned.id, captureDevice: .appleWatch,
+            watchSessionID: watchID
+        ))
+        XCTAssertFalse(store.matchesStartedPlannedWorkout(
+            sessionID: UUID(), captureDevice: .appleWatch,
+            watchSessionID: watchID
+        ))
+        XCTAssertFalse(store.matchesStartedPlannedWorkout(
+            sessionID: planned.id, captureDevice: .iPhone,
+            watchSessionID: watchID
+        ))
+        XCTAssertFalse(store.matchesStartedPlannedWorkout(
+            sessionID: planned.id, captureDevice: .appleWatch,
+            watchSessionID: UUID()
+        ))
+
+        let competing = PlannedSession(
+            id: UUID(), title: "Competing workout",
+            kind: .strength, scheduledStart: nil,
+            durationMinutes: nil, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil, routeID: nil,
+            exercises: [], notes: ""
+        )
+        store.start(
+            session: competing, watchSessionID: UUID(),
+            trackingMode: .simple, captureDevice: .appleWatch
+        )
+        XCTAssertTrue(store.matchesStartedPlannedWorkout(
+            sessionID: planned.id, captureDevice: .appleWatch,
+            watchSessionID: watchID
+        ), "A rejected second launch cannot claim the first recording")
+        XCTAssertFalse(store.matchesStartedPlannedWorkout(
+            sessionID: competing.id, captureDevice: .appleWatch,
+            watchSessionID: watchID
+        ))
+    }
+
+    @MainActor
+    func testIPhoneStrengthStartRequiresMatchingCheckpointBeforeCalendarAdvance() {
+        let store = StrengthWorkoutStore()
+        let planned = PlannedSession(
+            id: UUID(), title: "Strength",
+            kind: .strength, scheduledStart: nil,
+            durationMinutes: nil, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil, routeID: nil,
+            exercises: [], notes: ""
+        )
+        store.start(
+            session: planned, watchSessionID: nil,
+            trackingMode: .simple, captureDevice: .iPhone
+        )
+        XCTAssertTrue(store.matchesStartedPlannedWorkout(
+            sessionID: planned.id, captureDevice: .iPhone,
+            watchSessionID: nil
+        ))
+        XCTAssertFalse(store.matchesStartedPlannedWorkout(
+            sessionID: planned.id, captureDevice: .appleWatch,
+            watchSessionID: nil
+        ))
+        XCTAssertFalse(store.matchesStartedPlannedWorkout(
+            sessionID: planned.id, captureDevice: .iPhone,
+            watchSessionID: UUID()
+        ))
+    }
 }
