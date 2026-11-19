@@ -1244,6 +1244,15 @@ enum WorkoutLaunchCoordinator {
             )
         }
 
+        // The HealthKit Watch request suspends this task. Do not continue
+        // launch side effects if another local recording won in the meantime.
+        try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+            phoneWorkout.activeSessionState
+        )
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
+
         // Watch Spotify remains local to the Watch. Never start playback on
         // a previously selected Spotify Connect speaker from iPhone.
         startQuickSpotifyIfNeeded(
@@ -1453,6 +1462,15 @@ enum WorkoutLaunchCoordinator {
             workoutMirroring?
                 .clearIPhoneAudioCoach()
             throw error
+        }
+
+        // The HealthKit Watch request suspends this task. Do not continue
+        // launch side effects if another local recording won in the meantime.
+        try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+            phoneWorkout.activeSessionState
+        )
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
         gear.prepareNextWorkoutGear(
