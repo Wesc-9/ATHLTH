@@ -330,6 +330,7 @@ final class StrengthSkipSetWatchTests: XCTestCase {
         XCTAssertEqual(store.activeWorkout?.id, existingID)
     }
 
+    @MainActor
     func testWatchBootstrapAdmissionRejectsOccupiedAndCompletedSlots() throws {
         let userID = UUID()
         let store = StrengthWorkoutStore()
@@ -352,6 +353,63 @@ final class StrengthSkipSetWatchTests: XCTestCase {
             completedWorkoutIDs: [], slotAvailable: false
         ))
         XCTAssertNotEqual(userID, snapshot.workoutID)
+    }
+
+    func testCompletedWatchCommandsAreAcknowledgedOnlyForCorrectAccount() {
+        let owner = UUID()
+        let other = UUID()
+        let completedID = UUID()
+        var command = WatchStrengthCommand(
+            id: UUID(), workoutID: completedID, kind: .completeSet,
+            reps: 10, weightKilograms: 30, restSeconds: 60,
+            addRestSeconds: nil, sentAt: Date()
+        )
+        command.accountOwnerID = owner
+        XCTAssertTrue(ATHLTHStrengthWatchCommandRoutingPolicy.mayAcknowledgeCommitted(
+            command, signedInAccountID: owner,
+            completedWorkoutIDs: [completedID]
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayAcknowledgeCommitted(
+            command, signedInAccountID: other,
+            completedWorkoutIDs: [completedID]
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayAcknowledgeCommitted(
+            command, signedInAccountID: owner,
+            completedWorkoutIDs: []
+        ))
+        // An old Watch build without an owner may be acknowledged only
+        // when the exact immutable ID is already committed locally.
+        command.accountOwnerID = nil
+        XCTAssertTrue(ATHLTHStrengthWatchCommandRoutingPolicy.mayAcknowledgeCommitted(
+            command, signedInAccountID: owner,
+            completedWorkoutIDs: [completedID]
+        ))
+        command.workoutID = nil
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayAcknowledgeCommitted(
+            command, signedInAccountID: owner,
+            completedWorkoutIDs: [completedID]
+        ))
+    }
+
+    func testWatchBootstrapIsProcessedBeforeOutOfOrderSetEvents() {
+        let session = UUID()
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        func command(_ kind: WatchStrengthCommandKind, at offset: TimeInterval,
+                     initiatedOnWatch: Bool? = nil) -> WatchStrengthCommand {
+            WatchStrengthCommand(
+                id: UUID(), workoutID: session, kind: kind,
+                reps: nil, weightKilograms: nil, restSeconds: nil,
+                addRestSeconds: nil, sentAt: start.addingTimeInterval(offset),
+                initiatedOnWatch: initiatedOnWatch
+            )
+        }
+        let set1 = command(.completeSet, at: 10)
+        let set2 = command(.completeSet, at: 20)
+        let bootstrap = command(.requestSnapshot, at: 25, initiatedOnWatch: true)
+        let ordered = ATHLTHStrengthWatchCommandRoutingPolicy.orderedForReplay(
+            [set2, set1, bootstrap]
+        )
+        XCTAssertEqual(ordered.map(\.id), [bootstrap.id, set1.id, set2.id])
     }
 
     func testSameAccountOfflineWatchCommandsWaitForMatchingWorkout() {

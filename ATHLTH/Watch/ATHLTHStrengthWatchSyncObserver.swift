@@ -73,6 +73,44 @@ enum ATHLTHStrengthWatchBootstrapAdmissionPolicy {
 /// while a different account is signed in. Legacy commands may be applied
 /// only to an already-restored workout with the exact same workout UUID.
 enum ATHLTHStrengthWatchCommandRoutingPolicy {
+    /// Replaying a command for a completed local workout cannot add
+    /// another set. Acknowledge it only if the immutable workout ID is
+    /// already committed to the currently loaded account's history.
+    static func mayAcknowledgeCommitted(
+        _ command: WatchStrengthCommand,
+        signedInAccountID: UUID,
+        completedWorkoutIDs: Set<UUID>
+    ) -> Bool {
+        guard let workoutID = command.workoutID,
+              completedWorkoutIDs.contains(workoutID),
+              command.accountOwnerID == nil ||
+                command.accountOwnerID == signedInAccountID
+        else { return false }
+        return true
+    }
+
+    /// HealthKit / WatchConnectivity may deliver offline set actions before
+    /// the snapshot required to reconstruct their source session. Bootstrap
+    /// first, then replay the set actions in their original chronological
+    /// order. Never use arrival order as the workout clock.
+    static func orderedForReplay(
+        _ commands: [WatchStrengthCommand]
+    ) -> [WatchStrengthCommand] {
+        commands.sorted { left, right in
+            let leftBootstrap = left.kind == .requestSnapshot &&
+                left.initiatedOnWatch == true
+            let rightBootstrap = right.kind == .requestSnapshot &&
+                right.initiatedOnWatch == true
+            if leftBootstrap != rightBootstrap {
+                return leftBootstrap
+            }
+            if left.sentAt != right.sentAt {
+                return left.sentAt < right.sentAt
+            }
+            return left.id.uuidString < right.id.uuidString
+        }
+    }
+
     static func mayProcess(
         _ command: WatchStrengthCommand,
         signedInAccountID: UUID,
@@ -621,19 +659,37 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         guard appSession.signedIn,
               strengthWorkout.isLoaded(for: appSession.profile.userID)
         else { return }
-        // A journal may include commands for multiple account sessions.
-        // Skipping a foreign/unscoped command preserves its UUID and payload
-        // for its rightful owner without blocking current-owner commands.
-        for command in watchConnection.pendingStrengthCommands {
+        // A journal may contain several offline Watch sessions for one
+        // athlete. First restore each eligible session identity, then replay
+        // its chronologically ordered set events without crossing IDs.
+        let owner = appSession.profile.userID
+        let completedIDs = Set(
+            strengthWorkout.workoutHistory
+                .filter { $0.endedAt != nil }
+                .map(\.id)
+        )
+        let queued = ATHLTHStrengthWatchCommandRoutingPolicy.orderedForReplay(
+            watchConnection.pendingStrengthCommands
+        )
+        for command in queued {
+            // Only a confirmed durable history item can consume a late
+            // command without applying it. This prevents an ever-growing
+            // offline queue while preserving original set evidence.
+            if ATHLTHStrengthWatchCommandRoutingPolicy.mayAcknowledgeCommitted(
+                command, signedInAccountID: owner,
+                completedWorkoutIDs: completedIDs
+            ) {
+                watchConnection.consumeStrengthCommand(command.id)
+                continue
+            }
             guard ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
                 command,
-                signedInAccountID: appSession.profile.userID,
+                signedInAccountID: owner,
                 activeWorkoutID: strengthWorkout.activeWorkout?.id
             ) else { continue }
             guard handle(command) else {
-                // The matching account's checkpoint may not be restored yet.
-                // A later bootstrap request can establish it, after which
-                // .onChange(activeWorkout) retries the earlier commands.
+                // The correct account's checkpoint may not be restored yet.
+                // Keep this command intact for a later Watch or account restore.
                 continue
             }
             watchConnection.consumeStrengthCommand(command.id)

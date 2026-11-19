@@ -579,3 +579,18 @@ som ferdige før egne faser og reelle tester er fullført.
 - Observeren avviser ID-konflikter uten falsk kvittering selv om
   en feilaktig kommando når helt frem til behandlingsleddet.
   Tester dekker to økter på samme konto og Watch-bootstrap.
+
+### Fase 4 – varig Watch-journal: avsluttede økter og riktig hendelsesrekkefølge
+
+- Forsinkede kommandoer fra en økt som allerede er **varig lagret**
+  i den innloggede kontoens `strengthHistory` får nå kvittering uten
+  å mutere sett eller gjenskape HealthKit-opptak. Uten samme ferdige
+  økt-ID blir de liggende til korrekt gjenoppretting.
+- Watch-initiert bootstrap prioriteres før settkommandoer, også om
+  WatchConnectivity sendte en senere oppstartspakke enn sine
+  settpakker. Etter bootstrap brukes opprinnelig `sentAt` og
+  UUID som deterministisk sortering, ikke tilfeldig ankomstrekkefølge.
+- Tester dekker feil eier, ukjent/ferdig økt, eldre Watch-format
+  uten konto-ID og setthendelser som ankommer før bootstrap.
+  XCTest som bruker aktørbundet `StrengthWorkoutStore` er også merket
+  `@MainActor`.
