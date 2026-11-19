@@ -1188,3 +1188,40 @@ men ikke release-/fysisk godkjent.
 - Verifisering av fase 7 er fortsatt åpen: full iOS/iPad/watchOS-bygg og
   målrettet XCTest på én og samme commit, fysisk HealthKit-korrelasjon,
   gjenoppretting etter krasj og fullstendig segment-/PR-regnskap.
+
+### Fase 7 – resultatprojeksjon, korrekt PR-historikk og universell deduplisering (19.11.2026)
+
+- `StrengthWorkoutResultBreakdown` er en **ren, ikke-lagret** visning av
+  den eksisterende `StrengthWorkoutLog`. Sammendraget bruker samme
+  autoritative øktklokke som live-motoren, inkludert pågående hvile som
+  ennå ikke er skrevet til et sett. Først når økten er fullført kan en
+  gyldig HealthKit-sluttvarighet få prioritet.
+- Aktiv tid = total økttid minus faktisk registrert hvile, klamret til
+  intervallet 0...total tid. Ugyldige/negative hviletall og ikke-fullførte
+  sett får ikke påvirke hvile- og repetisjonssammendraget. Gjenopprettet
+  iPhone-dødtid er allerede ekskludert i den autoritative klokken.
+- Segmentprojeksjonen bevarer øvelse-ID, antall fullførte/hoppede sett,
+  reps, volum og registrert settid. Hybridkardio skiller mellom
+  **Watch-målt distanse**, **registrert distanse** og **estimert
+  tredemølledistanse**; verdiene blir ikke slått sammen og kalt
+  sensormåling. Det samme resultatkortet viser segmentene uten å lage
+  en ekstra økt eller et nytt HealthKit-opptak.
+- `StrengthWorkoutStore.workoutPersonalRecords` sammenligner nå en
+  historisk økt med **tidligere** fullførte økter, ikke treningsøkter
+  som ble gjennomført etter den aktuelle økten. Den første økten
+  forblir referansegrunnlag selv etter senere trening.
+- `ATHLTHRecordedWorkoutIndex.unlinkedKeys` grupperer lokale
+  øktsnapshots per eksakt lokal ID før HealthKit-deduplisering. En
+  tidlig post uten HealthKit-UUID kan ikke føre til at den samme økten
+  telles om igjen når en nyere kopi får HealthKit-kobling.
+- Testdekningen er utvidet for aktive pauser, gyldig/endelig HealthKit-
+  varighet, utelatte sett, historisk PR-sammenligning, hybrid
+  distanseproveniens og sen HealthKit-backfill. CI-workflowens
+  filfilter inkluderer nå også styrkens gjenopprettingstester.
+
+**Verifikasjonsstatus:** Kode og testtilfeller er lagt inn i
+`release/v2.2.5`, men det foreligger ingen bekreftet grønn
+samme-commit XCTest-/iOS-/iPad-/watchOS-kjøring i denne gjennomgangen.
+Ingen fysisk HealthKit-kontroll eller TestFlight-opplasting er utført.
+Full gjennomgang av alle eksterne sportsimporter, fysisk Watch-korrelasjon
+og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
