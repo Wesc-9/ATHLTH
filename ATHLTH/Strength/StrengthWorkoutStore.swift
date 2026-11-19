@@ -5030,7 +5030,7 @@ final class StrengthWorkoutStore: ObservableObject {
             workout.exercises[selectedExerciseIndex].skippedPlannedSetCount =
                 (selected.skippedPlannedSetCount ?? 0) + 1
             if workout.exercises[selectedExerciseIndex]
-                .sets.allSatisfy(\\.isResolved) {
+                .sets.allSatisfy(\.isResolved) {
                 workout.exercises[selectedExerciseIndex].completedAt = now
             }
 

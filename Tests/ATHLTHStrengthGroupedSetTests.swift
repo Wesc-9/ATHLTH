@@ -419,14 +419,14 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
             )
             let originalWorkoutID = try XCTUnwrap(store.activeWorkout?.id)
             let originalIDs = try XCTUnwrap(
-                store.activeWorkout?.exercises.map { $0.sets.map(\\.id) }
+                store.activeWorkout?.exercises.map { $0.sets.map(\.id) }
             )
             XCTAssertEqual(store.activeWorkout?.exercises.count, 2)
 
-            XCTAssertTrue(store.skipCurrentSet(), "Skip failed in \\(style)")
+            XCTAssertTrue(store.skipCurrentSet(), "Skip failed in \(style)")
             let after = try XCTUnwrap(store.activeWorkout)
             XCTAssertEqual(after.id, originalWorkoutID)
-            XCTAssertEqual(after.exercises.map { $0.sets.map(\\.id) }, originalIDs,
+            XCTAssertEqual(after.exercises.map { $0.sets.map(\.id) }, originalIDs,
                            "Skipping a station must not renumber rounds.")
             XCTAssertTrue(after.exercises[0].sets[0].isResolved)
             XCTAssertFalse(after.exercises[0].sets[0].isCompleted)
