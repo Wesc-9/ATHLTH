@@ -764,6 +764,19 @@ final class IPhoneWorkoutStore:
         }
     }
 
+    /// A remote command may be rejected while outdoor GPS permission is
+    /// still pending. Cancel only that exact deferred request; otherwise a
+    /// later system authorization callback could unexpectedly start a
+    /// workout after the server has already marked the command failed.
+    /// Ordinary local launches and other relay IDs are untouched.
+    func cancelPendingRelayedLaunch(requestID: UUID) {
+        guard pendingWalking != nil,
+              pendingRelayRequestID == requestID,
+              active?.relayRequestID != requestID
+        else { return }
+        clearPendingLaunchConfiguration()
+    }
+
     private func clearPendingLaunchConfiguration() {
         pendingWalking = nil
         pendingPlannedPlanID = nil
