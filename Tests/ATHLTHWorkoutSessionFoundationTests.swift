@@ -161,6 +161,35 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         ))
     }
 
+    func testUniversalSessionArbitrationRejectsParallelRecordings() throws {
+        let id = UUID()
+        func state(_ workoutID: UUID, _ owner: ATHLTHWorkoutRecordingOwner)
+            -> ATHLTHWorkoutSessionState {
+            ATHLTHWorkoutSessionState(
+                workoutID: workoutID, plannedSessionID: nil,
+                recordingOwner: owner, activity: .strength,
+                phase: .work, engine: .strength, startedAt: start,
+                activeElapsedSeconds: 10, stageIndex: nil, stageCount: nil
+            )
+        }
+        let first = state(id, .appleWatch)
+        XCTAssertNil(try ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+            running: nil, strength: nil
+        ))
+        XCTAssertEqual(try ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+            running: first, strength: nil
+        )?.workoutID, id)
+        XCTAssertEqual(try ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+            running: first, strength: state(id, .appleWatch)
+        )?.workoutID, id)
+        XCTAssertThrowsError(try ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+            running: first, strength: state(UUID(), .appleWatch)
+        ))
+        XCTAssertThrowsError(try ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+            running: first, strength: state(id, .iPhone)
+        ))
+    }
+
     func testRecoveryNeverResurrectsCompletedHistory() {
         XCTAssertTrue(ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
             hasEnded: false, alreadyCommitted: false
