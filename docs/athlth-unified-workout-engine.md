@@ -282,3 +282,15 @@ som ferdige før egne faser og reelle tester er fullført.
   et utelatt EMOM-sett ikke endrer økt-ID, sett-ID eller volum, at den
   historiske telleren overlever JSON-rundtur, og at gruppemodusene fortsatt
   fungerer gjennom felles styrkemotor.
+
+- **Fase 3 / gruppeprogresjon:** Et bevisst hoppet-over sett i supersett,
+  sirkel, dropsett og AMRAP beholder nå sin opprinnelige stasjon,
+  runde og sett-ID akkurat som EMOM. Dette unngår at resterende øvelser
+  forskyves og blandes med neste runde. Den eksisterende
+  `advanceGroupedSetIfNeeded` velger neste stasjon; ingen ekstra motor,
+  HealthKit-økt eller settmodell opprettes.
+- Watch- og historikkkompatibilitet beholdes ved at den opprinnelige
+  skipped-telleren fortsatt oppdateres. `auditedSkippedSets` skiller
+  speilet skip-tall fra faktiske ekstra utelatte sett, også i
+  andre gruppemoduser enn EMOM. Testene kontrollerer faste sett-ID-er,
+  ett skip, null utført volum og riktig neste stasjon.

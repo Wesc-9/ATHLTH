@@ -387,4 +387,56 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
     }
 
 
+
+    func testGroupedSkipPreservesRoundAndStationIdentity() throws {
+        for style in [WorkoutBlockGroupKind.superset, .circuit, .dropSet] {
+            let groupID = UUID()
+            var first = exercise(10, weight: 30, sets: 2)
+            var second = exercise(8, weight: 20, sets: 2)
+            for block in [0, 1] {
+                if block == 0 {
+                    first.groupID = groupID
+                    first.groupKind = style
+                    first.groupRounds = style == .dropSet ? 1 : 2
+                } else {
+                    second.groupID = groupID
+                    second.groupKind = style
+                    second.groupRounds = style == .dropSet ? 1 : 2
+                }
+            }
+            var plan = PlannedSession(
+                id: UUID(), title: "Skip group station", kind: .strength,
+                scheduledStart: nil, durationMinutes: 15,
+                targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil,
+                routeID: nil, exercises: [], notes: nil
+            )
+            plan.workoutBlocks = [first, second]
+            let store = StrengthWorkoutStore()
+            store.start(
+                session: plan, watchSessionID: nil,
+                trackingMode: .advanced, captureDevice: .iPhone
+            )
+            let originalWorkoutID = try XCTUnwrap(store.activeWorkout?.id)
+            let originalIDs = try XCTUnwrap(
+                store.activeWorkout?.exercises.map { $0.sets.map(\\.id) }
+            )
+            XCTAssertEqual(store.activeWorkout?.exercises.count, 2)
+
+            XCTAssertTrue(store.skipCurrentSet(), "Skip failed in \\(style)")
+            let after = try XCTUnwrap(store.activeWorkout)
+            XCTAssertEqual(after.id, originalWorkoutID)
+            XCTAssertEqual(after.exercises.map { $0.sets.map(\\.id) }, originalIDs,
+                           "Skipping a station must not renumber rounds.")
+            XCTAssertTrue(after.exercises[0].sets[0].isResolved)
+            XCTAssertFalse(after.exercises[0].sets[0].isCompleted)
+            XCTAssertEqual(after.exercises[0].auditedSkippedSets, 1)
+            XCTAssertEqual(after.exercises[0].skippedPlannedSetCount, 1)
+            XCTAssertEqual(after.totalCompletedSets, 0)
+            XCTAssertEqual(store.currentExercise?.id, after.exercises[1].id,
+                           "Next grouped station should be selected.")
+        }
+    }
+
+
 }

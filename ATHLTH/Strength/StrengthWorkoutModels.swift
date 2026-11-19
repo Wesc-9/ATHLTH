@@ -629,7 +629,10 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
         // AND previously incremented skippedPlannedSetCount. These are the
         // same omissions, not independent missed sets. max() also preserves
         // older checkpoints without rewriting their stored IDs or counters.
-        if groupStyle == .emom {
+        if groupStyle != nil {
+            // Grouped execution preserves the station/round slot when a
+            // set is intentionally skipped. Its legacy count mirrors the
+            // same omissions for Watch and older readers, not extra sets.
             return max(legacySkippedCount, retainedSkippedCount)
         }
         // Other modes may physically remove planned rows while retaining

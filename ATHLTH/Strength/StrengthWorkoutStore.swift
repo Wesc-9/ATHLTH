@@ -5014,17 +5014,61 @@ final class StrengthWorkoutStore: ObservableObject {
               !workout.exercises[currentExerciseIndex].sets[currentSetIndex].isResolved
         else { return false }
 
-        if workout.exercises[currentExerciseIndex].groupStyle == .emom,
-           let id = workout.exercises[currentExerciseIndex].groupID {
-            workout.exercises[currentExerciseIndex].sets[currentSetIndex].skippedAt = Date()
-            workout.exercises[currentExerciseIndex].skippedPlannedSetCount =
-                (workout.exercises[currentExerciseIndex].skippedPlannedSetCount ?? 0) + 1
-            activeWorkout = workout
+        if workout.exercises[currentExerciseIndex].groupID != nil,
+           let groupStyle = workout.exercises[currentExerciseIndex].groupStyle {
+            let now = Date()
+            let selectedExerciseIndex = currentExerciseIndex
+            let selectedSetIndex = currentSetIndex
+            let selected = workout.exercises[selectedExerciseIndex]
+            let set = selected.sets[selectedSetIndex]
+
+            // Keep the original station, round and set ID intact. Removing
+            // an array entry shifts the other stations into the wrong round
+            // in superset, circuit, drop-set, EMOM and AMRAP workouts.
+            workout.exercises[selectedExerciseIndex]
+                .sets[selectedSetIndex].skippedAt = now
+            workout.exercises[selectedExerciseIndex].skippedPlannedSetCount =
+                (selected.skippedPlannedSetCount ?? 0) + 1
+            if workout.exercises[selectedExerciseIndex]
+                .sets.allSatisfy(\\.isResolved) {
+                workout.exercises[selectedExerciseIndex].completedAt = now
+            }
+
             timedSetCountdown = nil
             setEffortClock = nil
-            // Keep each minute's original slot index so the group clock
-            // and the Watch never mix rounds when a station is omitted.
-            _ = reconcileCurrentEMOM()
+            restStartedAt = nil
+            restEndsAt = nil
+
+            if groupStyle == .emom {
+                activeWorkout = workout
+                // The original minute indices remain stable; only the
+                // authoritative EMOM clock chooses the next live slot.
+                _ = reconcileCurrentEMOM(at: now)
+            } else {
+                let restSeconds = max(
+                    selected.restSecondsOverride ??
+                        set.restSeconds ?? 0, 0
+                )
+                let automaticRestTimer =
+                    workout.advancedConfiguration?.restCues
+                        .automaticRestTimer ?? true
+                let advanced = advanceGroupedSetIfNeeded(
+                    workout: &workout,
+                    completedExerciseIndex: selectedExerciseIndex,
+                    completedSetIndex: selectedSetIndex,
+                    automaticRestTimer: automaticRestTimer,
+                    restSeconds: restSeconds,
+                    at: now
+                )
+                if !advanced,
+                   let nextPendingIndex =
+                     workout.exercises[selectedExerciseIndex].sets
+                        .firstIndex(where: { !$0.isResolved }) {
+                    currentSetIndex = nextPendingIndex
+                }
+                activeWorkout = workout
+                reloadDraftFromCurrentSet()
+            }
             persistCheckpointNow()
             return true
         }
