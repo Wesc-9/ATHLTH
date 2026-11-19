@@ -135,6 +135,31 @@ enum ATHLTHWorkoutSessionFoundation {
         try requireNoActiveRecording(currentSession(phone: phone, strength: strength))
     }
 
+    /// A device message must not rewind a running session. Wall-clock
+    /// timestamps can arrive out of order after an offline Watch replay;
+    /// the elapsed counter is the monotonic progress authority here.
+    static func acceptsProgressUpdate(
+        current: ATHLTHWorkoutSessionState,
+        incoming: ATHLTHWorkoutSessionState
+    ) -> Bool {
+        guard acceptsDeviceSnapshot(current: current, incoming: incoming) else {
+            return false
+        }
+        return incoming.activeElapsedSeconds.isFinite &&
+            incoming.activeElapsedSeconds >= 0 &&
+            incoming.activeElapsedSeconds >= current.activeElapsedSeconds
+    }
+
+    /// No duplicate completion may be produced from a late Watch replay.
+    /// Completion is idempotent by the stable workout ID, independent of
+    /// which live engine was visible when the workout ended.
+    static func shouldCommitCompletion(
+        workoutID: UUID,
+        committedWorkoutIDs: Set<UUID>
+    ) -> Bool {
+        !committedWorkoutIDs.contains(workoutID)
+    }
+
     /// Verify a restored checkpoint before exposing it as the active session.
     /// A completed record must never be resurrected by a late Watch or iPad
     /// snapshot, even if the snapshot has a matching workout identifier.
