@@ -222,6 +222,13 @@ final class MirroredWorkoutAudioCoach:
         let previousState = lastState
         lastState = snapshot.state
         workoutStartedAt = snapshot.startedAt
+        if snapshot.state == .paused {
+            cueQueue.discardWorkoutMotionCues()
+        } else if snapshot.state == .completed ||
+                  snapshot.state == .failed ||
+                  snapshot.state == .ending {
+            cueQueue.discardForWorkoutCompletion()
+        }
 
         if snapshot.state == .running,
            !announcedStart {
