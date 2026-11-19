@@ -201,15 +201,17 @@ enum WorkoutDeviceRelayClaimPolicy {
         source: String,
         target: String,
         kind: String,
-        payload: WorkoutDeviceRelayEnvelope,
+        payloadTarget: String,
+        payloadKind: String,
+        payloadVersion: Int,
         expiresAt: Date,
         now: Date = Date()
     ) -> Bool {
         source == "ipad" &&
-            target == payload.target.rawValue &&
-            kind == payload.kind.rawValue &&
+            target == payloadTarget &&
+            kind == payloadKind &&
             expiresAt > now &&
-            payload.version == 1
+            payloadVersion == 1
     }
 }
 
@@ -499,7 +501,9 @@ final class WorkoutDeviceRelayStore:
         isDrainingCommands = true
         defer { isDrainingCommands = false }
         guard let processingUserID = currentUserID else { return }
-        for _ in 0..<8 {
+        // Drain the complete bounded backlog on reconnect, not only the
+        // first eight commands when no further realtime event may arrive.
+        for _ in 0..<128 {
             guard currentUserID == processingUserID,
                 !Task.isCancelled
             else {
@@ -513,8 +517,9 @@ final class WorkoutDeviceRelayStore:
                 record =
                     try await claimNext()
             } catch {
-                errorMessage =
-                    error.localizedDescription
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
+                errorMessage = error.localizedDescription
                 return
             }
 
@@ -530,7 +535,9 @@ final class WorkoutDeviceRelayStore:
                 source: record.sourceDevice,
                 target: record.targetDevice,
                 kind: record.commandKind,
-                payload: record.payload,
+                payloadTarget: record.payload.target.rawValue,
+                payloadKind: record.payload.kind.rawValue,
+                payloadVersion: record.payload.version,
                 expiresAt: record.expiresAt
             ) else {
                 // A malformed or expired claim must never launch HealthKit.
@@ -563,6 +570,8 @@ final class WorkoutDeviceRelayStore:
                 try await markCompleted(
                     command.id
                 )
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
                 lastCompletedCommandID =
                     command.id
                 errorMessage = nil
@@ -580,6 +589,8 @@ final class WorkoutDeviceRelayStore:
                     command.id,
                     error: error
                 )
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
                 errorMessage =
                     error.localizedDescription
                 lastStatusText =
