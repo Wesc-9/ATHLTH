@@ -264,7 +264,9 @@ final class StrengthWorkoutStore: ObservableObject {
         var savedAt: Date? = nil
     }
 
-    init() {}
+    init() {
+        ATHLTHWorkoutRecordingArbiter.strength = self
+    }
 
     func switchAccount(_ userID: UUID?) {
         guard accountID != userID else { return }
@@ -2703,7 +2705,8 @@ final class StrengthWorkoutStore: ObservableObject {
             StrengthAdvancedConfiguration? = nil
     ) {
         // Never overwrite an unfinished workout or its account checkpoint.
-        guard activeWorkout == nil, !loadingAccount else { return }
+        guard activeWorkout == nil, !loadingAccount,
+              ATHLTHWorkoutRecordingArbiter.mayStartStrength() else { return }
         recoveredCheckpointSavedAt = nil
         setEffortClock = nil
         cardioWatchCaptures = [:]
@@ -3333,6 +3336,7 @@ final class StrengthWorkoutStore: ObservableObject {
     ) -> Bool {
         guard activeWorkout == nil,
               !loadingAccount,
+              ATHLTHWorkoutRecordingArbiter.mayStartStrength(),
               !validatedParts.isEmpty,
               validatedParts.allSatisfy({ $0.id == session.id }),
               ATHLTHHybridWorkoutLaunchPlan.parts(for: session) != nil
@@ -3386,7 +3390,8 @@ final class StrengthWorkoutStore: ObservableObject {
     ) {
         // Existing or recovered strength work must not be silently discarded
         // by a duplicate start action.
-        guard activeWorkout == nil, !loadingAccount else { return }
+        guard activeWorkout == nil, !loadingAccount,
+              ATHLTHWorkoutRecordingArbiter.mayStartStrength() else { return }
         recoveredCheckpointSavedAt = nil
         setEffortClock = nil
         cardioWatchCaptures = [:]
