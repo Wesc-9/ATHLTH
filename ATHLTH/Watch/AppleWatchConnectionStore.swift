@@ -1242,7 +1242,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         guard let receipt = WatchRemoteLaunchCompletionReceipt(
             result: result
         ) else { return }
+        rememberRelayCompletionReceipt(receipt)
+    }
 
+    private func rememberRelayCompletionReceipt(
+        _ receipt: WatchRemoteLaunchCompletionReceipt
+    ) {
         // Watch sends immediate and durable copies of the same result.
         // Keep only one exact copy; if a DIFFERENT HealthKit UUID claims
         // this request ID, retain both so reconciliation fails closed.
@@ -1653,6 +1658,26 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         return true
     }
 
+    private func receiveRelayCompletionProof(
+        from payload: IncomingWatchPayload
+    ) -> Bool {
+        guard payload.kind ==
+                WatchTransferKind.workoutRemoteLaunchCompletion.rawValue
+        else { return false }
+        // Even if this proof is malformed, do not misinterpret the payload
+        // as a normal workout result or mutate training history.
+        guard let data = payload.data,
+              let receipt = try? JSONDecoder().decode(
+                WatchRemoteLaunchCompletionReceipt.self, from: data
+              ),
+              receipt.endedAt >= receipt.startedAt,
+              receipt.startedAt <= Date().addingTimeInterval(120),
+              receipt.endedAt >= Date().addingTimeInterval(-30 * 86_400)
+        else { return true }
+        rememberRelayCompletionReceipt(receipt)
+        return true
+    }
+
     private func receiveWorkoutResult(
         from payload: IncomingWatchPayload
     ) {
@@ -1785,6 +1810,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
         if payload.kind == WatchTransferKind.connectivityAck.rawValue {
             handleConnectivityAck(payload)
+            return
+        }
+
+        if receiveRelayCompletionProof(from: payload) {
             return
         }
 
