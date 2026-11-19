@@ -68,4 +68,32 @@ final class ATHLTHRecordedWorkoutIndexTests: XCTestCase {
         )
         XCTAssertTrue(keys.isEmpty)
     }
+
+    func testConflictingUnimportedHealthKitIDsCannotBecomeTrustedLocalCount() {
+        let first = UUID()
+        let second = UUID()
+        let keys = ATHLTHRecordedWorkoutIndex.unlinkedKeys(
+            healthIDs: [], localRecords: [
+                .init(key: "phone-a", healthID: first),
+                .init(key: "phone-a", healthID: second),
+                .init(key: "strength-b", healthID: nil)
+            ]
+        )
+        XCTAssertEqual(keys, ["strength-b"])
+    }
+
+    func testConflictingLocalSnapshotsDoNotClaimHealthIdentityFromOtherWorkouts() {
+        let first = UUID()
+        let second = UUID()
+        let keys = ATHLTHRecordedWorkoutIndex.unlinkedKeys(
+            healthIDs: [], localRecords: [
+                .init(key: "conflict", healthID: first),
+                .init(key: "conflict", healthID: second),
+                .init(key: "valid", healthID: first),
+                .init(key: "duplicate", healthID: first),
+                .init(key: "independent", healthID: second)
+            ]
+        )
+        XCTAssertEqual(keys, ["valid", "independent"])
+    }
 }

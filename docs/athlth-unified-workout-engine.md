@@ -1359,3 +1359,19 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
 - En bestått backend-jobb er ikke nok for release: iPhone/iPad,
   watchOS, simulert gjenoppretting og fysisk HealthKit/Spotify-samspill
   må kontrolleres på **samme commit** før fase 8 er godkjent.
+
+### Fase 8 – konflikt i historikkidentitet og uavhengig iPad-smoketest (19.11.2026)
+
+- `ATHLTHRecordedWorkoutIndex` avviser nå en lokal økt når dens egne
+  snapshots har **to forskjellige HealthKit-UUID-er**, også før noen av
+  dem finnes i den importerte HealthKit-listen. Tvetydig historie
+  regnes ikke som et verifisert resultat og forurenser ikke andre
+  økters UUID-deduplisering.
+- To nye regresjonstester kontrollerer både konflikt uten HealthKit-
+  import og at uavhengige gyldige økter fortsatt telles korrekt.
+- `.github/workflows/ipad-smoke.yml` er aktivert på `release/v2.2.5`.
+  Egen iPad-bygg/launch-smoketest kjører dermed uavhengig av full
+  XCTest før de to sluttkontrollene for 11-/13-tommers iPad i
+  `build.yml`. Ingen TestFlight eller ekstra HealthKit-opptak.
+- Grønn GitHub-simulator betyr fortsatt ikke bekreftet ekte
+  iPad/Watch-tilgang, HealthKit-opptak eller universell GPS+styrke.

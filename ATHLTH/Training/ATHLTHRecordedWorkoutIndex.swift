@@ -31,7 +31,11 @@ enum ATHLTHRecordedWorkoutIndex {
         var selected: Set<String> = []
         for key in firstSeenKeys {
             let linkedIDs = linkedHealthIDsByKey[key] ?? []
-            guard linkedIDs.isDisjoint(with: seenHealthIDs) else { continue }
+            // Conflicting delayed snapshots with the same local key and
+            // different HealthKit identities are ambiguous. Neither record
+            // may become a reliable workout count until reconciled.
+            guard linkedIDs.count <= 1,
+                  linkedIDs.isDisjoint(with: seenHealthIDs) else { continue }
             selected.insert(key)
             // A reused HealthKit identity can contribute only once, even
             // when the local history was imported through two record kinds.

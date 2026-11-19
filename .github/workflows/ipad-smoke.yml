@@ -43,8 +43,11 @@ on:
       - release/v2.2.2
       - release/v2.2.3
       - release/v2.2.4
-      # release/v2.2.5 is validated by Build ATHLTH after XCTest.
-      # Keep older branches and manual dispatch as independent fallbacks.
+      - release/v2.2.5
+      # Run an independent iPad smoke check on v2.2.5 as well as the
+      # 11/13-inch checks that follow the complete XCTest build. This
+      # detects iPad compile/launch regressions without waiting for the
+      # full several-thousand-case iPhone test suite.
     paths:
       - ATHLTH/Planning/ATHLTHIntervalGroupAdjustmentView.swift
       - ATHLTH/Planning/ATHLTHPlannedWorkoutStudioView.swift
@@ -70,7 +73,7 @@ permissions:
 jobs:
   ipad-smoke:
     runs-on: xcode-27
-    # Fallback-only job; release/v2.2.5 uses its existing XCTest build.
+    # Independent iPad build/launch check; no TestFlight upload.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
