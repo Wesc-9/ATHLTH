@@ -302,3 +302,18 @@ som ferdige før egne faser og reelle tester er fullført.
   uttrykkelig avsluttet ved å hoppe over siste sett (`completedAt`), uten
   at manglende repetisjoner telles som utført. Egne regresjonstester dekker
   både sperre mot gjenvalg og faktisk overgang til neste øvelse.
+
+- **Fase 3 / sikre start/hvile-overganger:** `StrengthWorkoutStore`
+  krever nå et uløst sett og et gyldig gruppe-tidsvindu før «Hopp over
+  pause / start neste sett» gjør noe. Hvis EMOM-minuttet ennå ikke er
+  tilgjengelig, beholdes den opprinnelige pausefristen og settklokken
+  startes ikke. Tidsbaserte sett kan heller ikke starte nedtelling mens
+  hvile fortsatt er aktiv.
+- Et avslått «Neste øvelse»-forsøk forandrer ikke hvilestatus.
+  Ved automatisk EMOM-overgang til en ny øvelse nullstilles gamle
+  gruppe-/setttimere, og første **uløste** sett velges – aldri et
+  hoppet-over eller fullført sett. Alle handlingene bruker samme
+  `StrengthWorkoutStore`, uten duplikat-HealthKit eller ny klokke.
+- `ATHLTHStrengthGroupedSetTests` er utvidet med verifisering av
+  blokkert tidlig EMOM-start, bevart hviletid, tidssett under hvile og
+  opprydding av klokker ved automatisk gruppeslutt.

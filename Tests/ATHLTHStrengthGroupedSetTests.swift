@@ -480,4 +480,118 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
     }
 
 
+
+    func testEarlyEMOMRestCommandDoesNotClearCountdownOrStartNextStation() throws {
+        let groupID = UUID()
+        var first = exercise(8, weight: 20, sets: 1)
+        var second = exercise(10, weight: 15, sets: 1)
+        for index in 0..<2 {
+            if index == 0 {
+                first.groupID = groupID
+                first.groupKind = .emom
+                first.groupRounds = 1
+                first.groupClockSeconds = 60
+            } else {
+                second.groupID = groupID
+                second.groupKind = .emom
+                second.groupRounds = 1
+                second.groupClockSeconds = 60
+            }
+        }
+        var plan = PlannedSession(
+            id: UUID(), title: "Timed station gate", kind: .strength,
+            scheduledStart: nil, durationMinutes: 3,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        plan.workoutBlocks = [first, second]
+        let store = StrengthWorkoutStore()
+        store.start(
+            session: plan, watchSessionID: nil,
+            trackingMode: .advanced, captureDevice: .iPhone
+        )
+        XCTAssertTrue(store.skipCurrentSet())
+        XCTAssertEqual(store.currentExercise?.id, store.activeWorkout?.exercises[1].id)
+        XCTAssertFalse(store.canCompleteCurrentStrengthMode())
+
+        store.addRest(seconds: 30)
+        let originalRestDeadline = try XCTUnwrap(store.restEndsAt)
+        let pendingID = try XCTUnwrap(store.currentSet?.id)
+        XCTAssertFalse(store.skipRest())
+        XCTAssertEqual(store.restEndsAt, originalRestDeadline)
+        XCTAssertEqual(store.currentSet?.id, pendingID)
+        XCTAssertNil(store.currentSetEffortClock)
+        XCTAssertNil(store.currentTimedSetCountdown)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 0)
+    }
+
+    func testRestBlocksCountdownAndInvalidNextDoesNotDiscardRest() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let timed = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Wall Sit", instructions: [], primaryMuscles: ["Quadriceps"],
+            secondaryMuscles: [], equipment: [], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true
+        )
+        store.appendExercise(
+            timed, sets: 1, reps: nil, targetKind: .time,
+            targetDurationSeconds: 45, restSeconds: 0
+        )
+        store.addRest(seconds: 20)
+        let originalRest = try XCTUnwrap(store.restEndsAt)
+        store.startOrResumeTimedSet()
+        XCTAssertNil(store.currentTimedSetCountdown)
+        XCTAssertNil(store.currentSetEffortClock)
+
+        store.moveToNextExercise()
+        XCTAssertEqual(store.restEndsAt, originalRest,
+                       "An invalid next-exercise action cannot dismiss rest.")
+
+        XCTAssertTrue(store.skipRest())
+        XCTAssertNil(store.restEndsAt)
+        store.startOrResumeTimedSet()
+        XCTAssertNotNil(store.currentTimedSetCountdown)
+        XCTAssertNotNil(store.currentSetEffortClock)
+        XCTAssertEqual(store.currentSet?.plannedDurationSeconds, 45)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 0)
+    }
+
+    func testEMOMExpiryClearsStaleClockWhenMovingIntoNextExercise() throws {
+        let groupID = UUID()
+        var emom = exercise(8, weight: 12, sets: 1)
+        emom.groupID = groupID
+        emom.groupKind = .emom
+        emom.groupRounds = 1
+        emom.groupClockSeconds = 60
+        var next = exercise(10, weight: 20, sets: 1)
+        next.title = "Next planned station"
+        var plan = PlannedSession(
+            id: UUID(), title: "EMOM followed by strength", kind: .strength,
+            scheduledStart: nil, durationMinutes: 5,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        plan.workoutBlocks = [emom, next]
+        let store = StrengthWorkoutStore()
+        store.start(session: plan, watchSessionID: nil)
+        let started = try XCTUnwrap(store.currentExercise?.groupStartedAt)
+        let parentID = try XCTUnwrap(store.activeWorkout?.id)
+        store.startCurrentSetEffort()
+        XCTAssertNotNil(store.currentSetEffortClock)
+        store.addRest(seconds: 15)
+
+        XCTAssertEqual(
+            store.reconcileCurrentEMOM(at: started.addingTimeInterval(65)), 1
+        )
+        XCTAssertEqual(store.activeWorkout?.id, parentID)
+        XCTAssertEqual(store.currentExercise?.exercise.name, "Next planned station")
+        XCTAssertNil(store.restEndsAt)
+        XCTAssertNil(store.currentSetEffortClock)
+        XCTAssertNil(store.currentTimedSetCountdown)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 0)
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.auditedSkippedSets, 1)
+    }
+
+
 }

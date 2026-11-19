@@ -1624,7 +1624,7 @@ final class StrengthWorkoutStore: ObservableObject {
               let exercise = currentExercise,
               let set = currentSet,
               set.resolvedTargetKind == .time,
-              !set.isCompleted,
+              !set.isResolved,
               timedSetCountdown.workoutID == workout.id,
               timedSetCountdown.exerciseID == exercise.id,
               timedSetCountdown.setID == set.id
@@ -1643,7 +1643,7 @@ final class StrengthWorkoutStore: ObservableObject {
     var currentSetEffortClock: StrengthSetEffortClock? {
         guard let workout = activeWorkout,
               let exercise = currentExercise,
-              let set = currentSet, !set.isCompleted,
+              let set = currentSet, !set.isResolved,
               let clock = setEffortClock,
               clock.workoutID == workout.id,
               clock.exerciseID == exercise.id,
@@ -1656,7 +1656,7 @@ final class StrengthWorkoutStore: ObservableObject {
         guard canCompleteCurrentStrengthMode(at: date) else { return }
         guard !isResting, let workout = activeWorkout,
               let exercise = currentExercise, let set = currentSet,
-              !set.isCompleted else { return }
+              !set.isResolved else { return }
         if var resumed = currentSetEffortClock {
             resumed.resume(at: date)
             setEffortClock = resumed
@@ -1682,17 +1682,18 @@ final class StrengthWorkoutStore: ObservableObject {
         let matching = activeWorkout?.id == clock.workoutID &&
             currentExercise?.id == clock.exerciseID &&
             currentSet?.id == clock.setID &&
-            currentSet?.isCompleted == false
+            currentSet?.isResolved == false
         if !matching { setEffortClock = nil }
     }
 
     func startOrResumeTimedSet(at date: Date = Date()) {
         guard canCompleteCurrentStrengthMode(at: date) else { return }
-        guard let workout = activeWorkout,
+        guard !isResting,
+              let workout = activeWorkout,
               let exercise = currentExercise,
               let set = currentSet,
               set.resolvedTargetKind == .time,
-              !set.isCompleted
+              !set.isResolved
         else { return }
 
         let now = date
@@ -4400,7 +4401,14 @@ final class StrengthWorkoutStore: ObservableObject {
                   }) {
             Self.beginStrengthGroup(&workout, selected: subsequent, at: now)
             currentExerciseIndex = subsequent
-            currentSetIndex = 0
+            currentSetIndex = workout.exercises[subsequent].sets
+                .firstIndex(where: { !$0.isResolved }) ?? 0
+            // Finishing an EMOM group must not carry the old station's
+            // rest, effort or timed countdown into a different exercise.
+            restStartedAt = nil
+            restEndsAt = nil
+            timedSetCountdown = nil
+            setEffortClock = nil
         }
         let moved = previousExerciseIndex != currentExerciseIndex ||
             previousSetIndex != currentSetIndex
@@ -4764,11 +4772,21 @@ final class StrengthWorkoutStore: ObservableObject {
         return true
     }
 
-    func skipRest() {
+    /// Leave rest only when an unresolved set may start in its real window.
+    /// A user pressing Next early in an EMOM minute or during a stale Watch
+    /// replay must not discard the original rest/countdown checkpoint.
+    @discardableResult
+    func skipRest() -> Bool {
+        guard let set = currentSet,
+              !set.isResolved,
+              canCompleteCurrentStrengthMode()
+        else { return false }
         finalizeActualRestIfNeeded()
         restStartedAt = nil
         restEndsAt = nil
         startCurrentSetEffort()
+        persistCheckpointNow()
+        return true
     }
 
     func addRest(seconds: Int) {
@@ -5132,6 +5150,9 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func moveToNextExercise() {
+        // Invalid Next commands cannot zero an active rest period. Validate
+        // against the authoritative workout before changing any timer.
+        guard currentExerciseAllSetsCompleted, hasNextExercise else { return }
         finalizeActualRestIfNeeded()
         restStartedAt = nil
         guard
