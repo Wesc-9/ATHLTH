@@ -316,6 +316,28 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
                        newer.id)
         XCTAssertEqual(StrengthWorkoutCompletionJournal.read(userID: owner)?.endedAt,
                        newer.endedAt)
+
+        // Two distinct workouts can share the same end timestamp.
+        // A late packet must not replace the already durable identity.
+        let otherStore = StrengthWorkoutStore()
+        let otherOwner = UUID()
+        defer {
+            StrengthWorkoutCompletionJournal.remove(userID: otherOwner)
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthHistory", userID: otherOwner)
+            )
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthActive", userID: otherOwner)
+            )
+        }
+        otherStore.switchAccount(otherOwner)
+        otherStore.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        var other = try XCTUnwrap(otherStore.activeWorkout)
+        other.endedAt = newer.endedAt
+        XCTAssertNotEqual(other.id, newer.id)
+        try StrengthWorkoutCompletionJournal.save(other, userID: owner)
+        XCTAssertEqual(StrengthWorkoutCompletionJournal.read(userID: owner)?.id,
+                       newer.id)
     }
 
     @MainActor
