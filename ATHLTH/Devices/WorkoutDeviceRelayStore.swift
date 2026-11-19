@@ -218,6 +218,7 @@ enum WorkoutDeviceRelayClaimPolicy {
             target == payloadTarget &&
             kind == payloadKind &&
             expiresAt > now &&
+            expiresAt.timeIntervalSince1970.isFinite &&
             payloadVersion == 1 &&
             claimedDeviceID == expectedDeviceID &&
             !expectedDeviceID.isEmpty &&
@@ -261,7 +262,7 @@ enum WorkoutDeviceRelayClaimPolicy {
     static func hasMatchingRequestID(
         serverID: UUID, payloadID: UUID?
     ) -> Bool {
-        payloadID == nil || payloadID == serverID
+        payloadID == serverID
     }
 
     /// An active Watch workout can resolve uncertainty only when its
@@ -824,6 +825,15 @@ final class WorkoutDeviceRelayStore:
                 .insert(insert)
                 .execute()
 
+            // An account switch while the network insert is suspended must
+            // not expose the previous account's command as this user's.
+            guard currentUserID == userID, !Task.isCancelled else {
+                throw NSError(
+                    domain: "ATHLTH.DeviceRelay", code: 7,
+                    userInfo: [NSLocalizedDescriptionKey:
+                        "Account changed while queuing the remote workout."]
+                )
+            }
             lastQueuedCommandID =
                 requestID
             errorMessage = nil
@@ -849,6 +859,7 @@ final class WorkoutDeviceRelayStore:
                 )
 
                 guard let self,
+                      self.currentUserID == userID,
                       self.lastQueuedCommandID ==
                         requestID
                 else {
@@ -1116,8 +1127,9 @@ final class WorkoutDeviceRelayStore:
             rememberUncertainLaunch(command.id, userID: processingUserID)
             do {
                 try await process(command)
-                // Persist the success before any suspension for server I/O.
-                // A relaunch or offline reconnect must only retry the receipt.
+                // Persist the success before any suspension for server I/O,
+                // including when authentication changed during Watch launch.
+                // It belongs to the original account, never the new account.
                 rememberLaunchedCommand(command.id, userID: processingUserID)
                 forgetUncertainLaunch(command.id, userID: processingUserID)
             } catch {
