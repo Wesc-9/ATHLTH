@@ -11,11 +11,11 @@ final class ATHLTHHybridWatchDistanceAnchorTests: XCTestCase {
             primaryMuscles: [], setIndex: 0, setCount: 1,
             setNumber: 1, completedSets: 0, totalSets: 1,
             draftReps: 0, draftWeightKilograms: 0, draftRestSeconds: 0,
+            isEmbeddedRunningInterval: true,
             embeddedRunningTargetDistanceMeters: 1_500,
             isResting: false, restEndsAt: nil,
             currentExerciseComplete: false, hasNextExercise: true,
-            allExercisesComplete: false, updatedAt: Date(),
-            isEmbeddedRunningInterval: true
+            allExercisesComplete: false, updatedAt: Date()
         )
         let anchor = try XCTUnwrap(ATHLTHHybridWatchDistanceAnchor.make(
             snapshot: snap, measuredTotalMeters: 2_000,
@@ -50,11 +50,11 @@ final class ATHLTHHybridWatchDistanceAnchorTests: XCTestCase {
             primaryMuscles: [], setIndex: 0, setCount: 1,
             setNumber: 1, completedSets: 0, totalSets: 1,
             draftReps: 0, draftWeightKilograms: 0, draftRestSeconds: 0,
+            isEmbeddedRunningInterval: true,
             embeddedRunningTargetDistanceMeters: 1_000,
             isResting: false, restEndsAt: nil,
             currentExerciseComplete: false, hasNextExercise: false,
-            allExercisesComplete: false, updatedAt: Date(),
-            isEmbeddedRunningInterval: true
+            allExercisesComplete: false, updatedAt: Date()
         )
         XCTAssertNil(ATHLTHHybridWatchDistanceAnchor.make(
             snapshot: snap, measuredTotalMeters: .infinity,
