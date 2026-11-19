@@ -352,6 +352,38 @@ enum ATHLTHWorkoutSessionFoundation {
 /// are accepted only for a phone-initiated Watch session with a very close
 /// HealthKit start time. Never match by workout kind or finish time alone.
 enum ATHLTHWatchStrengthResultIdentityPolicy {
+    /// A completed Watch strength result with the authoritative session
+    /// snapshot is NOT a generic workout. When its matching strength log
+    /// cannot be restored yet, leave the result in the durable queue
+    /// instead of publishing a duplicate generic completion.
+    static func canReconcile(
+        result: WatchWorkoutResult,
+        activeStrength: StrengthWorkoutLog?,
+        savedStrength: [StrengthWorkoutLog],
+        strengthAccountReady: Bool,
+        recordingSlotAvailable: Bool
+    ) -> Bool {
+        guard result.kind == .strength,
+              result.strengthSnapshot != nil else {
+            // Legacy results without an ATHLTH strength identity still
+            // use the existing Watch completion import path.
+            return true
+        }
+        guard strengthAccountReady else { return false }
+        if let activeStrength,
+           matches(result: result, workout: activeStrength) {
+            return true
+        }
+        if savedStrength.contains(where: {
+            $0.endedAt != nil && matches(result: result, workout: $0)
+        }) {
+            return true
+        }
+        // Bootstrap is safe only when neither the iPhone nor Watch already
+        // has another workout/launch occupying the universal session slot.
+        return activeStrength == nil && recordingSlotAvailable
+    }
+
     static func matches(
         result: WatchWorkoutResult,
         workout: StrengthWorkoutLog

@@ -634,3 +634,20 @@ som ferdige før egne faser og reelle tester er fullført.
   Watch-start og lokal journalføring, kreves fortsatt en autoritativ
   Watch-status-/serverrekonsiliering før kommandoen kan anses endelig
   ferdig. Fysisk Watch/iPad-testing og grønn samme-commit CI gjenstår.
+
+### Fase 7 – resultatkø ved konkurrerende Watch-/iPhone-økter
+
+- Resultater med `strengthSnapshot.workoutID` er nå
+  styrkeresultater helt til de er korrekt koblet mot eksisterende
+  aktiv eller ferdiglagret `StrengthWorkoutLog`. De kan **ikke**
+  konverteres til generiske Watch-resultater ved opptakskonflikt.
+- En pågående iPhone-økt, uferdig kontogjenoppretting eller en
+  samtidig oppstart utsetter kun dette styrkeresultatet i den
+  eksisterende durable køen. Andre allerede kvalifiserte
+  Watch-resultater kan passere og behandles.
+- Planlagt økt får først faktisk Watch-sluttid etter at
+  styrkeresultatet er knyttet til varig historikk; tidligere
+  oppdaterte kalenderen seg før riktig fullføring var bekreftet.
+- Tester dekker konflikt med ny styrkeøkt, senere matching av
+  ferdig økt, kontoikke-klar, trygg bootstrap og generiske
+  Watch-resultater uten styrkesnapshot.

@@ -75,6 +75,72 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
     }
 
     @MainActor
+    func testWatchResultImportWaitsForCorrectStrengthSessionWithoutBlockingOtherSports() throws {
+        let owner = UUID()
+        defer {
+            StrengthWorkoutCompletionJournal.remove(userID: owner)
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthHistory", userID: owner)
+            )
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthActive", userID: owner)
+            )
+        }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        let active = try XCTUnwrap(store.activeWorkout)
+        var result = WatchWorkoutResult(
+            id: UUID(), kind: .strength, healthKitWorkoutUUID: UUID(),
+            startedAt: active.startedAt,
+            endedAt: active.startedAt.addingTimeInterval(60),
+            duration: 60, activeCalories: 30, distanceMeters: 0,
+            averageHeartRate: 115, maxHeartRate: 140, routePointCount: 0
+        )
+        result.strengthSnapshot = try XCTUnwrap(store.watchSnapshot)
+
+        func eligible(_ result: WatchWorkoutResult,
+                      activeStrength: StrengthWorkoutLog?,
+                      savedStrength: [StrengthWorkoutLog] = [],
+                      ready: Bool = true,
+                      free: Bool = false) -> Bool {
+            ATHLTHWatchStrengthResultIdentityPolicy.canReconcile(
+                result: result, activeStrength: activeStrength,
+                savedStrength: savedStrength, strengthAccountReady: ready,
+                recordingSlotAvailable: free
+            )
+        }
+
+        XCTAssertTrue(eligible(result, activeStrength: active))
+        XCTAssertFalse(eligible(result, activeStrength: active, ready: false))
+        var otherResult = result
+        var otherSnapshot = try XCTUnwrap(result.strengthSnapshot)
+        otherSnapshot.workoutID = UUID()
+        otherResult.strengthSnapshot = otherSnapshot
+        XCTAssertFalse(eligible(otherResult, activeStrength: active))
+        XCTAssertFalse(eligible(otherResult, activeStrength: nil))
+        XCTAssertTrue(eligible(otherResult, activeStrength: nil, free: true))
+
+        // A previously completed exact match remains importable while a
+        // different strength session is recording. No duplicate recording.
+        XCTAssertTrue(store.finish())
+        let finished = try XCTUnwrap(store.workoutHistory.first)
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        let newer = try XCTUnwrap(store.activeWorkout)
+        XCTAssertTrue(eligible(result, activeStrength: newer, savedStrength: [finished]))
+        XCTAssertFalse(eligible(otherResult, activeStrength: newer, savedStrength: [finished]))
+
+        result.kind = .running
+        XCTAssertTrue(eligible(result, activeStrength: newer),
+                      "Unrelated sport must not be blocked behind a strength result")
+        result.kind = .strength
+        result.strengthSnapshot = nil
+        XCTAssertTrue(eligible(result, activeStrength: newer),
+                      "Legacy Watch results keep their generic processing route")
+    }
+
+    @MainActor
     func testFinishedStrengthWorkoutIsRestoredAfterHistoryWriteIsLost() throws {
         let userID = UUID()
         defer {

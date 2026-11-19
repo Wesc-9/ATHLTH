@@ -857,11 +857,23 @@ struct AppRootView: View {
     /// Ignore legacy/unowned and other-account results without consuming
     /// them. A later owned result must not be blocked by a different owner
     /// at the front of the durable Watch completion queue.
+    @MainActor
     private var nextOwnedWatchResult: WatchWorkoutResult? {
-        watchConnection.pendingWorkoutResults.first {
-            ATHLTHWatchWorkoutOwnershipPolicy.canApply(
-                resultOwnerID: $0.accountOwnerID,
+        watchConnection.pendingWorkoutResults.first { result in
+            guard ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+                resultOwnerID: result.accountOwnerID,
                 signedInUserID: signedInUserID
+            ) else { return false }
+
+            return ATHLTHWatchStrengthResultIdentityPolicy.canReconcile(
+                result: result,
+                activeStrength: strengthWorkout.activeWorkout,
+                savedStrength: strengthWorkout.workoutHistory,
+                strengthAccountReady: signedInUserID.map {
+                    strengthWorkout.isLoaded(for: $0)
+                } == true,
+                recordingSlotAvailable:
+                    ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength()
             )
         }
     }
@@ -3039,9 +3051,22 @@ struct AppRootView: View {
               ) else { return }
 
         let resultOwnerID = appSession.profile.userID
-        // Completion carries Watch's real start and end timestamps. Only
-        // sessions with a unique, previously recorded start can be linked.
-        appSession.recordPlannedWatchWorkoutFinished(result)
+        guard ATHLTHWatchStrengthResultIdentityPolicy.canReconcile(
+            result: result,
+            activeStrength: strengthWorkout.activeWorkout,
+            savedStrength: strengthWorkout.workoutHistory,
+            strengthAccountReady: strengthWorkout.isLoaded(for: resultOwnerID),
+            recordingSlotAvailable:
+                ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength()
+        ) else {
+            // This result is still in Watch's durable completion queue. A
+            // different workout must finish before this one can be imported.
+            // Never consume it or publish a generic duplicate.
+            return
+        }
+        // Do not mark a planned workout complete until the corresponding
+        // Watch result can actually be committed to strength history or
+        // accepted by the generic completion pipeline.
         // A completed Watch result is authoritative evidence that the matching
         // mirrored workout has ended, even if HealthKit's mirror callback is
         // a fraction of a second late.
@@ -3133,6 +3158,9 @@ struct AppRootView: View {
                 ) else { return }
             }
 
+            // Only durable, correctly matched strength completion updates
+            // the planned session's actual end time.
+            appSession.recordPlannedWatchWorkoutFinished(result)
             // The strength completion path owns downstream review and
             // progress. The exact matching result is now durable and safe
             // to acknowledge without adding a second training session.
@@ -3140,8 +3168,16 @@ struct AppRootView: View {
             return
         }
 
+        // Snapshot-bearing strength results must never go through this
+        // generic pipeline, even when an older unrelated session is active.
+        // They remain in the Watch queue for a matching strength restore.
+        if result.kind == .strength, result.strengthSnapshot != nil {
+            return
+        }
+
         // Workouts started directly on Watch, or Watch workouts that are not
         // backed by an ATHLTH strength log, use the generic Watch pipeline.
+        appSession.recordPlannedWatchWorkoutFinished(result)
         let publishable =
             SocialPublishableWorkout(
                 watchResult: result
