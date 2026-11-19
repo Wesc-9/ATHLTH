@@ -834,8 +834,6 @@ final class WorkoutDeviceRelayStore:
             )
             .eq("user_id", value: userID)
             .eq("claimed_by_device_id", value: ATHLTHDeviceRole.persistentDeviceID)
-            .is("completed_at", value: nil)
-            .is("failed_at", value: nil)
             .select("id")
             .execute()
             .value
@@ -873,8 +871,6 @@ final class WorkoutDeviceRelayStore:
             )
             .eq("user_id", value: userID)
             .eq("claimed_by_device_id", value: ATHLTHDeviceRole.persistentDeviceID)
-            .is("completed_at", value: nil)
-            .is("failed_at", value: nil)
             .select("id")
             .execute()
             .value
