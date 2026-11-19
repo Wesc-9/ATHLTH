@@ -48,6 +48,40 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testWatchStrengthCompletionMustMatchStableMirroredIdentity() {
+        let original = UUID()
+        var mirrored = snapshot(kind: .strength)
+        mirrored.strengthWorkoutID = original
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: mirrored, kind: .strength,
+            startedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(60),
+            strengthWorkoutID: original
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: mirrored, kind: .strength,
+            startedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(60),
+            strengthWorkoutID: UUID()
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: mirrored, kind: .strength,
+            startedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(60)
+        ), "A result missing the strength ID must not end a newer mirror")
+        mirrored.strengthWorkoutID = nil
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: mirrored, kind: .strength,
+            startedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(60)
+        ), "Legacy Watch snapshots without stable IDs retain the time guard")
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: mirrored, kind: .strength,
+            startedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(-1)
+        ), "A result cannot finish before its own start")
+    }
+
     func testReattachingSameWatchWorkoutCanRetainMetrics() {
         XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
             previous: snapshot(),

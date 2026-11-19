@@ -517,6 +517,11 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertTrue(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
             mirror: mirror, mirrorActive: true, bootstrap: bootstrap
         ))
+        mirror.state = .completed
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
+            mirror: mirror, mirrorActive: true, bootstrap: bootstrap
+        ), "A completed Watch session can restore its exact matching log before the mirror disconnects")
+        mirror.state = .running
         mirror.strengthWorkoutID = UUID()
         XCTAssertFalse(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
             mirror: mirror, mirrorActive: true, bootstrap: bootstrap

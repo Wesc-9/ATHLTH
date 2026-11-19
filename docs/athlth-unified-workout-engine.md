@@ -732,3 +732,19 @@ som ferdige før egne faser og reelle tester er fullført.
 - Regresjonstestene fullfører to separate styrkeøkter, mottar sent
   HealthKit-svar på den første og verifiserer at den andre
   fortsatt er siste fullførte økt.
+
+### Fase 5/7 – Watch-ferdigmelding krever riktig styrke-ID
+
+- `WorkoutMirroringStore.reconcileCompletedWatchWorkout` sjekker nå
+  både HealthKit-starttid og stabil `strengthWorkoutID` når
+  Watch sender et fullført styrkeresultat. En gammel ferdigmelding
+  kan dermed ikke avslutte en nyere speilet Watch-økt med samme
+  aktivitet og omtrent samtidig start.
+- Når den nye speilingen har en stabil økt-ID, avvises en
+  sluttmelding uten identitet. Eldre Watch-speilinger uten ID
+  beholder den eksisterende strenge starttidskontrollen.
+- En allerede fullført Watch-økt med korrekt økt-ID kan fremdeles
+  rekonstruere iPhone-styrkehistorikk mens mirroring-flagget
+  holder på å avsluttes. Det skaper ingen ny HealthKit-økt.
+- Tester dekker feil ID, manglende ID, ugyldig slutttid,
+  legacy Watch og korrekt gjenoppretting etter fullføring.

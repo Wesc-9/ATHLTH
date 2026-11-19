@@ -88,10 +88,26 @@ enum ATHLTHWorkoutMirrorContinuity {
         snapshot: WatchWorkoutLiveSnapshot,
         kind: WatchWorkoutKind,
         startedAt: Date,
-        endedAt: Date
+        endedAt: Date,
+        strengthWorkoutID: UUID? = nil
     ) -> Bool {
-        guard snapshot.kind == kind, let currentStart = snapshot.startedAt else { return false }
-        return abs(currentStart.timeIntervalSince(startedAt)) < 2 && currentStart <= endedAt
+        guard snapshot.kind == kind,
+              let currentStart = snapshot.startedAt,
+              currentStart.timeIntervalSince1970.isFinite,
+              startedAt.timeIntervalSince1970.isFinite,
+              endedAt.timeIntervalSince1970.isFinite,
+              endedAt >= startedAt,
+              abs(currentStart.timeIntervalSince(startedAt)) < 2,
+              currentStart <= endedAt else { return false }
+
+        // Multiple same-kind Watch workouts may have started near each
+        // other. A captured stable strength ID always outranks timestamps.
+        // If a modern mirror has an ID, an unidentifiable late result
+        // must not close its HealthKit presentation or Audio Coach lease.
+        if kind == .strength, let mirroredID = snapshot.strengthWorkoutID {
+            return strengthWorkoutID == mirroredID
+        }
+        return true
     }
 
     /// Old HealthKit delegate callbacks can be delivered after a different

@@ -153,7 +153,8 @@ enum ATHLTHWorkoutSessionFoundation {
               mirror.state == .running ||
                 mirror.state == .paused ||
                 mirror.state == .preparing ||
-                mirror.state == .ending,
+                mirror.state == .ending ||
+                mirror.state == .completed,
               let mirrorStart = mirror.startedAt,
               let bootstrapStart = bootstrap.startedAt,
               abs(mirrorStart.timeIntervalSince(bootstrapStart)) <= 5
