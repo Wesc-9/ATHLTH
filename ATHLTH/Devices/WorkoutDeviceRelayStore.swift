@@ -225,6 +225,19 @@ enum WorkoutDeviceRelayClaimPolicy {
         returnedIDs.count == 1 && returnedIDs[0] == commandID
     }
 
+    /// A timed-out acknowledgement may already have succeeded on the
+    /// server. Clear a local success receipt only for one matching,
+    /// server-confirmed terminal success, never for a failed or missing row.
+    static func confirmsPersistedCompletion(
+        _ matches: [(id: UUID, completedAt: Date?, failedAt: Date?)],
+        commandID: UUID
+    ) -> Bool {
+        matches.count == 1 &&
+            matches[0].id == commandID &&
+            matches[0].completedAt != nil &&
+            matches[0].failedAt == nil
+    }
+
     /// A claim RPC must return zero or one row. Multiple rows may already
     /// be claimed on the server; executing only the first would conceal
     /// the remaining commands and make replay/reconciliation unsafe.
@@ -282,6 +295,18 @@ private struct ClaimWorkoutDeviceCommandParams:
 
 private struct WorkoutDeviceCommandReceipt: Decodable {
     let id: UUID
+}
+
+private struct WorkoutDeviceCommandServerStatus: Decodable {
+    let id: UUID
+    let completedAt: Date?
+    let failedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case completedAt = "completed_at"
+        case failedAt = "failed_at"
+    }
 }
 
 private struct WorkoutDeviceCommandCompletedWrite:
@@ -414,6 +439,34 @@ final class WorkoutDeviceRelayStore:
     /// Finish prior launch receipts before claiming another start. If the
     /// server is unavailable, retain the receipt and do not advance the queue.
     /// This never re-executes the recorded HealthKit / Watch side effect.
+    /// Read only the exact signed-in account/device claim. A network timeout
+    /// after UPDATE may mean the server already committed the completion.
+    /// This query has no HealthKit or workout-launch side effects.
+    private func hasPersistedCompletedReceipt(
+        _ commandID: UUID, userID: UUID
+    ) async -> Bool {
+        guard currentUserID == userID, !Task.isCancelled else { return false }
+        do {
+            let rows: [WorkoutDeviceCommandServerStatus] = try await client
+                .from("workout_device_commands")
+                .select("id,completed_at,failed_at")
+                .eq("id", value: commandID)
+                .eq("user_id", value: userID)
+                .eq("claimed_by_device_id",
+                    value: ATHLTHDeviceRole.persistentDeviceID)
+                .execute()
+                .value
+            guard currentUserID == userID, !Task.isCancelled else { return false }
+            return WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion(
+                rows.map { (id: $0.id, completedAt: $0.completedAt,
+                            failedAt: $0.failedAt) },
+                commandID: commandID
+            )
+        } catch {
+            return false
+        }
+    }
+
     private func reconcileLaunchedCommands(userID: UUID) async -> Bool {
         for id in unacknowledgedLaunchIDs(userID: userID) {
             guard currentUserID == userID, !Task.isCancelled else { return false }
@@ -422,9 +475,13 @@ final class WorkoutDeviceRelayStore:
                 guard currentUserID == userID, !Task.isCancelled else { return false }
                 forgetAcknowledgedCommand(id, userID: userID)
             } catch {
-                // An unacknowledged launch may still be recording. Do not
-                // consume another remote start while its receipt is pending.
-                return false
+                // The server may have committed just before a lost response.
+                // Only an exact, verified completed row clears the local
+                // receipt; an unknown outcome keeps the queue blocked.
+                guard await hasPersistedCompletedReceipt(id, userID: userID),
+                      currentUserID == userID, !Task.isCancelled
+                else { return false }
+                forgetAcknowledgedCommand(id, userID: userID)
             }
         }
         return currentUserID == userID && !Task.isCancelled
@@ -710,8 +767,12 @@ final class WorkoutDeviceRelayStore:
                           !Task.isCancelled else { return }
                     forgetAcknowledgedCommand(record.id, userID: processingUserID)
                 } catch {
-                    // Keep the launch receipt. A later reconnect can retry.
-                    return
+                    guard await hasPersistedCompletedReceipt(
+                        record.id, userID: processingUserID
+                    ), currentUserID == processingUserID,
+                       !Task.isCancelled
+                    else { return }
+                    forgetAcknowledgedCommand(record.id, userID: processingUserID)
                 }
                 continue
             }
