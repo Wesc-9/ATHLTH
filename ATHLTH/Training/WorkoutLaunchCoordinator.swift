@@ -1011,6 +1011,9 @@ enum WorkoutLaunchCoordinator {
                       recording.end == nil else {
                     // GPS authorization may still be pending. A deferred
                     // future start is not a confirmed recording now.
+                    phoneWorkout.cancelPendingRelayedLaunch(
+                        requestID: relayRequestID
+                    )
                     throw NSError(
                         domain: "ATHLTH.DeviceRelay", code: 409,
                         userInfo: [NSLocalizedDescriptionKey:
@@ -1415,6 +1418,9 @@ enum WorkoutLaunchCoordinator {
                 guard let recording = phoneWorkout.active,
                       recording.relayRequestID == relayRequestID,
                       recording.end == nil else {
+                    phoneWorkout.cancelPendingRelayedLaunch(
+                        requestID: relayRequestID
+                    )
                     throw NSError(
                         domain: "ATHLTH.DeviceRelay", code: 409,
                         userInfo: [NSLocalizedDescriptionKey:
