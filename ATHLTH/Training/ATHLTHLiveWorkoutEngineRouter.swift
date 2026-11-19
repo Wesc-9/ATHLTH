@@ -133,6 +133,23 @@ enum ATHLTHLiveWorkoutEngineRouter {
     /// Capture-aware routing entry point. The read-only UI router must not
     /// silently hand a recording from Watch to iPhone (or vice versa).
     /// A real owner transfer requires a separate explicit capture protocol.
+    /// Runtime route validation against the real stores, not a caller-built
+    /// projection. Rejects conflicting concurrent checkpoints and never
+    /// changes which device owns the HealthKit recording.
+    @MainActor
+    static func transition(
+        from previous: ATHLTHLiveWorkoutRoute,
+        to next: ATHLTHLiveWorkoutRoute,
+        phone: IPhoneWorkoutStore,
+        strength: StrengthWorkoutStore
+    ) throws -> ATHLTHLiveWorkoutTransition? {
+        guard let active = try ATHLTHWorkoutSessionFoundation.currentSession(
+            phone: phone, strength: strength
+        ), active.workoutID == previous.workoutID,
+           active.workoutID == next.workoutID else { return nil }
+        return transition(from: previous, to: next)
+    }
+
     static func transition(
         from previous: ATHLTHLiveWorkoutRoute,
         to next: ATHLTHLiveWorkoutRoute,
