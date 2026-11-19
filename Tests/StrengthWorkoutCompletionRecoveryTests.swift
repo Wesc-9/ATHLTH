@@ -257,4 +257,69 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         secondRead.removeWorkoutFromHistory(matching: [activeID])
         XCTAssertNil(StrengthWorkoutCompletionJournal.read(userID: userID))
     }
+
+    @MainActor
+    func testStrengthCompletionJournalRejectsInvalidFinishAndOlderReceipt() throws {
+        let owner = UUID()
+        defer {
+            StrengthWorkoutCompletionJournal.remove(userID: owner)
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthHistory", userID: owner)
+            )
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthActive", userID: owner)
+            )
+        }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        let first = try XCTUnwrap(store.activeWorkout)
+        var invalid = first
+        invalid.endedAt = first.startedAt.addingTimeInterval(-1)
+        XCTAssertThrowsError(
+            try StrengthWorkoutCompletionJournal.save(invalid, userID: owner)
+        )
+        XCTAssertNil(StrengthWorkoutCompletionJournal.read(userID: owner))
+
+        var older = first
+        older.endedAt = first.startedAt.addingTimeInterval(60)
+        var newer = first
+        newer.id = UUID()
+        newer.startedAt = first.startedAt.addingTimeInterval(120)
+        newer.endedAt = first.startedAt.addingTimeInterval(180)
+        try StrengthWorkoutCompletionJournal.save(newer, userID: owner)
+        try StrengthWorkoutCompletionJournal.save(older, userID: owner)
+        XCTAssertEqual(StrengthWorkoutCompletionJournal.read(userID: owner)?.id,
+                       newer.id)
+        XCTAssertEqual(StrengthWorkoutCompletionJournal.read(userID: owner)?.endedAt,
+                       newer.endedAt)
+    }
+
+    @MainActor
+    func testStrengthCompletionJournalIsIsolatedBetweenAccounts() throws {
+        let firstAccount = UUID()
+        let secondAccount = UUID()
+        defer {
+            for account in [firstAccount, secondAccount] {
+                StrengthWorkoutCompletionJournal.remove(userID: account)
+                UserDefaults.standard.removeObject(
+                    forKey: AccountLocalStorage.key("strengthHistory", userID: account)
+                )
+                UserDefaults.standard.removeObject(
+                    forKey: AccountLocalStorage.key("strengthActive", userID: account)
+                )
+            }
+        }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(firstAccount)
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        var completed = try XCTUnwrap(store.activeWorkout)
+        completed.endedAt = completed.startedAt.addingTimeInterval(30)
+        try StrengthWorkoutCompletionJournal.save(completed, userID: firstAccount)
+        XCTAssertNil(StrengthWorkoutCompletionJournal.read(userID: secondAccount))
+        XCTAssertEqual(StrengthWorkoutCompletionJournal.read(userID: firstAccount)?.id,
+                       completed.id)
+    }
 }
