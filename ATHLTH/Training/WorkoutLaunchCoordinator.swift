@@ -779,6 +779,9 @@ enum WorkoutLaunchCoordinator {
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil
     ) async throws {
+        let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+        defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+
         // Do not hand a second run to Watch while a local run is active or
         // recovered. The existing workout remains the source of truth.
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
@@ -1277,6 +1280,9 @@ enum WorkoutLaunchCoordinator {
         plannedSessionID: UUID? = nil,
         session: AppSessionStore? = nil
     ) async throws {
+        let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+        defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
@@ -1516,6 +1522,9 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws -> Bool {
+        let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+        defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+
         // Fail before launching HealthKit on Watch. A start command must
         // never replace an active/recovered strength checkpoint.
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
@@ -1671,6 +1680,9 @@ enum WorkoutLaunchCoordinator {
             try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
                 strengthWorkout.activeSessionState
             )
+            guard ATHLTHWorkoutRecordingArbiter.mayStartStrength() else {
+                throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+            }
         } catch {
             await social.markCurrentJoinedWorkoutLaunchFailed()
             throw error

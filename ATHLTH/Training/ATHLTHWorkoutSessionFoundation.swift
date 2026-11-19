@@ -62,6 +62,30 @@ enum ATHLTHWorkoutRecordingArbiter {
     static weak var phone: IPhoneWorkoutStore?
     static weak var strength: StrengthWorkoutStore?
 
+    /// One launch reservation spans every asynchronous preflight (social,
+    /// HealthKit Watch launch and device relay). Without it, two independent
+    /// start tasks can both observe an empty checkpoint before either writes.
+    /// This token is deliberately transient: it owns no workout or HealthKit
+    /// session and cannot be restored as a recorded activity.
+    private static var pendingLaunchID: UUID?
+
+    static func reserveLaunch() throws -> UUID {
+        guard pendingLaunchID == nil,
+              phone?.activeSessionState == nil,
+              strength?.activeSessionState == nil else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
+        let id = UUID()
+        pendingLaunchID = id
+        return id
+    }
+
+    /// A stale completion must not release the newer launch's reservation.
+    static func releaseLaunch(_ id: UUID) {
+        guard pendingLaunchID == id else { return }
+        pendingLaunchID = nil
+    }
+
     static func mayStartRunning() -> Bool {
         strength?.activeSessionState == nil
     }

@@ -404,3 +404,18 @@ som ferdige før egne faser og reelle tester er fullført.
 - iPad er fortsatt **read-only** og starter aldri et HealthKit-opptak.
   Ny `ATHLTHiPadLiveWorkoutTests` dekker frakoblet sensor,
   gammelt heartbeat, utløpt tillatelsessnapshot og eldre payloads.
+
+### Fase 4 — samtidige asynkrone oppstarter (implementert; CI gjenstår)
+
+- `ATHLTHWorkoutRecordingArbiter.reserveLaunch` låser midlertidig oppstart
+  på tvers av Quick Run, Quick Walk og planlagt styrke. Låsen beholdes gjennom
+  `await` ved Watch-/sosial-/iPad-overlevering og frigjøres ved både suksess
+  og feil. Den er ikke et nytt opptak eller et ekstra HealthKit-objekt.
+- Flere samtidige startforsøk kan ikke begge passere innledende kontroll
+  før første oppstart har sluttført sin asynkrone sekvens. Et gammelt
+  avslutningskall kan ikke frigjøre en nyere start.
+- Etter Watch-oppstart sjekker planlagt styrke også at en løpe-/gåøkt
+  ikke har blitt aktiv i mellomtiden, før øktstatus oppdateres.
+- `ATHLTHWorkoutSessionFoundationTests` dekker reservasjon, feilaktig
+  frigjøring, ny reservasjon og aktiv styrkeøkt. Dette verifiserer ikke
+  fysisk Watch, iPad, samlet HealthKit-eierskap eller full fase 4–8.

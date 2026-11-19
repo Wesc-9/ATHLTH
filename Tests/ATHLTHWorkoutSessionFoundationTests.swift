@@ -295,6 +295,31 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
     }
 
     @MainActor
+    func testLaunchReservationSerializesRunWalkAndStrengthPreflights() throws {
+        // Both existing authoritative stores are registered when constructed.
+        // No HealthKit session or user history is created by a reservation.
+        let phone = IPhoneWorkoutStore()
+        let strength = StrengthWorkoutStore()
+        XCTAssertNil(phone.active)
+        XCTAssertNil(strength.activeWorkout)
+
+        let first = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+        XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch())
+        ATHLTHWorkoutRecordingArbiter.releaseLaunch(UUID())
+        XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch())
+
+        ATHLTHWorkoutRecordingArbiter.releaseLaunch(first)
+        let next = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+        ATHLTHWorkoutRecordingArbiter.releaseLaunch(first)
+        XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch())
+        ATHLTHWorkoutRecordingArbiter.releaseLaunch(next)
+
+        strength.startFreestyle(watchSessionID: nil)
+        XCTAssertNotNil(strength.activeWorkout)
+        XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch())
+    }
+
+    @MainActor
     func testCurrentSessionReadsActualStrengthStoreWithoutCreatingRecording() throws {
         let phone = IPhoneWorkoutStore()
         let strength = StrengthWorkoutStore()
