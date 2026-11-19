@@ -99,6 +99,30 @@ struct StrengthSetEffortClock: Codable, Equatable {
     }
 }
 
+
+/// Late Watch rest commands must never mutate a different exercise, set or
+/// newer rest period. Older commands without indices remain decodable, but
+/// an explicit outdated target is always rejected.
+enum ATHLTHStrengthWatchRestActionPolicy {
+    static func accepts(
+        _ command: WatchStrengthCommand,
+        exerciseIndex: Int,
+        setIndex: Int,
+        restStartedAt: Date?
+    ) -> Bool {
+        if let targetExercise = command.exerciseIndex,
+           targetExercise != exerciseIndex { return false }
+        if let targetSet = command.setIndex,
+           targetSet != setIndex { return false }
+        // Allow minor device-clock skew, but reject a command issued before
+        // the currently running rest began. This protects against delayed
+        // WatchConnectivity packets after a station/round transition.
+        if let startedAt = restStartedAt,
+           command.sentAt.addingTimeInterval(2) < startedAt { return false }
+        return true
+    }
+}
+
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { scheduleCheckpointPersist() } }
@@ -1955,7 +1979,13 @@ final class StrengthWorkoutStore: ObservableObject {
         let set = currentSet
         let totalSets =
             workout.exercises.reduce(0) {
-                $0 + $1.sets.count + ($1.skippedPlannedSetCount ?? 0)
+                // Skipped grouped slots still exist in .sets. Do not add
+                // their mirrored legacy skip counter a second time.
+                let retainedSkips = $1.sets.filter { $0.skippedAt != nil }.count
+                let removedSkips = max(
+                    ($1.skippedPlannedSetCount ?? 0) - retainedSkips, 0
+                )
+                return $0 + $1.sets.count + removedSkips
             }
         let allExercisesComplete =
             !workout.exercises.isEmpty &&
@@ -1975,7 +2005,7 @@ final class StrengthWorkoutStore: ObservableObject {
             completedSets: workout.totalCompletedSets,
             totalSets: totalSets,
             skippedSets: workout.exercises.reduce(0) {
-                $0 + ($1.skippedPlannedSetCount ?? 0)
+                $0 + $1.auditedSkippedSets
             },
             draftReps: draftReps,
             draftWeightKilograms: currentSetRecordsWeight ? draftWeightKilograms : 0,
@@ -2353,7 +2383,7 @@ final class StrengthWorkoutStore: ObservableObject {
                        command.exerciseIndex == currentExerciseIndex),
                       (command.setIndex == nil ||
                        command.setIndex == currentSetIndex),
-                      currentSet?.isCompleted == false
+                      currentSet?.isResolved == false
                 else { continue }
                 startCurrentSetEffort(at: command.sentAt)
 
@@ -2362,7 +2392,7 @@ final class StrengthWorkoutStore: ObservableObject {
                        command.exerciseIndex == currentExerciseIndex),
                       (command.setIndex == nil ||
                        command.setIndex == currentSetIndex),
-                      currentSet?.isCompleted == false
+                      currentSet?.isResolved == false
                 else { continue }
                 _ = skipCurrentSet()
 
@@ -2374,10 +2404,10 @@ final class StrengthWorkoutStore: ObservableObject {
                       command.setIndex == nil ||
                         command.setIndex == currentSetIndex,
                       currentSet?.resolvedTargetKind == .time,
-                      currentSet?.isCompleted == false
+                      currentSet?.isResolved == false
                 else { continue }
 
-                startOrResumeTimedSet()
+                startOrResumeTimedSet(at: command.sentAt)
 
             case .pauseTimedSet:
                 guard command.exerciseIndex == nil ||
@@ -2385,10 +2415,10 @@ final class StrengthWorkoutStore: ObservableObject {
                       command.setIndex == nil ||
                         command.setIndex == currentSetIndex,
                       currentSet?.resolvedTargetKind == .time,
-                      currentSet?.isCompleted == false
+                      currentSet?.isResolved == false
                 else { continue }
 
-                pauseTimedSet()
+                pauseTimedSet(at: command.sentAt)
 
             case .resetTimedSet:
                 guard command.exerciseIndex == nil ||
@@ -2396,13 +2426,13 @@ final class StrengthWorkoutStore: ObservableObject {
                       command.setIndex == nil ||
                         command.setIndex == currentSetIndex,
                       currentSet?.resolvedTargetKind == .time,
-                      currentSet?.isCompleted == false
+                      currentSet?.isResolved == false
                 else { continue }
 
                 resetTimedSet()
 
             case .updateDraft:
-                guard
+                guard currentSet?.isResolved == false,
                     command.exerciseIndex == nil ||
                     command.exerciseIndex ==
                         currentExerciseIndex,
@@ -2445,7 +2475,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     continue
                 }
 
-                if currentSet?.isCompleted ==
+                if currentSet?.isResolved ==
                     true {
                     continue
                 }
@@ -2518,7 +2548,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     continue
                 }
 
-                if currentSet?.isCompleted !=
+                if currentSet?.isResolved !=
                     true {
                     if let rest =
                             command.restSeconds {
@@ -2534,7 +2564,13 @@ final class StrengthWorkoutStore: ObservableObject {
                 }
 
             case .skipRest:
-                skipRest()
+                guard ATHLTHStrengthWatchRestActionPolicy.accepts(
+                    command,
+                    exerciseIndex: currentExerciseIndex,
+                    setIndex: currentSetIndex,
+                    restStartedAt: restStartedAt
+                ) else { continue }
+                _ = skipRest(at: command.sentAt)
 
             case .skipRestAndStartTimedSet:
                 // Offline Watch commands are replayed against the correct
@@ -2544,17 +2580,26 @@ final class StrengthWorkoutStore: ObservableObject {
                       command.setIndex == currentSetIndex,
                       isResting,
                       currentSet?.resolvedTargetKind == .time,
-                      currentSet?.isCompleted == false
+                      currentSet?.isResolved == false
                 else { continue }
-                skipRest()
+                guard ATHLTHStrengthWatchRestActionPolicy.accepts(
+                    command,
+                    exerciseIndex: currentExerciseIndex,
+                    setIndex: currentSetIndex,
+                    restStartedAt: restStartedAt
+                ), skipRest(at: command.sentAt) else { continue }
                 startOrResumeTimedSet(at: command.sentAt)
 
             case .addRest:
+                guard ATHLTHStrengthWatchRestActionPolicy.accepts(
+                    command,
+                    exerciseIndex: currentExerciseIndex,
+                    setIndex: currentSetIndex,
+                    restStartedAt: restStartedAt
+                ) else { continue }
                 addRest(
-                    seconds:
-                        command
-                            .addRestSeconds ??
-                        30
+                    seconds: command.addRestSeconds ?? 30,
+                    at: command.sentAt
                 )
 
             case .nextExercise:
@@ -2567,7 +2612,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 }
 
                 if hasNextExercise {
-                    moveToNextExercise()
+                    moveToNextExercise(at: command.sentAt)
                 }
             }
         }
@@ -3388,7 +3433,7 @@ final class StrengthWorkoutStore: ObservableObject {
         // a blocked command cannot add completed reps, weight or records.
         guard canCompleteCurrentStrengthMode(at: completedAt) else { return }
         var set = workout.exercises[currentExerciseIndex].sets[currentSetIndex]
-        let measuredEffort = currentSetEffortClock?.elapsedSeconds()
+        let measuredEffort = currentSetEffortClock?.elapsedSeconds(at: completedAt)
         // The timer is an optional aid. It does not own set completion;
         // completion from iPhone or Watch always clears it if it targets this set.
         if currentTimedSetCountdown != nil {
@@ -3497,7 +3542,7 @@ final class StrengthWorkoutStore: ObservableObject {
         let allSetsCompleted = workout.exercises[currentExerciseIndex].sets.allSatisfy(\.isCompleted)
 
         if allSetsCompleted {
-            workout.exercises[currentExerciseIndex].completedAt = Date()
+            workout.exercises[currentExerciseIndex].completedAt = completedAt
         }
 
         let restConfiguration =
@@ -3564,7 +3609,7 @@ final class StrengthWorkoutStore: ObservableObject {
             if hasNextExercise &&
                 automaticRestTimer &&
                 resolvedRestSeconds > 0 {
-                let restStart = Date()
+                let restStart = completedAt
                 restStartedAt =
                     restStart
                 restEndsAt =
@@ -3577,13 +3622,13 @@ final class StrengthWorkoutStore: ObservableObject {
             } else {
                 // After the final exercise, keep counting idle time as rest
                 // until the next exercise is added or the workout is saved.
-                restStartedAt = Date()
+                restStartedAt = completedAt
                 restEndsAt = nil
             }
         } else {
             if automaticRestTimer &&
                 resolvedRestSeconds > 0 {
-                let restStart = Date()
+                let restStart = completedAt
                 restStartedAt =
                     restStart
                 restEndsAt =
@@ -3610,7 +3655,7 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
-    func completeCurrentDraftSet() {
+    func completeCurrentDraftSet(completedAt: Date = Date()) {
         let effortMetric =
             activeWorkout?
                 .advancedConfiguration?
@@ -3636,8 +3681,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 targetKind == .time
                     ? (currentSet?.plannedDurationSeconds == nil &&
                        currentExercise?.exercise.isTimeOnlyBodyweightStrength == true
-                        ? Int((currentSetEffortClock?.elapsedSeconds() ?? 0).rounded())
-                        : (currentTimedSetCountdown?.elapsedSeconds() ?? draftDurationSeconds))
+                        ? Int((currentSetEffortClock?.elapsedSeconds(at: completedAt) ?? 0).rounded())
+                        : (currentTimedSetCountdown?.elapsedSeconds(at: completedAt) ?? draftDurationSeconds))
                     : nil,
             weightKilograms:
                 loadKind == .weightKilograms && !treadmill && currentSetRecordsWeight
@@ -3657,7 +3702,8 @@ final class StrengthWorkoutStore: ObservableObject {
                     : nil,
             isWarmUp: draftWarmUp,
             restSeconds:
-                draftRestSeconds
+                draftRestSeconds,
+            completedAt: completedAt
         )
     }
 
@@ -4552,7 +4598,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     nextSetIndex
                 if automaticRestTimer &&
                     restSeconds > 0 {
-                    let restStart = Date()
+                    let restStart = completedAt
                     restStartedAt =
                         restStart
                     restEndsAt =
@@ -4776,29 +4822,28 @@ final class StrengthWorkoutStore: ObservableObject {
     /// A user pressing Next early in an EMOM minute or during a stale Watch
     /// replay must not discard the original rest/countdown checkpoint.
     @discardableResult
-    func skipRest() -> Bool {
+    func skipRest(at date: Date = Date()) -> Bool {
         guard let set = currentSet,
               !set.isResolved,
-              canCompleteCurrentStrengthMode()
+              canCompleteCurrentStrengthMode(at: date)
         else { return false }
-        finalizeActualRestIfNeeded()
+        finalizeActualRestIfNeeded(at: date)
         restStartedAt = nil
         restEndsAt = nil
-        startCurrentSetEffort()
+        startCurrentSetEffort(at: date)
         persistCheckpointNow()
         return true
     }
 
-    func addRest(seconds: Int) {
-        let now = Date()
+    func addRest(seconds: Int, at date: Date = Date()) {
         if restStartedAt == nil {
-            restStartedAt = now
+            restStartedAt = date
         }
 
         let base =
             max(
-                restEndsAt ?? now,
-                now
+                restEndsAt ?? date,
+                date
             )
         restEndsAt =
             base.addingTimeInterval(
@@ -4808,7 +4853,7 @@ final class StrengthWorkoutStore: ObservableObject {
             )
     }
 
-    private func finalizeActualRestIfNeeded() {
+    private func finalizeActualRestIfNeeded(at date: Date = Date()) {
         guard
             let restStartedAt,
             var workout = activeWorkout
@@ -4868,7 +4913,7 @@ final class StrengthWorkoutStore: ObservableObject {
             candidate.setIndex
         ].actualRestAfterSeconds =
             max(
-                Date()
+                date
                     .timeIntervalSince(
                         restStartedAt
                     ),
@@ -5149,11 +5194,11 @@ final class StrengthWorkoutStore: ObservableObject {
         return true
     }
 
-    func moveToNextExercise() {
+    func moveToNextExercise(at date: Date = Date()) {
         // Invalid Next commands cannot zero an active rest period. Validate
         // against the authoritative workout before changing any timer.
         guard currentExerciseAllSetsCompleted, hasNextExercise else { return }
-        finalizeActualRestIfNeeded()
+        finalizeActualRestIfNeeded(at: date)
         restStartedAt = nil
         guard
             var workout = activeWorkout,
@@ -5200,7 +5245,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 currentExerciseIndex
             ].transitionToNextExerciseSeconds =
                 max(
-                    Date()
+                    date
                         .timeIntervalSince(
                             completedAt
                         ),
@@ -5208,7 +5253,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 )
         }
 
-        Self.beginStrengthGroup(&workout, selected: nextIndex)
+        Self.beginStrengthGroup(&workout, selected: nextIndex, at: date)
         currentExerciseIndex = nextIndex
         currentSetIndex =
             workout.exercises[nextIndex]
@@ -5221,7 +5266,7 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = workout
         reloadDraftFromCurrentSet()
         if currentSet?.resolvedTargetKind == .time {
-            startOrResumeTimedSet()
+            startOrResumeTimedSet(at: date)
         }
         persistCheckpointNow()
     }

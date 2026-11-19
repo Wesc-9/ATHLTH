@@ -317,3 +317,23 @@ som ferdige før egne faser og reelle tester er fullført.
 - `ATHLTHStrengthGroupedSetTests` er utvidet med verifisering av
   blokkert tidlig EMOM-start, bevart hviletid, tidssett under hvile og
   opprydding av klokker ved automatisk gruppeslutt.
+
+- **Fase 3 / forsinket Apple Watch-synk:** Watch-kommandoer for
+  hopp over pause og +30 sek sender nå også opprinnelig øvelse- og
+  settindeks. iPhone avviser en gammel rest-kommando dersom den gjelder
+  en annen stasjon eller ble sendt før den aktive pauseperioden startet.
+  Eldre kommandoer med valgfri/manglende indeks kan fremdeles dekodes.
+  Kommandoer mot allerede fullførte/hoppede sett ignoreres før noen
+  kladdeverdier kan overskrives.
+- **Korrekt tidsstempel:** Live og offline Watch-settfullføring, pause,
+  pauseforlengelse og overgang til neste øvelse bruker hendelsens
+  `sentAt` i den eksisterende `StrengthWorkoutStore` i stedet for
+  tidspunktet Bluetooth-meldingen ble mottatt. Dette gjelder også
+  faktisk settid, fullført-tid og faktisk hvile etter settet.
+- **Watch-totalsum:** Sett som er beholdt med `skippedAt` i
+  supersett/sirkel/EMOM/dropsett/AMRAP blir nå telt én gang i
+  `WatchStrengthSessionSnapshot.totalSets`. Bare fysisk fjernede
+  planlagte sett legges til via den gamle skipped-telleren.
+  Nye tester dekker totalsett, feil stasjon, gammel pause og etterpå-
+  mottatte klokkeslett; ingen ny klokke, historikkmigrering eller
+  HealthKit-økt er introdusert.

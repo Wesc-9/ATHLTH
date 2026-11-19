@@ -263,6 +263,35 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             return true
         }
 
+        if (command.kind == .skipRest ||
+            command.kind == .addRest ||
+            command.kind == .skipRestAndStartTimedSet),
+           !ATHLTHStrengthWatchRestActionPolicy.accepts(
+               command,
+               exerciseIndex: strengthWorkout.currentExerciseIndex,
+               setIndex: strengthWorkout.currentSetIndex,
+               restStartedAt: strengthWorkout.restStartedAt
+           ) {
+            sendSnapshotNow()
+            return true
+        }
+
+        let requiresOpenSet =
+            command.kind == .updateDraft ||
+            command.kind == .completeSet ||
+            command.kind == .completeSetWithoutDetails ||
+            command.kind == .startSetEffort ||
+            command.kind == .skipSet ||
+            command.kind == .startTimedSet ||
+            command.kind == .pauseTimedSet ||
+            command.kind == .resetTimedSet ||
+            command.kind == .skipRestAndStartTimedSet
+        if requiresOpenSet,
+           strengthWorkout.currentSet?.isResolved != false {
+            sendSnapshotNow()
+            return true
+        }
+
         if command.kind == .nextExercise,
            let exerciseIndex =
                 command.exerciseIndex,
@@ -391,11 +420,12 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                                 .draftWarmUp,
                         restSeconds:
                             strengthWorkout
-                                .draftRestSeconds
+                                .draftRestSeconds,
+                        completedAt: command.sentAt
                     )
             } else {
                 strengthWorkout
-                    .completeCurrentDraftSet()
+                    .completeCurrentDraftSet(completedAt: command.sentAt)
             }
 
         case .startSetEffort:
@@ -412,11 +442,12 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 )
             }
             strengthWorkout.completeCurrentSetWithoutDetails(
-                restSeconds: strengthWorkout.draftRestSeconds
+                restSeconds: strengthWorkout.draftRestSeconds,
+                completedAt: command.sentAt
             )
 
         case .skipRest:
-            strengthWorkout.skipRest()
+            _ = strengthWorkout.skipRest(at: command.sentAt)
 
         case .skipRestAndStartTimedSet:
             // Skip the rest and start the already selected next time-based
@@ -424,17 +455,19 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             // jump past a set when a Watch command is replayed.
             if strengthWorkout.isResting,
                strengthWorkout.currentSet?.resolvedTargetKind == .time {
-                strengthWorkout.skipRest()
-                strengthWorkout.startOrResumeTimedSet(at: command.sentAt)
+                if strengthWorkout.skipRest(at: command.sentAt) {
+                    strengthWorkout.startOrResumeTimedSet(at: command.sentAt)
+                }
             }
 
         case .addRest:
             strengthWorkout.addRest(
-                seconds: command.addRestSeconds ?? 30
+                seconds: command.addRestSeconds ?? 30,
+                at: command.sentAt
             )
 
         case .nextExercise:
-            strengthWorkout.moveToNextExercise()
+            strengthWorkout.moveToNextExercise(at: command.sentAt)
 
         case .startTimedSet:
             // The authoritative store guards against duplicate starts,

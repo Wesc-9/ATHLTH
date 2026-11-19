@@ -2682,7 +2682,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     weightKilograms: nil,
                     restSeconds: nil,
                     addRestSeconds: nil,
-                    sentAt: Date()
+                    sentAt: Date(),
+                    exerciseIndex: snapshot.exerciseIndex,
+                    setIndex: snapshot.setIndex
                 )
             )
 
@@ -2719,7 +2721,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     restSeconds: nil,
                     addRestSeconds:
                         addedSeconds,
-                    sentAt: Date()
+                    sentAt: Date(),
+                    exerciseIndex: snapshot.exerciseIndex,
+                    setIndex: snapshot.setIndex
                 )
             )
 

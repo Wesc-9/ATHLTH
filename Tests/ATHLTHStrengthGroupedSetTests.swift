@@ -594,4 +594,107 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
     }
 
 
+
+    func testWatchSnapshotDoesNotDoubleCountPreservedGroupSkips() throws {
+        let groupID = UUID()
+        var grouped = exercise(8, weight: 20, sets: 1)
+        grouped.groupID = groupID
+        grouped.groupKind = .emom
+        grouped.groupRounds = 1
+        grouped.groupClockSeconds = 60
+        var plan = PlannedSession(
+            id: UUID(), title: "Watch totals in EMOM", kind: .strength,
+            scheduledStart: nil, durationMinutes: 5,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        plan.workoutBlocks = [grouped]
+        let store = StrengthWorkoutStore()
+        store.start(session: plan, watchSessionID: nil)
+        XCTAssertEqual(store.watchSnapshot?.totalSets, 1)
+        XCTAssertTrue(store.skipCurrentSet())
+        XCTAssertEqual(store.watchSnapshot?.totalSets, 1)
+        XCTAssertEqual(store.watchSnapshot?.skippedSets, 1)
+        XCTAssertEqual(store.watchSnapshot?.completedSets, 0)
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.auditedSkippedSets, 1)
+    }
+
+    func testOfflineWatchRestCommandsRespectOriginalSetAndRestStart() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let base = Date().addingTimeInterval(-200)
+        let workoutID = try XCTUnwrap(store.activeWorkout?.id)
+        store.addRest(seconds: 45, at: base)
+        let restDeadline = try XCTUnwrap(store.restEndsAt)
+
+        func command(_ kind: WatchStrengthCommandKind, sentAt: Date,
+                     setIndex: Int = 0, addSeconds: Int? = nil) -> WatchStrengthCommand {
+            WatchStrengthCommand(
+                id: UUID(), workoutID: workoutID, kind: kind,
+                reps: nil, weightKilograms: nil, restSeconds: nil,
+                addRestSeconds: addSeconds, sentAt: sentAt,
+                exerciseIndex: 0, setIndex: setIndex
+            )
+        }
+        // A command for another set, or one sent before this rest started,
+        // must not extend or dismiss the current rest.
+        store.replayOfflineWatchCommands([
+            command(.addRest, sentAt: base.addingTimeInterval(20),
+                    setIndex: 1, addSeconds: 30),
+            command(.skipRest, sentAt: base.addingTimeInterval(-35)),
+            command(.addRest, sentAt: base.addingTimeInterval(-20),
+                    addSeconds: 90)
+        ])
+        XCTAssertEqual(store.restEndsAt, restDeadline)
+        XCTAssertNil(store.currentSetEffortClock)
+
+        store.replayOfflineWatchCommands([
+            command(.skipRest, sentAt: base.addingTimeInterval(25))
+        ])
+        XCTAssertFalse(store.isResting)
+        XCTAssertEqual(store.currentSetEffortClock?.startedAt,
+                       base.addingTimeInterval(25))
+    }
+
+    func testOfflineWatchCompletionAndRestUseOriginalEventDates() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let squat = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Squat", instructions: [], primaryMuscles: ["Quadriceps"],
+            secondaryMuscles: [], equipment: [], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true
+        )
+        store.appendExercise(squat, sets: 2, reps: 8, restSeconds: 40)
+        let workoutID = try XCTUnwrap(store.activeWorkout?.id)
+        let completedAt = Date().addingTimeInterval(-135)
+        let completed = WatchStrengthCommand(
+            id: UUID(), workoutID: workoutID, kind: .completeSetWithoutDetails,
+            reps: nil, weightKilograms: nil, restSeconds: 40,
+            addRestSeconds: nil, sentAt: completedAt,
+            exerciseIndex: 0, setIndex: 0
+        )
+        store.replayOfflineWatchCommands([completed])
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.sets.first?.completedAt,
+                       completedAt)
+        XCTAssertEqual(store.restStartedAt, completedAt)
+        XCTAssertEqual(store.restEndsAt, completedAt.addingTimeInterval(40))
+        XCTAssertEqual(store.currentSetIndex, 1)
+
+        let resumedAt = completedAt.addingTimeInterval(22)
+        let next = WatchStrengthCommand(
+            id: UUID(), workoutID: workoutID, kind: .skipRest,
+            reps: nil, weightKilograms: nil, restSeconds: nil,
+            addRestSeconds: nil, sentAt: resumedAt,
+            exerciseIndex: 0, setIndex: 1
+        )
+        store.replayOfflineWatchCommands([next])
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.sets.first?
+            .actualRestAfterSeconds, 22, accuracy: 0.01)
+        XCTAssertEqual(store.currentSetEffortClock?.startedAt, resumedAt)
+        XCTAssertNil(store.restEndsAt)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+    }
+
+
 }
