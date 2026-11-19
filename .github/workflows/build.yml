@@ -347,7 +347,10 @@ jobs:
       matrix:
         ipad: [11, 13]
     runs-on: xcode-27
-    timeout-minutes: 40
+    # CoreSimulator can require three bounded boot attempts plus a retrying
+    # install on hosted macOS. Keep the job budget above those explicit
+    # per-command limits; otherwise GitHub cancels before diagnostics finish.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 27
@@ -377,7 +380,9 @@ jobs:
 
       - name: Open the app across iPad layouts
         shell: bash
-        timeout-minutes: 30
+        # Allows bounded CoreSimulator recovery to finish; an actual
+        # installation/render failure still exits nonzero.
+        timeout-minutes: 65
         env:
           ATHLTH_IPAD_SMOKE_APP: ${{ runner.temp }}/athlth-ipad-test-app/ATHLTH.app
           ATHLTH_IPAD_SMOKE_SIZE: ${{ matrix.ipad }}
