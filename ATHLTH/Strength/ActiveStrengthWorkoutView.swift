@@ -2390,6 +2390,7 @@ struct ActiveStrengthWorkoutView: View {
                     workout
                 )
 
+                focusedWorkoutSegmentResults(workout)
                 focusedStrengthModeSummary(workout)
 
                 focusedWorkoutRestSummary(
@@ -3299,27 +3300,15 @@ struct ActiveStrengthWorkoutView: View {
                 by: 1
             )
         ) { context in
-            let recordedDuration =
-                workout.healthMetrics.duration
-                    .flatMap {
-                        $0 > 0
-                            ? $0
-                            : nil
-                    }
-            let totalDuration = max(
-                recordedDuration ??
-                    strength.elapsedSessionSeconds(for: workout, at: context.date),
-                0
-            )
-            let restDuration =
-                workout
-                    .totalActualRestSeconds
-            let activeDuration =
-                max(
-                    totalDuration -
-                    restDuration,
-                    0
+            let breakdown = StrengthWorkoutResultBreakdown(
+                workout: workout,
+                elapsedSeconds: strength.elapsedSessionSeconds(
+                    for: workout, at: context.date
                 )
+            )
+            let totalDuration = breakdown.totalSeconds
+            let restDuration = breakdown.restSeconds
+            let activeDuration = breakdown.activeSeconds
 
             LazyVGrid(
                 columns: [
@@ -3415,6 +3404,107 @@ struct ActiveStrengthWorkoutView: View {
                     icon: "list.number"
                 )
             }
+        }
+    }
+
+    /// Phase 7: one presentation over the original recorded exercises/sets.
+    /// Measured Watch distance must never be combined with belt-speed
+    /// estimates and presented as sensor evidence.
+    @ViewBuilder
+    private func focusedWorkoutSegmentResults(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        let result = StrengthWorkoutResultBreakdown(
+            workout: workout,
+            elapsedSeconds: strength.elapsedSessionSeconds(for: workout)
+        )
+        let segments = result.segments.filter {
+            $0.completedSets > 0 &&
+                ($0.isCardio || $0.registeredEffortSeconds > 0)
+        }
+
+        if !segments.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Recorded segments",
+                        norwegian: "Registrerte deløkter"
+                    ),
+                    systemImage: "list.bullet.rectangle"
+                )
+                .font(.headline)
+
+                ForEach(segments) { segment in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(segment.exerciseName)
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "\(segment.completedSets) completed",
+                                    norwegian: "\(segment.completedSets) fullført"
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+
+                        if segment.registeredEffortSeconds > 0 {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Recorded effort: ",
+                                    norwegian: "Registrert tid: "
+                                ) + segment.registeredEffortSeconds.clockDuration
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        if segment.measuredDistanceMeters > 0 {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Watch-measured: ",
+                                    norwegian: "Målt av Watch: "
+                                ) + String(
+                                    format: "%.2f km",
+                                    segment.measuredDistanceMeters / 1_000
+                                )
+                            )
+                            .font(.caption)
+                        }
+                        if segment.loggedDistanceMeters > 0 {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Logged distance: ",
+                                    norwegian: "Registrert distanse: "
+                                ) + String(
+                                    format: "%.2f km",
+                                    segment.loggedDistanceMeters / 1_000
+                                )
+                            )
+                            .font(.caption)
+                        }
+                        if segment.estimatedTreadmillDistanceMeters > 0 {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Estimated treadmill distance: ",
+                                    norwegian: "Estimert mølledistanse: "
+                                ) + String(
+                                    format: "%.2f km",
+                                    segment.estimatedTreadmillDistanceMeters / 1_000
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
         }
     }
 
