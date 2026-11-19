@@ -854,17 +854,35 @@ final class WorkoutDeviceRelayStore:
                       !Task.isCancelled else { return }
                 forgetAcknowledgedCommand(command.id, userID: processingUserID)
             } catch {
-                // The claim remains unresolved, not failed: the Watch or
-                // iPhone may already be recording. Never replay this launch
-                // just to repair a missing acknowledgement.
+                // The workout already started. The server may even have
+                // committed before the response was lost: confirm only the
+                // matching persisted receipt without launching anything.
                 guard currentUserID == processingUserID,
                       !Task.isCancelled else { return }
-                errorMessage = error.localizedDescription
-                lastStatusText = ATHLTHLocalization.choose(
-                    english: "Workout started; confirmation is pending.",
-                    norwegian: "Økten er startet, men bekreftelsen venter."
-                )
-                continue
+                if await hasPersistedCompletedReceipt(
+                    command.id, userID: processingUserID
+                ) {
+                    guard currentUserID == processingUserID,
+                          !Task.isCancelled else { return }
+                    forgetAcknowledgedCommand(command.id, userID: processingUserID)
+                    lastCompletedCommandID = command.id
+                    errorMessage = nil
+                    lastStatusText = ATHLTHLocalization.choose(
+                        english: "Remote workout started.",
+                        norwegian: "Fjernstart av økt utført."
+                    )
+                } else {
+                    guard currentUserID == processingUserID,
+                          !Task.isCancelled else { return }
+                    errorMessage = error.localizedDescription
+                    lastStatusText = ATHLTHLocalization.choose(
+                        english: "Workout started; confirmation is pending.",
+                        norwegian: "Økten er startet, men bekreftelsen venter."
+                    )
+                }
+                // At most one successful launch per drain, regardless of
+                // acknowledgement state. Never claim/start the next workout.
+                return
             }
             guard currentUserID == processingUserID,
                   !Task.isCancelled else { return }
