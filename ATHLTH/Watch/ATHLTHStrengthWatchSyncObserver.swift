@@ -111,7 +111,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .task {
                 drainPendingCommands()
                 sendSnapshotNow()
-                if let latest = workoutMirroring.snapshot {
+                if appSession.signedIn,
+                   strengthWorkout.isLoaded(for: appSession.profile.userID),
+                   let latest = workoutMirroring.snapshot {
                     strengthWorkout.ingestWatchCardioSnapshot(latest)
                 }
             }
@@ -121,7 +123,8 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .task(id: appSession.profile.userID) {
                 guard !ATHLTHDeviceRole.isIPad else { return }
                 while !Task.isCancelled {
-                    if appSession.signedIn {
+                    if appSession.signedIn &&
+                        strengthWorkout.isLoaded(for: appSession.profile.userID) {
                         await ATHLTHPrivateLiveStrengthStatusStore.publish(
                             ATHLTHPrivateLiveStrengthSnapshot.make(
                                 from: strengthWorkout
@@ -139,7 +142,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 drainPendingCommands()
             }
             .onChange(of: workoutMirroring.snapshot) { _, latest in
-                if let latest {
+                if appSession.signedIn,
+                   strengthWorkout.isLoaded(for: appSession.profile.userID),
+                   let latest {
                     strengthWorkout.ingestWatchCardioSnapshot(latest)
                 }
             }
@@ -199,14 +204,21 @@ struct ATHLTHStrengthWatchSyncObserver: View {
 
     @MainActor
     private func schedulePrivateStatusUpdate() {
-        guard !ATHLTHDeviceRole.isIPad, appSession.signedIn else { return }
+        guard !ATHLTHDeviceRole.isIPad,
+              appSession.signedIn,
+              strengthWorkout.isLoaded(for: appSession.profile.userID)
+        else { return }
         pendingPrivateStatusTask?.cancel()
         pendingPrivateStatusTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(800))
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled,
+                  appSession.signedIn,
+                  strengthWorkout.isLoaded(for: appSession.profile.userID)
+            else { return }
+            let owner = appSession.profile.userID
             await ATHLTHPrivateLiveStrengthStatusStore.publish(
                 ATHLTHPrivateLiveStrengthSnapshot.make(from: strengthWorkout),
-                userID: appSession.profile.userID
+                userID: owner
             )
         }
     }
@@ -215,6 +227,10 @@ struct ATHLTHStrengthWatchSyncObserver: View {
     private func handle(
         _ command: WatchStrengthCommand
     ) -> Bool {
+        guard appSession.signedIn,
+              strengthWorkout.isLoaded(for: appSession.profile.userID)
+        else { return false }
+
         if command.kind == .requestSnapshot {
             if strengthWorkout.activeWorkout == nil,
                command.initiatedOnWatch == true {
@@ -582,7 +598,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
 
     @MainActor
     private func drainPendingCommands() {
-        guard appSession.signedIn else { return }
+        guard appSession.signedIn,
+              strengthWorkout.isLoaded(for: appSession.profile.userID)
+        else { return }
         // A journal may include commands for multiple account sessions.
         // Skipping a foreign/unscoped command preserves its UUID and payload
         // for its rightful owner without blocking current-owner commands.
@@ -620,7 +638,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         pendingDraftSnapshotTask?.cancel()
         pendingDraftSnapshotTask = nil
 
-        guard let workout = strengthWorkout.activeWorkout,
+        guard appSession.signedIn,
+              strengthWorkout.isLoaded(for: appSession.profile.userID),
+              let workout = strengthWorkout.activeWorkout,
               ATHLTHStrengthWatchControlPolicy.acceptsSetCommands(
                   captureDevice: workout.captureDevice,
                   inputMode: workout.advancedConfiguration?.inputMode ?? .both

@@ -553,3 +553,15 @@ som ferdige før egne faser og reelle tester er fullført.
 - Tester dekker eksisterende styrkeøkt, fullført økt, opptatt
   opptaksslot og tillatt bootstrap. Fysisk reconnect etter
   bortfall og kryssaktivitetstest på Watch gjenstår.
+
+### Fase 4 – kontoavgrensning for Watch-styrkekommandoer og iPad-status
+
+- Watch-observatøren behandler ikke gjenoppretting, settkommandoer,
+  pulsoppsummering eller køkvitteringer før den eksisterende
+  `StrengthWorkoutStore` har lastet **samme** konto som er innlogget.
+- En forsinket privat styrkestatus for iPad publiseres ikke med
+  øktdata fra forrige konto under kontobytte. Utgående Watch-snapshot
+  er underlagt samme konto-kontroll.
+- Ny test verifiserer at en styrkehistorikk først er konto-klar
+  etter en faktisk `switchAccount`; utlogging og fremmed konto
+  blokkerer Watch-data. Ingen ny konto-/opptakslagring innføres.

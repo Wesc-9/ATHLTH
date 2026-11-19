@@ -296,6 +296,19 @@ final class StrengthSkipSetWatchTests: XCTestCase {
 
 
     @MainActor
+    func testWatchStrengthStoreIsAccountReadyOnlyAfterScopedRestore() {
+        let owner = UUID()
+        let other = UUID()
+        let store = StrengthWorkoutStore()
+        XCTAssertFalse(store.isLoaded(for: owner))
+        store.switchAccount(owner)
+        XCTAssertTrue(store.isLoaded(for: owner))
+        XCTAssertFalse(store.isLoaded(for: other))
+        store.switchAccount(nil)
+        XCTAssertFalse(store.isLoaded(for: owner))
+    }
+
+    @MainActor
     func testWatchBootstrapDoesNotOverwriteExistingStrengthWorkout() throws {
         let userID = UUID()
         defer {

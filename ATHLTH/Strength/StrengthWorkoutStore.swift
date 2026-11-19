@@ -245,6 +245,13 @@ final class StrengthWorkoutStore: ObservableObject {
 
     private var accountID: UUID?
     private var loadingAccount = false
+
+    /// The Watch command observer must not process, publish or acknowledge
+    /// account-owned set data before the authoritative store has actually
+    /// switched its checkpoint and history to the signed-in athlete.
+    func isLoaded(for userID: UUID) -> Bool {
+        !loadingAccount && accountID == userID
+    }
     private var checkpointSaveTask: Task<Void, Never>?
     private var cardioWatchCaptures: [UUID: StrengthWatchCardioCapture] = [:]
     private var watchCaptureNeedsBaseline = Set<UUID>()
