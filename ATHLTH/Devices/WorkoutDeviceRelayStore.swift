@@ -458,6 +458,7 @@ final class WorkoutDeviceRelayStore:
     private var listeningUserID: UUID?
     private var listenerGeneration: UUID?
     private var isDrainingCommands = false
+    private var isReconcilingUncertainStarts = false
     // A launch may succeed while the Supabase acknowledgement fails.
     // Persist only its command ID, scoped to account and physical device;
     // never persist the workout payload or replay the HealthKit start.
@@ -549,6 +550,11 @@ final class WorkoutDeviceRelayStore:
         phoneWorkout: IPhoneWorkoutStore,
         strengthWorkout: StrengthWorkoutStore
     ) async {
+        // Background, Watch delivery and GPS permission callbacks can race.
+        // Only one reconciler may promote/acknowledge local journal entries.
+        guard !isReconcilingUncertainStarts else { return }
+        isReconcilingUncertainStarts = true
+        defer { isReconcilingUncertainStarts = false }
         guard ATHLTHDeviceRole.isIPhone,
               let userID = currentUserID,
               !uncertainLaunchIDs(userID: userID).isEmpty
