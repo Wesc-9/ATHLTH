@@ -1011,7 +1011,8 @@ struct AppRootView: View {
                     ghostRace:
                         ghostRace,
                     workoutMirroring:
-                        workoutMirroring
+                        workoutMirroring,
+                    relayRequestID: envelope.clientRequestID
                 )
 
         case .walk:
@@ -1054,7 +1055,8 @@ struct AppRootView: View {
                     spotify:
                         spotifyPlayback,
                     workoutMirroring:
-                        workoutMirroring
+                        workoutMirroring,
+                    relayRequestID: envelope.clientRequestID
                 )
 
         case .strength:
@@ -1106,7 +1108,8 @@ struct AppRootView: View {
                         watchConnection:
                             watchConnection,
                         spotify:
-                            spotifyPlayback
+                            spotifyPlayback,
+                        relayRequestID: envelope.clientRequestID
                     )
 
             guard didStart else {
