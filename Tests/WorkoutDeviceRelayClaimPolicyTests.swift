@@ -180,6 +180,51 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         XCTAssertTrue(decoded.walking)
     }
 
+    func testLegacyPhoneCheckpointCannotClaimNewRemoteStart() throws {
+        let now = Date()
+        let original = PhoneWorkout(
+            walking: false, start: now, end: nil, lastCheckpoint: now
+        )
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(original)
+        ) as? [String: Any])
+        json.removeValue(forKey: "relayRequestID")
+        let restored = try JSONDecoder().decode(
+            PhoneWorkout.self,
+            from: JSONSerialization.data(withJSONObject: json)
+        )
+        XCTAssertNil(restored.relayRequestID)
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsIPhoneRecording(
+            target: "iphone", kind: "run", serverRequestID: UUID(),
+            serverCreatedAt: now.addingTimeInterval(-5),
+            recordingRequestID: restored.relayRequestID,
+            recordingKind: "run", recordingStartedAt: restored.start,
+            ownerMatches: true, failedAt: nil
+        ))
+    }
+
+    func testStrengthCheckpointRetainsExactRemoteRequestIdentity() throws {
+        let request = UUID()
+        var workout = StrengthWorkoutLog(
+            id: UUID(), plannedSessionID: nil, watchSessionID: nil,
+            captureDevice: .iPhone, trackingMode: .simple,
+            title: "Remote strength", startedAt: Date(), endedAt: nil,
+            exercises: [],
+            healthMetrics: LinkedHealthWorkoutMetrics(
+                healthKitWorkoutUUID: nil, duration: nil,
+                activeCalories: nil, averageHeartRate: nil,
+                maxHeartRate: nil
+            )
+        )
+        workout.relayRequestID = request
+        let restored = try JSONDecoder().decode(
+            StrengthWorkoutLog.self,
+            from: JSONEncoder().encode(workout)
+        )
+        XCTAssertEqual(restored.relayRequestID, request)
+        XCTAssertEqual(restored.captureDevice, .iPhone)
+    }
+
     func testCompletedWatchResultResolvesOnlyMatchingAccountKindAndRequest() {
         let now = Date()
         let id = UUID(), owner = UUID()
