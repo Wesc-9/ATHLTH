@@ -459,6 +459,7 @@ final class WorkoutDeviceRelayStore:
     private var listenerGeneration: UUID?
     private var isDrainingCommands = false
     private var isReconcilingUncertainStarts = false
+    private var reconcileAgainAfterCurrentPass = false
     // A launch may succeed while the Supabase acknowledgement fails.
     // Persist only its command ID, scoped to account and physical device;
     // never persist the workout payload or replay the HealthKit start.
@@ -552,18 +553,35 @@ final class WorkoutDeviceRelayStore:
     ) async {
         // Background, Watch delivery and GPS permission callbacks can race.
         // Only one reconciler may promote/acknowledge local journal entries.
-        guard !isReconcilingUncertainStarts else { return }
+        guard !isReconcilingUncertainStarts else {
+            // A later GPS/HealthKit checkpoint may arrive while an earlier
+            // probe is waiting. Preserve that event for one final pass.
+            reconcileAgainAfterCurrentPass = true
+            return
+        }
         isReconcilingUncertainStarts = true
-        defer { isReconcilingUncertainStarts = false }
+        defer {
+            isReconcilingUncertainStarts = false
+            if reconcileAgainAfterCurrentPass {
+                reconcileAgainAfterCurrentPass = false
+                Task { @MainActor [weak self] in
+                    await self?.reconcileUncertainWorkoutStarts(
+                        watchConnection: watchConnection,
+                        phoneWorkout: phoneWorkout,
+                        strengthWorkout: strengthWorkout
+                    )
+                }
+            }
+        }
         guard ATHLTHDeviceRole.isIPhone,
               let userID = currentUserID,
               !uncertainLaunchIDs(userID: userID).isEmpty
         else { return }
 
-        // A missing Watch connection cannot block recovery of iPhone-owned
-        // recordings. Historical terminal receipts are durable on the phone.
-        let liveWatchRequestID =
-            await watchConnection.confirmedActiveRelayRequestID()
+        // Phone-owned recordings can reconcile even while Watch sleeps.
+        // Probe Watch lazily only for a still-unverified Watch-target claim.
+        var liveWatchRequestID: UUID?
+        var hasProbedWatch = false
 
         for commandID in uncertainLaunchIDs(userID: userID) {
             guard currentUserID == userID, !Task.isCancelled else { return }
@@ -582,13 +600,6 @@ final class WorkoutDeviceRelayStore:
                 else { continue }
                 let record = rows[0]
 
-                let isLiveWatch =
-                    WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
-                        target: record.targetDevice,
-                        serverRequestID: record.clientRequestID,
-                        watchRequestID: liveWatchRequestID,
-                        failedAt: record.failedAt
-                    )
                 let watchReceipt = watchConnection.completedRelayReceipt(
                     requestID: record.clientRequestID, ownerID: userID
                 )
@@ -600,6 +611,22 @@ final class WorkoutDeviceRelayStore:
                         serverCreatedAt: record.createdAt,
                         signedInOwnerID: userID,
                         receipt: watchReceipt,
+                        failedAt: record.failedAt
+                    )
+                if record.targetDevice ==
+                        WorkoutDeviceRelayTarget.appleWatch.rawValue &&
+                   !isCompletedWatch && !hasProbedWatch {
+                    hasProbedWatch = true
+                    liveWatchRequestID =
+                        await watchConnection.confirmedActiveRelayRequestID()
+                    guard currentUserID == userID, !Task.isCancelled
+                    else { return }
+                }
+                let isLiveWatch =
+                    WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
+                        target: record.targetDevice,
+                        serverRequestID: record.clientRequestID,
+                        watchRequestID: liveWatchRequestID,
                         failedAt: record.failedAt
                     )
 
