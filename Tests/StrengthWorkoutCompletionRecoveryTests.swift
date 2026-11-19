@@ -141,6 +141,62 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
     }
 
     @MainActor
+    func testLatePhoneHealthKitUUIDBackfillsExactWorkoutWithoutRewindingJournal() throws {
+        let owner = UUID()
+        defer {
+            StrengthWorkoutCompletionJournal.remove(userID: owner)
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthHistory", userID: owner)
+            )
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthActive", userID: owner)
+            )
+        }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        let firstID = try XCTUnwrap(store.activeWorkout?.id)
+        XCTAssertTrue(store.finish())
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        let secondID = try XCTUnwrap(store.activeWorkout?.id)
+        XCTAssertTrue(store.finish())
+        XCTAssertEqual(StrengthWorkoutCompletionJournal.read(userID: owner)?.id, secondID)
+
+        let uuid = UUID()
+        XCTAssertTrue(store.attachFinishedWorkoutHealthKitUUID(
+            uuid, workoutID: firstID, ownerID: owner
+        ))
+        XCTAssertTrue(store.attachFinishedWorkoutHealthKitUUID(
+            uuid, workoutID: firstID, ownerID: owner
+        ), "Duplicate callback for the same HealthKit UUID is harmless")
+        XCTAssertFalse(store.attachFinishedWorkoutHealthKitUUID(
+            UUID(), workoutID: firstID, ownerID: owner
+        ), "A second HealthKit recording cannot steal a committed session")
+        XCTAssertFalse(store.attachFinishedWorkoutHealthKitUUID(
+            UUID(), workoutID: secondID, ownerID: UUID()
+        ), "Never attach a previous account's HealthKit UUID")
+        XCTAssertFalse(store.attachFinishedWorkoutHealthKitUUID(
+            UUID(), workoutID: UUID(), ownerID: owner
+        ))
+
+        XCTAssertEqual(
+            store.workoutHistory.first(where: { $0.id == firstID })?
+                .healthMetrics.healthKitWorkoutUUID,
+            uuid
+        )
+        XCTAssertNil(
+            store.workoutHistory.first(where: { $0.id == secondID })?
+                .healthMetrics.healthKitWorkoutUUID
+        )
+        XCTAssertEqual(
+            StrengthWorkoutCompletionJournal.read(userID: owner)?.id,
+            secondID,
+            "Late HealthKit writes must not overwrite the newest completion"
+        )
+    }
+
+    @MainActor
     func testFinishedStrengthWorkoutIsRestoredAfterHistoryWriteIsLost() throws {
         let userID = UUID()
         defer {

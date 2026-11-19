@@ -5584,22 +5584,54 @@ final class StrengthWorkoutStore: ObservableObject {
 
     /// A late HealthKit save must update the exact finished session only,
     /// never whichever workout happens to be on screen when it returns.
+    @discardableResult
     func attachFinishedWorkoutHealthKitUUID(
         _ uuid: UUID,
         workoutID: UUID,
         ownerID: UUID
-    ) {
+    ) -> Bool {
+        // A HealthKit builder can finish after a new session has started
+        // or a different athlete has signed in. Never attach its UUID to
+        // anything except its durable phone-owned workout identity.
         guard accountID == ownerID,
-              var saved = workoutHistory.first(where: {
-                  $0.id == workoutID && $0.isFinished
-              }) else { return }
+              !UserDefaults.standard.bool(
+                  forKey: AccountLocalStorage.key("deleted", userID: ownerID)
+              ),
+              let index = workoutHistory.firstIndex(where: {
+                  $0.id == workoutID &&
+                  $0.isFinished &&
+                  $0.captureDevice == .iPhone
+              })
+        else { return false }
 
+        var updated = workoutHistory
+        var saved = updated[index]
+        if let alreadyLinked = saved.healthMetrics.healthKitWorkoutUUID {
+            // Repeated delivery is idempotent; a different HealthKit
+            // workout can never replace previously linked evidence.
+            return alreadyLinked == uuid
+        }
         saved.healthMetrics.healthKitWorkoutUUID = uuid
-        upsertWorkoutHistory(saved)
+        updated[index] = saved
+        do {
+            try AccountLocalStorage.writeChecked(
+                updated, name: "strengthHistory", userID: ownerID
+            )
+        } catch {
+            // Keep the original saved state so a retry can safely reattach.
+            return false
+        }
+        workoutHistory = updated
         if completedWorkout?.id == workoutID {
             completedWorkout = saved
         }
-        try? StrengthWorkoutCompletionJournal.save(saved, userID: ownerID)
+        // This receipt is a LAST-completion recovery record, not a second
+        // history store. Never replace a newer workout with an older one.
+        if StrengthWorkoutCompletionJournal.read(userID: ownerID)?.id == workoutID {
+            try? StrengthWorkoutCompletionJournal.save(saved, userID: ownerID)
+        }
+        ATHLTHTrainingDataChangeSignal.post(userID: ownerID)
+        return true
     }
 
     /// Backfilled Watch metrics belong to their exact completed history

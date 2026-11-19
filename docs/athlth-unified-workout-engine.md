@@ -719,3 +719,16 @@ som ferdige før egne faser og reelle tester er fullført.
   den valgte Watch/iPhone-lokalloggen er opprettet.
 - Tester dekker speilet Watch-styrke, Watch-løp, feil ID,
   gammel økt og legitim offline-gjenoppretting.
+
+### Fase 7 – HealthKit-backfill fra iPhone uten å overskrive «siste økt»
+
+- Den asynkrone HealthKit-UUID-en for iPhone-styrke knyttes nå
+  atomisk til **nøyaktig** fullført iPhone-treningslogg på riktig konto.
+  Feil konto, slettet konto, aktiv økt og fremmed HealthKit-UUID
+  avvises. Gjentatt kvittering med samme UUID er idempotent.
+- Oppdatering av en eldre økt kan ikke lenger skrive over den
+  nyeste fullføringsjournalen som brukes ved krasjgjenoppretting.
+  Journalen oppdateres bare hvis den allerede peker til samme økt.
+- Regresjonstestene fullfører to separate styrkeøkter, mottar sent
+  HealthKit-svar på den første og verifiserer at den andre
+  fortsatt er siste fullførte økt.
