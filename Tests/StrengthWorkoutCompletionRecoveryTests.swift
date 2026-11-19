@@ -454,9 +454,19 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         XCTAssertEqual(summary.segments[0].completedReps, 10)
         XCTAssertEqual(summary.segments[0].registeredEffortSeconds, 20)
 
-        // Imported HealthKit time is used only when valid. Rest can
-        // never exceed total recorded duration in the final summary.
+        // HealthKit duration is provisional until the whole session has
+        // finished. An open rest period is included only in the live preview.
         workout.healthMetrics.duration = 90
+        let live = StrengthWorkoutResultBreakdown(
+            workout: workout, elapsedSeconds: 180, ongoingRestSeconds: 30
+        )
+        XCTAssertEqual(live.totalSeconds, 180)
+        XCTAssertEqual(live.restSeconds, 70)
+        XCTAssertEqual(live.activeSeconds, 110)
+
+        // After Finish, use valid recorded HealthKit duration. Corrupted
+        // historical rest cannot exceed it or produce negative active time.
+        workout.endedAt = workout.startedAt.addingTimeInterval(180)
         workout.exercises[0].sets[0].actualRestAfterSeconds = 200
         let bounded = StrengthWorkoutResultBreakdown(
             workout: workout, elapsedSeconds: 180
