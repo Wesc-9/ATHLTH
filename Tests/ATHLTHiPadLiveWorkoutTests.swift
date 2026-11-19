@@ -239,7 +239,7 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         )
         plan.workoutBlocks = [block]
         let store = StrengthWorkoutStore()
-        store.start(session: plan, watchSessionID: nil)
+        store.start(session: plan, watchSessionID: nil, trackingMode: .advanced, captureDevice: .iPhone)
         XCTAssertTrue(store.skipCurrentSet())
         let snapshot = try XCTUnwrap(
             ATHLTHPrivateLiveStrengthSnapshot.make(from: store)
