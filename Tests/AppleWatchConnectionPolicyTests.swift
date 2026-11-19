@@ -156,4 +156,38 @@ final class AppleWatchConnectionPolicyTests: XCTestCase {
         XCTAssertEqual(resolved, newer)
     }
 
+    func testRemoteWatchIdentityExpiresBeforeAnotherWorkoutCanInheritIt() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let identity = WatchRemoteLaunchIdentity(
+            requestID: UUID(), kind: .strength, issuedAt: now
+        )
+        XCTAssertTrue(identity.isFresh(at: now.addingTimeInterval(44)))
+        XCTAssertFalse(identity.isFresh(at: now.addingTimeInterval(46)))
+        XCTAssertFalse(identity.isFresh(at: now.addingTimeInterval(-46)))
+    }
+
+    func testWatchActivityRequestIdentitySurvivesEncoding() throws {
+        let id = UUID()
+        let withIdentity = WatchWorkoutActivityState(
+            isActive: true, title: "Run", updatedAt: Date(),
+            relayRequestID: id
+        )
+        let decoded = try JSONDecoder().decode(
+            WatchWorkoutActivityState.self,
+            from: JSONEncoder().encode(withIdentity)
+        )
+        XCTAssertEqual(decoded.relayRequestID, id)
+    }
+
+    func testWatchActivityDecodesLegacyPayloadWithoutRemoteIdentity() throws {
+        let legacy = """
+        {"isActive":true,"title":"Run","updatedAt":0}
+        """
+        let activity = try JSONDecoder().decode(
+            WatchWorkoutActivityState.self,
+            from: Data(legacy.utf8)
+        )
+        XCTAssertNil(activity.relayRequestID)
+    }
+
 }
