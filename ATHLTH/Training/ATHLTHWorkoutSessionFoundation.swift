@@ -55,6 +55,22 @@ enum ATHLTHWorkoutSessionLaunchError: LocalizedError {
     }
 }
 
+/// Weak links to the two existing authoritative stores. This is a launch
+/// arbiter only: it does not persist workouts, own HealthKit or retain stores.
+@MainActor
+enum ATHLTHWorkoutRecordingArbiter {
+    static weak var phone: IPhoneWorkoutStore?
+    static weak var strength: StrengthWorkoutStore?
+
+    static func mayStartRunning() -> Bool {
+        strength?.activeSessionState == nil
+    }
+
+    static func mayStartStrength() -> Bool {
+        phone?.activeSessionState == nil
+    }
+}
+
 enum ATHLTHWorkoutSessionFoundation {
     static func requireNoActiveRecording(
         _ active: ATHLTHWorkoutSessionState?
