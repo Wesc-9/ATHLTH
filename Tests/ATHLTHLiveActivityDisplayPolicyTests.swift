@@ -262,4 +262,28 @@ final class ATHLTHLiveActivityDisplayPolicyTests: XCTestCase {
         ))
     }
 
+    func testStaleRunningPacketCannotCreateFreshActivityAfterReconnection() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertTrue(ATHLTHLiveActivityDisplayPolicy.acceptsActivityCapture(
+            updatedAt: now.addingTimeInterval(-20),
+            isTerminal: false, now: now
+        ))
+        XCTAssertFalse(ATHLTHLiveActivityDisplayPolicy.acceptsActivityCapture(
+            updatedAt: now.addingTimeInterval(-100),
+            isTerminal: false, now: now
+        ))
+        XCTAssertFalse(ATHLTHLiveActivityDisplayPolicy.acceptsActivityCapture(
+            updatedAt: now.addingTimeInterval(15),
+            isTerminal: false, now: now
+        ))
+        XCTAssertTrue(ATHLTHLiveActivityDisplayPolicy.acceptsActivityCapture(
+            updatedAt: now.addingTimeInterval(-1_200),
+            isTerminal: true, now: now
+        ))
+        XCTAssertFalse(ATHLTHLiveActivityDisplayPolicy.acceptsActivityCapture(
+            updatedAt: Date(timeIntervalSince1970: .infinity),
+            isTerminal: true, now: now
+        ))
+    }
+
 }
