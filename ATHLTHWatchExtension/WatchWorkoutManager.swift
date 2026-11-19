@@ -9437,6 +9437,23 @@ extension WatchWorkoutManager:
     ) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            if let pending = self.pendingLocalCoachEvent,
+               pending.utterance === utterance {
+                self.pendingLocalCoachEvent = nil
+                if self.coachEventLedger.canDeliver(pending.event) {
+                    self.coachEventLedger.didDeliver(pending.event)
+                    self.reportWatchSpokenEventAttempt(pending.event)
+                }
+            }
+            if let replay = self.pendingWatchCoachReplay,
+               replay.utterance === utterance,
+               replay.generation == self.audioCoachActivationGeneration {
+                self.pendingWatchCoachReplay = nil
+                self.confirmWatchCoachReplay(
+                    replay.text, priority: replay.priority,
+                    remember: replay.remember
+                )
+            }
             if self.pendingLocalCoachEvent?.utterance === utterance {
                 self.pendingLocalCoachEvent = nil
             }
@@ -9461,6 +9478,9 @@ extension WatchWorkoutManager:
     ) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            if self.pendingWatchCoachReplay?.utterance === utterance {
+                self.pendingWatchCoachReplay = nil
+            }
             if self.pendingLocalCoachEvent?.utterance === utterance {
                 self.pendingLocalCoachEvent = nil
             }
