@@ -187,4 +187,33 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         let workout = snapshot(completedSets: 12, totalSets: 10)
         XCTAssertEqual(ATHLTHiPadLiveMetrics.sets(workout), "10 / 10")
     }
+
+    func testLiveViewPermissionCannotTransferFromPreviousWorkout() {
+        let now = Date(timeIntervalSince1970: 2_100_000_000)
+        let owner = UUID()
+        var request = ATHLTHLiveViewRequest(
+            userID: owner, requestID: UUID(),
+            requestedAt: now.addingTimeInterval(-20),
+            expiresAt: now.addingTimeInterval(90),
+            status: "pending", respondedAt: nil, approvedSessionID: nil
+        )
+        XCTAssertTrue(ATHLTHLiveViewSessionRequestPolicy.mayPromptOwner(
+            request, accountID: owner,
+            sourceStartedAt: now.addingTimeInterval(-50), at: now
+        ))
+        XCTAssertFalse(ATHLTHLiveViewSessionRequestPolicy.mayPromptOwner(
+            request, accountID: owner,
+            sourceStartedAt: now.addingTimeInterval(-5), at: now
+        ))
+        XCTAssertFalse(ATHLTHLiveViewSessionRequestPolicy.mayPromptOwner(
+            request, accountID: UUID(),
+            sourceStartedAt: now.addingTimeInterval(-50), at: now
+        ))
+        request.status = "denied"
+        XCTAssertFalse(ATHLTHLiveViewSessionRequestPolicy.mayPromptOwner(
+            request, accountID: owner,
+            sourceStartedAt: now.addingTimeInterval(-50), at: now
+        ))
+    }
+
 }

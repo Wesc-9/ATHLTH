@@ -162,6 +162,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     @Published private(set) var sourceWorkoutTitle: String?
 
     private var lastSourceSessionID: UUID?
+    private var lastSourceStartedAt: Date?
     private var trackingAccountID: UUID?
     private var structuredSession: ATHLTHLocalStructuredWorkoutStatus?
     private var approvedSourceSessionID: UUID?
@@ -199,11 +200,14 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             ? Date().addingTimeInterval(600) : nil
     }
 
-    private func reconcileSession(_ currentID: UUID?, title: String?) {
+    private func reconcileSession(
+        _ currentID: UUID?, title: String?, startedAt: Date? = nil
+    ) {
         guard lastSourceSessionID != currentID else { return }
         approvedSourceSessionID = nil
         incomingRequest = nil
         lastSourceSessionID = currentID
+        lastSourceStartedAt = startedAt
         sourceWorkoutTitle = title
         if let currentID, shareNextWorkout,
            let expiry = nextWorkoutSharingExpiresAt, expiry > .now {
@@ -266,6 +270,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         requestError = nil
         approvedSourceSessionID = nil
         lastSourceSessionID = nil
+        lastSourceStartedAt = nil
         sourceWorkoutTitle = nil
         mirroredStartedAt = nil
         mirroredSessionID = nil
@@ -798,7 +803,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             phone: phone, strength: strength, mirroredWatch: mirroredWatch,
             spotify: spotify
         )
-        reconcileSession(active?.id, title: active?.title)
+        reconcileSession(active?.id, title: active?.title,
+                         startedAt: active?.startedAt)
         // Presence is intentionally independent from session-scoped approval.
         // No metrics or workout names enter this table.
         await publishPresence(accountID: accountID, snapshot: active)
@@ -995,6 +1001,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             incomingRequest = nil
             return
         }
+        let expectedSession = lastSourceSessionID
+        let expectedStartedAt = lastSourceStartedAt
         do {
             let rows: [ATHLTHLiveViewRequest] = try await client
                 .from("private_live_view_requests")
@@ -1003,9 +1011,20 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
-            let next = rows.first
-            incomingRequest = next?.isPending == true ? next : nil
+            guard trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID,
+                  lastSourceSessionID == expectedSession,
+                  lastSourceStartedAt == expectedStartedAt,
+                  !Task.isCancelled else { return }
+            incomingRequest = rows.first.flatMap {
+                ATHLTHLiveViewSessionRequestPolicy.mayPromptOwner(
+                    $0, accountID: accountID, sourceStartedAt: expectedStartedAt
+                ) ? $0 : nil
+            }
         } catch {
+            guard trackingAccountID == accountID,
+                  lastSourceSessionID == expectedSession,
+                  !Task.isCancelled else { return }
             incomingRequest = nil
         }
     }
@@ -1014,8 +1033,13 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     /// iPad database update nor a request row can authorize publication.
     func respondToRequest(approve: Bool, accountID: UUID) async {
         guard !ATHLTHDeviceRole.isIPad,
-              let request = incomingRequest, request.isPending,
+              let request = incomingRequest,
               let exactSessionID = lastSourceSessionID,
+              trackingAccountID == accountID,
+              ATHLTHLiveViewSessionRequestPolicy.mayPromptOwner(
+                  request, accountID: accountID,
+                  sourceStartedAt: lastSourceStartedAt
+              ),
               client.auth.currentUser?.id == accountID else { return }
 
         incomingRequest = nil

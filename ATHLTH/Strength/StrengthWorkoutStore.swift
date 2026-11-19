@@ -123,6 +123,15 @@ enum ATHLTHStrengthWatchRestActionPolicy {
     }
 }
 
+/// Mutating commands from Watch must belong to the single active workout.
+enum ATHLTHStrengthWatchCommandIdentityPolicy {
+    static func belongsToActiveWorkout(
+        _ command: WatchStrengthCommand, workoutID: UUID
+    ) -> Bool {
+        command.kind == .requestSnapshot || command.workoutID == workoutID
+    }
+}
+
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { scheduleCheckpointPersist() } }
@@ -2358,21 +2367,20 @@ final class StrengthWorkoutStore: ObservableObject {
         _ commands:
             [WatchStrengthCommand]
     ) {
-        for command in commands
-            .sorted(by: {
-                $0.sentAt < $1.sentAt
-            }) {
-            guard let workout =
-                    activeWorkout
-            else {
-                return
-            }
-
-            if let workoutID =
-                    command.workoutID,
-               workoutID != workout.id {
+        var seenCommandIDs = Set<UUID>()
+        for command in commands.sorted(by: {
+            $0.sentAt == $1.sentAt
+                ? $0.id.uuidString < $1.id.uuidString
+                : $0.sentAt < $1.sentAt
+        }) {
+            guard seenCommandIDs.insert(command.id).inserted else {
+                // The same ID may arrive via immediate and durable transport.
                 continue
             }
+            guard let workout = activeWorkout else { return }
+            guard ATHLTHStrengthWatchCommandIdentityPolicy.belongsToActiveWorkout(
+                command, workoutID: workout.id
+            ) else { continue }
 
             switch command.kind {
             case .requestSnapshot:

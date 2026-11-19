@@ -225,8 +225,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             return true
         }
 
-        if let workoutID = command.workoutID,
-           workoutID != workout.id {
+        guard ATHLTHStrengthWatchCommandIdentityPolicy.belongsToActiveWorkout(
+            command, workoutID: workout.id
+        ) else {
             sendSnapshotNow()
             return true
         }

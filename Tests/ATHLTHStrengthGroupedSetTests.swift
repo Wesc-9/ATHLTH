@@ -709,4 +709,40 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
     }
 
 
+
+    func testOfflineWatchJournalAppliesOnlyOnceToCorrectWorkout() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        let exercise = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Row", instructions: [], primaryMuscles: ["Back"],
+            secondaryMuscles: [], equipment: [], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true
+        )
+        store.appendExercise(exercise, sets: 2, reps: 8, restSeconds: 0)
+        let activeID = try XCTUnwrap(store.activeWorkout?.id)
+        let start = Date().addingTimeInterval(-10)
+        store.addRest(seconds: 20, at: start)
+        let initialDeadline = try XCTUnwrap(store.restEndsAt)
+        func make(_ owner: UUID?, id: UUID = UUID(), seconds: Int) -> WatchStrengthCommand {
+            WatchStrengthCommand(
+                id: id, workoutID: owner, kind: .addRest,
+                reps: nil, weightKilograms: nil, restSeconds: nil,
+                addRestSeconds: seconds,
+                sentAt: start.addingTimeInterval(1),
+                exerciseIndex: 0, setIndex: 0
+            )
+        }
+        let valid = make(activeID, seconds: 30)
+        let unscoped = make(nil, seconds: 300)
+        store.replayOfflineWatchCommands([
+            valid, valid, unscoped, make(UUID(), seconds: 600)
+        ])
+        XCTAssertEqual(store.restEndsAt, initialDeadline.addingTimeInterval(30))
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 0)
+        XCTAssertFalse(ATHLTHStrengthWatchCommandIdentityPolicy.belongsToActiveWorkout(
+            unscoped, workoutID: activeID
+        ))
+    }
+
 }

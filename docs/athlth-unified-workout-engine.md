@@ -337,3 +337,21 @@ som ferdige før egne faser og reelle tester er fullført.
   Nye tester dekker totalsett, feil stasjon, gammel pause og etterpå-
   mottatte klokkeslett; ingen ny klokke, historikkmigrering eller
   HealthKit-økt er introdusert.
+
+ 
+### Fase 4 — iPad-samtykke og Watch-journal (første del)
+
+- iPad-forespørsler skal nå være sendt under **den aktuelle
+  treningsøkten**, for riktig konto og fortsatt være ventende. Gammel
+  forespørsel fra en avsluttet økt kan ikke godkjenne en ny.
+  Asynkrone svar fra Supabase verifiserer konto og økt på nytt før
+  forespørselen vises eller godkjennes.
+- Watch-kommandoer som **endrer** et treningsopptak må bære
+  nøyaktig aktiv `workoutID`. Legacy-kommandoer uten
+  trenings-ID kan dekodes, men ikke endre en tilfeldig ny økt.
+  Den eksisterende offline-journalen sorteres deterministisk og
+  håndterer hver kommando-ID maksimalt én gang per replay.
+- Én eksisterende styrkemotor og én HealthKit-eier beholdes. Dette
+  er første sikkerhetsdel av fase 4, **ikke** en påstand om ferdig
+  end-to-end iPad-/Watch-synk, fysisk test eller global
+  HealthKit-koordinator på tvers av alle idretter.

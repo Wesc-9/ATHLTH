@@ -41,3 +41,22 @@ struct ATHLTHLiveViewDecision: Encodable {
         case approvedSessionID = "approved_session_id"
     }
 }
+
+ 
+/// Pending iPad requests are prompts, not grants of spectator permission.
+enum ATHLTHLiveViewSessionRequestPolicy {
+    static func mayPromptOwner(
+        _ request: ATHLTHLiveViewRequest, accountID: UUID,
+        sourceStartedAt: Date?, at now: Date = Date()
+    ) -> Bool {
+        guard request.userID == accountID,
+              request.status == "pending",
+              request.expiresAt > now,
+              request.expiresAt > request.requestedAt,
+              request.requestedAt <= now.addingTimeInterval(10),
+              let sourceStartedAt else { return false }
+        // Allow minor device clock skew but never reuse a previous
+        // workout's request for a newly started session.
+        return request.requestedAt.addingTimeInterval(5) >= sourceStartedAt
+    }
+}
