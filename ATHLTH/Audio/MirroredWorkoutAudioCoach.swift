@@ -1501,6 +1501,22 @@ final class MirroredWorkoutAudioCoach:
         let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self else { return }
+            // AVFoundation may omit didStart for a very short utterance.
+            // Successful didFinish is still verified playback, unlike cancel.
+            if let pending = self.pendingLocalSpokenEvent,
+               ObjectIdentifier(pending.utterance) == utteranceID {
+                self.pendingLocalSpokenEvent = nil
+                self.markSpokenEventStarted(pending.event)
+            }
+            if let replay = self.pendingLocalReplay,
+               ObjectIdentifier(replay.utterance) == utteranceID,
+               replay.generation == self.playbackGeneration {
+                self.pendingLocalReplay = nil
+                self.confirmSpokenReplay(
+                    rawText: replay.rawText, spokenText: replay.spokenText,
+                    priority: replay.priority, remember: replay.remember
+                )
+            }
             if self.pendingLocalSpokenEvent.map({
                 ObjectIdentifier($0.utterance) == utteranceID
             }) == true {
@@ -1535,6 +1551,11 @@ final class MirroredWorkoutAudioCoach:
         let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self else { return }
+            if self.pendingLocalReplay.map({
+                ObjectIdentifier($0.utterance) == utteranceID
+            }) == true {
+                self.pendingLocalReplay = nil
+            }
             if self.pendingLocalSpokenEvent.map({
                 ObjectIdentifier($0.utterance) == utteranceID
             }) == true {
