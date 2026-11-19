@@ -148,7 +148,7 @@ jobs:
               matched = [
                   artifact for artifact in artifacts
                   if artifact["name"] == name and not artifact["expired"]
-                  and artifact["size_in_bytes"] > 0
+                  and artifact["size_in_bytes"] >= 10_000
               ]
               if not matched:
                   print(f"::error::Missing verified iPad {size}-inch screenshot artifact")
