@@ -157,10 +157,16 @@ enum ATHLTHSurfaceCoordinator {
         )
 
         let workoutTransition =
+            previous.activeWorkout?.startedAt != surfaceSnapshot.activeWorkout?.startedAt ||
             previous.activeWorkout?.state != surfaceSnapshot.activeWorkout?.state ||
             previous.activeWorkout?.currentStep != surfaceSnapshot.activeWorkout?.currentStep ||
+            previous.activeWorkout?.nextStep != surfaceSnapshot.activeWorkout?.nextStep ||
             previous.activeWorkout?.runningIntervalOrdinal != surfaceSnapshot.activeWorkout?.runningIntervalOrdinal ||
+            previous.activeWorkout?.runningIntervalTotal != surfaceSnapshot.activeWorkout?.runningIntervalTotal ||
             previous.activeWorkout?.runningInRecovery != surfaceSnapshot.activeWorkout?.runningInRecovery ||
+            previous.activeWorkout?.strengthRestEndsAt != surfaceSnapshot.activeWorkout?.strengthRestEndsAt ||
+            previous.activeWorkout?.strengthSetIndex != surfaceSnapshot.activeWorkout?.strengthSetIndex ||
+            previous.activeWorkout?.strengthSetCount != surfaceSnapshot.activeWorkout?.strengthSetCount ||
             (previous.activeWorkout == nil) != (surfaceSnapshot.activeWorkout == nil)
 
         let surfaceChanged =
@@ -609,6 +615,9 @@ private final class ATHLTHLiveActivityController {
                 snapshot.strengthExerciseName ?? "",
                 String(snapshot.strengthSetIndex ?? -1),
                 String(snapshot.strengthSetCount ?? -1),
+                String(snapshot.strengthReps ?? -1),
+                String(snapshot.strengthWeightKilograms ?? -1),
+                String(snapshot.strengthTimedSetTargetSeconds ?? -1),
                 String(snapshot.strengthRestEndsAt?.timeIntervalSince1970 ?? -1),
                 snapshot.strengthNextExerciseName ?? "",
                 String(snapshot.strengthTimedSetResumedAt?.timeIntervalSince1970 ?? -1)
@@ -619,19 +628,17 @@ private final class ATHLTHLiveActivityController {
         // A running step transition is an immediate UI change, not another
         // five-second heart-rate sample. The native countdown continues
         // between captures, but the next step must appear immediately.
-        let runningPresentationKey: String? =
-            snapshot.kind == .running || snapshot.kind == .walking
-            ? [
-                String(snapshot.runningStepIndex ?? -1),
-                snapshot.runningStepTitle ?? "",
-                snapshot.runningNextStepTitle ?? "",
-                String(snapshot.runningIntervalOrdinal ?? -1),
-                String(snapshot.runningIntervalTotal ?? -1),
-                String(snapshot.runningInRecovery ?? false),
-                String(snapshot.runningStepCount ?? -1),
-                String(snapshot.runningStepRemainingMeters ?? -1)
-              ].joined(separator: "|")
-            : nil
+        let runningPresentationKey =
+            ATHLTHLiveActivityDisplayPolicy.runningTransitionKey(
+                kindRaw: snapshot.kind.rawValue,
+                stepIndex: snapshot.runningStepIndex,
+                stepTitle: snapshot.runningStepTitle,
+                nextStepTitle: snapshot.runningNextStepTitle,
+                intervalOrdinal: snapshot.runningIntervalOrdinal,
+                intervalTotal: snapshot.runningIntervalTotal,
+                isRecovery: snapshot.runningInRecovery,
+                awaitingMainStart: snapshot.runningAwaitingMainStart
+            )
         let runningChanged =
             lastRunningPresentationKey != runningPresentationKey
         let updateIsDue =
