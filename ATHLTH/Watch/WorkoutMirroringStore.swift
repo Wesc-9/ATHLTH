@@ -28,8 +28,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard aiConversationActive != active else { return }
         aiConversationActive = active
         if active {
-            // Never change HealthKit recording or remote Watch cue ownership.
-            // Only suspend the local phone voice while the AI has its audio.
+            // AI voice owns the phone audio route. Revoke its regular
+            // mirrored-coach lease so Watch regains ordinary prompts.
+            resetVoiceLease()
             iPhoneAudioCoach.suspendForWatchFallback()
         } else if iPhoneAudioCoachAttached, let snapshot {
             // Align milestones to current progress; old cues must not replay.
@@ -44,10 +45,16 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     }
 
     var isIPhoneCoachVoiceOwner: Bool {
-        mirroredIPhoneCoachAvailable &&
-        snapshot?.watchOwnedAudioCoach != true &&
-        (snapshot?.supportsAudioCoachVoiceLease != true ||
-            hasAcknowledgedVoiceLease)
+        // A mirrored UI may stay visible during pause, finish or AI dialog;
+        // none of these grants an unrestricted new speech lease.
+        guard !aiConversationActive,
+              mirroredIPhoneCoachAvailable,
+              snapshot?.watchOwnedAudioCoach != true,
+              let state = snapshot?.state,
+              state == .running || state == .paused
+        else { return false }
+        return snapshot?.supportsAudioCoachVoiceLease != true ||
+            hasAcknowledgedVoiceLease
     }
 
     var canReplayMirroredCoachMessage: Bool {
@@ -97,7 +104,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     private func offerVoiceLeaseIfNeeded(
         for snapshot: WatchWorkoutLiveSnapshot
     ) {
-        guard iPhoneAudioCoachAttached,
+        guard !aiConversationActive,
+              iPhoneAudioCoachAttached,
               iPhoneAudioCoach.isEnabled,
               snapshot.watchOwnedAudioCoach != true,
               snapshot.supportsAudioCoachVoiceLease == true,
@@ -145,7 +153,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         _ acknowledgement: ATHLTHAudioCoachLeaseAcknowledgement,
         latestSnapshot: WatchWorkoutLiveSnapshot? = nil
     ) {
-        guard iPhoneAudioCoachAttached,
+        guard !aiConversationActive,
+              iPhoneAudioCoachAttached,
               iPhoneAudioCoach.isEnabled,
               mirroredSession != nil,
               acknowledgement.generationID ==
