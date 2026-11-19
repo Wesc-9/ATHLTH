@@ -346,9 +346,9 @@ jobs:
           data = json.loads(Path(os.environ["RUNNER_TEMP"], "athlth-test-summary.json").read_text())
           print("XCTest summary:", json.dumps(data, ensure_ascii=False)[:10000])
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
-              out.write("\\n\\n```json\\n")
+              out.write("\n\n```json\n")
               out.write(json.dumps(data, ensure_ascii=False, indent=2)[:12000])
-              out.write("\\n```\\n")
+              out.write("\n```\n")
           PY
           else
             cat "$RUNNER_TEMP/athlth-xcresult-error.txt"
