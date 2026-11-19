@@ -221,4 +221,45 @@ final class ATHLTHLiveActivityDisplayPolicyTests: XCTestCase {
             )
         }
     }
+
+    func testIntervalTransitionKeyChangesImmediatelyForTheNextEffort() {
+        func key(
+            ordinal: Int = 1, recovery: Bool = false,
+            title: String = "Work", awaiting: Bool = false
+        ) -> String? {
+            ATHLTHLiveActivityDisplayPolicy.runningTransitionKey(
+                kindRaw: "running", stepIndex: ordinal,
+                stepTitle: title, nextStepTitle: "Recovery",
+                intervalOrdinal: ordinal, intervalTotal: 4,
+                isRecovery: recovery, awaitingMainStart: awaiting
+            )
+        }
+        XCTAssertNotNil(key())
+        XCTAssertNotEqual(key(), key(ordinal: 2))
+        XCTAssertNotEqual(key(), key(recovery: true))
+        XCTAssertNotEqual(key(), key(title: "Recovery"))
+        XCTAssertNotEqual(key(), key(awaiting: true))
+    }
+
+    func testFreeRunningUsesStableKeyAndOtherSportsDoNotBorrowIntervals() {
+        let first = ATHLTHLiveActivityDisplayPolicy.runningTransitionKey(
+            kindRaw: "running", stepIndex: nil,
+            stepTitle: nil, nextStepTitle: nil,
+            intervalOrdinal: nil, intervalTotal: nil,
+            isRecovery: nil, awaitingMainStart: nil
+        )
+        XCTAssertEqual(first, ATHLTHLiveActivityDisplayPolicy.runningTransitionKey(
+            kindRaw: "running", stepIndex: nil,
+            stepTitle: nil, nextStepTitle: nil,
+            intervalOrdinal: nil, intervalTotal: nil,
+            isRecovery: nil, awaitingMainStart: nil
+        ))
+        XCTAssertNil(ATHLTHLiveActivityDisplayPolicy.runningTransitionKey(
+            kindRaw: "strength", stepIndex: 1,
+            stepTitle: "Set", nextStepTitle: "Rest",
+            intervalOrdinal: 1, intervalTotal: 4,
+            isRecovery: false, awaitingMainStart: false
+        ))
+    }
+
 }
