@@ -96,7 +96,12 @@ private struct ATHLTHSurfaceProvider: TimelineProvider {
             let age = date.timeIntervalSince(workout.updatedAt)
             let permittedAge: TimeInterval =
                 workout.state == "remote_strength" ? 90 : 180
-            if age < -10 || age > permittedAge {
+            if age < -10 || age > permittedAge ||
+               ATHLTHSurfaceWorkoutOrdering.matchesTerminal(
+                   workout, marker: value.lastFinishedWorkout
+               ) {
+                // A cached active value is never stronger evidence than a
+                // recorded terminal marker, including after process restart.
                 value.activeWorkout = nil
             }
         }
@@ -195,6 +200,7 @@ private struct ATHLTHHomeWidgetView: View {
     private func timerCaption(
         _ workout: ATHLTHSurfaceWorkoutSnapshot
     ) -> String {
+        if workout.state == "paused" { return "PAUSET" }
         if workout.strengthRestEndsAt != nil { return "SETTPAUSE" }
         if workout.runningInRecovery == true { return "PAUSE" }
         if ATHLTHWidgetPresentationPolicy.remainingSeconds(
@@ -227,7 +233,7 @@ private struct ATHLTHHomeWidgetView: View {
                     } ?? stepSeconds ?? workout.elapsedTime
                 ))
             } else if let restEnd = workout.strengthRestEndsAt {
-                if restEnd > entry.date {
+                if restEnd > max(entry.date, workout.updatedAt) {
                     Text(timerInterval: workout.updatedAt...restEnd,
                          countsDown: true, showsHours: false)
                 } else {
