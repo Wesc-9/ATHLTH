@@ -332,6 +332,23 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         ))
     }
 
+    func testTerminalFailureTransitionNeverOverridesConfirmedOrFailedStart() {
+        let now = Date()
+        let policy = WorkoutDeviceRelayClaimPolicy.self
+        XCTAssertTrue(policy.mayTransitionToFailure(
+            completedAt: nil, failedAt: nil
+        ))
+        XCTAssertFalse(policy.mayTransitionToFailure(
+            completedAt: now, failedAt: nil
+        ))
+        XCTAssertFalse(policy.mayTransitionToFailure(
+            completedAt: nil, failedAt: now
+        ))
+        XCTAssertFalse(policy.mayTransitionToFailure(
+            completedAt: now, failedAt: now
+        ))
+    }
+
     func testRelayClaimRejectsMultipleServerRows() {
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(0))
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(1))
