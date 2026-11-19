@@ -5606,6 +5606,13 @@ final class StrengthWorkoutStore: ObservableObject {
               })
         else { return false }
 
+        // The same HealthKit workout may not be claimed by two different
+        // strength sessions, even when callbacks arrive after a later finish.
+        guard !workoutHistory.contains(where: {
+            $0.id != workoutID &&
+            $0.healthMetrics.healthKitWorkoutUUID == uuid
+        }) else { return false }
+
         var updated = workoutHistory
         var saved = updated[index]
         if let alreadyLinked = saved.healthMetrics.healthKitWorkoutUUID {
@@ -5654,11 +5661,19 @@ final class StrengthWorkoutStore: ObservableObject {
               !UserDefaults.standard.bool(
                   forKey: AccountLocalStorage.key("deleted", userID: ownerID)
               ) else { return false }
+        // A delayed Watch packet cannot erase already-linked HealthKit
+        // evidence, steal another workout's UUID, or replace it with a new
+        // recording. Reject missing UUID once a recording has been linked.
+        let incomingUUID = metrics.healthKitWorkoutUUID
+        if let incomingUUID,
+           workoutHistory.contains(where: {
+               $0.id != workoutID &&
+               $0.healthMetrics.healthKitWorkoutUUID == incomingUUID
+           }) { return false }
         var updated = workoutHistory
         var finished = updated[index]
         if let existing = finished.healthMetrics.healthKitWorkoutUUID,
-           let incoming = metrics.healthKitWorkoutUUID,
-           existing != incoming { return false }
+           existing != incomingUUID { return false }
         finished.healthMetrics = metrics
         updated[index] = finished
         do {
