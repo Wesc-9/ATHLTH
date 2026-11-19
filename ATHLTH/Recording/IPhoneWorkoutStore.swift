@@ -5350,6 +5350,20 @@ final class IPhoneWorkoutStore:
         let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self else { return }
+            if let pending = self.pendingLocalCoachEvent,
+               ObjectIdentifier(pending.utterance) == utteranceID {
+                self.pendingLocalCoachEvent = nil
+                self.markLocalCoachEventStarted(pending.event)
+            }
+            if let replay = self.pendingLocalCoachReplay,
+               ObjectIdentifier(replay.utterance) == utteranceID,
+               replay.generation == self.coachPlaybackGeneration {
+                self.pendingLocalCoachReplay = nil
+                self.confirmLocalCoachReplay(
+                    replay.text, priority: replay.priority,
+                    remember: replay.remember
+                )
+            }
             if self.pendingLocalCoachEvent.map({
                 ObjectIdentifier($0.utterance) == utteranceID
             }) == true {
@@ -5380,6 +5394,11 @@ final class IPhoneWorkoutStore:
         let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self else { return }
+            if self.pendingLocalCoachReplay.map({
+                ObjectIdentifier($0.utterance) == utteranceID
+            }) == true {
+                self.pendingLocalCoachReplay = nil
+            }
             if self.pendingLocalCoachEvent.map({
                 ObjectIdentifier($0.utterance) == utteranceID
             }) == true {
