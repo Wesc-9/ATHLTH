@@ -108,7 +108,15 @@ test -n "$APP"
 test -d "$APP"
 echo "Launching prebuilt simulator app: $APP"
 
-UDID=$(create_compatible_ipad 11 "ATHLTH-iPad")
+# CI executes 11- and 13-inch layouts as independent jobs on fresh Macs.
+# The legacy 'all' mode remains available for manual smoke runs.
+IPAD_SIZE="${ATHLTH_IPAD_SMOKE_SIZE:-all}"
+case "$IPAD_SIZE" in
+  11) UDID=$(create_compatible_ipad 11 "ATHLTH-iPad") ;;
+  13) UDID=$(create_compatible_ipad 13 "ATHLTH-iPad-13") ;;
+  all) UDID=$(create_compatible_ipad 11 "ATHLTH-iPad") ;;
+  *) echo "::error::Unsupported ATHLTH_IPAD_SMOKE_SIZE: $IPAD_SIZE"; exit 64 ;;
+esac
 
 cleanup() {
   xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
@@ -116,9 +124,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-simctl_bounded "boot 11-inch iPad" 100 boot "$UDID"
-simctl_bounded "wait for 11-inch iPad boot" 160 bootstatus "$UDID" -b
-simctl_bounded "install ATHLTH on 11-inch iPad" 180 install "$UDID" "$APP"
+CURRENT_SIZE="$IPAD_SIZE"
+if [ "$CURRENT_SIZE" = "all" ]; then CURRENT_SIZE=11; fi
+simctl_bounded "boot ${CURRENT_SIZE}-inch iPad" 100 boot "$UDID"
+simctl_bounded "wait for ${CURRENT_SIZE}-inch iPad boot" 160 bootstatus "$UDID" -b
+simctl_bounded "install ATHLTH on ${CURRENT_SIZE}-inch iPad" 180 install "$UDID" "$APP"
 
 validate_screen() {
   local label="$1"
@@ -155,6 +165,18 @@ PY
     2>&1 | tail -n 250 || true
   return 1
 }
+
+if [ "$IPAD_SIZE" = "13" ]; then
+  # Only the first Studio frame is required on the 13-inch layout.
+  # It runs on a fresh runner, without the 11-inch session's CoreSimulator
+  # churn, and must independently install, launch and render successfully.
+  xcrun simctl launch "$UDID" com.wesc9.athlth \
+    --athlth-compatibility-preview \
+    "--athlth-compatibility-tab=0"
+  validate_screen "13-inch-home"
+  echo "ATHLTH 13-inch iPad simulator install, launch and rendering passed."
+  exit 0
+fi
 
 LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
 echo "$LAUNCH_OUTPUT"
@@ -225,6 +247,13 @@ if ! kill -0 "$PROFILE_PID" 2>/dev/null; then
   exit 1
 fi
 xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+
+# The 11-inch matrix job is complete after these 12 validated screens.
+# A separate 13-inch job tests the larger layout on a fresh runner.
+if [ "$IPAD_SIZE" = "11" ]; then
+  echo "ATHLTH 11-inch iPad onboarding, tabs, libraries and profile passed."
+  exit 0
+fi
 
 # Check the actual first logged-in Studio frame on a larger iPad,
 # in addition to the 11-inch device tested above. Keep the PNG for

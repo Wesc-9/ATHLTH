@@ -334,8 +334,13 @@ jobs:
   # simulator from stalling iPad creation and application installation.
   # No second Xcode compilation; the app is identical to the tested binary.
   ipad-smoke:
+    name: iPad ${{ matrix.ipad }}-inch smoke
     if: github.ref == 'refs/heads/release/v2.2.5'
     needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        ipad: [11, 13]
     runs-on: xcode-27
     timeout-minutes: 40
     steps:
@@ -370,13 +375,14 @@ jobs:
         timeout-minutes: 30
         env:
           ATHLTH_IPAD_SMOKE_APP: ${{ runner.temp }}/athlth-ipad-test-app/ATHLTH.app
+          ATHLTH_IPAD_SMOKE_SIZE: ${{ matrix.ipad }}
         run: bash scripts/run_ipad_smoke.sh
 
       - name: Upload iPad screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: athlth-ipad-smoke-screenshots
+          name: athlth-ipad-smoke-screenshots-${{ matrix.ipad }}
           path: |
             ${{ runner.temp }}/athlth-ipad-*.png
             ${{ runner.temp }}/athlth-ipad-diagnostics.txt
