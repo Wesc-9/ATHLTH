@@ -1239,9 +1239,11 @@ struct AppRootView: View {
         // resolve a previous uncertain iPad relay. The store retains all
         // unproven launches and never starts a second workout.
         if ATHLTHDeviceRole.isIPhone && appSession.signedIn {
-            await deviceRelay.reconcileUncertainWatchStarts(
-                watchConnection: watchConnection
-            )
+            await deviceRelay.reconcileUncertainWorkoutStarts(
+                    watchConnection: watchConnection,
+                    phoneWorkout: phoneWorkout,
+                    strengthWorkout: strengthWorkout
+                )
         }
 
         // Optional backend, StoreKit, social and calendar requests must not
@@ -1811,9 +1813,11 @@ struct AppRootView: View {
                     .repairRegistrationIfAuthorized()
 
                 if ATHLTHDeviceRole.isIPhone {
-                    await deviceRelay.reconcileUncertainWatchStarts(
-                        watchConnection: watchConnection
-                    )
+                    await deviceRelay.reconcileUncertainWorkoutStarts(
+                    watchConnection: watchConnection,
+                    phoneWorkout: phoneWorkout,
+                    strengthWorkout: strengthWorkout
+                )
                     await deviceRelay
                         .refreshPending {
                             command in
@@ -2010,8 +2014,10 @@ struct AppRootView: View {
                   requestID != nil
             else { return }
             Task { @MainActor in
-                await deviceRelay.reconcileUncertainWatchStarts(
-                    watchConnection: watchConnection
+                await deviceRelay.reconcileUncertainWorkoutStarts(
+                    watchConnection: watchConnection,
+                    phoneWorkout: phoneWorkout,
+                    strengthWorkout: strengthWorkout
                 )
             }
         }
@@ -2024,8 +2030,10 @@ struct AppRootView: View {
                   activity?.relayRequestID != nil
             else { return }
             Task { @MainActor in
-                await deviceRelay.reconcileUncertainWatchStarts(
-                    watchConnection: watchConnection
+                await deviceRelay.reconcileUncertainWorkoutStarts(
+                    watchConnection: watchConnection,
+                    phoneWorkout: phoneWorkout,
+                    strengthWorkout: strengthWorkout
                 )
             }
         }
