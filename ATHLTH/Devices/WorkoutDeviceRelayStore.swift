@@ -257,6 +257,10 @@ private struct ClaimWorkoutDeviceCommandParams:
     }
 }
 
+private struct WorkoutDeviceCommandReceipt: Decodable {
+    let id: UUID
+}
+
 private struct WorkoutDeviceCommandCompletedWrite:
     Encodable
 {
@@ -794,13 +798,28 @@ final class WorkoutDeviceRelayStore:
         return rows.first
     }
 
+    /// Supabase can return HTTP success when a filtered UPDATE changes zero
+    /// rows. Never discard the local receipt unless the matching row was
+    /// actually acknowledged by this signed-in device.
+    private func requireAcknowledgedRow(
+        _ rows: [WorkoutDeviceCommandReceipt], commandID: UUID
+    ) throws {
+        guard rows.count == 1, rows[0].id == commandID else {
+            throw NSError(
+                domain: "ATHLTH.DeviceRelay", code: 4,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Remote command receipt was not acknowledged by the server."]
+            )
+        }
+    }
+
     private func markCompleted(
         _ commandID: UUID
     ) async throws {
         guard let userID = currentUserID else {
             throw NSError(domain: "ATHLTH.DeviceRelay", code: 3)
         }
-        try await client
+        let rows: [WorkoutDeviceCommandReceipt] = try await client
             .from(
                 "workout_device_commands"
             )
@@ -815,7 +834,12 @@ final class WorkoutDeviceRelayStore:
             )
             .eq("user_id", value: userID)
             .eq("claimed_by_device_id", value: ATHLTHDeviceRole.persistentDeviceID)
+            .is("completed_at", value: nil)
+            .is("failed_at", value: nil)
+            .select("id")
             .execute()
+            .value
+        try requireAcknowledgedRow(rows, commandID: commandID)
     }
 
     private func markFailed(
@@ -832,7 +856,7 @@ final class WorkoutDeviceRelayStore:
                     .prefix(500)
             )
 
-        try await client
+        let rows: [WorkoutDeviceCommandReceipt] = try await client
             .from(
                 "workout_device_commands"
             )
@@ -849,6 +873,11 @@ final class WorkoutDeviceRelayStore:
             )
             .eq("user_id", value: userID)
             .eq("claimed_by_device_id", value: ATHLTHDeviceRole.persistentDeviceID)
+            .is("completed_at", value: nil)
+            .is("failed_at", value: nil)
+            .select("id")
             .execute()
+            .value
+        try requireAcknowledgedRow(rows, commandID: commandID)
     }
 }
