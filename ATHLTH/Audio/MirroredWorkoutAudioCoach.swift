@@ -6,12 +6,25 @@ struct ATHLTHCoachCueRepeatPolicy {
     private var accepted: [String: Date] = [:]
     static let window: TimeInterval = 12
     mutating func reset() { accepted.removeAll() }
-    mutating func shouldAccept(_ text: String, at now: Date = Date()) -> Bool {
+    /// Deciding to request TTS is not proof that anything was heard.
+    /// Check repetition without consuming the cue; commit only on playback.
+    func canAccept(_ text: String, at now: Date = Date()) -> Bool {
         let key = Self.normalized(text)
         guard !key.isEmpty else { return false }
-        accepted = accepted.filter { now.timeIntervalSince($0.value) < Self.window }
-        guard accepted[key] == nil else { return false }
+        guard let lastSpoken = accepted[key] else { return true }
+        return now.timeIntervalSince(lastSpoken) >= Self.window
+    }
+    mutating func didSpeak(_ text: String, at now: Date = Date()) {
+        let key = Self.normalized(text)
+        guard !key.isEmpty else { return }
+        accepted = accepted.filter {
+            now.timeIntervalSince($0.value) < Self.window
+        }
         accepted[key] = now
+    }
+    mutating func shouldAccept(_ text: String, at now: Date = Date()) -> Bool {
+        guard canAccept(text, at: now) else { return false }
+        didSpeak(text, at: now)
         return true
     }
     static func normalized(_ text: String) -> String {
@@ -69,6 +82,15 @@ final class MirroredWorkoutAudioCoach:
     private var workoutStartedAt: Date?
     private var pendingLocalSpokenEvent: (
         utterance: AVSpeechUtterance, event: ATHLTHCoachEvent
+    )?
+    private var playbackGeneration = UUID()
+    private var pendingLocalReplay: (
+        utterance: AVSpeechUtterance,
+        rawText: String,
+        spokenText: String,
+        priority: ATHLTHGuidancePriority,
+        remember: Bool,
+        generation: UUID
     )?
 
     private var nextDistanceMeters:
@@ -131,6 +153,8 @@ final class MirroredWorkoutAudioCoach:
         finished = false
         workoutStartedAt = nil
         pendingLocalSpokenEvent = nil
+        pendingLocalReplay = nil
+        playbackGeneration = UUID()
         smartCoachState.reset()
         adaptiveCoachState.reset()
         measuredZoneCandidate = nil
@@ -395,6 +419,8 @@ final class MirroredWorkoutAudioCoach:
         finished = false
         workoutStartedAt = nil
         pendingLocalSpokenEvent = nil
+        pendingLocalReplay = nil
+        playbackGeneration = UUID()
     }
 
     /// Watch sends the exact step clock and timestamp. Subtract transport age
@@ -1261,6 +1287,9 @@ final class MirroredWorkoutAudioCoach:
             }
             return
         case .interruptAndDeliver:
+            playbackGeneration = UUID()
+            pendingLocalReplay = nil
+            pendingLocalSpokenEvent = nil
             azureCoachSpeech.stop()
             synthesizer.stopSpeaking(
                 at: .immediate
@@ -1271,7 +1300,7 @@ final class MirroredWorkoutAudioCoach:
 
         // Explicit Replay remains available. Routine, rules and step cues
         // cannot issue the same phrase twice within the safety window.
-        if rememberForReplay && !recentCueText.shouldAccept(text) {
+        if rememberForReplay && !recentCueText.canAccept(text) {
             return
         }
 
@@ -1288,6 +1317,7 @@ final class MirroredWorkoutAudioCoach:
             AVSpeechUtterance(
                 string: spokenText
             )
+        let generation = playbackGeneration
 
         // The mirrored iPhone coach uses the same selected/highest-quality
         // local voice as live running and the settings preview.
@@ -1309,13 +1339,17 @@ final class MirroredWorkoutAudioCoach:
             duckMusic: configuration.shouldDuckOtherAudio,
             muteMusic: configuration.shouldMuteOtherAudio,
             shouldStart: { [weak self] in
-                guard let self, self.configuration.enabled, !self.finished else { return false }
+                guard let self,
+                      self.playbackGeneration == generation,
+                      self.configuration.enabled, !self.finished else { return false }
                 guard let event else { return true }
                 return event.isFresh() && (event.runningStepIndex == nil ||
                     event.runningStepIndex == self.currentRunningStepIndex)
             },
             onFallback: { [weak self] in
-                guard let self, self.configuration.enabled, !self.finished
+                guard let self,
+                      self.playbackGeneration == generation,
+                      self.configuration.enabled, !self.finished
                 else { return }
                 try? ATHLTHSpokenAudioSession.activate(
                     duckOtherAudio: self.configuration.shouldDuckOtherAudio,
@@ -1325,12 +1359,21 @@ final class MirroredWorkoutAudioCoach:
                 self.pendingLocalSpokenEvent = event.map {
                     (utterance: utterance, event: $0)
                 }
+                self.pendingLocalReplay = (
+                    utterance, text, spokenText, priority,
+                    rememberForReplay, generation
+                )
                 self.synthesizer.speak(utterance)
                 self.watchLocalSpeech(utterance)
             },
             onStarted: { [weak self] in
-                guard let self, let event else { return }
-                self.markSpokenEventStarted(event)
+                guard let self,
+                      self.playbackGeneration == generation else { return }
+                if let event { self.markSpokenEventStarted(event) }
+                self.confirmSpokenReplay(
+                    rawText: text, spokenText: spokenText,
+                    priority: priority, remember: rememberForReplay
+                )
             },
             onFinished: { [weak self] in
                 guard let self else { return }
@@ -1347,14 +1390,27 @@ final class MirroredWorkoutAudioCoach:
             pendingLocalSpokenEvent = event.map {
                 (utterance: utterance, event: $0)
             }
+            pendingLocalReplay = (
+                utterance, text, spokenText, priority,
+                rememberForReplay, generation
+            )
             synthesizer.speak(utterance)
             watchLocalSpeech(utterance)
         }
-        if rememberForReplay,
-           ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
-            coachReplayMemory.remember(spokenText, priority: priority)
-            onLastSpokenCoachMessage?(coachReplayMemory.text)
-        }
+    }
+
+    private func confirmSpokenReplay(
+        rawText: String,
+        spokenText: String,
+        priority: ATHLTHGuidancePriority,
+        remember: Bool
+    ) {
+        guard remember else { return }
+        recentCueText.didSpeak(rawText)
+        guard ATHLTHCoachReplayMemory.mayRemember(priority: priority)
+        else { return }
+        coachReplayMemory.remember(spokenText, priority: priority)
+        onLastSpokenCoachMessage?(coachReplayMemory.text)
     }
 
     private func markSpokenEventStarted(_ event: ATHLTHCoachEvent) {
@@ -1418,11 +1474,21 @@ final class MirroredWorkoutAudioCoach:
         // Pass only the Sendable object identity into the actor-isolated Task.
         let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
-            guard let self,
-                  let pending = self.pendingLocalSpokenEvent,
-                  ObjectIdentifier(pending.utterance) == utteranceID else { return }
-            self.pendingLocalSpokenEvent = nil
-            self.markSpokenEventStarted(pending.event)
+            guard let self else { return }
+            if let pending = self.pendingLocalSpokenEvent,
+               ObjectIdentifier(pending.utterance) == utteranceID {
+                self.pendingLocalSpokenEvent = nil
+                self.markSpokenEventStarted(pending.event)
+            }
+            if let replay = self.pendingLocalReplay,
+               ObjectIdentifier(replay.utterance) == utteranceID,
+               replay.generation == self.playbackGeneration {
+                self.pendingLocalReplay = nil
+                self.confirmSpokenReplay(
+                    rawText: replay.rawText, spokenText: replay.spokenText,
+                    priority: replay.priority, remember: replay.remember
+                )
+            }
         }
     }
 
