@@ -777,7 +777,8 @@ enum WorkoutLaunchCoordinator {
         workoutMirroring:
             WorkoutMirroringStore? = nil,
         plannedPlanID: UUID? = nil,
-        plannedSessionID: UUID? = nil
+        plannedSessionID: UUID? = nil,
+        relayRequestID: UUID? = nil
     ) async throws {
         let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
         defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
@@ -1246,7 +1247,8 @@ enum WorkoutLaunchCoordinator {
         if configuration.watchStartMode != .onWatch {
             try await watchConnection.startWorkoutOnWatch(
                 .running,
-                indoor: configuration.environment != .outdoor
+                indoor: configuration.environment != .outdoor,
+                relayRequestID: relayRequestID
             )
         }
 
@@ -1281,7 +1283,8 @@ enum WorkoutLaunchCoordinator {
             WorkoutMirroringStore? = nil,
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil,
-        session: AppSessionStore? = nil
+        session: AppSessionStore? = nil,
+        relayRequestID: UUID? = nil
     ) async throws {
         let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
         defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
@@ -1464,7 +1467,7 @@ enum WorkoutLaunchCoordinator {
         do {
             try await watchConnection
                 .startWorkoutOnWatch(
-                    .walking
+                    .walking, relayRequestID: relayRequestID
                 )
         } catch {
             workoutMirroring?
@@ -1522,7 +1525,8 @@ enum WorkoutLaunchCoordinator {
         social: SocialStore,
         strengthWorkout: StrengthWorkoutStore,
         watchConnection: AppleWatchConnectionStore,
-        spotify: SpotifyPlaybackStore
+        spotify: SpotifyPlaybackStore,
+        relayRequestID: UUID? = nil
     ) async throws -> Bool {
         let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
         defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
@@ -1681,7 +1685,9 @@ enum WorkoutLaunchCoordinator {
                     )
 
                 try await watchConnection
-                    .startWorkoutOnWatch(.strength)
+                    .startWorkoutOnWatch(
+                    .strength, relayRequestID: relayRequestID
+                )
                 watchSessionID = UUID()
             } catch {
                 await social
