@@ -468,3 +468,27 @@ som ferdige før egne faser og reelle tester er fullført.
 - Felles policy hindrer negativ varighet ved justert systemklokke.
   Testene verifiserer korrekt tidsstempel og lagret resultat.
   Samlet HealthKit-resultat/-PR og fysisk enhetsverifisering gjenstår.
+
+### Fase 4 — fjernstart og iPad-konsistens (19.11.2026, delvis implementert)
+
+- ATHLTHWorkoutRecordingArbiter reserverer en transient startplass før
+  asynkron preflight for løping, gåing og styrke; eksisterende PhoneWorkout og
+  StrengthWorkoutLog er fortsatt autoritative opptak. En reservasjon er ikke
+  en ny HealthKit-økt eller en vedvarende offline-kommando.
+- iPad-livevisning har sekvensvern for overlappende nettverkslesninger,
+  kontooverganger og eldre snapshots fra samme økt. Eksisterende
+  øktspesifikt samtykke er beholdt; dette er ikke en ny generell deling.
+- iPad til iPhone/Watch-fjernstart serialiserer behandling av kommandokøen,
+  validerer avsender/mål/aktivitet/dataversjon/utløp før start og drenerer
+  en større kø etter frakobling. Serverkrav om client_request_id og claim
+  er bevart. Statusoppdatering er avgrenset til innlogget konto
+  og enheten som gjorde claim.
+- Feil ved serverkvittering etter vellykket HealthKit-start behandles
+  som startet med bekreftelse ventende, ikke som en mislykket start.
+  En claimet kommando skal ikke startes på nytt fordi kvitteringen mangler.
+  Serverbasert rekonsiliering av ukvitterte kommandoer og reell Watch-restart
+  er fortsatt ikke verifisert.
+- Regresjonstest for avvisning av ugyldig/utløpt kommandokonvolutt er lagt
+  til ATHLTHWorkoutSessionFoundationTests. Fysisk iPhone + Watch + iPad,
+  nettverksbrudd og samme-commit grønne CI-jobber gjenstår før fase 4 kan
+  godkjennes. Ingen TestFlight på dette grunnlaget alene.
