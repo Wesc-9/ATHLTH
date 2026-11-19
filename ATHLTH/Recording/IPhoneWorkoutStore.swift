@@ -754,6 +754,18 @@ final class IPhoneWorkoutStore:
         // request; preserve the already active recording and its HealthKit ID.
         guard active == nil, !saving else {
             pendingWalking = nil
+            pendingPlannedPlanID = nil
+            pendingPlannedSessionID = nil
+            pendingRoute = nil
+            pendingWorkoutTitle = nil
+            pendingAudioCoach = nil
+            pendingStructuredWorkout = nil
+            pendingRouteAlerts = nil
+            pendingGhostAudio = nil
+            pendingAutoPauseEnabled = false
+            pendingTreadmillInclinePercent = nil
+            pendingTreadmillSpeedKilometersPerHour = nil
+            pendingRunEnvironment = .outdoor
             return
         }
         guard let walking = pendingWalking else { return }
