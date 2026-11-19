@@ -99,6 +99,7 @@ on:
       - ATHLTH/Recording/PhoneWorkoutCompletionJournal.swift
       - ATHLTH/Strength/StrengthWorkoutCompletionJournal.swift
       - Tests/ATHLTHPhoneCompletionJournalTests.swift
+      - Tests/StrengthWorkoutCompletionRecoveryTests.swift
       - Tests/StrengthActiveExerciseQueueTests.swift
       - ATHLTH/Strength/ActiveStrengthWorkoutView.swift
       - ATHLTH/Strength/StrengthWorkoutModels.swift
