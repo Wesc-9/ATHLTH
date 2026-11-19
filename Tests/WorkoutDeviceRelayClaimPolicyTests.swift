@@ -129,6 +129,57 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         ))
     }
 
+    func testSavedIPhoneRecordingRequiresExactRequestOwnerAndSport() {
+        let request = UUID()
+        let now = Date()
+        let policy = WorkoutDeviceRelayClaimPolicy.self
+        func confirm(
+            target: String = "iphone",
+            kind: String = "run",
+            token: UUID? = nil,
+            recordingKind: String = "run",
+            startedAt: Date? = nil,
+            ownerMatches: Bool = true,
+            failedAt: Date? = nil
+        ) -> Bool {
+            policy.confirmsIPhoneRecording(
+                target: target, kind: kind,
+                serverRequestID: request,
+                serverCreatedAt: now.addingTimeInterval(-5),
+                recordingRequestID: token ?? request,
+                recordingKind: recordingKind,
+                recordingStartedAt: startedAt ?? now,
+                ownerMatches: ownerMatches, failedAt: failedAt
+            )
+        }
+        XCTAssertTrue(confirm())
+        XCTAssertTrue(confirm(kind: "walk", recordingKind: "walk"))
+        XCTAssertTrue(confirm(kind: "strength", recordingKind: "strength"))
+        XCTAssertFalse(confirm(target: "apple_watch"))
+        XCTAssertFalse(confirm(kind: "strength", recordingKind: "run"))
+        XCTAssertFalse(confirm(token: UUID()))
+        XCTAssertFalse(confirm(ownerMatches: false))
+        XCTAssertFalse(confirm(failedAt: now))
+        XCTAssertFalse(confirm(startedAt: now.addingTimeInterval(-600)))
+        XCTAssertFalse(confirm(startedAt: now.addingTimeInterval(600)))
+    }
+
+    func testPhoneWorkoutRetainsRemoteIdentityAcrossCheckpointSerialization() throws {
+        let now = Date()
+        let identity = UUID()
+        var workout = PhoneWorkout(
+            walking: true, start: now, end: nil,
+            lastCheckpoint: now
+        )
+        workout.relayRequestID = identity
+        let decoded = try JSONDecoder().decode(
+            PhoneWorkout.self,
+            from: JSONEncoder().encode(workout)
+        )
+        XCTAssertEqual(decoded.relayRequestID, identity)
+        XCTAssertTrue(decoded.walking)
+    }
+
     func testCompletedWatchResultResolvesOnlyMatchingAccountKindAndRequest() {
         let now = Date()
         let id = UUID(), owner = UUID()
