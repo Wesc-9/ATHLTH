@@ -1292,3 +1292,18 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   entydig gammel registrering, motstridende ID og tvetydig kobling.
 - Krever fortsatt vellykket samme-commit CI/Watch/iPad og fysisk HealthKit-
   validering før endelig fasegodkjenning. Ingen TestFlight-opplasting.
+
+### Fase 4 – streng kommandokorrelasjon og kontobytte (19.11.2026)
+
+- iPad-kommandokøen krever nå at den innebygde `clientRequestID` er identisk
+  med den uforanderlige serververdien. Gamle kommandoer uten token kan ikke
+  starte HealthKit; de avvises fremfor å bli utført uten mulighet for sikker
+  rekonsiliering etter krasj. Eksisterende treningshistorikk påvirkes ikke.
+- Mottak av nettverkssvar etter kontobytte oppdaterer ikke lenger ny brukers
+  sendestatus eller feilmelding. Kommandoen som allerede ble sendt, tilhører
+  fremdeles den opprinnelige kontoen; ingen automatisk overføring skjer.
+- Krav om endelig utløpstid avviser korrupte ikke-endelige tidsverdier.
+  XCTest er lagt til for manglende/feil request-ID og ugyldig utløpstid.
+- Dette er ikke en godkjent fase 4. Full startveidekning, Watch-avklaring,
+  iPad-samtykke, servermigrasjoner og fysisk iPhone/iPad/Watch-test må
+  fremdeles bekreftes på samme commit. Ingen TestFlight.
