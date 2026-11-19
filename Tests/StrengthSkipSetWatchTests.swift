@@ -354,6 +354,55 @@ final class StrengthSkipSetWatchTests: XCTestCase {
         XCTAssertNotEqual(userID, snapshot.workoutID)
     }
 
+    func testSameAccountOfflineWatchCommandsWaitForMatchingWorkout() {
+        let owner = UUID()
+        let sessionA = UUID()
+        let sessionB = UUID()
+        var command = WatchStrengthCommand(
+            id: UUID(), workoutID: sessionB, kind: .completeSet,
+            reps: 10, weightKilograms: 40, restSeconds: 45,
+            addRestSeconds: nil, sentAt: Date()
+        )
+        command.accountOwnerID = owner
+
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command, signedInAccountID: owner,
+            activeWorkoutID: sessionA
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command, signedInAccountID: owner,
+            activeWorkoutID: nil
+        ))
+        XCTAssertTrue(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command, signedInAccountID: owner,
+            activeWorkoutID: sessionB
+        ))
+
+        // Watch-started bootstrap must survive another local session and
+        // must still be allowed when no strength checkpoint is open.
+        command.kind = .requestSnapshot
+        command.initiatedOnWatch = true
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command, signedInAccountID: owner,
+            activeWorkoutID: sessionA
+        ))
+        XCTAssertTrue(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command, signedInAccountID: owner,
+            activeWorkoutID: nil
+        ))
+        XCTAssertTrue(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command, signedInAccountID: owner,
+            activeWorkoutID: sessionB
+        ))
+
+        // Read-only refresh from older Watch builds stays compatible.
+        command.initiatedOnWatch = nil
+        XCTAssertTrue(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command, signedInAccountID: owner,
+            activeWorkoutID: sessionA
+        ))
+    }
+
     func testWatchOfflineJournalKeepsOtherAccountAndUnownedCommandsQueued() {
         let rightfulOwner = UUID()
         let otherOwner = UUID()

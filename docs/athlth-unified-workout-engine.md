@@ -565,3 +565,17 @@ som ferdige før egne faser og reelle tester er fullført.
 - Ny test verifiserer at en styrkehistorikk først er konto-klar
   etter en faktisk `switchAccount`; utlogging og fremmed konto
   blokkerer Watch-data. Ingen ny konto-/opptakslagring innføres.
+
+### Fase 4 – flere Watch-økter i samme kontos frakoblingskø
+
+- Watch-journalen binder nå alle muterende settkommandoer til **både**
+  riktig konto og riktig aktiv økt-ID. Tidligere kunne en annen
+  økt på samme konto bli brukt som grunnlag for å konsumere en
+  forsinket kommando uten å registrere settet; det er nå avvist.
+- Kommandoer fra en annen Watch-økt blir liggende i eksisterende
+  durable kø for senere gjenoppretting. Ny Watch-bootstrap kan
+  fortsatt tas imot uten aktiv styrke, mens en leseforespørsel
+  fra eldre Watch-build beholder kompatibilitet.
+- Observeren avviser ID-konflikter uten falsk kvittering selv om
+  en feilaktig kommando når helt frem til behandlingsleddet.
+  Tester dekker to økter på samme konto og Watch-bootstrap.

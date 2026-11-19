@@ -79,7 +79,25 @@ enum ATHLTHStrengthWatchCommandRoutingPolicy {
         activeWorkoutID: UUID?
     ) -> Bool {
         if let owner = command.accountOwnerID {
-            return owner == signedInAccountID
+            guard owner == signedInAccountID else { return false }
+            if command.kind == .requestSnapshot {
+                // A Watch-started recording may bootstrap while no
+                // strength workout exists locally. If another workout
+                // is active, keep this request for the correct session.
+                if command.initiatedOnWatch == true {
+                    return activeWorkoutID == nil ||
+                        command.workoutID == activeWorkoutID
+                }
+                // Nonmutating legacy snapshot refresh requests are safe.
+                return true
+            }
+            // Same athlete can have several offline Watch sessions queued
+            // at once. NEVER consume a future workout's set commands merely
+            // because an unrelated local workout happens to be active.
+            guard let activeWorkoutID,
+                  let workoutID = command.workoutID
+            else { return false }
+            return workoutID == activeWorkoutID
         }
         guard command.kind != .requestSnapshot,
               let workoutID = command.workoutID,
@@ -318,8 +336,10 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         guard ATHLTHStrengthWatchCommandIdentityPolicy.belongsToActiveWorkout(
             command, workoutID: workout.id
         ) else {
-            sendSnapshotNow()
-            return true
+            // A mismatched command is not an instruction to this workout.
+            // Leave it pending for the correct restored workout, rather
+            // than acknowledging and permanently losing its set evidence.
+            return false
         }
 
         let setScopedCommand =
