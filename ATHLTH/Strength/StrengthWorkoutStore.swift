@@ -1836,7 +1836,8 @@ final class StrengthWorkoutStore: ObservableObject {
         // An untargeted timed hold uses only the durable count-up effort
         // clock. Do not fabricate a duration or launch a countdown.
         if set.plannedDurationSeconds == nil &&
-           exercise.exercise.isTimeOnlyBodyweightStrength {
+           (exercise.exercise.isTimeOnlyBodyweightStrength ||
+            set.hybridTargetDistanceMeters != nil) {
             timedSetCountdown = nil
             persistCheckpointNow()
             return
@@ -2143,6 +2144,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 set?.hybridTargetHeartRateZone,
             embeddedRunningTargetPaceSecondsPerKilometer:
                 set?.hybridTargetPaceSecondsPerKilometer,
+            embeddedRunningTargetDistanceMeters:
+                set?.hybridTargetDistanceMeters,
             isResting: isResting,
             restEndsAt: restEndsAt,
             currentExerciseComplete:
@@ -2225,7 +2228,9 @@ final class StrengthWorkoutStore: ObservableObject {
                                         hybridTargetHeartRateZone:
                                             set.hybridTargetHeartRateZone,
                                         hybridTargetPaceSecondsPerKilometer:
-                                            set.hybridTargetPaceSecondsPerKilometer
+                                            set.hybridTargetPaceSecondsPerKilometer,
+                                        hybridTargetDistanceMeters:
+                                            set.hybridTargetDistanceMeters
                                     )
                                 },
                             isCompleted:
@@ -2263,7 +2268,8 @@ final class StrengthWorkoutStore: ObservableObject {
             setEffortStartedAt: currentSetEffortClock?.startedAt,
             isOpenEndedTimedSet: set?.resolvedTargetKind == .time &&
                 set?.plannedDurationSeconds == nil &&
-                exercise?.exercise.isTimeOnlyBodyweightStrength == true
+                (exercise?.exercise.isTimeOnlyBodyweightStrength == true ||
+                 set?.hybridTargetDistanceMeters != nil)
         )
         if let exercise, let id = exercise.groupID {
             let siblings = workout.exercises.filter { $0.groupID == id }
@@ -3303,12 +3309,18 @@ final class StrengthWorkoutStore: ObservableObject {
                   })
             else { return false }
 
-            // A distance-only workout cannot be executed using the
-            // duration countdown; refuse it instead of silently skipping.
-            guard runBlocks.allSatisfy({
-                $0.durationSeconds.map {
-                    $0.isFinite && (15...7_200).contains($0)
-                } == true
+            // Outdoor distance targets use Watch GPS distance and a
+            // count-up effort clock, never a guessed time or belt speed.
+            guard runBlocks.allSatisfy({ block in
+                (block.distanceMeters == nil &&
+                 block.durationSeconds.map {
+                     $0.isFinite && (15...7_200).contains($0)
+                 } == true) ||
+                (outdoorGPS && block.kind == .run &&
+                 block.durationSeconds == nil &&
+                 block.distanceMeters.map {
+                     $0.isFinite && (100...50_000).contains($0)
+                 } == true)
             }) else { return false }
 
             let snapshots = ExerciseSnapshot(
@@ -3331,17 +3343,18 @@ final class StrengthWorkoutStore: ObservableObject {
                     restSeconds: 0,
                     isWarmUp: block.phase == .warmup,
                     targetKind: .time,
-                    plannedDurationSeconds: min(
-                        max(Int(block.durationSeconds!.rounded()), 15),
-                        7_200
-                    ),
+                    plannedDurationSeconds: block.durationSeconds.map {
+                        min(max(Int($0.rounded()), 15), 7_200)
+                    },
                     recordsWeight: false,
                     loadKind: .weightKilograms,
                     hybridPhaseTitle: block.title,
                     hybridPhaseKind: String(describing: block.phase),
                     hybridTargetHeartRateZone: block.targetHeartRateZone,
                     hybridTargetPaceSecondsPerKilometer:
-                        block.targetPaceSecondsPerKilometer
+                        block.targetPaceSecondsPerKilometer,
+                    hybridTargetDistanceMeters: outdoorGPS
+                        ? block.distanceMeters : nil
                 )
             }
             additions.append(StrengthExerciseLog(
@@ -3854,7 +3867,8 @@ final class StrengthWorkoutStore: ObservableObject {
             durationSeconds:
                 targetKind == .time
                     ? (currentSet?.plannedDurationSeconds == nil &&
-                       currentExercise?.exercise.isTimeOnlyBodyweightStrength == true
+                       (currentExercise?.exercise.isTimeOnlyBodyweightStrength == true ||
+                        currentSet?.hybridTargetDistanceMeters != nil)
                         ? Int((currentSetEffortClock?.elapsedSeconds(at: completedAt) ?? 0).rounded())
                         : (currentTimedSetCountdown?.elapsedSeconds(at: completedAt) ?? draftDurationSeconds))
                     : nil,

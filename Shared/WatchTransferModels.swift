@@ -1408,6 +1408,7 @@ struct WatchStrengthSetPlan: Codable, Hashable {
     var hybridPhaseKind: String? = nil
     var hybridTargetHeartRateZone: Int? = nil
     var hybridTargetPaceSecondsPerKilometer: Double? = nil
+    var hybridTargetDistanceMeters: Double? = nil
 }
 
 struct WatchStrengthExerciseSummary: Codable, Hashable {
@@ -1528,6 +1529,7 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var embeddedRunningTargetHeartRateZone: Int? = nil
     // Prescribed target, not measured or estimated running pace.
     var embeddedRunningTargetPaceSecondsPerKilometer: Double? = nil
+    var embeddedRunningTargetDistanceMeters: Double? = nil
     var isResting: Bool
     var restEndsAt: Date?
     var currentExerciseComplete: Bool

@@ -441,6 +441,9 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     var hybridPhaseKind: String? = nil
     var hybridTargetHeartRateZone: Int? = nil
     var hybridTargetPaceSecondsPerKilometer: Double? = nil
+    /// Watch GPS-measured distance goal, not a treadmill estimate.
+    /// Nil for time-based running and all older strength logs.
+    var hybridTargetDistanceMeters: Double? = nil
 
     // A completed set can contain multiple effort segments. Example:
     // 8 reps @ 10 kg + 2 reps @ 8 kg in the same planned 10-rep set.

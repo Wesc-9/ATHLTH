@@ -462,7 +462,7 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
         var plan = try outdoorTimedHybrid()
         plan.workoutBlocks?[0].distanceMeters = 1_000
         plan.workoutBlocks?[0].durationSeconds = nil
-        XCTAssertNil(ATHLTHHybridWorkoutLaunchPlan.parts(
+        XCTAssertNotNil(ATHLTHHybridWorkoutLaunchPlan.parts(
             for: plan, allowOutdoorGPS: true
         ))
 
@@ -478,5 +478,37 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
         XCTAssertNil(ATHLTHHybridWorkoutLaunchPlan.parts(
             for: plan, allowOutdoorGPS: true
         ))
+    }
+
+    @MainActor
+    func testOutdoorDistanceGoalPreservesExactWatchTargetWithoutInventedTime()
+        throws {
+        var plan = try outdoorTimedHybrid()
+        plan.workoutBlocks?[0].distanceMeters = 1_500
+        plan.workoutBlocks?[0].durationSeconds = nil
+        let parts = try XCTUnwrap(ATHLTHHybridWorkoutLaunchPlan.parts(
+            for: plan, allowOutdoorGPS: true
+        ))
+        let store = StrengthWorkoutStore()
+        XCTAssertTrue(store.startPlannedHybrid(
+            session: plan, validatedParts: parts,
+            watchSessionID: UUID(), trackingMode: .advanced,
+            captureDevice: .appleWatch
+        ))
+        let run = try XCTUnwrap(store.activeWorkout?.exercises.first {
+            $0.isEmbeddedRunningInterval == true
+        })
+        XCTAssertNil(run.sets.first?.plannedDurationSeconds)
+        XCTAssertEqual(run.sets.first?.hybridTargetDistanceMeters, 1_500)
+        XCTAssertEqual(store.watchSnapshot?.embeddedRunningTargetDistanceMeters, 1_500)
+        XCTAssertEqual(store.watchSnapshot?.isOpenEndedTimedSet, true)
+        let plans = try XCTUnwrap(store.watchSnapshot?.exerciseQueue?
+            .first(where: { $0.isEmbeddedRunningInterval == true })?.setPlans)
+        XCTAssertEqual(plans.first?.hybridTargetDistanceMeters, 1_500)
+        let original = try XCTUnwrap(store.activeWorkout)
+        let restored = try JSONDecoder().decode(
+            StrengthWorkoutLog.self, from: JSONEncoder().encode(original)
+        )
+        XCTAssertEqual(restored.exercises[0].sets[0].hybridTargetDistanceMeters, 1_500)
     }
 }

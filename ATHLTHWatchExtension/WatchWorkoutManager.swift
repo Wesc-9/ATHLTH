@@ -126,6 +126,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
     private var collectingHybridTreadmillDistance = false
+    private var hybridDistanceAnchor: ATHLTHHybridWatchDistanceAnchor?
     private var routeBuilder: HKWorkoutRouteBuilder?
     private var workoutLocation: CLLocation?
     private var workoutLocationMetadataAttached = false
@@ -2293,6 +2294,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // The total measured distance remains cumulative in HealthKit.
         lastAcceptedOutdoorLocation = nil
         lastRenderedRouteLocation = nil
+        if !shouldCollect {
+            hybridDistanceAnchor = nil
+        }
         if shouldCollect {
             source.enableCollection(for: distanceType, predicate: nil)
         } else {
@@ -2398,6 +2402,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               !snapshot.isResting,
               !snapshot.currentExerciseComplete
         else { return }
+
+        // Distance phases have a GPS goal and count-up effort clock,
+        // never a 60-second default countdown.
+        if snapshot.embeddedRunningTargetDistanceMeters != nil {
+            startStrengthSet()
+            return
+        }
 
         let now = Date()
         if var timer = snapshot.timedSetCountdown {
@@ -2533,7 +2544,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // optimistically claim it was performed outside the clock window.
             return
         }
-        let actualDuration = snapshot.isOpenEndedTimedSet == true
+        let actualDuration = snapshot.embeddedRunningTargetDistanceMeters != nil
+            ? hybridDistanceAnchor?.activeDurationSeconds(
+                workoutActiveSeconds: elapsedTime
+              )
+            : snapshot.isOpenEndedTimedSet == true
             ? snapshot.setEffortStartedAt.map {
                 Int(min(max(completedAt.timeIntervalSince($0).rounded(), 0), 7_200))
             }
@@ -3906,7 +3921,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 strengthSession:
                     strengthSession,
                 strengthCommands:
-                    strengthCommandJournal
+                    strengthCommandJournal,
+                hybridDistanceAnchor:
+                    hybridDistanceAnchor
             )
 
         guard let data =
@@ -3962,6 +3979,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
         strengthCommandJournal =
             snapshot.strengthCommands ?? []
+        hybridDistanceAnchor = snapshot.hybridDistanceAnchor
         structuredStepStartElapsedTime =
             snapshot
                 .structuredStepStartElapsedTime
@@ -4593,6 +4611,41 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// locked or out of range: durable Watch commands replay each completion
     /// into the original strength workout without creating another recording.
     private func advanceEmbeddedHybridIntervalIfNeeded(at date: Date) {
+        if let snapshot = strengthSession,
+           snapshot.embeddedRunningTargetDistanceMeters != nil {
+            guard state == .running,
+                  snapshot.inputMode != .iPhone,
+                  snapshot.isEmbeddedRunningInterval == true,
+                  !snapshot.isResting, !snapshot.currentExerciseComplete,
+                  snapshot.setIndex >= 0, snapshot.setIndex < snapshot.setCount,
+                  let watchStartedAt = startedAt,
+                  let plannedStartedAt = snapshot.startedAt,
+                  abs(watchStartedAt.timeIntervalSince(plannedStartedAt)) <= 180
+            else { return }
+
+            if hybridDistanceAnchor?.matches(snapshot) != true {
+                // New set identity: capture the current measured
+                // cumulative distance BEFORE moving, not from another set.
+                hybridDistanceAnchor =
+                    ATHLTHHybridWatchDistanceAnchor.make(
+                        snapshot: snapshot,
+                        measuredTotalMeters: distanceMeters,
+                        activeElapsedSeconds: elapsedTime
+                    )
+                persistWorkoutRecoveryState()
+            }
+            guard let anchor = hybridDistanceAnchor,
+                  anchor.matches(snapshot) else { return }
+            if snapshot.setEffortStartedAt == nil {
+                startStrengthSet()
+                return
+            }
+            guard anchor.hasReached(totalMeters: distanceMeters) else { return }
+            // The existing durable command records completion in the SAME
+            // strength workout, without creating a running HKWorkout.
+            completeStrengthSet()
+            return
+        }
         guard ATHLTHHybridWatchIntervalPolicy.shouldAutoAdvance(
             strengthSession,
             workoutState: mirrorState(for: state),

@@ -81,6 +81,8 @@ on:
       - ATHLTH/Views/ProductRootTabView.swift
       - Tests/ATHLTHPlannedHybridLaunchTests.swift
       - Tests/ATHLTHHybridOutdoorRoutePolicyTests.swift
+      - Tests/ATHLTHHybridWatchDistanceAnchorTests.swift
+      - Shared/ATHLTHHybridWatchDistanceAnchor.swift
       - Shared/ATHLTHHybridOutdoorRoutePolicy.swift
       - ATHLTH/Watch/AppleWatchConnectionStore.swift
       - Tests/ATHLTHUnifiedMixedWorkoutPlanTests.swift
@@ -255,6 +257,7 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/HybridTests.xcresult" \
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
             -only-testing:ATHLTHTests/ATHLTHHybridOutdoorRoutePolicyTests \
+            -only-testing:ATHLTHTests/ATHLTHHybridWatchDistanceAnchorTests \
             -only-testing:ATHLTHTests/ATHLTHExploreRoutePolicyTests \
             -only-testing:ATHLTHTests/ATHLTHRouteDetailsPolicyTests \
             -only-testing:ATHLTHTests/ATHLTHRouteOfflineAndDirectionTests \

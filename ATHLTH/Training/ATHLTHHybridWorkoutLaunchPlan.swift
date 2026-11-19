@@ -130,12 +130,19 @@ enum ATHLTHHybridWorkoutLaunchPlan {
                   blocks.contains(where: { $0.kind == .run }),
                   blocks.allSatisfy({
                       ($0.kind == .run || $0.kind == .rest) &&
-                      $0.distanceMeters == nil &&
                       ($0.kind != .run || (outdoorGPS
                           ? $0.isIndoor == false : $0.isIndoor != false)) &&
-                      $0.durationSeconds.map {
-                          $0.isFinite && (15...7_200).contains($0)
-                      } == true
+                      (
+                          ($0.distanceMeters == nil &&
+                           $0.durationSeconds.map {
+                               $0.isFinite && (15...7_200).contains($0)
+                           } == true) ||
+                          (outdoorGPS && $0.kind == .run &&
+                           $0.durationSeconds == nil &&
+                           $0.distanceMeters.map {
+                               $0.isFinite && (100...50_000).contains($0)
+                           } == true)
+                      )
                   }) else { return nil }
         }
         return result

@@ -1466,3 +1466,26 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   nullstilles **ikke**.
 - Tester dekker paused/resting/completed og vanlig aktiv utendørsfase.
   Reelle GPS-prøver på Watch er fortsatt nødvendig før endelig godkjenning.
+
+### Fase 8 – GPS-distansemål i Watch-eid hybrid (19.11.2026)
+
+- Eksplisitt utendørs Watch-løpedrag kan nå velge **enten** 15–7200 sekunder
+  **eller** 100–50 000 meter. Manglende eller ugyldig sensorbevis,
+  samtidig tids-/distansemål og manuell møllefart avvises.
+- Distansemålet lagres bakoverkompatibelt i original styrkeøkt,
+  øktens setjournal og `WatchStrengthSetPlan`. Det er ikke en
+  HealthKit-måling. Distanseprogresjon bruker bare akkumulerte **målte**
+  Watch-distanser minus en lagret per-sett baseline.
+- `ATHLTHHybridWatchDistanceAnchor` lagres i den eksisterende Watch
+  krasj-recovery-checkpointen og omfatter workout-ID, exercise-/set-ID,
+  distansebaselinje og aktiv HealthKit-øktklokke. Restart eller pause
+  lager ikke ny treningsøkt eller nullstiller distansemålet fra start.
+- Når faktisk mål nås under aktiv løping, sendes normal idempotent
+  Watch-styrke-settkommando; varigheten beregnes fra HealthKits **aktive**
+  klokke uten pause. Hvis distanse mangler, blir draget ikke auto-fullført.
+- iPhone-kortet viser distansemål uten å finne på en 60-sekunders
+  nedtelling og uten manuell møllefart for utendørs GPS-faser.
+- Tester dekker mål, identitet, kryss-restart, ikke-endelig GPS,
+  distansegrense, ugyldige mål og planens metadata.
+- Fremdeles ikke fysisk Watch-/HealthKit-verifisert; iPhone-only GPS
+  hybrid er separat og krever en iPhone-eid GPS-kilde før release.

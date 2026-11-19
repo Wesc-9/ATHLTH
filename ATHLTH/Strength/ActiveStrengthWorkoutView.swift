@@ -2700,6 +2700,20 @@ struct ActiveStrengthWorkoutView: View {
                     .font(.system(size: 27, weight: .semibold, design: .rounded))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
 
+                    if let distance = set.hybridTargetDistanceMeters {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(String(format: "%.2f km", distance / 1000))
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer(minLength: 2)
+                            Text(ATHLTHLocalization.choose(
+                                english: "GPS distance target", norwegian: "GPS-distansen du skal løpe"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    } else {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         let seconds = strength.currentTimedSetCountdown?
                             .secondsRemaining(at: context.date)
@@ -2719,6 +2733,8 @@ struct ActiveStrengthWorkoutView: View {
                         }
                     }
 
+                    }
+
                     HStack(spacing: 8) {
                         if let zone = set.hybridTargetHeartRateZone {
                             Label(ATHLTHLocalization.choose(
@@ -2736,21 +2752,23 @@ struct ActiveStrengthWorkoutView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
-                    HStack(spacing: 10) {
-                        focusedNumberField(
-                            title: ATHLTHLocalization.choose(
-                                english: "Manual speed", norwegian: "Manuell fart"
-                            ),
-                            value: treadmillSpeedBinding,
-                            suffix: "km/t"
-                        )
-                        focusedNumberField(
-                            title: ATHLTHLocalization.choose(
-                                english: "Incline", norwegian: "Stigning"
-                            ),
-                            value: treadmillInclineBinding,
-                            suffix: "%"
-                        )
+                    if strength.activeWorkout?.isOutdoorHybrid != true {
+                        HStack(spacing: 10) {
+                            focusedNumberField(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Manual speed", norwegian: "Manuell fart"
+                                ),
+                                value: treadmillSpeedBinding,
+                                suffix: "km/t"
+                            )
+                            focusedNumberField(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Incline", norwegian: "Stigning"
+                                ),
+                                value: treadmillInclineBinding,
+                                suffix: "%"
+                            )
+                        }
                     }
 
                     HStack(spacing: 10) {
@@ -2777,6 +2795,7 @@ struct ActiveStrengthWorkoutView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(ATHLTHPlanDesign.accentInk)
+                        .disabled(set.hybridTargetDistanceMeters != nil)
 
                         Button {
                             strength.completeCurrentDraftSet()

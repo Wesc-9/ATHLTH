@@ -113,5 +113,6 @@ struct WatchPersistedWorkoutState: Codable {
         WatchStrengthSessionSnapshot? = nil
     var strengthCommands:
         [WatchStrengthCommand]? = nil
+    var hybridDistanceAnchor: ATHLTHHybridWatchDistanceAnchor? = nil
 }
 
