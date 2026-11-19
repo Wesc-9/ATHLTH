@@ -31,4 +31,41 @@ final class ATHLTHRecordedWorkoutIndexTests: XCTestCase {
             ])
         XCTAssertEqual(keys, ["phone-a", "strength-b"])
     }
+
+    func testLateHealthKitLinkOnRepeatedLocalKeyPreventsDoubleCount() {
+        let linked = UUID()
+        let keys = ATHLTHRecordedWorkoutIndex.unlinkedKeys(
+            healthIDs: [linked], localRecords: [
+                .init(key: "run-a", healthID: nil),
+                .init(key: "run-a", healthID: linked)
+            ]
+        )
+        XCTAssertTrue(keys.isEmpty,
+                      "The first unlinked snapshot must not override its later HealthKit link")
+    }
+
+    func testCoalescedLocalKeyClaimsLinkedIdentityOnlyOnce() {
+        let linked = UUID()
+        let keys = ATHLTHRecordedWorkoutIndex.unlinkedKeys(
+            healthIDs: [], localRecords: [
+                .init(key: "strength-a", healthID: nil),
+                .init(key: "strength-a", healthID: linked),
+                .init(key: "phone-b", healthID: linked),
+                .init(key: "run-c", healthID: nil)
+            ]
+        )
+        XCTAssertEqual(keys, ["strength-a", "run-c"])
+    }
+
+    func testConflictingHealthKitLinksFailClosedWhenAnyIsImported() {
+        let first = UUID()
+        let second = UUID()
+        let keys = ATHLTHRecordedWorkoutIndex.unlinkedKeys(
+            healthIDs: [second], localRecords: [
+                .init(key: "run-a", healthID: first),
+                .init(key: "run-a", healthID: second)
+            ]
+        )
+        XCTAssertTrue(keys.isEmpty)
+    }
 }
