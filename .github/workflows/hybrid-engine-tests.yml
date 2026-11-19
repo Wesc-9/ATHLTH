@@ -96,6 +96,9 @@ on:
       - Tests/StrengthTimedSetCountdownTests.swift
       - Tests/ATHLTHHybridStrengthSessionTests.swift
       - Tests/ATHLTHWorkoutHealthKitContinuityPolicyTests.swift
+      - ATHLTH/Recording/PhoneWorkoutCompletionJournal.swift
+      - ATHLTH/Strength/StrengthWorkoutCompletionJournal.swift
+      - Tests/ATHLTHPhoneCompletionJournalTests.swift
       - Tests/StrengthActiveExerciseQueueTests.swift
       - ATHLTH/Strength/ActiveStrengthWorkoutView.swift
       - ATHLTH/Strength/StrengthWorkoutModels.swift
@@ -249,6 +252,7 @@ jobs:
             -only-testing:ATHLTHTests/StrengthTimedSetCountdownTests \
             -only-testing:ATHLTHTests/ATHLTHHybridStrengthSessionTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutHealthKitContinuityPolicyTests \
+            -only-testing:ATHLTHTests/ATHLTHPhoneCompletionJournalTests \
             -only-testing:ATHLTHTests/ATHLTHUnifiedMixedWorkoutPlanTests \
             -only-testing:ATHLTHTests/StrengthActiveExerciseQueueTests \
             -only-testing:ATHLTHTests/ATHLTHRecordedWorkoutIndexTests \
