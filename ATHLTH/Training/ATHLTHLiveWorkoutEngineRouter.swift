@@ -130,6 +130,23 @@ enum ATHLTHLiveWorkoutEngineRouter {
         )
     }
 
+    /// Capture-aware routing entry point. The read-only UI router must not
+    /// silently hand a recording from Watch to iPhone (or vice versa).
+    /// A real owner transfer requires a separate explicit capture protocol.
+    static func transition(
+        from previous: ATHLTHLiveWorkoutRoute,
+        to next: ATHLTHLiveWorkoutRoute,
+        previousSession: ATHLTHWorkoutSessionState,
+        nextSession: ATHLTHWorkoutSessionState
+    ) -> ATHLTHLiveWorkoutTransition? {
+        guard previous.workoutID == previousSession.workoutID,
+              next.workoutID == nextSession.workoutID,
+              ATHLTHWorkoutSessionFoundation.preservesRecordingOwnership(
+                  previousSession, nextSession
+              ) else { return nil }
+        return transition(from: previous, to: next)
+    }
+
     static func transition(
         from previous: ATHLTHLiveWorkoutRoute,
         to next: ATHLTHLiveWorkoutRoute
