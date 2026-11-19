@@ -1162,6 +1162,16 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     expiresAt: $0.expiresAt
                 ) ? $0.snapshot : nil
             }
+            // Polls can complete out of order after a connection drop.
+            // Do not rewind an approved live session with an older snapshot,
+            // even when its server row is still within the expiry window.
+            if let current = remote, let incoming = next,
+               current.sessionID == incoming.sessionID,
+               let currentCapturedAt = current.capturedAt,
+               let incomingCapturedAt = incoming.capturedAt,
+               incomingCapturedAt < currentCapturedAt {
+                return
+            }
             let previous = remote?.id
             if previous != next?.id {
                 if foregroundedSinceLastPoll &&
