@@ -25,13 +25,20 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
             payloadTarget: String = "apple_watch",
             payloadKind: String = "run",
             version: Int = 1,
-            expiry: TimeInterval = 60
+            expiry: TimeInterval = 60,
+            claimedDeviceID: String? = "test-iphone",
+            expectedDeviceID: String = "test-iphone",
+            completedAt: Date? = nil,
+            failedAt: Date? = nil
         ) -> Bool {
             WorkoutDeviceRelayClaimPolicy.accepts(
                 source: source, target: target, kind: kind,
                 payloadTarget: payloadTarget, payloadKind: payloadKind,
                 payloadVersion: version,
-                expiresAt: now.addingTimeInterval(expiry), now: now
+                expiresAt: now.addingTimeInterval(expiry),
+                claimedDeviceID: claimedDeviceID,
+                expectedDeviceID: expectedDeviceID,
+                completedAt: completedAt, failedAt: failedAt, now: now
             )
         }
         XCTAssertTrue(accepted())
@@ -43,6 +50,11 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertFalse(accepted(version: 2))
         XCTAssertFalse(accepted(expiry: 0))
         XCTAssertFalse(accepted(expiry: -1))
+        XCTAssertFalse(accepted(claimedDeviceID: nil))
+        XCTAssertFalse(accepted(claimedDeviceID: "another-iphone"))
+        XCTAssertFalse(accepted(expectedDeviceID: ""))
+        XCTAssertFalse(accepted(completedAt: now))
+        XCTAssertFalse(accepted(failedAt: now))
     }
 
     func testConcurrentManualStrengthHealthWritesHaveOneOwner() {
