@@ -97,6 +97,24 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         XCTAssertFalse(accepts(payloadVersion: 2))
     }
 
+    func testCrashBetweenConfirmedLaunchAndUncertainMarkerCleanup() {
+        let confirmed = UUID()
+        let unknown = UUID()
+        let otherConfirmed = UUID()
+        XCTAssertEqual(
+            WorkoutDeviceRelayClaimPolicy.resolvedUncertainIDs(
+                uncertainIDs: [confirmed, unknown],
+                confirmedLaunchIDs: [confirmed, otherConfirmed]
+            ), [unknown]
+        )
+        XCTAssertEqual(
+            WorkoutDeviceRelayClaimPolicy.resolvedUncertainIDs(
+                uncertainIDs: [unknown],
+                confirmedLaunchIDs: []
+            ), [unknown]
+        )
+    }
+
     func testReceiptRequiresExactlyOneMatchingServerRow() {
         let commandID = UUID()
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.confirmsReceipt(
