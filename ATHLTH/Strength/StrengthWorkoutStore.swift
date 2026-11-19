@@ -3353,6 +3353,8 @@ final class StrengthWorkoutStore: ObservableObject {
         // A rejected launch must not append hybrid parts to another workout.
         guard let launched = activeWorkout,
               launched.plannedSessionID == session.id,
+              launched.watchSessionID == watchSessionID,
+              launched.captureDevice == captureDevice,
               launched.endedAt == nil else { return false }
 
         for part in validatedParts {
