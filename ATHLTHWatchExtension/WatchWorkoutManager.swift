@@ -301,6 +301,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var recoveryInProgress = false
     private var workoutInitiatedLocallyOnWatch = false
     private let pendingRelayIdentityKey = "athlth.watch.pendingRemoteLaunch.v1"
+    private let relayCompletionOutboxKey = "athlth.watch.remoteCompletionOutbox.v1"
     private var activeRelayRequestID: UUID?
 
     /// Persist the identity before replying to the iPhone. The Watch can
@@ -3480,6 +3481,72 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // the remote start, not an allocated but unstarted session.
             relayRequestID: healthKitActive ? activeRelayRequestID : nil
         )
+    }
+
+    /// Only the minimal terminal proof is journaled. Full workout results
+    /// stay in the existing WatchConnectivity result path and HealthKit.
+    private func relayCompletionOutbox() -> [WatchRemoteLaunchCompletionReceipt] {
+        guard let data = UserDefaults.standard.data(
+            forKey: relayCompletionOutboxKey
+        ), let records = try? JSONDecoder().decode(
+            [WatchRemoteLaunchCompletionReceipt].self, from: data
+        ) else { return [] }
+        return records.filter {
+            $0.endedAt >= Date().addingTimeInterval(-30 * 86_400)
+        }
+    }
+
+    private func deliverRelayCompletionProof(
+        _ proof: WatchRemoteLaunchCompletionReceipt
+    ) {
+        guard WCSession.isSupported(),
+              WCSession.default.activationState == .activated,
+              let data = try? JSONEncoder().encode(proof)
+        else { return }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.workoutRemoteLaunchCompletion.rawValue,
+            WatchTransferMetadataKey.payload: data,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
+        ]
+        let session = WCSession.default
+        session.transferUserInfo(payload)
+        if session.isReachable {
+            session.sendMessage(
+                payload, replyHandler: nil, errorHandler: nil
+            )
+        }
+    }
+
+    private func rememberRelayCompletionProof(
+        for result: WatchWorkoutResult
+    ) {
+        guard let proof = WatchRemoteLaunchCompletionReceipt(
+            result: result
+        ) else { return }
+        var records = relayCompletionOutbox()
+        guard !records.contains(proof) else { return }
+        records.append(proof)
+        records = Array(records.suffix(64))
+        if let data = try? JSONEncoder().encode(records) {
+            // Persist before any WatchConnectivity side effect so Watch
+            // process termination cannot erase a completed HealthKit proof.
+            UserDefaults.standard.set(
+                data, forKey: relayCompletionOutboxKey
+            )
+        }
+        deliverRelayCompletionProof(proof)
+    }
+
+    /// Called after WatchConnectivity activation, including cold relaunch.
+    /// Replays receipt IDs only; iPhone de-duplicates by exact request and
+    /// HealthKit UUID, so repeated delivery never imports a workout twice.
+    func replayRelayCompletionProofs() {
+        for proof in relayCompletionOutbox() {
+            deliverRelayCompletionProof(proof)
+        }
     }
 
     func syncWorkoutActivityStateToPhone() {
@@ -8310,6 +8377,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 strengthCommandJournal
         }
 
+        rememberRelayCompletionProof(for: result)
         sendToPhone(result)
         WatchRouteStore.shared.clearCompletedPetSelection()
 
