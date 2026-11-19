@@ -16,6 +16,35 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         )
     }
 
+    func testRemoteRelayRejectsExpiredAndMismatchedClaims() {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        func accepted(
+            source: String = "ipad",
+            target: String = "apple_watch",
+            kind: String = "run",
+            payloadTarget: String = "apple_watch",
+            payloadKind: String = "run",
+            version: Int = 1,
+            expiry: TimeInterval = 60
+        ) -> Bool {
+            WorkoutDeviceRelayClaimPolicy.accepts(
+                source: source, target: target, kind: kind,
+                payloadTarget: payloadTarget, payloadKind: payloadKind,
+                payloadVersion: version,
+                expiresAt: now.addingTimeInterval(expiry), now: now
+            )
+        }
+        XCTAssertTrue(accepted())
+        XCTAssertFalse(accepted(source: "iphone"))
+        XCTAssertFalse(accepted(target: "iphone"))
+        XCTAssertFalse(accepted(kind: "strength"))
+        XCTAssertFalse(accepted(payloadTarget: "iphone"))
+        XCTAssertFalse(accepted(payloadKind: "walk"))
+        XCTAssertFalse(accepted(version: 2))
+        XCTAssertFalse(accepted(expiry: 0))
+        XCTAssertFalse(accepted(expiry: -1))
+    }
+
     func testSharedActiveClockMatchesExistingRunningElapsed() {
         var workout = phone()
         let later = start.addingTimeInterval(90)
