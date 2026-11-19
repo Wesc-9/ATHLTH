@@ -84,6 +84,7 @@ on:
       - Tests/ATHLTHLiveWorkoutBottomModeTests.swift
       - Tests/ATHLTHStrengthAdvancedLiveSetTests.swift
       - Tests/ATHLTHStrengthGroupedSetTests.swift
+      - Tests/StrengthSkipSetWatchTests.swift
       - Tests/ATHLTHiPadLiveWorkoutTests.swift
       - ATHLTH/Surfaces/ATHLTHCrossDeviceWorkoutStore.swift
       - ATHLTH/Surfaces/ATHLTHLiveViewRequest.swift
@@ -237,6 +238,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutBottomModeTests \
             -only-testing:ATHLTHTests/ATHLTHStrengthAdvancedLiveSetTests \
             -only-testing:ATHLTHTests/ATHLTHStrengthGroupedSetTests \
+            -only-testing:ATHLTHTests/StrengthSkipSetWatchTests \
             -only-testing:ATHLTHTests/ATHLTHiPadLiveWorkoutTests \
             -only-testing:ATHLTHTests/WorkoutLaunchHardeningTests \
             -only-testing:ATHLTHTests/StrengthTimedSetCountdownTests \
