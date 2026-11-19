@@ -1231,9 +1231,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     func completedRelayReceipt(
         requestID: UUID, ownerID: UUID
     ) -> WatchRemoteLaunchCompletionReceipt? {
-        relayCompletionReceipts.first {
-            $0.relayRequestID == requestID && $0.ownerID == ownerID
-        }
+        WatchRemoteLaunchCompletionPolicy.uniqueReceipt(
+            relayCompletionReceipts,
+            requestID: requestID,
+            ownerID: ownerID
+        )
     }
 
     private func rememberRelayCompletion(_ result: WatchWorkoutResult) {
@@ -1241,12 +1243,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             result: result
         ) else { return }
 
-        // Same request must never be attributed to different recordings.
-        // Retain the earliest observed complete proof rather than silently
-        // replacing it with a later or cross-account result.
-        if relayCompletionReceipts.contains(where: {
-            $0.relayRequestID == receipt.relayRequestID
-        }) { return }
+        // Watch sends immediate and durable copies of the same result.
+        // Keep only one exact copy; if a DIFFERENT HealthKit UUID claims
+        // this request ID, retain both so reconciliation fails closed.
+        if relayCompletionReceipts.contains(receipt) { return }
         relayCompletionReceipts.append(receipt)
         relayCompletionReceipts = Array(
             relayCompletionReceipts.filter {
