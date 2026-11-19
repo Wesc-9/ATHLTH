@@ -782,3 +782,18 @@ som ferdige før egne faser og reelle tester er fullført.
 - Test dekker gjentatte skrivetillatelsesforespørsler, parallell
   skriving for en annen økt og ny prøve etter ferdig skriv.
   Watch/HealthKit må fortsatt testes på faktiske enheter.
+
+
+### Fase 4 — fjernstart og kommandokø (19.11.2026)
+
+Fjernkommandoer valideres nå mot serverens avsender, mål, aktivitet, format,
+utløp, **faktisk claim-enhet** og terminalstatus før start. Bare én vellykket
+fjernstart utføres per køtømming; neste økt må ikke startes mens Watch/HealthKit
+etablerer forrige. Kontoendring kontrolleres også etter asynkrone operasjoner.
+Ved vellykket start journalføres kommando-ID lokalt før serverkvittering;
+serverkvittering som feiler må aldri automatisk føre til ny HealthKit-start.
+
+**Gjenstående sikkerhetsgrense:** Et krasj mellom faktisk Watch-oppstart og
+lokal journalføring kan fortsatt gi uavklart server-claim. Ikke innfør
+automatisk gjenkjøring av slike claims uten verifisert Watch-/HealthKit-status.
+Krev iPhone/iPad/Watch-akseptanse og samme-commit grønne CI-jobber før release.
