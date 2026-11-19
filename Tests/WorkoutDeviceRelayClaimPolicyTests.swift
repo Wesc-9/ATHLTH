@@ -129,6 +129,31 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         ))
     }
 
+    func testRejectedGPSRelayCancelsOnlyTheSamePendingRequest() {
+        let request = UUID(), unrelated = UUID()
+        let policy = ATHLTHRelayedPhoneLaunchCancellationPolicy.self
+        XCTAssertTrue(policy.mayCancel(
+            requestID: request, pendingID: request,
+            hasPendingStart: true, activeRecordingID: nil
+        ))
+        XCTAssertFalse(policy.mayCancel(
+            requestID: request, pendingID: unrelated,
+            hasPendingStart: true, activeRecordingID: nil
+        ))
+        XCTAssertFalse(policy.mayCancel(
+            requestID: request, pendingID: nil,
+            hasPendingStart: true, activeRecordingID: nil
+        ))
+        XCTAssertFalse(policy.mayCancel(
+            requestID: request, pendingID: request,
+            hasPendingStart: false, activeRecordingID: nil
+        ))
+        XCTAssertFalse(policy.mayCancel(
+            requestID: request, pendingID: request,
+            hasPendingStart: true, activeRecordingID: request
+        ))
+    }
+
     func testSavedIPhoneRecordingRequiresExactRequestOwnerAndSport() {
         let request = UUID()
         let now = Date()
