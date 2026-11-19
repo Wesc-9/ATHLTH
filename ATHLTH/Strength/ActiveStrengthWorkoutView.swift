@@ -1907,20 +1907,14 @@ struct ActiveStrengthWorkoutView: View {
                 .appleWatch,
               let snapshot =
                 workoutMirroring.snapshot,
-              snapshot.kind == .strength,
-              snapshot.state == .completed
+              ATHLTHWorkoutMirrorContinuity.canFinishStrength(
+                  snapshot: snapshot,
+                  workoutID: workout.id,
+                  workoutStartedAt: workout.startedAt
+              )
         else {
-            return
-        }
-
-        if let mirroredStartedAt =
-                snapshot.startedAt,
-           abs(
-                mirroredStartedAt
-                    .timeIntervalSince(
-                        workout.startedAt
-                    )
-           ) >= 180 {
+            // Watch's completed status is NOT proof for this strength
+            // workout when it belongs to another ATHLTH session.
             return
         }
 

@@ -35,6 +35,11 @@ enum ATHLTHWorkoutMirrorContinuity {
         }
         guard let previous else { return true }
         guard previous.kind == incoming.kind else { return false }
+        if let originalID = previous.strengthWorkoutID,
+           let incomingID = incoming.strengthWorkoutID,
+           originalID != incomingID {
+            return false
+        }
         if let original = previous.startedAt,
            let candidate = incoming.startedAt,
            abs(original.timeIntervalSince(candidate)) >= 2 {
@@ -54,6 +59,28 @@ enum ATHLTHWorkoutMirrorContinuity {
         // Never rewind even when the new payload is a valid terminal state:
         // an already newer capture must keep ownership of the screen.
         return incoming.capturedAt >= previous.capturedAt
+    }
+
+    /// Only a completed Watch-strength mirror for the same ATHLTH session
+    /// may finish the iPhone's strength log. Legacy snapshots have no UUID
+    /// and must match the actual Watch start closely; a missing start never
+    /// grants permission to finish an unrelated recording.
+    static func canFinishStrength(
+        snapshot: WatchWorkoutLiveSnapshot,
+        workoutID: UUID,
+        workoutStartedAt: Date
+    ) -> Bool {
+        guard snapshot.kind == .strength,
+              snapshot.state == .completed,
+              let startedAt = snapshot.startedAt,
+              startedAt.timeIntervalSince1970.isFinite,
+              snapshot.capturedAt >= startedAt,
+              abs(startedAt.timeIntervalSince(workoutStartedAt)) <= 15
+        else { return false }
+        if let stableID = snapshot.strengthWorkoutID {
+            return stableID == workoutID
+        }
+        return true
     }
 
     /// A late result from another short run must not terminate the new run.

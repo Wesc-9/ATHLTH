@@ -1856,6 +1856,10 @@ enum WatchWorkoutMirrorState: String, Codable, Hashable {
 }
 
 struct WatchWorkoutLiveSnapshot: Codable, Hashable {
+    /// Stable ATHLTH session identity for Watch-strength mirror updates.
+    /// Optional for older paired Watch apps; no new HealthKit session.
+    var strengthWorkoutID: UUID? = nil
+
     /// HealthKit active time is authoritative; delivery time must not add pauses.
     var confirmedActiveDuration: TimeInterval {
         elapsedTime.isFinite ? max(elapsedTime, 0) : 0

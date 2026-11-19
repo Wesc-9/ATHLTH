@@ -8727,6 +8727,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             coachPaceSampleAt: coachPaceSampleAt
         )
 
+        // Propagate the stable strength log identity with every live Watch
+        // snapshot. Completion is not allowed to identify a workout solely
+        // by its sport or by a nearby finish/start timestamp.
+        snapshot.strengthWorkoutID =
+            kind == .strength ? strengthSession?.workoutID : nil
+
         if let progress = runningStepProgress, let structure = structuredRunningWorkout {
             snapshot.runningOverallProgress = ATHLTHRunningStepEngine.overallProgress(
                 steps: structure.steps, index: structuredStepIndex,

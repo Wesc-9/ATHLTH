@@ -687,3 +687,20 @@ som ferdige før egne faser og reelle tester er fullført.
 - Tester dekker overlappende avbrudd, idempotens, aktiv økttid og
   at Watch ikke automatisk får tilført phone-offline pauser.
   Verifikasjon på faktisk iPhone/Watch og samme-commit CI gjenstår.
+
+### Fase 5 og 7 – stabil øktidentitet i live Watch-speiling
+
+- `WatchWorkoutLiveSnapshot` inneholder nå valgfri
+  `strengthWorkoutID`, sendt fra den eksisterende Watch-styrkeloggen
+  i hvert live snapshot. Den er den samme som `StrengthWorkoutLog.id`,
+  og skaper ikke en ekstra HealthKit-sesjon.
+- Speilet status fra en annen styrkeøkt kan ikke overskrive nyere
+  status når begge snapshot har stabil ID. Avslutning av iPhone
+  styrkelogg fra en speilet `completed` krever riktig økt-ID,
+  riktig aktivitet og tilsvarende HealthKit-starttid.
+- Eldre Watch-build uten ID kan fortsatt levere fullføringsstatus
+  ved bekreftet start innen 15 sekunder, men manglende start eller
+  3-minutters tilfeldige treff avvises. WatchWorkoutResult med
+  økt-ID i snapshot forblir primær varig fullføring.
+- Tester dekker feil ID, gammel økt, legacy-speiling, manglende
+  start og sen payload fra annen Watch-økt.

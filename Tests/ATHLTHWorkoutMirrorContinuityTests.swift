@@ -89,6 +89,46 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testWatchStrengthMirrorFinishesOnlyMatchingSession() {
+        let id = UUID()
+        var completed = snapshot(kind: .strength, state: .completed)
+        completed.strengthWorkoutID = id
+
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canFinishStrength(
+            snapshot: completed, workoutID: id,
+            workoutStartedAt: startedAt
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canFinishStrength(
+            snapshot: completed, workoutID: UUID(),
+            workoutStartedAt: startedAt
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canFinishStrength(
+            snapshot: completed, workoutID: id,
+            workoutStartedAt: startedAt.addingTimeInterval(120)
+        ))
+        completed.strengthWorkoutID = nil
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canFinishStrength(
+            snapshot: completed, workoutID: id,
+            workoutStartedAt: startedAt.addingTimeInterval(5)
+        ), "An older Watch without stable IDs can still finish when clocks agree")
+        completed.startedAt = nil
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canFinishStrength(
+            snapshot: completed, workoutID: id,
+            workoutStartedAt: startedAt
+        ))
+    }
+
+    func testWatchMirrorRejectsDifferentStrengthIDsEvenWhenTimestampsAgree() {
+        var original = snapshot(kind: .strength)
+        original.strengthWorkoutID = UUID()
+        var incoming = original
+        incoming.capturedAt = original.capturedAt.addingTimeInterval(5)
+        incoming.strengthWorkoutID = UUID()
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: original, incoming: incoming
+        ))
+    }
+
     func testWatchMirrorRejectsOlderBatchAndOtherWorkouts() {
         let current = snapshot()
         var older = snapshot()
