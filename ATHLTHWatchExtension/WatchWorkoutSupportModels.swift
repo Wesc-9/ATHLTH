@@ -89,6 +89,9 @@ struct WatchPersistedWorkoutState: Codable {
     /// after HealthKit restores a suspended or terminated Watch process.
     /// Optional to decode recovery snapshots from older Watch versions.
     var initiatedLocallyOnWatch: Bool? = nil
+    /// Authoritative request ID saved with the HealthKit recovery checkpoint.
+    /// Absent for local Watch starts and snapshots from older app versions.
+    var relayRequestID: UUID? = nil
     var plannedRoute: WatchRouteTransfer?
     var audioCoach: WatchAudioCoachConfiguration
     var structuredRunningWorkout: WatchRunningWorkoutTransfer?
