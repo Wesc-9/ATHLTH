@@ -61,6 +61,12 @@ enum ATHLTHWorkoutSessionLaunchError: LocalizedError {
 enum ATHLTHWorkoutRecordingArbiter {
     static weak var phone: IPhoneWorkoutStore?
     static weak var strength: StrengthWorkoutStore?
+    static weak var mirror: WorkoutMirroringStore?
+
+    private static var mirroredRecordingActive: Bool {
+        ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive ||
+            mirror?.hasActiveMirroredWorkout == true
+    }
 
     /// One launch reservation spans every asynchronous preflight (social,
     /// HealthKit Watch launch and device relay). Without it, two independent
@@ -74,7 +80,8 @@ enum ATHLTHWorkoutRecordingArbiter {
               ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
                   running: phone?.activeSessionState,
                   runningAuthorizationPending: phone?.hasPendingLaunch == true,
-                  strength: strength?.activeSessionState
+                  strength: strength?.activeSessionState,
+                  mirroredWatchRecordingActive: mirroredRecordingActive
               ) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
@@ -90,23 +97,32 @@ enum ATHLTHWorkoutRecordingArbiter {
     }
 
     static func mayStartRunning() -> Bool {
-        strength?.activeSessionState == nil
+        strength?.activeSessionState == nil &&
+            (!mirroredRecordingActive || pendingLaunchID != nil)
     }
 
     static func mayStartStrength() -> Bool {
         phone?.activeSessionState == nil &&
-            phone?.hasPendingLaunch != true
+            phone?.hasPendingLaunch != true &&
+            (!mirroredRecordingActive || pendingLaunchID != nil)
     }
 
-    /// A Watch-originated bootstrap does not pass through the async launch
-    /// coordinator. It must still honor its pending launch reservation and
-    /// both existing recording stores before restoring Watch's session ID.
-    static func mayBootstrapWatchStrength() -> Bool {
+    /// A Watch-started workout may be mirrored before its original
+    /// strength log is restored to iPhone. Only that same recording
+    /// is allowed to claim the local ATHLTH checkpoint.
+    static func mayBootstrapWatchStrength(
+        snapshot: WatchStrengthSessionSnapshot? = nil
+    ) -> Bool {
         pendingLaunchID == nil &&
             ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
                 running: phone?.activeSessionState,
                 runningAuthorizationPending: phone?.hasPendingLaunch == true,
                 strength: strength?.activeSessionState
+            ) &&
+            ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
+                mirror: mirror?.snapshot,
+                mirrorActive: mirroredRecordingActive,
+                bootstrap: snapshot
             )
     }
 }
@@ -117,9 +133,35 @@ enum ATHLTHWorkoutSessionFoundation {
     static func isRecordingSlotAvailable(
         running: ATHLTHWorkoutSessionState?,
         runningAuthorizationPending: Bool,
-        strength: ATHLTHWorkoutSessionState?
+        strength: ATHLTHWorkoutSessionState?,
+        mirroredWatchRecordingActive: Bool = false
     ) -> Bool {
-        running == nil && !runningAuthorizationPending && strength == nil
+        running == nil && !runningAuthorizationPending &&
+            strength == nil && !mirroredWatchRecordingActive
+    }
+
+    /// Never reinterpret a mirrored run or another strength workout
+    /// as the Watch session requesting offline bootstrap.
+    static func canBootstrapWatchStrength(
+        mirror: WatchWorkoutLiveSnapshot?,
+        mirrorActive: Bool,
+        bootstrap: WatchStrengthSessionSnapshot?
+    ) -> Bool {
+        guard mirrorActive else { return true }
+        guard let mirror, let bootstrap,
+              mirror.kind == .strength,
+              mirror.state == .running ||
+                mirror.state == .paused ||
+                mirror.state == .preparing ||
+                mirror.state == .ending,
+              let mirrorStart = mirror.startedAt,
+              let bootstrapStart = bootstrap.startedAt,
+              abs(mirrorStart.timeIntervalSince(bootstrapStart)) <= 5
+        else { return false }
+        if let mirrorID = mirror.strengthWorkoutID {
+            return mirrorID == bootstrap.workoutID
+        }
+        return true
     }
 
     static func requireNoActiveRecording(
@@ -210,7 +252,9 @@ enum ATHLTHWorkoutSessionFoundation {
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore
     ) throws {
-        guard !phone.hasPendingLaunch else {
+        guard !phone.hasPendingLaunch,
+              !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+        else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         try requireNoActiveRecording(currentSession(phone: phone, strength: strength))

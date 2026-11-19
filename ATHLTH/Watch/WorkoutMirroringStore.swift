@@ -220,6 +220,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        ATHLTHWorkoutRecordingArbiter.mirror = self
 
         iPhoneAudioCoach.onLastSpokenCoachMessage = { [weak self] message in
             self?.lastCoachMessage = message

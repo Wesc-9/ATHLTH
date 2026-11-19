@@ -2284,7 +2284,9 @@ final class StrengthWorkoutStore: ObservableObject {
         guard accountID != nil,
               activeWorkout == nil,
               !workoutHistory.contains(where: { $0.id == snapshot.workoutID }),
-              ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength()
+              ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength(
+                  snapshot: snapshot
+              )
         else { return false }
         var configuration =
             StrengthAdvancedConfiguration

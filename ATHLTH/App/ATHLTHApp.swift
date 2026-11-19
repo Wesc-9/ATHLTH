@@ -873,7 +873,9 @@ struct AppRootView: View {
                     strengthWorkout.isLoaded(for: $0)
                 } == true,
                 recordingSlotAvailable:
-                    ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength()
+                    ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength(
+                        snapshot: result.strengthSnapshot
+                    )
             )
         }
     }
@@ -3057,7 +3059,9 @@ struct AppRootView: View {
             savedStrength: strengthWorkout.workoutHistory,
             strengthAccountReady: strengthWorkout.isLoaded(for: resultOwnerID),
             recordingSlotAvailable:
-                ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength()
+                ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength(
+                    snapshot: result.strengthSnapshot
+                )
         ) else {
             // This result is still in Watch's durable completion queue. A
             // different workout must finish before this one can be imported.

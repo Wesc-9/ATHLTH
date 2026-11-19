@@ -704,3 +704,18 @@ som ferdige før egne faser og reelle tester er fullført.
   økt-ID i snapshot forblir primær varig fullføring.
 - Tester dekker feil ID, gammel økt, legacy-speiling, manglende
   start og sen payload fra annen Watch-økt.
+
+### Fase 4 – speilet Apple Watch-opptak er ikke en ledig opptaksplass
+
+- `ATHLTHWorkoutRecordingArbiter` inkluderer nå den eksisterende
+  HealthKit Watch-speilingen når den avgjør om løp, gå eller styrke
+  kan starte. Ingen ny lokal Quick Train kan starte oppå et
+  aktivt Watch-opptak bare fordi en lokal checkpoint mangler.
+- Watch-styrke kan fortsatt restaureres fra sin opprinnelige
+  snapshot når aktivitet, starttid og stabil økt-ID stemmer
+  med den speilede Watch-økten. Uidentifisert mirror, annen
+  Watch-aktivitet og andre styrkeøkter avvises i opptaksgrensen.
+- Den aktive asynkrone oppstartsreservasjonen beholdes til
+  den valgte Watch/iPhone-lokalloggen er opprettet.
+- Tester dekker speilet Watch-styrke, Watch-løp, feil ID,
+  gammel økt og legitim offline-gjenoppretting.

@@ -319,7 +319,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                     snapshot: bootstrap,
                     activeWorkoutID: strengthWorkout.activeWorkout?.id,
                     completedWorkoutIDs: completedIDs,
-                    slotAvailable: ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength()
+                    slotAvailable: ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength(
+                        snapshot: bootstrap
+                    )
                 ), strengthWorkout.startFromWatchSnapshot(
                     bootstrap, watchSessionID: command.id
                 ) else {

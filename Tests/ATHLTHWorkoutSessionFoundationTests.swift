@@ -495,6 +495,50 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch())
     }
 
+    @MainActor
+    func testWatchMirrorBlocksSecondRecordingButAllowsMatchingWatchStrengthRestore() throws {
+        let strength = StrengthWorkoutStore()
+        strength.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        let bootstrap = try XCTUnwrap(strength.watchSnapshot)
+        let startedAt = try XCTUnwrap(bootstrap.startedAt)
+        var mirror = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running,
+            startedAt: startedAt,
+            capturedAt: startedAt.addingTimeInterval(1),
+            elapsedTime: 1, heartRate: 110, activeCalories: 1,
+            distanceMeters: 0, averageHeartRate: nil,
+            maxHeartRate: nil, routePointCount: 0
+        )
+        mirror.strengthWorkoutID = bootstrap.workoutID
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+            running: nil, runningAuthorizationPending: false, strength: nil,
+            mirroredWatchRecordingActive: true
+        ))
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
+            mirror: mirror, mirrorActive: true, bootstrap: bootstrap
+        ))
+        mirror.strengthWorkoutID = UUID()
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
+            mirror: mirror, mirrorActive: true, bootstrap: bootstrap
+        ))
+        mirror.strengthWorkoutID = bootstrap.workoutID
+        mirror.kind = .running
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
+            mirror: mirror, mirrorActive: true, bootstrap: bootstrap
+        ))
+        mirror.kind = .strength
+        mirror.startedAt = startedAt.addingTimeInterval(45)
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
+            mirror: mirror, mirrorActive: true, bootstrap: bootstrap
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
+            mirror: nil, mirrorActive: true, bootstrap: bootstrap
+        ))
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.canBootstrapWatchStrength(
+            mirror: nil, mirrorActive: false, bootstrap: bootstrap
+        ))
+    }
+
     func testPendingOutdoorPermissionBlocksUniversalRecordingSlot() {
         let live = ATHLTHWorkoutSessionFoundation.running(phone(), at: start)
         XCTAssertTrue(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
