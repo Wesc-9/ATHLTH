@@ -326,6 +326,48 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      - name: Summarize failed XCTest cases for phase 4–8 triage
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          BUNDLE="$RUNNER_TEMP/ATHLTHTests.xcresult"
+          if [ ! -d "$BUNDLE" ]; then
+            echo "::warning::No XCTest result bundle was produced; check simulator boot or compilation."
+            exit 0
+          fi
+          echo "## XCTest failure diagnostics" >> "$GITHUB_STEP_SUMMARY"
+          xcrun xcresulttool get test-results summary --path "$BUNDLE" --format json \
+            > "$RUNNER_TEMP/athlth-test-summary.json" 2> "$RUNNER_TEMP/athlth-xcresult-error.txt"
+          if [ -s "$RUNNER_TEMP/athlth-test-summary.json" ]; then
+            python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          data = json.loads(Path(os.environ["RUNNER_TEMP"], "athlth-test-summary.json").read_text())
+          print("XCTest summary:", json.dumps(data, ensure_ascii=False)[:10000])
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write("\\n\\n```json\\n")
+              out.write(json.dumps(data, ensure_ascii=False, indent=2)[:12000])
+              out.write("\\n```\\n")
+          PY
+          else
+            cat "$RUNNER_TEMP/athlth-xcresult-error.txt"
+          fi
+          xcrun xcresulttool get test-results tests --path "$BUNDLE" --format json \
+            > "$RUNNER_TEMP/athlth-test-cases.json" 2>/dev/null || true
+
+      - name: Upload machine-readable XCTest failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-xctest-failure-summary
+          path: |
+            ${{ runner.temp }}/athlth-test-summary.json
+            ${{ runner.temp }}/athlth-test-cases.json
+            ${{ runner.temp }}/athlth-xcresult-error.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Preserve XCTest diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
