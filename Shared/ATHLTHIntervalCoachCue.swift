@@ -212,6 +212,18 @@ enum ATHLTHCoachCountdownAfter: String, Codable, CaseIterable, Identifiable {
 /// One-second deadlines always win over routine coach messages. A delayed tick
 /// SKIPS a number instead of speaking a stale one; no countdown is inferred
 /// from a distance-only or open-ended target.
+/// The audio route can take longer to activate than the last second of
+/// an interval. Never read the previous interval's digit after its deadline.
+enum ATHLTHCoachCountdownSpeechDeadline {
+    static func permitsPlayback(
+        deadline: Date?,
+        now: Date = Date()
+    ) -> Bool {
+        guard let deadline else { return true }
+        return now < deadline
+    }
+}
+
 enum ATHLTHCoachSecondCountdown {
     static let offeredLengths = [3, 5, 10, 15, 20, 30]
 
