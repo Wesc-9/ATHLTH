@@ -280,6 +280,53 @@ final class WorkoutDeviceRelayStore:
     private var listeningUserID: UUID?
     private var listenerGeneration: UUID?
     private var isDrainingCommands = false
+    // A launch may succeed while the Supabase acknowledgement fails.
+    // Persist only its command ID, scoped to account and physical device;
+    // never persist the workout payload or replay the HealthKit start.
+    private func completedJournalKey(userID: UUID) -> String {
+        "athlth.relay.completed.v1.\(userID.uuidString.lowercased()).\(ATHLTHDeviceRole.persistentDeviceID)"
+    }
+
+    private func unacknowledgedLaunchIDs(userID: UUID) -> [UUID] {
+        let values = UserDefaults.standard.stringArray(
+            forKey: completedJournalKey(userID: userID)
+        ) ?? []
+        return values.compactMap(UUID.init(uuidString:))
+    }
+
+    private func rememberLaunchedCommand(_ id: UUID, userID: UUID) {
+        var ids = unacknowledgedLaunchIDs(userID: userID)
+        guard !ids.contains(id) else { return }
+        ids.append(id)
+        // A bounded journal avoids unbounded storage after a prolonged outage.
+        UserDefaults.standard.set(
+            ids.suffix(256).map(\.uuidString),
+            forKey: completedJournalKey(userID: userID)
+        )
+    }
+
+    private func forgetAcknowledgedCommand(_ id: UUID, userID: UUID) {
+        let ids = unacknowledgedLaunchIDs(userID: userID).filter { $0 != id }
+        UserDefaults.standard.set(
+            ids.map(\.uuidString),
+            forKey: completedJournalKey(userID: userID)
+        )
+    }
+
+    private func reconcileLaunchedCommands(userID: UUID) async {
+        for id in unacknowledgedLaunchIDs(userID: userID) {
+            guard currentUserID == userID, !Task.isCancelled else { return }
+            do {
+                try await markCompleted(id)
+                guard currentUserID == userID, !Task.isCancelled else { return }
+                forgetAcknowledgedCommand(id, userID: userID)
+            } catch {
+                // Leave the durable receipt for the next reconnect.
+                return
+            }
+        }
+    }
+
 
     init(
         client:
@@ -501,6 +548,8 @@ final class WorkoutDeviceRelayStore:
         isDrainingCommands = true
         defer { isDrainingCommands = false }
         guard let processingUserID = currentUserID else { return }
+        await reconcileLaunchedCommands(userID: processingUserID)
+        guard currentUserID == processingUserID, !Task.isCancelled else { return }
         // Drain the complete bounded backlog on reconnect, not only the
         // first eight commands when no further realtime event may arrive.
         for _ in 0..<128 {
@@ -564,6 +613,9 @@ final class WorkoutDeviceRelayStore:
             // this command as a failed launch eligible for a second start.
             do {
                 try await process(command)
+                // Persist the success before any suspension for server I/O.
+                // A relaunch or offline reconnect must only retry the receipt.
+                rememberLaunchedCommand(command.id, userID: processingUserID)
             } catch {
                 guard currentUserID == processingUserID,
                       !Task.isCancelled else { return }
@@ -581,6 +633,9 @@ final class WorkoutDeviceRelayStore:
                   !Task.isCancelled else { return }
             do {
                 try await markCompleted(command.id)
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
+                forgetAcknowledgedCommand(command.id, userID: processingUserID)
             } catch {
                 // The claim remains unresolved, not failed: the Watch or
                 // iPhone may already be recording. Never replay this launch
