@@ -218,6 +218,38 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         ))
     }
 
+    func testOfflineProgressCannotRewindOrDuplicateCompletion() {
+        let base = ATHLTHWorkoutSessionState(
+            workoutID: UUID(), plannedSessionID: nil,
+            recordingOwner: .appleWatch, activity: .strength,
+            phase: .work, engine: .strength, startedAt: start,
+            activeElapsedSeconds: 120, stageIndex: nil, stageCount: nil
+        )
+        func update(_ elapsed: TimeInterval) -> ATHLTHWorkoutSessionState {
+            ATHLTHWorkoutSessionState(
+                workoutID: base.workoutID, plannedSessionID: nil,
+                recordingOwner: .appleWatch, activity: .running,
+                phase: .work, engine: .endurance, startedAt: start,
+                activeElapsedSeconds: elapsed, stageIndex: nil, stageCount: nil
+            )
+        }
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.acceptsProgressUpdate(
+            current: base, incoming: update(119)
+        ))
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.acceptsProgressUpdate(
+            current: base, incoming: update(121)
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.acceptsProgressUpdate(
+            current: base, incoming: update(.nan)
+        ))
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.shouldCommitCompletion(
+            workoutID: base.workoutID, committedWorkoutIDs: []
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.shouldCommitCompletion(
+            workoutID: base.workoutID, committedWorkoutIDs: [base.workoutID]
+        ))
+    }
+
     func testRecoveryNeverResurrectsCompletedHistory() {
         XCTAssertTrue(ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
             hasEnded: false, alreadyCommitted: false
