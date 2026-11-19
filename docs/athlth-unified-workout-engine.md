@@ -978,3 +978,43 @@ på nytt automatisk.
   betyr **ikke** at databasen er migrert.
 - Resterende aksept: samme-commit iOS/iPad/watchOS bygg, XCTest,
   backend-/kompatibilitetstester og fysisk treenhetstest med HealthKit.
+
+### Fase 5 – felles sannhetskilde for Audio Coach-avspilling (19.11.2026)
+
+- Styrkens `StrengthAudioCoachSpeaker` beholdes som spesialisert
+  sett-/hvileoppleser, men bruker samme felles hendelsesjournal og
+  prioritetskø som løp, gåing og Watch. Ingen ny coachmotor, separate
+  treningsopptak eller alternativ lydstemme innføres.
+- `MirroredWorkoutAudioCoach`, `IPhoneWorkoutStore` og
+  `WatchWorkoutManager` registrerer nå «spill siste melding» **først
+  ved faktisk lydstart** (`AVSpeechSynthesizer.didStart` eller
+  Azure sin `onStarted`), aldri bare ved bestilt syntese eller
+  `speak(utterance)`. Dersom AVFoundation mister `didStart`,
+  teller en vellykket `didFinish` også som bekreftet lyd.
+  `didCancel` gir verken hendelseskvittering eller replay-minne.
+- Mirrored Audio Coach sin tekstlige repetisjonssperre har nå
+  separate `canAccept` (sjekk uten sideeffekt) og `didSpeak`
+  (bekreftelse ved faktisk lydstart). Avbrutt Azure-oppslag skal
+  ikke konsumere neste lovlige forsøk på samme coach-melding.
+- Asynkrone lydmeldinger beskyttes med en avspillingsgenerasjon.
+  En forsinket Azure-/AVSpeech-callback fra tidligere avbrutt lyd
+  kan ikke oppdatere talekvittering eller «siste melding» for en
+  nyere økt.
+- Den felles `ATHLTHCoachCueQueue` forkaster målings-/intervall-/
+  rute-/Ghost-/styrkesett-/hvilebeskjeder ved pause, gamle «start»/
+  «pause»-meldinger etter gjenopptak og alle ventende meldinger ved
+  fullføring. Samme policy brukes i speilet løp/gå, iPhone-løp/gå og
+  Watch-økter. Eksisterende haptikk, HealthKit-opptak og
+  tidsstyrte styrkesett påvirkes ikke.
+- Nye regresjonstester kontrollerer at et tale-*forsøk* ikke
+  utløser repetisjonssperren, at en bekreftet avspilling gjør det,
+  at stillestående/forsinkede køhendelser fjernes ved pause,
+  resume og øktslutt, og at neste økt får tom kø.
+
+**Gjenstående fase-5-akseptanse:** Samme-commit grønn iOS/watchOS
+build og målrettet XCTest. På fysisk iPhone + Watch må norsk/engelsk
+stemmevalg, gjensidig talerett, AirPods/Bluetooth, Spotify-dukking
+og musikkgjenopptakelse, nedtelling og Azure-fallback testes.
+Audio Coach må heller ikke repetere en mottatt Watch-kvittering
+eller snakke etter en avbrutt økt. Fase 5 kan ikke merkes
+release-godkjent før dette er bekreftet.
