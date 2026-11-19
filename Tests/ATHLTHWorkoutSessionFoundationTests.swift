@@ -671,4 +671,60 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertEqual(store.activeWorkout?.id, firstID)
         XCTAssertNil(store.activeWorkout?.plannedSessionID)
     }
+
+    @MainActor
+    func testLongStrengthWorkoutRecoveryDoesNotCountLockedPhoneDowntime() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        var workout = try XCTUnwrap(store.activeWorkout)
+        let start = workout.startedAt
+        let checkpoint = start.addingTimeInterval(3_600)
+        let unlocked = start.addingTimeInterval(11 * 3_600)
+        let finished = start.addingTimeInterval(12 * 3_600)
+
+        XCTAssertEqual(workout.elapsedSessionSeconds(
+            at: finished, suspendedAt: checkpoint
+        ), 3_600, accuracy: 0.001)
+        workout.recordRecoveredDowntime(from: checkpoint, until: unlocked)
+        workout.endedAt = finished
+        XCTAssertEqual(workout.excludedRecoverySeconds ?? 0, 36_000)
+        XCTAssertEqual(workout.elapsedSessionSeconds(at: finished), 7_200)
+        let result = StrengthWorkoutResultBreakdown(
+            workout: workout, elapsedSeconds: workout.elapsedSessionSeconds(
+                at: finished
+            )
+        )
+        XCTAssertEqual(result.totalSeconds, 7_200)
+        XCTAssertEqual(result.restSeconds, 0)
+        XCTAssertEqual(result.activeSeconds, 7_200)
+        // A second recovery of the same checkpoint cannot add hours twice.
+        workout.recordRecoveredDowntime(from: checkpoint, until: unlocked)
+        XCTAssertEqual(workout.elapsedSessionSeconds(at: finished), 7_200)
+    }
+
+    func testWholeWorkoutClockSurvivesMultipleHoursAndExplicitPause() {
+        let started = Date(timeIntervalSince1970: 1_900_000_000)
+        let pausedAt = started.addingTimeInterval(4 * 3_600)
+        let later = pausedAt.addingTimeInterval(16 * 3_600)
+        XCTAssertEqual(
+            ATHLTHWorkoutSessionClock.elapsed(
+                startedAt: started, pausedAt: pausedAt,
+                excludedPauseSeconds: 60 * 15, at: later
+            ),
+            13_500
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutSessionClock.elapsed(
+                activeBeforeResume: 13_500, resumedAt: nil, at: later
+            ),
+            13_500
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutSessionClock.elapsed(
+                activeBeforeResume: 13_500, resumedAt: later,
+                at: later.addingTimeInterval(90)
+            ),
+            13_590
+        )
+    }
 }

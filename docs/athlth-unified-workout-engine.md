@@ -1240,3 +1240,16 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   pauseintervall, forsinket duplikatsteg og mølleproveniens.
 - Ingen ekstra historikkpersistens, ingen ny HealthKit writer. Fase 7
   forblir uverifisert inntil samme-commit iOS/iPad/watchOS/CI og fysisk test.
+
+### Fase 8 – lange økter og statiske ferdigresultater (19.11.2026)
+
+- Ferdige styrkeøkters resultatkort bruker ikke lenger en sekundvis
+  `TimelineView`. Den samme beregningen vises statisk fra lagret sluttid,
+  mens pågående styrkeøkt fremdeles bruker den felles datobaserte klokken.
+  Reduserer unødvendig UI-arbeid ved historikk og iPad-sammendrag.
+- Nye regresjonstester dekker en 12-timers styrkeøkt med 10 timer
+  gjenopprettet inaktivitet, gjentatt krasj-rekonstruksjon uten dobbel
+  fratrekk, timed set med 12 timers overtid og pause/fortsett etter
+  telefonlås. Ingen ny lagringsmodell eller treningsopptak er introdusert.
+- Ytelses- og tidsforbedringene er ikke fysisk eller CI-verifisert før
+  samme-commit iOS/iPad/watchOS-bygg, XCTest og målte tester er grønne.

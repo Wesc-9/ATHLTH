@@ -3291,126 +3291,139 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
+    /// Finished workout metrics never need a 1-second timeline. Keeping
+    /// one active only during a live finish preview avoids repeated grid
+    /// layout and formatting for historical strength workouts on iPad.
+    @ViewBuilder
     private func focusedWorkoutSummaryMetrics(
         _ workout: StrengthWorkoutLog
     ) -> some View {
-        TimelineView(
-            .periodic(
-                from: .now,
-                by: 1
+        if workout.isFinished {
+            focusedWorkoutSummaryMetricGrid(
+                workout, at: workout.endedAt ?? Date()
             )
-        ) { context in
-            let ongoingRestSeconds: TimeInterval =
-                strength.activeWorkout?.id == workout.id
-                ? strength.restStartedAt.map {
-                    max(context.date.timeIntervalSince($0), 0)
-                } ?? 0
-                : 0
-            let breakdown = StrengthWorkoutResultBreakdown(
-                workout: workout,
-                elapsedSeconds: strength.elapsedSessionSeconds(
-                    for: workout, at: context.date
-                ),
-                ongoingRestSeconds: ongoingRestSeconds
-            )
-            let totalDuration = breakdown.totalSeconds
-            let restDuration = breakdown.restSeconds
-            let activeDuration = breakdown.activeSeconds
-
-            LazyVGrid(
-                columns: [
-                    GridItem(
-                        .flexible(),
-                        spacing: 10
-                    ),
-                    GridItem(
-                        .flexible(),
-                        spacing: 10
-                    )
-                ],
-                spacing: 10
-            ) {
-                completionMetric(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Total time",
-                            norwegian:
-                                "Total tid"
-                        ),
-                    value:
-                        totalDuration
-                            .clockDuration,
-                    icon: "clock.fill"
-                )
-
-                completionMetric(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Active time",
-                            norwegian:
-                                "Aktiv tid"
-                        ),
-                    value:
-                        activeDuration
-                            .clockDuration,
-                    icon: "bolt.fill"
-                )
-
-                completionMetric(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Rest",
-                            norwegian: "Pause"
-                        ),
-                    value:
-                        restDuration
-                            .clockDuration,
-                    icon:
-                        "pause.circle.fill"
-                )
-
-                completionMetric(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Volume",
-                            norwegian: "Volum"
-                        ),
-                    value:
-                        formatWorkoutVolume(
-                            workout
-                                .totalVolumeKilograms
-                        ),
-                    icon: "scalemass.fill"
-                )
-
-                completionMetric(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Reps",
-                            norwegian:
-                                "Repetisjoner"
-                        ),
-                    value:
-                        "\(workout.totalCompletedReps)",
-                    icon: "repeat"
-                )
-
-                completionMetric(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Working sets",
-                            norwegian:
-                                "Arbeidssett"
-                        ),
-                    value:
-                        "\(workout.totalWorkingSets)",
-                    icon: "list.number"
+        } else {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                focusedWorkoutSummaryMetricGrid(
+                    workout, at: context.date
                 )
             }
+        }
+    }
+
+    private func focusedWorkoutSummaryMetricGrid(
+        _ workout: StrengthWorkoutLog, at now: Date
+    ) -> some View {
+        let ongoingRestSeconds: TimeInterval =
+            strength.activeWorkout?.id == workout.id
+            ? strength.restStartedAt.map {
+                max(now.timeIntervalSince($0), 0)
+            } ?? 0
+            : 0
+        let breakdown = StrengthWorkoutResultBreakdown(
+            workout: workout,
+            elapsedSeconds: strength.elapsedSessionSeconds(
+                for: workout, at: now
+            ),
+            ongoingRestSeconds: ongoingRestSeconds
+        )
+        let totalDuration = breakdown.totalSeconds
+        let restDuration = breakdown.restSeconds
+        let activeDuration = breakdown.activeSeconds
+
+        LazyVGrid(
+            columns: [
+                GridItem(
+                    .flexible(),
+                    spacing: 10
+                ),
+                GridItem(
+                    .flexible(),
+                    spacing: 10
+                )
+            ],
+            spacing: 10
+        ) {
+            completionMetric(
+                title:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Total time",
+                        norwegian:
+                            "Total tid"
+                    ),
+                value:
+                    totalDuration
+                        .clockDuration,
+                icon: "clock.fill"
+            )
+
+            completionMetric(
+                title:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Active time",
+                        norwegian:
+                            "Aktiv tid"
+                    ),
+                value:
+                    activeDuration
+                        .clockDuration,
+                icon: "bolt.fill"
+            )
+
+            completionMetric(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Rest",
+                        norwegian: "Pause"
+                    ),
+                value:
+                    restDuration
+                        .clockDuration,
+                icon:
+                    "pause.circle.fill"
+            )
+
+            completionMetric(
+                title:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Volume",
+                        norwegian: "Volum"
+                    ),
+                value:
+                    formatWorkoutVolume(
+                        workout
+                            .totalVolumeKilograms
+                    ),
+                icon: "scalemass.fill"
+            )
+
+            completionMetric(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Reps",
+                        norwegian:
+                            "Repetisjoner"
+                    ),
+                value:
+                    "\(workout.totalCompletedReps)",
+                icon: "repeat"
+            )
+
+            completionMetric(
+                title:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Working sets",
+                        norwegian:
+                            "Arbeidssett"
+                    ),
+                value:
+                    "\(workout.totalWorkingSets)",
+                icon: "list.number"
+            )
         }
     }
 

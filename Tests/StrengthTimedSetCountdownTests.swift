@@ -144,4 +144,37 @@ final class StrengthTimedSetCountdownTests: XCTestCase {
         XCTAssertEqual(restored.setID, timer.setID)
         XCTAssertEqual(restored.secondsRemaining(at: base.addingTimeInterval(299)), 1)
     }
+
+    func testLongStrengthSetRemainsDateAnchoredThroughHoursOfPhoneLock() throws {
+        let started = base
+        var timer = countdown(seconds: 300, started: started)
+        let twelveHoursLater = started.addingTimeInterval(12 * 3_600)
+        XCTAssertEqual(timer.elapsedSeconds(at: twelveHoursLater), 43_200)
+        XCTAssertEqual(timer.overtimeSeconds(at: twelveHoursLater), 42_900)
+        timer.pause(at: twelveHoursLater)
+        let restored = try JSONDecoder().decode(
+            StrengthTimedSetCountdown.self,
+            from: JSONEncoder().encode(timer)
+        )
+        XCTAssertNil(restored.resumedAt)
+        XCTAssertEqual(
+            restored.elapsedSeconds(at: twelveHoursLater.addingTimeInterval(3_600)),
+            43_200
+        )
+        XCTAssertEqual(
+            restored.overtimeSeconds(at: twelveHoursLater.addingTimeInterval(3_600)),
+            42_900
+        )
+    }
+
+    func testVeryOldSetDoesNotAdvanceWhenRestoredPaused() {
+        let started = base
+        var timer = countdown(seconds: 600, started: started)
+        timer.pause(at: started.addingTimeInterval(90))
+        XCTAssertEqual(timer.secondsRemaining(at: started.addingTimeInterval(86_400)), 510)
+        XCTAssertEqual(timer.elapsedSeconds(at: started.addingTimeInterval(86_400)), 90)
+        timer.resumedAt = started.addingTimeInterval(86_400)
+        XCTAssertEqual(timer.secondsRemaining(
+            at: started.addingTimeInterval(86_430)), 480)
+    }
 }
