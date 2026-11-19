@@ -225,6 +225,18 @@ enum WorkoutDeviceRelayClaimPolicy {
         returnedIDs.count == 1 && returnedIDs[0] == commandID
     }
 
+    /// A confirmed receipt written after the launch is stronger evidence
+    /// than its older pre-launch uncertainty marker. This resolves crashes
+    /// between rememberLaunchedCommand and forgetUncertainLaunch.
+    /// Unknown launches must remain uncertain, never guessed successful.
+    static func resolvedUncertainIDs(
+        uncertainIDs: [UUID],
+        confirmedLaunchIDs: [UUID]
+    ) -> [UUID] {
+        let confirmed = Set(confirmedLaunchIDs)
+        return uncertainIDs.filter { !confirmed.contains($0) }
+    }
+
     enum LaunchDecision: Equatable {
         case retryConfirmedReceipt
         case holdForDeviceReconciliation
@@ -373,6 +385,22 @@ final class WorkoutDeviceRelayStore:
         UserDefaults.standard.set(
             ids.map(\.uuidString),
             forKey: completedJournalKey(userID: userID)
+        )
+    }
+
+    /// Complete an interrupted local journal transition without launching
+    /// anything. Only an existing confirmed success marker can clear the
+    /// matching uncertain marker.
+    private func reconcileLocalLaunchMarkers(userID: UUID) {
+        let uncertain = uncertainLaunchIDs(userID: userID)
+        let remaining = WorkoutDeviceRelayClaimPolicy.resolvedUncertainIDs(
+            uncertainIDs: uncertain,
+            confirmedLaunchIDs: unacknowledgedLaunchIDs(userID: userID)
+        )
+        guard remaining != uncertain else { return }
+        UserDefaults.standard.set(
+            remaining.map(\.uuidString),
+            forKey: uncertainJournalKey(userID: userID)
         )
     }
 
@@ -616,6 +644,10 @@ final class WorkoutDeviceRelayStore:
         isDrainingCommands = true
         defer { isDrainingCommands = false }
         guard let processingUserID = currentUserID else { return }
+        // The two journal writes are individually durable, not atomic.
+        // Recover a confirmed success left with its older uncertain marker
+        // after process termination, before blocking the relay queue.
+        reconcileLocalLaunchMarkers(userID: processingUserID)
         // An interrupted start has an unknown outcome. Do not claim another
         // start or replay the ambiguous command until device reconciliation.
         guard uncertainLaunchIDs(userID: processingUserID).isEmpty else {
