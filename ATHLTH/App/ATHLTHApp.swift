@@ -885,7 +885,11 @@ struct AppRootView: View {
         _ command: WorkoutDeviceRelayCommand
     ) async throws {
         guard ATHLTHDeviceRole.isIPhone else {
-            return
+            throw NSError(
+                domain: "ATHLTH.DeviceRelay", code: 403,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Remote workout starts must be executed on the paired iPhone."]
+            )
         }
 
         guard Date() >= relayedWorkoutLaunchGuardUntil,
@@ -1105,10 +1109,17 @@ struct AppRootView: View {
                             spotifyPlayback
                     )
 
-            if didStart {
-                showingRelayedStrengthWorkout =
-                    true
+            guard didStart else {
+                // A false launch result is not a recorded workout. In
+                // particular, an aborted invitation must not be acknowledged
+                // as a successful remote Watch/HealthKit start.
+                throw NSError(
+                    domain: "ATHLTH.DeviceRelay", code: 422,
+                    userInfo: [NSLocalizedDescriptionKey:
+                        "The strength workout was not started."]
+                )
             }
+            showingRelayedStrengthWorkout = true
         }
     }
 
