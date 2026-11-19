@@ -811,3 +811,19 @@ fail-closed-sperre: den hindrer dobbeltopptak, men kan kreve manuell avklaring
 etter krasj. Automatisk, verifisert rekonsiliering av usikre starter er fortsatt
 **ikke implementert** og må på plass før fase 4 godkjennes. Ingen ny
 HealthKit-opptakstype, historikkpost eller datamigrering er innført.
+
+### Fase 4 – trygg kvittering av fjernstart (19.11.2026)
+
+- Den lokale ID-journalen for vellykket fjernstart blir kontrollert **før**
+  en serverclaim kan avvises som utløpt eller behandles på nytt. Et kjent
+  startforsøk blir aldri spilt av igjen bare for å reparere serverstatus.
+- Utestående kvitteringer må avklares før en ny serverkommando claim-es.
+  Dersom nettverket hindrer kvittering, stoppes købehandlingen i stedet
+  for å forsøke neste HealthKit-/Watch-start.
+- iPhone kan ikke lenger rapportere en avbrutt styrkeoppstart
+  (`startStrength == false`) som en vellykket fjernstart. Et feilaktig
+  kall på en annen enhet enn iPhone avvises eksplisitt.
+- Sikkerhetsbegrensning: et prosesskrasj mellom ekstern Watch-start
+  og lokal journalføring krever fremdeles autoritativ
+  Watch-/serverrekonsiliering før eksakt-én-gang kan garanteres.
+  Samme-commit iOS-/Watch-CI og fysisk treenhetstest gjenstår.
