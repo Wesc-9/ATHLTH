@@ -784,6 +784,9 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
 
         // Validate the shared timeline before handing a workout to iPad,
         // HealthKit, Apple Watch or the iPhone recording store.
@@ -845,6 +848,12 @@ enum WorkoutLaunchCoordinator {
         }
 
         try await watchConnection.requireNoActiveWatchWorkout()
+        try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+            phoneWorkout.activeSessionState
+        )
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
 
         let selectedRoute: TrainingRoute? = {
             // A saved structured route cannot re-enable GPS/route Ghost
@@ -1262,6 +1271,9 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
         if ATHLTHDeviceRole.isIPad {
             let envelope =
                 WorkoutDeviceRelayEnvelope(
@@ -1301,6 +1313,12 @@ enum WorkoutLaunchCoordinator {
         }
 
         try await watchConnection.requireNoActiveWatchWorkout()
+        try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+            phoneWorkout.activeSessionState
+        )
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
 
         let plannedWalkingWorkout: PlannedSession? = {
             guard let planID = plannedPlanID,
@@ -1485,7 +1503,16 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             strengthWorkout.activeSessionState
         )
+        guard ATHLTHWorkoutRecordingArbiter.mayStartStrength() else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
         try await watchConnection.requireNoActiveWatchWorkout()
+        try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+            strengthWorkout.activeSessionState
+        )
+        guard ATHLTHWorkoutRecordingArbiter.mayStartStrength() else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
 
         // Basic tracking can still opt into voice guidance. Keep the
         // selected coach in all workout and invitation payloads without
