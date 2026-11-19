@@ -3300,11 +3300,18 @@ struct ActiveStrengthWorkoutView: View {
                 by: 1
             )
         ) { context in
+            let ongoingRestSeconds: TimeInterval =
+                strength.activeWorkout?.id == workout.id
+                ? strength.restStartedAt.map {
+                    max(context.date.timeIntervalSince($0), 0)
+                } ?? 0
+                : 0
             let breakdown = StrengthWorkoutResultBreakdown(
                 workout: workout,
                 elapsedSeconds: strength.elapsedSessionSeconds(
                     for: workout, at: context.date
-                )
+                ),
+                ongoingRestSeconds: ongoingRestSeconds
             )
             let totalDuration = breakdown.totalSeconds
             let restDuration = breakdown.restSeconds
