@@ -487,6 +487,16 @@ final class IPhoneWorkoutStore:
     private var pendingLocalCoachEvent: (
         utterance: AVSpeechUtterance, event: ATHLTHCoachEvent
     )?
+    // The "last spoken" action must reflect actual audio, not a queued
+    // Azure synthesis request or an AVSpeech utterance never played.
+    private var coachPlaybackGeneration = UUID()
+    private var pendingLocalCoachReplay: (
+        utterance: AVSpeechUtterance,
+        text: String,
+        priority: ATHLTHGuidancePriority,
+        remember: Bool,
+        generation: UUID
+    )?
     private var coachCueQueue = ATHLTHCoachCueQueue()
     private var criticalCountdownEndsAt: Date?
     private var criticalCountdownKey: String?
@@ -5116,6 +5126,9 @@ final class IPhoneWorkoutStore:
             }
             return
         case .interruptAndDeliver:
+            coachPlaybackGeneration = UUID()
+            pendingLocalCoachReplay = nil
+            pendingLocalCoachEvent = nil
             azureCoachSpeech.stop()
             speechSynthesizer
                 .stopSpeaking(
@@ -5139,6 +5152,7 @@ final class IPhoneWorkoutStore:
             AVSpeechUtterance(
                 string: spokenPhrase
             )
+        let generation = coachPlaybackGeneration
 
         utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
             selectedIdentifier: configuration.voiceIdentifier,
@@ -5158,6 +5172,7 @@ final class IPhoneWorkoutStore:
             duckMusic: configuration.shouldDuckOtherAudio,
             shouldStart: { [weak self] in
                 guard let self, self.active != nil,
+                      self.coachPlaybackGeneration == generation,
                       ATHLTHCoachVoicePausePolicy.allowsSpeech(
                           coachEnabled: self.active?.audioCoachConfiguration?.enabled == true,
                           speechPaused: self.coachSpeechPaused, priority: priority
@@ -5167,7 +5182,10 @@ final class IPhoneWorkoutStore:
                     event.runningStepIndex == self.currentCoachRunningStepIndex)
             },
             onFallback: { [weak self] in
-                guard let self else { return }
+                guard let self,
+                      self.coachPlaybackGeneration == generation,
+                      self.active != nil,
+                      !self.coachSpeechPaused else { return }
                 try? ATHLTHSpokenAudioSession.activate(
                     duckOtherAudio: configuration.shouldDuckOtherAudio,
                     owner: self.audioOwner
@@ -5175,13 +5193,22 @@ final class IPhoneWorkoutStore:
                 self.pendingLocalCoachEvent = event.map {
                     (utterance: utterance, event: $0)
                 }
+                self.pendingLocalCoachReplay = (
+                    utterance, spokenPhrase, priority,
+                    rememberForReplay, generation
+                )
                 self.speechSynthesizer.speak(utterance)
                 self.watchLocalCoachSpeech(utterance)
             },
             // Standalone iPhone speech has its own local event ledger.
             onStarted: { [weak self] in
-                guard let self, let event else { return }
-                self.markLocalCoachEventStarted(event)
+                guard let self,
+                      self.coachPlaybackGeneration == generation else { return }
+                if let event { self.markLocalCoachEventStarted(event) }
+                self.confirmLocalCoachReplay(
+                    spokenPhrase, priority: priority,
+                    remember: rememberForReplay
+                )
             },
             onFinished: { [weak self] in
                 guard let self else { return }
@@ -5197,14 +5224,25 @@ final class IPhoneWorkoutStore:
             pendingLocalCoachEvent = event.map {
                 (utterance: utterance, event: $0)
             }
+            pendingLocalCoachReplay = (
+                utterance, spokenPhrase, priority,
+                rememberForReplay, generation
+            )
             speechSynthesizer.speak(utterance)
             watchLocalCoachSpeech(utterance)
         }
-        if rememberForReplay,
-           ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
-            coachReplayMemory.remember(spokenPhrase, priority: priority)
-            lastCoachMessage = coachReplayMemory.text
-        }
+    }
+
+    private func confirmLocalCoachReplay(
+        _ spokenText: String,
+        priority: ATHLTHGuidancePriority,
+        remember: Bool
+    ) {
+        guard remember,
+              ATHLTHCoachReplayMemory.mayRemember(priority: priority)
+        else { return }
+        coachReplayMemory.remember(spokenText, priority: priority)
+        lastCoachMessage = coachReplayMemory.text
     }
 
     private func markLocalCoachEventStarted(_ event: ATHLTHCoachEvent) {
@@ -5265,6 +5303,8 @@ final class IPhoneWorkoutStore:
     }
 
     private func deactivateCoachAudioSession() {
+        coachPlaybackGeneration = UUID()
+        pendingLocalCoachReplay = nil
         pendingLocalCoachEvent = nil
         localSpeechWatchdog?.cancel()
         localSpeechWatchdog = nil
@@ -5285,11 +5325,21 @@ final class IPhoneWorkoutStore:
         // callback to the main actor; AVSpeechUtterance is not Sendable.
         let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
-            guard let self,
-                  let pending = self.pendingLocalCoachEvent,
-                  ObjectIdentifier(pending.utterance) == utteranceID else { return }
-            self.pendingLocalCoachEvent = nil
-            self.markLocalCoachEventStarted(pending.event)
+            guard let self else { return }
+            if let pending = self.pendingLocalCoachEvent,
+               ObjectIdentifier(pending.utterance) == utteranceID {
+                self.pendingLocalCoachEvent = nil
+                self.markLocalCoachEventStarted(pending.event)
+            }
+            if let replay = self.pendingLocalCoachReplay,
+               ObjectIdentifier(replay.utterance) == utteranceID,
+               replay.generation == self.coachPlaybackGeneration {
+                self.pendingLocalCoachReplay = nil
+                self.confirmLocalCoachReplay(
+                    replay.text, priority: replay.priority,
+                    remember: replay.remember
+                )
+            }
         }
     }
 
