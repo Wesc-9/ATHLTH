@@ -128,7 +128,27 @@ CURRENT_SIZE="$IPAD_SIZE"
 if [ "$CURRENT_SIZE" = "all" ]; then CURRENT_SIZE=11; fi
 simctl_bounded "boot ${CURRENT_SIZE}-inch iPad" 100 boot "$UDID"
 simctl_bounded "wait for ${CURRENT_SIZE}-inch iPad boot" 160 bootstatus "$UDID" -b
-simctl_bounded "install ATHLTH on ${CURRENT_SIZE}-inch iPad" 180 install "$UDID" "$APP"
+# CoreSimulator on fresh hosted Macs sometimes reports boot complete while its
+# installation service is still initializing. A single 180s timeout is not
+# evidence of an app crash. Retry once after a bounded service restart, but
+# never pass the smoke test without a real install, launch and screenshot.
+install_ipad_app() {
+  local size="$1"
+  if simctl_bounded "install ATHLTH on ${size}-inch iPad (first attempt)" 240 install "$UDID" "$APP"; then
+    return 0
+  fi
+
+  echo "::warning::CoreSimulator installation failed; collecting diagnostics before one retry."
+  xcrun simctl list devices booted > "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
+  xcrun simctl spawn "$UDID" launchctl list >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
+  # A hung install may leave installd unresponsive. Restart the simulator
+  # instead of assuming that simply repeating install will make progress.
+  simctl_bounded "shutdown ${size}-inch iPad before retry" 60 shutdown "$UDID" || true
+  simctl_bounded "reboot ${size}-inch iPad before retry" 120 boot "$UDID"
+  simctl_bounded "wait for ${size}-inch iPad retry boot" 180 bootstatus "$UDID" -b
+  simctl_bounded "install ATHLTH on ${size}-inch iPad (final attempt)" 300 install "$UDID" "$APP"
+}
+install_ipad_app "$CURRENT_SIZE"
 
 validate_screen() {
   local label="$1"
@@ -265,7 +285,7 @@ if UDID_13=$(create_compatible_ipad 13 "ATHLTH-iPad-13"); then
   UDID="$UDID_13"
   simctl_bounded "boot 13-inch iPad" 100 boot "$UDID"
   simctl_bounded "wait for 13-inch iPad boot" 160 bootstatus "$UDID" -b
-  simctl_bounded "install ATHLTH on 13-inch iPad" 180 install "$UDID" "$APP"
+  install_ipad_app 13
   xcrun simctl launch "$UDID" com.wesc9.athlth \
     --athlth-compatibility-preview \
     "--athlth-compatibility-tab=0"
