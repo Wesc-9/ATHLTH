@@ -1902,7 +1902,7 @@ final class StrengthWorkoutStore: ObservableObject {
         countdown.pause(at: date)
         timedSetCountdown = countdown
         if var effort = currentSetEffortClock {
-            effort.pause(at: now)
+            effort.pause(at: date)
             setEffortClock = effort
         }
         persistCheckpointNow()
