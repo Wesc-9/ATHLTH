@@ -32,15 +32,17 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         XCTAssertTrue(ATHLTHWatchStrengthResultIdentityPolicy.matches(
             result: result, workout: original
         ))
-        var other = original
-        other.id = UUID()
+        var mismatchedResult = result
+        var wrongSnapshot = try XCTUnwrap(result.strengthSnapshot)
+        wrongSnapshot.workoutID = UUID()
+        mismatchedResult.strengthSnapshot = wrongSnapshot
         XCTAssertFalse(ATHLTHWatchStrengthResultIdentityPolicy.matches(
-            result: result, workout: other
+            result: mismatchedResult, workout: original
         ))
-        other = original
-        other.captureDevice = .iPhone
+        var wrongCapture = original
+        wrongCapture.captureDevice = .iPhone
         XCTAssertFalse(ATHLTHWatchStrengthResultIdentityPolicy.matches(
-            result: result, workout: other
+            result: result, workout: wrongCapture
         ))
         // The result ID itself is unrelated to the authoritative workout.
         XCTAssertNotEqual(result.id, original.id)
