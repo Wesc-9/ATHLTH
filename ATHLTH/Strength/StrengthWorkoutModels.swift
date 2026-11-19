@@ -858,50 +858,115 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     }
 
     var totalCompletedReps: Int {
+        // Prescribed or skipped sets may still contain legacy draft inputs.
+        // Only the athlete's completed repetitions belong in the result.
         exercises
             .flatMap(\.sets)
-            .compactMap {
-                $0.resolvedCompletedReps
-            }
-            .reduce(0, +)
+            .filter(\.isCompleted)
+            .reduce(0) { $0 + max($1.resolvedCompletedReps ?? 0, 0) }
+    }
+
+    var recordedRestDurationsSeconds: [TimeInterval] {
+        exercises
+            .flatMap(\.sets)
+            .filter(\.isCompleted)
+            .compactMap(\.actualRestAfterSeconds)
+            .filter { $0.isFinite && $0 >= 0 }
     }
 
     var totalActualRestSeconds: TimeInterval {
-        exercises
-            .flatMap(\.sets)
-            .compactMap {
-                $0.actualRestAfterSeconds
-            }
-            .reduce(0, +)
+        recordedRestDurationsSeconds.reduce(0, +)
     }
 
     var longestActualRestSeconds: TimeInterval {
-        exercises
-            .flatMap(\.sets)
-            .compactMap {
-                $0.actualRestAfterSeconds
-            }
-            .max() ?? 0
+        recordedRestDurationsSeconds.max() ?? 0
     }
 
     var averageActualRestSeconds: TimeInterval {
-        let values =
-            exercises
-                .flatMap(\.sets)
-                .compactMap {
-                    $0.actualRestAfterSeconds
-                }
-
-        guard !values.isEmpty else {
-            return 0
-        }
-
-        return
-            values.reduce(0, +) /
-            Double(values.count)
+        let values = recordedRestDurationsSeconds
+        guard !values.isEmpty else { return 0 }
+        return values.reduce(0, +) / Double(values.count)
     }
 
     var isFinished: Bool {
         endedAt != nil
+    }
+}
+
+
+/// Derived from the authoritative StrengthWorkoutLog, never persisted and
+/// never a second workout/HealthKit recording. Every exercise retains its
+/// stable source ID so hybrid cardio and strength can share one result.
+struct StrengthWorkoutResultSegment: Identifiable {
+    let id: UUID
+    let exerciseName: String
+    let isCardio: Bool
+    let completedSets: Int
+    let skippedSets: Int
+    let completedReps: Int
+    let volumeKilograms: Double
+    let registeredEffortSeconds: TimeInterval
+    let measuredDistanceMeters: Double
+    let loggedDistanceMeters: Double
+    let estimatedTreadmillDistanceMeters: Double
+
+    init(exercise: StrengthExerciseLog) {
+        id = exercise.id
+        exerciseName = exercise.exercise.displayName
+        isCardio = exercise.isEmbeddedRunningInterval == true ||
+            StrengthCardioExercisePolicy.isCardio(exercise.exercise.name) ||
+            exercise.sets.contains { $0.hybridPhaseKind != nil }
+        let completed = exercise.sets.filter(\.isCompleted)
+        completedSets = completed.count
+        skippedSets = exercise.auditedSkippedSets
+        completedReps = completed.reduce(0) {
+            $0 + max($1.resolvedCompletedReps ?? 0, 0)
+        }
+        volumeKilograms = completed.reduce(0) { $0 + $1.volumeKilograms }
+        // Prefer actual set/Watch timing to a manually recorded timed target.
+        // Never add both for the same set.
+        registeredEffortSeconds = completed.reduce(0) { subtotal, set in
+            let seconds = set.actualSetElapsedSeconds ??
+                set.watchActiveDurationSeconds ??
+                set.resolvedCompletedDurationSeconds.map(TimeInterval.init)
+            return subtotal + ((seconds?.isFinite == true) ? max(seconds ?? 0, 0) : 0)
+        }
+        measuredDistanceMeters = completed.reduce(0) { subtotal, set in
+            let meters = set.watchMeasuredDistanceMeters
+            return subtotal + ((meters?.isFinite == true) ? max(meters ?? 0, 0) : 0)
+        }
+        loggedDistanceMeters = completed.reduce(0) { subtotal, set in
+            // The Watch measurement also populates completedDistanceMeters;
+            // report it only once, in the measured category.
+            guard set.watchMeasuredDistanceMeters == nil else { return subtotal }
+            let meters = set.resolvedCompletedDistanceMeters
+            return subtotal + ((meters?.isFinite == true) ? max(meters ?? 0, 0) : 0)
+        }
+        estimatedTreadmillDistanceMeters = completed.reduce(0) { subtotal, set in
+            let meters = set.manuallyEstimatedTreadmillDistanceMeters
+            return subtotal + ((meters?.isFinite == true) ? max(meters ?? 0, 0) : 0)
+        }
+    }
+}
+
+/// One non-destructive results projection for the live finish review and
+/// saved history. Ordinary rest stays inside the HealthKit workout duration,
+/// while process-recovery downtime is excluded by the authoritative clock.
+struct StrengthWorkoutResultBreakdown {
+    let totalSeconds: TimeInterval
+    let restSeconds: TimeInterval
+    let activeSeconds: TimeInterval
+    let segments: [StrengthWorkoutResultSegment]
+
+    init(workout: StrengthWorkoutLog, elapsedSeconds: TimeInterval) {
+        let healthSeconds = workout.healthMetrics.duration
+        let chosen = (healthSeconds?.isFinite == true && (healthSeconds ?? 0) > 0)
+            ? (healthSeconds ?? 0) : elapsedSeconds
+        totalSeconds = chosen.isFinite ? max(chosen, 0) : 0
+        // Invalid imported rest evidence must never make 'active time'
+        // negative or exceed the actual workout duration.
+        restSeconds = min(workout.totalActualRestSeconds, totalSeconds)
+        activeSeconds = max(totalSeconds - restSeconds, 0)
+        segments = workout.exercises.map(StrengthWorkoutResultSegment.init)
     }
 }
