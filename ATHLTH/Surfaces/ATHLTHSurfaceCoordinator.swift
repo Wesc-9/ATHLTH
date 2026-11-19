@@ -34,18 +34,24 @@ enum ATHLTHSurfaceCoordinator {
                ) {
                 return
             }
-            if previousDisplayed != nil && previousRemote == nil {
-                // Only the owner can replace an existing local presentation.
+            if previousDisplayed != nil && previousRemote == nil &&
+               !ATHLTHDeviceRole.isIPad {
+                // A local iPhone recording is authoritative. On iPad,
+                // previousRemote is nil after app relaunch even though the
+                // prior read-only widget snapshot still exists in App Group.
                 return
             }
         } else if let previousDisplayed {
-            // Removing a remote relay must not erase a newer local session.
-            guard let previousRemote,
-                  ATHLTHSurfaceWorkoutOrdering.sameSession(
-                      previousDisplayed, previousRemote
-                  ) else {
-                remoteWorkout = nil
-                return
+            // Removing remote access must not erase a local recording. iPad
+            // is always a spectator and may clear its restored cached state.
+            if !ATHLTHDeviceRole.isIPad {
+                guard let previousRemote,
+                      ATHLTHSurfaceWorkoutOrdering.sameSession(
+                          previousDisplayed, previousRemote
+                      ) else {
+                    remoteWorkout = nil
+                    return
+                }
             }
         }
 
