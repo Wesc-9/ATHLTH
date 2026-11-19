@@ -244,6 +244,14 @@ enum WorkoutDeviceRelayClaimPolicy {
     /// A claim RPC must return zero or one row. Multiple rows may already
     /// be claimed on the server; executing only the first would conceal
     /// the remaining commands and make replay/reconciliation unsafe.
+    /// A terminal command cannot be overwritten by a late failure callback.
+    /// The database enforces the same invariant for all clients.
+    static func mayTransitionToFailure(
+        completedAt: Date?, failedAt: Date?
+    ) -> Bool {
+        completedAt == nil && failedAt == nil
+    }
+
     static func hasValidClaimBatchSize(_ count: Int) -> Bool {
         count == 0 || count == 1
     }
@@ -1247,6 +1255,10 @@ final class WorkoutDeviceRelayStore:
             )
             .eq("user_id", value: userID)
             .eq("claimed_by_device_id", value: ATHLTHDeviceRole.persistentDeviceID)
+            // Only pending claims can transition. A delayed callback must
+            // never turn a completed start into a failure (or vice versa).
+            .filter("completed_at", operator: "is", value: "null")
+            .filter("failed_at", operator: "is", value: "null")
             .select("id")
             .execute()
             .value
@@ -1284,6 +1296,10 @@ final class WorkoutDeviceRelayStore:
             )
             .eq("user_id", value: userID)
             .eq("claimed_by_device_id", value: ATHLTHDeviceRole.persistentDeviceID)
+            // Only pending claims can transition. A delayed callback must
+            // never turn a completed start into a failure (or vice versa).
+            .filter("completed_at", operator: "is", value: "null")
+            .filter("failed_at", operator: "is", value: "null")
             .select("id")
             .execute()
             .value
