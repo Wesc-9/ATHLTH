@@ -702,13 +702,18 @@ final class WorkoutDeviceRelayStore:
                 rememberLaunchedCommand(command.id, userID: processingUserID)
                 forgetUncertainLaunch(command.id, userID: processingUserID)
             } catch {
-                // The launch API explicitly failed; only this path may clear
-                // the pre-start uncertainty. Cancellation/account switch does
-                // not prove Watch did not start.
+                // An async start may throw after Watch accepted the request.
+                // A thrown error alone cannot prove that HealthKit is idle.
+                // Retain the uncertainty and never mark the server claim as
+                // definitively failed until device status is reconciled.
                 guard currentUserID == processingUserID,
                       !Task.isCancelled else { return }
-                forgetUncertainLaunch(command.id, userID: processingUserID)
-                try? await markFailed(command.id, error: error)
+                errorMessage = error.localizedDescription
+                lastStatusText = ATHLTHLocalization.choose(
+                    english: "Start outcome uncertain; verify on Apple Watch.",
+                    norwegian: "Uavklart oppstart – kontroller Apple Watch."
+                )
+                return
                 guard currentUserID == processingUserID,
                       !Task.isCancelled else { return }
                 errorMessage = error.localizedDescription
