@@ -863,3 +863,60 @@ historisk gjennomført oppstart. Journalen holdes da uavklart fremfor
 samme ID og HealthKit-workout-UUID, slik at også avsluttede økter kan
 gjenopprettes autoritativt. Alle nye endringer krever grønn CI på samme
 commit og fysisk iPhone/iPad/Watch-test før fase 4 kan godkjennes.
+
+### Fase 4 – terminal Watch-kvittering og akseptanseport (19.11.2026)
+
+**Implementert i kode (ikke fysisk godkjent):**
+- En vellykket Watch-`HKWorkoutBuilder.finishWorkout()` gir
+  `WatchWorkoutResult.relayRequestID` ved faktisk HealthKit-lagring,
+  sammen med eksisterende `healthKitWorkoutUUID` og Watch-kontoen.
+  Eldre/standalone Watch-resultater har `nil`, og kan ikke
+  bekrefte en fremmed fjernstart.
+- Watch lager en **minimal terminal kvittering** med kun forespørsels-ID,
+  resultats-ID, HealthKit-UUID, eier, type og start-/sluttid.
+  Den journalføres før ordinær resultatmelding og sendes både direkte
+  og via WatchConnectivity sin varige brukerinfo-kø.
+  Ved ny Watch-aktivering spilles kvitteringer fra en begrenset
+  30-dagers outbox av på nytt. Selve treningsmålingene dupliseres ikke.
+- iPhone beholder terminalt bevis **uavhengig av** Watch-resultatets
+  eksisterende importkø. En avsluttet økt kan dermed bekrefte en
+  tidligere uavklart fjernstart også etter at vanlig historikk-import
+  har konsumert resultatet. Kvitteringen begrenses til 128 poster /
+  30 dager og brukes kun ved eksakt innlogget konto.
+- Rekonsiliering krever både eksakt `client_request_id`, serverpost
+  claimet av denne telefonen, samme konto, Watch-mål, kompatibel
+  aktivitetstype, ikke-feilet serverpost og starttid etter request.
+  Terminalt bevis krever ekte HealthKit-UUID. En annen ferdig økt,
+  feil konto, feil aktivitet eller feil UUID kan aldri løse journalen.
+- To motstridende HealthKit-resultater med samme request-ID avvises
+  som tvetydig dokumentasjon. De slettes ikke for å velge en vilkårlig
+  «vinner». Replay av samme kvittering idempotent.
+- Dette etablerer **ingen ny HealthKit recording**, duplikat logg eller
+  alternativ treningshistorikk; PhoneWorkout/StrengthWorkoutLog og
+  Watch-resultatimport forblir autoritative.
+
+**Må verifiseres før fase 4 kan erklæres godkjent:**
+1. Samme-commit grønt Build ATHLTH, Train/Hybrid XCTest, backend og
+   iPhone-kompatibilitet, inkludert watchOS-kompilering.
+2. iPad → iPhone- og iPad → Watch-start for løp, gåing og styrke,
+   både fra forgrunn og etter app-frakobling; ett fysisk HealthKit-opptak.
+3. Frakobling/krasj før Watch-start, etter start, etter HealthKit-lagring
+   og før mottatt serverkvittering; hver tilstand har korrekt journal.
+4. Watch allerede avsluttet før iPhone får ny aktivitetsstatus;
+   minimal outbox-protokoll og vanlig treningshistorikk fungerer
+   uavhengig av meldingsrekkefølge. Ingen dobbel historikk/import.
+5. Kontobytte, feil økt-ID, to motstridende UUID-er, gammelt
+   heartbeat, iPad-samtykke og ny trening før gammel melding.
+6. Fysisk iPhone + iPad + Apple Watch og HealthKit-resultatet må
+   kontrolleres, inkludert Watch-app som ikke er i forgrunnen.
+
+**Gjenstående begrensninger:** HealthKit kan i sjeldne tilfeller lagre
+en økt rett før Watch-appen krasjer **uten at den rekker å konstruere
+terminal kvittering**. Da beholdes usikkerhetsjournalen inntil
+autoritativ HealthKit-historikkavklaring; ikke gjett eller start på nytt.
+Nye iPad-initierte Watch-starter krever WatchConnectivity-ACK før
+HealthKit-start – en sovende/ikke-reachable Watch kan derfor bli
+avvist uten at det opprettes en økt. Sikkerhet har prioritet til
+fysisk verifisert oppstartshåndtrykk finnes.
+
+Ingen TestFlight-opplasting uten separat uttrykkelig godkjenning.
