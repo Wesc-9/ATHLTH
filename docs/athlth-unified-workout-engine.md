@@ -827,3 +827,39 @@ HealthKit-opptakstype, historikkpost eller datamigrering er innført.
   og lokal journalføring krever fremdeles autoritativ
   Watch-/serverrekonsiliering før eksakt-én-gang kan garanteres.
   Samme-commit iOS-/Watch-CI og fysisk treenhetstest gjenstår.
+
+### Fase 4 – sammenhengende iPad → iPhone → Apple Watch-identitet (19.11.2026)
+
+- Nye iPad-fjernstarter bruker eksisterende `client_request_id` som én
+  stabil korrelasjons-ID i serverposten og payloaden. iPhone avviser en
+  serverclaim som ikke matcher payloadens ID. Eldre payloads uten feltet
+  kan fremdeles dekodes.
+- For Watch-mål føres samme ID gjennom felles oppstartskoordinator for
+  løping, gåing og styrke. iPhone krever en direkte WatchConnectivity-ACK
+  med eksakt ID **før** HealthKit får starte Watch-appen. Manglende
+  rekkevidde, timeout eller avvikende ACK avviser fjernstarten; det er
+  bevisst fail-closed og kan kreve at brukeren åpner Watch-appen.
+- Watch lagrer en kortvarig, typebundet ventende start-ID før ACK og
+  knytter den til faktisk HealthKit-økt når denne etableres. ID-en
+  lagres med Watch sin eksisterende recovery-checkpoint, og kan
+  rapporteres i den aktive øktens aktivitetsstatus. Lokal Watch-økt
+  arver aldri ID fra en relékommando.
+- Ved appstart og overgang til forgrunn kan iPhone sammenligne en
+  uavklart lokal startjournal med **fersk aktiv Watch-status**, og
+  kontrollere eksakt serverpost, fysisk telefon, konto, mål og
+  forespørsels-ID. Bare eksakt samsvar oppgraderer journalen til
+  en bekreftet start; den ordinære serverkvitteringsrutinen gjør resten.
+  Ingen gjenoppretting starter en ekstra HealthKit-økt.
+- For løp på Watch overstyrer en ekte fjernstart «start manuelt på
+  klokken» til umiddelbar start; den kan ikke kvitteres som vellykket
+  når bare et forberedelseskort er overført.
+- Testdekning: feil ID, manglende ID, feil mål, serverfeil,
+  kortvarig token, transport/eldre aktivitetspayload.
+
+**Fortsatt begrensning:** Hvis Watch-økten allerede er avsluttet før
+iPhone får en fersk aktivitetsstatus, kan aktiv status alene ikke bevise
+historisk gjennomført oppstart. Journalen holdes da uavklart fremfor
+å anta suksess/feil. En framtidig fullført Watch-kvittering bør ha
+samme ID og HealthKit-workout-UUID, slik at også avsluttede økter kan
+gjenopprettes autoritativt. Alle nye endringer krever grønn CI på samme
+commit og fysisk iPhone/iPad/Watch-test før fase 4 kan godkjennes.
