@@ -1395,7 +1395,8 @@ final class MirroredWorkoutAudioCoach:
                 )
             },
             onFinished: { [weak self] in
-                guard let self else { return }
+                guard let self,
+                      self.playbackGeneration == generation else { return }
                 self.guidanceGate.voiceDidFinish()
                 self.deliverNextQueuedCue()
             }
