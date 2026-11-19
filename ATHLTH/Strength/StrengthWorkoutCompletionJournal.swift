@@ -25,7 +25,8 @@ enum StrengthWorkoutCompletionJournal {
         // arrive out of order after app suspension or Watch reconnection.
         if let previous = read(userID: userID),
            let previousEnd = previous.endedAt,
-           previousEnd > endedAt { return }
+           (previousEnd > endedAt ||
+            (previousEnd == endedAt && previous.id != workout.id)) { return }
         let data = try JSONEncoder().encode(workout)
         let target = try url(userID: userID)
         try FileManager.default.createDirectory(
