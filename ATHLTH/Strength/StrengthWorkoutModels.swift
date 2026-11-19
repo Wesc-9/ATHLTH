@@ -766,6 +766,9 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var title: String
     var startedAt: Date
     var endedAt: Date?
+    // Present only when iPad remotely requested this exact existing workout.
+    // Optional to keep previously recorded strength history decodable.
+    var relayRequestID: UUID? = nil
     /// Accumulated *confirmed* phone-offline downtime after crash recovery.
     /// Optional preserves histories and checkpoints from earlier versions.
     /// Watch-owned HealthKit recordings never use this local correction.
