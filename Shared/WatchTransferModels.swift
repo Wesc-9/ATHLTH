@@ -1831,6 +1831,35 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     // Nil for legacy Watch versions; the phone must not silently attribute
     // an unowned result to whichever user happens to be signed in.
     var accountOwnerID: UUID? = nil
+    // Stable iPad request identity only when Watch actually finished its
+    // HealthKit recording. Optional for older Watch/phone builds.
+    var relayRequestID: UUID? = nil
+}
+
+/// Minimal terminal proof, independent of the workout-history import queue.
+/// This stores no health measurements, route or exercise data.
+struct WatchRemoteLaunchCompletionReceipt: Codable, Hashable {
+    let relayRequestID: UUID
+    let ownerID: UUID
+    let healthKitWorkoutUUID: UUID
+    let resultID: UUID
+    let kind: WatchWorkoutKind
+    let startedAt: Date
+    let endedAt: Date
+
+    init?(result: WatchWorkoutResult) {
+        guard let relayRequestID = result.relayRequestID,
+              let ownerID = result.accountOwnerID,
+              let healthKitWorkoutUUID = result.healthKitWorkoutUUID,
+              result.endedAt >= result.startedAt else { return nil }
+        self.relayRequestID = relayRequestID
+        self.ownerID = ownerID
+        self.healthKitWorkoutUUID = healthKitWorkoutUUID
+        self.resultID = result.id
+        self.kind = result.kind
+        self.startedAt = result.startedAt
+        self.endedAt = result.endedAt
+    }
 }
 
 /// Fail closed when WatchConnectivity delivers a completed workout to
