@@ -205,13 +205,20 @@ enum WorkoutDeviceRelayClaimPolicy {
         payloadKind: String,
         payloadVersion: Int,
         expiresAt: Date,
+        claimedDeviceID: String?,
+        expectedDeviceID: String,
+        completedAt: Date?,
+        failedAt: Date?,
         now: Date = Date()
     ) -> Bool {
         source == "ipad" &&
             target == payloadTarget &&
             kind == payloadKind &&
             expiresAt > now &&
-            payloadVersion == 1
+            payloadVersion == 1 &&
+            claimedDeviceID == expectedDeviceID &&
+            !expectedDeviceID.isEmpty &&
+            completedAt == nil && failedAt == nil
     }
 }
 
@@ -588,9 +595,15 @@ final class WorkoutDeviceRelayStore:
                 payloadTarget: record.payload.target.rawValue,
                 payloadKind: record.payload.kind.rawValue,
                 payloadVersion: record.payload.version,
-                expiresAt: record.expiresAt
+                expiresAt: record.expiresAt,
+                claimedDeviceID: record.claimedByDeviceID,
+                expectedDeviceID: ATHLTHDeviceRole.persistentDeviceID,
+                completedAt: record.completedAt,
+                failedAt: record.failedAt
             ) else {
                 // A malformed or expired claim must never launch HealthKit.
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
                 try? await markFailed(
                     record.id,
                     error: NSError(
@@ -658,6 +671,9 @@ final class WorkoutDeviceRelayStore:
                 english: "Remote workout started.",
                 norwegian: "Fjernstart av økt utført."
             )
+            // One successful remote start per drain. A second queued start
+            // must not race the newly active Watch/HealthKit recording.
+            return
         }
     }
 
