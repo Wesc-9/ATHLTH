@@ -536,7 +536,11 @@ final class WorkoutDeviceRelayStore:
                 // A malformed or expired claim must never launch HealthKit.
                 try? await markFailed(
                     record.id,
-                    error: ATHLTHWorkoutSessionLaunchError.alreadyRecording
+                    error: NSError(
+                        domain: "ATHLTH.DeviceRelay", code: 2,
+                        userInfo: [NSLocalizedDescriptionKey:
+                            "Expired or invalid workout relay command"]
+                    )
                 )
                 continue
             }
