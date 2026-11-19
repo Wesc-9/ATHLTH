@@ -330,18 +330,23 @@ final class WorkoutDeviceRelayStore:
         )
     }
 
-    private func reconcileLaunchedCommands(userID: UUID) async {
+    /// Finish prior launch receipts before claiming another start. If the
+    /// server is unavailable, retain the receipt and do not advance the queue.
+    /// This never re-executes the recorded HealthKit / Watch side effect.
+    private func reconcileLaunchedCommands(userID: UUID) async -> Bool {
         for id in unacknowledgedLaunchIDs(userID: userID) {
-            guard currentUserID == userID, !Task.isCancelled else { return }
+            guard currentUserID == userID, !Task.isCancelled else { return false }
             do {
                 try await markCompleted(id)
-                guard currentUserID == userID, !Task.isCancelled else { return }
+                guard currentUserID == userID, !Task.isCancelled else { return false }
                 forgetAcknowledgedCommand(id, userID: userID)
             } catch {
-                // Leave the durable receipt for the next reconnect.
-                return
+                // An unacknowledged launch may still be recording. Do not
+                // consume another remote start while its receipt is pending.
+                return false
             }
         }
+        return currentUserID == userID && !Task.isCancelled
     }
 
 
@@ -565,8 +570,9 @@ final class WorkoutDeviceRelayStore:
         isDrainingCommands = true
         defer { isDrainingCommands = false }
         guard let processingUserID = currentUserID else { return }
-        await reconcileLaunchedCommands(userID: processingUserID)
-        guard currentUserID == processingUserID, !Task.isCancelled else { return }
+        guard await reconcileLaunchedCommands(userID: processingUserID),
+              currentUserID == processingUserID, !Task.isCancelled
+        else { return }
         // Drain the complete bounded backlog on reconnect, not only the
         // first eight commands when no further realtime event may arrive.
         for _ in 0..<128 {
@@ -597,6 +603,26 @@ final class WorkoutDeviceRelayStore:
                 return
             }
 
+            // A server claim can reappear when its completion receipt fails.
+            // The locally durable launch journal is authoritative for this
+            // device: repair the receipt, never replay Watch/HealthKit start.
+            if !WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
+                commandID: record.id,
+                unacknowledgedLaunchIDs:
+                    unacknowledgedLaunchIDs(userID: processingUserID)
+            ) {
+                do {
+                    try await markCompleted(record.id)
+                    guard currentUserID == processingUserID,
+                          !Task.isCancelled else { return }
+                    forgetAcknowledgedCommand(record.id, userID: processingUserID)
+                } catch {
+                    // Keep the launch receipt. A later reconnect can retry.
+                    return
+                }
+                continue
+            }
+
             guard WorkoutDeviceRelayClaimPolicy.accepts(
                 source: record.sourceDevice,
                 target: record.targetDevice,
@@ -621,26 +647,6 @@ final class WorkoutDeviceRelayStore:
                             "Expired or invalid workout relay command"]
                     )
                 )
-                continue
-            }
-
-            // A server claim can reappear when its completion receipt fails.
-            // The locally durable launch journal is authoritative for this
-            // device: repair the receipt, never replay Watch/HealthKit start.
-            if !WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
-                commandID: record.id,
-                unacknowledgedLaunchIDs:
-                    unacknowledgedLaunchIDs(userID: processingUserID)
-            ) {
-                do {
-                    try await markCompleted(record.id)
-                    guard currentUserID == processingUserID,
-                          !Task.isCancelled else { return }
-                    forgetAcknowledgedCommand(record.id, userID: processingUserID)
-                } catch {
-                    // Keep the launch receipt. A later reconnect can retry.
-                    return
-                }
                 continue
             }
 
