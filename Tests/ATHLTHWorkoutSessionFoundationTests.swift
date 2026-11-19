@@ -62,6 +62,26 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
                        140, accuracy: 0.001)
     }
 
+    func testRecoveredRunAndWalkFinishAtRealTimeWithoutAddingIdleMinutes() {
+        let checkpointAt = start.addingTimeInterval(85)
+        let finishedAt = start.addingTimeInterval(3600)
+        for walking in [false, true] {
+            var recovered = phone(walking: walking)
+            recovered.accumulatedSeconds = 85
+            recovered.resumedAt = nil
+            recovered.lastCheckpoint = checkpointAt
+            recovered.pauses = [
+                PhoneWorkoutPauseInterval(startedAt: checkpointAt, endedAt: nil)
+            ]
+            recovered.end = ATHLTHWorkoutSessionFoundation.completionTimestamp(
+                startedAt: recovered.start, finishedAt: finishedAt
+            )
+            XCTAssertEqual(recovered.end, finishedAt)
+            XCTAssertEqual(recovered.elapsed(at: finishedAt), 85, accuracy: 0.001)
+            XCTAssertNotEqual(recovered.end, checkpointAt)
+        }
+    }
+
     func testSharedStrengthEffortClockExcludesOnlyExplicitPause() {
         let clock = StrengthSetEffortClock(
             workoutID: UUID(),

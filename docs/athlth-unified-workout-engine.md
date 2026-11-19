@@ -510,3 +510,13 @@ som ferdige før egne faser og reelle tester er fullført.
   identiske tidsstempel og sammenslåing av styrkepause-beskjeder.
 - Endringen krever iOS/Watch-byggetest og lydtest med AirPods og
   musikk på fysisk enhet; ingen påstand om fullført fase 5.
+
+### Fase 7 – også riktig sluttid for iPhone-løp og gåing
+
+- `IPhoneWorkoutStore.finish()` sluttfører nå med faktisk
+  brukerhandlingstid, ikke gjenopprettingssjekkpunktet fra før
+  appavbrudd. Tid brukt mens en gjenopprettet økt er pauset
+  forblir ekskludert fra aktiv tid ved hjelp av den eksisterende
+  `PhoneWorkout.elapsed(at:)`-klokken og pauseintervallene.
+- Regresjonen dekker både løp og gåing etter en lang bakgrunnspause.
+  Ingen separat HealthKit-motor, migrering eller ny historikk-ID.

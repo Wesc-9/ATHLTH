@@ -1671,13 +1671,15 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        let recoveryEnd =
-            recoveredWorkoutLastCheckpoint
-        workout.end =
-            max(
-                recoveryEnd ?? Date(),
-                workout.start
-            )
+        // A checkpoint recovered after a crash marks when recording was
+        // last saved, NOT when the athlete chose to finish. The workout
+        // remains paused on recovery, so this timestamp does not count
+        // app downtime as active training time.
+        let finishDate = Date()
+        workout.end = ATHLTHWorkoutSessionFoundation.completionTimestamp(
+            startedAt: workout.start,
+            finishedAt: finishDate
+        )
         let minuteSampleEnd = workout.end ?? Date()
         recordRunningMinuteIfDue(&workout, force: true, at: minuteSampleEnd)
         // Keep the final in-progress phase in the durable result as a
