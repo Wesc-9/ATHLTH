@@ -1174,3 +1174,17 @@ men ikke release-/fysisk godkjent.
   men beviser **ikke** fysisk HealthKit-idempotens på iPhone/Watch.
   Resultat-/PR-aggregasjon for alle treningsformer og release-kontroll
   gjenstår. Ingen TestFlight-opplasting.
+
+### Fase 7 – stabil identitet ved lik avslutningstid (19.11.2026)
+
+- Både `PhoneWorkoutCompletionJournal` og
+  `StrengthWorkoutCompletionJournal` beholder den eksisterende varige
+  kvitteringen når en annen økt ankommer med nøyaktig samme sluttid.
+  Oppdateringer som gjelder samme økt-ID ved samme sluttid er fortsatt
+  tillatt. Eldre sluttider avvises som før.
+- Utvidede regresjonstester dekker likt sluttidspunkt med ulike økt-ID-er
+  for både løp/gå og styrke. Dette er identitetsbeskyttelse i den
+  eksisterende journalen, ikke en ny database eller opptaksstrøm.
+- Verifisering av fase 7 er fortsatt åpen: full iOS/iPad/watchOS-bygg og
+  målrettet XCTest på én og samme commit, fysisk HealthKit-korrelasjon,
+  gjenoppretting etter krasj og fullstendig segment-/PR-regnskap.
