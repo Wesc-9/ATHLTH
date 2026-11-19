@@ -273,6 +273,29 @@ enum WorkoutDeviceRelayClaimPolicy {
 
     /// Only a genuinely saved Watch HealthKit workout can prove that a
     /// remote launch completed while the iPhone was disconnected.
+    /// Local iPhone recordings are authoritative only when their persisted
+    /// owner, exact request token, activity kind and start time agree with
+    /// the server claim. A matching plan title or calendar session is not proof.
+    static func confirmsIPhoneRecording(
+        target: String,
+        kind: String,
+        serverRequestID: UUID,
+        serverCreatedAt: Date,
+        recordingRequestID: UUID?,
+        recordingKind: String,
+        recordingStartedAt: Date,
+        ownerMatches: Bool,
+        failedAt: Date?
+    ) -> Bool {
+        target == WorkoutDeviceRelayTarget.iPhone.rawValue &&
+            failedAt == nil &&
+            ownerMatches &&
+            recordingRequestID == serverRequestID &&
+            kind == recordingKind &&
+            recordingStartedAt >= serverCreatedAt.addingTimeInterval(-120) &&
+            recordingStartedAt <= Date().addingTimeInterval(120)
+    }
+
     static func confirmsCompletedWatchLaunch(
         target: String,
         kind: String,
@@ -518,16 +541,22 @@ final class WorkoutDeviceRelayStore:
     /// active Watch proof or a durable saved HealthKit-result receipt. The
     /// latter remains available after the social/history queue was consumed.
     /// Never infer a launch from an idle Watch or matching workout title.
-    func reconcileUncertainWatchStarts(
-        watchConnection: AppleWatchConnectionStore
+    /// Resolve a stranded iPad relay against the authoritative owner:
+    /// a live/saved Watch HealthKit result OR the existing PhoneWorkout /
+    /// StrengthWorkoutLog checkpoint. Neither path creates a new recording.
+    func reconcileUncertainWorkoutStarts(
+        watchConnection: AppleWatchConnectionStore,
+        phoneWorkout: IPhoneWorkoutStore,
+        strengthWorkout: StrengthWorkoutStore
     ) async {
         guard ATHLTHDeviceRole.isIPhone,
               let userID = currentUserID,
               !uncertainLaunchIDs(userID: userID).isEmpty
         else { return }
 
-        // This probe can time out; saved completion evidence works offline.
-        let liveRequestID =
+        // A missing Watch connection cannot block recovery of iPhone-owned
+        // recordings. Historical terminal receipts are durable on the phone.
+        let liveWatchRequestID =
             await watchConnection.confirmedActiveRelayRequestID()
 
         for commandID in uncertainLaunchIDs(userID: userID) {
@@ -547,40 +576,78 @@ final class WorkoutDeviceRelayStore:
                 else { continue }
                 let record = rows[0]
 
-                let isLive = WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
-                    target: record.targetDevice,
-                    serverRequestID: record.clientRequestID,
-                    watchRequestID: liveRequestID,
-                    failedAt: record.failedAt
-                )
-                let receipt = watchConnection.completedRelayReceipt(
+                let isLiveWatch =
+                    WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
+                        target: record.targetDevice,
+                        serverRequestID: record.clientRequestID,
+                        watchRequestID: liveWatchRequestID,
+                        failedAt: record.failedAt
+                    )
+                let watchReceipt = watchConnection.completedRelayReceipt(
                     requestID: record.clientRequestID, ownerID: userID
                 )
-                let isCompleted = WorkoutDeviceRelayClaimPolicy.confirmsCompletedWatchLaunch(
-                    target: record.targetDevice,
-                    kind: record.commandKind,
-                    serverRequestID: record.clientRequestID,
-                    serverCreatedAt: record.createdAt,
-                    signedInOwnerID: userID,
-                    receipt: receipt,
-                    failedAt: record.failedAt
-                )
-                guard isLive || isCompleted else { continue }
+                let isCompletedWatch =
+                    WorkoutDeviceRelayClaimPolicy.confirmsCompletedWatchLaunch(
+                        target: record.targetDevice,
+                        kind: record.commandKind,
+                        serverRequestID: record.clientRequestID,
+                        serverCreatedAt: record.createdAt,
+                        signedInOwnerID: userID,
+                        receipt: watchReceipt,
+                        failedAt: record.failedAt
+                    )
 
-                // Promote the recorded success BEFORE clearing uncertainty.
-                // Restarting the app mid-transition only retries the server
-                // receipt; it never replays a HealthKit/Watch start.
+                let phoneCandidates =
+                    [phoneWorkout.active, phoneWorkout.lastCompletedWorkout]
+                        .compactMap { $0 } + phoneWorkout.history
+                let isIPhoneRunOrWalk = phoneCandidates.contains { workout in
+                    WorkoutDeviceRelayClaimPolicy.confirmsIPhoneRecording(
+                        target: record.targetDevice,
+                        kind: record.commandKind,
+                        serverRequestID: record.clientRequestID,
+                        serverCreatedAt: record.createdAt,
+                        recordingRequestID: workout.relayRequestID,
+                        recordingKind: workout.walking ? "walk" : "run",
+                        recordingStartedAt: workout.start,
+                        ownerMatches: phoneWorkout.recordingAccountID == userID,
+                        failedAt: record.failedAt
+                    )
+                }
+                let strengthCandidates =
+                    [strengthWorkout.activeWorkout].compactMap { $0 }
+                        + strengthWorkout.workoutHistory
+                let isIPhoneStrength = strengthCandidates.contains { workout in
+                    workout.captureDevice == .iPhone &&
+                    WorkoutDeviceRelayClaimPolicy.confirmsIPhoneRecording(
+                        target: record.targetDevice,
+                        kind: record.commandKind,
+                        serverRequestID: record.clientRequestID,
+                        serverCreatedAt: record.createdAt,
+                        recordingRequestID: workout.relayRequestID,
+                        recordingKind: "strength",
+                        recordingStartedAt: workout.startedAt,
+                        ownerMatches: strengthWorkout.isLoaded(for: userID),
+                        failedAt: record.failedAt
+                    )
+                }
+                guard isLiveWatch || isCompletedWatch ||
+                        isIPhoneRunOrWalk || isIPhoneStrength
+                else { continue }
+
+                // The existing source-of-truth workout already exists. Save
+                // the success receipt before clearing uncertainty so a
+                // second process crash cannot cause duplicate launch.
                 rememberLaunchedCommand(commandID, userID: userID)
                 forgetUncertainLaunch(commandID, userID: userID)
                 lastStatusText = ATHLTHLocalization.choose(
-                    english: "Apple Watch workout verified; confirming start.",
-                    norwegian: "Apple Watch-økt bekreftet; kvitterer oppstart."
+                    english: "Remote workout verified; confirming start.",
+                    norwegian: "Fjernstartet økt bekreftet; kvitterer oppstart."
                 )
                 _ = await reconcileLaunchedCommands(userID: userID)
-                // Never claim the next start in this reconciliation call.
+                // One reconciliation only. Never claim another remote start.
                 return
             } catch {
-                // Network/ownership failures leave uncertainty intact.
+                // Missing network/owner evidence remains uncertain.
                 return
             }
         }
