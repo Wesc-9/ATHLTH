@@ -1619,6 +1619,18 @@ enum WorkoutLaunchCoordinator {
             watchSessionID = nil
         }
 
+        // The Watch launch above suspends this task. Recheck the actual
+        // checkpoint after resuming: another start or restore may have won.
+        // Do not overwrite it or report a successful strength launch.
+        do {
+            try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+                strengthWorkout.activeSessionState
+            )
+        } catch {
+            await social.markCurrentJoinedWorkoutLaunchFailed()
+            throw error
+        }
+
         session.beginTrainingStatus(
             for: workout
         )
@@ -1633,6 +1645,16 @@ enum WorkoutLaunchCoordinator {
                     ? advancedConfiguration
                     : nil
         )
+
+        // The store can reject a launch during account restoration. Never
+        // announce an active workout or send a Watch snapshot in that case.
+        guard let started = strengthWorkout.activeWorkout,
+              started.plannedSessionID == workout.id,
+              started.endedAt == nil,
+              started.captureDevice == captureDevice else {
+            await social.markCurrentJoinedWorkoutLaunchFailed()
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
 
         if captureDevice == .iPhone {
             watchConnection
