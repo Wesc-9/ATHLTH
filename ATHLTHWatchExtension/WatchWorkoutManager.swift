@@ -302,6 +302,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var workoutInitiatedLocallyOnWatch = false
     private let pendingRelayIdentityKey = "athlth.watch.pendingRemoteLaunch.v1"
     private let relayCompletionOutboxKey = "athlth.watch.remoteCompletionOutbox.v1"
+    private var lastLiveRelayCompletionReplayAt: Date = .distantPast
     private var activeRelayRequestID: UUID?
 
     /// Persist the identity before replying to the iPhone. The Watch can
@@ -3497,7 +3498,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func deliverRelayCompletionProof(
-        _ proof: WatchRemoteLaunchCompletionReceipt
+        _ proof: WatchRemoteLaunchCompletionReceipt,
+        durable: Bool = true
     ) {
         guard WCSession.isSupported(),
               WCSession.default.activationState == .activated,
@@ -3512,7 +3514,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 Date().timeIntervalSince1970
         ]
         let session = WCSession.default
-        session.transferUserInfo(payload)
+        if durable {
+            session.transferUserInfo(payload)
+        }
         if session.isReachable {
             session.sendMessage(
                 payload, replyHandler: nil, errorHandler: nil
@@ -3543,9 +3547,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// Called after WatchConnectivity activation, including cold relaunch.
     /// Replays receipt IDs only; iPhone de-duplicates by exact request and
     /// HealthKit UUID, so repeated delivery never imports a workout twice.
-    func replayRelayCompletionProofs() {
+    func replayRelayCompletionProofs(durable: Bool = true) {
+        if !durable {
+            // Reachability can bounce repeatedly while iPhone wakes.
+            // Resend directly without adding another durable queue entry.
+            let now = Date()
+            guard now.timeIntervalSince(lastLiveRelayCompletionReplayAt) >= 60
+            else { return }
+            lastLiveRelayCompletionReplayAt = now
+        }
         for proof in relayCompletionOutbox() {
-            deliverRelayCompletionProof(proof)
+            deliverRelayCompletionProof(proof, durable: durable)
         }
     }
 
