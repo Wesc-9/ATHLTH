@@ -157,6 +157,40 @@ private final class WatchWorkoutActivityProbeContinuation: @unchecked Sendable {
     }
 }
 
+// A relay identity is only usable when the Watch confirms the identical
+// UUID was staged. A timeout or reply from a previous command is rejection.
+private final class WatchRemoteLaunchIdentityAck: @unchecked Sendable {
+    private let lock = NSLock()
+    private let expectedID: UUID
+    private var continuation: CheckedContinuation<Bool, Never>?
+
+    init(expectedID: UUID, continuation: CheckedContinuation<Bool, Never>) {
+        self.expectedID = expectedID
+        self.continuation = continuation
+    }
+
+    func complete(_ accepted: Bool) {
+        lock.lock()
+        let waiting = continuation
+        continuation = nil
+        lock.unlock()
+        waiting?.resume(returning: accepted)
+    }
+
+    nonisolated func reply(_ payload: [String: Any]) {
+        let matches = payload[WatchTransferMetadataKey.kind] as? String ==
+                WatchTransferKind.workoutRemoteLaunchIdentity.rawValue &&
+            payload[WatchTransferMetadataKey.relayRequestID] as? String ==
+                expectedID.uuidString &&
+            payload[WatchTransferMetadataKey.workoutAllowed] as? Bool == true
+        complete(matches)
+    }
+
+    nonisolated func failed(_ error: Error) {
+        complete(false)
+    }
+}
+
 private struct IncomingWatchPayload: Sendable {
     let kind: String?
     let probeID: String?
@@ -567,7 +601,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     @MainActor
     func startWorkoutOnWatch(
         _ kind: WatchWorkoutKind,
-        indoor: Bool? = nil
+        indoor: Bool? = nil,
+        relayRequestID: UUID? = nil
     ) async throws {
         guard isReady else {
             throw AppleWatchWorkoutLaunchError.watchUnavailable
@@ -633,6 +668,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             ATHLTHLiveWorkoutContextStore.load()
         )
 
+        if let relayRequestID {
+            try await stageRemoteLaunchIdentity(
+                requestID: relayRequestID, kind: kind
+            )
+        }
+
         do {
             try await healthStore.startWatchApp(toHandle: configuration)
         } catch {
@@ -644,6 +685,52 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             workoutLaunchError =
                 resolvedError.localizedDescription
             throw resolvedError
+        }
+    }
+
+    /// Only iPad-relayed launches require this synchronous handshake.
+    /// Never report a successful handoff when Watch did not store its ID.
+    private func stageRemoteLaunchIdentity(
+        requestID: UUID, kind: WatchWorkoutKind
+    ) async throws {
+        guard let session,
+              session.activationState == .activated,
+              session.isReachable,
+              let data = try? JSONEncoder().encode(
+                WatchRemoteLaunchIdentity(
+                    requestID: requestID, kind: kind, issuedAt: Date()
+                )
+              )
+        else {
+            throw NSError(
+                domain: "ATHLTH.WatchRelay", code: 7,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Apple Watch must be reachable to confirm this remote start."]
+            )
+        }
+
+        let staged: Bool = await withCheckedContinuation { continuation in
+            let gate = WatchRemoteLaunchIdentityAck(
+                expectedID: requestID, continuation: continuation
+            )
+            session.sendMessage([
+                WatchTransferMetadataKey.kind:
+                    WatchTransferKind.workoutRemoteLaunchIdentity.rawValue,
+                WatchTransferMetadataKey.payload: data,
+                WatchTransferMetadataKey.sentAt: Date().timeIntervalSince1970
+            ], replyHandler: { gate.reply($0) },
+               errorHandler: { gate.failed($0) })
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                gate.complete(false)
+            }
+        }
+        guard staged else {
+            throw NSError(
+                domain: "ATHLTH.WatchRelay", code: 8,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Apple Watch did not confirm the remote workout identity."]
+            )
         }
     }
 
