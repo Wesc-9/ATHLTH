@@ -1505,3 +1505,14 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
 - Nye tester sikrer plan-ID, Watch-session, original relay-ID og
   alle løpeblokker i ett opptak. Samme-commit CI og fysisk enhetstest
   er fortsatt et obligatorisk release-godkjenningskrav.
+
+### Fase 8 – korrekt Watch-presentasjon for GPS-distansemål (19.11.2026)
+
+- Begge styrke-/hybridlivevisningene på Watch viser GPS-distansemålet i
+  kilometer og når tilgjengelig **målt distanse siden aktivt drag startet**.
+  De viser ikke lenger en redigerbar tids-Crown for distansebaserte drag.
+- Fremdrift hentes fra den durable `ATHLTHHybridWatchDistanceAnchor`
+  (workout+øvelse+sett), ikke den kumulative distansen i hele økten.
+  Pausede og avsluttede drag viser ikke et falskt GPS-framdriftstall.
+- Faktisk sensor-/HealthKit-validering må fortsatt gjennomføres på en
+  fysisk Apple Watch før funksjonen kan erklæres ferdig.

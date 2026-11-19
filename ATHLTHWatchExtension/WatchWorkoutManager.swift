@@ -970,6 +970,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             workoutSession?.workoutConfiguration.locationType == .outdoor
     }
 
+    /// Live progress strictly relative to the current outdoor hybrid set.
+    /// Never use total recorded workout distance as per-phase progress.
+    var hybridDistanceProgressMeters: Double? {
+        guard let anchor = hybridDistanceAnchor,
+              let snapshot = strengthSession,
+              anchor.matches(snapshot),
+              ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
+                  isOutdoor: usesOutdoorGPS,
+                  isEmbeddedRunningInterval:
+                      snapshot.isEmbeddedRunningInterval == true,
+                  isResting: snapshot.isResting,
+                  isExerciseComplete: snapshot.currentExerciseComplete,
+                  isWorkoutRunning: state == .running
+              )
+        else { return nil }
+        return anchor.measuredProgress(totalMeters: distanceMeters)
+    }
+
     var averagePaceSecondsPerKilometer: TimeInterval? {
         ATHLTHRunningPace.average(
             elapsedSeconds: elapsedTime,

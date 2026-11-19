@@ -942,7 +942,25 @@ struct WatchActiveWorkoutView: View {
                     }
 
                     HStack(spacing: 6) {
-                        if snapshot
+                        if let targetMeters = snapshot.embeddedRunningTargetDistanceMeters {
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "GPS DISTANCE", norwegian: "GPS-DISTANSE"
+                                ))
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(WatchTheme.muted)
+                                Text(String(format: "%.2f km", targetMeters / 1_000))
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                                if let progress = workoutManager.hybridDistanceProgressMeters {
+                                    Text(String(format: "%.0f / %.0f m",
+                                        min(progress, targetMeters), targetMeters))
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundStyle(WatchTheme.muted)
+                                }
+                            }
+                        } else if snapshot
                             .targetKindRaw ==
                             "time" {
                             WatchStrengthPrimaryCrownMetric(
@@ -2073,7 +2091,25 @@ struct WatchActiveWorkoutView: View {
                     }
 
                     HStack(spacing: 7) {
-                        if snapshot.targetKindRaw == "time" {
+                        if let targetMeters = snapshot.embeddedRunningTargetDistanceMeters {
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "GPS DISTANCE", norwegian: "GPS-DISTANSE"
+                                ))
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(WatchTheme.muted)
+                                Text(String(format: "%.2f km", targetMeters / 1_000))
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                                if let progress = workoutManager.hybridDistanceProgressMeters {
+                                    Text(String(format: "%.0f / %.0f m",
+                                        min(progress, targetMeters), targetMeters))
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundStyle(WatchTheme.muted)
+                                }
+                            }
+                        } else if snapshot.targetKindRaw == "time" {
                             WatchStrengthPrimaryCrownMetric(
                                 title: ATHLTHLocalization.choose(
                                     english: "Duration",
