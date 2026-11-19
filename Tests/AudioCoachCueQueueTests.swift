@@ -238,6 +238,25 @@ final class AudioCoachCueQueueTests: XCTestCase {
         )
     }
 
+    func testResumeDiscardsQueuedOldPauseAndStartInstructions() {
+        var queue = ATHLTHCoachCueQueue()
+        XCTAssertTrue(queue.enqueue(
+            cue(.workoutPause, key: "paused", priority: .structuredStep),
+            now: origin
+        ))
+        XCTAssertTrue(queue.enqueue(
+            cue(.workoutStart, key: "started", priority: .structuredStep),
+            now: origin
+        ))
+        XCTAssertTrue(queue.enqueue(
+            cue(.workoutResume, key: "resumed", priority: .structuredStep),
+            now: origin
+        ))
+        queue.discardPreviousPauseCues()
+        XCTAssertEqual(queue.pending.count, 1)
+        XCTAssertEqual(queue.popNext(now: origin)?.event.kind, .workoutResume)
+    }
+
     func testCompletionDropsPendingCueAndNextWorkoutStartsWithEmptyQueue() {
         var queue = ATHLTHCoachCueQueue()
         XCTAssertTrue(queue.enqueue(
