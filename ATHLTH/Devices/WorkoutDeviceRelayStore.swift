@@ -93,6 +93,9 @@ struct WorkoutDeviceRelayEnvelope:
     Codable
 {
     var version: Int = 1
+    // Created on iPad and stored in both the server row and its payload.
+    // Optional to decode commands queued by older releases.
+    var clientRequestID: UUID? = nil
     let kind: WorkoutDeviceRelayKind
     let target: WorkoutDeviceRelayTarget
     let workoutPayload:
@@ -243,6 +246,14 @@ enum WorkoutDeviceRelayClaimPolicy {
     /// the remaining commands and make replay/reconciliation unsafe.
     static func hasValidClaimBatchSize(_ count: Int) -> Bool {
         count == 0 || count == 1
+    }
+
+    /// Correlate the immutable server row with the original iPad payload.
+    /// Legacy requests did not carry the embedded identifier.
+    static func hasMatchingRequestID(
+        serverID: UUID, payloadID: UUID?
+    ) -> Bool {
+        payloadID == nil || payloadID == serverID
     }
 
     /// A confirmed receipt written after the launch is stronger evidence
@@ -537,6 +548,8 @@ final class WorkoutDeviceRelayStore:
         }
 
         let requestID = UUID()
+        var correlatedEnvelope = envelope
+        correlatedEnvelope.clientRequestID = requestID
         let insert =
             WorkoutDeviceRelayInsert(
                 userID: userID,
@@ -553,7 +566,7 @@ final class WorkoutDeviceRelayStore:
                     envelope
                         .kind
                         .rawValue,
-                payload: envelope
+                payload: correlatedEnvelope
             )
 
         do {
@@ -795,6 +808,25 @@ final class WorkoutDeviceRelayStore:
                     norwegian: "Fjernstart må avklares mot enhetens opptak."
                 )
                 return
+            }
+
+            guard WorkoutDeviceRelayClaimPolicy.hasMatchingRequestID(
+                serverID: record.clientRequestID,
+                payloadID: record.payload.clientRequestID
+            ) else {
+                // The server row and iPad payload disagree. Never launch an
+                // activity from a mismatched or tampered correlation token.
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
+                try? await markFailed(
+                    record.id,
+                    error: NSError(
+                        domain: "ATHLTH.DeviceRelay", code: 6,
+                        userInfo: [NSLocalizedDescriptionKey:
+                            "Remote workout request identity does not match."]
+                    )
+                )
+                continue
             }
 
             guard WorkoutDeviceRelayClaimPolicy.accepts(
