@@ -391,6 +391,11 @@ final class MirroredWorkoutAudioCoach:
     /// Stop audio immediately on expired ownership without discarding
     /// workout progress or queued configuration.
     func suspendForWatchFallback() {
+        // Revocation of the phone voice lease must invalidate callbacks from
+        // already queued Azure/local speech, not merely stop the audio player.
+        playbackGeneration = UUID()
+        pendingLocalReplay = nil
+        pendingLocalSpokenEvent = nil
         localSpeechWatchdog?.cancel()
         localSpeechWatchdog = nil
         azureCoachSpeech.stop()
@@ -481,6 +486,11 @@ final class MirroredWorkoutAudioCoach:
         }
         priorityCountdownUntil = Date().addingTimeInterval(remaining)
         cueQueue.reset()
+        // The countdown is an immediate, deadline-anchored replacement. Any
+        // old Azure/local cue callbacks must lose their generation.
+        playbackGeneration = UUID()
+        pendingLocalReplay = nil
+        pendingLocalSpokenEvent = nil
         azureCoachSpeech.stop()
         synthesizer.stopSpeaking(at: .immediate)
         guidanceGate.voiceDidFinish()
