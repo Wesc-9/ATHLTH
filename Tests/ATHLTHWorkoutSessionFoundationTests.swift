@@ -218,6 +218,29 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         ))
     }
 
+    func testSharedRecordingRejectsConflictingPlanAndStartMetadata() throws {
+        let id = UUID()
+        func snapshot(_ plan: UUID?, _ started: Date) -> ATHLTHWorkoutSessionState {
+            ATHLTHWorkoutSessionState(
+                workoutID: id, plannedSessionID: plan,
+                recordingOwner: .appleWatch, activity: .strength,
+                phase: .work, engine: .strength, startedAt: started,
+                activeElapsedSeconds: 20, stageIndex: nil, stageCount: nil
+            )
+        }
+        let plan = UUID()
+        let original = snapshot(plan, start)
+        XCTAssertEqual(try ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+            running: original, strength: snapshot(plan, start)
+        )?.workoutID, id)
+        XCTAssertThrowsError(try ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+            running: original, strength: snapshot(UUID(), start)
+        ))
+        XCTAssertThrowsError(try ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+            running: original, strength: snapshot(plan, start.addingTimeInterval(1))
+        ))
+    }
+
     func testOfflineProgressCannotRewindOrDuplicateCompletion() {
         let base = ATHLTHWorkoutSessionState(
             workoutID: UUID(), plannedSessionID: nil,
