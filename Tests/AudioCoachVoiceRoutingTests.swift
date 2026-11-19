@@ -1,3 +1,4 @@
+import AVFoundation
 import XCTest
 @testable import ATHLTH
 
@@ -303,4 +304,29 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
             )
         )
     }
+    func testCoachMusicRestoreIgnoresItsOwnCategoryRouteChange() {
+        // A category change is often produced by our own deactivate/restore
+        // path. Retrying on that event risks an infinite notify loop.
+        XCTAssertFalse(
+            ATHLTHCoachMusicRouteRestorePolicy
+                .shouldRetryAfterRouteChange(.categoryChange)
+        )
+        XCTAssertFalse(
+            ATHLTHCoachMusicRouteRestorePolicy
+                .shouldRetryAfterRouteChange(nil)
+        )
+        XCTAssertTrue(
+            ATHLTHCoachMusicRouteRestorePolicy
+                .shouldRetryAfterRouteChange(.oldDeviceUnavailable)
+        )
+        XCTAssertTrue(
+            ATHLTHCoachMusicRouteRestorePolicy
+                .shouldRetryAfterRouteChange(.newDeviceAvailable)
+        )
+        XCTAssertTrue(
+            ATHLTHCoachMusicRouteRestorePolicy
+                .shouldRetryAfterRouteChange(.routeConfigurationChange)
+        )
+    }
+
 }
