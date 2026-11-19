@@ -102,10 +102,13 @@ enum ATHLTHWorkoutSessionFoundation {
         case (let session?, nil), (nil, let session?):
             return session
         case (let first?, let second?):
-            guard preservesRecordingOwnership(first, second) else {
+            guard preservesRecordingOwnership(first, second),
+                  first.plannedSessionID == second.plannedSessionID,
+                  first.startedAt == second.startedAt,
+                  !first.isFinished, !second.isFinished else {
                 throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
             }
-            // Same ID and owner can be two projections of one hybrid session.
+            // Same ID, owner, plan and start can be two projections of one hybrid session.
             // Neither projection creates a new recording or changes history.
             return first
         }
