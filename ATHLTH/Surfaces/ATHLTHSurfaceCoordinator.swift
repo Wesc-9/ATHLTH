@@ -265,47 +265,41 @@ enum ATHLTHSurfaceCoordinator {
     ) {
         var stored = ATHLTHSurfaceSharedStore.load()
 
-        let finishedIdentity = ATHLTHLiveActivitySessionIdentity(
-            systemImage: finished.kind.systemImage,
-            startedAt: finished.startedAt,
-            fallbackTitle: finished.kind.title
-        )
-        if let active = stored.activeWorkout {
-            let storedIdentity = ATHLTHLiveActivitySessionIdentity(
-                systemImage: active.systemImage,
-                startedAt: active.startedAt,
-                fallbackTitle: active.title
-            )
-            // An old Watch completion cannot erase a new phone session.
-            guard storedIdentity.matches(finishedIdentity) else { return }
-        }
-
-        let tombstoneSource = stored.activeWorkout ??
-            ATHLTHSurfaceWorkoutSnapshot(
-                title: finished.kind.title,
-                systemImage: finished.kind.systemImage,
-                state: finished.state.rawValue,
-                startedAt: finished.startedAt,
-                elapsedTime: finished.elapsedTime,
-                distanceMeters: finished.distanceMeters,
-                heartRate: finished.heartRate,
-                updatedAt: finished.capturedAt
-            )
         let closedAt = finished.capturedAt
         guard closedAt.timeIntervalSince1970.isFinite else { return }
-        if let previousClosed = stored.lastFinishedWorkout,
-           previousClosed.finishedAt > closedAt {
-            // Never replace a newer terminal watermark with a late result.
+        let reported = ATHLTHSurfaceWorkoutSnapshot(
+            title: finished.kind.title,
+            systemImage: finished.kind.systemImage,
+            state: finished.state.rawValue,
+            startedAt: finished.startedAt,
+            elapsedTime: finished.elapsedTime,
+            distanceMeters: finished.distanceMeters,
+            heartRate: finished.heartRate,
+            updatedAt: closedAt
+        )
+        // The source may already have started another workout on this
+        // phone. Remember the older terminal result for future deduplication,
+        // but NEVER clear that newer active workout's Home/Lock widget.
+        let isDisplayedFinished = stored.activeWorkout.map {
+            ATHLTHSurfaceWorkoutOrdering.sameSession($0, reported)
+        } ?? false
+        let source = isDisplayedFinished
+            ? (stored.activeWorkout ?? reported) : reported
+        let marker = ATHLTHSurfaceWorkoutTerminalMarker(
+            workout: source, finishedAt: closedAt
+        )
+        let previousLatest = stored.lastFinishedWorkout?.finishedAt
+        ATHLTHSurfaceWorkoutOrdering.rememberFinished(marker, in: &stored)
+        if isDisplayedFinished {
+            stored.activeWorkout = nil
+        }
+        if !isDisplayedFinished,
+           (stored.activeWorkout != nil ||
+            (previousLatest.map { $0 > closedAt } ?? false)) {
+            // Persist the marker without another widget transition.
+            ATHLTHSurfaceSharedStore.save(stored)
             return
         }
-
-        ATHLTHSurfaceWorkoutOrdering.rememberFinished(
-            ATHLTHSurfaceWorkoutTerminalMarker(
-                workout: tombstoneSource, finishedAt: closedAt
-            ),
-            in: &stored
-        )
-        stored.activeWorkout = nil
         stored.updatedAt = Date()
         ATHLTHSurfaceSharedStore.save(stored)
         lastSnapshotWriteAt = Date()

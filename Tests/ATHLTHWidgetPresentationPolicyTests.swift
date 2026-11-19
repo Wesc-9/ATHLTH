@@ -138,6 +138,65 @@ final class ATHLTHWidgetPresentationPolicyTests: XCTestCase {
         ))
     }
 
+    func testLateOlderFinishDoesNotClearNewPhoneWorkout() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let older = surfaceWorkout(
+            startedAt: start, capturedAt: start.addingTimeInterval(80)
+        )
+        let active = surfaceWorkout(
+            startedAt: start.addingTimeInterval(300),
+            capturedAt: start.addingTimeInterval(360),
+            systemImage: "dumbbell.fill"
+        )
+        let marker = ATHLTHSurfaceWorkoutTerminalMarker(
+            workout: older, finishedAt: start.addingTimeInterval(95)
+        )
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.shouldClearActive(
+            active, for: marker
+        ))
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.shouldClearActive(
+            older, for: marker
+        ))
+        var shared = ATHLTHSurfaceSnapshot.empty
+        shared.activeWorkout = active
+        ATHLTHSurfaceWorkoutOrdering.rememberFinished(marker, in: &shared)
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+            older, in: shared
+        ))
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+            active, in: shared
+        ))
+    }
+
+    func testRememberOutOfOrderTerminalsPreservesNewestWatermark() {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = surfaceWorkout(startedAt: start, capturedAt: start)
+        let second = surfaceWorkout(
+            startedAt: start.addingTimeInterval(180),
+            capturedAt: start.addingTimeInterval(200)
+        )
+        let firstMarker = ATHLTHSurfaceWorkoutTerminalMarker(
+            workout: first, finishedAt: start.addingTimeInterval(100)
+        )
+        let secondMarker = ATHLTHSurfaceWorkoutTerminalMarker(
+            workout: second, finishedAt: start.addingTimeInterval(210)
+        )
+        var shared = ATHLTHSurfaceSnapshot.empty
+        ATHLTHSurfaceWorkoutOrdering.rememberFinished(
+            secondMarker, in: &shared
+        )
+        ATHLTHSurfaceWorkoutOrdering.rememberFinished(
+            firstMarker, in: &shared
+        )
+        XCTAssertEqual(shared.lastFinishedWorkout, secondMarker)
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+            first, in: shared
+        ))
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+            second, in: shared
+        ))
+    }
+
     func testOldWidgetSnapshotDecodesWithoutTerminalWatermark() throws {
         let oldJSON = """
         {"recoveryState":"Ready","updatedAt":0}

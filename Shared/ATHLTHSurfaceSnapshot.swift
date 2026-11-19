@@ -95,6 +95,16 @@ enum ATHLTHSurfaceWorkoutOrdering {
         }
     }
 
+    /// An old Watch completion can be recorded for deduplication without
+    /// erasing the currently displayed newer phone workout.
+    static func shouldClearActive(
+        _ active: ATHLTHSurfaceWorkoutSnapshot?,
+        for finished: ATHLTHSurfaceWorkoutTerminalMarker
+    ) -> Bool {
+        guard let active else { return false }
+        return matchesTerminal(active, marker: finished)
+    }
+
     static func matchesAnyFinished(
         _ workout: ATHLTHSurfaceWorkoutSnapshot,
         in snapshot: ATHLTHSurfaceSnapshot
