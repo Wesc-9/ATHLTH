@@ -1235,6 +1235,14 @@ struct AppRootView: View {
         // mirroring callback just after app activation. Give that callback
         // first priority before any later Health refresh decisions.
         await allowWatchMirroringToAttachIfNeeded()
+        // Only an exact matching, currently recording Watch workout may
+        // resolve a previous uncertain iPad relay. The store retains all
+        // unproven launches and never starts a second workout.
+        if ATHLTHDeviceRole.isIPhone && appSession.signedIn {
+            await deviceRelay.reconcileUncertainWatchStarts(
+                watchConnection: watchConnection
+            )
+        }
 
         // Optional backend, StoreKit, social and calendar requests must not
         // hold up HealthKit, Watch mirroring or offline workout launch.
@@ -1803,6 +1811,9 @@ struct AppRootView: View {
                     .repairRegistrationIfAuthorized()
 
                 if ATHLTHDeviceRole.isIPhone {
+                    await deviceRelay.reconcileUncertainWatchStarts(
+                        watchConnection: watchConnection
+                    )
                     await deviceRelay
                         .refreshPending {
                             command in
