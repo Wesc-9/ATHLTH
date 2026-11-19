@@ -123,6 +123,20 @@ enum ATHLTHLiveActivityDisplayPolicy {
         return min(max(fraction, 0), 1)
     }
 
+    /// A stale recording packet must not *create* a Live Activity after a
+    /// phone/watch reconnect. A terminal receipt is still allowed to close
+    /// its exact recording, even if the receipt itself arrived late.
+    static func acceptsActivityCapture(
+        updatedAt: Date,
+        isTerminal: Bool,
+        now: Date = Date()
+    ) -> Bool {
+        guard updatedAt.timeIntervalSince1970.isFinite else { return false }
+        if isTerminal { return true }
+        let age = now.timeIntervalSince(updatedAt)
+        return age.isFinite && age >= -10 && age <= 90
+    }
+
     /// Snapshot age limits only *claims of live data*; the existing workout
     /// continues independently of the Lock Screen and Dynamic Island.
     static func isRecent(
