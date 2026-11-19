@@ -1,0 +1,3 @@
+ATHLTH 2.2.5 full validation refresh 2026-11-19 07:26 Europe/Oslo
+Purpose: launch hybrid/Watch and iPhone smoke alongside iOS/iPad and backend on the same commit.
+This marker never initiates TestFlight upload.

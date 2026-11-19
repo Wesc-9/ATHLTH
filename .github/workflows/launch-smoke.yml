@@ -60,6 +60,7 @@ on:
       - scripts/optimize_hero_assets.sh
       - .github/workflows/launch-smoke.yml
       - .github/testflight-trigger
+      - .github/release-validation-trigger
       - .github/workflows/hybrid-engine-tests.yml
       - Tests/ATHLTHPlannedHybridLaunchTests.swift
       - Tests/ATHLTHUnifiedMixedWorkoutPlanTests.swift

@@ -36,6 +36,7 @@ on:
       - Tests/ATHLTHIntervalRecipeEditingTests.swift
       - .github/workflows/hybrid-engine-tests.yml
       - .github/testflight-trigger
+      - .github/release-validation-trigger
       - ATHLTH/Routes/ATHLTHExploreRoutePolicy.swift
       - ATHLTH/Routes/ATHLTHRouteDetailsPolicy.swift
       - ATHLTH/Routes/ATHLTHRouteAttemptDirection.swift
