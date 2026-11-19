@@ -96,4 +96,20 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         XCTAssertFalse(accepts(payloadVersion: 0))
         XCTAssertFalse(accepts(payloadVersion: 2))
     }
+
+    func testReceiptRequiresExactlyOneMatchingServerRow() {
+        let commandID = UUID()
+        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.confirmsReceipt(
+            [commandID], commandID: commandID
+        ))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsReceipt(
+            [], commandID: commandID
+        ))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsReceipt(
+            [UUID()], commandID: commandID
+        ))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsReceipt(
+            [commandID, commandID], commandID: commandID
+        ))
+    }
 }
