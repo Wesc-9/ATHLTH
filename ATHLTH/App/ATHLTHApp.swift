@@ -1996,6 +1996,23 @@ struct AppRootView: View {
         ) { _ in
             handleRemoteNotificationReceived()
         }
+        // Watch may become active after the iPhone reported an ambiguous
+        // remote launch. A fresh matching Watch identity resolves only its
+        // receipt, never starts another workout or drains the next claim.
+        .onReceive(
+            watchConnection.$watchWorkoutActivityState.removeDuplicates()
+        ) { activity in
+            guard appSession.signedIn,
+                  ATHLTHDeviceRole.isIPhone,
+                  activity?.isActive == true,
+                  activity?.relayRequestID != nil
+            else { return }
+            Task { @MainActor in
+                await deviceRelay.reconcileUncertainWatchStarts(
+                    watchConnection: watchConnection
+                )
+            }
+        }
         // An explicitly chosen workout-peak source follows new higher
         // measurements. It never changes a manually entered or age-estimated
         // maximum. Re-check on foreground and when the user opts in.
