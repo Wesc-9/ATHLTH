@@ -103,6 +103,34 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
         ))
     }
 
+    @MainActor
+    func testRuntimeRoutingRequiresMatchingLiveRecording() throws {
+        let phone = IPhoneWorkoutStore()
+        let strength = StrengthWorkoutStore()
+        strength.startFreestyle(watchSessionID: nil)
+        let id = try XCTUnwrap(strength.activeWorkout?.id)
+        let blocks = [
+            block("Squat", kind: .exercise, sequence: 1),
+            block("Run", kind: .run, sequence: 2)
+        ]
+        let first = try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
+            workoutID: id, blocks: blocks, index: 0
+        ))
+        let second = try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
+            workoutID: id, blocks: blocks, index: 1
+        ))
+        XCTAssertNotNil(try ATHLTHLiveWorkoutEngineRouter.transition(
+            from: first, to: second, phone: phone, strength: strength
+        ))
+        let unrelated = try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
+            workoutID: UUID(), blocks: blocks, index: 1
+        ))
+        XCTAssertNil(try ATHLTHLiveWorkoutEngineRouter.transition(
+            from: first, to: unrelated, phone: phone, strength: strength
+        ))
+        XCTAssertEqual(strength.activeWorkout?.id, id)
+    }
+
     func testDifferentWorkoutCannotBeTreatedAsMotorTransition() throws {
         let blocks = [block("Squat", kind: .exercise, sequence: 1)]
         let first = try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
