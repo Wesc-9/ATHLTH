@@ -518,6 +518,10 @@ final class WorkoutDeviceRelayStore:
                 try await process(
                     command
                 )
+                // Processing can suspend for Watch startup. A user switch
+                // must not acknowledge or surface another account's result.
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
                 try await markCompleted(
                     command.id
                 )
@@ -532,6 +536,8 @@ final class WorkoutDeviceRelayStore:
                             "Fjernstart av økt utført."
                     )
             } catch {
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
                 try? await markFailed(
                     command.id,
                     error: error
