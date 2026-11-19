@@ -52,15 +52,7 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                 publishSurface()
             }
             .onChange(of: workoutMirroring.snapshot) { _, snapshot in
-                publishSurface()
-                ATHLTHSurfaceCoordinator.syncLiveActivity(
-                    with: enrichedWorkoutSnapshot(
-                        ATHLTHLiveWorkoutSnapshotSelection.resolve(
-                            mirroredWatch: snapshot,
-                            phoneWorkout: phoneWorkout.currentLiveSnapshot()
-                        )
-                    )
-                )
+                syncCurrentWorkoutSurfaces()
                 ghostRace.update(with: snapshot)
             }
             // Disable ATHLTH autoplay as soon as the underlying recording
@@ -129,15 +121,7 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                 if phoneWorkout.active != nil {
                     syncPhoneWorkoutGuidance()
                 } else {
-                    publishSurface()
-                    ATHLTHSurfaceCoordinator
-                        .syncLiveActivity(
-                            with:
-                                enrichedWorkoutSnapshot(
-                                    workoutMirroring
-                                        .snapshot
-                                )
-                        )
+                    syncCurrentWorkoutSurfaces()
                 }
             }
             .onChange(
@@ -148,15 +132,7 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                 if phoneWorkout.active != nil {
                     syncPhoneWorkoutGuidance()
                 } else {
-                    publishSurface()
-                    ATHLTHSurfaceCoordinator
-                        .syncLiveActivity(
-                            with:
-                                enrichedWorkoutSnapshot(
-                                    workoutMirroring
-                                        .snapshot
-                                )
-                        )
+                    syncCurrentWorkoutSurfaces()
                 }
             }
     }
@@ -165,13 +141,68 @@ struct ATHLTHSurfaceRuntimeObserver: View {
         syncCurrentWorkoutSurfaces()
     }
 
+    /// Project the existing iPhone-owned StrengthWorkoutLog, never a new
+    /// HealthKit session. The Watch-owned strength log is enriched from its
+    /// actual mirror instead so neither device fabricates measurements.
+    private func phoneStrengthSnapshot() -> WatchWorkoutLiveSnapshot? {
+        guard let workout = strengthWorkout.activeWorkout,
+              workout.captureDevice == .iPhone,
+              workout.endedAt == nil,
+              let sessionState = strengthWorkout.activeSessionState
+        else { return nil }
+
+        let now = Date()
+        var snapshot = WatchWorkoutLiveSnapshot(
+            kind: .strength,
+            state: sessionState.phase == .paused ? .paused : .running,
+            startedAt: workout.startedAt,
+            capturedAt: now,
+            elapsedTime: sessionState.activeElapsedSeconds,
+            heartRate: workout.healthMetrics.averageHeartRate ?? 0,
+            activeCalories: workout.healthMetrics.activeCalories ?? 0,
+            distanceMeters: 0,
+            averageHeartRate: workout.healthMetrics.averageHeartRate,
+            maxHeartRate: workout.healthMetrics.maxHeartRate,
+            routePointCount: 0
+        )
+        snapshot.strengthWorkoutID = workout.id
+        snapshot.workoutDisplayTitle = workout.title
+        snapshot.strengthExerciseName =
+            strengthWorkout.currentExercise?.exercise.displayName
+        let setCount = strengthWorkout.currentExercise?.sets.count ?? 0
+        snapshot.strengthSetCount = setCount > 0 ? setCount : nil
+        snapshot.strengthSetIndex = setCount > 0
+            ? min(max(strengthWorkout.currentSetIndex + 1, 1), setCount)
+            : nil
+        snapshot.strengthReps = strengthWorkout.draftReps
+        snapshot.strengthWeightKilograms =
+            strengthWorkout.currentSetRecordsWeight
+                ? strengthWorkout.draftWeightKilograms : nil
+        snapshot.strengthRestEndsAt = strengthWorkout.restEndsAt
+        snapshot.strengthNextExerciseName =
+            strengthWorkout.nextPendingExercise?.exercise.displayName
+        if let countdown = strengthWorkout.currentTimedSetCountdown {
+            snapshot.strengthTimedSetTargetSeconds =
+                strengthWorkout.draftDurationSeconds
+            snapshot.strengthTimedSetSecondsAtSnapshot =
+                countdown.remaining(at: now)
+            snapshot.strengthTimedSetResumedAt = countdown.resumedAt
+        }
+        return snapshot
+    }
+
+    private func selectedWorkoutSnapshot() -> WatchWorkoutLiveSnapshot? {
+        ATHLTHLiveWorkoutSnapshotSelection.resolve(
+            mirroredWatch: workoutMirroring.snapshot,
+            phoneWorkout: phoneWorkout.currentLiveSnapshot() ??
+                phoneStrengthSnapshot()
+        )
+    }
+
     /// One presentation projection; never a second workout recorder.
     private func syncCurrentWorkoutSurfaces() {
         let selected = enrichedWorkoutSnapshot(
-            ATHLTHLiveWorkoutSnapshotSelection.resolve(
-                mirroredWatch: workoutMirroring.snapshot,
-                phoneWorkout: phoneWorkout.currentLiveSnapshot()
-            )
+            selectedWorkoutSnapshot()
         )
         ATHLTHSurfaceCoordinator.syncLiveActivity(with: selected)
         publishSurface()
@@ -183,12 +214,7 @@ struct ATHLTHSurfaceRuntimeObserver: View {
             session: session,
             goals: goals,
             workout:
-                enrichedWorkoutSnapshot(
-                    ATHLTHLiveWorkoutSnapshotSelection.resolve(
-                        mirroredWatch: workoutMirroring.snapshot,
-                        phoneWorkout: phoneWorkout.currentLiveSnapshot()
-                    )
-                )
+                enrichedWorkoutSnapshot(selectedWorkoutSnapshot())
         )
 
         syncLiveGhostWatchContext()
