@@ -1002,8 +1002,22 @@ enum WorkoutLaunchCoordinator {
                     configuration
                         .autoPauseEnabled,
                 plannedPlanID: plannedPlanID,
-                plannedSessionID: plannedSessionID
+                plannedSessionID: plannedSessionID,
+                relayRequestID: relayRequestID
             )
+            if let relayRequestID {
+                guard let recording = phoneWorkout.active,
+                      recording.relayRequestID == relayRequestID,
+                      recording.end == nil else {
+                    // GPS authorization may still be pending. A deferred
+                    // future start is not a confirmed recording now.
+                    throw NSError(
+                        domain: "ATHLTH.DeviceRelay", code: 409,
+                        userInfo: [NSLocalizedDescriptionKey:
+                            "Remote iPhone run has not started recording yet."]
+                    )
+                }
+            }
 
             // Only a deliberately chosen track, and only for iPhone-owned
             // workouts. Apple Watch retains independent Spotify playback.
@@ -1394,8 +1408,20 @@ enum WorkoutLaunchCoordinator {
                 autoPauseEnabled:
                     configuration.autoPauseEnabled,
                 plannedPlanID: plannedPlanID,
-                plannedSessionID: plannedSessionID
+                plannedSessionID: plannedSessionID,
+                relayRequestID: relayRequestID
             )
+            if let relayRequestID {
+                guard let recording = phoneWorkout.active,
+                      recording.relayRequestID == relayRequestID,
+                      recording.end == nil else {
+                    throw NSError(
+                        domain: "ATHLTH.DeviceRelay", code: 409,
+                        userInfo: [NSLocalizedDescriptionKey:
+                            "Remote iPhone walk has not started recording yet."]
+                    )
+                }
+            }
             if phoneWorkout.active != nil {
                 watchConnection.updateLocalWorkoutActivity(
                     isActive: true,
@@ -1725,7 +1751,8 @@ enum WorkoutLaunchCoordinator {
             advancedConfiguration:
                 includeCoachConfiguration
                     ? advancedConfiguration
-                    : nil
+                    : nil,
+            relayRequestID: relayRequestID
         )
 
         // The store can reject a launch during account restoration. Never
@@ -1733,7 +1760,8 @@ enum WorkoutLaunchCoordinator {
         guard let started = strengthWorkout.activeWorkout,
               started.plannedSessionID == workout.id,
               started.endedAt == nil,
-              started.captureDevice == captureDevice else {
+              started.captureDevice == captureDevice,
+              started.relayRequestID == relayRequestID else {
             await social.markCurrentJoinedWorkoutLaunchFailed()
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
