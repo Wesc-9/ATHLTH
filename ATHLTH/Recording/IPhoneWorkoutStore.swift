@@ -1577,6 +1577,7 @@ final class IPhoneWorkoutStore:
         else {
             return
         }
+        coachCueQueue.discardPreviousPauseCues()
 
         let environment =
             workout.runEnvironment ?? .outdoor
