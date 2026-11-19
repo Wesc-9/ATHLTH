@@ -101,6 +101,28 @@ struct ATHLTHCoachCueQueue {
         }
     }
 
+    /// Pause invalidates movement-dependent voice instructions. Keep only
+    /// lifecycle/manual messages; delayed sensor, pace, distance and rest
+    /// cues must not be read as if the athlete were still exercising.
+    mutating func discardWorkoutMotionCues() {
+        pending.removeAll { cue in
+            switch cue.event.kind {
+            case .runningStep, .routineMilestone, .targetAlert,
+                 .routeAlert, .ghostUpdate, .strengthSet, .strengthRest:
+                return true
+            case .workoutStart, .workoutPause, .workoutResume,
+                 .workoutComplete, .manualStatus:
+                return false
+            }
+        }
+    }
+
+    /// At finish there is no future interval or set in the same workout.
+    /// Never replay a delayed coach cue after the recording has ended.
+    mutating func discardForWorkoutCompletion() {
+        reset()
+    }
+
     mutating func reset() {
         pending.removeAll(keepingCapacity: true)
     }
