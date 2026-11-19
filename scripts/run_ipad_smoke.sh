@@ -127,7 +127,32 @@ trap cleanup EXIT
 CURRENT_SIZE="$IPAD_SIZE"
 if [ "$CURRENT_SIZE" = "all" ]; then CURRENT_SIZE=11; fi
 simctl_bounded "boot ${CURRENT_SIZE}-inch iPad" 100 boot "$UDID"
-simctl_bounded "wait for ${CURRENT_SIZE}-inch iPad boot" 160 bootstatus "$UDID" -b
+# Hosted Xcode 27 simulators sometimes finish booting after bootstatus -b
+# itself stalls. Verify the device is genuinely Booted and its launch services
+# respond before attempting installation; never treat a timeout alone as success.
+wait_for_ipad_services() {
+  local size="$1" attempt
+  for attempt in 1 2 3; do
+    if simctl_bounded "wait for ${size}-inch iPad boot (attempt ${attempt})" 180 bootstatus "$UDID" -b; then
+      if simctl_bounded "probe ${size}-inch iPad launch services" 35 spawn "$UDID" launchctl list; then
+        return 0
+      fi
+    fi
+    echo "::warning::CoreSimulator not responsive after boot attempt ${attempt}; collecting diagnostics."
+    {
+      date -u
+      xcrun simctl list devices booted
+      xcrun simctl list runtimes
+    } >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
+    if [ "$attempt" -eq 3 ]; then
+      echo "::error::iPad simulator failed to become responsive after three attempts."
+      return 1
+    fi
+    simctl_bounded "shutdown ${size}-inch iPad after boot stall" 65 shutdown "$UDID" || true
+    simctl_bounded "restart ${size}-inch iPad after boot stall" 120 boot "$UDID"
+  done
+}
+wait_for_ipad_services "$CURRENT_SIZE"
 # CoreSimulator on fresh hosted Macs sometimes reports boot complete while its
 # installation service is still initializing. A single 180s timeout is not
 # evidence of an app crash. Retry once after a bounded service restart, but
