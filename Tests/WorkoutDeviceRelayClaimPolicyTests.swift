@@ -129,6 +129,31 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         ))
     }
 
+    func testUnknownWatchStartRequiresExactLiveRequestIdentity() {
+        let request = UUID()
+        let confirm = WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch
+        XCTAssertTrue(confirm(
+            target: "apple_watch", serverRequestID: request,
+            watchRequestID: request, failedAt: nil
+        ))
+        XCTAssertFalse(confirm(
+            target: "apple_watch", serverRequestID: request,
+            watchRequestID: UUID(), failedAt: nil
+        ))
+        XCTAssertFalse(confirm(
+            target: "apple_watch", serverRequestID: request,
+            watchRequestID: nil, failedAt: nil
+        ))
+        XCTAssertFalse(confirm(
+            target: "iphone", serverRequestID: request,
+            watchRequestID: request, failedAt: nil
+        ))
+        XCTAssertFalse(confirm(
+            target: "apple_watch", serverRequestID: request,
+            watchRequestID: request, failedAt: Date()
+        ))
+    }
+
     func testRelayClaimRejectsMultipleServerRows() {
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(0))
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(1))
