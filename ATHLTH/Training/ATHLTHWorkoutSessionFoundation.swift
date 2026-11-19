@@ -89,6 +89,28 @@ enum ATHLTHWorkoutSessionFoundation {
             previous.recordingOwner == next.recordingOwner
     }
 
+    /// Read-only arbitration across existing recording stores. Never select
+    /// one arbitrarily if both stores report different active workouts:
+    /// doing so could hide a second HealthKit recording after recovery.
+    static func uniqueActiveSession(
+        running: ATHLTHWorkoutSessionState?,
+        strength: ATHLTHWorkoutSessionState?
+    ) throws -> ATHLTHWorkoutSessionState? {
+        switch (running, strength) {
+        case (nil, nil):
+            return nil
+        case (let session?, nil), (nil, let session?):
+            return session
+        case (let first?, let second?):
+            guard preservesRecordingOwnership(first, second) else {
+                throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+            }
+            // Same ID and owner can be two projections of one hybrid session.
+            // Neither projection creates a new recording or changes history.
+            return first
+        }
+    }
+
     static func running(
         _ workout: PhoneWorkout,
         at now: Date = Date()
