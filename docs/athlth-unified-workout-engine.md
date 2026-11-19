@@ -520,3 +520,19 @@ som ferdige før egne faser og reelle tester er fullført.
   `PhoneWorkout.elapsed(at:)`-klokken og pauseintervallene.
 - Regresjonen dekker både løp og gåing etter en lang bakgrunnspause.
   Ingen separat HealthKit-motor, migrering eller ny historikk-ID.
+
+### Fase 8 – iPhone-gjenoppretting uten tidsinflasjon
+
+- Ved rekonstruksjon av en iPhone-eid styrkeøkt stoppes nå
+  tidsstyrte sett og faktisk settinnsats på det sist varig
+  lagrede `Checkpoint.savedAt`. Tid utenfor appen etter prosessavbrudd
+  telles ikke som utført øvelse.
+- En aktiv hvile avsluttes ved samme sjekkpunkt. Registrert
+  hviletid frem til sjekkpunktet bevares, men offline-tid
+  legges ikke til som virkelig hvile.
+- De samme nedtellingsreglene brukes ved ordinær pause og
+  krasjgjenoppretting; overtid (negative gjenværende sekunder)
+  beholdes. Watch-eide økter berøres ikke, ettersom Watch
+  fortsatt kan ha målt trening offline.
+- Tester dekker lang frakobling, gjenopptakelse og overtid.
+  Fysisk enhets- og HealthKit-verifisering gjenstår.

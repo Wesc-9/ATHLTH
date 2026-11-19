@@ -113,6 +113,51 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         ), -40, accuracy: 0.001)
     }
 
+    func testRecoveredIPhoneStrengthTimersFreezeAtDurableCheckpoint() {
+        let workoutID = UUID()
+        let exerciseID = UUID()
+        let setID = UUID()
+        let checkpoint = start.addingTimeInterval(45)
+        let reopened = start.addingTimeInterval(3600)
+
+        var countdown = StrengthTimedSetCountdown(
+            workoutID: workoutID, exerciseID: exerciseID, setID: setID,
+            targetSeconds: 120, secondsAtPause: 120, resumedAt: start
+        )
+        countdown.pause(at: checkpoint)
+        XCTAssertFalse(countdown.isRunning)
+        XCTAssertEqual(countdown.remaining(at: reopened), 75, accuracy: 0.001)
+        countdown.resumedAt = reopened
+        XCTAssertEqual(countdown.remaining(
+            at: reopened.addingTimeInterval(10)
+        ), 65, accuracy: 0.001)
+
+        var effort = StrengthSetEffortClock(
+            workoutID: workoutID, exerciseID: exerciseID,
+            setID: setID, startedAt: start
+        )
+        effort.pause(at: checkpoint)
+        XCTAssertEqual(effort.elapsedSeconds(at: reopened), 45, accuracy: 0.001)
+        effort.resume(at: reopened)
+        XCTAssertEqual(effort.elapsedSeconds(
+            at: reopened.addingTimeInterval(10)
+        ), 55, accuracy: 0.001)
+    }
+
+    func testRecoveredTimedSetPreservesOvertimeWithoutAddingOfflineTime() {
+        let id = UUID()
+        let checkpoint = start.addingTimeInterval(35)
+        let reopened = start.addingTimeInterval(3600)
+        var countdown = StrengthTimedSetCountdown(
+            workoutID: id, exerciseID: UUID(), setID: UUID(),
+            targetSeconds: 20, secondsAtPause: 20, resumedAt: start
+        )
+        countdown.pause(at: checkpoint)
+        XCTAssertEqual(countdown.overtimeSeconds(at: reopened), 15)
+        countdown.pause(at: reopened)
+        XCTAssertEqual(countdown.overtimeSeconds(at: reopened), 15)
+    }
+
     func testWatchAndIPhoneTimedStrengthClocksStayIdentical() {
         var watch = WatchTimedStrengthCountdown(
             targetSeconds: 300, secondsAtPause: 300, resumedAt: start

@@ -63,6 +63,18 @@ struct StrengthTimedSetCountdown: Codable, Equatable {
     }
 
     var isRunning: Bool { resumedAt != nil }
+
+    /// Preserve exact negative remaining time (overtime), while freezing
+    /// a local timer at the last durable checkpoint on process recovery.
+    mutating func pause(at date: Date) {
+        guard let resumedAt else { return }
+        secondsAtPause = ATHLTHWorkoutSessionClock.remaining(
+            secondsAtPause: secondsAtPause,
+            resumedAt: resumedAt,
+            at: max(date, resumedAt)
+        )
+        self.resumedAt = nil
+    }
 }
 
 /// Date-anchored count-up clock. Identity protects against a stale
@@ -353,6 +365,27 @@ final class StrengthWorkoutStore: ObservableObject {
         setEffortClock = checkpoint?.setEffortClock
         discardStaleTimedSetCountdown()
         discardStaleSetEffortClock()
+        // Phone-only timers cannot keep running across a process crash.
+        // Watch-owned sessions continue independently in HealthKit and are
+        // reconciled through Watch commands instead of inventing phone time.
+        if let savedAt = recoveredCheckpointSavedAt,
+           activeWorkout?.captureDevice == .iPhone {
+            if var countdown = timedSetCountdown {
+                countdown.pause(at: savedAt)
+                timedSetCountdown = countdown
+            }
+            if var effort = setEffortClock {
+                effort.pause(at: max(savedAt, effort.startedAt))
+                setEffortClock = effort
+            }
+            // Ending the stale rest at the checkpoint preserves the actual
+            // measured rest without counting hours while the app was closed.
+            if let restStartedAt {
+                finalizeActualRestIfNeeded(at: max(savedAt, restStartedAt))
+                self.restStartedAt = nil
+                restEndsAt = nil
+            }
+        }
         hasLegacyHistory = userID != nil && UserDefaults.standard.string(forKey: "legacy.strengthClaimedBy") == nil && !Self.loadWorkoutHistory().isEmpty
     }
 
@@ -1844,10 +1877,7 @@ final class StrengthWorkoutStore: ObservableObject {
     func pauseTimedSet(at date: Date = Date()) {
         guard var countdown = currentTimedSetCountdown,
               countdown.isRunning else { return }
-        let now = date
-        countdown.secondsAtPause =
-            countdown.secondsAtPause - max(now.timeIntervalSince(countdown.resumedAt ?? now), 0)
-        countdown.resumedAt = nil
+        countdown.pause(at: date)
         timedSetCountdown = countdown
         if var effort = currentSetEffortClock {
             effort.pause(at: now)
