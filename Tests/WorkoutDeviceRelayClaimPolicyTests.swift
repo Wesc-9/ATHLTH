@@ -144,14 +144,14 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         let policy = WorkoutDeviceRelayClaimPolicy.self
         func verified(
             target: String = "apple_watch", kind: String = "run",
-            request: UUID = id, signedIn: UUID = owner,
+            request: UUID? = nil, signedIn: UUID? = nil,
             failure: Date? = nil, createdAt: Date? = nil
         ) -> Bool {
             policy.confirmsCompletedWatchLaunch(
                 target: target, kind: kind,
-                serverRequestID: request,
+                serverRequestID: request ?? id,
                 serverCreatedAt: createdAt ?? now.addingTimeInterval(-5),
-                signedInOwnerID: signedIn, receipt: receipt, failedAt: failure
+                signedInOwnerID: signedIn ?? owner, receipt: receipt, failedAt: failure
             )
         }
         XCTAssertNotNil(receipt)
