@@ -337,4 +337,53 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
         XCTAssertEqual(timer.elapsed(at: start.addingTimeInterval(775)), 265, accuracy: 0.001)
     }
 
+
+    @MainActor
+    func testHybridLaunchRejectsStaleOrReorderedValidatedParts() throws {
+        let session = try plannedHybrid()
+        let parts = try XCTUnwrap(
+            ATHLTHHybridWorkoutLaunchPlan.parts(for: session)
+        )
+
+        let tooFew = Array(parts.dropLast())
+        let store = StrengthWorkoutStore()
+        XCTAssertFalse(store.startPlannedHybrid(
+            session: session, validatedParts: tooFew,
+            watchSessionID: nil, trackingMode: .advanced,
+            captureDevice: .iPhone
+        ))
+        XCTAssertNil(store.activeWorkout)
+
+        var retyped = parts
+        retyped[1].kind = .strength
+        XCTAssertFalse(store.startPlannedHybrid(
+            session: session, validatedParts: retyped,
+            watchSessionID: nil, trackingMode: .advanced,
+            captureDevice: .iPhone
+        ))
+        XCTAssertNil(store.activeWorkout)
+    }
+
+    @MainActor
+    func testHybridLaunchNeverAppendsTamperedButPlausiblePartContent() throws {
+        let session = try plannedHybrid()
+        let parts = try XCTUnwrap(
+            ATHLTHHybridWorkoutLaunchPlan.parts(for: session)
+        )
+        var changed = parts
+        // A stale caller snapshot could quietly lose the run's intervals.
+        // Execution must reconstruct them from the original session.
+        changed[1].workoutBlocks = []
+        let store = StrengthWorkoutStore()
+        XCTAssertTrue(store.startPlannedHybrid(
+            session: session, validatedParts: changed,
+            watchSessionID: nil, trackingMode: .advanced,
+            captureDevice: .iPhone
+        ))
+        XCTAssertEqual(
+            store.activeWorkout?.exercises.filter {
+                $0.isEmbeddedRunningInterval == true
+            }.count, 3
+        )
+    }
 }

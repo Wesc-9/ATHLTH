@@ -3419,8 +3419,15 @@ final class StrengthWorkoutStore: ObservableObject {
               !loadingAccount,
               ATHLTHWorkoutRecordingArbiter.mayStartStrength(),
               !validatedParts.isEmpty,
-              validatedParts.allSatisfy({ $0.id == session.id }),
-              ATHLTHHybridWorkoutLaunchPlan.parts(for: session) != nil
+              let canonicalParts = ATHLTHHybridWorkoutLaunchPlan.parts(
+                  for: session
+              ),
+              // Validate again against the original plan immediately before
+              // recording starts. A caller-supplied parts array can be stale
+              // or mutated after the preview was accepted.
+              canonicalParts.count == validatedParts.count,
+              canonicalParts.map(\.kind) == validatedParts.map(\.kind),
+              validatedParts.allSatisfy({ $0.id == session.id })
         else { return false }
 
         var root = session
@@ -3442,7 +3449,9 @@ final class StrengthWorkoutStore: ObservableObject {
               launched.captureDevice == captureDevice,
               launched.endedAt == nil else { return false }
 
-        for part in validatedParts {
+        // Only the freshly validated canonical parts may affect the
+        // single recording. Never append caller-controlled snapshots.
+        for part in canonicalParts {
             guard appendWorkoutDuringSession(part) else {
                 // Never leave a partially constructed hybrid marked live.
                 discardActiveWorkout()

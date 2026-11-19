@@ -1375,3 +1375,16 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   `build.yml`. Ingen TestFlight eller ekstra HealthKit-opptak.
 - Grønn GitHub-simulator betyr fortsatt ikke bekreftet ekte
   iPad/Watch-tilgang, HealthKit-opptak eller universell GPS+styrke.
+
+### Fase 8 – fail-closed hybridopptak ved foreldet plan-snapshot (19.11.2026)
+
+- `StrengthWorkoutStore.startPlannedHybrid` validerer den opprinnelige
+  `PlannedSession` på nytt **før** ny styrke-/Watch-økt kan startes.
+  Lengde og motorrekkefølge i callerens `validatedParts` må fortsatt
+  stemme med kanonisk plan. Eldre/endrede deløktkopier skrives aldri
+  direkte til den levende loggen: kun ferske kanoniske deler brukes.
+- Regresjonstester kontrollerer foreldet antall deler, ugyldig endret
+  motorrekkefølge og et forsinket deløktobjekt uten løpeblokker. Ingen
+  ekstra HealthKit-opptak eller egen hybridresultatlogg.
+- Fysisk iPhone+Watch-løping med GPS+styrke er fortsatt unsupported;
+  dette hardener eksisterende tidsstyrte **innendørs** hybridøkter.
