@@ -218,7 +218,10 @@ final class StrengthAudioCoachSpeaker:
                 )
             },
             onFinished: { [weak self] in
-                self?.deliverNextQueuedCue()
+                guard let self,
+                      self.playbackGeneration == generation,
+                      !self.speechPaused else { return }
+                self.deliverNextQueuedCue()
             }
         )
         if !routedToAzure, mayStart() {
