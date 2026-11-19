@@ -749,6 +749,13 @@ final class IPhoneWorkoutStore:
     }
 
     private func beginIfAuthorized() {
+        // Location authorization can arrive after another start or checkpoint
+        // recovery. Never allocate a second PhoneWorkout from a stale pending
+        // request; preserve the already active recording and its HealthKit ID.
+        guard active == nil, !saving else {
+            pendingWalking = nil
+            return
+        }
         guard let walking = pendingWalking else { return }
         let environment = pendingRunEnvironment
 
