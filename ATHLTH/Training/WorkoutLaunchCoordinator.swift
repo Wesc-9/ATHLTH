@@ -1235,7 +1235,10 @@ enum WorkoutLaunchCoordinator {
                     preparedGhostRace,
                 indoor:
                     configuration.environment != .outdoor,
-                startMode: configuration.watchStartMode,
+                // A relayed command represents a request to START now,
+                // never a manual Watch card that can be left unstarted.
+                startMode: relayRequestID == nil
+                    ? configuration.watchStartMode : .immediate,
                 updatedAt: Date()
             )
         )
@@ -1244,7 +1247,8 @@ enum WorkoutLaunchCoordinator {
         // The prepared payload carries the start mode and full route/coach
         // context; the Watch applies it before starting its session.
         // Manual mode retains the existing ready-to-start Watch card.
-        if configuration.watchStartMode != .onWatch {
+        if configuration.watchStartMode != .onWatch ||
+           relayRequestID != nil {
             try await watchConnection.startWorkoutOnWatch(
                 .running,
                 indoor: configuration.environment != .outdoor,
