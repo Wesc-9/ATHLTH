@@ -85,78 +85,78 @@ jobs:
           set -euo pipefail
           for attempt in $(seq 1 180); do
             if python3 - <<'PY'
-            import json
-            import os
-            import subprocess
-            import sys
-            
-            repo = os.environ["GITHUB_REPOSITORY"]
-            sha = os.environ["GITHUB_SHA"]
-            
-            def api(path):
-                response = subprocess.run(
-                    ["gh", "api", path], text=True, capture_output=True, timeout=60
-                )
-                if response.returncode != 0:
-                    raise RuntimeError(f"GitHub API {path}: {response.stderr[-400:]}")
-                return json.loads(response.stdout)
-            
-            branch = api(f"repos/{repo}/git/ref/heads/release/v2.2.5")
-            if branch["object"]["sha"] != sha:
-                print("::error::Release branch advanced; refusing to ship stale source.")
-                sys.exit(1)
-            
-            runs = api(f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")["workflow_runs"]
-            required = [
-                "Build ATHLTH",
-                "ATHLTH backend regressions",
-                "ATHLTH Train and Hybrid Engine XCTest",
-                "ATHLTH iPhone Compatibility Smoke Test",
-            ]
-            selected = {}
-            pending = False
-            
-            for name in required:
-                matches = [run for run in runs if run["name"] == name and run["head_sha"] == sha]
-                if not matches:
-                    print(f"Waiting for {name}: workflow missing on this commit")
-                    pending = True
-                    continue
-                run = max(matches, key=lambda item: item["id"])
-                selected[name] = run
-                if run["status"] != "completed":
-                    print(f"Waiting for {name}: {run['status']} ({run['id']})")
-                    pending = True
-                elif run["conclusion"] != "success":
-                    print(f"::error::Release blocked: {name} {run['conclusion']} ({run['id']})")
-                    sys.exit(1)
-            
-            if pending:
-                sys.exit(2)
-            
-            build_id = selected["Build ATHLTH"]["id"]
-            jobs = api(f"repos/{repo}/actions/runs/{build_id}/jobs?per_page=100")["jobs"]
-            for name in ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]:
-                matches = [job for job in jobs if job["name"] == name]
-                if len(matches) != 1 or matches[0]["conclusion"] != "success":
-                    print(f"::error::Required iPad/iOS job not verified: {name} in {build_id}")
-                    sys.exit(1)
-            
-            artifacts = api(f"repos/{repo}/actions/runs/{build_id}/artifacts?per_page=100")["artifacts"]
-            for size in (11, 13):
-                name = f"athlth-ipad-smoke-screenshots-{size}"
-                matched = [
-                    artifact for artifact in artifacts
-                    if artifact["name"] == name and not artifact["expired"]
-                    and artifact["size_in_bytes"] > 0
-                ]
-                if not matched:
-                    print(f"::error::Missing verified iPad {size}-inch screenshot artifact")
-                    sys.exit(1)
-            
-            print(f"All four workflows, both iPad layouts and artifacts verified for {sha}.")
-            sys.exit(0)
-            PY
+          import json
+          import os
+          import subprocess
+          import sys
+          
+          repo = os.environ["GITHUB_REPOSITORY"]
+          sha = os.environ["GITHUB_SHA"]
+          
+          def api(path):
+              response = subprocess.run(
+                  ["gh", "api", path], text=True, capture_output=True, timeout=60
+              )
+              if response.returncode != 0:
+                  raise RuntimeError(f"GitHub API {path}: {response.stderr[-400:]}")
+              return json.loads(response.stdout)
+          
+          branch = api(f"repos/{repo}/git/ref/heads/release/v2.2.5")
+          if branch["object"]["sha"] != sha:
+              print("::error::Release branch advanced; refusing to ship stale source.")
+              sys.exit(1)
+          
+          runs = api(f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")["workflow_runs"]
+          required = [
+              "Build ATHLTH",
+              "ATHLTH backend regressions",
+              "ATHLTH Train and Hybrid Engine XCTest",
+              "ATHLTH iPhone Compatibility Smoke Test",
+          ]
+          selected = {}
+          pending = False
+          
+          for name in required:
+              matches = [run for run in runs if run["name"] == name and run["head_sha"] == sha]
+              if not matches:
+                  print(f"Waiting for {name}: workflow missing on this commit")
+                  pending = True
+                  continue
+              run = max(matches, key=lambda item: item["id"])
+              selected[name] = run
+              if run["status"] != "completed":
+                  print(f"Waiting for {name}: {run['status']} ({run['id']})")
+                  pending = True
+              elif run["conclusion"] != "success":
+                  print(f"::error::Release blocked: {name} {run['conclusion']} ({run['id']})")
+                  sys.exit(1)
+          
+          if pending:
+              sys.exit(2)
+          
+          build_id = selected["Build ATHLTH"]["id"]
+          jobs = api(f"repos/{repo}/actions/runs/{build_id}/jobs?per_page=100")["jobs"]
+          for name in ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]:
+              matches = [job for job in jobs if job["name"] == name]
+              if len(matches) != 1 or matches[0]["conclusion"] != "success":
+                  print(f"::error::Required iPad/iOS job not verified: {name} in {build_id}")
+                  sys.exit(1)
+          
+          artifacts = api(f"repos/{repo}/actions/runs/{build_id}/artifacts?per_page=100")["artifacts"]
+          for size in (11, 13):
+              name = f"athlth-ipad-smoke-screenshots-{size}"
+              matched = [
+                  artifact for artifact in artifacts
+                  if artifact["name"] == name and not artifact["expired"]
+                  and artifact["size_in_bytes"] > 0
+              ]
+              if not matched:
+                  print(f"::error::Missing verified iPad {size}-inch screenshot artifact")
+                  sys.exit(1)
+          
+          print(f"All four workflows, both iPad layouts and artifacts verified for {sha}.")
+          sys.exit(0)
+          PY
             then
               echo "All release acceptance gates are green."
               exit 0
