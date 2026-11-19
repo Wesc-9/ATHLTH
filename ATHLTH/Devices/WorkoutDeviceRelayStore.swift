@@ -559,48 +559,49 @@ final class WorkoutDeviceRelayStore:
                         record.payload
                 )
 
+            // Keep the launch result separate from the acknowledgement.
+            // A network failure *after* HealthKit started must never mark
+            // this command as a failed launch eligible for a second start.
             do {
-                try await process(
-                    command
-                )
-                // Processing can suspend for Watch startup. A user switch
-                // must not acknowledge or surface another account's result.
-                guard currentUserID == processingUserID,
-                      !Task.isCancelled else { return }
-                try await markCompleted(
-                    command.id
-                )
-                guard currentUserID == processingUserID,
-                      !Task.isCancelled else { return }
-                lastCompletedCommandID =
-                    command.id
-                errorMessage = nil
-                lastStatusText =
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Remote workout started.",
-                        norwegian:
-                            "Fjernstart av økt utført."
-                    )
+                try await process(command)
             } catch {
                 guard currentUserID == processingUserID,
                       !Task.isCancelled else { return }
-                try? await markFailed(
-                    command.id,
-                    error: error
-                )
+                try? await markFailed(command.id, error: error)
                 guard currentUserID == processingUserID,
                       !Task.isCancelled else { return }
-                errorMessage =
-                    error.localizedDescription
-                lastStatusText =
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Remote workout could not be started.",
-                        norwegian:
-                            "Fjernstart av økten kunne ikke gjennomføres."
-                    )
+                errorMessage = error.localizedDescription
+                lastStatusText = ATHLTHLocalization.choose(
+                    english: "Remote workout could not be started.",
+                    norwegian: "Fjernstart av økten kunne ikke gjennomføres."
+                )
+                continue
             }
+            guard currentUserID == processingUserID,
+                  !Task.isCancelled else { return }
+            do {
+                try await markCompleted(command.id)
+            } catch {
+                // The claim remains unresolved, not failed: the Watch or
+                // iPhone may already be recording. Never replay this launch
+                // just to repair a missing acknowledgement.
+                guard currentUserID == processingUserID,
+                      !Task.isCancelled else { return }
+                errorMessage = error.localizedDescription
+                lastStatusText = ATHLTHLocalization.choose(
+                    english: "Workout started; confirmation is pending.",
+                    norwegian: "Økten er startet, men bekreftelsen venter."
+                )
+                continue
+            }
+            guard currentUserID == processingUserID,
+                  !Task.isCancelled else { return }
+            lastCompletedCommandID = command.id
+            errorMessage = nil
+            lastStatusText = ATHLTHLocalization.choose(
+                english: "Remote workout started.",
+                norwegian: "Fjernstart av økt utført."
+            )
         }
     }
 
