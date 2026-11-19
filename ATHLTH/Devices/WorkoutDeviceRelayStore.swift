@@ -630,6 +630,9 @@ final class WorkoutDeviceRelayStore:
     private func markCompleted(
         _ commandID: UUID
     ) async throws {
+        guard let userID = currentUserID else {
+            throw NSError(domain: "ATHLTH.DeviceRelay", code: 3)
+        }
         try await client
             .from(
                 "workout_device_commands"
@@ -643,6 +646,8 @@ final class WorkoutDeviceRelayStore:
                 "id",
                 value: commandID
             )
+            .eq("user_id", value: userID)
+            .eq("claimed_by_device_id", value: ATHLTHDeviceRole.persistentDeviceID)
             .execute()
     }
 
@@ -650,6 +655,9 @@ final class WorkoutDeviceRelayStore:
         _ commandID: UUID,
         error: Error
     ) async throws {
+        guard let userID = currentUserID else {
+            throw NSError(domain: "ATHLTH.DeviceRelay", code: 3)
+        }
         let cleanMessage =
             String(
                 error
@@ -672,6 +680,8 @@ final class WorkoutDeviceRelayStore:
                 "id",
                 value: commandID
             )
+            .eq("user_id", value: userID)
+            .eq("claimed_by_device_id", value: ATHLTHDeviceRole.persistentDeviceID)
             .execute()
     }
 }
