@@ -225,9 +225,11 @@ enum WorkoutDeviceRelayClaimPolicy {
     /// its server receipt could not be committed and the same claim returns.
     static func mayExecuteClaim(
         commandID: UUID,
-        unacknowledgedLaunchIDs: [UUID]
+        unacknowledgedLaunchIDs: [UUID],
+        uncertainLaunchIDs: [UUID] = []
     ) -> Bool {
-        !unacknowledgedLaunchIDs.contains(commandID)
+        !unacknowledgedLaunchIDs.contains(commandID) &&
+            !uncertainLaunchIDs.contains(commandID)
     }
 }
 
@@ -299,6 +301,31 @@ final class WorkoutDeviceRelayStore:
     // A launch may succeed while the Supabase acknowledgement fails.
     // Persist only its command ID, scoped to account and physical device;
     // never persist the workout payload or replay the HealthKit start.
+    // Written BEFORE an asynchronous start. A crash between a successful
+    // Watch launch and the success receipt must not replay HealthKit.
+    private func uncertainJournalKey(userID: UUID) -> String {
+        "athlth.relay.uncertain.v1.\(userID.uuidString.lowercased()).\(ATHLTHDeviceRole.persistentDeviceID)"
+    }
+
+    private func uncertainLaunchIDs(userID: UUID) -> [UUID] {
+        (UserDefaults.standard.stringArray(forKey: uncertainJournalKey(userID: userID)) ?? [])
+            .compactMap(UUID.init(uuidString:))
+    }
+
+    private func rememberUncertainLaunch(_ id: UUID, userID: UUID) {
+        var ids = uncertainLaunchIDs(userID: userID)
+        guard !ids.contains(id) else { return }
+        ids.append(id)
+        UserDefaults.standard.set(ids.map(\.uuidString),
+                                  forKey: uncertainJournalKey(userID: userID))
+    }
+
+    private func forgetUncertainLaunch(_ id: UUID, userID: UUID) {
+        let ids = uncertainLaunchIDs(userID: userID).filter { $0 != id }
+        UserDefaults.standard.set(ids.map(\.uuidString),
+                                  forKey: uncertainJournalKey(userID: userID))
+    }
+
     private func completedJournalKey(userID: UUID) -> String {
         "athlth.relay.completed.v1.\(userID.uuidString.lowercased()).\(ATHLTHDeviceRole.persistentDeviceID)"
     }
@@ -570,6 +597,12 @@ final class WorkoutDeviceRelayStore:
         isDrainingCommands = true
         defer { isDrainingCommands = false }
         guard let processingUserID = currentUserID else { return }
+        // An interrupted start has an unknown outcome. Do not claim another
+        // start or replay the ambiguous command until device reconciliation.
+        guard uncertainLaunchIDs(userID: processingUserID).isEmpty else {
+            errorMessage = "A previous remote start needs device reconciliation."
+            return
+        }
         guard await reconcileLaunchedCommands(userID: processingUserID),
               currentUserID == processingUserID, !Task.isCancelled
         else { return }
@@ -609,7 +642,8 @@ final class WorkoutDeviceRelayStore:
             if !WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
                 commandID: record.id,
                 unacknowledgedLaunchIDs:
-                    unacknowledgedLaunchIDs(userID: processingUserID)
+                    unacknowledgedLaunchIDs(userID: processingUserID),
+                uncertainLaunchIDs: uncertainLaunchIDs(userID: processingUserID)
             ) {
                 do {
                     try await markCompleted(record.id)
@@ -660,14 +694,20 @@ final class WorkoutDeviceRelayStore:
             // Keep the launch result separate from the acknowledgement.
             // A network failure *after* HealthKit started must never mark
             // this command as a failed launch eligible for a second start.
+            rememberUncertainLaunch(command.id, userID: processingUserID)
             do {
                 try await process(command)
                 // Persist the success before any suspension for server I/O.
                 // A relaunch or offline reconnect must only retry the receipt.
                 rememberLaunchedCommand(command.id, userID: processingUserID)
+                forgetUncertainLaunch(command.id, userID: processingUserID)
             } catch {
+                // The launch API explicitly failed; only this path may clear
+                // the pre-start uncertainty. Cancellation/account switch does
+                // not prove Watch did not start.
                 guard currentUserID == processingUserID,
                       !Task.isCancelled else { return }
+                forgetUncertainLaunch(command.id, userID: processingUserID)
                 try? await markFailed(command.id, error: error)
                 guard currentUserID == processingUserID,
                       !Task.isCancelled else { return }
