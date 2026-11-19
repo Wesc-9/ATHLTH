@@ -5375,10 +5375,13 @@ final class StrengthWorkoutStore: ObservableObject {
         duration: TimeInterval? = nil,
         activeCalories: Double? = nil,
         averageHeartRate: Double? = nil,
-        maxHeartRate: Double? = nil
+        maxHeartRate: Double? = nil,
+        completedAt: Date? = nil
     ) -> Bool {
         guard activeWorkout != nil else { return false }
-        let finishDate = Date()
+        // When the Watch owns HealthKit, its recorded end is authoritative.
+        // Local Finish still defaults to the actual tap time.
+        let finishDate = completedAt ?? Date()
         finalizeActualRestIfNeeded(at: finishDate)
         restStartedAt = nil
         restEndsAt = nil
@@ -5566,6 +5569,50 @@ final class StrengthWorkoutStore: ObservableObject {
             completedWorkout = saved
         }
         try? StrengthWorkoutCompletionJournal.save(saved, userID: ownerID)
+    }
+
+    /// Backfilled Watch metrics belong to their exact completed history
+    /// entry. Never attach them to an unrelated newer active workout, and
+    /// never replace another Watch workout's existing HealthKit UUID.
+    @discardableResult
+    func attachFinishedWatchMetrics(
+        _ metrics: LinkedHealthWorkoutMetrics,
+        workoutID: UUID,
+        ownerID: UUID
+    ) -> Bool {
+        guard accountID == ownerID,
+              let index = workoutHistory.firstIndex(where: {
+                  $0.id == workoutID &&
+                  $0.isFinished &&
+                  $0.captureDevice == .appleWatch
+              }),
+              !UserDefaults.standard.bool(
+                  forKey: AccountLocalStorage.key("deleted", userID: ownerID)
+              ) else { return false }
+        var updated = workoutHistory
+        var finished = updated[index]
+        if let existing = finished.healthMetrics.healthKitWorkoutUUID,
+           let incoming = metrics.healthKitWorkoutUUID,
+           existing != incoming { return false }
+        finished.healthMetrics = metrics
+        updated[index] = finished
+        do {
+            try AccountLocalStorage.writeChecked(
+                updated, name: "strengthHistory", userID: ownerID
+            )
+        } catch {
+            return false
+        }
+        workoutHistory = updated
+        if completedWorkout?.id == workoutID {
+            completedWorkout = finished
+        }
+        // Do not replace the most recent journal with an older completion.
+        if StrengthWorkoutCompletionJournal.read(userID: ownerID)?.id == workoutID {
+            try? StrengthWorkoutCompletionJournal.save(finished, userID: ownerID)
+        }
+        ATHLTHTrainingDataChangeSignal.post(userID: ownerID)
+        return true
     }
 
     func attachHealthMetrics(_ metrics: LinkedHealthWorkoutMetrics) {

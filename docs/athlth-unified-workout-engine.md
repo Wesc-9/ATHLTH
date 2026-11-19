@@ -594,3 +594,23 @@ som ferdige før egne faser og reelle tester er fullført.
   uten konto-ID og setthendelser som ankommer før bootstrap.
   XCTest som bruker aktørbundet `StrengthWorkoutStore` er også merket
   `@MainActor`.
+
+### Fase 7 – Watch-resultat: avslutt bare korrekt økt, aldri neste treningslogg
+
+- `WatchWorkoutResult.id` opprettes når Watch lagrer resultatet.
+  Den er **ikke** identiteten til styrketreningsøkten. Ny
+  `ATHLTHWatchStrengthResultIdentityPolicy` bruker den stabile
+  `strengthSnapshot.workoutID` mot eksisterende `StrengthWorkoutLog.id`.
+  Bare eldre Watch-resultater uten snapshot får en streng,
+  tidsbegrenset fallback for telefon-initiert Watch-opptak.
+- En gammel Watch-ferdigstilling kan nå verken avslutte feil
+  aktiv styrkeøkt eller feste kalorier/puls til en ny økt.
+  Metrics for allerede lagrede økter oppdateres på **eksakt
+  historikk-ID**, med separat kontosjekk og atomisk historikk-skriving.
+  Den siste fullføringsjournalen erstattes ikke med en eldre økt.
+- Når Watch eier HealthKit er `result.endedAt` også autoritativ
+  sluttid i styrkehistorikken, ikke klokken når iPhone senere
+  mottar resultatet. Ved diskfeil beholdes Watch-resultatet i
+  eksisterende kø slik at en retry ikke lager dobbelt resultat.
+- Regresjonstester dekker avvikende økt-ID, ny aktiv økt,
+  HealthKit-backfill på eldre fullført økt og faktisk sluttid.

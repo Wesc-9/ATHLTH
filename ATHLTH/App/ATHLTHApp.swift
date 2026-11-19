@@ -3085,73 +3085,58 @@ struct AppRootView: View {
             }
         }
 
-        let watchFinishedActiveStrength =
-            result.kind == .strength &&
-            strengthWorkout.activeWorkout?
-                .captureDevice == .appleWatch
-
-        let watchMatchesCompletedStrength =
-            result.kind == .strength &&
-            strengthWorkout.completedWorkout?
-                .captureDevice == .appleWatch &&
-            strengthWorkout.completedWorkout.map {
-                abs(
-                    result.endedAt.timeIntervalSince(
-                        $0.endedAt ??
-                        result.endedAt
-                    )
-                ) < 180
+        // The Watch result UUID is generated at completion, so it is NOT
+        // the session ID used by the iPhone strength log. Prefer the stable
+        // snapshot.workoutID. Never end an unrelated Apple Watch workout
+        // merely because another Watch result arrived afterward.
+        let matchingActiveStrength =
+            strengthWorkout.activeWorkout.map {
+                ATHLTHWatchStrengthResultIdentityPolicy.matches(
+                    result: result, workout: $0
+                )
             } == true
 
-        let watchBelongsToATHLTHStrength =
-            watchFinishedActiveStrength ||
-            watchMatchesCompletedStrength
+        let matchingSavedStrength = strengthWorkout.workoutHistory.first {
+            $0.endedAt != nil &&
+            ATHLTHWatchStrengthResultIdentityPolicy.matches(
+                result: result, workout: $0
+            )
+        }
 
-        if watchBelongsToATHLTHStrength {
-            let metrics =
-                LinkedHealthWorkoutMetrics(
-                    healthKitWorkoutUUID:
-                        result
-                            .healthKitWorkoutUUID,
-                    duration: result.duration,
-                    activeCalories:
-                        result.activeCalories,
-                    averageHeartRate:
-                        result.averageHeartRate,
-                    maxHeartRate:
-                        result.maxHeartRate
-                )
+        if matchingActiveStrength || matchingSavedStrength != nil {
+            let metrics = LinkedHealthWorkoutMetrics(
+                healthKitWorkoutUUID: result.healthKitWorkoutUUID,
+                duration: result.duration,
+                activeCalories: result.activeCalories,
+                averageHeartRate: result.averageHeartRate,
+                maxHeartRate: result.maxHeartRate
+            )
 
-            if watchFinishedActiveStrength {
-                // This transition publishes completedWorkout. The regular
-                // strength completion handler below is therefore the single
-                // owner of review, challenges, social, gear and trophies.
-                strengthWorkout.finish(
-                    healthKitWorkoutUUID:
-                        metrics
-                            .healthKitWorkoutUUID,
-                    duration:
-                        metrics.duration,
-                    activeCalories:
-                        metrics.activeCalories,
-                    averageHeartRate:
-                        metrics.averageHeartRate,
-                    maxHeartRate:
-                        metrics.maxHeartRate
-                )
+            if matchingActiveStrength {
+                // Watch's actual end date (not delayed iPhone delivery) is
+                // authoritative. If durable saving fails, leave the result
+                // queued for retry and do not publish generic duplicates.
+                guard strengthWorkout.finish(
+                    healthKitWorkoutUUID: metrics.healthKitWorkoutUUID,
+                    duration: metrics.duration,
+                    activeCalories: metrics.activeCalories,
+                    averageHeartRate: metrics.averageHeartRate,
+                    maxHeartRate: metrics.maxHeartRate,
+                    completedAt: result.endedAt
+                ) else { return }
                 appSession.endTrainingStatus()
-            } else {
-                strengthWorkout
-                    .attachHealthMetrics(
-                        metrics
-                    )
+            } else if let saved = matchingSavedStrength {
+                // A later Watch result must never attach HealthKit metrics
+                // to whichever newer session is active on the phone.
+                guard strengthWorkout.attachFinishedWatchMetrics(
+                    metrics, workoutID: saved.id, ownerID: resultOwnerID
+                ) else { return }
             }
 
-            // The strength completion handler owns every downstream side
-            // effect, including the post-Watch Health refresh. The raw Watch
-            // result is now fully consumed.
-            watchConnection
-                .consumeCompletedWorkout(result.id)
+            // The strength completion path owns downstream review and
+            // progress. The exact matching result is now durable and safe
+            // to acknowledge without adding a second training session.
+            watchConnection.consumeCompletedWorkout(result.id)
             return
         }
 

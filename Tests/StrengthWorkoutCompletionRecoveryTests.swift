@@ -4,6 +4,75 @@ import XCTest
 
 final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
     @MainActor
+    func testDelayedWatchResultCannotEndOrModifyAnotherStrengthSession() throws {
+        let owner = UUID()
+        defer {
+            StrengthWorkoutCompletionJournal.remove(userID: owner)
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthHistory", userID: owner)
+            )
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthActive", userID: owner)
+            )
+        }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        let original = try XCTUnwrap(store.activeWorkout)
+        var result = WatchWorkoutResult(
+            id: UUID(), kind: .strength, healthKitWorkoutUUID: UUID(),
+            startedAt: original.startedAt,
+            endedAt: original.startedAt.addingTimeInterval(120),
+            duration: 120, activeCalories: 60, distanceMeters: 0,
+            averageHeartRate: 120, maxHeartRate: 145, routePointCount: 0
+        )
+        result.strengthSnapshot = try XCTUnwrap(store.watchSnapshot)
+
+        XCTAssertTrue(ATHLTHWatchStrengthResultIdentityPolicy.matches(
+            result: result, workout: original
+        ))
+        var other = original
+        other.id = UUID()
+        XCTAssertFalse(ATHLTHWatchStrengthResultIdentityPolicy.matches(
+            result: result, workout: other
+        ))
+        other = original
+        other.captureDevice = .iPhone
+        XCTAssertFalse(ATHLTHWatchStrengthResultIdentityPolicy.matches(
+            result: result, workout: other
+        ))
+        // The result ID itself is unrelated to the authoritative workout.
+        XCTAssertNotEqual(result.id, original.id)
+        XCTAssertTrue(store.finish(completedAt: result.endedAt))
+        XCTAssertEqual(store.workoutHistory.first?.endedAt, result.endedAt)
+
+        // A different current session must survive late metrics from the
+        // previous finished workout; only its exact history entry changes.
+        let originalID = original.id
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        let nextID = try XCTUnwrap(store.activeWorkout?.id)
+        let measured = LinkedHealthWorkoutMetrics(
+            healthKitWorkoutUUID: result.healthKitWorkoutUUID,
+            duration: 120, activeCalories: 60,
+            averageHeartRate: 120, maxHeartRate: 145
+        )
+        XCTAssertTrue(store.attachFinishedWatchMetrics(
+            measured, workoutID: originalID, ownerID: owner
+        ))
+        XCTAssertEqual(store.activeWorkout?.id, nextID)
+        XCTAssertNil(store.activeWorkout?.healthMetrics.healthKitWorkoutUUID)
+        XCTAssertEqual(
+            store.workoutHistory.first(where: { $0.id == originalID })?
+                .healthMetrics.healthKitWorkoutUUID,
+            result.healthKitWorkoutUUID
+        )
+        XCTAssertFalse(store.attachFinishedWatchMetrics(
+            measured, workoutID: nextID, ownerID: owner
+        ))
+    }
+
+    @MainActor
     func testFinishedStrengthWorkoutIsRestoredAfterHistoryWriteIsLost() throws {
         let userID = UUID()
         defer {

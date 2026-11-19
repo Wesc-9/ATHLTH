@@ -344,3 +344,38 @@ enum ATHLTHWorkoutSessionFoundation {
         )
     }
 }
+
+ 
+/// A Watch result has its own delivery/result UUID, unrelated to the
+/// authoritative strength session UUID. Only the latter may finish a log or
+/// attach HealthKit metrics. Older Watch builds without a strength snapshot
+/// are accepted only for a phone-initiated Watch session with a very close
+/// HealthKit start time. Never match by workout kind or finish time alone.
+enum ATHLTHWatchStrengthResultIdentityPolicy {
+    static func matches(
+        result: WatchWorkoutResult,
+        workout: StrengthWorkoutLog
+    ) -> Bool {
+        guard result.kind == .strength,
+              workout.captureDevice == .appleWatch,
+              result.startedAt.timeIntervalSince1970.isFinite,
+              result.endedAt.timeIntervalSince1970.isFinite,
+              result.endedAt >= result.startedAt
+        else { return false }
+
+        if let linked = workout.healthMetrics.healthKitWorkoutUUID,
+           let fromWatch = result.healthKitWorkoutUUID,
+           linked != fromWatch {
+            return false
+        }
+
+        if let snapshot = result.strengthSnapshot {
+            return snapshot.workoutID == workout.id
+        }
+
+        // Compatibility-only: Watch-only offline workouts without a stable
+        // strengthSnapshot must not be assigned to an unrelated active log.
+        guard workout.watchSessionID != nil else { return false }
+        return abs(workout.startedAt.timeIntervalSince(result.startedAt)) <= 10
+    }
+}
