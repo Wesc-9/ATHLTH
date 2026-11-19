@@ -748,3 +748,15 @@ som ferdige før egne faser og reelle tester er fullført.
   holder på å avsluttes. Det skaper ingen ny HealthKit-økt.
 - Tester dekker feil ID, manglende ID, ugyldig slutttid,
   legacy Watch og korrekt gjenoppretting etter fullføring.
+
+### Fase 5/6 – gammel inaktiv Watch-status skal ikke stenge ny liveøkt
+
+- `reconcileInactiveWatchActivity` krever nå at en eksplisitt
+  «inaktiv»-melding er minst like ny som **siste godkjente**
+  Watch-snapshot, ikke bare nyere enn øktens opprinnelige start.
+  Dermed kan en forsinket melding fra forrige økt ikke avslutte
+  en nyere aktiv HealthKit-speiling eller Dynamic Island-visning.
+- Håndterer manglende start, ugyldig dato, allerede avsluttet
+  økt og aktiv Watch-status som ikke bevis for slutt.
+- Tester dekker gammel versus ny status og fullført økt.
+  Fortsatt nødvendig med reell iPhone/Watch-reconnect-test.

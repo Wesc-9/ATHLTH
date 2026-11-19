@@ -83,6 +83,26 @@ enum ATHLTHWorkoutMirrorContinuity {
         return true
     }
 
+    /// An inactivity response without an explicit workout ID cannot close
+    /// a newer Watch mirror snapshot. Watch sends both timestamps in the
+    /// same clock domain; a status older than the last accepted snapshot
+    /// is stale regardless of which HealthKit workout it describes.
+    static func acceptsInactiveWatchActivity(
+        snapshot: WatchWorkoutLiveSnapshot,
+        activity: WatchWorkoutActivityState
+    ) -> Bool {
+        guard !activity.isActive,
+              snapshot.state != .completed,
+              snapshot.state != .failed,
+              activity.updatedAt.timeIntervalSince1970.isFinite,
+              snapshot.capturedAt.timeIntervalSince1970.isFinite,
+              let start = snapshot.startedAt,
+              start.timeIntervalSince1970.isFinite else {
+            return false
+        }
+        return activity.updatedAt >= max(start, snapshot.capturedAt)
+    }
+
     /// A late result from another short run must not terminate the new run.
     static func canApplyCompletion(
         snapshot: WatchWorkoutLiveSnapshot,

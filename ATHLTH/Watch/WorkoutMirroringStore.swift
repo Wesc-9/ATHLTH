@@ -812,10 +812,11 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     /// An explicit inactive Watch response also ends a stale live mirror.
     /// Ignore inactive messages from before this workout started.
     func reconcileInactiveWatchActivity(_ activity: WatchWorkoutActivityState) {
-        guard !activity.isActive, var current = snapshot,
+        guard var current = snapshot,
               hasActiveMirroredWorkout,
-              current.startedAt.map({ $0 <= activity.updatedAt })
-                ?? (current.capturedAt <= activity.updatedAt)
+              ATHLTHWorkoutMirrorContinuity.acceptsInactiveWatchActivity(
+                  snapshot: current, activity: activity
+              )
         else { return }
         current.state = .completed
         current.capturedAt = activity.updatedAt

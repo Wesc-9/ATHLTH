@@ -82,6 +82,42 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ), "A result cannot finish before its own start")
     }
 
+    func testOldInactiveWatchResponseCannotEndNewerMirror() {
+        let live = snapshot(kind: .running)
+        let oldInactive = WatchWorkoutActivityState(
+            isActive: false, title: nil,
+            updatedAt: live.capturedAt.addingTimeInterval(-15)
+        )
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsInactiveWatchActivity(
+            snapshot: live, activity: oldInactive
+        ), "A late status from the previous workout cannot close newer live data")
+
+        let confirmedInactive = WatchWorkoutActivityState(
+            isActive: false, title: nil,
+            updatedAt: live.capturedAt.addingTimeInterval(1)
+        )
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsInactiveWatchActivity(
+            snapshot: live, activity: confirmedInactive
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsInactiveWatchActivity(
+            snapshot: live,
+            activity: WatchWorkoutActivityState(
+                isActive: true, title: nil,
+                updatedAt: live.capturedAt.addingTimeInterval(1)
+            )
+        ))
+        var completed = live
+        completed.state = .completed
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsInactiveWatchActivity(
+            snapshot: completed, activity: confirmedInactive
+        ))
+        var missingStart = live
+        missingStart.startedAt = nil
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsInactiveWatchActivity(
+            snapshot: missingStart, activity: confirmedInactive
+        ))
+    }
+
     func testReattachingSameWatchWorkoutCanRetainMetrics() {
         XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
             previous: snapshot(),
