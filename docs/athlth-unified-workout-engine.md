@@ -1253,3 +1253,22 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   telefonlås. Ingen ny lagringsmodell eller treningsopptak er introdusert.
 - Ytelses- og tidsforbedringene er ikke fysisk eller CI-verifisert før
   samme-commit iOS/iPad/watchOS-bygg, XCTest og målte tester er grønne.
+
+### Fase 8 – Watch terminal-state and stale mirror identity (19.11.2026)
+
+- `WorkoutMirroringStore.reconcileInactiveWatchActivity` treats an inactive
+  Watch status as **ending**, not **completed**. The correlated final Watch
+  result is the only path to the completed mirror state. The matching Live
+  Activity is still dismissed immediately; no extra HealthKit recording or
+  synthetic completion is created by the inactive status.
+- `ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot` refuses later
+  strength snapshots missing or contradicting an already-established
+  strength workout ID, and refuses later live updates omitting a previously
+  established Watch start timestamp. The legacy pre-start/preparing path
+  remains available when no start was known yet.
+- Targeted XCTest cases cover inactive-to-ending status for running and
+  strength, delayed correlated completion, missing stable strength ID,
+  missing start timestamp and legacy pre-start transition.
+- This is code hardening, not proof of real-device HealthKit consistency.
+  Require same-commit iOS/iPad/watchOS/XCTest and physical handoff/finish
+  tests before release or TestFlight.

@@ -273,4 +273,71 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
             activeSession: nil, incomingSession: oldID
         ))
     }
+
+    func testInactiveWatchStatusEndsPresentationWithoutClaimingSavedResult() {
+        let run = snapshot(kind: .running)
+        let strength = snapshot(kind: .strength)
+        let pending = snapshot(kind: .strength, state: .ending)
+        XCTAssertEqual(
+            ATHLTHWorkoutMirrorContinuity.stateAfterInactiveWatchActivity(run),
+            .ending
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutMirrorContinuity.stateAfterInactiveWatchActivity(strength),
+            .ending
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutMirrorContinuity.stateAfterInactiveWatchActivity(pending),
+            .ending
+        )
+        XCTAssertNotEqual(
+            ATHLTHWorkoutMirrorContinuity.stateAfterInactiveWatchActivity(strength),
+            .completed,
+            "Watch inactive is not evidence that its HealthKit result was saved"
+        )
+        // A later, correlated persisted Watch result can still finish the
+        // same session after the inactive indicator stopped the live UI.
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: pending, kind: .strength,
+            startedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(181)
+        ))
+    }
+
+    func testKnownStrengthIdentityRejectsUnidentifiedLaterLiveSnapshot() {
+        var original = snapshot(kind: .strength)
+        original.strengthWorkoutID = UUID()
+        var late = original
+        late.strengthWorkoutID = nil
+        late.capturedAt = original.capturedAt.addingTimeInterval(1)
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: original, incoming: late
+        ))
+        late.strengthWorkoutID = original.strengthWorkoutID
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: original, incoming: late
+        ))
+    }
+
+    func testActiveMirrorRejectsLaterPacketWithoutWorkoutStart() {
+        let original = snapshot(kind: .walking)
+        var missingStart = original
+        missingStart.startedAt = nil
+        missingStart.capturedAt = original.capturedAt.addingTimeInterval(2)
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: original, incoming: missingStart
+        ))
+        // A legacy preparing session, before any start time is known, may
+        // still move into its first recorded start.
+        var preparing = snapshot(state: .preparing)
+        preparing.startedAt = nil
+        var first = preparing
+        first.startedAt = startedAt
+        first.state = .running
+        first.capturedAt = preparing.capturedAt.addingTimeInterval(1)
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: preparing, incoming: first
+        ))
+    }
+
 }

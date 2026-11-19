@@ -827,11 +827,20 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                   snapshot: current, activity: activity
               )
         else { return }
-        current.state = .completed
+        // Activity state proves the Watch is no longer recording, not that
+        // the final HealthKit workout was persisted. Do not turn a pending
+        // mirror into a completed workout or accidentally finish the
+        // corresponding iPhone strength log before its Watch result.
+        current.state =
+            ATHLTHWorkoutMirrorContinuity.stateAfterInactiveWatchActivity(current)
         current.capturedAt = activity.updatedAt
         snapshot = current
-        // The Watch's explicit inactive state is authoritative. Close the
-        // matching Live Activity even if HealthKit result import is delayed.
+        connectionText = ATHLTHLocalization.choose(
+            english: "Finishing Apple Watch workout",
+            norwegian: "Avslutter Apple Watch-økt"
+        )
+        // Ending also dismisses the exact matching Live Activity so that
+        // the lock screen never shows a workout timer still running.
         ATHLTHSurfaceCoordinator.syncLiveActivity(with: current)
         mirroredSession = nil
         isPresentationRequested = false

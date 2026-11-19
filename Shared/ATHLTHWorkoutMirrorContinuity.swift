@@ -35,15 +35,22 @@ enum ATHLTHWorkoutMirrorContinuity {
         }
         guard let previous else { return true }
         guard previous.kind == incoming.kind else { return false }
+        // A snapshot that has already established an exact strength
+        // identity may never be updated by an unidentifiable or different
+        // strength session. Older Watch versions still work when neither
+        // snapshot ever carried a stable strength ID.
         if let originalID = previous.strengthWorkoutID,
-           let incomingID = incoming.strengthWorkoutID,
-           originalID != incomingID {
+           incoming.strengthWorkoutID != originalID {
             return false
         }
-        if let original = previous.startedAt,
-           let candidate = incoming.startedAt,
-           abs(original.timeIntervalSince(candidate)) >= 2 {
-            return false
+        // When an active session established a start timestamp, a later
+        // packet with a missing start is not proof of the same recording.
+        // Keep the pending/preparing legacy path when no start was known.
+        if let original = previous.startedAt {
+            guard let candidate = incoming.startedAt,
+                  candidate.timeIntervalSince1970.isFinite,
+                  abs(original.timeIntervalSince(candidate)) < 2
+            else { return false }
         }
         if previous.state == .completed || previous.state == .failed {
             return false
@@ -59,6 +66,15 @@ enum ATHLTHWorkoutMirrorContinuity {
         // Never rewind even when the new payload is a valid terminal state:
         // an already newer capture must keep ownership of the screen.
         return incoming.capturedAt >= previous.capturedAt
+    }
+
+    /// A watch-inactive state ends the visible timer, but it is NOT proof
+    /// that HealthKit has finished saving the workout. Only the correlated
+    /// terminal Watch result can move the mirrored session to completed.
+    static func stateAfterInactiveWatchActivity(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) -> WatchWorkoutMirrorState {
+        snapshot.state == .failed ? .failed : .ending
     }
 
     /// Only a completed Watch-strength mirror for the same ATHLTH session
