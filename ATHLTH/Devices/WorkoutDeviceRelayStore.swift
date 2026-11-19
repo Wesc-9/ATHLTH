@@ -271,6 +271,36 @@ enum WorkoutDeviceRelayClaimPolicy {
             failedAt == nil
     }
 
+    /// Only a genuinely saved Watch HealthKit workout can prove that a
+    /// remote launch completed while the iPhone was disconnected.
+    static func confirmsCompletedWatchLaunch(
+        target: String,
+        kind: String,
+        serverRequestID: UUID,
+        serverCreatedAt: Date,
+        signedInOwnerID: UUID,
+        receipt: WatchRemoteLaunchCompletionReceipt?,
+        failedAt: Date?
+    ) -> Bool {
+        guard target == WorkoutDeviceRelayTarget.appleWatch.rawValue,
+              failedAt == nil,
+              let receipt,
+              receipt.relayRequestID == serverRequestID,
+              receipt.ownerID == signedInOwnerID,
+              receipt.endedAt >= receipt.startedAt,
+              // The Watch must not use a completion of an older workout.
+              receipt.startedAt >= serverCreatedAt.addingTimeInterval(-120),
+              receipt.startedAt <= Date().addingTimeInterval(120)
+        else { return false }
+
+        switch receipt.kind {
+        case .running: return kind == WorkoutDeviceRelayKind.run.rawValue
+        case .walking: return kind == WorkoutDeviceRelayKind.walk.rawValue
+        case .strength: return kind == WorkoutDeviceRelayKind.strength.rawValue
+        default: return false
+        }
+    }
+
     /// A confirmed receipt written after the launch is stronger evidence
     /// than its older pre-launch uncertainty marker. This resolves crashes
     /// between rememberLaunchedCommand and forgetUncertainLaunch.
@@ -339,12 +369,16 @@ private struct WorkoutDeviceCommandReconciliationRow: Decodable {
     let id: UUID
     let clientRequestID: UUID
     let targetDevice: String
+    let commandKind: String
+    let createdAt: Date
     let failedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
         case clientRequestID = "client_request_id"
         case targetDevice = "target_device"
+        case commandKind = "command_kind"
+        case createdAt = "created_at"
         case failedAt = "failed_at"
     }
 }
@@ -480,54 +514,73 @@ final class WorkoutDeviceRelayStore:
     /// exact live workout identity returned by Watch, never merely against
     /// an inactive Watch state or an elapsed timeout. The server row is
     /// scoped to the signed-in account and this physical iPhone.
+    /// Complete a previously uncertain remote start only with either fresh
+    /// active Watch proof or a durable saved HealthKit-result receipt. The
+    /// latter remains available after the social/history queue was consumed.
+    /// Never infer a launch from an idle Watch or matching workout title.
     func reconcileUncertainWatchStarts(
         watchConnection: AppleWatchConnectionStore
     ) async {
         guard ATHLTHDeviceRole.isIPhone,
               let userID = currentUserID,
-              !uncertainLaunchIDs(userID: userID).isEmpty,
-              let liveRequestID = await watchConnection.confirmedActiveRelayRequestID()
+              !uncertainLaunchIDs(userID: userID).isEmpty
         else { return }
+
+        // This probe can time out; saved completion evidence works offline.
+        let liveRequestID =
+            await watchConnection.confirmedActiveRelayRequestID()
 
         for commandID in uncertainLaunchIDs(userID: userID) {
             guard currentUserID == userID, !Task.isCancelled else { return }
             do {
                 let rows: [WorkoutDeviceCommandReconciliationRow] = try await client
                     .from("workout_device_commands")
-                    .select("id,client_request_id,target_device,failed_at")
+                    .select("id,client_request_id,target_device,command_kind,created_at,failed_at")
                     .eq("id", value: commandID)
                     .eq("user_id", value: userID)
                     .eq("claimed_by_device_id",
                         value: ATHLTHDeviceRole.persistentDeviceID)
                     .execute()
                     .value
-                guard rows.count == 1,
-                      rows[0].id == commandID,
-                      WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
-                        target: rows[0].targetDevice,
-                        serverRequestID: rows[0].clientRequestID,
-                        watchRequestID: liveRequestID,
-                        failedAt: rows[0].failedAt
-                      ),
+                guard rows.count == 1, rows[0].id == commandID,
                       currentUserID == userID, !Task.isCancelled
                 else { continue }
+                let record = rows[0]
 
-                // The real Watch workout is confirmed; promote the local
-                // uncertainty to a success receipt BEFORE clearing it.
-                // Reconciliation never invokes a workout-start method.
+                let isLive = WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
+                    target: record.targetDevice,
+                    serverRequestID: record.clientRequestID,
+                    watchRequestID: liveRequestID,
+                    failedAt: record.failedAt
+                )
+                let receipt = watchConnection.completedRelayReceipt(
+                    requestID: record.clientRequestID, ownerID: userID
+                )
+                let isCompleted = WorkoutDeviceRelayClaimPolicy.confirmsCompletedWatchLaunch(
+                    target: record.targetDevice,
+                    kind: record.commandKind,
+                    serverRequestID: record.clientRequestID,
+                    serverCreatedAt: record.createdAt,
+                    signedInOwnerID: userID,
+                    receipt: receipt,
+                    failedAt: record.failedAt
+                )
+                guard isLive || isCompleted else { continue }
+
+                // Promote the recorded success BEFORE clearing uncertainty.
+                // Restarting the app mid-transition only retries the server
+                // receipt; it never replays a HealthKit/Watch start.
                 rememberLaunchedCommand(commandID, userID: userID)
                 forgetUncertainLaunch(commandID, userID: userID)
                 lastStatusText = ATHLTHLocalization.choose(
-                    english: "Apple Watch workout recovered; confirming start.",
-                    norwegian: "Apple Watch-økt gjenopprettet; bekrefter oppstart."
+                    english: "Apple Watch workout verified; confirming start.",
+                    norwegian: "Apple Watch-økt bekreftet; kvitterer oppstart."
                 )
-                // Repair the completion receipt right now. Never claim the
-                // next queued start while the recovered workout is active.
                 _ = await reconcileLaunchedCommands(userID: userID)
-                // Exactly one live Watch session can own this request ID.
+                // Never claim the next start in this reconciliation call.
                 return
             } catch {
-                // Missing server proof is not proof of failure or success.
+                // Network/ownership failures leave uncertainty intact.
                 return
             }
         }
