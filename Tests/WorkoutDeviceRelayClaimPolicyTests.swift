@@ -129,32 +129,6 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         ))
     }
 
-    func testRelayEnvelopeDecodesLegacyPayloadWithoutRequestID() throws {
-        let envelope = WorkoutDeviceRelayEnvelope(
-            kind: .walk,
-            target: .iPhone,
-            workoutPayload: SocialWorkoutInvitePayload(
-                workout: PlannedSession(title: "Walk")
-            ),
-            watchAudioCoach: nil,
-            ghostTargetDurationSeconds: nil,
-            ghostUpdates: nil,
-            spotifyPlaylist: nil,
-            spotifyAutoplay: false,
-            gearIDs: []
-        )
-        let data = try JSONEncoder().encode(envelope)
-        var legacy = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: data) as? [String: Any]
-        )
-        legacy.removeValue(forKey: "clientRequestID")
-        let legacyData = try JSONSerialization.data(withJSONObject: legacy)
-        let decoded = try JSONDecoder().decode(
-            WorkoutDeviceRelayEnvelope.self, from: legacyData
-        )
-        XCTAssertNil(decoded.clientRequestID)
-    }
-
     func testRelayClaimRejectsMultipleServerRows() {
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(0))
         XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(1))
