@@ -3476,8 +3476,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             isActive: active,
             title: active ? kind.title : nil,
             updatedAt: Date(),
-            relayRequestID: active && workoutSession != nil
-                ? activeRelayRequestID : nil
+            // Only an actually running/paused HealthKit session proves
+            // the remote start, not an allocated but unstarted session.
+            relayRequestID: healthKitActive ? activeRelayRequestID : nil
         )
     }
 
@@ -3513,8 +3514,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         ? kind.title
                         : nil,
                 updatedAt: Date(),
-                relayRequestID: active && workoutSession != nil
-                    ? activeRelayRequestID : nil
+                relayRequestID: (
+                    workoutSession?.state == .running ||
+                    workoutSession?.state == .paused
+                ) ? activeRelayRequestID : nil
             )
 
         if !force,
