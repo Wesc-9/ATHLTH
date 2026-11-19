@@ -9392,7 +9392,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             coachCueQueue.discardWorkoutMotionCues()
         case .ending, .completed, .failed:
             coachCueQueue.discardForWorkoutCompletion()
-        case .idle, .preparing, .running:
+        case .running:
+            coachCueQueue.discardPreviousPauseCues()
+        case .idle, .preparing:
             break
         }
         publish {
