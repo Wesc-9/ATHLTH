@@ -31,6 +31,21 @@ enum ATHLTHWorkoutScreenAwake {
     }
 }
 
+enum ATHLTHRelayedPhoneLaunchCancellationPolicy {
+    /// A permission callback may arrive later. It must not revive a
+    /// rejected relay, but nor may it cancel a different/local recording.
+    static func mayCancel(
+        requestID: UUID,
+        pendingID: UUID?,
+        hasPendingStart: Bool,
+        activeRecordingID: UUID?
+    ) -> Bool {
+        hasPendingStart &&
+            pendingID == requestID &&
+            activeRecordingID != requestID
+    }
+}
+
 struct PhoneWorkoutPauseInterval: Codable, Equatable {
     let startedAt: Date
     var endedAt: Date?
@@ -770,10 +785,12 @@ final class IPhoneWorkoutStore:
     /// workout after the server has already marked the command failed.
     /// Ordinary local launches and other relay IDs are untouched.
     func cancelPendingRelayedLaunch(requestID: UUID) {
-        guard pendingWalking != nil,
-              pendingRelayRequestID == requestID,
-              active?.relayRequestID != requestID
-        else { return }
+        guard ATHLTHRelayedPhoneLaunchCancellationPolicy.mayCancel(
+            requestID: requestID,
+            pendingID: pendingRelayRequestID,
+            hasPendingStart: pendingWalking != nil,
+            activeRecordingID: active?.relayRequestID
+        ) else { return }
         clearPendingLaunchConfiguration()
     }
 
