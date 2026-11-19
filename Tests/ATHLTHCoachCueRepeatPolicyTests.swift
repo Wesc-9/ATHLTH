@@ -30,4 +30,18 @@ final class ATHLTHCoachCueRepeatPolicyTests: XCTestCase {
             ["Distanse 1 kilometer", "Puls 140"]
         )
     }
+    func testRequestDoesNotConsumeRepeatWindowBeforePlayback() {
+        var policy = ATHLTHCoachCueRepeatPolicy()
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        XCTAssertTrue(policy.canAccept("Kilometer en.", at: now))
+        XCTAssertTrue(policy.canAccept("KILOMETER EN", at: now.addingTimeInterval(1)))
+        // Only a confirmed Azure/AVSpeech start should consume the window.
+        policy.didSpeak("Kilometer en.", at: now.addingTimeInterval(2))
+        XCTAssertFalse(policy.canAccept("kilometer en", at: now.addingTimeInterval(3)))
+        XCTAssertTrue(policy.canAccept("Kilometer en", at: now.addingTimeInterval(15)))
+        policy.reset()
+        XCTAssertTrue(policy.canAccept("Kilometer en", at: now.addingTimeInterval(3)))
+    }
+
+
 }
