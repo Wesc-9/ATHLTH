@@ -3450,7 +3450,8 @@ final class StrengthWorkoutStore: ObservableObject {
         trackingMode: StrengthTrackingMode,
         captureDevice: WorkoutCaptureDevice,
         advancedConfiguration:
-            StrengthAdvancedConfiguration? = nil
+            StrengthAdvancedConfiguration? = nil,
+        relayRequestID: UUID? = nil
     ) {
         // Existing or recovered strength work must not be silently discarded
         // by a duplicate start action.
@@ -3489,6 +3490,7 @@ final class StrengthWorkoutStore: ObservableObject {
         let launchStartedAt = launchedWorkout.startedAt
         Self.beginStrengthGroup(&launchedWorkout, selected: 0,
                                 at: launchStartedAt)
+        launchedWorkout.relayRequestID = relayRequestID
         launchedWorkout.plannedTrainingPlace = session.plannedTrainingPlace
         launchedWorkout.liveHeartRateTargetZone =
             session.targetAlertConfiguration?.heartRateZone
