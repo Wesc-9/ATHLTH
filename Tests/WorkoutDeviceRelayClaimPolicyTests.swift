@@ -12,7 +12,11 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         payloadTarget: String = "apple_watch",
         payloadKind: String = "strength",
         payloadVersion: Int = 1,
-        expiresAt: Date? = nil
+        expiresAt: Date? = nil,
+        claimedDeviceID: String? = "device-a",
+        expectedDeviceID: String = "device-a",
+        completedAt: Date? = nil,
+        failedAt: Date? = nil
     ) -> Bool {
         WorkoutDeviceRelayClaimPolicy.accepts(
             source: source,
@@ -22,6 +26,10 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
             payloadKind: payloadKind,
             payloadVersion: payloadVersion,
             expiresAt: expiresAt ?? now.addingTimeInterval(60),
+            claimedDeviceID: claimedDeviceID,
+            expectedDeviceID: expectedDeviceID,
+            completedAt: completedAt,
+            failedAt: failedAt,
             now: now
         )
     }
@@ -37,6 +45,14 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         XCTAssertFalse(accepts(source: "unknown"))
         XCTAssertFalse(accepts(payloadTarget: "iphone"))
         XCTAssertFalse(accepts(payloadKind: "walk"))
+    }
+
+    func testWrongDeviceOrTerminalClaimCannotLaunch() {
+        XCTAssertFalse(accepts(claimedDeviceID: nil))
+        XCTAssertFalse(accepts(claimedDeviceID: "device-b"))
+        XCTAssertFalse(accepts(expectedDeviceID: ""))
+        XCTAssertFalse(accepts(completedAt: now))
+        XCTAssertFalse(accepts(failedAt: now))
     }
 
     func testExpiredOrUnknownVersionCannotLaunch() {
