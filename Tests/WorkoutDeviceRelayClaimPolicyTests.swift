@@ -55,32 +55,39 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         XCTAssertFalse(accepts(failedAt: now))
     }
 
-    func testPreviouslyLaunchedClaimIsNeverReexecuted() {
-        let launched = UUID()
-        let other = UUID()
-        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
-            commandID: launched, unacknowledgedLaunchIDs: [launched]
-        ))
-        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
-            commandID: other, unacknowledgedLaunchIDs: [launched]
-        ))
-        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
-            commandID: launched, unacknowledgedLaunchIDs: []
-        ))
+    func testOnlyConfirmedLaunchMayRetryItsReceipt() {
+        let command = UUID()
+        let policy = WorkoutDeviceRelayClaimPolicy.self
+        XCTAssertEqual(policy.launchDecision(
+            commandID: command,
+            unacknowledgedLaunchIDs: [command],
+            uncertainLaunchIDs: []
+        ), .retryConfirmedReceipt)
+        XCTAssertEqual(policy.launchDecision(
+            commandID: command,
+            unacknowledgedLaunchIDs: [],
+            uncertainLaunchIDs: []
+        ), .validateNewLaunch)
     }
 
-    func testInterruptedLaunchIsNotAutomaticallyReplayed() {
-        let interrupted = UUID()
-        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
-            commandID: interrupted,
+    func testUncertainStartCannotBeAcknowledgedEvenIfAlsoMarkedCompleted() {
+        let command = UUID()
+        let policy = WorkoutDeviceRelayClaimPolicy.self
+        XCTAssertEqual(policy.launchDecision(
+            commandID: command,
             unacknowledgedLaunchIDs: [],
-            uncertainLaunchIDs: [interrupted]
-        ))
-        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
+            uncertainLaunchIDs: [command]
+        ), .holdForDeviceReconciliation)
+        XCTAssertEqual(policy.launchDecision(
+            commandID: command,
+            unacknowledgedLaunchIDs: [command],
+            uncertainLaunchIDs: [command]
+        ), .holdForDeviceReconciliation)
+        XCTAssertEqual(policy.launchDecision(
             commandID: UUID(),
             unacknowledgedLaunchIDs: [],
-            uncertainLaunchIDs: [interrupted]
-        ))
+            uncertainLaunchIDs: [command]
+        ), .validateNewLaunch)
     }
 
     func testExpiredOrUnknownVersionCannotLaunch() {
