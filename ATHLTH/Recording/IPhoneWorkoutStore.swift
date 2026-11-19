@@ -4297,6 +4297,12 @@ final class IPhoneWorkoutStore:
         criticalCountdownKey = key
         criticalCountdownEndsAt = deadline
         coachCueQueue.reset()
+        // A second-accurate countdown supersedes any previous asynchronous
+        // Azure response or local cue; stale callbacks must not create a
+        // false spoken receipt or consume the next interval's voice gate.
+        coachPlaybackGeneration = UUID()
+        pendingLocalCoachReplay = nil
+        pendingLocalCoachEvent = nil
         azureCoachSpeech.stop()
         speechSynthesizer.stopSpeaking(at: .immediate)
         guidancePriorityGate.voiceDidFinish()
