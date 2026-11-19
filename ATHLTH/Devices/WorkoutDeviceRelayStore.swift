@@ -869,8 +869,11 @@ final class WorkoutDeviceRelayStore:
                 self.lastStatusText = nil
             }
         } catch {
-            errorMessage =
-                error.localizedDescription
+            // A response from the old account must not overwrite the new
+            // account's remote-workout status after sign-out/sign-in.
+            if currentUserID == userID {
+                errorMessage = error.localizedDescription
+            }
             throw error
         }
     }
