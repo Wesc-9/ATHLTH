@@ -190,4 +190,44 @@ final class AppleWatchConnectionPolicyTests: XCTestCase {
         XCTAssertNil(activity.relayRequestID)
     }
 
+    func testCompletedWatchResultCarriesRelayIdentityThroughTransport() throws {
+        let now = Date()
+        let request = UUID()
+        var result = WatchWorkoutResult(
+            id: UUID(), kind: .walking, healthKitWorkoutUUID: UUID(),
+            startedAt: now, endedAt: now.addingTimeInterval(90),
+            duration: 90, activeCalories: 18, distanceMeters: 180,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+        )
+        result.relayRequestID = request
+        result.accountOwnerID = UUID()
+        let restored = try JSONDecoder().decode(
+            WatchWorkoutResult.self, from: JSONEncoder().encode(result)
+        )
+        XCTAssertEqual(restored.relayRequestID, request)
+        let receipt = try XCTUnwrap(WatchRemoteLaunchCompletionReceipt(result: restored))
+        XCTAssertEqual(receipt.relayRequestID, request)
+        XCTAssertEqual(receipt.healthKitWorkoutUUID, result.healthKitWorkoutUUID)
+    }
+
+    func testLegacyWatchCompletionDoesNotInheritRemoteRequestID() throws {
+        let now = Date()
+        let original = WatchWorkoutResult(
+            id: UUID(), kind: .running, healthKitWorkoutUUID: UUID(),
+            startedAt: now, endedAt: now.addingTimeInterval(90),
+            duration: 90, activeCalories: 18, distanceMeters: 250,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+        )
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(original)
+        ) as? [String: Any])
+        legacy.removeValue(forKey: "relayRequestID")
+        let decoded = try JSONDecoder().decode(
+            WatchWorkoutResult.self,
+            from: JSONSerialization.data(withJSONObject: legacy)
+        )
+        XCTAssertNil(decoded.relayRequestID)
+        XCTAssertNil(WatchRemoteLaunchCompletionReceipt(result: decoded))
+    }
+
 }
