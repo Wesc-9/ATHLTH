@@ -494,6 +494,17 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         await checkWatchWorkoutActivity() == .clear
     }
 
+    /// A fresh, explicit reply from the Watch is the only proof usable for
+    /// reconciling an interrupted iPad-relayed launch. Cached activity or a
+    /// same-kind workout without the UUID must not resolve ambiguity.
+    func confirmedActiveRelayRequestID() async -> UUID? {
+        guard await checkWatchWorkoutActivity() == .active,
+              let activity = watchWorkoutActivityState,
+              activity.isActive
+        else { return nil }
+        return activity.relayRequestID
+    }
+
     /// All recording entry points share the same fail-safe rule.
     func requireNoActiveWatchWorkout() async throws {
         switch await checkWatchWorkoutActivity() {
