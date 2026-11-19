@@ -1489,3 +1489,19 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   distansegrense, ugyldige mål og planens metadata.
 - Fremdeles ikke fysisk Watch-/HealthKit-verifisert; iPhone-only GPS
   hybrid er separat og krever en iPhone-eid GPS-kilde før release.
+
+### Fase 8 – én hybridstart fra iPad-relay, kalender og Train (19.11.2026)
+
+- `WorkoutLaunchCoordinator.startStrength` validerer alle kombinerte
+  planer **før** iPad-relay, sosial invitasjon eller Watch HealthKit-start.
+  Gyldige planer bruker nå den samme kanoniske `startPlannedHybrid`
+  i stedet for at en alternativ startsti starter ren styrke og mister
+  løpeblokkene. Avviste blandingsplaner starter ingenting.
+- Outdoor Watch-hybrid velger `.crossTraining` med `.outdoor`,
+  mens vanlig styrke og tredemølle beholder innendørsaktivitet.
+- `startPlannedHybrid` overfører også eksisterende Audio Coach/
+  advanced config og `relayRequestID` til original logg. Dette
+  oppretter **ikke** parallelt PhoneWorkout eller annet HK-opptak.
+- Nye tester sikrer plan-ID, Watch-session, original relay-ID og
+  alle løpeblokker i ett opptak. Samme-commit CI og fysisk enhetstest
+  er fortsatt et obligatorisk release-godkjenningskrav.

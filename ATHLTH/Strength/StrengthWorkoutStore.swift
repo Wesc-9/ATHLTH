@@ -3432,7 +3432,9 @@ final class StrengthWorkoutStore: ObservableObject {
         validatedParts: [PlannedSession],
         watchSessionID: UUID?,
         trackingMode: StrengthTrackingMode,
-        captureDevice: WorkoutCaptureDevice
+        captureDevice: WorkoutCaptureDevice,
+        advancedConfiguration: StrengthAdvancedConfiguration? = nil,
+        relayRequestID: UUID? = nil
     ) -> Bool {
         guard activeWorkout == nil,
               !loadingAccount,
@@ -3460,13 +3462,16 @@ final class StrengthWorkoutStore: ObservableObject {
             session: root,
             watchSessionID: watchSessionID,
             trackingMode: trackingMode,
-            captureDevice: captureDevice
+            captureDevice: captureDevice,
+            advancedConfiguration: advancedConfiguration,
+            relayRequestID: relayRequestID
         )
         // A rejected launch must not append hybrid parts to another workout.
         guard let launched = activeWorkout,
               launched.plannedSessionID == session.id,
               launched.watchSessionID == watchSessionID,
               launched.captureDevice == captureDevice,
+              launched.relayRequestID == relayRequestID,
               launched.endedAt == nil else { return false }
 
         if captureDevice == .appleWatch &&

@@ -511,4 +511,27 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
         )
         XCTAssertEqual(restored.exercises[0].sets[0].hybridTargetDistanceMeters, 1_500)
     }
+
+    @MainActor
+    func testRelayedHybridPreservesBothMotorsAndRemoteRequestIdentity()
+        throws {
+        let plan = try plannedHybrid()
+        let parts = try XCTUnwrap(ATHLTHHybridWorkoutLaunchPlan.parts(for: plan))
+        let store = StrengthWorkoutStore()
+        let relay = UUID()
+        let watchID = UUID()
+        XCTAssertTrue(store.startPlannedHybrid(
+            session: plan, validatedParts: parts,
+            watchSessionID: watchID,
+            trackingMode: .advanced, captureDevice: .appleWatch,
+            relayRequestID: relay
+        ))
+        XCTAssertEqual(store.activeWorkout?.relayRequestID, relay)
+        XCTAssertEqual(store.activeWorkout?.plannedSessionID, plan.id)
+        XCTAssertEqual(store.activeWorkout?.watchSessionID, watchID)
+        XCTAssertEqual(store.activeWorkout?.exercises.filter {
+            $0.isEmbeddedRunningInterval == true
+        }.count, 3)
+        XCTAssertEqual(store.activeWorkout?.id, store.watchSnapshot?.workoutID)
+    }
 }

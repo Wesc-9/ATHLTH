@@ -1567,6 +1567,25 @@ enum WorkoutLaunchCoordinator {
         let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
         defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
 
+        // Validate EVERY mixed start—including iPad relay—before
+        // invitations, HealthKit or any authoritative recording side effect.
+        let hybridParts: [PlannedSession]?
+        if ATHLTHHybridWorkoutLaunchPlan.isCandidate(workout) {
+            guard let approved = ATHLTHHybridWorkoutLaunchPlan.parts(
+                for: workout,
+                allowOutdoorGPS: captureDevice == .appleWatch
+            ) else {
+                throw NSError(
+                    domain: "ATHLTH.HybridLaunch", code: 2,
+                    userInfo: [NSLocalizedDescriptionKey:
+                        "This mixed session requires timed treadmill and strength, or Watch-owned outdoor running with a measured distance/time goal."]
+                )
+            }
+            hybridParts = approved
+        } else {
+            hybridParts = nil
+        }
+
         // Fail before launching HealthKit on Watch. A start command must
         // never replace an active/recovered strength checkpoint.
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
@@ -1720,9 +1739,13 @@ enum WorkoutLaunchCoordinator {
                         audioCoach
                     )
 
-                try await watchConnection
-                    .startWorkoutOnWatch(
-                    .strength, relayRequestID: relayRequestID
+                let outdoorHybrid = hybridParts != nil &&
+                    ATHLTHHybridWorkoutLaunchPlan.isOutdoorTimedHybrid(workout)
+                try await watchConnection.startWorkoutOnWatch(
+                    .strength,
+                    indoor: !outdoorHybrid,
+                    outdoorHybrid: outdoorHybrid,
+                    relayRequestID: relayRequestID
                 )
                 watchSessionID = UUID()
             } catch {
@@ -1749,17 +1772,31 @@ enum WorkoutLaunchCoordinator {
             throw error
         }
 
-        strengthWorkout.start(
-            session: workout,
-            watchSessionID: watchSessionID,
-            trackingMode: trackingMode,
-            captureDevice: captureDevice,
-            advancedConfiguration:
-                includeCoachConfiguration
-                    ? advancedConfiguration
-                    : nil,
-            relayRequestID: relayRequestID
-        )
+        if let hybridParts {
+            guard strengthWorkout.startPlannedHybrid(
+                session: workout,
+                validatedParts: hybridParts,
+                watchSessionID: watchSessionID,
+                trackingMode: trackingMode,
+                captureDevice: captureDevice,
+                advancedConfiguration:
+                    includeCoachConfiguration ? advancedConfiguration : nil,
+                relayRequestID: relayRequestID
+            ) else {
+                await social.markCurrentJoinedWorkoutLaunchFailed()
+                throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+            }
+        } else {
+            strengthWorkout.start(
+                session: workout,
+                watchSessionID: watchSessionID,
+                trackingMode: trackingMode,
+                captureDevice: captureDevice,
+                advancedConfiguration:
+                    includeCoachConfiguration ? advancedConfiguration : nil,
+                relayRequestID: relayRequestID
+            )
+        }
 
         // The store can reject a launch during account restoration. Never
         // announce an active workout or send a Watch snapshot in that case.
