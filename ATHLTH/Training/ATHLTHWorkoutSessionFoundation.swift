@@ -305,6 +305,7 @@ enum ATHLTHWorkoutSessionFoundation {
         _ workout: StrengthWorkoutLog,
         exerciseIndex: Int,
         isResting: Bool,
+        suspendedAt: Date? = nil,
         at now: Date = Date()
     ) -> ATHLTHWorkoutSessionState {
         let current = workout.exercises.indices.contains(exerciseIndex)
@@ -312,6 +313,8 @@ enum ATHLTHWorkoutSessionFoundation {
         let phase: ATHLTHWorkoutSessionPhase
         if workout.endedAt != nil {
             phase = .completed
+        } else if suspendedAt != nil && workout.captureDevice == .iPhone {
+            phase = .paused
         } else if isResting {
             phase = .recovery
         } else {
@@ -334,10 +337,11 @@ enum ATHLTHWorkoutSessionFoundation {
             phase: phase,
             engine: engine,
             startedAt: workout.startedAt,
-            // Whole-session duration includes rest. Set effort is measured
-            // separately and never adds a second HealthKit workout.
-            activeElapsedSeconds: max(
-                (workout.endedAt ?? now).timeIntervalSince(workout.startedAt), 0
+            // Whole-session duration includes genuine rest, but excludes
+            // explicitly measured offline downtime after phone recovery.
+            // Set effort remains separately recorded in the same workout.
+            activeElapsedSeconds: workout.elapsedSessionSeconds(
+                at: now, suspendedAt: suspendedAt
             ),
             stageIndex: current == nil ? nil : exerciseIndex,
             stageCount: workout.exercises.isEmpty ? nil : workout.exercises.count

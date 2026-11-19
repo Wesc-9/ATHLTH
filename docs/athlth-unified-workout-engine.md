@@ -651,3 +651,20 @@ som ferdige før egne faser og reelle tester er fullført.
 - Tester dekker konflikt med ny styrkeøkt, senere matching av
   ferdig økt, kontoikke-klar, trygg bootstrap og generiske
   Watch-resultater uten styrkesnapshot.
+
+### Fase 8 – ett klokkegrunnlag i styrke-, hybrid- og livekort
+
+- `StrengthWorkoutLog.elapsedSessionSeconds` er nå den felles,
+  rene øktklokken for styrke og hybrid. Tid mellom vanlige sett
+  inngår fremdeles, mens dokumentert offline-tid fra iPhone-
+  gjenoppretting trekkes fra via et valgfritt, bakoverkompatibelt
+  `excludedRecoverySeconds`-felt.
+- `StrengthWorkoutStore` samler gjenværende nedetid ved «Fortsett»
+  eller «Avslutt» etter gjenoppretting. Dette bevarer den opprinnelige
+  økt-ID-en og oppstartstiden. Pågående gjenopprettet iPhone-økt
+  vises som `paused` inntil brukeren bekrefter fortsettelse.
+- Felles session-projeksjon, live styrkekort, header,
+  avslutningsdialog og resultatoppsummering bruker samme varighet.
+  Watch-eide HealthKit-økter får ikke påført en kunstig pause.
+- Tester verifiserer en times offlineperiode, 45 sekunder faktisk
+  innsats før avbrudd, korrekt fortsettelse og stabil økt-ID.

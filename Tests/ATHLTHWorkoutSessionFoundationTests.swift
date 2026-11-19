@@ -82,6 +82,42 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testRecoveredStrengthAndHybridSessionTimeStopsWhilePhoneIsSuspended() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        var workout = try XCTUnwrap(store.activeWorkout)
+        let started = workout.startedAt
+        let checkpoint = started.addingTimeInterval(45)
+        let reopened = started.addingTimeInterval(3_600)
+
+        XCTAssertEqual(workout.elapsedSessionSeconds(
+            at: reopened, suspendedAt: checkpoint
+        ), 45, accuracy: 0.001)
+        let paused = ATHLTHWorkoutSessionFoundation.strength(
+            workout, exerciseIndex: 0, isResting: false,
+            suspendedAt: checkpoint, at: reopened
+        )
+        XCTAssertEqual(paused.phase, .paused)
+        XCTAssertEqual(paused.activeElapsedSeconds, 45, accuracy: 0.001)
+
+        workout.excludedRecoverySeconds = reopened.timeIntervalSince(checkpoint)
+        XCTAssertEqual(workout.elapsedSessionSeconds(
+            at: reopened.addingTimeInterval(20)
+        ), 65, accuracy: 0.001)
+        let resumed = ATHLTHWorkoutSessionFoundation.strength(
+            workout, exerciseIndex: 0, isResting: false,
+            at: reopened.addingTimeInterval(20)
+        )
+        XCTAssertEqual(resumed.phase, .work)
+        XCTAssertEqual(resumed.activeElapsedSeconds, 65, accuracy: 0.001)
+
+        // The same normalized session remains one strength/hybrid workout,
+        // even when an embedded running exercise controls its visible UI.
+        XCTAssertEqual(paused.workoutID, resumed.workoutID)
+        XCTAssertEqual(paused.recordingOwner, .iPhone)
+    }
+
     func testSharedStrengthEffortClockExcludesOnlyExplicitPause() {
         let clock = StrengthSetEffortClock(
             workoutID: UUID(),

@@ -181,7 +181,9 @@ final class StrengthWorkoutStore: ObservableObject {
             ATHLTHWorkoutSessionFoundation.strength(
                 $0,
                 exerciseIndex: currentExerciseIndex,
-                isResting: isResting
+                isResting: isResting,
+                suspendedAt: $0.captureDevice == .iPhone
+                    ? recoveredCheckpointSavedAt : nil
             )
         }
     }
@@ -241,6 +243,19 @@ final class StrengthWorkoutStore: ObservableObject {
 
     var recoveredActiveWorkoutReferenceDate: Date? {
         recoveredCheckpointSavedAt
+    }
+
+    /// All strength and hybrid views use this same elapsed source. The
+    /// suspended date only applies to this active phone-owned workout,
+    /// never a different completed log or an independently running Watch.
+    func elapsedSessionSeconds(
+        for workout: StrengthWorkoutLog,
+        at now: Date = Date()
+    ) -> TimeInterval {
+        let suspended = activeWorkout?.id == workout.id &&
+            workout.captureDevice == .iPhone
+            ? recoveredCheckpointSavedAt : nil
+        return workout.elapsedSessionSeconds(at: now, suspendedAt: suspended)
     }
 
     private var accountID: UUID?
@@ -5389,6 +5404,18 @@ final class StrengthWorkoutStore: ObservableObject {
         guard var workout = activeWorkout else { return false }
         completionSaveError = nil
 
+        // A restored phone workout was suspended at its last checkpoint.
+        // Closing it without pressing Resume must not count the offline
+        // hours as active elapsed workout time.
+        if workout.captureDevice == .iPhone,
+           let suspended = recoveredCheckpointSavedAt {
+            let inactive = finishDate.timeIntervalSince(suspended)
+            if inactive.isFinite, inactive > 0 {
+                workout.excludedRecoverySeconds =
+                    (workout.excludedRecoverySeconds ?? 0) + inactive
+            }
+        }
+
         // A restored checkpoint can be hours old. Its save timestamp
         // must not truncate the real workout's duration on completion.
         workout.endedAt = ATHLTHWorkoutSessionFoundation.completionTimestamp(
@@ -5466,12 +5493,18 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func acknowledgeRecoveredWorkout() {
-        guard activeWorkout != nil,
-              recoveredCheckpointSavedAt != nil
-        else {
-            return
-        }
+        guard var workout = activeWorkout,
+              let suspended = recoveredCheckpointSavedAt
+        else { return }
 
+        if workout.captureDevice == .iPhone {
+            let inactive = Date().timeIntervalSince(suspended)
+            if inactive.isFinite, inactive > 0 {
+                workout.excludedRecoverySeconds =
+                    (workout.excludedRecoverySeconds ?? 0) + inactive
+                activeWorkout = workout
+            }
+        }
         recoveredCheckpointSavedAt = nil
         persistCheckpointNow()
     }

@@ -2066,7 +2066,7 @@ struct ActiveStrengthWorkoutView: View {
                         title: ATHLTHLocalization.choose(
                             english: "Elapsed", norwegian: "Varighet"
                         ),
-                        value: "\(max(Int(Date().timeIntervalSince(workout.startedAt) / 60), 0)) min",
+                        value: "\(max(Int(strength.elapsedSessionSeconds(for: workout) / 60), 0)) min",
                         symbol: "clock"
                     ),
                     ATHLTHWorkoutFinishMetric(
@@ -3326,18 +3326,11 @@ struct ActiveStrengthWorkoutView: View {
                             ? $0
                             : nil
                     }
-            let resolvedEndDate =
-                workout.endedAt ??
-                context.date
-            let totalDuration =
-                max(
-                    recordedDuration ??
-                    resolvedEndDate
-                        .timeIntervalSince(
-                            workout.startedAt
-                        ),
-                    0
-                )
+            let totalDuration = max(
+                recordedDuration ??
+                    strength.elapsedSessionSeconds(for: workout, at: context.date),
+                0
+            )
             let restDuration =
                 workout
                     .totalActualRestSeconds
@@ -4162,8 +4155,9 @@ struct ActiveStrengthWorkoutView: View {
                             .minimumScaleFactor(0.8)
 
                         Label(
-                            max(0, timeline.date.timeIntervalSince(workout.startedAt))
-                                .clockDuration,
+                            strength.elapsedSessionSeconds(
+                                for: workout, at: timeline.date
+                            ).clockDuration,
                             systemImage: "clock"
                         )
                         .font(.system(size: 15, weight: .bold,
@@ -7986,7 +7980,9 @@ struct ActiveStrengthWorkoutView: View {
                     Text(workout.title)
                         .font(.headline)
                     TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Text(context.date.timeIntervalSince(workout.startedAt).clockDuration)
+                        Text(strength.elapsedSessionSeconds(
+                            for: workout, at: context.date
+                        ).clockDuration)
                             .font(.system(size: 39, weight: .bold, design: .rounded).monospacedDigit())
                     }
                 }

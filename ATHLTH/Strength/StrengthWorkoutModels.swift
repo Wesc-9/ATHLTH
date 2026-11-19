@@ -766,6 +766,10 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var title: String
     var startedAt: Date
     var endedAt: Date?
+    /// Accumulated *confirmed* phone-offline downtime after crash recovery.
+    /// Optional preserves histories and checkpoints from earlier versions.
+    /// Watch-owned HealthKit recordings never use this local correction.
+    var excludedRecoverySeconds: TimeInterval? = nil
     var exercises: [StrengthExerciseLog]
     var healthMetrics: LinkedHealthWorkoutMetrics
     var advancedConfiguration:
@@ -778,6 +782,19 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     /// The same optional planned venue can be shown in preparation, live
     /// training and the saved strength summary, without claiming GPS check-in.
     var plannedTrainingPlace: ATHLTHTrainingPlace? = nil
+
+    /// One pure elapsed clock for live strength, hybrid, summary and
+    /// recovery. Only explicit checkpoint downtime is excluded; ordinary
+    /// exercise rest remains part of the workout's elapsed time.
+    func elapsedSessionSeconds(
+        at now: Date = Date(),
+        suspendedAt: Date? = nil
+    ) -> TimeInterval {
+        let end = endedAt ?? suspendedAt ?? now
+        let inactive = excludedRecoverySeconds ?? 0
+        let excluded = inactive.isFinite ? max(inactive, 0) : 0
+        return max(end.timeIntervalSince(startedAt) - excluded, 0)
+    }
 
     var totalCompletedSets: Int {
         exercises
