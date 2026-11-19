@@ -69,6 +69,20 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         ))
     }
 
+    func testInterruptedLaunchIsNotAutomaticallyReplayed() {
+        let interrupted = UUID()
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
+            commandID: interrupted,
+            unacknowledgedLaunchIDs: [],
+            uncertainLaunchIDs: [interrupted]
+        ))
+        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
+            commandID: UUID(),
+            unacknowledgedLaunchIDs: [],
+            uncertainLaunchIDs: [interrupted]
+        ))
+    }
+
     func testExpiredOrUnknownVersionCannotLaunch() {
         XCTAssertFalse(accepts(expiresAt: now))
         XCTAssertFalse(accepts(expiresAt: now.addingTimeInterval(-1)))
