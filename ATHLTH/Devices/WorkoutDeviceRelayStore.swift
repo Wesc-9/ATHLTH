@@ -220,6 +220,15 @@ enum WorkoutDeviceRelayClaimPolicy {
             !expectedDeviceID.isEmpty &&
             completedAt == nil && failedAt == nil
     }
+
+    /// A previously launched command must never be executed again, even if
+    /// its server receipt could not be committed and the same claim returns.
+    static func mayExecuteClaim(
+        commandID: UUID,
+        unacknowledgedLaunchIDs: [UUID]
+    ) -> Bool {
+        !unacknowledgedLaunchIDs.contains(commandID)
+    }
 }
 
 private struct ClaimWorkoutDeviceCommandParams:
@@ -612,6 +621,26 @@ final class WorkoutDeviceRelayStore:
                             "Expired or invalid workout relay command"]
                     )
                 )
+                continue
+            }
+
+            // A server claim can reappear when its completion receipt fails.
+            // The locally durable launch journal is authoritative for this
+            // device: repair the receipt, never replay Watch/HealthKit start.
+            if !WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
+                commandID: record.id,
+                unacknowledgedLaunchIDs:
+                    unacknowledgedLaunchIDs(userID: processingUserID)
+            ) {
+                do {
+                    try await markCompleted(record.id)
+                    guard currentUserID == processingUserID,
+                          !Task.isCancelled else { return }
+                    forgetAcknowledgedCommand(record.id, userID: processingUserID)
+                } catch {
+                    // Keep the launch receipt. A later reconnect can retry.
+                    return
+                }
                 continue
             }
 
