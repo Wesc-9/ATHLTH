@@ -574,7 +574,7 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         )
         plan.workoutBlocks = [emom, next]
         let store = StrengthWorkoutStore()
-        store.start(session: plan, watchSessionID: nil)
+        store.start(session: plan, watchSessionID: nil, trackingMode: .advanced, captureDevice: .iPhone)
         let started = try XCTUnwrap(store.currentExercise?.groupStartedAt)
         let parentID = try XCTUnwrap(store.activeWorkout?.id)
         store.startCurrentSetEffort()
@@ -610,7 +610,7 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         )
         plan.workoutBlocks = [grouped]
         let store = StrengthWorkoutStore()
-        store.start(session: plan, watchSessionID: nil)
+        store.start(session: plan, watchSessionID: nil, trackingMode: .advanced, captureDevice: .iPhone)
         XCTAssertEqual(store.watchSnapshot?.totalSets, 1)
         XCTAssertTrue(store.skipCurrentSet())
         XCTAssertEqual(store.watchSnapshot?.totalSets, 1)
