@@ -1272,3 +1272,23 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
 - This is code hardening, not proof of real-device HealthKit consistency.
   Require same-commit iOS/iPad/watchOS/XCTest and physical handoff/finish
   tests before release or TestFlight.
+
+### Fase 8 – løpehistorikk og HealthKit-korrelasjon (19.11.2026)
+
+- `ATHLTHRunningPerformanceHistory.match` grupperer dupliserte snapshot
+  etter lokal resultat-ID før matching, og foretrekker nyere kopier med
+  eksplisitt HealthKit-UUID fremfor samme eldre lokale post uten UUID.
+  Motstridende UUID-er for samme ID avvises; to ulike lokale poster med
+  identisk HealthKit-UUID avvises som tvetydige.
+- Omtrentlig match på sluttid/varighet er nå *bare* tillatt for eldre
+  resultater **uten** eksplisitt HealthKit-identitet. En annen lagret
+  HealthKit-UUID kan aldri forveksles med den etterspurte registreringen,
+  selv om varighet og sluttid er nesten identisk.
+- Watch-opptak med ikke-endelig eller negativ sluttid, ugyldig varighet
+  eller ugyldig registrert minuttbevis oppretter ikke resultater i
+  progresjonshistorikken.
+- Utvidede `ATHLTHCompletedRunningPerformanceTests` kjøres eksplisitt
+  i hybrid-XCTest-workflowen og dekker eksakt ID, sen HealthKit-backfill,
+  entydig gammel registrering, motstridende ID og tvetydig kobling.
+- Krever fortsatt vellykket samme-commit CI/Watch/iPad og fysisk HealthKit-
+  validering før endelig fasegodkjenning. Ingen TestFlight-opplasting.

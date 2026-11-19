@@ -159,18 +159,53 @@ final class ATHLTHCompletedRunningPerformanceTests: XCTestCase {
         )
         XCTAssertEqual(unique?.id, first.id)
 
-        let ambiguous = ATHLTHRunningPerformanceHistory.match(
-            workoutID: UUID(), endDate: endedAt, duration: 720,
-            candidates: [first, second]
-        )
-        XCTAssertNil(ambiguous)
-        XCTAssertEqual(ATHLTHRunningPerformanceHistory.match(
+        // A different explicit HealthKit UUID cannot win a fuzzy match.
+        XCTAssertNil(ATHLTHRunningPerformanceHistory.match(
             workoutID: UUID(), endDate: endedAt, duration: 720,
             candidates: [first]
-        )?.id, first.id)
+        ))
+        // Only an unlinked legacy result is eligible for a unique
+        // time/duration fallback.
+        XCTAssertEqual(ATHLTHRunningPerformanceHistory.match(
+            workoutID: UUID(), endDate: endedAt, duration: 720,
+            candidates: [first, second]
+        )?.id, second.id)
+        let third = try completed(UUID(), nil, endedAt.addingTimeInterval(10))
+        let ambiguous = ATHLTHRunningPerformanceHistory.match(
+            workoutID: UUID(), endDate: endedAt, duration: 720,
+            candidates: [first, second, third]
+        )
+        XCTAssertNil(ambiguous)
         XCTAssertNil(ATHLTHRunningPerformanceHistory.match(
             workoutID: UUID(), endDate: endedAt.addingTimeInterval(3_600),
-            duration: 720, candidates: [first]
+            duration: 720, candidates: [second]
+        ))
+
+        // The first snapshot may be missing its HealthKit ID; the later
+        // linked snapshot for that same local ID must take priority.
+        let sameLocalBackfill = try completed(first.id, exactHealthID, endedAt)
+        let firstUnlinked = try completed(first.id, nil, endedAt)
+        XCTAssertEqual(ATHLTHRunningPerformanceHistory.match(
+            workoutID: exactHealthID, endDate: endedAt, duration: 720,
+            candidates: [firstUnlinked, sameLocalBackfill]
+        )?.id, first.id)
+        XCTAssertNil(ATHLTHRunningPerformanceHistory.match(
+            workoutID: UUID(), endDate: endedAt, duration: 720,
+            candidates: [firstUnlinked, sameLocalBackfill]
+        ))
+
+        // Two local records claiming the same HK recording are ambiguous.
+        let duplicateHealth = try completed(UUID(), exactHealthID, endedAt)
+        XCTAssertNil(ATHLTHRunningPerformanceHistory.match(
+            workoutID: exactHealthID, endDate: endedAt, duration: 720,
+            candidates: [first, duplicateHealth]
+        ))
+
+        // Conflicting HealthKit UUIDs on the same local ID are also unsafe.
+        let conflicted = try completed(first.id, UUID(), endedAt)
+        XCTAssertNil(ATHLTHRunningPerformanceHistory.match(
+            workoutID: exactHealthID, endDate: endedAt, duration: 720,
+            candidates: [first, conflicted]
         ))
     }
 }

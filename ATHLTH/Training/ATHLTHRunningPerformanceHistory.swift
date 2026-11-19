@@ -79,10 +79,19 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         let recorded = watch.recordedRunningSteps ?? []
         let fullyStructured = watch.structuredWorkoutFullyCompleted == true &&
             Self.validFullRecording(recorded, expectedCount: recorded.count)
+        // Untrusted or partially transferred Watch minute evidence cannot
+        // create a fake performance record with infinite speed or distance.
         let hasMeasuredMinutes = (watch.recordedRunningMinutes ?? []).contains {
-            $0.activeSeconds > 0 && $0.recordedDistanceMeters > 0
+            $0.activeSeconds.isFinite &&
+            $0.activeSeconds > 0 &&
+            $0.recordedDistanceMeters.isFinite &&
+            $0.recordedDistanceMeters > 0
         }
         guard (watch.kind == .running || watch.kind == .walking),
+              watch.startedAt.timeIntervalSince1970.isFinite,
+              watch.endedAt.timeIntervalSince1970.isFinite,
+              watch.endedAt >= watch.startedAt,
+              watch.duration.isFinite, watch.duration > 0,
               fullyStructured || hasMeasuredMinutes else { return nil }
         id = watch.id
         workoutID = watch.structuredWorkoutSourceID
@@ -114,16 +123,55 @@ enum ATHLTHRunningPerformanceHistory {
         duration: TimeInterval,
         candidates: [ATHLTHCompletedRunningPerformance]
     ) -> ATHLTHCompletedRunningPerformance? {
-        var seen = Set<UUID>()
-        let unique = candidates.filter { seen.insert($0.id).inserted }
-        if let exact = unique.first(where: {
-            $0.id == workoutID || $0.healthWorkoutUUID == workoutID
-        }) { return exact }
-        guard duration.isFinite, duration > 0 else { return nil }
-        let matches = unique.filter {
-            abs($0.completedAt.timeIntervalSince(endDate)) <= 75 &&
-            abs($0.steps.reduce(0) { $0 + $1.activeSeconds } - duration) <=
-                max(20, duration * 0.07)
+        var byID: [UUID: ATHLTHCompletedRunningPerformance] = [:]
+        var conflictingLocalIDs: Set<UUID> = []
+        for candidate in candidates {
+            if let existing = byID[candidate.id] {
+                if let previousHealth = existing.healthWorkoutUUID,
+                   let incomingHealth = candidate.healthWorkoutUUID,
+                   previousHealth != incomingHealth {
+                    // Conflicting persisted identities are never resolved
+                    // by choosing the most recent or first duplicate.
+                    conflictingLocalIDs.insert(candidate.id)
+                } else if existing.healthWorkoutUUID == nil &&
+                          candidate.healthWorkoutUUID != nil {
+                    // A later HealthKit backfill supersedes the same
+                    // unlinked local snapshot.
+                    byID[candidate.id] = candidate
+                }
+            } else {
+                byID[candidate.id] = candidate
+            }
+        }
+        let unique = byID.values.filter {
+            !conflictingLocalIDs.contains($0.id)
+        }
+
+        // HealthKit identity is authoritative. If multiple local IDs claim
+        // the same saved HealthKit recording, do not guess which is correct.
+        let healthMatches = unique.filter { $0.healthWorkoutUUID == workoutID }
+        if !healthMatches.isEmpty {
+            return healthMatches.count == 1 ? healthMatches[0] : nil
+        }
+        if let local = unique.first(where: { $0.id == workoutID }) {
+            return local
+        }
+        guard duration.isFinite, duration > 0,
+              endDate.timeIntervalSince1970.isFinite else { return nil }
+
+        // Timestamp-based matching is a legacy recovery route ONLY for
+        // records that have never acquired a HealthKit identity. A different
+        // explicit UUID is decisive evidence of a different recording.
+        let matches = unique.filter { candidate in
+            guard candidate.healthWorkoutUUID == nil,
+                  candidate.completedAt.timeIntervalSince1970.isFinite,
+                  abs(candidate.completedAt.timeIntervalSince(endDate)) <= 75
+            else { return false }
+            let elapsed = candidate.steps.reduce(0.0) {
+                $0 + $1.activeSeconds
+            }
+            return elapsed.isFinite && elapsed > 0 &&
+                abs(elapsed - duration) <= max(20, duration * 0.07)
         }
         return matches.count == 1 ? matches[0] : nil
     }
