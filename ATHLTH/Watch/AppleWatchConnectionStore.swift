@@ -272,6 +272,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     @Published private(set) var workoutLaunchError: String?
     @Published private(set) var watchWorkoutActivityState:
         WatchWorkoutActivityState?
+    // Fires even if the regular workout-history result is already consumed.
+    @Published private(set) var latestRelayCompletionRequestID: UUID?
 
     private let localWorkoutActivityLock =
         IPhoneWorkoutActivityLock()
@@ -309,6 +311,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         "athlth.watch.pendingStrengthCommands.v1"
     private static let pendingWorkoutResultsKey =
         "athlth.watch.pendingWorkoutResults.v1"
+    private static let relayCompletionReceiptsKey =
+        "athlth.watch.relayCompletionReceipts.v1"
+    private var relayCompletionReceipts: [WatchRemoteLaunchCompletionReceipt] = []
     private var lastSpotifyCommandSentAt:
         Date = .distantPast
     private var latestTodaySnapshot =
@@ -329,6 +334,16 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
     override init() {
         super.init()
+
+        if let data = UserDefaults.standard.data(
+            forKey: Self.relayCompletionReceiptsKey
+        ), let stored = try? JSONDecoder().decode(
+            [WatchRemoteLaunchCompletionReceipt].self, from: data
+        ) {
+            relayCompletionReceipts = stored.filter {
+                $0.endedAt >= Date().addingTimeInterval(-30 * 86_400)
+            }
+        }
 
         if let stored =
                 UserDefaults.standard
@@ -1211,6 +1226,43 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         consumeCompletedWorkout(id)
     }
 
+    /// Reconciliation reads proof independently of normal history import:
+    /// the latter may have consumed the Watch result hours earlier.
+    func completedRelayReceipt(
+        requestID: UUID, ownerID: UUID
+    ) -> WatchRemoteLaunchCompletionReceipt? {
+        relayCompletionReceipts.first {
+            $0.relayRequestID == requestID && $0.ownerID == ownerID
+        }
+    }
+
+    private func rememberRelayCompletion(_ result: WatchWorkoutResult) {
+        guard let receipt = WatchRemoteLaunchCompletionReceipt(
+            result: result
+        ) else { return }
+
+        // Same request must never be attributed to different recordings.
+        // Retain the earliest observed complete proof rather than silently
+        // replacing it with a later or cross-account result.
+        if relayCompletionReceipts.contains(where: {
+            $0.relayRequestID == receipt.relayRequestID
+        }) { return }
+        relayCompletionReceipts.append(receipt)
+        relayCompletionReceipts = Array(
+            relayCompletionReceipts.filter {
+                $0.endedAt >= Date().addingTimeInterval(-30 * 86_400)
+            }.suffix(128)
+        )
+        if let data = try? JSONEncoder().encode(
+            relayCompletionReceipts
+        ) {
+            UserDefaults.standard.set(
+                data, forKey: Self.relayCompletionReceiptsKey
+            )
+        }
+        latestRelayCompletionRequestID = receipt.relayRequestID
+    }
+
     func consumeCompletedWorkout(
         _ id: UUID
     ) {
@@ -1614,6 +1666,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         else {
             return
         }
+
+        // Preserve the minimal HealthKit completion proof BEFORE the normal
+        // result queue can deduplicate or consume this result. The evidence
+        // survives a crash during social/history processing.
+        rememberRelayCompletion(result)
 
         // Watch sends a fast message AND a durable transfer for the same
         // completion. De-duplicate before touching pet participation, current
