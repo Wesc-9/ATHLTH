@@ -1862,6 +1862,23 @@ struct WatchRemoteLaunchCompletionReceipt: Codable, Hashable {
     }
 }
 
+
+/// Two different HealthKit recordings with the same remote request ID are
+/// contradictory evidence, never an invitation to pick the first result.
+enum WatchRemoteLaunchCompletionPolicy {
+    static func uniqueReceipt(
+        _ receipts: [WatchRemoteLaunchCompletionReceipt],
+        requestID: UUID,
+        ownerID: UUID
+    ) -> WatchRemoteLaunchCompletionReceipt? {
+        let matches = receipts.filter {
+            $0.relayRequestID == requestID && $0.ownerID == ownerID
+        }
+        guard matches.count == 1 else { return nil }
+        return matches[0]
+    }
+}
+
 /// Fail closed when WatchConnectivity delivers a completed workout to
 /// a different signed-in ATHLTH account. Legacy (unowned) results stay in
 /// the pending queue for explicit review rather than being silently assigned.
