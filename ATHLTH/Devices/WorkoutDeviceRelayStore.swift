@@ -298,9 +298,10 @@ final class WorkoutDeviceRelayStore:
         var ids = unacknowledgedLaunchIDs(userID: userID)
         guard !ids.contains(id) else { return }
         ids.append(id)
-        // A bounded journal avoids unbounded storage after a prolonged outage.
+        // Never evict an unacknowledged successful launch: doing so could
+        // strand its receipt permanently after a long offline period.
         UserDefaults.standard.set(
-            ids.suffix(256).map(\.uuidString),
+            ids.map(\.uuidString),
             forKey: completedJournalKey(userID: userID)
         )
     }
