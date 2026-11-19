@@ -960,3 +960,21 @@ får opprettet terminalkvitteringen, skal fremdeles holdes
 fail-closed inntil HealthKit-historikken er verifisert. Det er
 ikke trygt å erklære en slik oppstart mislykket eller starte den
 på nytt automatisk.
+
+### Fase 4 – terminale fjernkommandoer er skrivebeskyttet (19.11.2026)
+
+- iPhone sin Supabase-oppdatering for både `completed_at` og `failed_at`
+  filtrerer nå på **begge** tomme terminalfelt. En forsinket feilcallback
+  kan ikke overskrive en fullført start; en forsinket suksesscallback kan
+  ikke overskrive en feilet kommando. Ved null oppdaterte rader beholdes
+  eksisterende lokal suksessjournal inntil serverstatus er verifisert.
+- Migrasjonen `20261119161500_workout_relay_terminal_state_immutability.sql`
+  legger samme invariant i PostgreSQL: immutable bruker/request/payload,
+  uforanderlig claim-eier etter claim, og terminalstatus som ikke kan
+  omskrives. Den endrer ikke eksisterende historikk, HealthKit-opptak eller
+  gamle kommandorader.
+- XCTest dekker den terminale overgangsregelen. Migrasjonen må deployes og
+  testes mot reell Supabase før fase 4 godkjennes; kode i GitHub alene
+  betyr **ikke** at databasen er migrert.
+- Resterende aksept: samme-commit iOS/iPad/watchOS bygg, XCTest,
+  backend-/kompatibilitetstester og fysisk treenhetstest med HealthKit.
