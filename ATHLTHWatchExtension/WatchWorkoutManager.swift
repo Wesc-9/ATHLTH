@@ -5935,7 +5935,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func updateOutdoorMetrics(
         using location: CLLocation
     ) {
-        guard (kind == .running || kind == .walking),
+        guard (kind == .running || kind == .walking ||
+                  (kind == .strength &&
+                   ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
+                       isOutdoor: usesOutdoorGPS,
+                       isEmbeddedRunningInterval:
+                           strengthSession?.isEmbeddedRunningInterval == true
+                   ))),
               usesOutdoorGPS,
               ATHLTHCoachSensorFreshness.isFresh(
                   sampledAt: location.timestamp,
@@ -9163,7 +9169,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return .running
         case .walking:
             return .walking
-        case .traditionalStrengthTraining:
+        case .traditionalStrengthTraining, .crossTraining:
             return .strength
         case .functionalStrengthTraining:
             return .functional
@@ -9848,7 +9854,14 @@ private extension WatchWorkoutManager {
                 workoutLocation = bestLocation
                 attachWorkoutLocationMetadataIfPossible()
             }
-            return
+            // A regular strength workout never records a GPS route.
+            // During outdoor hybrid, route samples only belong to the
+            // currently active run; no second HealthKit workout is created.
+            guard ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
+                isOutdoor: usesOutdoorGPS,
+                isEmbeddedRunningInterval:
+                    strengthSession?.isEmbeddedRunningInterval == true
+            ) else { return }
         }
 
         // Treadmill sessions must not consume GPS points, pace or auto-pause.
@@ -10039,7 +10052,13 @@ private extension WatchWorkoutManager {
     ) {
         guard state == .running,
               usesOutdoorGPS,
-              (kind == .running || kind == .walking)
+              (kind == .running || kind == .walking ||
+                (kind == .strength &&
+                 ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
+                     isOutdoor: usesOutdoorGPS,
+                     isEmbeddedRunningInterval:
+                         strengthSession?.isEmbeddedRunningInterval == true
+                 )))
         else {
             return
         }

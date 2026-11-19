@@ -628,10 +628,18 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     func startWorkoutOnWatch(
         _ kind: WatchWorkoutKind,
         indoor: Bool? = nil,
+        outdoorHybrid: Bool = false,
         relayRequestID: UUID? = nil
     ) async throws {
         guard isReady else {
             throw AppleWatchWorkoutLaunchError.watchUnavailable
+        }
+        guard !outdoorHybrid || (kind == .strength && indoor == false) else {
+            throw NSError(
+                domain: "ATHLTH.OutdoorHybrid", code: 1,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Outdoor hybrid requires one strength-owned Watch session with GPS enabled."]
+            )
         }
 
         guard !workoutLaunchInProgress else {
@@ -658,7 +666,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         case .walking:
             configuration.activityType = .walking
         case .strength:
-            configuration.activityType = .traditionalStrengthTraining
+            // One cross-training parent, with phase detail in ATHLTH rather
+            // than a second running workout or mixed native HK activities.
+            configuration.activityType = outdoorHybrid
+                ? .crossTraining : .traditionalStrengthTraining
         case .hiit:
             configuration.activityType = .highIntensityIntervalTraining
         case .functional:

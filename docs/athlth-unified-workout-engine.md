@@ -1423,3 +1423,33 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
 - Tester dekker faktisk bekreftet iPhone-/Watch-eier, feil plan-ID,
   feil Watch-session-ID og avvist konkurrerende start.
 - Fullført CI og fysisk Watch-/iPad-korrelasjon kreves fortsatt.
+
+### Fase 8 – tidsstyrt utendørs GPS + styrke på Watch (19.11.2026)
+
+- `ATHLTHHybridWorkoutLaunchPlan.parts(for:allowOutdoorGPS:)` godtar
+  eksplisitt tidsstyrte utendørs løpeblokker + styrke **kun når Watch
+  eier opptaket**. Den krever `isIndoor == false` på løpeblokkene,
+  ingen distansebaserte drag og ingen uoverført lagret rute. iPhone-only
+  GPS-hybrid og tvetydige treningsmiljøer avvises.
+- Watch starter ett `HKWorkoutSession` som `.crossTraining` med
+  `.outdoor`; eksisterende Watch-styrkejournal og `StrengthWorkoutLog`
+  eier alle delresultater. Ved Watch-gjenoppretting rutes denne
+  HealthKit-typen tilbake til samme hybridkontroller.
+- Den bakoverkompatible `StrengthWorkoutLog.isOutdoorHybrid` markerer
+  den ene lagrede økten. Løpedeler merkes «Outdoor Running» i stedet
+  for «Treadmill Running». Plan, Watch, sett og HealthKit beholder
+  hver sin opprinnelige, korrelerte ID uten dupliserte opptak.
+- Watch registrerer GPS-rutepunkter, fallbacksensor-distanse og
+  GPS-pace bare i aktiv utendørs løpefase. Vanlige styrkesett,
+  innendørs hybrid og alle inaktive løpefaser får ingen rute.
+  `distanceWalkingRunning` blir aktivert for løpefasen gjennom
+  eksisterende Watch-sensorlogikk.
+- Apple Health tillater ikke separate løpe- og styrkeaktivitetskategorier
+  i én vanlig cross-training-økt. Segmentene beholdes derfor i ATHLTH;
+  ikke kall dette en native HealthKit multisportaktivitet.
+- Nye tester dekker Watch-opptaksidentitet, korrekt utendørsmerking,
+  JSON-kontinuitet, avvisning på iPhone, ugyldige distansemål og
+  GPS-rute kun ved aktiv løpefase.
+- **Koden er ikke en fysisk verifisert GPS/HealthKit-funksjon.**
+  Samme-commit CI/iOS/iPad/watchOS og reelle Watch-sensorprøver er
+  obligatoriske før release-godkjenning.

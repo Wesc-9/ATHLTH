@@ -3288,12 +3288,18 @@ final class StrengthWorkoutStore: ObservableObject {
         if runBlocks.contains(where: { $0.kind == .run }) {
             // This embedded motor is for indoor treadmill intervals only.
             // A saved outdoor route must stay on its real GPS run engine.
+            let outdoorGPS =
+                workout.captureDevice == .appleWatch &&
+                workout.isOutdoorHybrid == true &&
+                runBlocks.filter({ $0.kind == .run }).allSatisfy({
+                    $0.isIndoor == false
+                })
             guard session.routeID == nil,
                   session.resolvedRunningWorkouts.allSatisfy({
                       $0.routeID == nil
                   }),
                   runBlocks.filter({ $0.kind == .run }).allSatisfy({
-                      $0.isIndoor != false
+                      $0.isIndoor != false || outdoorGPS
                   })
             else { return false }
 
@@ -3306,10 +3312,10 @@ final class StrengthWorkoutStore: ObservableObject {
             }) else { return false }
 
             let snapshots = ExerciseSnapshot(
-                name: "Treadmill Running",
+                name: outdoorGPS ? "Outdoor Running" : "Treadmill Running",
                 instructions: [],
                 primaryMuscles: ["Quadriceps", "Gastrocnemius"],
-                equipment: ["Treadmill"],
+                equipment: outdoorGPS ? [] : ["Treadmill"],
                 imageURL: nil
             )
             let sets: [StrengthSetLog] = runBlocks.enumerated().map { i, block in
@@ -3420,7 +3426,8 @@ final class StrengthWorkoutStore: ObservableObject {
               ATHLTHWorkoutRecordingArbiter.mayStartStrength(),
               !validatedParts.isEmpty,
               let canonicalParts = ATHLTHHybridWorkoutLaunchPlan.parts(
-                  for: session
+                  for: session,
+                  allowOutdoorGPS: captureDevice == .appleWatch
               ),
               // Validate again against the original plan immediately before
               // recording starts. A caller-supplied parts array can be stale
@@ -3448,6 +3455,13 @@ final class StrengthWorkoutStore: ObservableObject {
               launched.watchSessionID == watchSessionID,
               launched.captureDevice == captureDevice,
               launched.endedAt == nil else { return false }
+
+        if captureDevice == .appleWatch &&
+            ATHLTHHybridWorkoutLaunchPlan.isOutdoorTimedHybrid(session) {
+            var marked = launched
+            marked.isOutdoorHybrid = true
+            activeWorkout = marked
+        }
 
         // Only the freshly validated canonical parts may affect the
         // single recording. Never append caller-controlled snapshots.

@@ -776,6 +776,9 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     /// Exact pause windows for HealthKit; optional for existing history.
     /// A second save/recovery cannot insert the same offline pause twice.
     var recoveryPauseIntervals: [DateInterval]? = nil
+    /// One Watch-owned cross-training workout may contain timed outdoor GPS
+    /// segments. Optional keeps all earlier strength checkpoints decodable.
+    var isOutdoorHybrid: Bool? = nil
     var exercises: [StrengthExerciseLog]
     var healthMetrics: LinkedHealthWorkoutMetrics
     var advancedConfiguration:

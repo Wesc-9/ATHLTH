@@ -386,4 +386,97 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
             }.count, 3
         )
     }
+
+    @MainActor
+    private func outdoorTimedHybrid() throws -> PlannedSession {
+        var session = try plannedHybrid()
+        session.workoutCategory = "running"
+        session.runningWorkout = nil
+        session.runningWorkouts = nil
+        session.workoutBlocks = [
+            WorkoutTemplateBlock(
+                sequence: 1, kind: .run, title: "Outdoor run",
+                exerciseSlug: nil, distanceMeters: nil,
+                repetitions: nil, durationSeconds: 600,
+                targetWeightKilograms: nil, loadNote: nil,
+                notes: nil, phase: .main, isIndoor: false
+            ),
+            WorkoutTemplateBlock(
+                sequence: 2, kind: .exercise, title: "Squat",
+                exerciseSlug: nil, distanceMeters: nil,
+                repetitions: 10, durationSeconds: nil,
+                targetWeightKilograms: 20, loadNote: nil,
+                notes: nil, phase: .main
+            )
+        ]
+        return session
+    }
+
+    @MainActor
+    func testTimedOutdoorHybridUsesOneWatchWorkoutAndRealGPSProvenance() throws {
+        let plan = try outdoorTimedHybrid()
+        XCTAssertTrue(ATHLTHHybridWorkoutLaunchPlan.isOutdoorTimedHybrid(plan))
+        XCTAssertNil(ATHLTHHybridWorkoutLaunchPlan.parts(for: plan))
+        let parts = try XCTUnwrap(ATHLTHHybridWorkoutLaunchPlan.parts(
+            for: plan, allowOutdoorGPS: true
+        ))
+        XCTAssertEqual(parts.map(\.kind), [.running, .strength])
+        XCTAssertTrue(parts.allSatisfy { $0.id == plan.id })
+        let watchID = UUID()
+        let store = StrengthWorkoutStore()
+        XCTAssertTrue(store.startPlannedHybrid(
+            session: plan, validatedParts: parts,
+            watchSessionID: watchID, trackingMode: .advanced,
+            captureDevice: .appleWatch
+        ))
+        let result = try XCTUnwrap(store.activeWorkout)
+        XCTAssertEqual(result.plannedSessionID, plan.id)
+        XCTAssertEqual(result.watchSessionID, watchID)
+        XCTAssertEqual(result.isOutdoorHybrid, true)
+        XCTAssertEqual(result.exercises.count, 2)
+        let run = try XCTUnwrap(result.exercises.first {
+            $0.isEmbeddedRunningInterval == true
+        })
+        XCTAssertEqual(run.exercise.name, "Outdoor Running")
+        XCTAssertEqual(run.sets.first?.plannedDurationSeconds, 600)
+        XCTAssertEqual(run.sets.first?.hybridPhaseTitle, "Outdoor run")
+        XCTAssertEqual(result.exercises.filter {
+            $0.isEmbeddedRunningInterval != true
+        }.count, 1)
+        let roundtrip = try JSONDecoder().decode(
+            StrengthWorkoutLog.self, from: JSONEncoder().encode(result)
+        )
+        XCTAssertEqual(roundtrip.isOutdoorHybrid, true)
+
+        let phoneStore = StrengthWorkoutStore()
+        XCTAssertFalse(phoneStore.startPlannedHybrid(
+            session: plan, validatedParts: parts,
+            watchSessionID: nil, trackingMode: .advanced,
+            captureDevice: .iPhone
+        ))
+        XCTAssertNil(phoneStore.activeWorkout)
+    }
+
+    @MainActor
+    func testOutdoorHybridRejectsDistanceOnlyAndMixedEnvironments() throws {
+        var plan = try outdoorTimedHybrid()
+        plan.workoutBlocks?[0].distanceMeters = 1_000
+        plan.workoutBlocks?[0].durationSeconds = nil
+        XCTAssertNil(ATHLTHHybridWorkoutLaunchPlan.parts(
+            for: plan, allowOutdoorGPS: true
+        ))
+
+        plan = try outdoorTimedHybrid()
+        plan.workoutBlocks?[0].isIndoor = true
+        XCTAssertFalse(ATHLTHHybridWorkoutLaunchPlan.isOutdoorTimedHybrid(plan))
+        XCTAssertNil(ATHLTHHybridWorkoutLaunchPlan.parts(
+            for: plan, allowOutdoorGPS: true
+        ))
+
+        plan = try outdoorTimedHybrid()
+        plan.routeID = UUID()
+        XCTAssertNil(ATHLTHHybridWorkoutLaunchPlan.parts(
+            for: plan, allowOutdoorGPS: true
+        ))
+    }
 }

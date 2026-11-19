@@ -4550,12 +4550,15 @@ struct ATHLTHHomeView: View {
             // strength-only workout and silently drop the other motor.
             if ATHLTHHybridWorkoutLaunchPlan.isCandidate(persisted) {
                 guard let validatedParts =
-                    ATHLTHHybridWorkoutLaunchPlan.parts(for: persisted)
+                    ATHLTHHybridWorkoutLaunchPlan.parts(
+                        for: persisted,
+                        allowOutdoorGPS: device == .appleWatch
+                    )
                 else {
                     await social.markCurrentJoinedWorkoutLaunchFailed()
                     homeWatchTransferError = ATHLTHLocalization.choose(
-                        english: "Mixed sessions currently require timed treadmill intervals and strength. Outdoor GPS or distance-only runs are not supported in one recording yet.",
-                        norwegian: "Kombinerte økter støtter foreløpig tidsstyrte tredemølleintervaller og styrke. Utendørs GPS og distansebaserte drag kan ikke kombineres i ett opptak ennå."
+                        english: "Mixed workouts support timed treadmill + strength on iPhone, or explicitly timed outdoor GPS + strength on Apple Watch. Distance-only intervals and saved-route mixes are not supported yet.",
+                        norwegian: "Kombinerte økter støtter tidsstyrt tredemølle + styrke på iPhone, eller tydelig planlagt tidsstyrt GPS-løping + styrke på Apple Watch. Distansebaserte drag og lagrede ruter støttes ikke i kombinasjonsøkten ennå."
                     )
                     return
                 }
@@ -4994,7 +4997,13 @@ struct ATHLTHHomeView: View {
                     let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
                     defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
                     let initiatingAccount = session.profile.userID
-                    try await watchConnection.startWorkoutOnWatch(.strength)
+                    let outdoorHybrid = hybridParts != nil &&
+                        ATHLTHHybridWorkoutLaunchPlan.isOutdoorTimedHybrid(workout)
+                    try await watchConnection.startWorkoutOnWatch(
+                        .strength,
+                        indoor: outdoorHybrid ? false : true,
+                        outdoorHybrid: outdoorHybrid
+                    )
                     watchStartAcknowledged = true
 
                     guard session.profile.userID == initiatingAccount,

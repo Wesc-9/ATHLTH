@@ -80,6 +80,9 @@ on:
       - ATHLTH/Planning/ATHLTHUnifiedWorkout.swift
       - ATHLTH/Views/ProductRootTabView.swift
       - Tests/ATHLTHPlannedHybridLaunchTests.swift
+      - Tests/ATHLTHHybridOutdoorRoutePolicyTests.swift
+      - Shared/ATHLTHHybridOutdoorRoutePolicy.swift
+      - ATHLTH/Watch/AppleWatchConnectionStore.swift
       - Tests/ATHLTHUnifiedMixedWorkoutPlanTests.swift
       - Tests/ATHLTHLiveWorkoutEngineRouterTests.swift
       - Tests/ATHLTHWorkoutSessionFoundationTests.swift
@@ -251,6 +254,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/HybridDerivedData" \
             -resultBundlePath "$RUNNER_TEMP/HybridTests.xcresult" \
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
+            -only-testing:ATHLTHTests/ATHLTHHybridOutdoorRoutePolicyTests \
             -only-testing:ATHLTHTests/ATHLTHExploreRoutePolicyTests \
             -only-testing:ATHLTHTests/ATHLTHRouteDetailsPolicyTests \
             -only-testing:ATHLTHTests/ATHLTHRouteOfflineAndDirectionTests \

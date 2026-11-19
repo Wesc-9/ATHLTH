@@ -12,7 +12,20 @@ enum ATHLTHHybridWorkoutLaunchPlan {
             projected.contains(where: { $0.kind == .exercise })
     }
 
-    static func parts(for workout: PlannedSession) -> [PlannedSession]? {
+    /// Only explicitly outdoor timed running blocks qualify for one
+    /// Watch-owned cross-training + GPS recording. No guess from a
+    /// session title, a saved route, or a treadmill pace target.
+    static func isOutdoorTimedHybrid(_ workout: PlannedSession) -> Bool {
+        let runBlocks = workout.resolvedWorkoutBlocks.filter { $0.kind == .run }
+        return workout.workoutCategory != "treadmill" &&
+            !runBlocks.isEmpty &&
+            runBlocks.allSatisfy { $0.isIndoor == false }
+    }
+
+    static func parts(
+        for workout: PlannedSession,
+        allowOutdoorGPS: Bool = false
+    ) -> [PlannedSession]? {
         guard isCandidate(workout),
               workout.routeID == nil,
               workout.resolvedRunningWorkouts.allSatisfy({ $0.routeID == nil })
@@ -25,7 +38,8 @@ enum ATHLTHHybridWorkoutLaunchPlan {
             sourceBlocks.filter({ $0.kind == .run })
                 .allSatisfy({ $0.isIndoor == true }) &&
             sourceBlocks.contains(where: { $0.kind == .run })
-        guard explicitlyIndoor else { return nil }
+        let outdoorGPS = allowOutdoorGPS && isOutdoorTimedHybrid(workout)
+        guard explicitlyIndoor || outdoorGPS else { return nil }
 
         let result: [PlannedSession]
         if !sourceBlocks.isEmpty {
@@ -117,7 +131,8 @@ enum ATHLTHHybridWorkoutLaunchPlan {
                   blocks.allSatisfy({
                       ($0.kind == .run || $0.kind == .rest) &&
                       $0.distanceMeters == nil &&
-                      $0.isIndoor != false &&
+                      ($0.kind != .run || (outdoorGPS
+                          ? $0.isIndoor == false : $0.isIndoor != false)) &&
                       $0.durationSeconds.map {
                           $0.isFinite && (15...7_200).contains($0)
                       } == true
