@@ -354,6 +354,9 @@ final class IPhoneWorkoutStore:
     var activeSessionState: ATHLTHWorkoutSessionState? {
         active.map { ATHLTHWorkoutSessionFoundation.running($0) }
     }
+
+    /// A permission prompt is an in-flight launch until explicitly resolved.
+    var hasPendingLaunch: Bool { pendingWalking != nil }
     @Published private(set) var history: [PhoneWorkout] = []
     @Published private(set) var treadmillInclineOverrides:
         [UUID: Double] = [:]
@@ -699,7 +702,7 @@ final class IPhoneWorkoutStore:
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil
     ) {
-        guard accountID != nil, !saving,
+        guard accountID != nil, !saving, pendingWalking == nil,
               ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
             return
         }
@@ -752,25 +755,27 @@ final class IPhoneWorkoutStore:
         }
     }
 
+    private func clearPendingLaunchConfiguration() {
+        pendingWalking = nil
+        pendingPlannedPlanID = nil
+        pendingPlannedSessionID = nil
+        pendingRoute = nil
+        pendingWorkoutTitle = nil
+        pendingAudioCoach = nil
+        pendingStructuredWorkout = nil
+        pendingRouteAlerts = nil
+        pendingGhostAudio = nil
+        pendingAutoPauseEnabled = false
+        pendingTreadmillInclinePercent = nil
+        pendingTreadmillSpeedKilometersPerHour = nil
+        pendingRunEnvironment = .outdoor
+    }
+
     private func beginIfAuthorized() {
-        // Location authorization can arrive after another start or checkpoint
-        // recovery. Never allocate a second PhoneWorkout from a stale pending
-        // request; preserve the already active recording and its HealthKit ID.
+        // Authorization can arrive after another workout starts or restores.
         guard active == nil, !saving,
               ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
-            pendingWalking = nil
-            pendingPlannedPlanID = nil
-            pendingPlannedSessionID = nil
-            pendingRoute = nil
-            pendingWorkoutTitle = nil
-            pendingAudioCoach = nil
-            pendingStructuredWorkout = nil
-            pendingRouteAlerts = nil
-            pendingGhostAudio = nil
-            pendingAutoPauseEnabled = false
-            pendingTreadmillInclinePercent = nil
-            pendingTreadmillSpeedKilometersPerHour = nil
-            pendingRunEnvironment = .outdoor
+            clearPendingLaunchConfiguration()
             return
         }
         guard let walking = pendingWalking else { return }
@@ -780,6 +785,11 @@ final class IPhoneWorkoutStore:
            manager.authorizationStatus != .authorizedAlways,
            manager.authorizationStatus != .authorizedWhenInUse {
             message = "Allow location access in iPhone Settings to record an outdoor workout."
+            // A permanent denial must not block all future sports.
+            if manager.authorizationStatus == .denied ||
+                manager.authorizationStatus == .restricted {
+                clearPendingLaunchConfiguration()
+            }
             return
         }
 
@@ -804,19 +814,7 @@ final class IPhoneWorkoutStore:
             environment == .outdoor &&
             pendingAutoPauseEnabled
 
-        pendingWalking = nil
-        pendingPlannedPlanID = nil
-        pendingPlannedSessionID = nil
-        pendingRunEnvironment = .outdoor
-        pendingTreadmillInclinePercent = nil
-        pendingTreadmillSpeedKilometersPerHour = nil
-        pendingRoute = nil
-        pendingWorkoutTitle = nil
-        pendingAudioCoach = nil
-        pendingStructuredWorkout = nil
-        pendingRouteAlerts = nil
-        pendingGhostAudio = nil
-        pendingAutoPauseEnabled = false
+        clearPendingLaunchConfiguration()
 
         cachePlannedRouteGeometry(route)
         resetCoachThresholds(

@@ -71,8 +71,11 @@ enum ATHLTHWorkoutRecordingArbiter {
 
     static func reserveLaunch() throws -> UUID {
         guard pendingLaunchID == nil,
-              phone?.activeSessionState == nil,
-              strength?.activeSessionState == nil else {
+              ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+                  running: phone?.activeSessionState,
+                  runningAuthorizationPending: phone?.hasPendingLaunch == true,
+                  strength: strength?.activeSessionState
+              ) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         let id = UUID()
@@ -91,11 +94,22 @@ enum ATHLTHWorkoutRecordingArbiter {
     }
 
     static func mayStartStrength() -> Bool {
-        phone?.activeSessionState == nil
+        phone?.activeSessionState == nil &&
+            phone?.hasPendingLaunch != true
     }
 }
 
 enum ATHLTHWorkoutSessionFoundation {
+    /// Waiting for outdoor location permission still occupies the one
+    /// universal recording slot, even before PhoneWorkout is allocated.
+    static func isRecordingSlotAvailable(
+        running: ATHLTHWorkoutSessionState?,
+        runningAuthorizationPending: Bool,
+        strength: ATHLTHWorkoutSessionState?
+    ) -> Bool {
+        running == nil && !runningAuthorizationPending && strength == nil
+    }
+
     static func requireNoActiveRecording(
         _ active: ATHLTHWorkoutSessionState?
     ) throws {
@@ -175,6 +189,9 @@ enum ATHLTHWorkoutSessionFoundation {
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore
     ) throws {
+        guard !phone.hasPendingLaunch else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
         try requireNoActiveRecording(currentSession(phone: phone, strength: strength))
     }
 

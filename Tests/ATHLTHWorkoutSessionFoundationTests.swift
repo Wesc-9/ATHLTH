@@ -319,6 +319,22 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch())
     }
 
+    func testPendingOutdoorPermissionBlocksUniversalRecordingSlot() {
+        let live = ATHLTHWorkoutSessionFoundation.running(phone(), at: start)
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+            running: nil, runningAuthorizationPending: false, strength: nil
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+            running: nil, runningAuthorizationPending: true, strength: nil
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+            running: live, runningAuthorizationPending: false, strength: nil
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+            running: nil, runningAuthorizationPending: false, strength: live
+        ))
+    }
+
     @MainActor
     func testCurrentSessionReadsActualStrengthStoreWithoutCreatingRecording() throws {
         let phone = IPhoneWorkoutStore()

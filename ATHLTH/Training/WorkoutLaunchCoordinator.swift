@@ -1021,11 +1021,14 @@ enum WorkoutLaunchCoordinator {
                 return recording
             }
 
-            watchConnection
-                .updateLocalWorkoutActivity(
+            // Do not declare Watch-facing phone recording active while
+            // GPS consent is still pending. AppRoot observes actual starts.
+            if phoneWorkout.active != nil {
+                watchConnection.updateLocalWorkoutActivity(
                     isActive: true,
                     title: plannedRunningWorkout?.title ?? configuration.title
                 )
+            }
 
             if let recording = initialEffortWorkout {
                 // A workout starting directly with a work interval must not
@@ -1386,15 +1389,14 @@ enum WorkoutLaunchCoordinator {
                 plannedPlanID: plannedPlanID,
                 plannedSessionID: plannedSessionID
             )
-            watchConnection
-                .updateLocalWorkoutActivity(
+            if phoneWorkout.active != nil {
+                watchConnection.updateLocalWorkoutActivity(
                     isActive: true,
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Walk",
-                            norwegian: "Gåtur"
-                        )
+                    title: ATHLTHLocalization.choose(
+                        english: "Walk", norwegian: "Gåtur"
+                    )
                 )
+            }
             startQuickSpotifyIfNeeded(
                 playlist:
                     configuration.spotifyPlaylist,
@@ -1592,6 +1594,20 @@ enum WorkoutLaunchCoordinator {
             }
         }
 
+        // The invitation awaited a network response: repeat the
+        // cross-activity admission check before any remote/Watch launch.
+        do {
+            try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
+                strengthWorkout.activeSessionState
+            )
+            guard ATHLTHWorkoutRecordingArbiter.mayStartStrength() else {
+                throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+            }
+        } catch {
+            await social.markCurrentJoinedWorkoutLaunchFailed()
+            throw error
+        }
+
         if ATHLTHDeviceRole.isIPad {
             let relayPayload =
                 SocialWorkoutInvitePayload(
@@ -1641,9 +1657,12 @@ enum WorkoutLaunchCoordinator {
                         workout.gearIDs ?? []
                 )
 
-            try await WorkoutDeviceRelayStore
-                .shared
-                .enqueue(envelope)
+            do {
+                try await WorkoutDeviceRelayStore.shared.enqueue(envelope)
+            } catch {
+                await social.markCurrentJoinedWorkoutLaunchFailed()
+                throw error
+            }
 
             // A relayed workout must not open a second local strength session
             // on iPad. The iPhone becomes the authoritative workout device.
@@ -1688,10 +1707,6 @@ enum WorkoutLaunchCoordinator {
             throw error
         }
 
-        session.beginTrainingStatus(
-            for: workout
-        )
-
         strengthWorkout.start(
             session: workout,
             watchSessionID: watchSessionID,
@@ -1712,6 +1727,10 @@ enum WorkoutLaunchCoordinator {
             await social.markCurrentJoinedWorkoutLaunchFailed()
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
+
+        // Only record scheduled progress after the authoritative store
+        // confirms an actual new strength session was accepted.
+        session.beginTrainingStatus(for: workout)
 
         if captureDevice == .iPhone {
             watchConnection

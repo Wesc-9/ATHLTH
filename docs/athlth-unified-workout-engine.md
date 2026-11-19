@@ -419,3 +419,16 @@ som ferdige før egne faser og reelle tester er fullført.
 - `ATHLTHWorkoutSessionFoundationTests` dekker reservasjon, feilaktig
   frigjøring, ny reservasjon og aktiv styrkeøkt. Dette verifiserer ikke
   fysisk Watch, iPad, samlet HealthKit-eierskap eller full fase 4–8.
+
+### Fase 4 — kontroll av pågående GPS-tillatelse og relé
+
+- Et utendørs iPhone-opptak som venter på posisjonstillatelse, opptar
+  treningsplassen til samtykke er håndtert. Nytt startforsøk kan ikke
+  erstatte den ventende konfigurasjonen. Avslag fjerner ventende data.
+- Planlagt styrke kontrollerer status igjen etter sosialt nettverkskall.
+  Feil ved iPad-relé ruller tilbake invitasjonsoppstart.
+- Apple Watch får ikke meldingen «aktiv iPhone-økt» før den faktiske
+  `PhoneWorkout` finnes. Planlagt styrke markeres først startet når
+  den autoritative styrkeloggen faktisk er opprettet.
+- Ingen ekstra HealthKit-økt, gammel historikk eller separat styrkemotor.
+  Full iOS-/watchOS-/iPad-regresjon og fysisk test gjenstår.
