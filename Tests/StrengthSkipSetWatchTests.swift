@@ -286,4 +286,45 @@ final class StrengthSkipSetWatchTests: XCTestCase {
     }
 
 
+
+    func testWatchOfflineJournalKeepsOtherAccountAndUnownedCommandsQueued() {
+        let rightfulOwner = UUID()
+        let otherOwner = UUID()
+        let activeWorkoutID = UUID()
+        var command = WatchStrengthCommand(
+            id: UUID(), workoutID: activeWorkoutID, kind: .completeSet,
+            reps: 8, weightKilograms: 24, restSeconds: 60,
+            addRestSeconds: nil, sentAt: Date()
+        )
+        command.accountOwnerID = rightfulOwner
+        XCTAssertTrue(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command,
+            signedInAccountID: rightfulOwner,
+            activeWorkoutID: activeWorkoutID
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command,
+            signedInAccountID: otherOwner,
+            activeWorkoutID: activeWorkoutID
+        ))
+        command.accountOwnerID = nil
+        XCTAssertTrue(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command,
+            signedInAccountID: otherOwner,
+            activeWorkoutID: activeWorkoutID
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command,
+            signedInAccountID: otherOwner,
+            activeWorkoutID: UUID()
+        ))
+        command.kind = .requestSnapshot
+        XCTAssertFalse(ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+            command,
+            signedInAccountID: rightfulOwner,
+            activeWorkoutID: activeWorkoutID
+        ))
+    }
+
+
 }

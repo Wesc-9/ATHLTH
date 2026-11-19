@@ -373,3 +373,13 @@ som ferdige før egne faser og reelle tester er fullført.
   Legacy-kommandoer uten eier-ID dekodes fortsatt, men kan ikke
   opprette en ny styrkeøkt på en vilkårlig konto. Den opprinnelige
   Watch-journalen og fullføringsresultatet beholdes på Watch.
+
+- **Fase 4 / innlogging og frakobling:** Ventende Watch-kommandoer
+  filtreres nå etter eierkonto før de forbrukes fra den vedvarende
+  journalen. En annen kontos kommando bevares, men kan ikke mutere
+  den aktive økten. Kommandolisten forsøkes på nytt ved innlogging,
+  kontobytte og når øktsjekkpunktet er gjenopprettet. Eldre Watch-
+  kommandoer uten eier-ID kan fortsatt brukes mot en **eksakt
+  eksisterende** aktiv økt med samme UUID, men ikke starte en økt.
+  Oppstartsforespørsler med feil/manglende eier beholdes i køen
+  for senere kontroll i stedet for å bli kvittert ut feilaktig.

@@ -51,6 +51,27 @@ enum ATHLTHStrengthWatchBootstrapOwnershipPolicy {
     }
 }
 
+
+/// Keep an offline Watch journal for its owner instead of consuming entries
+/// while a different account is signed in. Legacy commands may be applied
+/// only to an already-restored workout with the exact same workout UUID.
+enum ATHLTHStrengthWatchCommandRoutingPolicy {
+    static func mayProcess(
+        _ command: WatchStrengthCommand,
+        signedInAccountID: UUID,
+        activeWorkoutID: UUID?
+    ) -> Bool {
+        if let owner = command.accountOwnerID {
+            return owner == signedInAccountID
+        }
+        guard command.kind != .requestSnapshot,
+              let workoutID = command.workoutID,
+              let activeWorkoutID
+        else { return false }
+        return workoutID == activeWorkoutID
+    }
+}
+
 /// Keeps the high-frequency strength <-> Apple Watch synchronization out of
 /// AppRootView so reps/weight/rest edits do not invalidate the entire app
 /// hierarchy.
@@ -93,6 +114,12 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                     }
                     try? await Task.sleep(for: .seconds(25))
                 }
+            }
+            .onChange(of: appSession.signedIn) { _, signedIn in
+                if signedIn { drainPendingCommands() }
+            }
+            .onChange(of: appSession.profile.userID) { _, _ in
+                drainPendingCommands()
             }
             .onChange(of: workoutMirroring.snapshot) { _, latest in
                 if let latest {
@@ -184,8 +211,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 ) else {
                     // Never reinterpret a legacy/unowned Watch request as
                     // consent to record under a different signed-in account.
-                    // Watch keeps its durable journal and final result.
-                    return true
+                    // Keep the pending command intact until a compatible
+                    // account/bootstrap becomes available; never claim it.
+                    return false
                 }
 
                 if let bootstrap =
@@ -537,18 +565,23 @@ struct ATHLTHStrengthWatchSyncObserver: View {
 
     @MainActor
     private func drainPendingCommands() {
-        while let command =
-                watchConnection
-                    .pendingStrengthCommands
-                    .first {
+        guard appSession.signedIn else { return }
+        // A journal may include commands for multiple account sessions.
+        // Skipping a foreign/unscoped command preserves its UUID and payload
+        // for its rightful owner without blocking current-owner commands.
+        for command in watchConnection.pendingStrengthCommands {
+            guard ATHLTHStrengthWatchCommandRoutingPolicy.mayProcess(
+                command,
+                signedInAccountID: appSession.profile.userID,
+                activeWorkoutID: strengthWorkout.activeWorkout?.id
+            ) else { continue }
             guard handle(command) else {
-                break
+                // The matching account's checkpoint may not be restored yet.
+                // A later bootstrap request can establish it, after which
+                // .onChange(activeWorkout) retries the earlier commands.
+                continue
             }
-
-            watchConnection
-                .consumeStrengthCommand(
-                    command.id
-                )
+            watchConnection.consumeStrengthCommand(command.id)
         }
     }
 
