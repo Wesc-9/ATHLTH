@@ -9387,6 +9387,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func publishState(_ newState: WatchWorkoutState) {
+        switch newState {
+        case .paused:
+            coachCueQueue.discardWorkoutMotionCues()
+        case .ending, .completed, .failed:
+            coachCueQueue.discardForWorkoutCompletion()
+        case .idle, .preparing, .running:
+            break
+        }
         publish {
             self.state = newState
         }
