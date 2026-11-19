@@ -385,4 +385,23 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
             [commandID, commandID], commandID: commandID
         ))
     }
+    func testRelayCorrelationRequiresExactEmbeddedRequestID() {
+        let request = UUID()
+        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasMatchingRequestID(
+            serverID: request, payloadID: request
+        ))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.hasMatchingRequestID(
+            serverID: request, payloadID: nil
+        ))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.hasMatchingRequestID(
+            serverID: request, payloadID: UUID()
+        ))
+    }
+
+    func testClaimRejectsNonFiniteExpiry() {
+        XCTAssertFalse(accepts(expiresAt: Date(timeIntervalSince1970: .infinity)))
+        XCTAssertFalse(accepts(expiresAt: Date(timeIntervalSince1970: -.infinity)))
+        XCTAssertFalse(accepts(expiresAt: now))
+    }
+
 }
