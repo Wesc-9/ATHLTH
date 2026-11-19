@@ -928,7 +928,7 @@ struct StrengthWorkoutResultSegment: Identifiable {
         registeredEffortSeconds = completed.reduce(0) { subtotal, set in
             let seconds = set.actualSetElapsedSeconds ??
                 set.watchActiveDurationSeconds ??
-                set.resolvedCompletedDurationSeconds.map(TimeInterval.init)
+                set.resolvedCompletedDurationSeconds.map { TimeInterval($0) }
             return subtotal + ((seconds?.isFinite == true) ? max(seconds ?? 0, 0) : 0)
         }
         measuredDistanceMeters = completed.reduce(0) { subtotal, set in
