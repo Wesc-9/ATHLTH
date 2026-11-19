@@ -292,4 +292,21 @@ final class AudioCoachFreshnessAndReceiptTests: XCTestCase {
             routePointCount: 1
         )
     }
+    func testCountdownDoesNotSpeakAfterBluetoothRouteActivationMissesDeadline() {
+        let deadline = now.addingTimeInterval(1)
+        XCTAssertTrue(ATHLTHCoachCountdownSpeechDeadline.permitsPlayback(
+            deadline: deadline, now: now
+        ))
+        XCTAssertFalse(ATHLTHCoachCountdownSpeechDeadline.permitsPlayback(
+            deadline: deadline, now: now.addingTimeInterval(1)
+        ))
+        XCTAssertFalse(ATHLTHCoachCountdownSpeechDeadline.permitsPlayback(
+            deadline: deadline, now: now.addingTimeInterval(3)
+        ))
+        // Ordinary non-countdown speech has no strict boundary deadline.
+        XCTAssertTrue(ATHLTHCoachCountdownSpeechDeadline.permitsPlayback(
+            deadline: nil, now: now.addingTimeInterval(3)
+        ))
+    }
+
 }
