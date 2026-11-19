@@ -258,6 +258,7 @@ final class WorkoutDeviceRelayStore:
         Task<Void, Never>?
     private var listeningUserID: UUID?
     private var listenerGeneration: UUID?
+    private var isDrainingCommands = false
 
     init(
         client:
@@ -473,8 +474,14 @@ final class WorkoutDeviceRelayStore:
             (WorkoutDeviceRelayCommand)
                 async throws -> Void
     ) async {
+        // Realtime notifications and foreground refresh may overlap. Only
+        // one command processor may consume this device's queue at a time.
+        guard !isDrainingCommands else { return }
+        isDrainingCommands = true
+        defer { isDrainingCommands = false }
+        guard let processingUserID = currentUserID else { return }
         for _ in 0..<8 {
-            guard
+            guard currentUserID == processingUserID,
                 !Task.isCancelled
             else {
                 return
@@ -492,8 +499,11 @@ final class WorkoutDeviceRelayStore:
                 return
             }
 
-            guard let record
-            else {
+            guard let record else { return }
+            guard currentUserID == processingUserID,
+                  record.userID == processingUserID,
+                  !Task.isCancelled else {
+                // Do not execute a command claimed during an account change.
                 return
             }
 
