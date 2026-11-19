@@ -83,6 +83,8 @@ on:
       - Tests/ATHLTHUnifiedMixedWorkoutPlanTests.swift
       - Tests/ATHLTHLiveWorkoutEngineRouterTests.swift
       - Tests/ATHLTHWorkoutSessionFoundationTests.swift
+      - Tests/WorkoutDeviceRelayClaimPolicyTests.swift
+      - ATHLTH/Devices/WorkoutDeviceRelayStore.swift
       - Tests/ATHLTHLiveWorkoutBottomModeTests.swift
       - Tests/ATHLTHStrengthAdvancedLiveSetTests.swift
       - Tests/ATHLTHStrengthGroupedSetTests.swift
@@ -237,6 +239,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHPublicTrailDiskCacheTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutSessionFoundationTests \
+            -only-testing:ATHLTHTests/WorkoutDeviceRelayClaimPolicyTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutBottomModeTests \
             -only-testing:ATHLTHTests/ATHLTHStrengthAdvancedLiveSetTests \
             -only-testing:ATHLTHTests/ATHLTHStrengthGroupedSetTests \
