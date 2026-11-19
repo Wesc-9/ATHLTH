@@ -1999,6 +1999,22 @@ struct AppRootView: View {
         // Watch may become active after the iPhone reported an ambiguous
         // remote launch. A fresh matching Watch identity resolves only its
         // receipt, never starts another workout or drains the next claim.
+        // A HealthKit completion can arrive after the Watch has gone idle,
+        // and the normal import queue may consume it before the next launch.
+        // Reconcile immediately using the separately persisted receipt.
+        .onReceive(
+            watchConnection.$latestRelayCompletionRequestID.removeDuplicates()
+        ) { requestID in
+            guard appSession.signedIn,
+                  ATHLTHDeviceRole.isIPhone,
+                  requestID != nil
+            else { return }
+            Task { @MainActor in
+                await deviceRelay.reconcileUncertainWatchStarts(
+                    watchConnection: watchConnection
+                )
+            }
+        }
         .onReceive(
             watchConnection.$watchWorkoutActivityState.removeDuplicates()
         ) { activity in
