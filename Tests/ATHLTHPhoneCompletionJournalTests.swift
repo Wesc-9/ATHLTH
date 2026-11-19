@@ -56,4 +56,20 @@ final class ATHLTHPhoneCompletionJournalTests: XCTestCase {
         XCTAssertEqual(PhoneWorkoutCompletionJournal.read(userID: first)?.id,
                        record.id)
     }
+
+    func testSameEndTimeCannotReplaceAnotherWorkoutReceipt() throws {
+        let account = UUID()
+        defer { PhoneWorkoutCompletionJournal.remove(userID: account) }
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        let completedAt = start.addingTimeInterval(180)
+        let first = workout(start: start, end: completedAt)
+        let second = workout(start: start.addingTimeInterval(60), end: completedAt)
+        XCTAssertNotEqual(first.id, second.id)
+        try PhoneWorkoutCompletionJournal.save(first, userID: account)
+        try PhoneWorkoutCompletionJournal.save(second, userID: account)
+        XCTAssertEqual(PhoneWorkoutCompletionJournal.read(userID: account)?.id, first.id)
+        // Updates for the SAME completed workout are still permitted.
+        try PhoneWorkoutCompletionJournal.save(first, userID: account)
+        XCTAssertEqual(PhoneWorkoutCompletionJournal.read(userID: account)?.id, first.id)
+    }
 }
