@@ -414,4 +414,146 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         )
         XCTAssertEqual(local.workoutHistory.count, 1)
     }
+
+    @MainActor
+    func testResultBreakdownExcludesUncompletedSetsAndClampsRest() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        let exercise = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Phase 7 squat", instructions: [],
+            primaryMuscles: ["Quadriceps"], secondaryMuscles: [],
+            equipment: [], imageURL: nil, isVisibleOutsideOwnerLibrary: true
+        )
+        store.appendExercise(exercise, sets: 2, reps: 10, restSeconds: 60)
+        var workout = try XCTUnwrap(store.activeWorkout)
+        XCTAssertEqual(workout.exercises.count, 1)
+        XCTAssertEqual(workout.exercises[0].sets.count, 2)
+        workout.exercises[0].sets[0].completedAt =
+            workout.startedAt.addingTimeInterval(20)
+        workout.exercises[0].sets[0].completedReps = 10
+        workout.exercises[0].sets[0].completedWeightKilograms = 20
+        workout.exercises[0].sets[0].actualSetElapsedSeconds = 20
+        workout.exercises[0].sets[0].actualRestAfterSeconds = 40
+        // Legacy draft values on a skipped set are not completed evidence.
+        workout.exercises[0].sets[1].completedReps = 50
+        workout.exercises[0].sets[1].skippedAt =
+            workout.startedAt.addingTimeInterval(70)
+        workout.exercises[0].sets[1].actualRestAfterSeconds = 800
+
+        XCTAssertEqual(workout.totalCompletedReps, 10)
+        XCTAssertEqual(workout.recordedRestDurationsSeconds, [40])
+        XCTAssertEqual(workout.totalActualRestSeconds, 40)
+        let summary = StrengthWorkoutResultBreakdown(
+            workout: workout, elapsedSeconds: 180
+        )
+        XCTAssertEqual(summary.totalSeconds, 180)
+        XCTAssertEqual(summary.restSeconds, 40)
+        XCTAssertEqual(summary.activeSeconds, 140)
+        XCTAssertEqual(summary.segments[0].completedSets, 1)
+        XCTAssertEqual(summary.segments[0].completedReps, 10)
+        XCTAssertEqual(summary.segments[0].registeredEffortSeconds, 20)
+
+        // Imported HealthKit time is used only when valid. Rest can
+        // never exceed total recorded duration in the final summary.
+        workout.healthMetrics.duration = 90
+        workout.exercises[0].sets[0].actualRestAfterSeconds = 200
+        let bounded = StrengthWorkoutResultBreakdown(
+            workout: workout, elapsedSeconds: 180
+        )
+        XCTAssertEqual(bounded.totalSeconds, 90)
+        XCTAssertEqual(bounded.restSeconds, 90)
+        XCTAssertEqual(bounded.activeSeconds, 0)
+        workout.healthMetrics.duration = .infinity
+        XCTAssertEqual(
+            StrengthWorkoutResultBreakdown(
+                workout: workout, elapsedSeconds: 180
+            ).totalSeconds, 180
+        )
+    }
+
+    @MainActor
+    func testHybridResultKeepsSensorDistanceSeparateFromManualEstimates() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        let exercise = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Phase 7 interval", instructions: [],
+            primaryMuscles: [], secondaryMuscles: [],
+            equipment: [], imageURL: nil, isVisibleOutsideOwnerLibrary: true
+        )
+        store.appendExercise(
+            exercise, sets: 1, reps: nil, targetKind: .time,
+            targetDurationSeconds: 60, restSeconds: 0
+        )
+        var workout = try XCTUnwrap(store.activeWorkout)
+        workout.exercises[0].isEmbeddedRunningInterval = true
+        workout.exercises[0].sets[0].completedAt =
+            workout.startedAt.addingTimeInterval(70)
+        workout.exercises[0].sets[0].completedDurationSeconds = 60
+        workout.exercises[0].sets[0].actualSetElapsedSeconds = 70
+        workout.exercises[0].sets[0].watchActiveDurationSeconds = 65
+        workout.exercises[0].sets[0].watchMeasuredDistanceMeters = 220
+        workout.exercises[0].sets[0].completedDistanceMeters = 220
+        workout.exercises[0].sets[0].manuallyEstimatedTreadmillDistanceMeters = 250
+
+        let segment = try XCTUnwrap(
+            StrengthWorkoutResultBreakdown(
+                workout: workout, elapsedSeconds: 90
+            ).segments.first
+        )
+        XCTAssertTrue(segment.isCardio)
+        XCTAssertEqual(segment.completedSets, 1)
+        XCTAssertEqual(segment.registeredEffortSeconds, 70)
+        XCTAssertEqual(segment.measuredDistanceMeters, 220)
+        XCTAssertEqual(segment.loggedDistanceMeters, 0)
+        XCTAssertEqual(segment.estimatedTreadmillDistanceMeters, 250)
+    }
+
+    @MainActor
+    func testHistoricalStrengthPRUsesOnlyEarlierCompletedWorkouts() throws {
+        let owner = UUID()
+        defer {
+            StrengthWorkoutCompletionJournal.remove(userID: owner)
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthHistory", userID: owner)
+            )
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthActive", userID: owner)
+            )
+        }
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        let exercise = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Phase 7 bench press", instructions: [],
+            primaryMuscles: ["Chest"], secondaryMuscles: [],
+            equipment: [], imageURL: nil, isVisibleOutsideOwnerLibrary: true
+        )
+
+        for weight in [90.0, 80.0, 100.0] {
+            store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+            store.appendExercise(exercise, sets: 1, reps: 3, restSeconds: 0)
+            store.setDraft(reps: 3, weightKilograms: weight)
+            store.completeCurrentDraftSet()
+            XCTAssertTrue(store.finish())
+        }
+
+        let chronological = store.workoutHistory.sorted {
+            $0.startedAt < $1.startedAt
+        }
+        XCTAssertEqual(chronological.count, 3)
+        XCTAssertTrue(
+            store.workoutPersonalRecords(for: chronological[0]).isEmpty,
+            "The first workout remains a baseline, even after later training"
+        )
+        XCTAssertTrue(
+            store.workoutPersonalRecords(for: chronological[1]).isEmpty,
+            "Lighter training is not a new PR"
+        )
+        XCTAssertFalse(
+            store.workoutPersonalRecords(for: chronological[2]).isEmpty,
+            "The genuine later improvement is supported by prior evidence"
+        )
+    }
 }
