@@ -622,6 +622,13 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
     func testOfflineWatchRestCommandsRespectOriginalSetAndRestStart() throws {
         let store = StrengthWorkoutStore()
         store.startFreestyle(watchSessionID: nil)
+        let exercise = Exercise(
+            id: UUID(), origin: .publicCatalog, ownerID: nil,
+            name: "Squat", instructions: [], primaryMuscles: ["Quadriceps"],
+            secondaryMuscles: [], equipment: [], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: true
+        )
+        store.appendExercise(exercise, sets: 2, reps: 8, restSeconds: 0)
         let base = Date().addingTimeInterval(-200)
         let workoutID = try XCTUnwrap(store.activeWorkout?.id)
         store.addRest(seconds: 45, at: base)
@@ -689,8 +696,13 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
             exerciseIndex: 0, setIndex: 1
         )
         store.replayOfflineWatchCommands([next])
-        XCTAssertEqual(store.activeWorkout?.exercises.first?.sets.first?
-            .actualRestAfterSeconds, 22, accuracy: 0.01)
+        XCTAssertEqual(
+            try XCTUnwrap(
+                store.activeWorkout?.exercises.first?.sets.first?
+                    .actualRestAfterSeconds
+            ),
+            22, accuracy: 0.01
+        )
         XCTAssertEqual(store.currentSetEffortClock?.startedAt, resumedAt)
         XCTAssertNil(store.restEndsAt)
         XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
