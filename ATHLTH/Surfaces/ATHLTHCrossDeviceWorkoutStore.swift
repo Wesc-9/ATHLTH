@@ -252,6 +252,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private var lastUnauthorisedCleanupAt: Date?
     private var mirroredStartedAt: Date?
     private var mirroredSessionID: UUID?
+    // Invalidate overlapping polls (and responses from an old account).
+    // A late response must not restore revoked or expired spectator data.
+    private var remoteReadGeneration: UInt64 = 0
+    private var presenceReadGeneration: UInt64 = 0
     private var lastRemoteExpiry: Date?
     private var hasLoadedRemote = false
     private var foregroundedSinceLastPoll = false
@@ -273,6 +277,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     }
 
     func clearLocalState() {
+        remoteReadGeneration &+= 1
+        presenceReadGeneration &+= 1
         remote = nil
         remotePresence = nil
         presenceConnectionIssue = false
@@ -924,6 +930,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     }
 
     private func readPresence(accountID: UUID) async {
+        presenceReadGeneration &+= 1
+        let requestGeneration = presenceReadGeneration
         do {
             let rows: [ATHLTHCrossDevicePresenceRow] = try await client
                 .from("private_active_workout_presence")
@@ -932,7 +940,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
-            guard trackingAccountID == accountID,
+            guard requestGeneration == presenceReadGeneration,
+                  trackingAccountID == accountID,
                   client.auth.currentUser?.id == accountID,
                   !Task.isCancelled else {
                 return
@@ -943,7 +952,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             presenceConnectionIssue = false
             hasCheckedPresence = true
         } catch {
-            guard trackingAccountID == accountID,
+            guard requestGeneration == presenceReadGeneration,
+                  trackingAccountID == accountID,
                   client.auth.currentUser?.id == accountID,
                   !Task.isCancelled else {
                 return
@@ -1143,6 +1153,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     }
 
     private func readRemote(accountID: UUID) async {
+        remoteReadGeneration &+= 1
+        let requestGeneration = remoteReadGeneration
         do {
             let rows: [ATHLTHCrossDeviceWorkoutRow] = try await client
                 .from("private_active_workout_status")
@@ -1151,7 +1163,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
-            guard trackingAccountID == accountID,
+            guard requestGeneration == remoteReadGeneration,
+                  trackingAccountID == accountID,
                   client.auth.currentUser?.id == accountID,
                   !Task.isCancelled else { return }
             let row = rows.first
@@ -1206,7 +1219,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 )
             })
         } catch {
-            guard trackingAccountID == accountID,
+            guard requestGeneration == remoteReadGeneration,
+                  trackingAccountID == accountID,
                   client.auth.currentUser?.id == accountID,
                   !Task.isCancelled else { return }
             presenceConnectionIssue = true
