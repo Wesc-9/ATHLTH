@@ -3377,7 +3377,8 @@ final class StrengthWorkoutStore: ObservableObject {
         guard
             var workout = activeWorkout,
             workout.exercises.indices.contains(currentExerciseIndex),
-            workout.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex)
+            workout.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex),
+            !workout.exercises[currentExerciseIndex].sets[currentSetIndex].isResolved
         else {
             return
         }
@@ -5010,7 +5011,7 @@ final class StrengthWorkoutStore: ObservableObject {
         guard var workout = activeWorkout,
               workout.exercises.indices.contains(currentExerciseIndex),
               workout.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex),
-              !workout.exercises[currentExerciseIndex].sets[currentSetIndex].isCompleted
+              !workout.exercises[currentExerciseIndex].sets[currentSetIndex].isResolved
         else { return false }
 
         if workout.exercises[currentExerciseIndex].groupStyle == .emom,
@@ -5019,6 +5020,8 @@ final class StrengthWorkoutStore: ObservableObject {
             workout.exercises[currentExerciseIndex].skippedPlannedSetCount =
                 (workout.exercises[currentExerciseIndex].skippedPlannedSetCount ?? 0) + 1
             activeWorkout = workout
+            timedSetCountdown = nil
+            setEffortClock = nil
             // Keep each minute's original slot index so the group clock
             // and the Watch never mix rounds when a station is omitted.
             _ = reconcileCurrentEMOM()

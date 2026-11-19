@@ -623,8 +623,18 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     /// timed EMOM skips retain the original slot and store skippedAt.
     /// These must be combined for display, never counted twice in totals.
     var auditedSkippedSets: Int {
-        (skippedPlannedSetCount ?? 0) +
-            sets.filter { $0.skippedAt != nil }.count
+        let legacySkippedCount = skippedPlannedSetCount ?? 0
+        let retainedSkippedCount = sets.filter { $0.skippedAt != nil }.count
+        // EMOM retains a skipped set in its original minute/station slot
+        // AND previously incremented skippedPlannedSetCount. These are the
+        // same omissions, not independent missed sets. max() also preserves
+        // older checkpoints without rewriting their stored IDs or counters.
+        if groupStyle == .emom {
+            return max(legacySkippedCount, retainedSkippedCount)
+        }
+        // Other modes may physically remove planned rows while retaining
+        // separate timestamped skips, so those independent counts add.
+        return legacySkippedCount + retainedSkippedCount
     }
 
     var isWarmUpExercise: Bool {

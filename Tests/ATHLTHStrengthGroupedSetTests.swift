@@ -199,6 +199,8 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         XCTAssertNotNil(logs[1].sets[0].skippedAt)
         XCTAssertEqual(logs[1].sets[0].volumeKilograms, 0)
         XCTAssertEqual(logs[1].skippedPlannedSetCount, 1)
+        XCTAssertEqual(logs[1].auditedSkippedSets, 1,
+                       "A retained EMOM slot and the legacy counter are the same skip.")
 
         let again = try XCTUnwrap(StrengthWorkoutStore.reconcileEMOMWindows(
             exercises: &logs, groupID: id,
@@ -212,6 +214,13 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         )
         XCTAssertTrue(restored[1].sets[0].isResolved)
         XCTAssertFalse(restored[1].sets[0].isCompleted)
+        XCTAssertEqual(restored[1].auditedSkippedSets, 1)
+
+        // Historical checkpoints with a larger already-persisted counter
+        // must remain readable and must not add the timestamp a second time.
+        var older = restored[1]
+        older.skippedPlannedSetCount = 2
+        XCTAssertEqual(older.auditedSkippedSets, 2)
     }
 
     func testGroupedStrengthStationTransitionIsSeparateFromRoundPause() {
@@ -338,4 +347,44 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
             in: [base, unrelatedRest, second]
         ).count, 3)
     }
+
+    func testOneStationEMOMSkipCannotBeRepeatedOrLoggedAsCompleted() throws {
+        let id = UUID()
+        var block = exercise(8, weight: 20, sets: 1)
+        block.groupID = id
+        block.groupKind = .emom
+        block.groupRounds = 1
+        block.groupClockSeconds = 60
+        var plan = PlannedSession(
+            id: UUID(), title: "EMOM idempotence", kind: .strength,
+            scheduledStart: nil, durationMinutes: 5,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        plan.workoutBlocks = [block]
+        let store = StrengthWorkoutStore()
+        store.start(
+            session: plan, watchSessionID: nil,
+            trackingMode: .advanced, captureDevice: .iPhone
+        )
+        let originalWorkoutID = try XCTUnwrap(store.activeWorkout?.id)
+        let originalSetID = try XCTUnwrap(store.currentSet?.id)
+        XCTAssertEqual(store.currentExercise?.groupStyle, .emom)
+
+        XCTAssertTrue(store.skipCurrentSet())
+        XCTAssertFalse(store.skipCurrentSet(),
+                       "The same skipped minute must not be skipped twice.")
+        store.completeCurrentDraftSet()
+
+        let recorded = try XCTUnwrap(store.activeWorkout)
+        let slot = try XCTUnwrap(recorded.exercises.first?.sets.first)
+        XCTAssertEqual(recorded.id, originalWorkoutID)
+        XCTAssertEqual(slot.id, originalSetID)
+        XCTAssertNil(slot.completedAt)
+        XCTAssertNotNil(slot.skippedAt)
+        XCTAssertEqual(recorded.totalCompletedSets, 0)
+        XCTAssertEqual(recorded.exercises.first?.auditedSkippedSets, 1)
+    }
+
+
 }

@@ -83,6 +83,7 @@ on:
       - Tests/ATHLTHWorkoutSessionFoundationTests.swift
       - Tests/ATHLTHLiveWorkoutBottomModeTests.swift
       - Tests/ATHLTHStrengthAdvancedLiveSetTests.swift
+      - Tests/ATHLTHStrengthGroupedSetTests.swift
       - Tests/StrengthTimedSetCountdownTests.swift
       - Tests/ATHLTHHybridStrengthSessionTests.swift
       - Tests/ATHLTHWorkoutHealthKitContinuityPolicyTests.swift
@@ -231,6 +232,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHWorkoutSessionFoundationTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutBottomModeTests \
             -only-testing:ATHLTHTests/ATHLTHStrengthAdvancedLiveSetTests \
+            -only-testing:ATHLTHTests/ATHLTHStrengthGroupedSetTests \
             -only-testing:ATHLTHTests/WorkoutLaunchHardeningTests \
             -only-testing:ATHLTHTests/StrengthTimedSetCountdownTests \
             -only-testing:ATHLTHTests/ATHLTHHybridStrengthSessionTests \

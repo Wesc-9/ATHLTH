@@ -267,3 +267,18 @@ som ferdige før egne faser og reelle tester er fullført.
   eksakt settid og bevaring av økt-/øvelse-/sett-ID-er. Full fase 3
   omfatter også gjennomgang av gruppemodus og overgangskontroller før
   endelig godkjenning.
+
+- **Fase 3 / gruppemodus – EMOM-sikring:** Et tidsvindu som er hoppet
+  over beholdes i den opprinnelige sett-ID-en med `skippedAt`. For
+  historiske EMOM-sjekkpunkter er `skippedPlannedSetCount` en
+  speilregistrering av samme hendelse, derfor brukes maksimum av de to
+  tellerne i rapporteringen – ikke summen. Dette hindrer at en manglende
+  stasjon telles dobbelt.
+- Eksisterende `completeCurrentSet` og `skipCurrentSet` avviser nå et
+  allerede **løst** sett (`isResolved`), både ved dobbeltrykking og
+  gjentatte/sene Watch-kommandoer. Å hoppe over et EMOM-sett stopper den
+  lokale innsatstimeren uten å fullføre eller opprette et nytt sett.
+- Regresjonstester kontrollerer at gjentatt skip og forsøk på å fullføre
+  et utelatt EMOM-sett ikke endrer økt-ID, sett-ID eller volum, at den
+  historiske telleren overlever JSON-rundtur, og at gruppemodusene fortsatt
+  fungerer gjennom felles styrkemotor.
