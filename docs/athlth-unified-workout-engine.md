@@ -1081,3 +1081,56 @@ release-godkjent før dette er bekreftet.
 inn i release-grenen, men fase 5 kan ikke kalles verifisert
 eller release-godkjent før grønn CI og fysiske lydtester.
 Ingen TestFlight-opplasting uten uttrykkelig godkjenning.
+
+### Fase 6 – felles Live Activity, widget og Dynamic Island (19.11.2026)
+
+**Samlet kodeleveranse på `release/v2.2.5`:**
+
+- Alle overflatene leser fortsatt den eksisterende, autoritative
+  `WatchWorkoutLiveSnapshot`-projeksjonen. `ATHLTHSurfaceRuntimeObserver`
+  binder nå oppdateringer fra starten/slutten av iPhone-løp/gåing,
+  intervalloverganger, innendørs økter uten GPS-punkter, endret styrkesett
+  og hvile til **samme oppdateringsvei** for App Group-widgets og ActivityKit.
+  Ingen ny HealthKit-skriver eller separat øktlogg er introdusert.
+- iPhone-eide styrkeøkter projiseres direkte fra det eksisterende
+  `StrengthWorkoutStore.activeWorkout` og `activeSessionState`:
+  stabil økt-ID, øktstart, korrekt aktiv/pauset klokke, øvelsesnavn, sett,
+  registrert belastning, hvilefrist og tidsstyrt sett. Watch-eide økter
+  får fortsatt sensordata fra Watch og settdetaljer fra riktig styrkelogg.
+  Slik får også lokal styrke samme Live Activity/Widget uten dobbelt opptak.
+- Ny `ATHLTHSurfaceWorkoutOrdering` bruker øktidentitet og
+  `capturedAt` som monotont vannmerke. Forsinkede pakker kan ikke
+  overskrive nyere widget-data, eldre økt kan ikke erstatte en senere
+  økt, og en kontoavgrenset **terminalmarkør** hindrer at en avsluttet
+  økt vises som aktiv igjen – også etter omstart av iPhone-appen.
+  Eldre App Group-snapshots dekodes uten terminalfelt.
+- En iPad får bare oppdatere sin godkjente **lesevisning**. På iPhone
+  kan ikke en remote widget-pakke overstyre det lokale opptaket.
+  iPad kan reetablere sin widget etter app-omstart og fjerne gamle
+  fjernvisninger uten å skrive til HealthKit.
+- `ATHLTHLiveActivityDisplayPolicy.runningTransitionKey` markerer
+  fase-/drag-/pausebytter som umiddelbare ActivityKit-oppdateringer.
+  Måleverdier og sekundvis tidsendring ligger **ikke** i nøkkelen;
+  native systemtimere fortsetter å telle mens sensortelemetri
+  er begrenset. Styrkesett/øvelse/hvilefrist oppdaterer direkte.
+- ActivityKit bruker kildens tidsstempel som `staleDate`, ikke
+  tidspunktet når en forsinket telefonpakke endelig mottas.
+  Gamle aktive pakker kan ikke nyopprette en Live Activity, mens en
+  forsinket terminalkvittering fortsatt kan avslutte riktig økt.
+  Asynkron ActivityKit-nedstenging stoppes ved nyere sync-revisjon.
+- WidgetExtension skjuler også ved lasting et aktivt cache-element
+  som allerede har terminalmarkør, viser korrekt pauset status og
+  unngår ugyldig nedtellingsintervall når hvilefristen er utløpt.
+  Widgets for iPhone/iPad/låseskjerm deler eksisterende klokkegrunnlag.
+
+**Lagt til regresjonstester for:** same-session klokkevannmerke,
+bytte av sport og ny økt, stoppmarkør og app-omstart, gamle JSON-data,
+framtidige/ugyldige tidspunkt, drag-/pauseovergang, langt forsinket
+Watch-snapshot og lokal iPhone-styrke etter avsluttet Watch-økt.
+
+**Ikke godkjent for distribusjon:** Brukeren har utsatt fysisk testing.
+Siste-commit iOS/widget/watchOS-build, relevante XCTest-suiter og
+fysisk kontroll av låseskjerm/Dynamic Island, skjermlås, fem minutters
+tredemølle uten GPS, gjenoppkobling og iPad-samtykke gjenstår.
+Ingen TestFlight-opplasting. Fase 6 er implementert i kildekode,
+men ikke release-/fysisk godkjent.
