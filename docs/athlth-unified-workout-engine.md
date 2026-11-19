@@ -1516,3 +1516,16 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   Pausede og avsluttede drag viser ikke et falskt GPS-framdriftstall.
 - Faktisk sensor-/HealthKit-validering må fortsatt gjennomføres på en
   fysisk Apple Watch før funksjonen kan erklæres ferdig.
+
+### Fase 8 – korrupt Watch-checkpoint og automatisk GPS-pause (19.11.2026)
+
+- Gjenopprettede distanseankre med negativ/ikke-endelig baseline,
+  ugyldig tidsstempel eller ugyldig GPS-mål kan ikke vise fremdrift,
+  gi fullføringssignal eller produsere settvarighet.
+- Nye ankere krever gyldig øvelses-/settindeks og en aktiv løpefase.
+  Bytte til en annen trening, stasjon eller øvelse gjenbruker aldri ankeret.
+- GPS-lagring, pace, fremdrift og automatisk fullføring av
+  distansedrag er sperret under automatisk pause. Automatisk
+  distansefullføring krever utendørs Watch-eid styrkehybrid.
+- Nye XCTest-regresjoner er lagt til. Fysiske Watch-/HealthKit-/GPS-
+  tester og full samme-commit CI kreves fortsatt før release-godkjenning.

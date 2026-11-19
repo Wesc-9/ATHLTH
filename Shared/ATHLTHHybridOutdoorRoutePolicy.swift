@@ -9,9 +9,11 @@ enum ATHLTHHybridOutdoorRoutePolicy {
         isEmbeddedRunningInterval: Bool,
         isResting: Bool = false,
         isExerciseComplete: Bool = false,
-        isWorkoutRunning: Bool = true
+        isWorkoutRunning: Bool = true,
+        isAutomaticallyPaused: Bool = false
     ) -> Bool {
         isOutdoor && isEmbeddedRunningInterval &&
-            !isResting && !isExerciseComplete && isWorkoutRunning
+            !isResting && !isExerciseComplete && isWorkoutRunning &&
+            !isAutomaticallyPaused
     }
 }

@@ -36,4 +36,15 @@ final class ATHLTHHybridOutdoorRoutePolicyTests: XCTestCase {
             isWorkoutRunning: true
         ))
     }
+
+    func testAutomaticPauseNeverCollectsHybridGPSSamples() {
+        XCTAssertFalse(ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
+            isOutdoor: true, isEmbeddedRunningInterval: true,
+            isWorkoutRunning: true, isAutomaticallyPaused: true
+        ))
+        XCTAssertTrue(ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
+            isOutdoor: true, isEmbeddedRunningInterval: true,
+            isWorkoutRunning: true, isAutomaticallyPaused: false
+        ))
+    }
 }

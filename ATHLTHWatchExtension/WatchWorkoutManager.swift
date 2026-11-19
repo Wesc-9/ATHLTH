@@ -982,7 +982,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                       snapshot.isEmbeddedRunningInterval == true,
                   isResting: snapshot.isResting,
                   isExerciseComplete: snapshot.currentExerciseComplete,
-                  isWorkoutRunning: state == .running
+                  isWorkoutRunning: state == .running,
+                  isAutomaticallyPaused: automaticPauseActive
               )
         else { return nil }
         return anchor.measuredProgress(totalMeters: distanceMeters)
@@ -4631,10 +4632,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func advanceEmbeddedHybridIntervalIfNeeded(at date: Date) {
         if let snapshot = strengthSession,
            snapshot.embeddedRunningTargetDistanceMeters != nil {
-            guard state == .running,
+            guard kind == .strength,
+                  ATHLTHHybridOutdoorRoutePolicy.mayCaptureStrengthRoute(
+                      isOutdoor: usesOutdoorGPS,
+                      isEmbeddedRunningInterval:
+                          snapshot.isEmbeddedRunningInterval == true,
+                      isResting: snapshot.isResting,
+                      isExerciseComplete: snapshot.currentExerciseComplete,
+                      isWorkoutRunning: state == .running,
+                      isAutomaticallyPaused: automaticPauseActive
+                  ),
                   snapshot.inputMode != .iPhone,
-                  snapshot.isEmbeddedRunningInterval == true,
-                  !snapshot.isResting, !snapshot.currentExerciseComplete,
                   snapshot.setIndex >= 0, snapshot.setIndex < snapshot.setCount,
                   let watchStartedAt = startedAt,
                   let plannedStartedAt = snapshot.startedAt,
@@ -6022,7 +6030,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                        isResting: strengthSession?.isResting == true,
                        isExerciseComplete:
                            strengthSession?.currentExerciseComplete == true,
-                       isWorkoutRunning: state == .running
+                       isWorkoutRunning: state == .running,
+                       isAutomaticallyPaused: automaticPauseActive
                    ))),
               usesOutdoorGPS,
               ATHLTHCoachSensorFreshness.isFresh(
@@ -9946,7 +9955,8 @@ private extension WatchWorkoutManager {
                 isResting: strengthSession?.isResting == true,
                 isExerciseComplete:
                     strengthSession?.currentExerciseComplete == true,
-                isWorkoutRunning: state == .running
+                isWorkoutRunning: state == .running,
+                isAutomaticallyPaused: automaticPauseActive
             ) else { return }
         }
 
@@ -10147,7 +10157,8 @@ private extension WatchWorkoutManager {
                      isResting: strengthSession?.isResting == true,
                      isExerciseComplete:
                          strengthSession?.currentExerciseComplete == true,
-                     isWorkoutRunning: state == .running
+                     isWorkoutRunning: state == .running,
+                     isAutomaticallyPaused: automaticPauseActive
                  )))
         else {
             return
