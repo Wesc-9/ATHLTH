@@ -132,6 +132,32 @@ enum ATHLTHStrengthWatchCommandIdentityPolicy {
     }
 }
 
+
+ 
+/// Idempotent replay per workout across multiple batches in one app session.
+/// The WatchConnectivity receiver persists its own handled UUID journal
+/// across restarts; this local gate protects repeated replay calls.
+struct ATHLTHStrengthWatchReplayDeduplication {
+    private var workoutID: UUID?
+    private var recentIDs: Set<UUID> = []
+    private var orderedIDs: [UUID] = []
+
+    mutating func admit(commandID: UUID, workoutID: UUID) -> Bool {
+        if self.workoutID != workoutID {
+            self.workoutID = workoutID
+            recentIDs.removeAll()
+            orderedIDs.removeAll()
+        }
+        guard recentIDs.insert(commandID).inserted else { return false }
+        orderedIDs.append(commandID)
+        if orderedIDs.count > 2_048 {
+            orderedIDs = Array(orderedIDs.suffix(1_024))
+            recentIDs = Set(orderedIDs)
+        }
+        return true
+    }
+}
+
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { scheduleCheckpointPersist() } }
@@ -210,6 +236,8 @@ final class StrengthWorkoutStore: ObservableObject {
     private var checkpointSaveTask: Task<Void, Never>?
     private var cardioWatchCaptures: [UUID: StrengthWatchCardioCapture] = [:]
     private var watchCaptureNeedsBaseline = Set<UUID>()
+    private var offlineWatchReplayDeduplication =
+        ATHLTHStrengthWatchReplayDeduplication()
     private var lastCardioWatchCheckpointAt: Date = .distantPast
     @Published private(set) var hasLegacyHistory = false
 
@@ -2380,6 +2408,9 @@ final class StrengthWorkoutStore: ObservableObject {
             guard let workout = activeWorkout else { return }
             guard ATHLTHStrengthWatchCommandIdentityPolicy.belongsToActiveWorkout(
                 command, workoutID: workout.id
+            ) else { continue }
+            guard offlineWatchReplayDeduplication.admit(
+                commandID: command.id, workoutID: workout.id
             ) else { continue }
 
             switch command.kind {

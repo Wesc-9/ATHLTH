@@ -216,4 +216,39 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         ))
     }
 
+
+    @MainActor
+    func testPrivateStrengthMirrorCountsSkippedEMOMOnlyOnce() throws {
+        let id = UUID()
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Squat",
+            exerciseSlug: "squat", distanceMeters: nil,
+            repetitions: 8, durationSeconds: nil,
+            targetWeightKilograms: 20, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        block.groupID = id
+        block.groupKind = .emom
+        block.groupRounds = 1
+        block.groupClockSeconds = 60
+        var plan = PlannedSession(
+            id: UUID(), title: "iPad mirror", kind: .strength,
+            scheduledStart: nil, durationMinutes: 5,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        plan.workoutBlocks = [block]
+        let store = StrengthWorkoutStore()
+        store.start(session: plan, watchSessionID: nil)
+        XCTAssertTrue(store.skipCurrentSet())
+        let snapshot = try XCTUnwrap(
+            ATHLTHPrivateLiveStrengthSnapshot.make(from: store)
+        )
+        XCTAssertEqual(snapshot.totalPlannedSets, 1)
+        XCTAssertEqual(snapshot.skippedSets, 1)
+        XCTAssertEqual(snapshot.exercises.first?.plannedSets, 1)
+        XCTAssertEqual(snapshot.exercises.first?.skippedSets, 1)
+        XCTAssertEqual(snapshot.completedSets, 0)
+    }
+
 }

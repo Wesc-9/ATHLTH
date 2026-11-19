@@ -355,3 +355,12 @@ som ferdige før egne faser og reelle tester er fullført.
   er første sikkerhetsdel av fase 4, **ikke** en påstand om ferdig
   end-to-end iPad-/Watch-synk, fysisk test eller global
   HealthKit-koordinator på tvers av alle idretter.
+
+- **Fase 4 / ytterligere idempotens:** En egen, øktavgrenset
+  replay-UUID-vakt hindrer at samme offline Watch-kommando kjøres
+  på nytt i en senere batch mens appen er åpen; den nullstilles når
+  økt-ID-en skifter. Mottakerens eksisterende vedvarende journal
+  for håndterte UUID-er beholdes også lenger for langsom levering.
+  Begge har begrenset størrelse og endrer ikke HealthKit-opptaket.
+- Privat, lesbar iPad-styrkestatus teller beholdte gruppesett med
+  `skippedAt` nøyaktig én gang, både totalt og per øvelse.

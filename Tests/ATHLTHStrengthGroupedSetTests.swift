@@ -738,6 +738,7 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         store.replayOfflineWatchCommands([
             valid, valid, unscoped, make(UUID(), seconds: 600)
         ])
+        store.replayOfflineWatchCommands([valid]) // second batch, same UUID
         XCTAssertEqual(store.restEndsAt, initialDeadline.addingTimeInterval(30))
         XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 0)
         XCTAssertFalse(ATHLTHStrengthWatchCommandIdentityPolicy.belongsToActiveWorkout(

@@ -87,6 +87,7 @@ on:
       - Tests/ATHLTHiPadLiveWorkoutTests.swift
       - ATHLTH/Surfaces/ATHLTHCrossDeviceWorkoutStore.swift
       - ATHLTH/Surfaces/ATHLTHLiveViewRequest.swift
+      - ATHLTH/Studio/ATHLTHPrivateLiveStrengthStatusStore.swift
       - Tests/StrengthTimedSetCountdownTests.swift
       - Tests/ATHLTHHybridStrengthSessionTests.swift
       - Tests/ATHLTHWorkoutHealthKitContinuityPolicyTests.swift

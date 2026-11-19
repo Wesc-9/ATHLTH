@@ -1002,11 +1002,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 .append(id)
 
             if handledStrengthCommandIDs
-                .count > 256 {
+                .count > 2_048 {
                 handledStrengthCommandIDs =
                     Array(
                         handledStrengthCommandIDs
-                            .suffix(128)
+                            .suffix(1_024)
                     )
             }
         }

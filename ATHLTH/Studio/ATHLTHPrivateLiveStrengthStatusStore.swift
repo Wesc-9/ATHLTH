@@ -56,10 +56,12 @@ struct ATHLTHPrivateLiveStrengthSnapshot: Codable, Hashable, Identifiable {
             currentSetCount: store.currentExercise?.sets.count ?? 0,
             completedSets: workout.totalCompletedSets,
             totalPlannedSets: workout.exercises.reduce(0) {
-                $0 + $1.sets.count + ($1.skippedPlannedSetCount ?? 0)
+                let retained = $1.sets.filter { $0.skippedAt != nil }.count
+                return $0 + $1.sets.count +
+                    max(($1.skippedPlannedSetCount ?? 0) - retained, 0)
             },
             skippedSets: workout.exercises.reduce(0) {
-                $0 + ($1.skippedPlannedSetCount ?? 0)
+                $0 + $1.auditedSkippedSets
             },
             restEndsAtEpoch: store.restEndsAt?.timeIntervalSince1970,
             plannedReps: currentSet?.plannedReps,
@@ -72,9 +74,11 @@ struct ATHLTHPrivateLiveStrengthSnapshot: Codable, Hashable, Identifiable {
                     id: entry.id,
                     name: String(entry.exercise.name.prefix(120)),
                     completedSets: entry.sets.filter(\.isCompleted).count,
-                    plannedSets: entry.sets.count +
-                        (entry.skippedPlannedSetCount ?? 0),
-                    skippedSets: entry.skippedPlannedSetCount ?? 0,
+                    plannedSets: entry.sets.count + max(
+                        (entry.skippedPlannedSetCount ?? 0) -
+                            entry.sets.filter { $0.skippedAt != nil }.count, 0
+                    ),
+                    skippedSets: entry.auditedSkippedSets,
                     isCurrent: index == store.currentExerciseIndex
                 )
             }
