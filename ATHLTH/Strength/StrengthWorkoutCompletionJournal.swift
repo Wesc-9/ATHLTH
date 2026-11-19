@@ -17,9 +17,15 @@ enum StrengthWorkoutCompletionJournal {
     }
 
     static func save(_ workout: StrengthWorkoutLog, userID: UUID) throws {
-        guard workout.endedAt != nil else {
+        guard let endedAt = workout.endedAt,
+              endedAt >= workout.startedAt else {
             throw CocoaError(.fileWriteInvalidFileName)
         }
+        // Preserve the newest completed workout when async finish callbacks
+        // arrive out of order after app suspension or Watch reconnection.
+        if let previous = read(userID: userID),
+           let previousEnd = previous.endedAt,
+           previousEnd > endedAt { return }
         let data = try JSONEncoder().encode(workout)
         let target = try url(userID: userID)
         try FileManager.default.createDirectory(
@@ -38,7 +44,8 @@ enum StrengthWorkoutCompletionJournal {
               let workout = try? JSONDecoder().decode(
                   StrengthWorkoutLog.self, from: data
               ),
-              workout.endedAt != nil else { return nil }
+              let endedAt = workout.endedAt,
+              endedAt >= workout.startedAt else { return nil }
         return workout
     }
 
