@@ -14,27 +14,59 @@ enum ATHLTHSurfaceCoordinator {
     /// The remote activity is presentation-only; the owner device records
     /// the workout. Never start a HealthKit workout on the spectator iPad.
     static func setRemoteWorkout(_ workout: ATHLTHSurfaceWorkoutSnapshot?) {
-        let previous = remoteWorkout
-        remoteWorkout = workout
+        let previousRemote = remoteWorkout
         var shared = ATHLTHSurfaceSharedStore.load()
-        guard shared.activeWorkout == nil ||
-              previous != nil else { return }
+        let previousDisplayed = shared.activeWorkout
+        let now = Date()
+
+        if let workout {
+            // Spectator relay packets are not allowed to overwrite a newer
+            // local workout or resurrect a terminal Watch/iPhone session.
+            guard ATHLTHSurfaceWorkoutOrdering.accepts(
+                incoming: workout,
+                current: previousDisplayed,
+                terminal: shared.lastFinishedWorkout,
+                now: now
+            ) else { return }
+            if let previousDisplayed, let previousRemote,
+               !ATHLTHSurfaceWorkoutOrdering.sameSession(
+                   previousDisplayed, previousRemote
+               ) {
+                return
+            }
+            if previousDisplayed != nil && previousRemote == nil {
+                // Only the owner can replace an existing local presentation.
+                return
+            }
+        } else if let previousDisplayed {
+            // Removing a remote relay must not erase a newer local session.
+            guard let previousRemote,
+                  ATHLTHSurfaceWorkoutOrdering.sameSession(
+                      previousDisplayed, previousRemote
+                  ) else {
+                remoteWorkout = nil
+                return
+            }
+        }
+
+        remoteWorkout = workout
         shared.activeWorkout = workout
-        shared.updatedAt = Date()
+        shared.updatedAt = now
         ATHLTHSurfaceSharedStore.save(shared)
-        let changedSession = previous?.startedAt != workout?.startedAt ||
-            previous?.state != workout?.state ||
-            previous?.currentStep != workout?.currentStep ||
-            previous?.runningIntervalOrdinal != workout?.runningIntervalOrdinal ||
-            previous?.runningInRecovery != workout?.runningInRecovery ||
-            (previous == nil) != (workout == nil)
+
+        let changedSession = previousDisplayed?.startedAt != workout?.startedAt ||
+            previousDisplayed?.state != workout?.state ||
+            previousDisplayed?.currentStep != workout?.currentStep ||
+            previousDisplayed?.runningIntervalOrdinal != workout?.runningIntervalOrdinal ||
+            previousDisplayed?.runningInRecovery != workout?.runningInRecovery ||
+            (previousDisplayed == nil) != (workout == nil)
         let stale = lastRemoteWidgetReloadAt.map {
-            Date().timeIntervalSince($0) >= 20
+            now.timeIntervalSince($0) >= 20
         } ?? true
         if changedSession || stale {
             WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHHomeWidget")
             WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHLockScreenWidget")
-            lastRemoteWidgetReloadAt = Date()
+            lastRemoteWidgetReloadAt = now
         }
     }
 
@@ -88,6 +120,24 @@ enum ATHLTHSurfaceCoordinator {
 
         let goal = goals.primaryGoal
 
+        let previous = ATHLTHSurfaceSharedStore.load()
+        let orderedWorkout: ATHLTHSurfaceWorkoutSnapshot?
+        if let activeWorkout {
+            if ATHLTHSurfaceWorkoutOrdering.accepts(
+                incoming: activeWorkout,
+                current: previous.activeWorkout,
+                terminal: previous.lastFinishedWorkout
+            ) {
+                orderedWorkout = activeWorkout
+            } else {
+                // An old capture must not overwrite a newer persisted
+                // widget status or reopen an already ended recording.
+                orderedWorkout = previous.activeWorkout
+            }
+        } else {
+            orderedWorkout = nil
+        }
+
         let surfaceSnapshot = ATHLTHSurfaceSnapshot(
             recoveryScore: health.recovery.score,
             recoveryState: health.recovery.state.title,
@@ -101,12 +151,10 @@ enum ATHLTHSurfaceCoordinator {
                     latestBodyWeightKilograms: health.personalDetails.weightKilograms
                 )
             },
-            activeWorkout: activeWorkout,
+            activeWorkout: orderedWorkout,
+            lastFinishedWorkout: previous.lastFinishedWorkout,
             updatedAt: Date()
         )
-
-        let previous =
-            ATHLTHSurfaceSharedStore.load()
 
         let workoutTransition =
             previous.activeWorkout?.state != surfaceSnapshot.activeWorkout?.state ||
@@ -201,32 +249,51 @@ enum ATHLTHSurfaceCoordinator {
         matching finished: WatchWorkoutLiveSnapshot
     ) {
         var stored = ATHLTHSurfaceSharedStore.load()
-        guard let active = stored.activeWorkout else { return }
 
-        // Never clear a new iPhone or Watch workout just because a delayed
-        // completion receipt from a previous Watch session arrived.
-        let storedIdentity = ATHLTHLiveActivitySessionIdentity(
-            systemImage: active.systemImage,
-            startedAt: active.startedAt,
-            fallbackTitle: active.title
-        )
         let finishedIdentity = ATHLTHLiveActivitySessionIdentity(
             systemImage: finished.kind.systemImage,
             startedAt: finished.startedAt,
             fallbackTitle: finished.kind.title
         )
-        guard storedIdentity.matches(finishedIdentity) else { return }
+        if let active = stored.activeWorkout {
+            let storedIdentity = ATHLTHLiveActivitySessionIdentity(
+                systemImage: active.systemImage,
+                startedAt: active.startedAt,
+                fallbackTitle: active.title
+            )
+            // An old Watch completion cannot erase a new phone session.
+            guard storedIdentity.matches(finishedIdentity) else { return }
+        }
 
+        let tombstoneSource = stored.activeWorkout ??
+            ATHLTHSurfaceWorkoutSnapshot(
+                title: finished.kind.title,
+                systemImage: finished.kind.systemImage,
+                state: finished.state.rawValue,
+                startedAt: finished.startedAt,
+                elapsedTime: finished.elapsedTime,
+                distanceMeters: finished.distanceMeters,
+                heartRate: finished.heartRate,
+                updatedAt: finished.capturedAt
+            )
+        let closedAt = finished.capturedAt
+        guard closedAt.timeIntervalSince1970.isFinite else { return }
+        if let previousClosed = stored.lastFinishedWorkout,
+           previousClosed.finishedAt > closedAt {
+            // Never replace a newer terminal watermark with a late result.
+            return
+        }
+
+        stored.lastFinishedWorkout =
+            ATHLTHSurfaceWorkoutTerminalMarker(
+                workout: tombstoneSource, finishedAt: closedAt
+            )
         stored.activeWorkout = nil
         stored.updatedAt = Date()
         ATHLTHSurfaceSharedStore.save(stored)
         lastSnapshotWriteAt = Date()
-        WidgetCenter.shared.reloadTimelines(
-            ofKind: "ATHLTHHomeWidget"
-        )
-        WidgetCenter.shared.reloadTimelines(
-            ofKind: "ATHLTHLockScreenWidget"
-        )
+        WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHHomeWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHLockScreenWidget")
         lastWidgetReloadAt = Date()
     }
 
