@@ -162,6 +162,21 @@ private final class HealthRouteQueryAccumulator:
      }
  }
 
+/// Single-process admission guard for an async HealthKit write. A second
+/// completion callback cannot create a duplicate workout while the first
+/// builder is active. The sync identifier also remains stable across launches.
+struct ATHLTHManualStrengthWorkoutWriteGate {
+    private var pending: Set<UUID> = []
+
+    mutating func reserve(_ workoutID: UUID) -> Bool {
+        pending.insert(workoutID).inserted
+    }
+
+    mutating func release(_ workoutID: UUID) {
+        pending.remove(workoutID)
+    }
+}
+
 @MainActor
 final class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
@@ -213,6 +228,7 @@ final class HealthKitManager: ObservableObject {
 
         private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
+    private var manualStrengthWrites = ATHLTHManualStrengthWorkoutWriteGate()
     private var workoutObjectCacheOrder: [UUID] = []
     private static let workoutObjectCacheLimit = 128
 
@@ -1498,6 +1514,43 @@ final class HealthKitManager: ObservableObject {
             ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
     }
 
+    /// Return an existing workout if the same ATHLTH strength session was
+    /// already saved. This also recovers a HealthKit save whose iPhone
+    /// history-link callback was interrupted by process termination.
+    private func existingManualStrengthWorkout(
+        syncIdentifier: String
+    ) async throws -> HKWorkout? {
+        if let cached = workoutObjects.values.first(where: {
+            ($0.metadata?[HKMetadataKeySyncIdentifier] as? String)
+                == syncIdentifier
+        }) {
+            return cached
+        }
+        let predicate = HKQuery.predicateForObjects(
+            withMetadataKey: HKMetadataKeySyncIdentifier,
+            operatorType: .equalTo,
+            value: syncIdentifier
+        )
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<HKWorkout?, Error>) in
+            let query = HKSampleQuery(
+                sampleType: HKObjectType.workoutType(),
+                predicate: predicate,
+                limit: 1,
+                sortDescriptors: nil
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(
+                        returning: samples?.first as? HKWorkout
+                    )
+                }
+            }
+            healthStore.execute(query)
+        }
+    }
+
     func saveManualStrengthWorkout(
         startDate: Date,
         endDate: Date,
@@ -1507,9 +1560,19 @@ final class HealthKitManager: ObservableObject {
         guard integrationEnabled,
               healthDataAvailable,
               canWriteWorkouts,
-              endDate > startDate
-        else {
-            return nil
+              endDate > startDate,
+              manualStrengthWrites.reserve(externalID)
+        else { return nil }
+        defer { manualStrengthWrites.release(externalID) }
+
+        let syncIdentifier = "athlth-strength-" + externalID.uuidString
+        // Query by stable HealthKit sync identity before constructing a
+        // second workout, including on the next launch after a crash.
+        if let existing = try? await existingManualStrengthWorkout(
+            syncIdentifier: syncIdentifier
+        ) {
+            cacheWorkoutObject(existing)
+            return existing.uuid
         }
 
         let configuration = HKWorkoutConfiguration()
@@ -1526,7 +1589,7 @@ final class HealthKitManager: ObservableObject {
             try await builder.beginCollection(at: startDate)
             try await builder.addMetadata([
                 HKMetadataKeyExternalUUID: externalID.uuidString,
-                HKMetadataKeySyncIdentifier: "athlth-strength-" + externalID.uuidString,
+                HKMetadataKeySyncIdentifier: syncIdentifier,
                 HKMetadataKeySyncVersion: 1
             ])
 

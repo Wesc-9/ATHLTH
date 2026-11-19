@@ -45,6 +45,22 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertFalse(accepted(expiry: -1))
     }
 
+    func testConcurrentManualStrengthHealthWritesHaveOneOwner() {
+        let workoutID = UUID()
+        let otherWorkoutID = UUID()
+        var gate = ATHLTHManualStrengthWorkoutWriteGate()
+        XCTAssertTrue(gate.reserve(workoutID))
+        XCTAssertFalse(gate.reserve(workoutID))
+        XCTAssertTrue(gate.reserve(otherWorkoutID))
+        gate.release(workoutID)
+        XCTAssertTrue(gate.reserve(workoutID),
+                      "A failed first write may be retried")
+        XCTAssertFalse(gate.reserve(workoutID))
+        gate.release(otherWorkoutID)
+        gate.release(workoutID)
+        XCTAssertTrue(gate.reserve(workoutID))
+    }
+
     func testSharedActiveClockMatchesExistingRunningElapsed() {
         var workout = phone()
         let later = start.addingTimeInterval(90)

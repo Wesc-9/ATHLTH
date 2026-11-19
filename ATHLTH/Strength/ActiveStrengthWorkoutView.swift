@@ -1845,7 +1845,6 @@ struct ActiveStrengthWorkoutView: View {
 
         case .iPhone:
             let endDate = Date()
-            let ownerID = appSession.profile.userID
 
             guard appSession.signedIn,
                   strength.activeWorkout?.id == workout.id
@@ -1871,31 +1870,9 @@ struct ActiveStrengthWorkoutView: View {
             appSession.endTrainingStatus()
             finishInProgress = false
             dismiss()
-
-            // Create the HealthKit workout asynchronously and attach its
-            // identifier to this exact saved session if still signed into
-            // the same account. The local log survives a temporary failure.
-            let healthService = health
-            let historyStore = strength
-            // Capture the durable post-finish pause windows before any
-            // asynchronous HealthKit operation or account change.
-            let recoveredPauses =
-                strength.completedWorkout?.id == workout.id
-                    ? (strength.completedWorkout?.recoveryPauseIntervals ?? [])
-                    : []
-            Task { @MainActor in
-                let uuid = await healthService.saveManualStrengthWorkout(
-                    startDate: workout.startedAt,
-                    endDate: endDate,
-                    externalID: workout.id,
-                    recoveryPauseIntervals: recoveredPauses
-                )
-                if let uuid {
-                    historyStore.attachFinishedWorkoutHealthKitUUID(
-                        uuid, workoutID: workout.id, ownerID: ownerID
-                    )
-                }
-            }
+            // The app-level completion observer creates exactly one
+            // HealthKit workout and backfills its UUID after durable save.
+            // This view deliberately does not start another HKWorkoutBuilder.
         }
     }
 

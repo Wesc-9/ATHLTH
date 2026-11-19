@@ -760,3 +760,25 @@ som ferdige før egne faser og reelle tester er fullført.
   økt og aktiv Watch-status som ikke bevis for slutt.
 - Tester dekker gammel versus ny status og fullført økt.
   Fortsatt nødvendig med reell iPhone/Watch-reconnect-test.
+
+### Fase 7 – fjern dobbelt HealthKit-skriving fra styrke-fullføring
+
+- Det ble identifisert **to samtidige** manuelle HealthKit-skriveveier
+  ved fullføring av iPhone-styrke: `ActiveStrengthWorkoutView` og
+  `ATHLTHApp.handleStrengthWorkoutCompletion`. UI-veien er fjernet;
+  den sentrale fullføringshåndteringen er nå eneansvarlig for
+  HealthKit-registreringen. Én eksisterende `StrengthWorkoutLog`
+  og samme stabile økt-ID beholdes.
+- Central writer viderefører dokumenterte `recoveryPauseIntervals`
+  til `HealthKitManager` og knytter den returnerte HealthKit-UUID
+  atomisk til samme fullførte logg og riktig innlogget konto.
+- `onChange` observerer nå **fullført økt-ID**, ikke hele objektet,
+  slik at etterleverte puls-/HealthKit-målinger ikke starter ny
+  fullføringsflyt, nye utfordringer, trofeer eller sosiale sideeffekter.
+- `HealthKitManager` beskytter overlappende asynkrone skrivinger
+  for samme økt og søker etter det eksisterende synkroniserte
+  HealthKit-opptaket før et nytt bygges. Stabilt
+  `HKMetadataKeySyncIdentifier` støtter gjenbruk etter appavbrudd.
+- Test dekker gjentatte skrivetillatelsesforespørsler, parallell
+  skriving for en annen økt og ny prøve etter ferdig skriv.
+  Watch/HealthKit må fortsatt testes på faktiske enheter.

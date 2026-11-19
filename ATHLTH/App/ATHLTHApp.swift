@@ -2160,8 +2160,12 @@ struct AppRootView: View {
             }
             handlePhoneWorkoutCompletion(workout)
         }
-        .onChange(of: strengthWorkout.completedWorkout) { _, workout in
-            guard let workout else { return }
+        // A late HealthKit UUID or Watch metric updates the same result;
+        // those changes must NOT replay completion impacts or publish twice.
+        .onChange(of: strengthWorkout.completedWorkout?.id) { _, newID in
+            guard let newID,
+                  let workout = strengthWorkout.completedWorkout,
+                  workout.id == newID else { return }
             handleStrengthWorkoutCompletion(workout)
         }
         )
@@ -3568,6 +3572,11 @@ struct AppRootView: View {
     private func handleStrengthWorkoutCompletion(
         _ workout: StrengthWorkoutLog
     ) {
+        guard appSession.signedIn,
+              strengthWorkout.isLoaded(for: appSession.profile.userID),
+              workout.isFinished else { return }
+        let completionOwnerID = appSession.profile.userID
+
         if let plannedSessionID = workout.plannedSessionID,
            let endedAt = workout.endedAt, workout.isFinished {
             _ = appSession.recordPlannedWorkoutFinished(
@@ -3617,7 +3626,11 @@ struct AppRootView: View {
                 appSession.profile.displayName
         )
 
-        Task {
+        Task { @MainActor in
+            guard appSession.signedIn,
+                  appSession.profile.userID == completionOwnerID else {
+                return
+            }
             await homeAssistant.sendCompletedWorkout(
                 name: publishable.title,
                 type: publishable.activity.rawValue,
@@ -3642,28 +3655,56 @@ struct AppRootView: View {
                         : "iPhone"
             )
 
+            guard appSession.signedIn,
+                  appSession.profile.userID == completionOwnerID else {
+                return
+            }
             if workout.captureDevice == .appleWatch {
                 await refreshHealthAfterWatchCompletion()
+                guard appSession.signedIn,
+                      appSession.profile.userID == completionOwnerID else {
+                    return
+                }
                 await officialWeeklyChallenges
                     .syncCompletionState(
                         workouts:
                             health.workouts
                     )
                 syncAppleHealthProfileDetailsIfNeeded()
-            } else if workout.captureDevice == .iPhone,
-               workout.healthMetrics
-                    .healthKitWorkoutUUID == nil,
-               let endedAt = workout.endedAt {
-                _ = await health
-                    .saveManualStrengthWorkout(
-                        startDate:
-                            workout.startedAt,
-                        endDate: endedAt,
-                        externalID: workout.id
+            } else if ATHLTHDeviceRole.isIPhone,
+                      workout.captureDevice == .iPhone,
+                      workout.healthMetrics.healthKitWorkoutUUID == nil,
+                      let endedAt = workout.endedAt {
+                // The canonical completion observer is the ONLY phone
+                // writer. The live strength view commits the durable log
+                // and dismisses; it never creates a competing HKWorkout.
+                // The persisted intervals correct genuine phone recovery
+                // downtime without deleting normal between-set rest.
+                let uuid = await health.saveManualStrengthWorkout(
+                    startDate: workout.startedAt,
+                    endDate: endedAt,
+                    externalID: workout.id,
+                    recoveryPauseIntervals: workout.recoveryPauseIntervals ?? []
+                )
+                guard appSession.signedIn,
+                      appSession.profile.userID == completionOwnerID else {
+                    return
+                }
+                if let uuid {
+                    _ = strengthWorkout.attachFinishedWorkoutHealthKitUUID(
+                        uuid, workoutID: workout.id,
+                        ownerID: completionOwnerID
                     )
-                await health.refreshAll()
+                    if !health.shouldDeferAutomaticHealthWork {
+                        await health.refreshAll()
+                    }
+                }
             }
 
+            guard appSession.signedIn,
+                  appSession.profile.userID == completionOwnerID else {
+                return
+            }
             await goals.refreshAutomaticMilestones(
                 health: health,
                 strength: strengthWorkout
