@@ -36,6 +36,25 @@ final class ATHLTHLiveWorkoutSnapshotSelectionTests: XCTestCase {
         XCTAssertEqual(selected.elapsedTime, 325)
     }
 
+    func testNewPhoneStrengthRecordingWinsAfterOldWatchCompletes() throws {
+        let previousWatch = snapshot(
+            kind: .running, elapsed: 600,
+            at: now, state: .completed
+        )
+        let strength = snapshot(
+            kind: .strength, elapsed: 60,
+            at: now.addingTimeInterval(700)
+        )
+        let resolved = try XCTUnwrap(
+            ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                mirroredWatch: previousWatch,
+                phoneWorkout: strength
+            )
+        )
+        XCTAssertEqual(resolved.kind, .strength)
+        XCTAssertEqual(resolved.startedAt, strength.startedAt)
+    }
+
     func testActiveWatchStillOwnsMirroredPresentation() throws {
         let watch = snapshot(kind: .strength, elapsed: 80, at: now)
         let phone = snapshot(
