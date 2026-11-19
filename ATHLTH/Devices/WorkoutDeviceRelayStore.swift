@@ -225,6 +225,13 @@ enum WorkoutDeviceRelayClaimPolicy {
         returnedIDs.count == 1 && returnedIDs[0] == commandID
     }
 
+    /// A claim RPC must return zero or one row. Multiple rows may already
+    /// be claimed on the server; executing only the first would conceal
+    /// the remaining commands and make replay/reconciliation unsafe.
+    static func hasValidClaimBatchSize(_ count: Int) -> Bool {
+        count == 0 || count == 1
+    }
+
     /// A confirmed receipt written after the launch is stronger evidence
     /// than its older pre-launch uncertainty marker. This resolves crashes
     /// between rememberLaunchedCommand and forgetUncertainLaunch.
@@ -831,6 +838,15 @@ final class WorkoutDeviceRelayStore:
                     .execute()
                     .value
 
+        guard WorkoutDeviceRelayClaimPolicy.hasValidClaimBatchSize(
+            rows.count
+        ) else {
+            throw NSError(
+                domain: "ATHLTH.DeviceRelay", code: 5,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Remote start claim returned multiple commands; no workout was started."]
+            )
+        }
         return rows.first
     }
 
