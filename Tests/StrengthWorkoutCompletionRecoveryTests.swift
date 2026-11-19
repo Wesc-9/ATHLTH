@@ -285,8 +285,6 @@ final class StrengthWorkoutCompletionRecoveryTests: XCTestCase {
         var older = first
         older.endedAt = first.startedAt.addingTimeInterval(60)
         var newer = first
-        newer.id = UUID()
-        newer.startedAt = first.startedAt.addingTimeInterval(120)
         newer.endedAt = first.startedAt.addingTimeInterval(180)
         try StrengthWorkoutCompletionJournal.save(newer, userID: owner)
         try StrengthWorkoutCompletionJournal.save(older, userID: owner)
