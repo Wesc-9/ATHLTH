@@ -392,6 +392,7 @@ private final class ATHLTHLiveActivityController {
     private var lastUpdateAt: Date?
     private var lastPhase: WatchWorkoutMirrorState?
     private var lastStrengthPresentationKey: String?
+    private var lastRunningPresentationKey: String?
     private var lastSessionIdentity: ATHLTHLiveActivitySessionIdentity?
     private var lastSourceCapturedAt: Date?
     /// Never re-create an already stopped Watch session from a delayed
@@ -408,7 +409,7 @@ private final class ATHLTHLiveActivityController {
         let revision = syncRevision
 
         guard let snapshot else {
-            await endExistingActivities()
+            await endExistingActivities(revision: revision)
             // A newer workout may have started while ActivityKit was
             // dismissing the previous Live Activity. Do not erase the
             // newer session's controller state after this suspension.
@@ -416,6 +417,7 @@ private final class ATHLTHLiveActivityController {
             lastPhase = nil
             lastUpdateAt = nil
             lastStrengthPresentationKey = nil
+            lastRunningPresentationKey = nil
             lastSessionIdentity = nil
             lastSourceCapturedAt = nil
             return
@@ -431,11 +433,12 @@ private final class ATHLTHLiveActivityController {
             ATHLTHLiveWorkoutPreferencesStore.load()
 
         if !surfaceConfiguration.dynamicIslandEnabled {
-            await endExistingActivities()
+            await endExistingActivities(revision: revision)
             guard revision == syncRevision else { return }
             lastPhase = nil
             lastUpdateAt = nil
             lastStrengthPresentationKey = nil
+            lastRunningPresentationKey = nil
             lastSessionIdentity = nil
             lastSourceCapturedAt = nil
             return
@@ -484,6 +487,7 @@ private final class ATHLTHLiveActivityController {
             lastUpdateAt = nil
             lastPhase = nil
             lastStrengthPresentationKey = nil
+            lastRunningPresentationKey = nil
             lastSourceCapturedAt = nil
         }
         // A newer sample wins before ActivityKit awaits. Even when pulse
@@ -612,6 +616,24 @@ private final class ATHLTHLiveActivityController {
             : nil
         let strengthChanged =
             lastStrengthPresentationKey != strengthPresentationKey
+        // A running step transition is an immediate UI change, not another
+        // five-second heart-rate sample. The native countdown continues
+        // between captures, but the next step must appear immediately.
+        let runningPresentationKey: String? =
+            snapshot.kind == .running || snapshot.kind == .walking
+            ? [
+                String(snapshot.runningStepIndex ?? -1),
+                snapshot.runningStepTitle ?? "",
+                snapshot.runningNextStepTitle ?? "",
+                String(snapshot.runningIntervalOrdinal ?? -1),
+                String(snapshot.runningIntervalTotal ?? -1),
+                String(snapshot.runningInRecovery ?? false),
+                String(snapshot.runningStepCount ?? -1),
+                String(snapshot.runningStepRemainingMeters ?? -1)
+              ].joined(separator: "|")
+            : nil
+        let runningChanged =
+            lastRunningPresentationKey != runningPresentationKey
         let updateIsDue =
             lastUpdateAt.map {
                 Date().timeIntervalSince($0) >= 5
@@ -621,6 +643,7 @@ private final class ATHLTHLiveActivityController {
         // delay a completed set, change of exercise or new rest countdown.
         if !phaseChanged &&
             !strengthChanged &&
+            !runningChanged &&
             !updateIsDue &&
             !isTerminal {
             return
@@ -628,6 +651,7 @@ private final class ATHLTHLiveActivityController {
 
         lastPhase = snapshot.state
         lastStrengthPresentationKey = strengthPresentationKey
+        lastRunningPresentationKey = runningPresentationKey
         lastUpdateAt = Date()
 
         // Read each Activity only once. Filtering into a second array
@@ -704,16 +728,21 @@ private final class ATHLTHLiveActivityController {
             }
             lastSessionIdentity = nil
             lastPhase = nil
+            lastStrengthPresentationKey = nil
+            lastRunningPresentationKey = nil
             lastUpdateAt = nil
         }
     }
 
-    private func endExistingActivities() async {
+    private func endExistingActivities(revision: UInt64) async {
         let activities =
             Activity<ATHLTHWorkoutActivityAttributes>
                 .activities
 
         for activity in activities {
+            // A newer workout can start while an old Activity is ending.
+            // Never continue dismissing sessions after ownership changes.
+            guard revision == syncRevision else { return }
             await activity.end(
                 nil,
                 dismissalPolicy: .immediate
