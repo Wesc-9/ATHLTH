@@ -122,7 +122,10 @@ on:
       - release/v2.2.5
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Previous pre-matrix builds can remain stuck in CoreSimulator teardown,
+  # even after cancellation. Use a new concurrency group for the isolated
+  # 11/13-inch iPad matrix. Later release pushes cancel their predecessors.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.ref == 'refs/heads/release/v2.2.5' && '-ipad-matrix-v2' || '' }}
   # Prefer the newest release/v2.2.5 commit: a stale 2,930-test
   # workflow otherwise holds this concurrency group indefinitely, leaving
   # the new independent iPad matrix queued even after its code has changed.
