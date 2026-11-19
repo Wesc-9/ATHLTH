@@ -1142,3 +1142,21 @@ men ikke release-/fysisk godkjent.
 - Leseveien ignorerer også ugyldige tidsintervaller fra gamle/ødelagte journalfiler. Eldre gyldige filer dekodes som før.
 - `ATHLTHPhoneCompletionJournalTests` tester kronologisk monotoni, ugyldig sluttid og isolasjon mellom kontoer. Den målrettede hybrid-XCTest-workflowen er oppdatert for å kjøre disse ved endring av journalene.
 - Dette er en avgrenset fase-7-hardening, **ikke** godkjenning av HealthKit/resultater/historikk. Gjenstår: samme-commit bygg/XCTest, styrkejournalens integrasjonsregresjon, reell HealthKit-UUID-korrelasjon, gjenoppretting etter prosesskrasj, og fysisk test av løp/gå/styrke med Watch og iPhone.
+
+### Fase 7 – HealthKit-identitet ved forsinkede styrkeresultater (19.11.2026)
+
+- `StrengthWorkoutStore.attachFinishedWorkoutHealthKitUUID` avviser nå at samme
+  HealthKit-UUID allerede er knyttet til en annen ferdig styrkeøkt i den
+  autoritative kontohistorikken. Tidligere idempotent kvittering for den
+  *samme* økten forblir tillatt.
+- `attachFinishedWatchMetrics` avviser tilsvarende gjenbruk av HealthKit-UUID
+  på tvers av økter, og avviser tom eller motstridende UUID når en fullført
+  Watch-økt allerede har en koblet HealthKit-UUID. Dermed kan ikke forsinkede
+  pakker fjerne opptaksidentiteten eller få en nyere økt til å overta den.
+- Utvidede `StrengthWorkoutCompletionRecoveryTests` dekker ugyldig/eldre
+  fullføringskvittering, kontoisolasjon, manglende Watch-UUID og gjenbruk av
+  HealthKit-UUID mellom ferdige styrkeøkter.
+- Dette er **lokal historikk-/evidenssikring**, ikke bevis for at HealthKit
+  fysisk bare lagret én workout, og ikke en komplett PR-/segmentmotor.
+  Samme-commit iOS/iPad/watchOS-build, XCTest/CI, reelle opptak og
+  gjenoppretting på fysiske enheter er fortsatt nødvendig. Ingen TestFlight.
