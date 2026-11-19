@@ -920,3 +920,43 @@ avvist uten at det opprettes en økt. Sikkerhet har prioritet til
 fysisk verifisert oppstartshåndtrykk finnes.
 
 Ingen TestFlight-opplasting uten separat uttrykkelig godkjenning.
+
+### Fase 4 – avsluttende lokal iPhone-rekonsiliering (19.11.2026)
+
+- Reléidentiteten er nå et valgfritt, varig felt i den **eksisterende**
+  `PhoneWorkout` (løp/gå) og `StrengthWorkoutLog`. Den settes bare når
+  en iPad-kommando faktisk skaper en autoritativ lokal økt.
+  Eldre registreringer uten `relayRequestID` forblir kompatible og
+  kan ikke feilaktig bekrefte en ny fjernstart.
+- Den felles `WorkoutLaunchCoordinator` krever at iPhone faktisk har
+  opprettet en aktiv økt med eksakt request-ID **før** fjernstart kan
+  rapporteres som vellykket. Dette hindrer falsk serverkvittering mens
+  en utendørs løpe-/gåøkt fremdeles venter på GPS-tillatelse.
+- Ved avbrutt prosess kan reléet kontrollere eksisterende
+  `phoneActive`, `phoneHistory`, sluttført iPhone-resultat,
+  `StrengthWorkoutStore.activeWorkout` og `workoutHistory` mot
+  eksakt serverrequest, riktig konto, aktivitetstype, iPhone-mål
+  og starttid. Ingen heuristikk basert på tittel, mal eller plan-ID.
+  Apple Watch-eide styrkelogger er **ikke** tilstrekkelig bevis;
+  Watch krever sin egen aktive eller terminale HealthKit-kvittering.
+- Automatisk avklaring forsøkes ved kald appstart, forgrunn,
+  sen Watch-resultatmelding, opprettet iPhone-økt og endret lokal
+  historikk. Samtidige callbacks serialiseres; hendelser som kommer
+  under en aktiv rekonsiliering utløser en ekstra gjennomgang.
+  Watch-probe utføres bare når nødvendig og bare for Watch-mål.
+- Ved sikkert bevist eksisterende opptak flyttes serverkommandoen
+  fra usikker journal til varig suksesskvittering, og serverreceipt
+  forsøkes oppdatert. Verken iPhone eller Watch startes på nytt.
+  Uavklarte eller motstridende bevis fortsetter å blokkere ny start.
+
+**Implementeringsstatus:** Fase 4s hovedkode for fjernstart,
+krasjsikker lokal journal, kontobytte, Watch- og iPhone-bevis,
+offline-kvittering, iPad read-only-status og gjenoppkobling
+er nå lagt inn i `release/v2.2.5`. Full aksept krever fortsatt
+samme-commit grønn iOS/watchOS/iPad-build, simulator-XCTest og
+fysisk treenhetstest med reelle HealthKit-opptak. Svært sjeldent
+krasj rett etter at Watch har lagret i HealthKit, men før Watch
+får opprettet terminalkvitteringen, skal fremdeles holdes
+fail-closed inntil HealthKit-historikken er verifisert. Det er
+ikke trygt å erklære en slik oppstart mislykket eller starte den
+på nytt automatisk.
