@@ -639,12 +639,8 @@ final class WorkoutDeviceRelayStore:
             // A server claim can reappear when its completion receipt fails.
             // The locally durable launch journal is authoritative for this
             // device: repair the receipt, never replay Watch/HealthKit start.
-            if !WorkoutDeviceRelayClaimPolicy.mayExecuteClaim(
-                commandID: record.id,
-                unacknowledgedLaunchIDs:
-                    unacknowledgedLaunchIDs(userID: processingUserID),
-                uncertainLaunchIDs: uncertainLaunchIDs(userID: processingUserID)
-            ) {
+            if unacknowledgedLaunchIDs(userID: processingUserID)
+                .contains(record.id) {
                 do {
                     try await markCompleted(record.id)
                     guard currentUserID == processingUserID,
@@ -655,6 +651,18 @@ final class WorkoutDeviceRelayStore:
                     return
                 }
                 continue
+            }
+
+            // An uncertain pre-launch marker does not prove that a workout
+            // started. It must never be transformed into a success receipt
+            // until the original Watch/HealthKit status is reconciled.
+            guard !uncertainLaunchIDs(userID: processingUserID)
+                .contains(record.id) else {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "Remote start requires device reconciliation.",
+                    norwegian: "Fjernstart må avklares mot enhetens opptak."
+                )
+                return
             }
 
             guard WorkoutDeviceRelayClaimPolicy.accepts(
@@ -714,14 +722,6 @@ final class WorkoutDeviceRelayStore:
                     norwegian: "Uavklart oppstart – kontroller Apple Watch."
                 )
                 return
-                guard currentUserID == processingUserID,
-                      !Task.isCancelled else { return }
-                errorMessage = error.localizedDescription
-                lastStatusText = ATHLTHLocalization.choose(
-                    english: "Remote workout could not be started.",
-                    norwegian: "Fjernstart av økten kunne ikke gjennomføres."
-                )
-                continue
             }
             guard currentUserID == processingUserID,
                   !Task.isCancelled else { return }
