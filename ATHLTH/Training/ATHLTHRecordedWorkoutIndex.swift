@@ -11,14 +11,31 @@ enum ATHLTHRecordedWorkoutIndex {
     static func unlinkedKeys(
         healthIDs: Set<UUID>, localRecords: [LocalRecord]
     ) -> Set<String> {
-        var seenHealthIDs = healthIDs
-        var seenLocalKeys: Set<String> = []
-        var selected: Set<String> = []
+        var firstSeenKeys: [String] = []
+        var knownKeys: Set<String> = []
+        var linkedHealthIDsByKey: [String: Set<UUID>] = [:]
+
+        // Merge repeated snapshots of the same local workout before deciding
+        // whether it was already imported from HealthKit. An earlier snapshot
+        // may have had no HealthKit UUID while a later one is linked.
         for record in localRecords {
-            guard seenLocalKeys.insert(record.key).inserted else { continue }
-            if let healthID = record.healthID,
-               !seenHealthIDs.insert(healthID).inserted { continue }
-            selected.insert(record.key)
+            if knownKeys.insert(record.key).inserted {
+                firstSeenKeys.append(record.key)
+            }
+            if let linked = record.healthID {
+                linkedHealthIDsByKey[record.key, default: []].insert(linked)
+            }
+        }
+
+        var seenHealthIDs = healthIDs
+        var selected: Set<String> = []
+        for key in firstSeenKeys {
+            let linkedIDs = linkedHealthIDsByKey[key] ?? []
+            guard linkedIDs.isDisjoint(with: seenHealthIDs) else { continue }
+            selected.insert(key)
+            // A reused HealthKit identity can contribute only once, even
+            // when the local history was imported through two record kinds.
+            seenHealthIDs.formUnion(linkedIDs)
         }
         return selected
     }
