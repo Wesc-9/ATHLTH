@@ -2703,7 +2703,7 @@ final class StrengthWorkoutStore: ObservableObject {
             StrengthAdvancedConfiguration? = nil
     ) {
         // Never overwrite an unfinished workout or its account checkpoint.
-        guard activeWorkout == nil else { return }
+        guard activeWorkout == nil, !loadingAccount else { return }
         recoveredCheckpointSavedAt = nil
         setEffortClock = nil
         cardioWatchCaptures = [:]
@@ -3332,6 +3332,7 @@ final class StrengthWorkoutStore: ObservableObject {
         captureDevice: WorkoutCaptureDevice
     ) -> Bool {
         guard activeWorkout == nil,
+              !loadingAccount,
               !validatedParts.isEmpty,
               validatedParts.allSatisfy({ $0.id == session.id }),
               ATHLTHHybridWorkoutLaunchPlan.parts(for: session) != nil
@@ -3349,6 +3350,10 @@ final class StrengthWorkoutStore: ObservableObject {
             trackingMode: trackingMode,
             captureDevice: captureDevice
         )
+        // A rejected launch must not append hybrid parts to another workout.
+        guard let launched = activeWorkout,
+              launched.plannedSessionID == session.id,
+              launched.endedAt == nil else { return false }
 
         for part in validatedParts {
             guard appendWorkoutDuringSession(part) else {
@@ -3379,7 +3384,7 @@ final class StrengthWorkoutStore: ObservableObject {
     ) {
         // Existing or recovered strength work must not be silently discarded
         // by a duplicate start action.
-        guard activeWorkout == nil else { return }
+        guard activeWorkout == nil, !loadingAccount else { return }
         recoveredCheckpointSavedAt = nil
         setEffortClock = nil
         cardioWatchCaptures = [:]
