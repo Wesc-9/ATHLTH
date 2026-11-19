@@ -69,15 +69,19 @@ struct ATHLTHCoachCueQueue {
         guard !pending.isEmpty else {
             return nil
         }
-        let chosenIndex = pending.indices.max { left, right in
-            if pending[left].event.priority ==
-                pending[right].event.priority {
-                // Earlier is preferable for the same priority.
-                return pending[left].event.createdAt >
+        // Highest priority first. Equal priorities are ordered by
+        // timestamp, then original insertion index (stable FIFO even when
+        // multiple Watch events carry the exact same timestamp).
+        let chosenIndex = pending.indices.min { left, right in
+            if pending[left].event.priority != pending[right].event.priority {
+                return pending[left].event.priority >
+                    pending[right].event.priority
+            }
+            if pending[left].event.createdAt != pending[right].event.createdAt {
+                return pending[left].event.createdAt <
                     pending[right].event.createdAt
             }
-            return pending[left].event.priority <
-                pending[right].event.priority
+            return left < right
         }!
         return pending.remove(at: chosenIndex)
     }

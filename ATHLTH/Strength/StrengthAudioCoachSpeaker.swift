@@ -15,6 +15,16 @@ final class StrengthAudioCoachSpeaker:
     private var cueQueue = ATHLTHCoachCueQueue()
     private var localSpeechWatchdog: Task<Void, Never>?
     private var eventLedger = ATHLTHCoachEventLedger()
+    // A queued or remote cue is not delivered until playback actually starts.
+    // Invalidate stale asynchronous callbacks after mute, countdown or stop.
+    private var playbackGeneration = UUID()
+    private var pendingLocalSpokenEvent: (
+        utterance: AVSpeechUtterance,
+        event: ATHLTHCoachEvent,
+        text: String,
+        shouldRemember: Bool,
+        generation: UUID
+    )?
     private var latestConfiguration: StrengthAudioCoachConfiguration?
     private var replayMemory = ATHLTHCoachReplayMemory()
     private var priorityCountdownUntil: Date? = nil
@@ -39,6 +49,8 @@ final class StrengthAudioCoachSpeaker:
         speechPaused = paused
         cueQueue.reset()
         if paused {
+            playbackGeneration = UUID()
+            pendingLocalSpokenEvent = nil
             localSpeechWatchdog?.cancel()
             localSpeechWatchdog = nil
             azureSpeech.stop()
@@ -127,7 +139,6 @@ final class StrengthAudioCoachSpeaker:
             )
             return
         }
-        eventLedger.didDeliver(resolvedEvent)
 
         let spokenText = rememberForReplay
             ? (configuration.speechStyle ?? .balanced).render(
@@ -172,32 +183,72 @@ final class StrengthAudioCoachSpeaker:
                 )
             )
 
+        let generation = playbackGeneration
+        let mayStart: () -> Bool = { [weak self] in
+            guard let self else { return false }
+            return self.playbackGeneration == generation &&
+                !self.speechPaused &&
+                self.latestConfiguration?.enabled == true &&
+                self.eventLedger.canDeliver(resolvedEvent)
+        }
         let routedToAzure = azureSpeech.begin(
             spokenText,
             voiceIdentifier: configuration.voiceIdentifier,
             duckMusic: configuration.duckOtherAudio,
+            shouldStart: mayStart,
             onFallback: { [weak self] in
-                guard let self, !self.speechPaused,
-                      self.latestConfiguration?.enabled == true
-                else { return }
+                guard let self, mayStart() else { return }
                 self.activateLocalAudio(duck: configuration.duckOtherAudio)
+                self.pendingLocalSpokenEvent = (
+                    utterance: utterance,
+                    event: resolvedEvent,
+                    text: spokenText,
+                    shouldRemember: rememberForReplay,
+                    generation: generation
+                )
                 self.synthesizer.speak(utterance)
                 self.watchLocalSpeech(utterance)
             },
-            // Azure owns audio-session activation and reports playback start.
-            // Strength cues already record delivery in the event ledger.
-            onStarted: {},
+            onStarted: { [weak self] in
+                self?.markSpokenEventStarted(
+                    resolvedEvent,
+                    text: spokenText,
+                    shouldRemember: rememberForReplay,
+                    generation: generation
+                )
+            },
             onFinished: { [weak self] in
                 self?.deliverNextQueuedCue()
             }
         )
-        if !routedToAzure {
+        if !routedToAzure, mayStart() {
             activateLocalAudio(duck: configuration.duckOtherAudio)
+            pendingLocalSpokenEvent = (
+                utterance: utterance,
+                event: resolvedEvent,
+                text: spokenText,
+                shouldRemember: rememberForReplay,
+                generation: generation
+            )
             synthesizer.speak(utterance)
             watchLocalSpeech(utterance)
         }
-        if rememberForReplay {
-            replayMemory.remember(spokenText, priority: .structuredStep)
+    }
+
+    private func markSpokenEventStarted(
+        _ event: ATHLTHCoachEvent,
+        text: String,
+        shouldRemember: Bool,
+        generation: UUID
+    ) {
+        guard generation == playbackGeneration,
+              !speechPaused,
+              latestConfiguration?.enabled == true,
+              eventLedger.canDeliver(event)
+        else { return }
+        eventLedger.didDeliver(event)
+        if shouldRemember {
+            replayMemory.remember(text, priority: .structuredStep)
             lastCoachMessage = replayMemory.text
         }
     }
@@ -213,6 +264,9 @@ final class StrengthAudioCoachSpeaker:
               (1...30).contains(number), Date() < deadline else { return }
         priorityCountdownUntil = deadline
         latestConfiguration = configuration
+        // Critical local countdown supersedes any queued Azure result.
+        playbackGeneration = UUID()
+        pendingLocalSpokenEvent = nil
         cueQueue.reset()
         azureSpeech.stop()
         synthesizer.stopSpeaking(at: .immediate)
@@ -246,6 +300,8 @@ final class StrengthAudioCoachSpeaker:
     }
 
     func stop() {
+        playbackGeneration = UUID()
+        pendingLocalSpokenEvent = nil
         localSpeechWatchdog?.cancel()
         localSpeechWatchdog = nil
         cueQueue.reset()
@@ -264,11 +320,45 @@ final class StrengthAudioCoachSpeaker:
 
     nonisolated func speechSynthesizer(
         _ synthesizer: AVSpeechSynthesizer,
-        didFinish utterance: AVSpeechUtterance
+        didStart utterance: AVSpeechUtterance
     ) {
+        let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self,
-                  !self.synthesizer.isSpeaking
+                  let pending = self.pendingLocalSpokenEvent,
+                  ObjectIdentifier(pending.utterance) == utteranceID
+            else { return }
+            self.pendingLocalSpokenEvent = nil
+            self.markSpokenEventStarted(
+                pending.event,
+                text: pending.text,
+                shouldRemember: pending.shouldRemember,
+                generation: pending.generation
+            )
+        }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        let utteranceID = ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            // A very short utterance can finish before its didStart Task
+            // executes. Finishing successfully is also playback evidence.
+            if let pending = self.pendingLocalSpokenEvent,
+               ObjectIdentifier(pending.utterance) == utteranceID {
+                self.pendingLocalSpokenEvent = nil
+                self.markSpokenEventStarted(
+                    pending.event,
+                    text: pending.text,
+                    shouldRemember: pending.shouldRemember,
+                    generation: pending.generation
+                )
+            }
+            guard !self.synthesizer.isSpeaking,
+                  !self.azureSpeech.isBusy
             else { return }
             self.localSpeechWatchdog?.cancel()
             self.localSpeechWatchdog = nil
@@ -281,9 +371,17 @@ final class StrengthAudioCoachSpeaker:
         _ synthesizer: AVSpeechSynthesizer,
         didCancel utterance: AVSpeechUtterance
     ) {
+        let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
-            guard let self,
-                  !self.synthesizer.isSpeaking
+            guard let self else { return }
+            // Never acknowledge a cue that was cancelled before playback.
+            if self.pendingLocalSpokenEvent.map({
+                ObjectIdentifier($0.utterance) == utteranceID
+            }) == true {
+                self.pendingLocalSpokenEvent = nil
+            }
+            guard !self.synthesizer.isSpeaking,
+                  !self.azureSpeech.isBusy
             else { return }
             self.localSpeechWatchdog?.cancel()
             self.localSpeechWatchdog = nil

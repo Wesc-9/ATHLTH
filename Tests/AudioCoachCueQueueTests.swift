@@ -106,6 +106,35 @@ final class AudioCoachCueQueueTests: XCTestCase {
         XCTAssertEqual(queue.popNext(now: origin.addingTimeInterval(2))?.event.key, "second")
     }
 
+    func testSamePriorityAndIdenticalTimestampRetainInsertionOrder() {
+        var queue = ATHLTHCoachCueQueue()
+        for key in ["first", "second", "third"] {
+            XCTAssertTrue(queue.enqueue(
+                cue(.strengthSet, key: key, priority: .structuredStep),
+                now: origin
+            ))
+        }
+        XCTAssertEqual(queue.popNext(now: origin)?.event.key, "first")
+        XCTAssertEqual(queue.popNext(now: origin)?.event.key, "second")
+        XCTAssertEqual(queue.popNext(now: origin)?.event.key, "third")
+    }
+
+    func testStrengthRestQueueCoalescesToLatestState() {
+        var queue = ATHLTHCoachCueQueue()
+        XCTAssertTrue(queue.enqueue(
+            cue(.strengthRest, key: "rest-start", priority: .structuredStep),
+            now: origin
+        ))
+        XCTAssertTrue(queue.enqueue(
+            cue(.strengthRest, key: "rest-end", priority: .structuredStep,
+                offset: 1),
+            now: origin.addingTimeInterval(1)
+        ))
+        XCTAssertEqual(queue.pending.count, 1)
+        XCTAssertEqual(queue.popNext(now: origin.addingTimeInterval(1))?.event.key,
+                       "rest-end")
+    }
+
     func testCoalescesOlderTargetAlertsAndKeepsOtherKinds() {
         var queue = ATHLTHCoachCueQueue()
         XCTAssertTrue(queue.enqueue(

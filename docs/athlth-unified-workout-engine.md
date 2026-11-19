@@ -492,3 +492,21 @@ som ferdige før egne faser og reelle tester er fullført.
   til ATHLTHWorkoutSessionFoundationTests. Fysisk iPhone + Watch + iPad,
   nettverksbrudd og samme-commit grønne CI-jobber gjenstår før fase 4 kan
   godkjennes. Ingen TestFlight på dette grunnlaget alene.
+
+### Fase 5 – Audio Coach: kvitter først etter faktisk avspilling
+
+- Styrkens Audio Coach bruker nå samme leveringsprinsipp som den
+  speilede løpemotoren: en hendelse kvitteres først ved bekreftet
+  start av Azure-avspilling, lokal AVSpeech-start eller vellykket
+  lokal fullføring. Ikke når forespørselen er sendt.
+- Forsinkede Azure-svar filtreres med øktens/gjeldende avspillings
+  generasjon, aktiv lydtilstand og utløpstid. Pause, stopp og kritisk
+  nedtelling ugyldiggjør eldre svar uten å registrere en falsk melding.
+- Talehistorikk og «spill siste melding» oppdateres først når stemmen
+  faktisk begynner. Gjenopprettbart opptak, HealthKit og haptikk
+  påvirkes ikke av internettfeil.
+- Felles kø avgjør lik prioritet med stabil FIFO også når flere
+  meldinger har nøyaktig samme tidsstempel. Tester inkluderer
+  identiske tidsstempel og sammenslåing av styrkepause-beskjeder.
+- Endringen krever iOS/Watch-byggetest og lydtest med AirPods og
+  musikk på fysisk enhet; ingen påstand om fullført fase 5.
