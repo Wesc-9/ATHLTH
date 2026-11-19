@@ -1958,17 +1958,30 @@ struct IPhoneWorkoutView: View {
                                         time: .shortened
                                     )
                                 )
+                                let result = ATHLTHPhoneWorkoutResultBreakdown(
+                                    workout: workout
+                                )
                                 Text(
                                     String(
-                                        format:
-                                            "%.2f km · %.0f min",
-                                        workout.distanceMeters / 1000,
-                                        workout.accumulatedSeconds / 60
+                                        format: "%.2f km · %.0f min",
+                                        result.distanceMeters / 1000,
+                                        result.activeSeconds / 60
                                     )
                                 )
+                                if result.pausedSeconds > 0.5 {
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english: "Paused / inactive: ",
+                                            norwegian: "Pause / inaktiv: "
+                                        ) + ATHLTHRunStepCountdown.display(
+                                            result.pausedSeconds
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
 
-                                if let recorded = workout.recordedRunningSteps,
-                                   !recorded.isEmpty {
+                                if !result.segments.isEmpty {
                                     DisclosureGroup(
                                         ATHLTHLocalization.choose(
                                             english: "Time per workout phase",
@@ -1976,9 +1989,7 @@ struct IPhoneWorkoutView: View {
                                         )
                                     ) {
                                         VStack(alignment: .leading, spacing: 10) {
-                                            ForEach(recorded.sorted {
-                                                $0.index < $1.index
-                                            }, id: \.index) { phase in
+                                            ForEach(result.segments) { phase in
                                                 HStack(alignment: .firstTextBaseline) {
                                                     Text(phase.title)
                                                         .font(.subheadline.weight(.medium))
@@ -1990,10 +2001,18 @@ struct IPhoneWorkoutView: View {
                                                         .font(.subheadline.monospacedDigit())
                                                         Text(String(
                                                             format: "%.2f km",
-                                                            max(0, phase.distanceMeters) / 1000
+                                                            phase.distanceMeters / 1000
                                                         ))
                                                         .font(.caption.monospacedDigit())
                                                         .foregroundStyle(.secondary)
+                                                        if phase.isUserReported {
+                                                            Text(ATHLTHLocalization.choose(
+                                                                english: "Estimated / entered",
+                                                                norwegian: "Estimert / oppgitt"
+                                                            ))
+                                                            .font(.caption2)
+                                                            .foregroundStyle(.secondary)
+                                                        }
                                                     }
                                                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                                 }

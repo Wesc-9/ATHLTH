@@ -72,4 +72,66 @@ final class ATHLTHPhoneCompletionJournalTests: XCTestCase {
         try PhoneWorkoutCompletionJournal.save(first, userID: account)
         XCTAssertEqual(PhoneWorkoutCompletionJournal.read(userID: account)?.id, first.id)
     }
+
+    func testPhoneResultBreakdownKeepsWallTimeAndActiveTimeSeparate() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        var workout = PhoneWorkout(
+            walking: false, start: start,
+            resumedAt: nil, lastCheckpoint: start.addingTimeInterval(300)
+        )
+        workout.accumulatedSeconds = 180
+        workout.end = start.addingTimeInterval(300)
+        workout.distanceMeters = 1_000
+        let result = ATHLTHPhoneWorkoutResultBreakdown(workout: workout)
+        XCTAssertEqual(result.workoutID, workout.id)
+        XCTAssertEqual(result.activeSeconds, 180)
+        XCTAssertEqual(result.wallClockSeconds, 300)
+        XCTAssertEqual(result.pausedSeconds, 120)
+        XCTAssertEqual(result.distanceMeters, 1_000)
+        XCTAssertFalse(result.isEstimatedTreadmillDistance)
+        XCTAssertTrue(result.segments.isEmpty)
+    }
+
+    func testPhoneResultDeduplicatesPartialStepsAndKeepsEstimateProvenance() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        var workout = PhoneWorkout(
+            walking: false, start: start,
+            resumedAt: nil, lastCheckpoint: start.addingTimeInterval(180)
+        )
+        workout.end = start.addingTimeInterval(180)
+        workout.accumulatedSeconds = 180
+        workout.runEnvironment = .treadmill
+        workout.distanceMeters = 550
+        workout.recordedRunningSteps = [
+            ATHLTHRecordedRunningStep(
+                index: 0, title: "Warmup", phase: "warmup",
+                activeSeconds: 50, distanceMeters: 100,
+                isUserReported: false, targetPaceSecondsPerKilometer: nil
+            ),
+            ATHLTHRecordedRunningStep(
+                index: 0, title: "Warmup", phase: "warmup",
+                activeSeconds: 80, distanceMeters: 220,
+                isUserReported: false, targetPaceSecondsPerKilometer: nil
+            ),
+            ATHLTHRecordedRunningStep(
+                index: 1, title: "Run", phase: "main",
+                activeSeconds: 100, distanceMeters: 330,
+                isUserReported: true, targetPaceSecondsPerKilometer: nil
+            ),
+            ATHLTHRecordedRunningStep(
+                index: 2, title: "Invalid", phase: "main",
+                activeSeconds: -.infinity, distanceMeters: 100,
+                isUserReported: true, targetPaceSecondsPerKilometer: nil
+            )
+        ]
+        let result = ATHLTHPhoneWorkoutResultBreakdown(workout: workout)
+        XCTAssertTrue(result.isEstimatedTreadmillDistance)
+        XCTAssertEqual(result.segments.map(\.index), [0, 1])
+        XCTAssertEqual(result.segments[0].activeSeconds, 80)
+        XCTAssertEqual(result.segments[0].distanceMeters, 220)
+        XCTAssertTrue(result.segments.allSatisfy(\.isUserReported))
+        XCTAssertEqual(result.distanceMeters, 550)
+        // The total is independent of the phase list: the result must
+        // not add interval distances to the workout's overall distance.
+    }
 }

@@ -1225,3 +1225,18 @@ samme-commit XCTest-/iOS-/iPad-/watchOS-kjøring i denne gjennomgangen.
 Ingen fysisk HealthKit-kontroll eller TestFlight-opplasting er utført.
 Full gjennomgang av alle eksterne sportsimporter, fysisk Watch-korrelasjon
 og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
+
+### Fase 7 – registrert iPhone-løp/gå resultat (19.11.2026)
+
+- `ATHLTHPhoneWorkoutResultBreakdown` gir én skrivefri projeksjon av
+  autoritativ `PhoneWorkout`: aktiv økttid, veggklokketid, pausert/inaktiv
+  tid, total distanse og deløkter. Eldre økter uten deløkter vises som før.
+- Deløktlisten filtrerer ugyldige intervaller, velger den mest fullstendige
+  av dupliserte registreringer per faktisk stegindeks, og bevarer kildebevis:
+  oppgitte/estimerte mølledistanser blir ikke omtalt som sensormålinger.
+  Den summerer aldri deløktdistanser på toppen av totaldistanse.
+- iPhone-historikkortet bruker samme projeksjon og viser inaktiv/pause-tid
+  separat fra faktisk aktiv tid. Regresjonstester dekker eldre/frie økter,
+  pauseintervall, forsinket duplikatsteg og mølleproveniens.
+- Ingen ekstra historikkpersistens, ingen ny HealthKit writer. Fase 7
+  forblir uverifisert inntil samme-commit iOS/iPad/watchOS/CI og fysisk test.

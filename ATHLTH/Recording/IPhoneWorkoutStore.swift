@@ -284,6 +284,69 @@ struct PhoneWorkout: Codable, Identifiable {
     }
 }
 
+
+/** Read-only result projection for iPhone run and walk history. It reads
+ * PhoneWorkout's recorded steps without creating a second history or a
+ * separate HealthKit workout. Distances from manual treadmill speeds remain
+ * explicitly estimated, never reclassified as sensor measurements.
+ */
+struct ATHLTHPhoneWorkoutResultBreakdown {
+    struct Segment: Identifiable {
+        let index: Int
+        let title: String
+        let phase: String?
+        let activeSeconds: TimeInterval
+        let distanceMeters: Double
+        let isUserReported: Bool
+        var id: Int { index }
+    }
+
+    let workoutID: UUID
+    let activeSeconds: TimeInterval
+    let wallClockSeconds: TimeInterval
+    let pausedSeconds: TimeInterval
+    let distanceMeters: Double
+    let isEstimatedTreadmillDistance: Bool
+    let segments: [Segment]
+
+    init(workout: PhoneWorkout) {
+        workoutID = workout.id
+        let endedAt = workout.end ?? workout.lastCheckpoint
+        let elapsed = workout.elapsed(at: endedAt)
+        activeSeconds = elapsed.isFinite ? max(elapsed, 0) : 0
+        let wall = endedAt.timeIntervalSince(workout.start)
+        wallClockSeconds = wall.isFinite ? max(wall, 0) : 0
+        pausedSeconds = max(wallClockSeconds - activeSeconds, 0)
+        let meters = workout.distanceMeters
+        distanceMeters = meters.isFinite ? max(meters, 0) : 0
+        isEstimatedTreadmillDistance = workout.runEnvironment == .treadmill
+
+        var phases: [Int: ATHLTHRecordedRunningStep] = [:]
+        for step in workout.recordedRunningSteps ?? [] {
+            guard step.index >= 0,
+                  step.activeSeconds.isFinite, step.activeSeconds >= 0,
+                  step.distanceMeters.isFinite, step.distanceMeters >= 0
+            else { continue }
+            if let previous = phases[step.index],
+               previous.activeSeconds >= step.activeSeconds { continue }
+            phases[step.index] = step
+        }
+        segments = phases.keys.sorted().compactMap { index in
+            guard let step = phases[index] else { return nil }
+            return Segment(
+                index: index,
+                title: step.title,
+                phase: step.phase,
+                activeSeconds: step.activeSeconds,
+                distanceMeters: step.distanceMeters,
+                isUserReported: step.isUserReported ||
+                    workout.runEnvironment == .treadmill
+            )
+        }
+    }
+}
+
+
 /// Verified against previously saved ATHLTH iPhone workouts only.
 /// The coach must not describe these as lifetime Apple Health records.
 enum ATHLTHPhoneRunningRecordEvidence {
