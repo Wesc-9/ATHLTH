@@ -25,18 +25,7 @@ struct ATHLTHSurfaceRuntimeObserver: View {
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)
             .task {
-                publishSurface()
-                // Start/recover the active workout Live Activity even when
-                // the initial mirrored snapshot arrived before this observer
-                // was mounted. The existing onChange still owns updates.
-                ATHLTHSurfaceCoordinator.syncLiveActivity(
-                    with: enrichedWorkoutSnapshot(
-                        ATHLTHLiveWorkoutSnapshotSelection.resolve(
-                            mirroredWatch: workoutMirroring.snapshot,
-                            phoneWorkout: phoneWorkout.currentLiveSnapshot()
-                        )
-                    )
-                )
+                syncCurrentWorkoutSurfaces()
                 // iPhone-only treadmill/indoor interval steps do not move
                 // GPS, so a distance/route-point observer cannot update the
                 // Home/Lock Screen widget. Refresh the lightweight snapshot
@@ -49,7 +38,7 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                     }
                     if phoneWorkout.active != nil ||
                        strengthWorkout.activeWorkout != nil {
-                        publishSurface()
+                        syncCurrentWorkoutSurfaces()
                     }
                 }
             }
@@ -80,15 +69,16 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                 if previous != nil && current == nil {
                     spotify.endLinkedWorkoutPlaybackSession()
                 }
-                publishSurface()
+                // Starts and stops can occur without any GPS updates.
+                // ActivityKit and widgets must receive the same transition.
+                syncCurrentWorkoutSurfaces()
             }
             .onChange(of: phoneWorkout.active?.structuredStepIndex) { _, _ in
-                // Publish title/1-of-4/pause transitions without waiting for
-                // the next GPS point or a five-minute widget reload.
-                publishSurface()
+                // A new interval is a state transition, not sensor telemetry.
+                syncCurrentWorkoutSurfaces()
             }
             .onChange(of: phoneWorkout.active?.structuredWorkoutComplete) { _, _ in
-                publishSurface()
+                syncCurrentWorkoutSurfaces()
             }
             .onChange(of: workoutMirroring.hasActiveMirroredWorkout) { previous, current in
                 if previous && !current {
@@ -172,13 +162,19 @@ struct ATHLTHSurfaceRuntimeObserver: View {
     }
 
     private func syncStrengthLiveActivity() {
-        let selected = ATHLTHLiveWorkoutSnapshotSelection.resolve(
-            mirroredWatch: workoutMirroring.snapshot,
-            phoneWorkout: phoneWorkout.currentLiveSnapshot()
+        syncCurrentWorkoutSurfaces()
+    }
+
+    /// One presentation projection; never a second workout recorder.
+    private func syncCurrentWorkoutSurfaces() {
+        let selected = enrichedWorkoutSnapshot(
+            ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                mirroredWatch: workoutMirroring.snapshot,
+                phoneWorkout: phoneWorkout.currentLiveSnapshot()
+            )
         )
-        ATHLTHSurfaceCoordinator.syncLiveActivity(
-            with: enrichedWorkoutSnapshot(selected)
-        )
+        ATHLTHSurfaceCoordinator.syncLiveActivity(with: selected)
+        publishSurface()
     }
 
     private func publishSurface() {
