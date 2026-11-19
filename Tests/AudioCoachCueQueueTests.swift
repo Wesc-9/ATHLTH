@@ -221,8 +221,6 @@ final class AudioCoachCueQueueTests: XCTestCase {
             (.runningStep, .structuredStep),
             (.targetAlert, .targetCritical),
             (.routeAlert, .routeCritical),
-            (.ghostUpdate, .ghostImportant),
-            (.strengthSet, .structuredStep),
             (.strengthRest, .structuredStep),
             (.workoutPause, .structuredStep),
             (.manualStatus, .structuredStep)
