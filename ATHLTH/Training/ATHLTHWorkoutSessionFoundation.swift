@@ -111,6 +111,30 @@ enum ATHLTHWorkoutSessionFoundation {
         }
     }
 
+    /// Resolve the actual active stores at the moment of a launch or restore.
+    /// This does not mutate either store, start HealthKit or create a shadow
+    /// session. A conflict must be surfaced rather than silently preferred.
+    @MainActor
+    static func currentSession(
+        phone: IPhoneWorkoutStore,
+        strength: StrengthWorkoutStore
+    ) throws -> ATHLTHWorkoutSessionState? {
+        try uniqueActiveSession(
+            running: phone.activeSessionState,
+            strength: strength.activeSessionState
+        )
+    }
+
+    /// All activity-specific launch paths can call this before allocating a
+    /// recording. A recovered workout is a live workout, not a free slot.
+    @MainActor
+    static func requireAvailableRecordingSlot(
+        phone: IPhoneWorkoutStore,
+        strength: StrengthWorkoutStore
+    ) throws {
+        try requireNoActiveRecording(currentSession(phone: phone, strength: strength))
+    }
+
     static func running(
         _ workout: PhoneWorkout,
         at now: Date = Date()
