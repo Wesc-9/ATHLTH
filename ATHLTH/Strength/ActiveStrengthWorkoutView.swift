@@ -3331,7 +3331,7 @@ struct ActiveStrengthWorkoutView: View {
         let restDuration = breakdown.restSeconds
         let activeDuration = breakdown.activeSeconds
 
-        LazyVGrid(
+        return LazyVGrid(
             columns: [
                 GridItem(
                     .flexible(),
