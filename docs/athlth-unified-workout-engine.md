@@ -432,3 +432,17 @@ som ferdige før egne faser og reelle tester er fullført.
   den autoritative styrkeloggen faktisk er opprettet.
 - Ingen ekstra HealthKit-økt, gammel historikk eller separat styrkemotor.
   Full iOS-/watchOS-/iPad-regresjon og fysisk test gjenstår.
+
+### Fase 5–6 — rekkefølge i Watch-snapshot og talerett (påbegynt)
+
+- `ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot` brukes nå før
+  speilstatus, Audio Coach, stemmeleie og Live Activity oppdateres.
+  Forsinket melding med eldre `capturedAt`, forskjellig aktivitet eller
+  annet oppstartstidspunkt avvises. Fullført økt kan ikke gjenåpnes av
+  en senere aktiv-melding.
+- Innkommende Watch-batcher velger nyeste gyldige opptakstidsstempel
+  i stedet for siste dekodede element. Hendelses-/talekvitteringer
+  fra forkastede batchelementer kan dermed ikke flytte taleretten
+  ved forsinket levering.
+- Dette er et sikkerhetssteg, ikke ferdig fase 5 eller 6. Fysisk
+  Watch/AirPods/Spotify og widget-regresjon gjenstår.

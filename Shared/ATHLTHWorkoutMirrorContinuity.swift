@@ -22,6 +22,32 @@ enum ATHLTHWorkoutMirrorContinuity {
         return true
     }
 
+
+    /// WatchConnectivity batches are not guaranteed to be chronological.
+    /// Neither a stale active sample nor a result from an earlier workout
+    /// may replace the current HealthKit mirror or trigger a second coach cue.
+    static func acceptsLiveSnapshot(
+        previous: WatchWorkoutLiveSnapshot?,
+        incoming: WatchWorkoutLiveSnapshot
+    ) -> Bool {
+        guard incoming.capturedAt.timeIntervalSince1970.isFinite else {
+            return false
+        }
+        guard let previous else { return true }
+        guard previous.kind == incoming.kind else { return false }
+        if let original = previous.startedAt,
+           let candidate = incoming.startedAt,
+           abs(original.timeIntervalSince(candidate)) >= 2 {
+            return false
+        }
+        if previous.state == .completed || previous.state == .failed {
+            return false
+        }
+        // Never rewind even when the new payload is a valid terminal state:
+        // an already newer capture must keep ownership of the screen.
+        return incoming.capturedAt >= previous.capturedAt
+    }
+
     /// A late result from another short run must not terminate the new run.
     static func canApplyCompletion(
         snapshot: WatchWorkoutLiveSnapshot,

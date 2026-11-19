@@ -674,8 +674,26 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 WatchWorkoutLiveSnapshot.self,
                 from: data
             ) {
-                latestSnapshot = decoded
+                if let previous = latestSnapshot {
+                    if ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+                        previous: previous, incoming: decoded
+                    ) {
+                        latestSnapshot = decoded
+                    }
+                } else {
+                    latestSnapshot = decoded
+                }
             }
+        }
+
+        // Reject stale and wrong-session batches before their speech
+        // receipts, lease acknowledgements or UI updates can act on them.
+        // Keep the previous live mirror and voice owner unchanged.
+        if let latestSnapshot,
+           !ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+               previous: snapshot, incoming: latestSnapshot
+           ) {
+            return
         }
 
         let currentStart = latestSnapshot?.startedAt ?? snapshot?.startedAt

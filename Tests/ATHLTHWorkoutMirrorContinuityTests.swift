@@ -89,6 +89,52 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testWatchMirrorRejectsOlderBatchAndOtherWorkouts() {
+        let current = snapshot()
+        var older = snapshot()
+        older.capturedAt = current.capturedAt.addingTimeInterval(-5)
+        older.state = .paused
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: current, incoming: older
+        ))
+
+        var later = snapshot()
+        later.capturedAt = current.capturedAt.addingTimeInterval(1)
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: current, incoming: later
+        ))
+
+        later.startedAt = startedAt.addingTimeInterval(25)
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: current, incoming: later
+        ))
+        later.startedAt = startedAt
+        later.kind = .walking
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: current, incoming: later
+        ))
+    }
+
+    func testWatchMirrorCannotResurrectCompletedSession() {
+        let completed = snapshot(state: .completed)
+        var late = snapshot()
+        late.capturedAt = completed.capturedAt.addingTimeInterval(10)
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: completed, incoming: late
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+            previous: nil, incoming: lateWithInvalidClock(late)
+        ))
+    }
+
+    private func lateWithInvalidClock(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) -> WatchWorkoutLiveSnapshot {
+        var copy = snapshot
+        copy.capturedAt = Date(timeIntervalSince1970: .infinity)
+        return copy
+    }
+
     func testOldHealthKitCallbacksCannotModifyNewMirroringSession() {
         let oldSession = NSObject()
         let newSession = NSObject()
