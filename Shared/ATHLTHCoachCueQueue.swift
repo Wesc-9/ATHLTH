@@ -117,6 +117,15 @@ struct ATHLTHCoachCueQueue {
         }
     }
 
+    /// Resuming invalidates the previous pause/readiness instruction,
+    /// particularly after Bluetooth route changes delay speech.
+    mutating func discardPreviousPauseCues() {
+        pending.removeAll { cue in
+            cue.event.kind == .workoutPause ||
+                cue.event.kind == .workoutStart
+        }
+    }
+
     /// At finish there is no future interval or set in the same workout.
     /// Never replay a delayed coach cue after the recording has ended.
     mutating func discardForWorkoutCompletion() {
