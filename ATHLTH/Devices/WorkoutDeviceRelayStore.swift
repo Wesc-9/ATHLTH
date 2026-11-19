@@ -521,6 +521,9 @@ final class WorkoutDeviceRelayStore:
                     english: "Apple Watch workout recovered; confirming start.",
                     norwegian: "Apple Watch-økt gjenopprettet; bekrefter oppstart."
                 )
+                // Repair the completion receipt right now. Never claim the
+                // next queued start while the recovered workout is active.
+                _ = await reconcileLaunchedCommands(userID: userID)
                 // Exactly one live Watch session can own this request ID.
                 return
             } catch {
