@@ -497,6 +497,7 @@ final class IPhoneWorkoutStore:
 
     override init() {
         super.init()
+        ATHLTHWorkoutRecordingArbiter.phone = self
         manager.delegate = self
         speechSynthesizer.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
@@ -698,7 +699,10 @@ final class IPhoneWorkoutStore:
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil
     ) {
-        guard accountID != nil, !saving else { return }
+        guard accountID != nil, !saving,
+              ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+            return
+        }
 
         // If a workout is already active, treat this as a request to return
         // to its live screen. For a brand-new workout, defer presentation
@@ -752,7 +756,8 @@ final class IPhoneWorkoutStore:
         // Location authorization can arrive after another start or checkpoint
         // recovery. Never allocate a second PhoneWorkout from a stale pending
         // request; preserve the already active recording and its HealthKit ID.
-        guard active == nil, !saving else {
+        guard active == nil, !saving,
+              ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
             pendingWalking = nil
             pendingPlannedPlanID = nil
             pendingPlannedSessionID = nil
