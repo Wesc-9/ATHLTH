@@ -25,6 +25,31 @@ enum ATHLTHCompactIslandMetric: Equatable {
 }
 
 enum ATHLTHLiveActivityDisplayPolicy {
+    /// Stable presentation identity for an interval transition. Numeric
+    /// distance/time values deliberately stay out of the key: the native
+    /// countdown ticks between samples and sensor data remains throttled.
+    static func runningTransitionKey(
+        kindRaw: String,
+        stepIndex: Int?,
+        stepTitle: String?,
+        nextStepTitle: String?,
+        intervalOrdinal: Int?,
+        intervalTotal: Int?,
+        isRecovery: Bool?,
+        awaitingMainStart: Bool?
+    ) -> String? {
+        guard kindRaw == "running" || kindRaw == "walking" else { return nil }
+        return [
+            String(stepIndex ?? -1),
+            stepTitle ?? "",
+            nextStepTitle ?? "",
+            String(intervalOrdinal ?? -1),
+            String(intervalTotal ?? -1),
+            String(isRecovery ?? false),
+            String(awaitingMainStart ?? false)
+        ].joined(separator: "|")
+    }
+
     static func resolve(
         kindRaw: String?,
         phase: String,
