@@ -803,9 +803,9 @@ Krev iPhone/iPad/Watch-akseptanse og samme-commit grønne CI-jobber før release
 
 Før iPhone suspenderer i asynkron Watch-/HealthKit-start journalføres kommando-ID
 som **usikker start** per konto og fysisk enhet. Ved vellykket start flyttes
-ID-en til den eksisterende kvitteringsjournalen før serverkall. Ved eksplisitt
-startfeil kan den usikre posten fjernes; ved prosessdød, kansellering eller
-kontobytte kan utfallet **ikke** antas å være feil. Køen blokkeres derfor til
+ID-en til den eksisterende kvitteringsjournalen før serverkall. Selv om asynkron oppstart kaster feil, beholdes den usikre posten fordi
+Watch kan ha akseptert kommandoen før feilen. Ved prosessdød, kansellering eller
+kontobytte kan utfallet heller **ikke** antas å være feil. Køen blokkeres derfor til
 faktisk Watch-/HealthKit-status er rekonsiliert. Dette er en bevisst
 fail-closed-sperre: den hindrer dobbeltopptak, men kan kreve manuell avklaring
 etter krasj. Automatisk, verifisert rekonsiliering av usikre starter er fortsatt
