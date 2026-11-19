@@ -776,6 +776,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
              .aiCoachConversationRequest,
              .workoutResult,
              .workoutActivityQuery,
+             .workoutRemoteLaunchCompletion,
              .workoutRemoteLaunchIdentity,
              .workoutStartGuard,
              .workoutCommand,
@@ -1268,6 +1269,9 @@ extension WatchRouteStore:
                 self?.requestSpotifyPlaybackState()
                 WatchWorkoutManager.shared
                     .syncWorkoutActivityStateToPhone()
+                // Requeue tiny completion proofs if Watch terminated after
+                // saving HealthKit but before the iPhone received the result.
+                WatchWorkoutManager.shared.replayRelayCompletionProofs()
             }
         }
     }
