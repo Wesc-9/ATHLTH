@@ -194,6 +194,25 @@ private struct WorkoutDeviceRelayRecord:
     }
 }
 
+/// Validates the server-claimed envelope before any Watch/HealthKit side
+/// effects. Old or mismatched relay rows are never interpreted as starts.
+enum WorkoutDeviceRelayClaimPolicy {
+    static func accepts(
+        source: String,
+        target: String,
+        kind: String,
+        payload: WorkoutDeviceRelayEnvelope,
+        expiresAt: Date,
+        now: Date = Date()
+    ) -> Bool {
+        source == "ipad" &&
+            target == payload.target.rawValue &&
+            kind == payload.kind.rawValue &&
+            expiresAt > now &&
+            payload.version == 1
+    }
+}
+
 private struct ClaimWorkoutDeviceCommandParams:
     Encodable
 {
@@ -505,6 +524,21 @@ final class WorkoutDeviceRelayStore:
                   !Task.isCancelled else {
                 // Do not execute a command claimed during an account change.
                 return
+            }
+
+            guard WorkoutDeviceRelayClaimPolicy.accepts(
+                source: record.sourceDevice,
+                target: record.targetDevice,
+                kind: record.commandKind,
+                payload: record.payload,
+                expiresAt: record.expiresAt
+            ) else {
+                // A malformed or expired claim must never launch HealthKit.
+                try? await markFailed(
+                    record.id,
+                    error: ATHLTHWorkoutSessionLaunchError.alreadyRecording
+                )
+                continue
             }
 
             let command =
