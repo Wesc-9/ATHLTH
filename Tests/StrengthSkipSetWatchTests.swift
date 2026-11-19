@@ -295,6 +295,52 @@ final class StrengthSkipSetWatchTests: XCTestCase {
 
 
 
+    @MainActor
+    func testWatchBootstrapDoesNotOverwriteExistingStrengthWorkout() throws {
+        let userID = UUID()
+        defer {
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthActive", userID: userID)
+            )
+            UserDefaults.standard.removeObject(
+                forKey: AccountLocalStorage.key("strengthHistory", userID: userID)
+            )
+            StrengthWorkoutCompletionJournal.remove(userID: userID)
+        }
+        let store = StrengthWorkoutStore()
+        store.switchAccount(userID)
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        let existingID = try XCTUnwrap(store.activeWorkout?.id)
+        var competing = try XCTUnwrap(store.watchSnapshot)
+        competing.workoutID = UUID()
+        XCTAssertFalse(store.startFromWatchSnapshot(competing))
+        XCTAssertEqual(store.activeWorkout?.id, existingID)
+    }
+
+    func testWatchBootstrapAdmissionRejectsOccupiedAndCompletedSlots() throws {
+        let userID = UUID()
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .appleWatch)
+        let snapshot = try XCTUnwrap(store.watchSnapshot)
+        XCTAssertTrue(ATHLTHStrengthWatchBootstrapAdmissionPolicy.canRestore(
+            snapshot: snapshot, activeWorkoutID: nil,
+            completedWorkoutIDs: [], slotAvailable: true
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchBootstrapAdmissionPolicy.canRestore(
+            snapshot: snapshot, activeWorkoutID: UUID(),
+            completedWorkoutIDs: [], slotAvailable: true
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchBootstrapAdmissionPolicy.canRestore(
+            snapshot: snapshot, activeWorkoutID: nil,
+            completedWorkoutIDs: [snapshot.workoutID], slotAvailable: true
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchBootstrapAdmissionPolicy.canRestore(
+            snapshot: snapshot, activeWorkoutID: nil,
+            completedWorkoutIDs: [], slotAvailable: false
+        ))
+        XCTAssertNotEqual(userID, snapshot.workoutID)
+    }
+
     func testWatchOfflineJournalKeepsOtherAccountAndUnownedCommandsQueued() {
         let rightfulOwner = UUID()
         let otherOwner = UUID()

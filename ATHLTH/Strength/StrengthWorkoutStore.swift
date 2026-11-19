@@ -2250,11 +2250,20 @@ final class StrengthWorkoutStore: ObservableObject {
         return snapshot
     }
 
+    @discardableResult
     func startFromWatchSnapshot(
         _ snapshot:
             WatchStrengthSessionSnapshot,
         watchSessionID: UUID? = nil
-    ) {
+    ) -> Bool {
+        // A WatchConnectivity request may arrive well after iPhone has
+        // created a different workout or committed this exact Watch workout.
+        // Neither case grants permission to overwrite the authoritative log.
+        guard accountID != nil,
+              activeWorkout == nil,
+              !workoutHistory.contains(where: { $0.id == snapshot.workoutID }),
+              ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength()
+        else { return false }
         var configuration =
             StrengthAdvancedConfiguration
                 .savedDefaults()
@@ -2421,6 +2430,7 @@ final class StrengthWorkoutStore: ObservableObject {
         restStartedAt = nil
         reloadDraftFromCurrentSet()
         persistCheckpointNow()
+        return true
     }
 
     func replayOfflineWatchCommands(

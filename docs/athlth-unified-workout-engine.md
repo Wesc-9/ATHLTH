@@ -536,3 +536,20 @@ som ferdige før egne faser og reelle tester er fullført.
   fortsatt kan ha målt trening offline.
 - Tester dekker lang frakobling, gjenopptakelse og overtid.
   Fysisk enhets- og HealthKit-verifisering gjenstår.
+
+### Fase 4 – Watch-originert styrkeoppstart under konflikt
+
+- En standalone Watch-bootstrap tar nå hensyn til både aktive
+  styrke-/løpeopptak og den reserverte asynkrone oppstarten for
+  løp, gåing og styrke. Watch-meldinger går dermed gjennom samme
+  opptaksgrense som appens ordinære Quick Train-/planlagte start.
+- `StrengthWorkoutStore.startFromWatchSnapshot` avviser aktiv
+  styrke, signert-ut konto, ferdig lagret økt og opptatt slot.
+  Den opprinnelige økt-ID-en fra Watch beholdes ved en godkjent restore.
+- `requestSnapshot` for en annen pågående økt blir ikke konsumert
+  og kan ikke erstatte en eksisterende registrering. Bootstrap for
+  en allerede lagret økt blir anerkjent som håndtert uten å
+  reaktivere eller duplisere historikk.
+- Tester dekker eksisterende styrkeøkt, fullført økt, opptatt
+  opptaksslot og tillatt bootstrap. Fysisk reconnect etter
+  bortfall og kryssaktivitetstest på Watch gjenstår.

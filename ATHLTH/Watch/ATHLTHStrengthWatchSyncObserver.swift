@@ -54,6 +54,21 @@ enum ATHLTHStrengthWatchBootstrapOwnershipPolicy {
 }
 
 
+/// A Watch bootstrap can claim the recording slot only when neither a
+/// previously completed result nor an existing local workout owns it.
+enum ATHLTHStrengthWatchBootstrapAdmissionPolicy {
+    static func canRestore(
+        snapshot: WatchStrengthSessionSnapshot,
+        activeWorkoutID: UUID?,
+        completedWorkoutIDs: Set<UUID>,
+        slotAvailable: Bool
+    ) -> Bool {
+        activeWorkoutID == nil &&
+            !completedWorkoutIDs.contains(snapshot.workoutID) &&
+            slotAvailable
+    }
+}
+
 /// Keep an offline Watch journal for its owner instead of consuming entries
 /// while a different account is signed in. Legacy commands may be applied
 /// only to an already-restored workout with the exact same workout UUID.
@@ -221,15 +236,36 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 guard let bootstrap = command.bootstrapSnapshot else {
                     return false
                 }
-                strengthWorkout.startFromWatchSnapshot(
+                let completedIDs = Set(strengthWorkout.workoutHistory.map(\.id))
+                if completedIDs.contains(bootstrap.workoutID) {
+                    // This Watch session is already durable. Replaying its
+                    // bootstrap must neither recreate a session nor retain
+                    // the request indefinitely.
+                    return true
+                }
+                guard ATHLTHStrengthWatchBootstrapAdmissionPolicy.canRestore(
+                    snapshot: bootstrap,
+                    activeWorkoutID: strengthWorkout.activeWorkout?.id,
+                    completedWorkoutIDs: completedIDs,
+                    slotAvailable: ATHLTHWorkoutRecordingArbiter.mayBootstrapWatchStrength()
+                ), strengthWorkout.startFromWatchSnapshot(
                     bootstrap, watchSessionID: command.id
-                )
+                ) else {
+                    // A running/walking workout or an async start owns the
+                    // recording slot. Preserve this Watch request until a
+                    // legitimate restore can occur; never replace the run.
+                    return false
+                }
             }
 
+            if command.initiatedOnWatch == true,
+               command.workoutID != strengthWorkout.activeWorkout?.id {
+                // Do not consume a different Watch workout's snapshot while
+                // another local strength workout is active.
+                return false
+            }
             sendSnapshotNow()
-            return
-                strengthWorkout.activeWorkout !=
-                nil ||
+            return strengthWorkout.activeWorkout != nil ||
                 command.initiatedOnWatch != true
         }
 

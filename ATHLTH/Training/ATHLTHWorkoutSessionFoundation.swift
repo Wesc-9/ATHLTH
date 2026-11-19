@@ -97,6 +97,18 @@ enum ATHLTHWorkoutRecordingArbiter {
         phone?.activeSessionState == nil &&
             phone?.hasPendingLaunch != true
     }
+
+    /// A Watch-originated bootstrap does not pass through the async launch
+    /// coordinator. It must still honor its pending launch reservation and
+    /// both existing recording stores before restoring Watch's session ID.
+    static func mayBootstrapWatchStrength() -> Bool {
+        pendingLaunchID == nil &&
+            ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+                running: phone?.activeSessionState,
+                runningAuthorizationPending: phone?.hasPendingLaunch == true,
+                strength: strength?.activeSessionState
+            )
+    }
 }
 
 enum ATHLTHWorkoutSessionFoundation {
