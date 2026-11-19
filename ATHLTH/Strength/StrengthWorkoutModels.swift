@@ -958,14 +958,26 @@ struct StrengthWorkoutResultBreakdown {
     let activeSeconds: TimeInterval
     let segments: [StrengthWorkoutResultSegment]
 
-    init(workout: StrengthWorkoutLog, elapsedSeconds: TimeInterval) {
+    init(
+        workout: StrengthWorkoutLog,
+        elapsedSeconds: TimeInterval,
+        ongoingRestSeconds: TimeInterval = 0
+    ) {
         let healthSeconds = workout.healthMetrics.duration
-        let chosen = (healthSeconds?.isFinite == true && (healthSeconds ?? 0) > 0)
+        // A live finish preview continues to use the shared runtime clock.
+        // HealthKit's final duration only becomes authoritative after Finish.
+        let useFinalHealthKitDuration = workout.isFinished &&
+            (healthSeconds?.isFinite == true) && (healthSeconds ?? 0) > 0
+        let chosen = useFinalHealthKitDuration
             ? (healthSeconds ?? 0) : elapsedSeconds
         totalSeconds = chosen.isFinite ? max(chosen, 0) : 0
+        // Explicitly tracked live rest has not been written to a completed
+        // set yet. Include it in the preview without modifying history.
+        let liveRest = ongoingRestSeconds.isFinite
+            ? max(ongoingRestSeconds, 0) : 0
         // Invalid imported rest evidence must never make 'active time'
         // negative or exceed the actual workout duration.
-        restSeconds = min(workout.totalActualRestSeconds, totalSeconds)
+        restSeconds = min(workout.totalActualRestSeconds + liveRest, totalSeconds)
         activeSeconds = max(totalSeconds - restSeconds, 0)
         segments = workout.exercises.map(StrengthWorkoutResultSegment.init)
     }
