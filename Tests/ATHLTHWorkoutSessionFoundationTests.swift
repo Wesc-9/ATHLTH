@@ -133,6 +133,34 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertFalse(ATHLTHWorkoutSessionFoundation.preservesWorkoutID(id, UUID()))
     }
 
+    func testActivityTransitionCannotSilentlyTransferRecordingOwner() {
+        let id = UUID()
+        let original = ATHLTHWorkoutSessionState(
+            workoutID: id, plannedSessionID: nil,
+            recordingOwner: .appleWatch, activity: .strength,
+            phase: .work, engine: .strength, startedAt: start,
+            activeElapsedSeconds: 30, stageIndex: 0, stageCount: 2
+        )
+        let changedActivity = ATHLTHWorkoutSessionState(
+            workoutID: id, plannedSessionID: nil,
+            recordingOwner: .appleWatch, activity: .running,
+            phase: .work, engine: .endurance, startedAt: start,
+            activeElapsedSeconds: 40, stageIndex: 1, stageCount: 2
+        )
+        let changedOwner = ATHLTHWorkoutSessionState(
+            workoutID: id, plannedSessionID: nil,
+            recordingOwner: .iPhone, activity: .running,
+            phase: .work, engine: .endurance, startedAt: start,
+            activeElapsedSeconds: 40, stageIndex: 1, stageCount: 2
+        )
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.preservesRecordingOwnership(
+            original, changedActivity
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.preservesRecordingOwnership(
+            original, changedOwner
+        ))
+    }
+
     func testRecoveryNeverResurrectsCompletedHistory() {
         XCTAssertTrue(ATHLTHWorkoutSessionFoundation.mayRecoverCheckpoint(
             hasEnded: false, alreadyCommitted: false
