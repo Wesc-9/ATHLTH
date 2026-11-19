@@ -1652,14 +1652,6 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
 
         strengthExerciseCount = performedExercises.count
 
-        let completedSets = performedExercises
-            .flatMap(\.sets)
-            .filter { set in
-                set.isCompleted ||
-                set.completedReps != nil ||
-                set.completedWeightKilograms != nil
-            }
-
         // Warm-up and cardio sets never contribute to strength training
         // volume or heaviest-lift statistics (or personal records).
         let workingSets = performedExercises.flatMap { exercise in

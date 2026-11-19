@@ -158,6 +158,23 @@ on:
       - Shared/ATHLTHCoachCueQueue.swift
       - Shared/ATHLTHCoachSensorFreshness.swift
       - Shared/ATHLTHHeartRateZoneCoachTarget.swift
+      # Phase 8: music handoff, coached cues and backwards-compatible plans.
+      - ATHLTH/Music/**
+      - ATHLTH/Planning/ATHLTHSpotifyIntervalTrackPicker.swift
+      - ATHLTH/Planning/ATHLTHSpotifySmartMusicSheet.swift
+      - ATHLTH/Planning/ATHLTHWorkoutSpotifyOptionsSheet.swift
+      - Tests/ATHLTHSpotifyIntervalCuePolicyTests.swift
+      - Tests/ATHLTHSpotifySmartMusicTests.swift
+      - Tests/SpotifyWorkoutAutoplayGateTests.swift
+      - Tests/WorkoutSpotifyOverrideTests.swift
+      - Tests/AudioCoachVoicePausePolicyTests.swift
+      - Tests/ATHLTHAudioCoachPaceAndPRTests.swift
+      - Tests/ATHLTHAudioCoachEventTriggerTests.swift
+      - Tests/ATHLTHAudioCoachGroupMoveTests.swift
+      - Tests/ATHLTHTrainingPlanStructuredAuditTests.swift
+      - Tests/ATHLTHWorkoutDraftRecoveryPolicyTests.swift
+      - Tests/TrainingPlanBlockTests.swift
+      - Tests/ATHLTHHomeWorkoutComposerRecoveryTests.swift
       - Tests/ATHLTHGuidanceStudioConfigurationTests.swift
       - Tests/ATHLTHAudioCoachRuleDeliveryTests.swift
       - Tests/ATHLTHCoachAdaptiveMotivationTests.swift
@@ -280,6 +297,18 @@ jobs:
             -only-testing:ATHLTHTests/AudioCoachFreshnessAndReceiptTests \
             -only-testing:ATHLTHTests/AudioCoachVoiceRoutingTests \
             -only-testing:ATHLTHTests/ATHLTHAudioCoachSmartPromptsTests \
+            -only-testing:ATHLTHTests/ATHLTHSpotifyIntervalCuePolicyTests \
+            -only-testing:ATHLTHTests/ATHLTHSpotifySmartMusicTests \
+            -only-testing:ATHLTHTests/SpotifyWorkoutAutoplayGateTests \
+            -only-testing:ATHLTHTests/WorkoutSpotifyOverrideTests \
+            -only-testing:ATHLTHTests/AudioCoachVoicePausePolicyTests \
+            -only-testing:ATHLTHTests/ATHLTHAudioCoachPaceAndPRTests \
+            -only-testing:ATHLTHTests/ATHLTHAudioCoachEventTriggerTests \
+            -only-testing:ATHLTHTests/ATHLTHAudioCoachGroupMoveTests \
+            -only-testing:ATHLTHTests/ATHLTHTrainingPlanStructuredAuditTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutDraftRecoveryPolicyTests \
+            -only-testing:ATHLTHTests/TrainingPlanBlockTests \
+            -only-testing:ATHLTHTests/ATHLTHHomeWorkoutComposerRecoveryTests \
             CODE_SIGNING_ALLOWED=NO \
             test
 

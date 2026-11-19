@@ -229,12 +229,6 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                     } : nil)
                 : workout.currentPaceSecondsPerKilometer
             let currentPace = paceSeconds.map { isMetric ? $0 : $0 * 1.609344 }
-            let treadmillAveragePace = isTreadmill
-                ? ATHLTHRunningPace.average(
-                    elapsedSeconds: elapsed,
-                    distanceMeters: workout.distanceMeters
-                ).map { isMetric ? $0 : $0 * 1.609344 }
-                : nil
             let measuredAveragePace = ATHLTHRunningPace.average(
                 elapsedSeconds: elapsed, distanceMeters: workout.distanceMeters
             ).map { isMetric ? $0 : $0 * 1.609344 }

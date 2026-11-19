@@ -1345,3 +1345,17 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   To forskjellige lokale treninger får ikke lov å ta samme UUID.
   `ATHLTHPhoneHealthExportPolicy.canLinkHealthKitWorkout` er testbar uten
   faktisk helseautorisasjon; fysiske telefon-/Watch-tester må fortsatt kjøres.
+
+### Fase 8 – bred musikk/coach/legacy-testpakke og fjernet død kode (19.11.2026)
+
+- Hybrid-XCTest får nå 12 eksisterende regresjonsuiter for
+  Spotify-oppstart, sporbytte, valgt spilleliste, Audio Coach-lyd-/pauseregler,
+  triggere og tempo/PR, gamle treningsplanblokker, strukturert planbibliotek og
+  utkastgjenoppretting. Filer under `ATHLTH/Music` og relevante Spotify-editorer
+  utløser også den målrettede testpakken.
+- Bekreftet ubrukt `treadmillAveragePace` i live-løpevisning og ubrukt
+  `completedSets` i sosial historikkmodell er fjernet. Ingen persistensfelt,
+  overføring, layout-kontrakt eller HealthKit writer er endret.
+- En bestått backend-jobb er ikke nok for release: iPhone/iPad,
+  watchOS, simulert gjenoppretting og fysisk HealthKit/Spotify-samspill
+  må kontrolleres på **samme commit** før fase 8 er godkjent.
