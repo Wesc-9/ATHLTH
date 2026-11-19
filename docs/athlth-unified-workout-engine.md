@@ -1018,3 +1018,66 @@ og musikkgjenopptakelse, nedtelling og Azure-fallback testes.
 Audio Coach må heller ikke repetere en mottatt Watch-kvittering
 eller snakke etter en avbrutt økt. Fase 5 kan ikke merkes
 release-godkjent før dette er bekreftet.
+
+### Fase 5 – fullføring av talerett, nedtelling og musikk (19.11.2026)
+
+**Sammenhengende fase-5-kodeleveranse (ikke fysisk godkjent):**
+
+- iPhone- og Watch-talerett er fortsatt basert på den eksisterende,
+  kortvarige HealthKit-mirror-leien. En AI-samtale på iPhone opphever
+  nå telefonens ordinære coach-lease umiddelbart, og nye tilbud/
+  kvitteringer avvises mens AI-samtalen er aktiv. Status-/replay-UI
+  krever både gyldig økt, riktig lyd-eier og ikke-aktiv AI-dialog.
+- `MirroredWorkoutAudioCoach.suspendForWatchFallback` ugyldiggjør nå
+  også avspillingsgenerasjon, ventende systemstemme og replay-minne,
+  slik at en sen AVFoundation-/Azure-callback ikke kan erklære en
+  melding opplest etter at Watch har overtatt. Det samme gjelder når
+  en eksakt nedtelling overtar en vanlig stemmebeskjed.
+- `onFinished` fra Azure er nå generasjonskontrollert både for
+  speilet løp/gå, lokal iPhone-løp/gå og styrke. Et sent svar fra
+  en gammel stemme kan ikke frigjøre en ny talers prioritet eller
+  starte neste beskjed etter pause, stopp eller eierskifte.
+- Watch sin sekundnøyaktige nedtelling sjekker nå sin absolutte
+  sluttfrist **igjen etter** asynkron Bluetooth-/audio-route-
+  aktivering. Et gammelt tall må droppes selv om lydruten først blir
+  klar etter den aktuelle sekundgrensen. iPhone avviser tilsvarende
+  gamle callbacks ved direkte kritisk nedtelling.
+- Music/Spotify på iPhone beholdes under iOS sitt
+  `AVAudioSession`-eierskap. Etter coach-stemmen bruker eksisterende
+  `notifyOthersOnDeactivation` musikkens originale app som eier;
+  ATHLTH starter ikke andre apper med en kunstig play-kommando.
+  En route-change forårsaket av ATHLTHs **egen** kategoriendring
+  starter nå ikke ny deaktivering i en løkke. Ekte AirPods-
+  tilkobling/frakobling tillater fortsatt gjenopprettingsforsøk.
+- Felles `ATHLTHCoachCueQueue` fjerner fortsatt foreldede
+  intervall-, rute-, puls- og styrke-hvilebeskjeder ved
+  pause, gjenopptakelse og øktslutt. Talerett,
+  lyd-/hendelseskvittering og faktisk HealthKit-opptak holdes adskilt.
+- Nye tester omfatter deadline-overskridelse under
+  Bluetooth-aktivering, rutekategori-loop mot fysisk
+  tilkobling, og tidligere tester dekker pause/resume,
+  bekreftet avspilling og stale talekvitteringer.
+
+**Release-akseptanse som ennå ikke er bekreftet:**
+
+1. Samme commit må bestå iOS + watchOS + iPad-bygg,
+   `ATHLTH Train and Hybrid Engine XCTest`, backend og
+   iPhone-kompatibilitet. Kansellerte bygg er ikke grønne bygg.
+2. Fysisk iPhone/Watch/AirPods: bytte talerett under aktivt drag,
+   midt i en lang melding, ved avslutning, ved telefonlås,
+   ved skjerm- og Bluetooth-brudd, og etter nettverksretur.
+3. Offline Azure-fallback skal bruke lokal stemme uten å stoppe
+   HealthKit, haptikk eller intervallmotoren, uten dobbel tale.
+4. Spotify-spilleliste i faktisk avspilling: duck/mute etter
+   brukerinnstilling, resume etter coach, etter to samtidige
+   meldinger og etter AirPods-ruteendring. iOS eier musikk;
+   vi kan ikke bevise faktisk Spotify-resume gjennom enhetstester
+   som ikke er kjørt.
+5. Løp, gåing og styrke med norske/engelske stemmer;
+   kritiske rute-/pulsvarsler forblir høyt prioritert og
+   nøyaktige nedtellinger må ikke snakke etter deadline.
+
+**Status:** Den planlagte fase-5-implementeringen er lagt
+inn i release-grenen, men fase 5 kan ikke kalles verifisert
+eller release-godkjent før grønn CI og fysiske lydtester.
+Ingen TestFlight-opplasting uten uttrykkelig godkjenning.
