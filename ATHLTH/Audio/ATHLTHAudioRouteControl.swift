@@ -92,6 +92,23 @@ private struct ATHLTHSystemAudioRoutePicker:
     }
 }
 
+/// Ignore AVAudioSession route changes caused by our own category/mix
+/// restoration. React only when hardware or the selected route changed;
+/// otherwise .notifyOthersOnDeactivation can trigger a restore loop.
+enum ATHLTHCoachMusicRouteRestorePolicy {
+    static func shouldRetryAfterRouteChange(
+        _ reason: AVAudioSession.RouteChangeReason?
+    ) -> Bool {
+        switch reason {
+        case .newDeviceAvailable, .oldDeviceUnavailable,
+             .routeConfigurationChange, .override:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 @MainActor
 enum ATHLTHSpokenAudioSession {
     // Several independent speakers can coexist: a Watch mirror, local phone
@@ -118,8 +135,19 @@ enum ATHLTHSpokenAudioSession {
                 forName: AVAudioSession.routeChangeNotification,
                 object: AVAudioSession.sharedInstance(),
                 queue: .main
-            ) { _ in
+            ) { event in
+                let reason = (event.userInfo?[
+                    AVAudioSessionRouteChangeReasonKey
+                ] as? UInt).flatMap {
+                    AVAudioSession.RouteChangeReason(rawValue: $0)
+                }
+                guard ATHLTHCoachMusicRouteRestorePolicy
+                    .shouldRetryAfterRouteChange(reason)
+                else { return }
                 Task { @MainActor in
+                    // Don't reconfigure active speech when AirPods switch
+                    // routes; iOS owns the device change. After the last
+                    // voice is gone we retry returning music ownership.
                     guard owners.isEmpty else { return }
                     restoreIfIdle(generation: revision)
                 }
