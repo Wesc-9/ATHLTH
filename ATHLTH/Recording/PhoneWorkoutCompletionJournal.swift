@@ -19,7 +19,8 @@ enum PhoneWorkoutCompletionJournal {
         // Late completion callbacks must not replace a newer durable receipt.
         if let previous = read(userID: userID),
            let previousEnd = previous.end,
-           previousEnd > endedAt { return }
+           (previousEnd > endedAt ||
+            (previousEnd == endedAt && previous.id != workout.id)) { return }
         let data = try JSONEncoder().encode(workout)
         let target = try url(userID: userID)
         try FileManager.default.createDirectory(
