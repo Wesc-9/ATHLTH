@@ -221,6 +221,10 @@ enum WorkoutDeviceRelayClaimPolicy {
             completedAt == nil && failedAt == nil
     }
 
+    static func confirmsReceipt(_ returnedIDs: [UUID], commandID: UUID) -> Bool {
+        returnedIDs.count == 1 && returnedIDs[0] == commandID
+    }
+
     enum LaunchDecision: Equatable {
         case retryConfirmedReceipt
         case holdForDeviceReconciliation
@@ -804,7 +808,9 @@ final class WorkoutDeviceRelayStore:
     private func requireAcknowledgedRow(
         _ rows: [WorkoutDeviceCommandReceipt], commandID: UUID
     ) throws {
-        guard rows.count == 1, rows[0].id == commandID else {
+        guard WorkoutDeviceRelayClaimPolicy.confirmsReceipt(
+            rows.map(\.id), commandID: commandID
+        ) else {
             throw NSError(
                 domain: "ATHLTH.DeviceRelay", code: 4,
                 userInfo: [NSLocalizedDescriptionKey:
