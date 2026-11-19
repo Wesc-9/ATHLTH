@@ -81,12 +81,16 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
             Self.validFullRecording(recorded, expectedCount: recorded.count)
         // Untrusted or partially transferred Watch minute evidence cannot
         // create a fake performance record with infinite speed or distance.
-        let hasMeasuredMinutes = (watch.recordedRunningMinutes ?? []).contains {
+        let verifiedMinutes = (watch.recordedRunningMinutes ?? []).filter {
+            $0.stepIndex >= 0 &&
+            $0.stepElapsedAtEndSeconds.isFinite &&
+            $0.stepElapsedAtEndSeconds >= 0 &&
             $0.activeSeconds.isFinite &&
             $0.activeSeconds > 0 &&
             $0.recordedDistanceMeters.isFinite &&
             $0.recordedDistanceMeters > 0
         }
+        let hasMeasuredMinutes = !verifiedMinutes.isEmpty
         guard (watch.kind == .running || watch.kind == .walking),
               watch.startedAt.timeIntervalSince1970.isFinite,
               watch.endedAt.timeIntervalSince1970.isFinite,
@@ -102,8 +106,11 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         )
         completedAt = watch.endedAt
         source = "Apple Watch"
-        steps = recorded
-        minutes = watch.recordedRunningMinutes
+        // A minute-only recovery is valuable evidence of a genuine run,
+        // but a partial interval transfer is not proof the interval plan
+        // was completed. Do not promote its incomplete steps to a PR.
+        steps = fullyStructured ? recorded : []
+        minutes = verifiedMinutes.isEmpty ? nil : verifiedMinutes
         healthWorkoutUUID = watch.healthKitWorkoutUUID
     }
 }

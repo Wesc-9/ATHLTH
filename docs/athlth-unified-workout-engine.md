@@ -1388,3 +1388,17 @@ og fase-8 regresjon gjenstår. Ikke marker fase 7 som release-godkjent.
   ekstra HealthKit-opptak eller egen hybridresultatlogg.
 - Fysisk iPhone+Watch-løping med GPS+styrke er fortsatt unsupported;
   dette hardener eksisterende tidsstyrte **innendørs** hybridøkter.
+
+### Fase 8 – Watch-resultat ved delvis overførte løpeintervaller (19.11.2026)
+
+- `ATHLTHCompletedRunningPerformance(watch:)` godtar fremdeles gyldige
+  sensormålte minuttresultater fra en ekte avsluttet Watch-økt selv om
+  hele intervallplanen ikke er fullført eller overført.
+- En slik delvis overføring kan **ikke** produsere komplette per-drag-
+  resultater eller personlige rekorder utledet fra ufullstendige
+  intervaller. Registrerte deløkter beholdes bare når den komplette,
+  sammenhengende strukturen er verifisert.
+- Ugyldige minuttprøver (ikke-endelige tidspunkt eller distanse,
+  negativ indeks/tid) filtreres før treningshistorikken lagres.
+  Nye regresjonstester dekker delvis Watch-overføring, gyldig
+  minuttbevis og ugyldige prøver.

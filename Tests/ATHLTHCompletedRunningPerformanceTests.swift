@@ -276,4 +276,61 @@ final class ATHLTHCompletedRunningPerformanceTests: XCTestCase {
         result.endedAt = start.addingTimeInterval(600)
         XCTAssertNotNil(ATHLTHCompletedRunningPerformance(watch: result))
     }
+
+    func testPartialWatchIntervalsWithMeasuredMinutesDoNotBecomeCompleteSteps()
+        throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        var result = WatchWorkoutResult(
+            id: UUID(), kind: .running, healthKitWorkoutUUID: UUID(),
+            startedAt: now.addingTimeInterval(-600), endedAt: now,
+            duration: 600, activeCalories: 70, distanceMeters: 1_200,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 4
+        )
+        result.structuredWorkoutFullyCompleted = false
+        result.recordedRunningSteps = [
+            sample(0, phase: "warmup"),
+            sample(2, phase: "main")
+        ]
+        let valid = ATHLTHRecordedRunningMinute(
+            stepIndex: 0, stepElapsedAtEndSeconds: 60,
+            activeSeconds: 60, recordedDistanceMeters: 160,
+            watchHeartRateBPM: nil,
+            targetPaceSecondsPerKilometer: nil,
+            targetTreadmillInclinePercent: nil,
+            manuallyEnteredTreadmillInclinePercent: nil
+        )
+        var invalid = valid
+        invalid.stepIndex = 1
+        invalid.recordedDistanceMeters = .infinity
+        result.recordedRunningMinutes = [valid, invalid]
+        let performance = try XCTUnwrap(
+            ATHLTHCompletedRunningPerformance(watch: result)
+        )
+        XCTAssertTrue(performance.steps.isEmpty,
+                      "Incomplete intervals cannot qualify as complete PR evidence")
+        XCTAssertEqual(performance.minutes?.count, 1)
+        XCTAssertEqual(performance.minutes?.first?.recordedDistanceMeters, 160)
+    }
+
+    func testInvalidMinuteOnlyWatchEvidenceDoesNotCreateRunningPerformance() {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        var watch = WatchWorkoutResult(
+            id: UUID(), kind: .walking, healthKitWorkoutUUID: UUID(),
+            startedAt: now.addingTimeInterval(-120), endedAt: now,
+            duration: 120, activeCalories: 20, distanceMeters: 300,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+        )
+        watch.structuredWorkoutFullyCompleted = false
+        var broken = ATHLTHRecordedRunningMinute(
+            stepIndex: 0, stepElapsedAtEndSeconds: 60,
+            activeSeconds: 60, recordedDistanceMeters: 100,
+            watchHeartRateBPM: nil,
+            targetPaceSecondsPerKilometer: nil,
+            targetTreadmillInclinePercent: nil,
+            manuallyEnteredTreadmillInclinePercent: nil
+        )
+        broken.stepElapsedAtEndSeconds = .infinity
+        watch.recordedRunningMinutes = [broken]
+        XCTAssertNil(ATHLTHCompletedRunningPerformance(watch: watch))
+    }
 }
