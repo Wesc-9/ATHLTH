@@ -300,6 +300,37 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         "athlth.watch.activeWorkoutRecovery.v1"
     private var recoveryInProgress = false
     private var workoutInitiatedLocallyOnWatch = false
+    private let pendingRelayIdentityKey = "athlth.watch.pendingRemoteLaunch.v1"
+    private var activeRelayRequestID: UUID?
+
+    /// Persist the identity before replying to the iPhone. The Watch can
+    /// then bind it to the next matching HealthKit start after a cold launch.
+    /// This merely stages an ID and never creates a recording.
+    func stageRemoteLaunchIdentity(_ identity: WatchRemoteLaunchIdentity) -> Bool {
+        guard identity.isFresh(),
+              state == .idle,
+              workoutSession == nil,
+              !recoveryInProgress,
+              let data = try? JSONEncoder().encode(identity)
+        else { return false }
+
+        if let queued = pendingRemoteLaunchIdentity(),
+           queued.isFresh(),
+           queued.requestID != identity.requestID {
+            return false
+        }
+        UserDefaults.standard.set(data, forKey: pendingRelayIdentityKey)
+        return true
+    }
+
+    private func pendingRemoteLaunchIdentity() -> WatchRemoteLaunchIdentity? {
+        guard let data = UserDefaults.standard.data(forKey: pendingRelayIdentityKey),
+              let identity = try? JSONDecoder().decode(
+                WatchRemoteLaunchIdentity.self, from: data
+              ), identity.isFresh()
+        else { return nil }
+        return identity
+    }
     private var strengthCommandJournal:
         [WatchStrengthCommand] = []
 
@@ -3444,7 +3475,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         return WatchWorkoutActivityState(
             isActive: active,
             title: active ? kind.title : nil,
-            updatedAt: Date()
+            updatedAt: Date(),
+            relayRequestID: active && workoutSession != nil
+                ? activeRelayRequestID : nil
         )
     }
 
@@ -3479,7 +3512,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     active
                         ? kind.title
                         : nil,
-                updatedAt: Date()
+                updatedAt: Date(),
+                relayRequestID: active && workoutSession != nil
+                    ? activeRelayRequestID : nil
             )
 
         if !force,
@@ -3487,8 +3522,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 lastReportedWorkoutActivity,
            previous.isActive ==
                 activity.isActive,
-           previous.title ==
-                activity.title {
+           previous.title == activity.title,
+           previous.relayRequestID == activity.relayRequestID {
             return
         }
 
@@ -3740,6 +3775,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 startedAt: startedAt,
                 accountOwnerID: workoutOwnerID,
                 initiatedLocallyOnWatch: workoutInitiatedLocallyOnWatch,
+                relayRequestID: activeRelayRequestID,
                 plannedRoute: plannedRoute,
                 audioCoach:
                     audioCoachConfiguration,
@@ -3811,6 +3847,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workoutOwnerID = snapshot.accountOwnerID
         workoutInitiatedLocallyOnWatch =
             snapshot.initiatedLocallyOnWatch ?? false
+        activeRelayRequestID = snapshot.relayRequestID
         switchedIndoorVenue = snapshot.indoorVenue
         if let venue = snapshot.indoorVenue {
             indoorPromptedInThisWorkout = true
@@ -3900,6 +3937,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         workoutInitiatedLocallyOnWatch = true
+        activeRelayRequestID = nil
+        UserDefaults.standard.removeObject(forKey: pendingRelayIdentityKey)
         prepareForLocalWorkoutStart()
 
         if kind == .strength {
@@ -4014,6 +4053,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func reset() {
+        activeRelayRequestID = nil
+        UserDefaults.standard.removeObject(forKey: pendingRelayIdentityKey)
         setAIConversationVoiceSuppressed(false)
         stopTimer()
         workoutSession = nil
@@ -4140,6 +4181,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         route: WatchRouteTransfer?
     ) async {
         guard !isActive, state != .preparing, state != .ending else { return }
+
+        if workoutInitiatedLocallyOnWatch {
+            activeRelayRequestID = nil
+        } else if let staged = pendingRemoteLaunchIdentity(),
+                  staged.kind == kind {
+            activeRelayRequestID = staged.requestID
+        } else {
+            activeRelayRequestID = nil
+        }
 
         workoutOwnerID = WatchRouteStore.shared.companionAccountID
         audioCoachRollingKilometer.reset()
@@ -4274,6 +4324,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             let startDate = Date()
             startedAt = startDate
             persistWorkoutRecoveryState()
+            // The immutable relay ID is now in the workout's recovery
+            // checkpoint. A later reconnect must not restage this token.
+            UserDefaults.standard.removeObject(forKey: pendingRelayIdentityKey)
 
             // Start the HealthKit session and collection before enabling
             // mirroring. Mirroring a session that is not yet active can
