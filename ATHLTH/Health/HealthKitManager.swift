@@ -1501,7 +1501,8 @@ final class HealthKitManager: ObservableObject {
     func saveManualStrengthWorkout(
         startDate: Date,
         endDate: Date,
-        externalID: UUID
+        externalID: UUID,
+        recoveryPauseIntervals: [DateInterval] = []
     ) async -> UUID? {
         guard integrationEnabled,
               healthDataAvailable,
@@ -1528,6 +1529,50 @@ final class HealthKitManager: ObservableObject {
                 HKMetadataKeySyncIdentifier: "athlth-strength-" + externalID.uuidString,
                 HKMetadataKeySyncVersion: 1
             ])
+
+            // Preserve the athlete's real start and finish timestamps.
+            // Without these pause events, Apple Health counts the whole
+            // crash/offline interval as a continuous strength workout.
+            // Ordinary rest between sets still counts as session time.
+            let recoveryEvents = recoveryPauseIntervals.flatMap {
+                interval -> [HKWorkoutEvent] in
+                let pausedAt = max(startDate, interval.start)
+                let resumedAt = min(endDate, interval.end)
+                guard resumedAt > pausedAt else { return [] }
+                return [
+                    HKWorkoutEvent(
+                        type: .pause,
+                        dateInterval: DateInterval(
+                            start: pausedAt, duration: 0
+                        ), metadata: nil
+                    ),
+                    HKWorkoutEvent(
+                        type: .resume,
+                        dateInterval: DateInterval(
+                            start: resumedAt, duration: 0
+                        ), metadata: nil
+                    )
+                ]
+            }
+            if !recoveryEvents.isEmpty {
+                try await withCheckedThrowingContinuation {
+                    (continuation: CheckedContinuation<Void, Error>) in
+                    builder.addWorkoutEvents(recoveryEvents) { success, error in
+                        if let error {
+                            continuation.resume(throwing: error)
+                        } else if success {
+                            continuation.resume()
+                        } else {
+                            continuation.resume(throwing: NSError(
+                                domain: "ATHLTH.HealthKit",
+                                code: 502,
+                                userInfo: [NSLocalizedDescriptionKey:
+                                    "Could not preserve recovered workout pauses"]
+                            ))
+                        }
+                    }
+                }
+            }
             try await builder.endCollection(at: endDate)
             let workout = try await builder.finishWorkout()
 
@@ -1545,6 +1590,7 @@ final class HealthKitManager: ObservableObject {
 
             return workout?.uuid
         } catch {
+            builder.discardWorkout()
             authorizationError =
                 "Could not save the ATHLTH strength workout to Apple Health: \(error.localizedDescription)"
             return nil

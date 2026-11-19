@@ -668,3 +668,22 @@ som ferdige før egne faser og reelle tester er fullført.
   Watch-eide HealthKit-økter får ikke påført en kunstig pause.
 - Tester verifiserer en times offlineperiode, 45 sekunder faktisk
   innsats før avbrudd, korrekt fortsettelse og stabil økt-ID.
+
+### Fase 8 – HealthKit får nøyaktige recovery-pausehendelser
+
+- Phone-eide styrkeøkter lagrer nå eksakte `DateInterval` for
+  dokumenterte avbrudd etter krasjgjenoppretting. Overlappende/
+  doble sjekkpunkter slås sammen idempotent. Eldre loggformat
+  leses videre uten krav om migrering.
+- Den ordinære iPhone-avslutningen skriver korrigert aktiv varighet
+  til styrkehistorikken, ikke rå veggklokke fra første start.
+- `HealthKitManager.saveManualStrengthWorkout` sender pause- og
+  resume-hendelser til samme HKWorkoutBuilder før lagring, slik at
+  Apple Health kan ekskludere dokumentert offline-tid samtidig
+  som sann start og slutt beholdes. Vanlig pause **mellom sett**
+  forblir del av styrkeøkta. Ved feil ved pausehendelsene
+  forkastes den ufullstendige HealthKit-byggeren i stedet for å
+  lagre et kunstig langt treningstidsrom.
+- Tester dekker overlappende avbrudd, idempotens, aktiv økttid og
+  at Watch ikke automatisk får tilført phone-offline pauser.
+  Verifikasjon på faktisk iPhone/Watch og samme-commit CI gjenstår.

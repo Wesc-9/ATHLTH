@@ -1859,7 +1859,9 @@ struct ActiveStrengthWorkoutView: View {
             // screen, leave a spinner for many seconds, or lose the sets.
             guard strength.finish(
                 healthKitWorkoutUUID: nil,
-                duration: endDate.timeIntervalSince(workout.startedAt)
+                duration: strength.elapsedSessionSeconds(
+                    for: workout, at: endDate
+                )
             ) else {
                 finishInProgress = false
                 watchFinishError = strength.completionSaveError
@@ -1875,11 +1877,18 @@ struct ActiveStrengthWorkoutView: View {
             // the same account. The local log survives a temporary failure.
             let healthService = health
             let historyStore = strength
+            // Capture the durable post-finish pause windows before any
+            // asynchronous HealthKit operation or account change.
+            let recoveredPauses =
+                strength.completedWorkout?.id == workout.id
+                    ? (strength.completedWorkout?.recoveryPauseIntervals ?? [])
+                    : []
             Task { @MainActor in
                 let uuid = await healthService.saveManualStrengthWorkout(
                     startDate: workout.startedAt,
                     endDate: endDate,
-                    externalID: workout.id
+                    externalID: workout.id,
+                    recoveryPauseIntervals: recoveredPauses
                 )
                 if let uuid {
                     historyStore.attachFinishedWorkoutHealthKitUUID(

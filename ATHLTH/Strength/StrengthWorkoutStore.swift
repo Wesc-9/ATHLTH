@@ -5409,11 +5409,9 @@ final class StrengthWorkoutStore: ObservableObject {
         // hours as active elapsed workout time.
         if workout.captureDevice == .iPhone,
            let suspended = recoveredCheckpointSavedAt {
-            let inactive = finishDate.timeIntervalSince(suspended)
-            if inactive.isFinite, inactive > 0 {
-                workout.excludedRecoverySeconds =
-                    (workout.excludedRecoverySeconds ?? 0) + inactive
-            }
+            workout.recordRecoveredDowntime(
+                from: suspended, until: finishDate
+            )
         }
 
         // A restored checkpoint can be hours old. Its save timestamp
@@ -5498,12 +5496,10 @@ final class StrengthWorkoutStore: ObservableObject {
         else { return }
 
         if workout.captureDevice == .iPhone {
-            let inactive = Date().timeIntervalSince(suspended)
-            if inactive.isFinite, inactive > 0 {
-                workout.excludedRecoverySeconds =
-                    (workout.excludedRecoverySeconds ?? 0) + inactive
-                activeWorkout = workout
-            }
+            workout.recordRecoveredDowntime(
+                from: suspended, until: Date()
+            )
+            activeWorkout = workout
         }
         recoveredCheckpointSavedAt = nil
         persistCheckpointNow()

@@ -118,6 +118,37 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertEqual(paused.recordingOwner, .iPhone)
     }
 
+    @MainActor
+    func testRecoveredPhoneStrengthPauseEventsRemainDeduplicated() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        var workout = try XCTUnwrap(store.activeWorkout)
+        let start = workout.startedAt
+
+        let first = start.addingTimeInterval(80)
+        let resumed = start.addingTimeInterval(400)
+        workout.recordRecoveredDowntime(from: first, until: resumed)
+        XCTAssertEqual(workout.excludedRecoverySeconds ?? 0, 320, accuracy: 0.001)
+        XCTAssertEqual(workout.recoveryPauseIntervals?.count, 1)
+        workout.recordRecoveredDowntime(
+            from: first.addingTimeInterval(10),
+            until: resumed.addingTimeInterval(30)
+        )
+        XCTAssertEqual(workout.excludedRecoverySeconds ?? 0, 350, accuracy: 0.001)
+        XCTAssertEqual(workout.recoveryPauseIntervals?.count, 1)
+        XCTAssertEqual(workout.elapsedSessionSeconds(
+            at: resumed.addingTimeInterval(30)
+        ), 80, accuracy: 0.001)
+
+        var watchWorkout = workout
+        watchWorkout.captureDevice = .appleWatch
+        watchWorkout.recordRecoveredDowntime(
+            from: resumed, until: resumed.addingTimeInterval(100)
+        )
+        XCTAssertEqual(watchWorkout.recoveryPauseIntervals?.count, 1)
+        XCTAssertEqual(watchWorkout.excludedRecoverySeconds ?? 0, 350, accuracy: 0.001)
+    }
+
     func testSharedStrengthEffortClockExcludesOnlyExplicitPause() {
         let clock = StrengthSetEffortClock(
             workoutID: UUID(),

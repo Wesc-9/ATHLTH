@@ -770,6 +770,9 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     /// Optional preserves histories and checkpoints from earlier versions.
     /// Watch-owned HealthKit recordings never use this local correction.
     var excludedRecoverySeconds: TimeInterval? = nil
+    /// Exact pause windows for HealthKit; optional for existing history.
+    /// A second save/recovery cannot insert the same offline pause twice.
+    var recoveryPauseIntervals: [DateInterval]? = nil
     var exercises: [StrengthExerciseLog]
     var healthMetrics: LinkedHealthWorkoutMetrics
     var advancedConfiguration:
@@ -794,6 +797,39 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
         let inactive = excludedRecoverySeconds ?? 0
         let excluded = inactive.isFinite ? max(inactive, 0) : 0
         return max(end.timeIntervalSince(startedAt) - excluded, 0)
+    }
+
+    /// Reconcile overlapping/retried crash checkpoints, retaining the
+    /// entire offline pause only once. No ordinary between-set rest is a
+    /// HealthKit pause.
+    mutating func recordRecoveredDowntime(
+        from checkpoint: Date,
+        until resumedAt: Date
+    ) {
+        guard captureDevice == .iPhone else { return }
+        let start = max(checkpoint, startedAt)
+        guard resumedAt > start else { return }
+        let previous = (recoveryPauseIntervals ?? [])
+            .filter { $0.duration.isFinite && $0.duration > 0 }
+        let previousSeconds = previous.reduce(0) { $0 + $1.duration }
+        let legacyUnrepresentedSeconds = max(
+            (excludedRecoverySeconds ?? 0) - previousSeconds, 0
+        )
+        let sorted = (previous + [DateInterval(start: start, end: resumedAt)])
+            .sorted { $0.start < $1.start }
+        var merged: [DateInterval] = []
+        for interval in sorted {
+            if let last = merged.last, interval.start <= last.end {
+                merged[merged.count - 1] = DateInterval(
+                    start: last.start, end: max(last.end, interval.end)
+                )
+            } else {
+                merged.append(interval)
+            }
+        }
+        recoveryPauseIntervals = merged
+        excludedRecoverySeconds = legacyUnrepresentedSeconds +
+            merged.reduce(0) { $0 + $1.duration }
     }
 
     var totalCompletedSets: Int {
