@@ -9,6 +9,18 @@ enum ATHLTHLiveWorkoutSnapshotSelection {
     ) -> WatchWorkoutLiveSnapshot? {
         guard let mirroredWatch else { return phoneWorkout }
 
+        // An old *active* Watch snapshot can also survive reconnect while a
+        // genuinely later phone recording has already started. Prefer the
+        // newer authoritative session only when start times are clearly
+        // separated; near-simultaneous mirroring still belongs to Watch.
+        if let phoneWorkout,
+           [.preparing, .running, .paused].contains(phoneWorkout.state),
+           let phoneStart = phoneWorkout.startedAt,
+           let watchStart = mirroredWatch.startedAt,
+           phoneStart.timeIntervalSince(watchStart) > 10 {
+            return phoneWorkout
+        }
+
         // A completed, failed or ending Watch workout may remain cached for
         // results reconciliation while a newly started iPhone workout is
         // active. It cannot replace that new workout's Live Activity.

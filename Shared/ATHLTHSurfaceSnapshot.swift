@@ -11,6 +11,10 @@ struct ATHLTHSurfaceSnapshot: Codable, Equatable {
     // Durable, account-scoped presentation tombstone. Never stores health
     // samples or a second workout recording; legacy snapshots decode nil.
     var lastFinishedWorkout: ATHLTHSurfaceWorkoutTerminalMarker? = nil
+    // A single terminal marker is insufficient after multiple workouts:
+    // an old delayed Watch packet can otherwise resurrect session N-1.
+    // Optional to decode existing app-group snapshots without migration.
+    var recentFinishedWorkouts: [ATHLTHSurfaceWorkoutTerminalMarker]? = nil
     var updatedAt: Date
 
     static let empty = ATHLTHSurfaceSnapshot(
@@ -64,6 +68,43 @@ struct ATHLTHSurfaceWorkoutTerminalMarker: Codable, Equatable {
 }
 
 enum ATHLTHSurfaceWorkoutOrdering {
+    static let maximumRecentFinished = 12
+
+    /// A bounded history protects older terminal sessions after the user
+    /// has started and stopped more than one recording on this account.
+    static func rememberFinished(
+        _ finished: ATHLTHSurfaceWorkoutTerminalMarker,
+        in snapshot: inout ATHLTHSurfaceSnapshot
+    ) {
+        var entries = snapshot.recentFinishedWorkouts ?? []
+        if let previous = snapshot.lastFinishedWorkout,
+           !entries.contains(previous) {
+            entries.append(previous)
+        }
+        if !entries.contains(finished) {
+            entries.append(finished)
+        }
+        entries.sort { $0.finishedAt > $1.finishedAt }
+        snapshot.recentFinishedWorkouts = Array(
+            entries.prefix(maximumRecentFinished)
+        )
+        if snapshot.lastFinishedWorkout.map({
+            finished.finishedAt >= $0.finishedAt
+        }) ?? true {
+            snapshot.lastFinishedWorkout = finished
+        }
+    }
+
+    static func matchesAnyFinished(
+        _ workout: ATHLTHSurfaceWorkoutSnapshot,
+        in snapshot: ATHLTHSurfaceSnapshot
+    ) -> Bool {
+        matchesTerminal(workout, marker: snapshot.lastFinishedWorkout) ||
+            (snapshot.recentFinishedWorkouts ?? []).contains {
+                matchesTerminal(workout, marker: $0)
+            }
+    }
+
     static func sameSession(
         _ lhs: ATHLTHSurfaceWorkoutSnapshot,
         _ rhs: ATHLTHSurfaceWorkoutSnapshot
@@ -102,12 +143,16 @@ enum ATHLTHSurfaceWorkoutOrdering {
         incoming: ATHLTHSurfaceWorkoutSnapshot,
         current: ATHLTHSurfaceWorkoutSnapshot?,
         terminal: ATHLTHSurfaceWorkoutTerminalMarker?,
+        recentFinished: [ATHLTHSurfaceWorkoutTerminalMarker] = [],
         now: Date = Date()
     ) -> Bool {
         let timestamp = incoming.updatedAt.timeIntervalSince1970
         guard timestamp.isFinite,
               now.timeIntervalSince(incoming.updatedAt) >= -10,
-              !matchesTerminal(incoming, marker: terminal)
+              !matchesTerminal(incoming, marker: terminal),
+              !recentFinished.contains(where: {
+                  matchesTerminal(incoming, marker: $0)
+              })
         else { return false }
         guard let current else { return true }
         if sameSession(current, incoming) {

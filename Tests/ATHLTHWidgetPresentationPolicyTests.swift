@@ -97,6 +97,47 @@ final class ATHLTHWidgetPresentationPolicyTests: XCTestCase {
         ))
     }
 
+    func testMultipleCompletedSessionsCannotResurrectOldWidget() throws {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = surfaceWorkout(
+            startedAt: start, capturedAt: start.addingTimeInterval(70)
+        )
+        let second = surfaceWorkout(
+            startedAt: start.addingTimeInterval(140),
+            capturedAt: start.addingTimeInterval(190)
+        )
+        var shared = ATHLTHSurfaceSnapshot.empty
+        ATHLTHSurfaceWorkoutOrdering.rememberFinished(
+            ATHLTHSurfaceWorkoutTerminalMarker(
+                workout: first, finishedAt: start.addingTimeInterval(90)
+            ), in: &shared
+        )
+        ATHLTHSurfaceWorkoutOrdering.rememberFinished(
+            ATHLTHSurfaceWorkoutTerminalMarker(
+                workout: second, finishedAt: start.addingTimeInterval(200)
+            ), in: &shared
+        )
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+            first, in: shared
+        ))
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+            second, in: shared
+        ))
+        XCTAssertFalse(ATHLTHSurfaceWorkoutOrdering.accepts(
+            incoming: first, current: nil,
+            terminal: shared.lastFinishedWorkout,
+            recentFinished: shared.recentFinishedWorkouts ?? [],
+            now: start.addingTimeInterval(205)
+        ))
+        let restored = try JSONDecoder().decode(
+            ATHLTHSurfaceSnapshot.self,
+            from: JSONEncoder().encode(shared)
+        )
+        XCTAssertTrue(ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+            first, in: restored
+        ))
+    }
+
     func testOldWidgetSnapshotDecodesWithoutTerminalWatermark() throws {
         let oldJSON = """
         {"recoveryState":"Ready","updatedAt":0}
@@ -105,6 +146,7 @@ final class ATHLTHWidgetPresentationPolicyTests: XCTestCase {
             ATHLTHSurfaceSnapshot.self, from: Data(oldJSON.utf8)
         )
         XCTAssertNil(old.lastFinishedWorkout)
+        XCTAssertNil(old.recentFinishedWorkouts)
         XCTAssertNil(old.activeWorkout)
     }
 

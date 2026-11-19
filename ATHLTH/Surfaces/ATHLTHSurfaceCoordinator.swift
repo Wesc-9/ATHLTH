@@ -26,6 +26,7 @@ enum ATHLTHSurfaceCoordinator {
                 incoming: workout,
                 current: previousDisplayed,
                 terminal: shared.lastFinishedWorkout,
+                recentFinished: shared.recentFinishedWorkouts ?? [],
                 now: now
             ) else { return }
             if let previousDisplayed, let previousRemote,
@@ -132,7 +133,8 @@ enum ATHLTHSurfaceCoordinator {
             if ATHLTHSurfaceWorkoutOrdering.accepts(
                 incoming: activeWorkout,
                 current: previous.activeWorkout,
-                terminal: previous.lastFinishedWorkout
+                terminal: previous.lastFinishedWorkout,
+                recentFinished: previous.recentFinishedWorkouts ?? []
             ) {
                 orderedWorkout = activeWorkout
             } else {
@@ -159,6 +161,7 @@ enum ATHLTHSurfaceCoordinator {
             },
             activeWorkout: orderedWorkout,
             lastFinishedWorkout: previous.lastFinishedWorkout,
+            recentFinishedWorkouts: previous.recentFinishedWorkouts,
             updatedAt: Date()
         )
 
@@ -296,10 +299,12 @@ enum ATHLTHSurfaceCoordinator {
             return
         }
 
-        stored.lastFinishedWorkout =
+        ATHLTHSurfaceWorkoutOrdering.rememberFinished(
             ATHLTHSurfaceWorkoutTerminalMarker(
                 workout: tombstoneSource, finishedAt: closedAt
-            )
+            ),
+            in: &stored
+        )
         stored.activeWorkout = nil
         stored.updatedAt = Date()
         ATHLTHSurfaceSharedStore.save(stored)
@@ -483,8 +488,7 @@ private final class ATHLTHLiveActivityController {
         // The App Group marker survives iPhone process termination. A
         // delayed Watch .running snapshot cannot reopen the same Activity
         // even if ActivityKit's in-memory controller was recreated.
-        let persistedTerminal =
-            ATHLTHSurfaceSharedStore.load().lastFinishedWorkout
+        let persistedSurface = ATHLTHSurfaceSharedStore.load()
         if !ATHLTHLiveActivityStopPolicy.shouldDismiss(snapshot.state) {
             let candidate = ATHLTHSurfaceWorkoutSnapshot(
                 title: identity.fallbackTitle,
@@ -496,8 +500,8 @@ private final class ATHLTHLiveActivityController {
                 heartRate: snapshot.heartRate,
                 updatedAt: snapshot.capturedAt
             )
-            guard !ATHLTHSurfaceWorkoutOrdering.matchesTerminal(
-                candidate, marker: persistedTerminal
+            guard !ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+                candidate, in: persistedSurface
             ) else { return }
         }
 

@@ -97,8 +97,8 @@ private struct ATHLTHSurfaceProvider: TimelineProvider {
             let permittedAge: TimeInterval =
                 workout.state == "remote_strength" ? 90 : 180
             if age < -10 || age > permittedAge ||
-               ATHLTHSurfaceWorkoutOrdering.matchesTerminal(
-                   workout, marker: value.lastFinishedWorkout
+               ATHLTHSurfaceWorkoutOrdering.matchesAnyFinished(
+                   workout, in: value
                ) {
                 // A cached active value is never stronger evidence than a
                 // recorded terminal marker, including after process restart.

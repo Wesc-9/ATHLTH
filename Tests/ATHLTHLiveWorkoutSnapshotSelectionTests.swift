@@ -55,6 +55,21 @@ final class ATHLTHLiveWorkoutSnapshotSelectionTests: XCTestCase {
         XCTAssertEqual(resolved.startedAt, strength.startedAt)
     }
 
+    func testStaleActiveWatchCannotReplaceMuchNewerPhoneSession() {
+        let staleWatch = snapshot(
+            kind: .running, elapsed: 720, at: now, state: .running
+        )
+        let newPhone = snapshot(
+            kind: .strength, elapsed: 42,
+            at: now.addingTimeInterval(1_200), state: .running
+        )
+        XCTAssertEqual(
+            ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                mirroredWatch: staleWatch, phoneWorkout: newPhone
+            ), newPhone
+        )
+    }
+
     func testActiveWatchStillOwnsMirroredPresentation() throws {
         let watch = snapshot(kind: .strength, elapsed: 80, at: now)
         let phone = snapshot(
