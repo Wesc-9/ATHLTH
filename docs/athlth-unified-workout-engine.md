@@ -1,3 +1,10 @@
+## 2.2.6 – én identitet for bekreftet Watch-styrke før iPhone-sjekkpunkt
+
+- Universell aktiv økttilstand kan nå lese et nylig bekreftet Watch-speil for styrke direkte fra faktisk Watch UUID, HealthKit-aktiv tid og startklokke. Dette er én skrivebeskyttet visning av originalt Watch-opptak, aldri en ekstra økt, lokal journal eller HealthKit-writer.
+- Watch-økter med manglende UUID, gammel sensorstatus, feil idrett, avsluttet tilstand eller umulig aktiv tid forblir beskyttet som opptatt; de gis ikke en oppdiktet økt-ID.
+- Når den opprinnelige iPhone-styrkeloggen allerede finnes, brukes den etter eksisterende streng same-ID/same-owner validering. Nye XCTest verifiserer Watch UUID, pause, HealthKit-tid og ugyldige prøver.
+- Generiske Watch-idretter uten originalt ATHLTH-workout-ID kan ennå ikke projiseres som bekreftet universell aktiv økt. Ingen usikker deduplisering i historikk.
+
 ## 2.2.6 – felles faseovergang og komplette øktoppskrifter
 
 - Den strukturerte iPhone-motoren bruker nå en egen validering av den faktiske neste blokken via ATHLTHLiveWorkoutEngineRouter.advance. Bare etterfølgende, unike steg-ID-er i samme opprinnelige økt kan få motoren til å flytte livekursør. Pauser/instruksjoner er ordinære steg, og ingen overgang lager en separat trenings- eller HealthKit-økt.

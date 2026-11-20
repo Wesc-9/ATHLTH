@@ -8,6 +8,9 @@ enum ATHLTHUniversalCaptureSource: String, Codable, Hashable {
     case strength
     case manualTimer
     case structuredTimer
+    /// Read-only projection of a provably identified Watch strength session.
+    /// The Watch remains the sole HealthKit owner of its workout.
+    case watchMirror
 
     var isManualTiming: Bool {
         self == .manualTimer || self == .structuredTimer
@@ -174,6 +177,45 @@ enum ATHLTHUniversalActiveCapture {
         )
     }
 
+    /// Recover a confirmed mirrored Watch strength workout while its
+    /// iPhone strength log has not been materialized yet. The Watch's
+    /// real UUID and HealthKit active clock are required; never invent a
+    /// local workout ID for older Watch snapshots that lack these fields.
+    static func mirroredStrength(
+        _ snapshot: WatchWorkoutLiveSnapshot,
+        at now: Date = Date()
+    ) -> ATHLTHUniversalActiveCaptureState? {
+        guard snapshot.kind == .strength,
+              snapshot.state == .running || snapshot.state == .paused,
+              let id = snapshot.strengthWorkoutID,
+              let start = snapshot.startedAt,
+              start.timeIntervalSince1970.isFinite,
+              snapshot.capturedAt.timeIntervalSince1970.isFinite,
+              now.timeIntervalSince1970.isFinite,
+              start <= snapshot.capturedAt,
+              snapshot.elapsedTime.isFinite,
+              snapshot.elapsedTime >= 0,
+              snapshot.elapsedTime <= snapshot.capturedAt.timeIntervalSince(
+                  start
+              ) + 10,
+              now.timeIntervalSince(snapshot.capturedAt) >= -10,
+              now.timeIntervalSince(snapshot.capturedAt) <= 35
+        else { return nil }
+        return ATHLTHUniversalActiveCaptureState(
+            workoutID: id,
+            plannedSessionID: nil,
+            recordingOwner: .appleWatch,
+            source: .watchMirror,
+            activityCategory: "strength",
+            engine: .strength,
+            phase: snapshot.state == .paused ? .paused : .work,
+            startedAt: start,
+            elapsedSeconds: snapshot.elapsedTime,
+            stageIndex: nil,
+            stageCount: nil
+        )
+    }
+
     /// A hybrid run+strength may have TWO projections of the SAME recorded
     /// workout. Every other overlap is unsafe and must fail closed.
     static func unique(
@@ -248,12 +290,20 @@ enum ATHLTHUniversalActiveCapture {
             running: running, strength: strength,
             manual: manual, structured: structured, at: now
         )
-        // An in-flight launch cannot silently coexist with an already
-        // active journal, and an orphan Watch mirror is not a free slot.
-        if ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
-           ATHLTHWorkoutRecordingArbiter.phone?.hasPendingLaunch == true ||
-           (result == nil && mirrorActive) {
+        // Pending starts cannot be mistaken for an existing confirmed
+        // Watch or phone workout. Recover only a fresh, identity-proven
+        // Watch strength mirror; otherwise protect its occupied slot.
+        guard !ATHLTHWorkoutRecordingArbiter.hasPendingLaunch,
+              ATHLTHWorkoutRecordingArbiter.phone?.hasPendingLaunch != true
+        else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
+        if result == nil && mirrorActive {
+            guard let snapshot = mirror?.snapshot,
+                  let confirmed = mirroredStrength(snapshot, at: now) else {
+                throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+            }
+            return confirmed
         }
         return result
     }

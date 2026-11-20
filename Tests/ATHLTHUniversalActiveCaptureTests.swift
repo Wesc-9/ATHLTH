@@ -356,4 +356,78 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         ))
     }
 
+
+    func testConfirmedWatchStrengthMirrorUsesRealHealthKitClockAndID() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        var snapshot = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running, startedAt: start,
+            capturedAt: start.addingTimeInterval(60),
+            elapsedTime: 45, heartRate: 120,
+            activeCalories: 16, distanceMeters: 0,
+            averageHeartRate: nil, maxHeartRate: nil,
+            routePointCount: 0
+        )
+        let id = UUID()
+        snapshot.strengthWorkoutID = id
+        let active = try XCTUnwrap(
+            ATHLTHUniversalActiveCapture.mirroredStrength(
+                snapshot, at: snapshot.capturedAt
+            )
+        )
+        XCTAssertEqual(active.workoutID, id)
+        XCTAssertNil(active.plannedSessionID)
+        XCTAssertEqual(active.source, .watchMirror)
+        XCTAssertFalse(active.source.isManualTiming)
+        XCTAssertEqual(active.recordingOwner, .appleWatch)
+        XCTAssertEqual(active.elapsedSeconds, 45)
+        XCTAssertEqual(active.engine, .strength)
+        XCTAssertEqual(active.phase, .work)
+        XCTAssertNil(active.stageIndex, "Never invent a missing Watch cursor")
+
+        snapshot.state = .paused
+        snapshot.elapsedTime = 45
+        let paused = try XCTUnwrap(
+            ATHLTHUniversalActiveCapture.mirroredStrength(
+                snapshot, at: snapshot.capturedAt
+            )
+        )
+        XCTAssertEqual(paused.phase, .paused)
+        XCTAssertEqual(paused.workoutID, active.workoutID)
+        XCTAssertEqual(paused.elapsedSeconds, active.elapsedSeconds)
+    }
+
+    func testUnidentifiedOrStaleWatchMirrorKeepsOriginalSlotProtected() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        var snapshot = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running, startedAt: start,
+            capturedAt: start.addingTimeInterval(30),
+            elapsedTime: 20, heartRate: 111,
+            activeCalories: 5, distanceMeters: 0,
+            averageHeartRate: nil, maxHeartRate: nil,
+            routePointCount: 0
+        )
+        let now = snapshot.capturedAt
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredStrength(
+            snapshot, at: now
+        ))
+        snapshot.strengthWorkoutID = UUID()
+        snapshot.kind = .running
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredStrength(
+            snapshot, at: now
+        ))
+        snapshot.kind = .strength
+        snapshot.elapsedTime = 1_000
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredStrength(
+            snapshot, at: now
+        ))
+        snapshot.elapsedTime = 20
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredStrength(
+            snapshot, at: now.addingTimeInterval(45)
+        ))
+        snapshot.state = .completed
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredStrength(
+            snapshot, at: now
+        ))
+    }
+
 }
