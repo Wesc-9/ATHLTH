@@ -135,11 +135,36 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Bound CoreSimulator calls independently of the workflow timeout.
+          # Preserve real app PID checks and the nonblank visual threshold.
+          simctl_bounded() {
+            local label="$1" seconds="$2"
+            shift 2
+            python3 - "$label" "$seconds" "$@" <<'PY'
+          import subprocess, sys
+          label, seconds = sys.argv[1], int(sys.argv[2])
+          cmd = ["xcrun", "simctl", *sys.argv[3:]]
+          print(f"::notice::iPhone simulator: {label} (limit {seconds}s)", file=sys.stderr, flush=True)
+          try:
+              result = subprocess.run(cmd, capture_output=True, text=True, timeout=seconds)
+          except subprocess.TimeoutExpired:
+              print(f"::error::iPhone simulator timed out at {label} after {seconds}s", file=sys.stderr, flush=True)
+              raise SystemExit(124)
+          if result.stdout:
+              print(result.stdout, end="", flush=True)
+          if result.stderr:
+              print(result.stderr, end="", file=sys.stderr, flush=True)
+          if result.returncode:
+              print(f"::error::iPhone simulator '{label}' failed ({result.returncode})", file=sys.stderr, flush=True)
+          raise SystemExit(result.returncode)
+          PY
+          }
+
           # The device-type catalog contains older phones that iOS 27 cannot
           # create. Select existing simulator UDIDs registered to compatible
           # runtimes instead; report classes unavailable on this runner.
           DEVICE_MATRIX="$RUNNER_TEMP/iphone-device-matrix.txt"
-          xcrun simctl list devices available -j \
+          simctl_bounded "list registered iPhones" 45 list devices available -j \
             | python3 scripts/select_iphone_simulators.py > "$DEVICE_MATRIX"
           test -s "$DEVICE_MATRIX"
 
@@ -156,7 +181,7 @@ jobs:
             local udid="$1"
             # These are registered runner-owned simulators, not temporary
             # devices created by this job. Never delete them.
-            xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+            simctl_bounded "shutdown registered iPhone" 35 shutdown "$udid" >/dev/null 2>&1 || true
           }
 
           validate_nonblank_screen() {
@@ -168,7 +193,7 @@ jobs:
             local entropy="0"
 
             while [ "$attempt" -le 3 ]; do
-              xcrun simctl io "$udid" screenshot "$screenshot"
+              simctl_bounded "capture $label" 55 io "$udid" screenshot "$screenshot"
               test -s "$screenshot"
 
               entropy=$(magick "$screenshot" -colorspace Gray -format "%[entropy]" info:)
@@ -195,7 +220,7 @@ jobs:
               return 1
             fi
             echo "::error::$label remained visually blank after relaunch and three more checks (entropy=$entropy)."
-            xcrun simctl spawn "$udid" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+            simctl_bounded "collect $label logs" 65 spawn "$udid" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
             return 1
           }
 
@@ -206,12 +231,17 @@ jobs:
             trap 'cleanup_device "$UDID"' EXIT
             # Reuse the runner's already-compatible device/runtime pairing.
             # A previously booted device does not need a second boot.
-            xcrun simctl boot "$UDID" || true
-            xcrun simctl bootstatus "$UDID" -b
-            xcrun simctl install "$UDID" "$APP"
+            simctl_bounded "boot registered $DEVICE_NAME" 95 boot "$UDID" || true
+            # A hanging bootstatus is not proof of failure or success.
+            # Require a responsive launchd before installation.
+            if ! simctl_bounded "wait for $DEVICE_NAME boot" 145 bootstatus "$UDID" -b; then
+              echo "::warning::Boot status incomplete; probing launch services."
+            fi
+            simctl_bounded "probe $DEVICE_NAME launch services" 50 spawn "$UDID" launchctl list
+            simctl_bounded "install ATHLTH $DEVICE_NAME" 155 install "$UDID" "$APP"
 
             set +e
-            LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
+            LAUNCH_OUTPUT=$(simctl_bounded "launch ATHLTH $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth 2>&1)
             LAUNCH_STATUS=$?
             set -e
 
@@ -219,7 +249,7 @@ jobs:
 
             if [ "$LAUNCH_STATUS" -ne 0 ]; then
               echo "::error::ATHLTH failed to launch on $DEVICE_NAME."
-              xcrun simctl spawn "$UDID" log show --last 2m --style compact --predicate 'process == "ATHLTH"' || true
+              simctl_bounded "collect ATHLTH failure logs" 65 spawn "$UDID" log show --last 2m --style compact --predicate 'process == "ATHLTH"' || true
               exit 1
             fi
 
@@ -228,7 +258,7 @@ jobs:
 
             if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
               echo "::error::ATHLTH exited shortly after launch on $DEVICE_NAME."
-              xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+              simctl_bounded "collect ATHLTH failure logs" 65 spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
               exit 1
             fi
 
@@ -238,10 +268,10 @@ jobs:
               # after a successful process launch on a freshly created device.
               # Reopen the real app once; do not lower the visual threshold or
               # mark a persistently blank screen as a passing result.
-              xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+              simctl_bounded "terminate ATHLTH $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
               sleep 3
               set +e
-              RETRY_LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
+              RETRY_LAUNCH_OUTPUT=$(simctl_bounded "launch ATHLTH $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth 2>&1)
               RETRY_LAUNCH_STATUS=$?
               set -e
               echo "$RETRY_LAUNCH_OUTPUT"
@@ -260,13 +290,13 @@ jobs:
 
             echo "ATHLTH remained alive and rendered non-blank onboarding UI on $DEVICE_NAME (PID $PID)."
 
-            xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+            simctl_bounded "terminate ATHLTH $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
 
             for TAB in 0 1 2 3 4; do
               echo "Rendering main tab $TAB on $DEVICE_NAME"
 
               set +e
-              TAB_LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth \
+              TAB_LAUNCH_OUTPUT=$(simctl_bounded "launch ATHLTH $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth \
                 --athlth-compatibility-preview \
                 "--athlth-compatibility-tab=$TAB" 2>&1)
               TAB_LAUNCH_STATUS=$?
@@ -284,7 +314,7 @@ jobs:
 
               if [ -z "$TAB_PID" ] || ! kill -0 "$TAB_PID" 2>/dev/null; then
                 echo "::error::ATHLTH tab $TAB exited on $DEVICE_NAME."
-                xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+                simctl_bounded "collect ATHLTH failure logs" 65 spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
                 exit 1
               fi
 
@@ -294,10 +324,10 @@ jobs:
                 # framebuffer between previews. Reopen this exact tab once;
                 # still fail if it does not render a real nonblank frame.
                 echo "::warning::Retrying blank $DEVICE_NAME tab $TAB after a fresh launch."
-                xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+                simctl_bounded "terminate ATHLTH $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
                 sleep 3
                 set +e
-                TAB_RETRY_LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth \
+                TAB_RETRY_LAUNCH_OUTPUT=$(simctl_bounded "launch ATHLTH $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth \
                   --athlth-compatibility-preview \
                   "--athlth-compatibility-tab=$TAB" 2>&1)
                 TAB_RETRY_LAUNCH_STATUS=$?
@@ -316,7 +346,7 @@ jobs:
                 validate_nonblank_screen "$UDID" "$TAB_SCREENSHOT" "$DEVICE_NAME tab $TAB"
               fi
 
-              xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+              simctl_bounded "terminate ATHLTH $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
             done
 
             echo "All five main tabs rendered on $DEVICE_NAME."
