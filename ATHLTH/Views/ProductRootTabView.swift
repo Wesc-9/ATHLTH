@@ -6919,7 +6919,8 @@ struct ATHLTHTrainView: View {
             ).flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
               .first(where: { $0.id == structuredID }) {
             Button {
-                selectedStructuredWorkout = structured
+                selectedStructuredWorkout = ATHLTHUnifiedWorkout
+                    .timedNonCardioProjection(from: structured) ?? structured
             } label: {
                 Label(
                     ATHLTHLocalization.choose(
@@ -8079,6 +8080,12 @@ struct ATHLTHTrainView: View {
         // silently discards the programmed blocks and their completion link.
         if workout.isStructuredWorkout {
             selectedStructuredWorkout = workout
+            return
+        }
+
+        if let timedProjection = ATHLTHUnifiedWorkout
+            .timedNonCardioProjection(from: workout) {
+            selectedStructuredWorkout = timedProjection
             return
         }
 

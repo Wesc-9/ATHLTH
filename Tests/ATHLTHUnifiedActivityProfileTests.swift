@@ -120,6 +120,38 @@ final class ATHLTHUnifiedActivityProfileTests: XCTestCase {
         XCTAssertEqual(meditationTimeline.first?.durationSeconds, 1800)
     }
 
+    func testSimpleTimedCyclingYogaAndMeditationUseExistingStructuredPlayer() throws {
+        for (category, kind) in [
+            ("cycling", WorkoutKind.custom),
+            ("yoga", WorkoutKind.mobility),
+            ("meditation", WorkoutKind.recovery)
+        ] {
+            let source = workout(kind: kind, category: category)
+            XCTAssertNil(source.workoutBlocks)
+            let projected = try XCTUnwrap(
+                ATHLTHUnifiedWorkout.timedNonCardioProjection(from: source)
+            )
+            XCTAssertEqual(projected.id, source.id)
+            XCTAssertEqual(projected.kind, source.kind)
+            XCTAssertEqual(projected.workoutBlocks?.count, 1)
+            XCTAssertEqual(projected.workoutBlocks?.first?.durationSeconds, 1_800)
+            XCTAssertNil(projected.workoutBlocks?.first?.distanceMeters)
+            XCTAssertNil(projected.workoutBlocks?.first?.targetPaceSecondsPerKilometer)
+            XCTAssertEqual(ATHLTHLiveWorkoutEngineRouter.engine(
+                for: try XCTUnwrap(projected.workoutBlocks?.first)
+            ), category == "cycling" ? .cycling : .mobility)
+            // Projection is read-only. The original JSON is not migrated.
+            XCTAssertNil(source.workoutBlocks)
+        }
+    }
+
+    func testSimpleNonTimedCustomAndRunningDoNotGetFakeSteps() {
+        let running = workout(kind: .running)
+        let custom = workout(kind: .custom)
+        XCTAssertNil(ATHLTHUnifiedWorkout.timedNonCardioProjection(from: running))
+        XCTAssertNil(ATHLTHUnifiedWorkout.timedNonCardioProjection(from: custom))
+    }
+
     func testLegacyExplicitCategoriesAndOriginalIdentitySurviveEncoding() throws {
         let old = workout(kind: .custom, category: "hiking")
         XCTAssertEqual(ATHLTHUnifiedActivityProfile.category(for: old), "walking")

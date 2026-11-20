@@ -87,6 +87,33 @@ enum ATHLTHUnifiedWorkout {
         return blocks
     }
 
+    /// A legacy simple cycling/yoga/meditation plan may have a title, kind
+    /// and duration but no encoded timeline. Project its existing timing into
+    /// the shared structured player without changing the saved plan, its ID
+    /// or creating a second HealthKit/Watch workout.
+    ///
+    /// All sensor values stay absent; iPhone marks this as a timed/manual
+    /// structured completion. Other activity types keep their own recorder.
+    static func timedNonCardioProjection(
+        from workout: PlannedSession
+    ) -> PlannedSession? {
+        guard !workout.isStructuredWorkout else { return nil }
+        let category = ATHLTHUnifiedActivityProfile.category(for: workout)
+        guard ["cycling", "mobility", "recovery"].contains(category) else {
+            return nil
+        }
+        let projectedBlocks = editorBlocks(from: workout)
+        guard !projectedBlocks.isEmpty,
+              projectedBlocks.allSatisfy({
+                  $0.kind == .note || $0.kind == .rest
+              }) else { return nil }
+        var projected = workout
+        projected.workoutBlocks = projectedBlocks
+        // Keep the original workoutCategory and duration in persisted data.
+        // The projection is used only during the selected live session.
+        return projected
+    }
+
     private static func appendExercises(
         _ exercises: [PlannedExercise],
         phase: WorkoutPhaseKind,
