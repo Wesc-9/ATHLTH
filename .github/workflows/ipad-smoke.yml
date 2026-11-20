@@ -62,6 +62,7 @@ on:
       - scripts/optimize_hero_assets.sh
       - .github/workflows/ipad-smoke.yml
       - .github/ipad-trigger
+      - .github/testflight-trigger
 
 concurrency:
   group: athlth-ipad-compatibility-${{ github.ref }}
@@ -126,7 +127,13 @@ jobs:
             build
 
       - name: Launch onboarding and all main tabs on iPad
+        # The 11- and 13-inch layouts are already independently exercised
+        # after full XCTest by Build ATHLTH. This independent smoke job
+        # checks all 12 screens on 11-inch without reusing a tired runner
+        # for a second 13-inch simulator (which timed out in two CI runs).
         shell: bash
+        env:
+          ATHLTH_IPAD_SMOKE_SIZE: "11"
         run: bash scripts/run_ipad_smoke.sh
 
       - name: Upload iPad smoke screenshots

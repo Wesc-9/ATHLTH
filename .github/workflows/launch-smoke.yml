@@ -288,7 +288,32 @@ jobs:
               fi
 
               TAB_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-tab-$TAB.png"
-              validate_nonblank_screen                 "$UDID"                 "$TAB_SCREENSHOT"                 "$DEVICE_NAME tab $TAB"
+              if ! validate_nonblank_screen "$UDID" "$TAB_SCREENSHOT" "$DEVICE_NAME tab $TAB" probe; then
+                # A reused headless CoreSimulator can preserve a stale blank
+                # framebuffer between previews. Reopen this exact tab once;
+                # still fail if it does not render a real nonblank frame.
+                echo "::warning::Retrying blank $DEVICE_NAME tab $TAB after a fresh launch."
+                xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+                sleep 3
+                set +e
+                TAB_RETRY_LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth \
+                  --athlth-compatibility-preview \
+                  "--athlth-compatibility-tab=$TAB" 2>&1)
+                TAB_RETRY_LAUNCH_STATUS=$?
+                set -e
+                echo "$TAB_RETRY_LAUNCH_OUTPUT"
+                if [ "$TAB_RETRY_LAUNCH_STATUS" -ne 0 ]; then
+                  echo "::error::ATHLTH tab $TAB failed to relaunch on $DEVICE_NAME."
+                  exit 1
+                fi
+                TAB_PID=$(echo "$TAB_RETRY_LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+                sleep 12
+                if [ -z "$TAB_PID" ] || ! kill -0 "$TAB_PID" 2>/dev/null; then
+                  echo "::error::ATHLTH tab $TAB exited after relaunch on $DEVICE_NAME."
+                  exit 1
+                fi
+                validate_nonblank_screen "$UDID" "$TAB_SCREENSHOT" "$DEVICE_NAME tab $TAB"
+              fi
 
               xcrun simctl terminate "$UDID" com.wesc9.athlth || true
             done

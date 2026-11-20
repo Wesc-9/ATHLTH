@@ -112,6 +112,7 @@ jobs:
               "ATHLTH backend regressions",
               "ATHLTH Train and Hybrid Engine XCTest",
               "ATHLTH iPhone Compatibility Smoke Test",
+              "ATHLTH iPad Compatibility Smoke Test",
           ]
           selected = {}
           pending = False
@@ -154,7 +155,7 @@ jobs:
                   print(f"::error::Missing verified iPad {size}-inch screenshot artifact")
                   sys.exit(1)
           
-          print(f"All four workflows, both iPad layouts and artifacts verified for {sha}.")
+          print(f"All five workflows, both iPad layouts and artifacts verified for {sha}.")
           sys.exit(0)
           PY
             then
