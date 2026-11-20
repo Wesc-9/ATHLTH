@@ -403,4 +403,22 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         XCTAssertEqual(mixed.resolvedWorkoutBlocks.count, 2)
     }
 
+
+    func testUniversalPlannedLaunchRequiresWholeOriginalPlanLink() {
+        let planID = UUID()
+        let sessionID = UUID()
+        XCTAssertTrue(ATHLTHPlannedLaunchIdentityPolicy.hasCompleteLink(
+            planID: nil, sessionID: nil
+        ))
+        XCTAssertTrue(ATHLTHPlannedLaunchIdentityPolicy.hasCompleteLink(
+            planID: planID, sessionID: sessionID
+        ))
+        XCTAssertFalse(ATHLTHPlannedLaunchIdentityPolicy.hasCompleteLink(
+            planID: planID, sessionID: nil
+        ))
+        XCTAssertFalse(ATHLTHPlannedLaunchIdentityPolicy.hasCompleteLink(
+            planID: nil, sessionID: sessionID
+        ))
+    }
+
 }

@@ -775,6 +775,12 @@ enum WorkoutLaunchCoordinator {
         expectedKind: WorkoutKind,
         device: WorkoutCaptureDevice
     ) throws -> PlannedSession? {
+        guard ATHLTHPlannedLaunchIdentityPolicy.hasCompleteLink(
+            planID: planID, sessionID: workoutID
+        ) else {
+            throw ATHLTHWorkoutCaptureAdmission.Rejection
+                .requiresDedicatedActivityCapture
+        }
         guard let planID, let workoutID else { return nil }
         guard let session,
               let plan = session.trainingPlan(withID: planID),

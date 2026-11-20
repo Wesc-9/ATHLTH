@@ -9,6 +9,17 @@ import Foundation
 /// One physical recorder choice per complete planned recipe, irrespective
 /// of whether the start action originated in Train, Home or the calendar.
 /// This never creates an extra HealthKit session or rewrites a saved plan.
+/// A planned launch may be free or linked to exactly one plan and session.
+/// A half-present link is not permission to silently launch Free Run and
+/// discard the original training plan's stage identity.
+enum ATHLTHPlannedLaunchIdentityPolicy {
+    static func hasCompleteLink(
+        planID: UUID?, sessionID: UUID?
+    ) -> Bool {
+        (planID == nil) == (sessionID == nil)
+    }
+}
+
 enum ATHLTHPlannedWorkoutCaptureRoute: Equatable {
     case phoneEndurance
     case phoneStrength

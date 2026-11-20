@@ -1,3 +1,9 @@
+## 2.2.6 – ikke mist plan-ID ved gjenopptak eller Quick Train
+
+- Før Quick Run og Quick Walk starter et planlagt opptak, kontrollerer `ATHLTHPlannedLaunchIdentityPolicy` at både plan-ID og session-ID finnes sammen. Et mangelfullt/halvt koblet planobjekt blir avvist i stedet for å bli startet som en «fri» økt hvor planens faser eller identitet kan forsvinne.
+- Vanlig fri Quick Train uten planlenke fungerer fortsatt. Hele planlenken og eksisterende opptakseier beholdes; ingen ekstra HealthKit-opptaker eller øktjournal er introdusert.
+- Ny XCTest dekker alle kombinasjoner av manglende og fullstendige lenker, og tidligere rutevalidering gjelder fortsatt.
+
 ## 2.2.6 – enhetlig opptaksplass også ved Watch-start uten speil
 
 - `ATHLTHWorkoutSessionFoundation.requireAvailableRecordingSlot` bruker nå én testbar regel for pending iPhone, manuell og strukturert tidtaker, aktive Watch-speil og Watch-opptak som er startet før speilet kommer. Det hindrer at et kildeopptak på Watch blir tolket som et ledig iPhone-opptak bare fordi overføringen er forsinket.
