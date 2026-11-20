@@ -348,8 +348,11 @@ enum ATHLTHUniversalActiveCapture {
         // Watch-owned strength journal is already available on iPhone.
         // An old or cross-account mirror cannot authorize live telemetry.
         if mirrorActive {
-            guard let snapshot = mirror?.snapshot,
-                  mirroredWatch(snapshot, for: userID, at: now) != nil else {
+            // Check immutable account ownership for every mirror. A
+            // disconnected Watch may leave its last sample stale while the
+            // original, account-scoped strength checkpoint is still valid.
+            // Freshness is required below ONLY to project mirror telemetry.
+            guard mirror?.snapshot?.accountOwnerID == userID else {
                 throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
             }
         }

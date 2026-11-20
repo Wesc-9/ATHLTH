@@ -101,6 +101,32 @@ final class CustomQuickWorkoutJournalTests: XCTestCase {
         }
     }
 
+    func testEveryManualSportUsesSameDistanceAvailabilityAsLiveUI() {
+        for sport in CustomQuickWorkoutActivity.allCases {
+            let supported = ATHLTHSpectatorSportMetricPolicy.supportsDistance(
+                sport.rawValue
+            )
+            XCTAssertTrue(CustomQuickWorkoutRecord.validDistance(
+                nil, durationSeconds: 3600, activity: sport
+            ))
+            XCTAssertEqual(CustomQuickWorkoutRecord.validDistance(
+                1.0, durationSeconds: 3600, activity: sport
+            ), supported, sport.rawValue)
+        }
+        for sport in [CustomQuickWorkoutActivity.yoga, .hiit,
+                      .circuit, .functional, .mobility] {
+            XCTAssertNil(CustomQuickWorkoutRecord.make(
+                configuration: CustomQuickWorkoutConfiguration(
+                    activity: sport, method: .open, durationMinutes: 30,
+                    workSeconds: 40, restSeconds: 20, rounds: 8
+                ),
+                recordedAt: .now, durationSeconds: 1800,
+                distanceKilometers: 2.0, perceivedEffort: 4,
+                notes: nil, evidence: .manual
+            ))
+        }
+    }
+
     func testFreeTrainingUsesGenericOpenRecorderAndKeepsItsName() throws {
         let setup = CustomQuickWorkoutConfiguration(
             activity: .other,

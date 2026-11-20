@@ -512,6 +512,29 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
     }
 
 
+    func testStaleSameAccountMirrorCannotClaimFreshSensorTelemetry() throws {
+        let original = UUID(), owner = UUID()
+        var mirror = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running,
+            startedAt: started, capturedAt: started.addingTimeInterval(75),
+            elapsedTime: 65, heartRate: 125, activeCalories: 20,
+            distanceMeters: 0, averageHeartRate: nil,
+            maxHeartRate: nil, routePointCount: 0
+        )
+        mirror.strengthWorkoutID = original
+        mirror.universalWorkoutID = original
+        mirror.accountOwnerID = owner
+        XCTAssertEqual(mirror.accountOwnerID, owner)
+        // After connectivity loss, current-account strength checkpoints may
+        // persist, but this old mirror cannot become fresh live sensor data.
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            mirror, for: owner, at: mirror.capturedAt.addingTimeInterval(60)
+        ))
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            mirror, for: UUID(), at: mirror.capturedAt
+        ))
+    }
+
     func testCurrentAccountWatchProjectionNeverLeaksAcrossLogin() throws {
         let start = Date(timeIntervalSince1970: 1_900_000_000)
         let sourceOwner = UUID()

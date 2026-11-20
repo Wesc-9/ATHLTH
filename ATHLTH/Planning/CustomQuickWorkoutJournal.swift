@@ -65,6 +65,12 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
                               activity: CustomQuickWorkoutActivity) -> Bool {
         guard let value else { return true }
         guard value.isFinite && value > 0 && value <= 1_000 else { return false }
+        // Follow the same activity policy as the live/manual entry UI.
+        // A hidden distance field can never create a fictional yoga,
+        // HIIT or circuit distance through a stale draft or API caller.
+        guard ATHLTHSpectatorSportMetricPolicy.supportsDistance(
+            activity.rawValue
+        ) else { return false }
         if activity == .cycling || activity == .rowing { return true }
         return value <= maximumRunningSpeedKilometersPerHour(for: durationSeconds)
             * durationSeconds / 3600

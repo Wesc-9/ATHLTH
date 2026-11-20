@@ -1,3 +1,9 @@
+## 2.2.6 – måleproveniens og frakoblet Watch uten falsk økt
+
+- Manuell Custom Quick-historikk bruker samme distansekapabilitet som aktiviteten faktisk har i skjermbildet. Stale/eksterne data kan ikke lagre fiktive kilometer for yoga, HIIT, sirkel og bevegelighet; eksisterende historie slettes eller migreres ikke. Manuell distanse for støttede aktiviteter er fortsatt uttrykkelig uverifisert.
+- En Watch-styrkejournal skal kunne leve videre under kort forbindelsesbrudd. Kontoeier verifiseres fortsatt ved aktivt speil, men en gammel Watch-sensorprøve brukes ikke som krav for å lese den originale styrkejournalen. Bare fersk, identitetsverifisert Watch-telemetri kan publiseres som Watch-live.
+- Regresjonstester dekker alle manuelle sportsvalg, misvisende distanser og utdatert Watch-sensormåling. Same-commit CI og fysisk test gjenstår.
+
 ## 2.2.6 – planbundet Watch-live uten tapt originalidentitet
 
 - Watch inkluderer nå `plannedCalendarSessionID` i det opprinnelige live-snapshotet, i tillegg til allerede lagret Watch-gjenoppretting og resultat. Universell aktiv Watch-projeksjon viser original planlagt session-ID for alle støttede Watch-aktiviteter; fri trening og legacy Watch-overføringer forblir uten plan-ID.
