@@ -1,3 +1,11 @@
+## 2.2.6 – manuelle økter i iPad-spektator og felles startkontroll
+
+- iPhone-tidsstyrte Custom Quick-økter for alle aktiviteter vises nå i den **eksisterende samtykkestyrte** iPad-livekanalen. Økt-ID, start, aktiv tid, drag og pause kommer fra original tidscheckpoint via universalmotorens projeksjon.
+- Tidsregistrering gir ikke grunnlag for å publisere puls, kalorier, GPS, målt distanse, pace eller Spotify-status; disse feltene er fraværende for manuelle økter.
+- Train og Custom Quick kontrollerer også startforespørsler som ennå venter på opptaksopprettelse, så en UI-knapp ikke varsler falsk ledig plass.
+- En minimert strukturert økt startet utenfor treningsplanen kan gjenfinnes fra Hjem i tillegg til ordinære planøkter. Ingen dobbel fullføring eller ny opptaksjournal opprettes.
+- Regresjonstester dekker alle manuelle aktiviteter, 20/10 Tabata, fryst pause, intervallposisjon og fravær av oppdiktede sensorer. Krever samme-commit iPhone/iPad/Watch CI og fysisk test før utgivelse.
+
 ## 2.2.6 – Watch-resultater for flere treningsformer
 
 Eldre Watch-resultater uten eksplisitt plan-ID kan nå knyttes til korrekt planlagt sykling, roing, HIIT, trapp, yoga og andre støttede aktiviteter når den eksisterende tre-minuttersregelen finner nøyaktig én gyldig, aktiv plan. Vi matcher aldri en meditasjonsøkt som yoga eller en annen aktivitet som styrke, og lager ingen ekstra historikk.

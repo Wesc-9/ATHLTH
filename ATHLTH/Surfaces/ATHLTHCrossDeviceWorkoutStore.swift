@@ -83,7 +83,7 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
         case "hiit": return "figure.highintensity.intervaltraining"
         case "functional": return "figure.cross.training"
         case "rowing": return "figure.rower"
-        case "stairClimbing": return "figure.stair.stepper"
+        case "stairClimbing", "stairClimber": return "figure.stair.stepper"
         case "yoga": return "figure.yoga"
         default: return "figure.mixed.cardio"
         }
@@ -140,6 +140,64 @@ struct ATHLTHLocalStructuredWorkoutStatus {
     var completedCount: Int
     var pausedAt: Date? = nil
     var completedPauseSeconds: TimeInterval = 0
+}
+
+/// Read-only same-account manual timer rendering. It contains no HealthKit
+/// measurements and uses the original saved Custom Quick ID and clock.
+/// This is NOT a second recorder or a permission to publish without consent.
+enum ATHLTHManualSpectatorSnapshot {
+    static func make(
+        _ checkpoint: ATHLTHManualTimedCheckpoint,
+        at now: Date = Date()
+    ) -> ATHLTHCrossDeviceWorkoutSnapshot? {
+        guard let session = ATHLTHUniversalActiveCapture.manual(
+            checkpoint, at: now
+        ), let timeline = ATHLTHCustomWorkoutTimeline.state(
+            method: checkpoint.method,
+            durationMinutes: checkpoint.durationMinutes,
+            workSeconds: checkpoint.workSeconds,
+            restSeconds: checkpoint.restSeconds,
+            rounds: checkpoint.rounds,
+            elapsedSeconds: session.elapsedSeconds,
+            isPaused: session.phase == .paused
+        ) else { return nil }
+
+        let label: String?
+        if session.phase == .paused {
+            label = ATHLTHLocalization.choose(
+                english: "Paused", norwegian: "Pauset"
+            )
+        } else if timeline.stageIndex != nil {
+            label = timeline.inRestInterval
+                ? ATHLTHLocalization.choose(
+                    english: "Rest", norwegian: "Pause"
+                ) : ATHLTHLocalization.choose(
+                    english: "Work", norwegian: "Arbeid"
+                )
+        } else {
+            label = nil
+        }
+
+        return ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: checkpoint.id,
+            kind: checkpoint.activity.rawValue,
+            title: checkpoint.titleOverride ?? checkpoint.activity.localizedTitle,
+            startedAt: checkpoint.startedAt,
+            elapsedSeconds: session.elapsedSeconds,
+            distanceMeters: nil,
+            currentStep: label,
+            nextStep: nil,
+            completedSets: nil,
+            totalSets: nil,
+            paused: session.phase == .paused,
+            runningIntervalOrdinal: timeline.stageIndex.map { $0 + 1 },
+            runningIntervalTotal: timeline.stageCount,
+            runningInRecovery: timeline.inRestInterval,
+            runningStepRemainingSeconds: timeline.remainingSeconds,
+            capturedAt: now,
+            sourceDevice: "iphone"
+        )
+    }
 }
 
 /// Polling deliberately shares only a compact spectator state; no second
@@ -606,6 +664,14 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 runningStepIndex: structured.stepIndex,
                 runningStepCount: structured.steps.count
             )
+        }
+        // Manual timed sessions now participate in the same opt-in iPad
+        // spectator pipeline. Never publish a false pulse, pace, calorie,
+        // distance or GPS sample from a timer.
+        if let accountID = trackingAccountID,
+           let manual = ATHLTHManualTimedCapture.current(for: accountID),
+           !mirroredWatch.hasActiveMirroredWorkout {
+            return ATHLTHManualSpectatorSnapshot.make(manual)
         }
         if let watch = mirroredWatch.snapshot,
            watch.state == .preparing ||

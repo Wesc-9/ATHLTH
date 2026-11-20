@@ -6934,6 +6934,8 @@ struct ATHLTHTrainView: View {
     // Recovered workouts already have a dedicated checkpoint review above;
     // never show two competing resume buttons for the same session.
     private var hasOngoingTrainWorkout: Bool {
+        ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
+        phoneWorkout.hasPendingLaunch ||
         phoneWorkout.active != nil ||
         strengthWorkout.activeWorkout != nil ||
         ATHLTHManualTimedCapture.hasActiveCapture ||
@@ -6982,9 +6984,10 @@ struct ATHLTHTrainView: View {
         } else if let structuredID =
             ATHLTHStructuredCaptureAdmission.activeWorkoutID,
             let structured = (
-                [session.activePlan].compactMap { $0 } + session.scheduledPlans
-            ).flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
-              .first(where: { $0.id == structuredID }) {
+                session.standalonePlannedSessions +
+                ([session.activePlan].compactMap { $0 } + session.scheduledPlans)
+                    .flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
+            ).first(where: { $0.id == structuredID }) {
             Button {
                 selectedStructuredWorkout = ATHLTHUnifiedWorkout
                     .timedNonCardioProjection(from: structured) ?? structured
@@ -8167,6 +8170,8 @@ struct ATHLTHTrainView: View {
         // Never replace a live workout with a second one from the plan.
         if ATHLTHStructuredCaptureAdmission.hasActiveCapture ||
             ATHLTHManualTimedCapture.hasActiveCapture ||
+            ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
+            phoneWorkout.hasPendingLaunch ||
             phoneWorkout.active != nil ||
             strengthWorkout.activeWorkout != nil ||
             watchConnection.hasActiveWatchWorkout ||
@@ -9578,6 +9583,8 @@ struct ATHLTHTrainView: View {
     }
 
     private var customQuickStartAvailable: Bool {
+        !ATHLTHWorkoutRecordingArbiter.hasPendingLaunch &&
+        !phoneWorkout.hasPendingLaunch &&
         phoneWorkout.active == nil &&
         strengthWorkout.activeWorkout == nil &&
         !ATHLTHManualTimedCapture.hasActiveCapture &&

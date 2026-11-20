@@ -229,4 +229,67 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         XCTAssertEqual(resumed.workoutID, paused.workoutID)
     }
 
+
+    func testManualSpectatorUsesSameIntervalCursorWithoutFabricatedSensors() throws {
+        let active = timer(method: .intervals, resumedAt: started)
+        let now = started.addingTimeInterval(45)
+        let preview = try XCTUnwrap(
+            ATHLTHManualSpectatorSnapshot.make(active, at: now)
+        )
+        let universal = try XCTUnwrap(
+            ATHLTHUniversalActiveCapture.manual(active, at: now)
+        )
+        XCTAssertEqual(preview.sessionID, universal.workoutID)
+        XCTAssertEqual(preview.elapsedSeconds, universal.elapsedSeconds)
+        XCTAssertEqual(preview.startedAt, universal.startedAt)
+        XCTAssertEqual(preview.kind, active.activity.rawValue)
+        XCTAssertEqual(preview.sourceDevice, "iphone")
+        XCTAssertEqual(preview.paused, false)
+        XCTAssertEqual(preview.runningIntervalOrdinal, 2)
+        XCTAssertEqual(preview.runningIntervalTotal, 5)
+        XCTAssertEqual(preview.runningInRecovery, true)
+        XCTAssertEqual(preview.runningStepRemainingSeconds, 15)
+        XCTAssertNil(preview.distanceMeters)
+        XCTAssertNil(preview.heartRateBPM)
+        XCTAssertNil(preview.activeCalories)
+        XCTAssertNil(preview.currentPaceSecondsPerKilometer)
+        XCTAssertNil(preview.liveLatitude)
+        XCTAssertNil(preview.liveLongitude)
+        XCTAssertNil(preview.spotifyPlaying)
+    }
+
+    func testManualSpectatorFreezesWhenPausedAndRejectsUnreadableTimer() throws {
+        let original = timer(method: .tabata, accumulatedSeconds: 23)
+        let now = started.addingTimeInterval(1100)
+        let preview = try XCTUnwrap(ATHLTHManualSpectatorSnapshot.make(
+            original, at: now
+        ))
+        XCTAssertEqual(preview.paused, true)
+        XCTAssertEqual(preview.elapsedSeconds, 23)
+        XCTAssertEqual(preview.runningInRecovery, true)
+        XCTAssertEqual(preview.runningStepRemainingSeconds, 7)
+        XCTAssertEqual(preview.runningIntervalOrdinal, 2)
+        XCTAssertNil(preview.distanceMeters)
+        var invalid = original
+        invalid.approvedTimeLimit = -.infinity
+        XCTAssertNil(ATHLTHManualSpectatorSnapshot.make(invalid, at: now))
+    }
+
+    func testManualSpectatorCanRepresentEverySavedActivityWithoutSensors() throws {
+        for sport in CustomQuickWorkoutActivity.allCases {
+            let source = timer(activity: sport, resumedAt: started)
+            let preview = try XCTUnwrap(
+                ATHLTHManualSpectatorSnapshot.make(
+                    source, at: started.addingTimeInterval(90)
+                )
+            )
+            XCTAssertEqual(preview.sessionID, source.id)
+            XCTAssertEqual(preview.kind, sport.rawValue)
+            XCTAssertNil(preview.distanceMeters)
+            XCTAssertNil(preview.heartRateBPM)
+            XCTAssertNil(preview.activeCalories)
+            XCTAssertNil(preview.liveLatitude)
+        }
+    }
+
 }
