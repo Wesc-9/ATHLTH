@@ -1544,7 +1544,9 @@ enum WorkoutLaunchCoordinator {
             id: UUID(),
             title: plannedWalkingWorkout?.title ?? selectedWalkingRoute?.title ??
                 ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
-            summary: plannedWalkingWorkout?.summary ??
+            // PlannedSession has a title, but no summary property.
+            // Reuse the original card title without inventing another recipe.
+            summary: plannedWalkingWorkout?.title ?? selectedWalkingRoute?.title ??
                 ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
             kind: .walking,
             routeID: selectedWalkingRoute?.id,
