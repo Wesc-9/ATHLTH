@@ -1,3 +1,10 @@
+## 2.2.6 – token-eid opptaksadgang helt inn i originale HealthKit-opptak
+
+- `ATHLTHWorkoutRecordingArbiter.mayStartRunning` og `.mayStartStrength` krever nå nøyaktig **samme UUID** som `reserveLaunch` når en asynkron start allerede har reservert opptaksplassen. Ingen annen Quick, Home, Train eller sosial start kan snike seg forbi bare fordi «en» reservasjon finnes. Gammelt, feil og utløpt token avvises.
+- `WorkoutLaunchCoordinator` sender sin opprinnelige token videre gjennom alle revalideringer, inn i de eksisterende PhoneWorkout/StrengthWorkoutLog-skriverne. Watch-oppstart fra Hjem sender samme token gjennom StrengthWorkoutStore, også ved interne hybrid-deløkter. Direkte lokale startveier uten reservasjon fungerer fortsatt.
+- Eksisterende `IPhoneWorkoutStore` lagrer den opprinnelig tillatte token midlertidig mens GPS-autorisasjon avventes, uten å opprette økt-ID eller ekstra HealthKit-workout. Når det opprinnelige `reserveLaunch` er frigitt, kan **bare den allerede oppstartede** pending PhoneWorkout fullføres. Annen start hindres fortsatt av `pendingWalking` i opptaksarbiteren. Tokenet tømmes ved avbrutt, avvist eller fullført forberedelse.
+- XCTest dekker hver native Watch-idrett, konkurrerende legacy løp/styrke uten token, riktig token, feil token og token etter frigivelse. Samme-commit iOS/iPad/watchOS CI samt fysisk Watch/iPhone GPS/HealthKit-samtidighet må fortsatt verifiseres.
+
 ## 2.2.6 – Quick Run respekterer manuell og 30-sekunders Watch-start
 
 - `RunQuickStartConfiguration.watchStartMode` brukes nå også på Advanced Quick Run. `.onWatch` og `.afterThirtySeconds` oppretter **kun ett klargjort kort**, med original rutetilknytning, all løpe-/intervalloppskrift, Audio Coach og korrekt `indoor`-miljø. De starter aldri en økt umiddelbart i HealthKit i strid med brukerens valg.

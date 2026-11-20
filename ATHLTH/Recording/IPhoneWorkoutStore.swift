@@ -560,6 +560,8 @@ final class IPhoneWorkoutStore:
     }
     private var accountID: UUID?
     private var pendingWalking: Bool?
+    /// Not persisted: exact token admitted before possible GPS prompt.
+    private var pendingLaunchAdmissionID: UUID?
     private var pendingPlannedPlanID: UUID?
     private var pendingPlannedSessionID: UUID?
     private var pendingRelayRequestID: UUID?
@@ -844,12 +846,13 @@ final class IPhoneWorkoutStore:
         autoPauseEnabled: Bool = false,
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil,
-        relayRequestID: UUID? = nil
+        relayRequestID: UUID? = nil,
+        admissionID: UUID? = nil
     ) {
         guard accountID != nil, !saving, pendingWalking == nil,
-              ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
-            return
-        }
+              ATHLTHWorkoutRecordingArbiter.mayStartRunning(
+                  admissionID: admissionID
+              ) else { return }
 
         // If a workout is already active, treat this as a request to return
         // to its live screen. For a brand-new workout, defer presentation
@@ -863,6 +866,7 @@ final class IPhoneWorkoutStore:
         }
 
         pendingWalking = walking
+        pendingLaunchAdmissionID = admissionID
         pendingPlannedPlanID = plannedPlanID
         pendingPlannedSessionID = plannedSessionID
         pendingRelayRequestID = relayRequestID
@@ -917,6 +921,7 @@ final class IPhoneWorkoutStore:
 
     private func clearPendingLaunchConfiguration() {
         pendingWalking = nil
+        pendingLaunchAdmissionID = nil
         pendingPlannedPlanID = nil
         pendingPlannedSessionID = nil
         pendingRelayRequestID = nil
@@ -933,9 +938,15 @@ final class IPhoneWorkoutStore:
     }
 
     private func beginIfAuthorized() {
-        // Authorization can arrive after another workout starts or restores.
+        // The already-admitted GPS launch may finish after its synchronous
+        // coordinator released the token. pendingWalking still occupies
+        // the sole global slot until it completes or is explicitly canceled.
+        let admissionID = ATHLTHWorkoutRecordingArbiter.hasPendingLaunch
+            ? pendingLaunchAdmissionID : nil
         guard active == nil, !saving,
-              ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+              ATHLTHWorkoutRecordingArbiter.mayStartRunning(
+                  admissionID: admissionID
+              ) else {
             clearPendingLaunchConfiguration()
             return
         }

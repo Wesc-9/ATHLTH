@@ -122,23 +122,38 @@ enum ATHLTHWorkoutRecordingArbiter {
         pendingLaunchID = nil
     }
 
-    static func mayStartRunning() -> Bool {
-        !localRecorderOccupied &&
+    /// A reserved launch is a capability held by one exact owner, not
+    /// blanket permission for any legacy store to begin recording.
+    private static func admitsLaunch(_ admissionID: UUID?) -> Bool {
+        if let reserved = pendingLaunchID {
+            return admissionID == reserved
+        }
+        return admissionID == nil
+    }
+
+    static func mayStartRunning(admissionID: UUID? = nil) -> Bool {
+        let ownsReservation = pendingLaunchID != nil &&
+            pendingLaunchID == admissionID
+        return admitsLaunch(admissionID) &&
+            !localRecorderOccupied &&
             !ATHLTHManualTimedCapture.hasActiveCapture &&
             !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
             strength?.activeSessionState == nil &&
-            (!unmirroredWatchRecordingActive || pendingLaunchID != nil) &&
-            (!mirroredRecordingActive || pendingLaunchID != nil)
+            (!unmirroredWatchRecordingActive || ownsReservation) &&
+            (!mirroredRecordingActive || ownsReservation)
     }
 
-    static func mayStartStrength() -> Bool {
-        !localRecorderOccupied &&
+    static func mayStartStrength(admissionID: UUID? = nil) -> Bool {
+        let ownsReservation = pendingLaunchID != nil &&
+            pendingLaunchID == admissionID
+        return admitsLaunch(admissionID) &&
+            !localRecorderOccupied &&
             !ATHLTHManualTimedCapture.hasActiveCapture &&
             !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
             phone?.activeSessionState == nil &&
             phone?.hasPendingLaunch != true &&
-            (!unmirroredWatchRecordingActive || pendingLaunchID != nil) &&
-            (!mirroredRecordingActive || pendingLaunchID != nil)
+            (!unmirroredWatchRecordingActive || ownsReservation) &&
+            (!mirroredRecordingActive || ownsReservation)
     }
 
     /// A Watch-started workout may be mirrored before its original

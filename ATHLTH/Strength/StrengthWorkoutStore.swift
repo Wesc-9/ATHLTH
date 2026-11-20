@@ -3434,11 +3434,14 @@ final class StrengthWorkoutStore: ObservableObject {
         trackingMode: StrengthTrackingMode,
         captureDevice: WorkoutCaptureDevice,
         advancedConfiguration: StrengthAdvancedConfiguration? = nil,
-        relayRequestID: UUID? = nil
+        relayRequestID: UUID? = nil,
+        admissionID: UUID? = nil
     ) -> Bool {
         guard activeWorkout == nil,
               !loadingAccount,
-              ATHLTHWorkoutRecordingArbiter.mayStartStrength(),
+              ATHLTHWorkoutRecordingArbiter.mayStartStrength(
+                  admissionID: admissionID
+              ),
               !validatedParts.isEmpty,
               let canonicalParts = ATHLTHHybridWorkoutLaunchPlan.parts(
                   for: session,
@@ -3464,7 +3467,8 @@ final class StrengthWorkoutStore: ObservableObject {
             trackingMode: trackingMode,
             captureDevice: captureDevice,
             advancedConfiguration: advancedConfiguration,
-            relayRequestID: relayRequestID
+            relayRequestID: relayRequestID,
+            admissionID: admissionID
         )
         // A rejected launch must not append hybrid parts to another workout.
         guard let launched = activeWorkout,
@@ -3526,12 +3530,14 @@ final class StrengthWorkoutStore: ObservableObject {
         captureDevice: WorkoutCaptureDevice,
         advancedConfiguration:
             StrengthAdvancedConfiguration? = nil,
-        relayRequestID: UUID? = nil
+        relayRequestID: UUID? = nil,
+        admissionID: UUID? = nil
     ) {
-        // Existing or recovered strength work must not be silently discarded
-        // by a duplicate start action.
+        // A reserved original workout may be written only by its owner.
         guard activeWorkout == nil, !loadingAccount,
-              ATHLTHWorkoutRecordingArbiter.mayStartStrength() else { return }
+              ATHLTHWorkoutRecordingArbiter.mayStartStrength(
+                  admissionID: admissionID
+              ) else { return }
         recoveredCheckpointSavedAt = nil
         setEffortClock = nil
         cardioWatchCaptures = [:]

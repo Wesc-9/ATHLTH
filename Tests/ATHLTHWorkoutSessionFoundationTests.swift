@@ -26,12 +26,36 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
             let reservation = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
             XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.hasPendingLaunch,
                           kind.rawValue)
+            XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.mayStartRunning(),
+                           "An unrelated phone run may not borrow Watch launch")
+            XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.mayStartStrength(),
+                           "An unrelated strength start may not borrow Watch launch")
+            XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.mayStartRunning(
+                admissionID: UUID()
+            ))
+            XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.mayStartStrength(
+                admissionID: UUID()
+            ))
+            XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.mayStartRunning(
+                admissionID: reservation
+            ))
+            XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.mayStartStrength(
+                admissionID: reservation
+            ))
             XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch(),
                                  "Different Watch kinds must share a launch slot")
             ATHLTHWorkoutRecordingArbiter.releaseLaunch(UUID())
             XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.hasPendingLaunch)
             ATHLTHWorkoutRecordingArbiter.releaseLaunch(reservation)
             XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.hasPendingLaunch)
+            XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.mayStartRunning(
+                admissionID: reservation
+            ))
+            XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.mayStartStrength(
+                admissionID: reservation
+            ))
+            XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.mayStartRunning())
+            XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.mayStartStrength())
         }
     }
 

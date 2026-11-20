@@ -825,7 +825,7 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
-        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning(admissionID: launchID) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
@@ -898,7 +898,7 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
-        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning(admissionID: launchID) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
@@ -1038,7 +1038,8 @@ enum WorkoutLaunchCoordinator {
                         .autoPauseEnabled,
                 plannedPlanID: plannedPlanID,
                 plannedSessionID: plannedSessionID,
-                relayRequestID: relayRequestID
+                relayRequestID: relayRequestID,
+                admissionID: launchID
             )
             if let relayRequestID {
                 guard let recording = phoneWorkout.active,
@@ -1314,7 +1315,7 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
-        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning(admissionID: launchID) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
@@ -1356,7 +1357,7 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
-        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning(admissionID: launchID) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         if ATHLTHDeviceRole.isIPad {
@@ -1403,7 +1404,7 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
-        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning(admissionID: launchID) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
@@ -1449,7 +1450,8 @@ enum WorkoutLaunchCoordinator {
                     configuration.autoPauseEnabled,
                 plannedPlanID: plannedPlanID,
                 plannedSessionID: plannedSessionID,
-                relayRequestID: relayRequestID
+                relayRequestID: relayRequestID,
+                admissionID: launchID
             )
             if let relayRequestID {
                 guard let recording = phoneWorkout.active,
@@ -1576,7 +1578,7 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             phoneWorkout.activeSessionState
         )
-        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning() else {
+        guard ATHLTHWorkoutRecordingArbiter.mayStartRunning(admissionID: launchID) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
@@ -1658,14 +1660,14 @@ enum WorkoutLaunchCoordinator {
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             strengthWorkout.activeSessionState
         )
-        guard ATHLTHWorkoutRecordingArbiter.mayStartStrength() else {
+        guard ATHLTHWorkoutRecordingArbiter.mayStartStrength(admissionID: launchID) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         try await watchConnection.requireNoActiveWatchWorkout()
         try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
             strengthWorkout.activeSessionState
         )
-        guard ATHLTHWorkoutRecordingArbiter.mayStartStrength() else {
+        guard ATHLTHWorkoutRecordingArbiter.mayStartStrength(admissionID: launchID) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
@@ -1726,7 +1728,7 @@ enum WorkoutLaunchCoordinator {
             try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
                 strengthWorkout.activeSessionState
             )
-            guard ATHLTHWorkoutRecordingArbiter.mayStartStrength() else {
+            guard ATHLTHWorkoutRecordingArbiter.mayStartStrength(admissionID: launchID) else {
                 throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
             }
         } catch {
@@ -1831,7 +1833,7 @@ enum WorkoutLaunchCoordinator {
             try ATHLTHWorkoutSessionFoundation.requireNoActiveRecording(
                 strengthWorkout.activeSessionState
             )
-            guard ATHLTHWorkoutRecordingArbiter.mayStartStrength() else {
+            guard ATHLTHWorkoutRecordingArbiter.mayStartStrength(admissionID: launchID) else {
                 throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
             }
         } catch {
@@ -1848,7 +1850,8 @@ enum WorkoutLaunchCoordinator {
                 captureDevice: captureDevice,
                 advancedConfiguration:
                     includeCoachConfiguration ? advancedConfiguration : nil,
-                relayRequestID: relayRequestID
+                relayRequestID: relayRequestID,
+                admissionID: launchID
             ) else {
                 await social.markCurrentJoinedWorkoutLaunchFailed()
                 throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
@@ -1861,7 +1864,8 @@ enum WorkoutLaunchCoordinator {
                 captureDevice: captureDevice,
                 advancedConfiguration:
                     includeCoachConfiguration ? advancedConfiguration : nil,
-                relayRequestID: relayRequestID
+                relayRequestID: relayRequestID,
+                admissionID: launchID
             )
         }
 

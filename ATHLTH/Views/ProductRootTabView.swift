@@ -5075,14 +5075,16 @@ struct ATHLTHHomeView: View {
                             validatedParts: hybridParts,
                             watchSessionID: remoteSessionID,
                             trackingMode: trackingMode,
-                            captureDevice: .appleWatch
+                            captureDevice: .appleWatch,
+                            admissionID: launchID
                         )
                     } else {
                         strengthWorkout.start(
                             session: workout,
                             watchSessionID: remoteSessionID,
                             trackingMode: trackingMode,
-                            captureDevice: .appleWatch
+                            captureDevice: .appleWatch,
+                            admissionID: launchID
                         )
                     }
                     guard strengthWorkout.matchesStartedPlannedWorkout(
