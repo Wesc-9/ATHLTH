@@ -298,4 +298,60 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         ).canUsePreparedWatchTransfer)
     }
 
+
+    func testInstructionStagesAreNotDroppedByEnduranceCapture() {
+        var instructions = block(.note, sequence: 2)
+        instructions.notes = "Run technique and posture"
+        let planned = session(.running, blocks: [
+            block(.run), instructions
+        ])
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                planned, device: .iPhone
+            ), .phoneStructuredManual
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                planned, device: .appleWatch
+            ), .unavailable
+        )
+        XCTAssertNil(ATHLTHWorkoutCaptureAdmission.watchKind(for: planned))
+    }
+
+    func testStrengthAndInstructionsRetainOriginalStepsInsteadOfFalseWatchRecipe() {
+        let planned = session(.strength, blocks: [
+            block(.exercise), block(.note, sequence: 2)
+        ])
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                planned, device: .iPhone
+            ), .phoneStructuredManual
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                planned, device: .appleWatch
+            ), .unavailable
+        )
+        XCTAssertFalse(ATHLTHPlannedWorkoutCaptureRoute.resolve(
+            planned, device: .appleWatch
+        ).canUsePreparedWatchTransfer)
+    }
+
+    func testPureStructuredWorkoutRetainsMeasuredRoute() {
+        let running = session(.running, blocks: [
+            block(.run), block(.rest, sequence: 2),
+            block(.run, sequence: 3)
+        ])
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                running, device: .iPhone
+            ), .phoneEndurance
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                running, device: .appleWatch
+            ), .watchEndurance
+        )
+    }
+
 }

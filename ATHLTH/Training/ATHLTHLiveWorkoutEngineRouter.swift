@@ -168,6 +168,31 @@ enum ATHLTHLiveWorkoutEngineRouter {
         return transition(from: previous, to: next)
     }
 
+    /// The original ordered structured recipe is the only valid source
+    /// for moving the live cursor. Rest, technique, warmup and cooldown
+    /// are normal stages, not new workout recordings. Never skip a stage,
+    /// move backwards, or accidentally enter a duplicate/ambiguous block ID.
+    static func advance(
+        workoutID: UUID,
+        blocks: [WorkoutTemplateBlock],
+        from index: Int
+    ) -> ATHLTHLiveWorkoutTransition? {
+        guard blocks.indices.contains(index),
+              blocks.indices.contains(index + 1),
+              let previous = route(
+                workoutID: workoutID, blocks: blocks, index: index
+              ),
+              let next = route(
+                workoutID: workoutID, blocks: blocks, index: index + 1
+              ),
+              !previous.blockID.isEmpty, !next.blockID.isEmpty,
+              previous.blockID != next.blockID,
+              blocks.filter({ $0.id == previous.blockID }).count == 1,
+              blocks.filter({ $0.id == next.blockID }).count == 1
+        else { return nil }
+        return transition(from: previous, to: next)
+    }
+
     static func transition(
         from previous: ATHLTHLiveWorkoutRoute,
         to next: ATHLTHLiveWorkoutRoute

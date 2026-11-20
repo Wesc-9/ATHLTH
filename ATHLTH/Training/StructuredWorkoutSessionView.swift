@@ -1320,6 +1320,17 @@ struct StructuredWorkoutSessionView: View {
             activeExecutionBlocks = updated
         }
         if currentIndex < blocks.count - 1 {
+            guard ATHLTHLiveWorkoutEngineRouter.advance(
+                workoutID: workout.id,
+                blocks: blocks,
+                from: currentIndex
+            ) != nil else {
+                persistenceErrorMessage = ATHLTHLocalization.choose(
+                    english: "The workout step order could not be verified. Your progress has been preserved.",
+                    norwegian: "Kunne ikke kontrollere rekkefølgen på økten. Fremdriften er bevart."
+                )
+                return
+            }
             currentIndex += 1
         } else {
             showingFinishConfirmation = true

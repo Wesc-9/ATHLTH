@@ -185,4 +185,49 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
         XCTAssertTrue(transition.switchesEngine)
     }
 
+
+    func testOrderedRecipeTransitionPreservesEveryStageAndSingleIdentity() throws {
+        let workoutID = UUID()
+        let planned = [
+            block("Warm-up", kind: .run, sequence: 1, phase: .warmup),
+            block("Instruction", kind: .note, sequence: 2),
+            block("Rest", kind: .rest, sequence: 3, phase: .recovery),
+            block("Strength", kind: .exercise, sequence: 4)
+        ]
+        for index in 0..<(planned.count - 1) {
+            let transition = try XCTUnwrap(
+                ATHLTHLiveWorkoutEngineRouter.advance(
+                    workoutID: workoutID, blocks: planned, from: index
+                )
+            )
+            XCTAssertEqual(transition.previous.blockIndex, index)
+            XCTAssertEqual(transition.next.blockIndex, index + 1)
+            XCTAssertTrue(transition.preservesWorkoutIdentity)
+            XCTAssertEqual(transition.next.workoutID, workoutID)
+        }
+        XCTAssertNil(ATHLTHLiveWorkoutEngineRouter.advance(
+            workoutID: workoutID, blocks: planned, from: -1
+        ))
+        XCTAssertNil(ATHLTHLiveWorkoutEngineRouter.advance(
+            workoutID: workoutID, blocks: planned,
+            from: planned.count - 1
+        ))
+    }
+
+    func testDuplicateStageIdentityCannotAdvanceOrInventAnExtraWorkout() {
+        let id = UUID()
+        let first = block("Work", kind: .exercise, sequence: 1)
+        var duplicated = block("Rest", kind: .rest, sequence: 2)
+        duplicated.id = first.id
+        XCTAssertNil(ATHLTHLiveWorkoutEngineRouter.advance(
+            workoutID: id, blocks: [first, duplicated], from: 0
+        ))
+        let recovered = [
+            first, block("Rest", kind: .rest, sequence: 2)
+        ]
+        XCTAssertNotNil(ATHLTHLiveWorkoutEngineRouter.advance(
+            workoutID: id, blocks: recovered, from: 0
+        ))
+    }
+
 }

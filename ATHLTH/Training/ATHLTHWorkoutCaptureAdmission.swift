@@ -47,13 +47,22 @@ enum ATHLTHPlannedWorkoutCaptureRoute: Equatable {
             ["running", "treadmill"].contains(category)) ||
             (workout.kind == .walking && category == "walking")
         let strength = workout.kind == .strength && category == "strength"
+        // Explicit note steps may contain technique, effort or recovery
+        // instructions. Current measured run/Watch transfers cannot
+        // promise to execute them in sequence. Keep the whole recipe in
+        // the existing block-based iPhone player, not a truncated export.
+        let hasInstructionSteps = workout.resolvedWorkoutBlocks.contains {
+            $0.kind == .note
+        }
 
         if workout.isStructuredWorkout {
             if device == .iPhone {
                 // Run-only plans keep their measured run recorder; mixed
                 // plans stay intact in the original structured manual player.
-                return endurance ? .phoneEndurance : .phoneStructuredManual
+                return endurance && !hasInstructionSteps
+                    ? .phoneEndurance : .phoneStructuredManual
             }
+            guard !hasInstructionSteps else { return .unavailable }
             if endurance { return .watchEndurance }
             if strength { return .watchStrength }
             // Watch's current prepared transfer cannot execute an arbitrary
@@ -117,7 +126,10 @@ enum ATHLTHWorkoutCaptureAdmission {
     /// support for a mixed scripted Watch session.
     static func watchKind(for workout: PlannedSession) -> WatchWorkoutKind? {
         let category = ATHLTHUnifiedActivityProfile.category(for: workout)
-        guard category != "hybrid" else { return nil }
+        guard category != "hybrid",
+              !workout.resolvedWorkoutBlocks.contains(where: {
+                  $0.kind == .note
+              }) else { return nil }
 
         // Preserve the current dedicated running/walking/strength Watch
         // transfer path and reject contradictory legacy sport metadata.

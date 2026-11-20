@@ -1,3 +1,9 @@
+## 2.2.6 – felles faseovergang og komplette øktoppskrifter
+
+- Den strukturerte iPhone-motoren bruker nå en egen validering av den faktiske neste blokken via ATHLTHLiveWorkoutEngineRouter.advance. Bare etterfølgende, unike steg-ID-er i samme opprinnelige økt kan få motoren til å flytte livekursør. Pauser/instruksjoner er ordinære steg, og ingen overgang lager en separat trenings- eller HealthKit-økt.
+- Planlagte rene løpeøkter uten instruksjonssteg fortsetter via den opprinnelige sensorregistreringen. Blandede løpe-/styrkeoppskrifter med egne instruksjonssteg sendes ikke til Watch/rent løpeopptak der de kan bli stille utelatt. iPhone bevarer alle blokkene i den eksisterende strukturerte manuelle spilleren. Dette er fortsatt en manuell oppskrift, IKKE et sensorbevis.
+- Tester dekker steg-id, rekkefølge, pauser, instruksjoner, ufullstendige Watch-payloads og uendret øktidentitet. Verifiser samme-commit CI før bruk.
+
 ## 2.2.6 – samle Watch Today og øvrige opptaksinnganger
 
 Watch Today-filter, klargjøring fra Hjem, direkte start av planlagt løp/gå og Quick Train-Watch-start bruker nå den samme rute- og beleggsbeslutningen. Watch Today tilbyr ikke fleridrettsoppskrifter som vil miste deler av planen eller en custom-idrett med lagret rute som ikke kan overføres. Den ekte Watch-hybridruten beholdes adskilt fra forenklede Watch Today-payloads, men eier fortsatt bare én treningsøkt. Testene verifiserer alle disse avvisningene. Ingen nye sensorkilder/øktopptak.
