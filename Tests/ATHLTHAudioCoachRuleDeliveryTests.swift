@@ -1038,4 +1038,45 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
                                  paceSecondsPerKilometer: nil, heartRateBPM: nil,
                                  norwegian: true, context: context))
     }
+
+    func testUniversalAudioRulesKeepGenericCommandsButRejectWrongSport() {
+        let time = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .elapsedTime, interval: 60
+        )
+        let heart = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .heartRate, interval: 60
+        )
+        let distance = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 1000
+        )
+        let pace = ATHLTHAudioCoachRule(
+            trigger: .paceFasterOverall, metric: .pace, interval: 300
+        )
+        let step = ATHLTHAudioCoachRule(
+            trigger: .effortStart, metric: .stepName, interval: 1
+        )
+        let record = ATHLTHAudioCoachRule(
+            trigger: .personalRecordConfirmed, metric: .personalRecord, interval: 1
+        )
+        let mixed = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .elapsedTime, interval: 60,
+            additionalMetrics: [.averagePace]
+        )
+        let rules = [time, heart, distance, pace, step, record, mixed]
+        let cycle = ATHLTHAudioCoachSportPolicy.eligibleRules(
+            rules, sport: "cycling"
+        )
+        XCTAssertEqual(cycle.map(\.id), [time.id, heart.id, distance.id])
+        let hiit = ATHLTHAudioCoachSportPolicy.eligibleRules(
+            rules, sport: "hiit"
+        )
+        XCTAssertEqual(hiit.map(\.id), [time.id, heart.id])
+        XCTAssertEqual(ATHLTHAudioCoachSportPolicy.eligibleRules(
+            rules, sport: "running"
+        ).map(\.id), rules.map(\.id))
+        XCTAssertTrue(ATHLTHAudioCoachSportPolicy.supportsDistance("rowing"))
+        XCTAssertFalse(ATHLTHAudioCoachSportPolicy.supportsRunningPace("cycling"))
+        XCTAssertFalse(ATHLTHAudioCoachSportPolicy.supportsDistance("yoga"))
+    }
+
 }

@@ -280,22 +280,30 @@ final class MirroredWorkoutAudioCoach:
             }
         }
 
-        currentRunningStepIndex = snapshot.state == .running ? snapshot.runningStepIndex : nil
+        let runningSteps = ATHLTHAudioCoachSportPolicy.supportsRunningSteps(
+            snapshot.kind.rawValue
+        )
+        currentRunningStepIndex = snapshot.state == .running && runningSteps
+            ? snapshot.runningStepIndex : nil
         if snapshot.state == .running,
            ATHLTHCoachSensorFreshness.isFresh(
                sampledAt: snapshot.capturedAt,
                maximumAge: ATHLTHCoachSensorFreshness.maximumSnapshotAge
            ) {
-            if let report = snapshot.runningCoachReport,
-               !(lastScopedCountdownRule?.after == .numbersOnly &&
-                 lastScopedCountdownStepIndex == report.stepIndex),
-               report.event.isFresh() {
-                speak(report.text(norwegian: phrase(english: "en", norwegian: "no") == "no"),
-                      priority: .structuredStep, event: report.event)
+            if runningSteps {
+                if let report = snapshot.runningCoachReport,
+                   !(lastScopedCountdownRule?.after == .numbersOnly &&
+                     lastScopedCountdownStepIndex == report.stepIndex),
+                   report.event.isFresh() {
+                    speak(
+                        report.text(norwegian: phrase(english: "en", norwegian: "no") == "no"),
+                        priority: .structuredStep, event: report.event
+                    )
+                }
+                announceCriticalCountdownIfDue(snapshot)
+                announceStepIfNeeded(snapshot)
+                announceIntervalProgressIfDue(snapshot)
             }
-            announceCriticalCountdownIfDue(snapshot)
-            announceStepIfNeeded(snapshot)
-            announceIntervalProgressIfDue(snapshot)
             announceFuelIfNeeded(snapshot)
             let customDue = announceCustomAudioCoachRules(snapshot)
             announceMeasuredZoneIfNeeded(snapshot)
@@ -343,7 +351,9 @@ final class MirroredWorkoutAudioCoach:
         workoutStartedAt = snapshot.startedAt
         announcedStart =
             snapshot.state != .preparing
-        lastStepIndex = snapshot.runningStepIndex
+        lastStepIndex = ATHLTHAudioCoachSportPolicy.supportsRunningSteps(
+            snapshot.kind.rawValue
+        ) ? snapshot.runningStepIndex : nil
         measuredZoneCandidate = nil
         measuredZoneFirstSeenAt = nil
         lastMeasuredZoneAnnouncementAt = snapshot.elapsedTime
@@ -718,9 +728,15 @@ final class MirroredWorkoutAudioCoach:
     private func announceCustomAudioCoachRules(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> [ATHLTHAudioCoachDueAnnouncement] {
-        ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
-            rules: configuration.activeCustomRules,
-            distanceMeters: snapshot.distanceMeters,
+        let sport = snapshot.kind.rawValue
+        let distance = ATHLTHAudioCoachSportPolicy.supportsDistance(sport) &&
+            snapshot.distanceMeters.isFinite
+            ? max(0, snapshot.distanceMeters) : 0
+        return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: ATHLTHAudioCoachSportPolicy.eligibleRules(
+                configuration.activeCustomRules, sport: sport
+            ),
+            distanceMeters: distance,
             elapsedSeconds: snapshot.elapsedTime,
             paceSecondsPerKilometer:
                 ATHLTHCoachSensorFreshness.validPace(
@@ -732,7 +748,10 @@ final class MirroredWorkoutAudioCoach:
             norwegian: phrase(english: "en", norwegian: "no") == "no",
             maximumHeartRateBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
                 configuration.smartPrompts?.maximumHeartRateBPM,
-            context: snapshot.coachReadoutContext ?? .init(routeRemainingMeters: snapshot.routeRemainingMeters),
+            context: ATHLTHAudioCoachSportPolicy.supportsRunningSteps(sport)
+                ? (snapshot.coachReadoutContext ??
+                    .init(routeRemainingMeters: snapshot.routeRemainingMeters))
+                : .init(),
             lastSlots: &customAudioCoachLastSlots
         )
     }
@@ -912,8 +931,10 @@ final class MirroredWorkoutAudioCoach:
         var due = false
         var milestoneKeys: [String] = []
 
-        if let next =
-                nextDistanceMeters,
+        if ATHLTHAudioCoachSportPolicy.supportsDistance(
+               snapshot.kind.rawValue
+           ), snapshot.distanceMeters.isFinite,
+           let next = nextDistanceMeters,
            snapshot.distanceMeters >= next {
             due = true
             milestoneKeys.append("d\(Int(next.rounded()))")
@@ -988,6 +1009,8 @@ final class MirroredWorkoutAudioCoach:
         var norwegian: [String] = []
 
         if configuration.announceDistance,
+           ATHLTHAudioCoachSportPolicy.supportsDistance(snapshot.kind.rawValue),
+           snapshot.distanceMeters.isFinite, snapshot.distanceMeters > 0,
            !metrics.contains(.distance) {
             let kilometers =
                 snapshot.distanceMeters /
@@ -1034,6 +1057,7 @@ final class MirroredWorkoutAudioCoach:
         }
 
         if configuration.announceAveragePace,
+           ATHLTHAudioCoachSportPolicy.supportsRunningPace(snapshot.kind.rawValue),
            !metrics.contains(.pace),
            let pace =
                 resolvedPace(snapshot) {
@@ -1098,7 +1122,9 @@ final class MirroredWorkoutAudioCoach:
         }
 
         if configuration
-            .announceRemainingRouteDistance, !metrics.contains(.routeRemainingDistance),
+            .announceRemainingRouteDistance,
+           ATHLTHAudioCoachSportPolicy.supportsRunningSteps(snapshot.kind.rawValue),
+           !metrics.contains(.routeRemainingDistance),
            let remaining =
                 snapshot
                     .routeRemainingMeters {
@@ -1125,7 +1151,9 @@ final class MirroredWorkoutAudioCoach:
         }
 
         if configuration
-            .announceEstimatedRemainingRouteTime, !metrics.contains(.estimatedRouteTime),
+            .announceEstimatedRemainingRouteTime,
+           ATHLTHAudioCoachSportPolicy.supportsRunningSteps(snapshot.kind.rawValue),
+           !metrics.contains(.estimatedRouteTime),
            let remaining =
                 snapshot
                     .routeRemainingMeters,
@@ -1155,6 +1183,7 @@ final class MirroredWorkoutAudioCoach:
 
         if configuration
             .announceCurrentWorkoutStep,
+           ATHLTHAudioCoachSportPolicy.supportsRunningSteps(snapshot.kind.rawValue),
            let title =
                 snapshot
                     .runningStepTitle,
@@ -1182,7 +1211,10 @@ final class MirroredWorkoutAudioCoach:
     private func resolvedPace(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> TimeInterval? {
-        guard ATHLTHCoachSensorFreshness.validPace(
+        guard ATHLTHAudioCoachSportPolicy.supportsRunningPace(
+            snapshot.kind.rawValue
+        ),
+        ATHLTHCoachSensorFreshness.validPace(
             snapshot.currentPaceSecondsPerKilometer,
             sampledAt: snapshot.coachPaceSampleAt
         ) else { return nil }

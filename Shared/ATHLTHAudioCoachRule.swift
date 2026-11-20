@@ -1376,3 +1376,57 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         }
     }
 }
+
+/// Activity-specific eligibility for the existing audio coach. Stored
+/// templates are unchanged; unsuitable running rules are skipped only
+/// while a different sport is active. This does not open a second coach.
+enum ATHLTHAudioCoachSportPolicy {
+    private static func key(_ sport: String) -> String {
+        sport.lowercased().filter { $0.isLetter || $0.isNumber }
+    }
+
+    static func supportsRunningSteps(_ sport: String) -> Bool {
+        ["running", "walking", "treadmill", "hiking"].contains(key(sport))
+    }
+
+    static func supportsDistance(_ sport: String) -> Bool {
+        ["running", "walking", "treadmill", "hiking",
+         "cycling", "rowing"].contains(key(sport))
+    }
+
+    static func supportsRunningPace(_ sport: String) -> Bool {
+        supportsRunningSteps(sport)
+    }
+
+    /// Keep generic time, measured pulse, hydration and eligible measured
+    /// distance rules on non-running sports. Do not misread running pace,
+    /// route, PR, or step evidence as cycling/rowing/HIIT measurements.
+    static func eligibleRules(
+        _ rules: [ATHLTHAudioCoachRule], sport: String
+    ) -> [ATHLTHAudioCoachRule] {
+        guard !supportsRunningSteps(sport) else { return rules }
+        return rules.filter { rule in
+            if rule.trigger.needsStructuredStep ||
+                rule.trigger.isPaceCondition ||
+                rule.trigger == .personalRecordConfirmed { return false }
+            if rule.trigger == .distance && !supportsDistance(sport) {
+                return false
+            }
+            return rule.selectedMetrics.allSatisfy { metric in
+                switch metric {
+                case .pace, .averagePace, .lastKilometerPace,
+                     .personalRecord, .routeRemainingDistance,
+                     .estimatedRouteTime, .stepName, .stepRemainingTime,
+                     .groupRemainingTime, .workoutRemainingTime,
+                     .estimatedFinishTime, .remainingExercises, .nextExercise,
+                     .previousExerciseSummary, .previousMainSectionSummary,
+                     .speed:
+                    return false
+                case .distance:
+                    return supportsDistance(sport)
+                default: return true
+                }
+            }
+        }
+    }
+}
