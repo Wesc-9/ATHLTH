@@ -38,11 +38,20 @@ enum ATHLTHStructuredCaptureAdmission {
                   ), checkpoint.workoutID == id,
                   checkpoint.startedAt.timeIntervalSince1970.isFinite,
                   checkpoint.savedAt.timeIntervalSince1970.isFinite,
-                  checkpoint.savedAt <= Date().addingTimeInterval(3600),
-                  checkpoint.savedAt > Date().addingTimeInterval(-7 * 86_400),
                   checkpoint.executionBlocks.indices.contains(
                     checkpoint.currentIndex
                   ) else {
+                unresolvedCheckpoint = true
+                continue
+            }
+            // Existing structured recovery allows a seven-day window. An
+            // older, otherwise valid abandoned checkpoint is retained on
+            // disk, but must not permanently block *all* future workouts.
+            // Corrupt, future-dated or ambiguous data remains fail-closed.
+            if checkpoint.savedAt <= Date().addingTimeInterval(-7 * 86_400) {
+                continue
+            }
+            if checkpoint.savedAt > Date().addingTimeInterval(3600) {
                 unresolvedCheckpoint = true
                 continue
             }

@@ -76,6 +76,41 @@ final class ATHLTHStructuredCaptureAdmissionTests: XCTestCase {
         XCTAssertEqual(saved.first?.sourceWorkoutID, source)
     }
 
+    func testExpiredButDecodableCheckpointDoesNotBlockNewWorkouts() throws {
+        let suite = "ATHLTH.structured.expired.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer {
+            ATHLTHStructuredCaptureAdmission.switchAccount(nil, defaults: defaults)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let owner = UUID(), workout = UUID()
+        let old = Date().addingTimeInterval(-9 * 86_400)
+        let step = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Yoga",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 300,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        let saved = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: workout, savedAt: old,
+            startedAt: old, stepEnteredAt: old,
+            currentIndex: 0, completedIDs: [],
+            results: [:], modeStarts: [:],
+            executionBlocks: [step], emomWaiting: false,
+            timedOutGroups: [], enteredReps: 0,
+            enteredWeight: ""
+        )
+        let key = AccountLocalStorage.key(
+            "structuredWorkoutInProgress.v1.\(workout.uuidString)",
+            userID: owner
+        )
+        defaults.set(try JSONEncoder().encode(saved), forKey: key)
+        ATHLTHStructuredCaptureAdmission.switchAccount(owner, defaults: defaults)
+        XCTAssertFalse(ATHLTHStructuredCaptureAdmission.hasActiveCapture)
+        XCTAssertNotNil(defaults.data(forKey: key))
+    }
+
     func testCorruptStructuredCheckpointDoesNotGetOverwritten() throws {
         let suite = "ATHLTH.structured.corrupt.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
