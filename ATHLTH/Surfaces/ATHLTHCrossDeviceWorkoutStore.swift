@@ -370,6 +370,23 @@ enum ATHLTHManualSpectatorSnapshot {
 /// Session identity and account authorization for the existing private
 /// Watch-to-iPad spectator. It is read-only; it never starts a workout.
 enum ATHLTHWatchSpectatorSessionPolicy {
+    /// The spectator uses the same active-sport policy as the universal
+    /// recorder projection. Strength-owned run/rest hybrids must not
+    /// become a second HealthKit workout just to display their phase.
+    static func activeCategory(_ watch: WatchWorkoutLiveSnapshot) -> String {
+        ATHLTHWatchLiveSportPolicy.activityCategory(watch)
+    }
+
+    /// Only native Watch running/walking sources can supply MEASURED pace.
+    /// A treadmill target carried inside a strength-owned hybrid is a
+    /// prescription, never proof that HealthKit sampled current run pace.
+    static func measuredPace(_ watch: WatchWorkoutLiveSnapshot) -> Double? {
+        guard (watch.kind == .running || watch.kind == .walking),
+              let seconds = watch.currentPaceSecondsPerKilometer,
+              seconds.isFinite, seconds > 0 else { return nil }
+        return seconds
+    }
+
     static func canRelay(
         _ snapshot: WatchWorkoutLiveSnapshot,
         to accountID: UUID?
@@ -946,7 +963,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             ) ? watch.heartRate : nil
             var snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
                 sessionID: sessionID,
-                kind: watch.kind.rawValue,
+                kind: ATHLTHWatchSpectatorSessionPolicy.activeCategory(watch),
                 title: watch.workoutDisplayTitle ?? watch.kind.title,
                 startedAt: startedAt,
                 elapsedSeconds: watch.confirmedActiveDuration,
@@ -961,7 +978,11 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             snapshot.paused = watch.state == .paused
             snapshot.runningIntervalOrdinal = watch.runningIntervalOrdinal
             snapshot.runningIntervalTotal = watch.runningIntervalTotal
-            snapshot.runningInRecovery = watch.runningInRecovery
+            // A Watch-owned strength hybrid carries its real rest phase
+            // without changing the original strength recording category.
+            snapshot.runningInRecovery =
+                watch.kind == .strength && watch.strengthRecoveryActive == true
+                ? true : watch.runningInRecovery
             snapshot.runningStepRemainingSeconds = watch.runningStepRemainingSeconds
             snapshot.capturedAt = watch.capturedAt
             snapshot.sourceDevice = "watch"
@@ -969,7 +990,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             snapshot.heartRateBPM = freshHeartRate
             snapshot.activeCalories = watch.activeCalories > 0
                 ? Double(watch.activeCalories) : nil
-            snapshot.currentPaceSecondsPerKilometer = watch.currentPaceSecondsPerKilometer
+            snapshot.currentPaceSecondsPerKilometer =
+                ATHLTHWatchSpectatorSessionPolicy.measuredPace(watch)
+            // A target may remain visible on a strength-owned running
+            // interval; it must never be presented as measured speed.
             snapshot.targetPaceSecondsPerKilometer =
                 watch.runningStepTargetPaceSecondsPerKilometer
             snapshot.targetHeartRateZone =

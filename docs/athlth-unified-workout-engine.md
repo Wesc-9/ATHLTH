@@ -1,3 +1,10 @@
+## 2.2.6 – samme aktive Watch-sport og dokumentert måleopprinnelse på iPad
+
+- iPad-spektatoren bruker nå nøyaktig den samme read-only aktivitetstolkningen som den universelle Watch-live-motoren. En styrkeeid kombinert økt kan dermed vise løp, styrke og pause uten å endre original styrke-HealthKit-opptak, eierskap eller økt-ID. Standard sporter, inkludert trappetrening, får kanoniske aktivitetsnavn.
+- iPad viser bare en *målt* løpe-/gåfart når kildeopptaket faktisk er et native Watch løpe-/gåopptak. Styrkeeid hybrid med planlagt målfart kan vise dette som MÅL, men overtar aldri en ubekreftet målt løpefart. Ikke-finite/ugyldige pace-prøver forkastes. Hvileflagg fra original Watch-hybrid følger samme spectator-snapshot.
+- Ingen nye opptak, historikker, databasekolonner, publikumsvisninger eller ekstra publiseringsrettigheter. Eksisterende eierkontroll/samtykke/RLS for privat livevisning er uendret.
+- Nye XCTest dekker alle native Watch-aktiviteter, hybridfase og sensorproveniens. Grønn samme-commit CI, langvarige økter og fysisk Watch→iPad-verifikasjon gjenstår.
+
 ## 2.2.6 – øvelse og sett er to separate kursorkontrakter
 
 - Felles live `stageIndex/stageCount` betyr nå ORIGINAL 0-basert øvelse/antall øvelser på alle styrke- og hybridopptak, inkludert Apple Watch. Watch publiserer valgfri `strengthExerciseIndex` og `strengthExerciseCount` fra sin allerede eksisterende styrkejournal; eldre payload gir ukjent fase, aldri et syntetisk sett.

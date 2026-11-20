@@ -444,6 +444,85 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         ))
     }
 
+    func testWatchSpectatorAndUniversalLiveAgreeOnActiveSport() throws {
+        let owner = UUID(), workoutID = UUID()
+        let started = Date(timeIntervalSince1970: 1_900_000_000)
+        let recordedAt = started.addingTimeInterval(110)
+        for kind: WatchWorkoutKind in [
+            .running, .walking, .strength, .cycling, .rowing,
+            .stairClimbing, .hiit, .functional, .yoga, .other
+        ] {
+            var mirror = WatchWorkoutLiveSnapshot(
+                kind: kind, state: .running, startedAt: started,
+                capturedAt: recordedAt, elapsedTime: 95,
+                heartRate: 120, activeCalories: 20, distanceMeters: 0,
+                averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+            )
+            mirror.accountOwnerID = owner
+            mirror.universalWorkoutID = workoutID
+            if kind == .strength { mirror.strengthWorkoutID = workoutID }
+            let live = try XCTUnwrap(
+                ATHLTHUniversalActiveCapture.mirroredWatch(
+                    mirror, for: owner, at: recordedAt
+                )
+            )
+            XCTAssertEqual(
+                ATHLTHWatchSpectatorSessionPolicy.activeCategory(mirror),
+                live.activityCategory, kind.rawValue
+            )
+            if kind == .strength {
+                mirror.strengthHybridRunningActive = true
+                XCTAssertEqual(
+                    ATHLTHWatchSpectatorSessionPolicy.activeCategory(mirror),
+                    "running"
+                )
+                mirror.strengthRecoveryActive = true
+                XCTAssertEqual(
+                    ATHLTHWatchSpectatorSessionPolicy.activeCategory(mirror),
+                    "recovery"
+                )
+                mirror.strengthRecoveryActive = false
+                mirror.strengthHybridRunningActive = false
+                XCTAssertEqual(
+                    ATHLTHWatchSpectatorSessionPolicy.activeCategory(mirror),
+                    "strength"
+                )
+            }
+        }
+    }
+
+    func testWatchSpectatorNeverInventsMeasuredHybridPace() {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        var mirror = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running, startedAt: now,
+            capturedAt: now.addingTimeInterval(30), elapsedTime: 20,
+            heartRate: 120, activeCalories: 10, distanceMeters: 0,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0
+        )
+        mirror.strengthHybridRunningActive = true
+        mirror.currentPaceSecondsPerKilometer = 290
+        XCTAssertEqual(
+            ATHLTHWatchSpectatorSessionPolicy.activeCategory(mirror), "running"
+        )
+        XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror),
+                     "Strength HealthKit cannot prove running pace")
+        mirror.kind = .running
+        XCTAssertEqual(
+            ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror), 290
+        )
+        mirror.kind = .walking
+        XCTAssertEqual(
+            ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror), 290
+        )
+        mirror.kind = .cycling
+        XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror))
+        mirror.kind = .running
+        mirror.currentPaceSecondsPerKilometer = .infinity
+        XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror))
+        mirror.currentPaceSecondsPerKilometer = -3
+        XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror))
+    }
+
     func testWatchSpectatorRejectsConflictingStrengthIDs() {
         var mirror = WatchWorkoutLiveSnapshot(
             kind: .strength, state: .running,
