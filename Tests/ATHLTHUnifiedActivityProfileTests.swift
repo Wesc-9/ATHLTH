@@ -98,6 +98,24 @@ final class ATHLTHUnifiedActivityProfileTests: XCTestCase {
         XCTAssertEqual(timeline.first?.distanceMeters, nil)
     }
 
+    func testActualYogaAndMeditationBlocksKeepTheirLiveSportIdentity() {
+        var yoga = block(.note)
+        yoga.wellnessKind = .yoga
+        var meditation = block(.note, sequence: 2)
+        meditation.wellnessKind = .meditation
+
+        XCTAssertEqual(ATHLTHWorkoutSportMode.forBlock(yoga), .yoga)
+        XCTAssertEqual(ATHLTHWorkoutSportMode.forBlock(meditation), .meditation)
+        XCTAssertEqual(ATHLTHLiveWorkoutEngineRouter.engine(for: yoga), .mobility)
+        XCTAssertEqual(ATHLTHLiveWorkoutEngineRouter.engine(for: meditation), .mobility)
+        // The overall plan classification can still group wellness
+        // activities together without overwriting each active sport.
+        XCTAssertEqual(
+            ATHLTHUnifiedActivityProfile(blocks: [yoga, meditation]).category,
+            "mobility"
+        )
+    }
+
     func testMeditationAndYogaKeepDistinctPlanCategories() {
         var meditation = block(.note)
         meditation.wellnessKind = .meditation

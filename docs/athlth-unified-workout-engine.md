@@ -1,3 +1,10 @@
+## 2.2.6 – riktig aktiv deløkt for Watch-hybrid og velvære
+
+- Watch styrke/hybrid publiserer to valgfrie, bakoverkompatible presentasjonsflagg fra original styrkejournal: aktiv løpedel og aktiv hvile. Den felles live-projeksjonen bruker nå aktiv sport (løp / pause / styrke), mens ÉN opprinnelig Watch HealthKit-økt, UUID, planlenke og eier beholdes.
+- Alle øvrige native Watch-sporter går gjennom én felles sportskontrakt, og en irrelevant styrkehybrid-markør kan ikke omklassifisere en annen sportsøkt.
+- Strukturerte yoga- og meditasjonsblokker beholder nå egen aktivitet i livevisningen i stedet for å bli slått sammen til bare «bevegelighet», mens det felles wellness-planfilteret er uendret.
+- Nye regresjoner dekker fasebytter, pause, original øktidentitet, andre Watch-sporter, yoga og meditasjon. Dette oppretter ingen ny writer, sportstype i HealthKit eller historikk. Same-commit CI og fysisk enhetsverifikasjon gjenstår.
+
 ## 2.2.6 – måleproveniens og frakoblet Watch uten falsk økt
 
 - Manuell Custom Quick-historikk bruker samme distansekapabilitet som aktiviteten faktisk har i skjermbildet. Stale/eksterne data kan ikke lagre fiktive kilometer for yoga, HIIT, sirkel og bevegelighet; eksisterende historie slettes eller migreres ikke. Manuell distanse for støttede aktiviteter er fortsatt uttrykkelig uverifisert.

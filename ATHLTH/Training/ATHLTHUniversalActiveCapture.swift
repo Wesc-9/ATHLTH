@@ -219,19 +219,9 @@ enum ATHLTHUniversalActiveCapture {
             guard let original = snapshot.universalWorkoutID else { return nil }
             id = original
         }
-        let category: String
-        switch snapshot.kind {
-        case .running: category = "running"
-        case .walking: category = "walking"
-        case .strength: category = "strength"
-        case .cycling: category = "cycling"
-        case .rowing: category = "rowing"
-        case .stairClimbing: category = "stairclimber"
-        case .hiit: category = "hiit"
-        case .functional: category = "functional"
-        case .yoga: category = "yoga"
-        case .other: category = "other"
-        }
+        // Use the original Watch's actual active hybrid segment. The
+        // source HKWorkoutSession and universal workout ID stay unchanged.
+        let category = ATHLTHWatchLiveSportPolicy.activityCategory(snapshot)
         let engine = ATHLTHWorkoutSportMode(category: category).engine
         let endurance = snapshot.kind == .running || snapshot.kind == .walking
         let index = endurance ? snapshot.runningStepIndex : nil
@@ -247,7 +237,8 @@ enum ATHLTHUniversalActiveCapture {
             plannedSessionID: snapshot.plannedCalendarSessionID,
             recordingOwner: .appleWatch, source: .watchMirror,
             activityCategory: category, engine: engine,
-            phase: snapshot.state == .paused ? .paused : .work,
+            phase: snapshot.state == .paused ? .paused :
+                (category == "recovery" ? .recovery : .work),
             startedAt: start, elapsedSeconds: snapshot.elapsedTime,
             stageIndex: verified, stageCount: verified == nil ? nil : count
         )

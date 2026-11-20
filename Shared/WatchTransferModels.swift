@@ -2172,6 +2172,12 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     // value remains decodable from older Watch/iPhone combinations.
     var workoutAutoPaused: Bool? = nil
 
+    /// Original strength/hybrid Watch journal identifies the active
+    /// recorded subactivity. These are presentation flags, not a new
+    /// HealthKit activity and never a separate workout recording.
+    /// Nil is expected from older Watch builds.
+    var strengthHybridRunningActive: Bool? = nil
+    var strengthRecoveryActive: Bool? = nil
     var strengthExerciseName: String? = nil
     var strengthSetIndex: Int? = nil
     var strengthSetCount: Int? = nil
@@ -2208,6 +2214,29 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var coachResolvedMaximumHeartRateBPM: Double? = nil
     /// Watch-verified fresh terrain grade; absent on older Watch builds.
     var coachReliableNonClimbingTerrain: Bool? = nil
+}
+
+/// One source of truth for the *active* Watch segment, not just the
+/// HealthKit category used to record the whole workout. A strength-owned
+/// run/strength hybrid remains one HealthKit session and one workout UUID.
+enum ATHLTHWatchLiveSportPolicy {
+    static func activityCategory(_ snapshot: WatchWorkoutLiveSnapshot) -> String {
+        switch snapshot.kind {
+        case .running: return "running"
+        case .walking: return "walking"
+        case .strength:
+            if snapshot.strengthRecoveryActive == true { return "recovery" }
+            if snapshot.strengthHybridRunningActive == true { return "running" }
+            return "strength"
+        case .cycling: return "cycling"
+        case .rowing: return "rowing"
+        case .stairClimbing: return "stairclimber"
+        case .hiit: return "hiit"
+        case .functional: return "functional"
+        case .yoga: return "yoga"
+        case .other: return "other"
+        }
+    }
 }
 
 struct WatchGhostRaceTimingPoint: Codable, Hashable {

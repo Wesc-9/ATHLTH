@@ -665,6 +665,95 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
     }
 
 
+    func testWatchHybridChangesActiveSportWithoutChangingCaptureOwner() throws {
+        let id = UUID(), owner = UUID(), planned = UUID()
+        var mirror = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running, startedAt: started,
+            capturedAt: started.addingTimeInterval(180),
+            elapsedTime: 160, heartRate: 155,
+            activeCalories: 65, distanceMeters: 800,
+            averageHeartRate: nil, maxHeartRate: nil,
+            routePointCount: 0
+        )
+        mirror.strengthWorkoutID = id
+        mirror.universalWorkoutID = id
+        mirror.accountOwnerID = owner
+        mirror.plannedCalendarSessionID = planned
+
+        mirror.strengthHybridRunningActive = true
+        mirror.strengthRecoveryActive = false
+        let run = try XCTUnwrap(ATHLTHUniversalActiveCapture.mirroredWatch(
+            mirror, for: owner, at: mirror.capturedAt
+        ))
+        XCTAssertEqual(run.workoutID, id)
+        XCTAssertEqual(run.plannedSessionID, planned)
+        XCTAssertEqual(run.activityCategory, "running")
+        XCTAssertEqual(run.engine, .endurance)
+        XCTAssertEqual(run.phase, .work)
+        XCTAssertEqual(run.recordingOwner, .appleWatch)
+
+        mirror.strengthRecoveryActive = true
+        let rest = try XCTUnwrap(ATHLTHUniversalActiveCapture.mirroredWatch(
+            mirror, for: owner, at: mirror.capturedAt
+        ))
+        XCTAssertEqual(rest.workoutID, id)
+        XCTAssertEqual(rest.activityCategory, "recovery")
+        XCTAssertEqual(rest.engine, .recovery)
+        XCTAssertEqual(rest.phase, .recovery)
+
+        mirror.state = .paused
+        let paused = try XCTUnwrap(ATHLTHUniversalActiveCapture.mirroredWatch(
+            mirror, for: owner, at: mirror.capturedAt
+        ))
+        XCTAssertEqual(paused.phase, .paused)
+        XCTAssertEqual(paused.workoutID, id)
+
+        mirror.state = .running
+        mirror.strengthRecoveryActive = false
+        mirror.strengthHybridRunningActive = false
+        let lifting = try XCTUnwrap(ATHLTHUniversalActiveCapture.mirroredWatch(
+            mirror, for: owner, at: mirror.capturedAt
+        ))
+        XCTAssertEqual(lifting.activityCategory, "strength")
+        XCTAssertEqual(lifting.engine, .strength)
+        XCTAssertEqual(lifting.workoutID, id)
+
+        // An incorrectly attached hybrid flag may never turn another
+        // native sport into a strength or running HealthKit recording.
+        mirror.kind = .cycling
+        mirror.strengthHybridRunningActive = true
+        XCTAssertEqual(
+            ATHLTHWatchLiveSportPolicy.activityCategory(mirror), "cycling"
+        )
+    }
+
+    func testStructuredWellnessKeepsActiveYogaAndMeditationIdentity() throws {
+        for (kind, expected) in [
+            (WorkoutWellnessKind.yoga, "yoga"),
+            (.meditation, "meditation")
+        ] {
+            var stage = block(kind: .note, sequence: 1)
+            stage.wellnessKind = kind
+            let workoutID = UUID()
+            let checkpoint = ATHLTHStructuredWorkoutCheckpoint(
+                workoutID: workoutID, savedAt: started,
+                startedAt: started, stepEnteredAt: started,
+                currentIndex: 0, completedIDs: [], results: [:],
+                modeStarts: [:], executionBlocks: [stage],
+                emomWaiting: false, timedOutGroups: [],
+                enteredReps: 0, enteredWeight: ""
+            )
+            let active = try XCTUnwrap(
+                ATHLTHUniversalActiveCapture.structured(
+                    checkpoint, at: started.addingTimeInterval(30)
+                )
+            )
+            XCTAssertEqual(active.activityCategory, expected)
+            XCTAssertEqual(active.engine, .mobility)
+            XCTAssertEqual(active.workoutID, workoutID)
+        }
+    }
+
     func testStructuredPlanIdentitySurvivesCursorRecovery() throws {
         let planID = UUID(), workoutID = UUID()
         let step = block(kind: .note, sequence: 1)

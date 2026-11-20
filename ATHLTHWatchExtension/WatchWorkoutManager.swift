@@ -9141,6 +9141,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         snapshot.accountOwnerID = workoutOwnerID
         // Publish only the actual session's original calendar identity.
         snapshot.plannedCalendarSessionID = plannedCalendarSessionID
+        // A hybrid is recorded under the original strength HealthKit
+        // session, but the current RUNNING phase needs endurance controls.
+        // Only the original Watch strength cursor determines this mode.
+        snapshot.strengthRecoveryActive =
+            kind == .strength ? strengthSession?.isResting : nil
+        snapshot.strengthHybridRunningActive =
+            kind == .strength &&
+            strengthSession?.isEmbeddedRunningInterval == true &&
+            strengthSession?.isResting == false &&
+            strengthSession?.currentExerciseComplete == false
 
         if let progress = runningStepProgress, let structure = structuredRunningWorkout {
             snapshot.runningOverallProgress = ATHLTHRunningStepEngine.overallProgress(

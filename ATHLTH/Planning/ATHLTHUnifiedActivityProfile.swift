@@ -78,6 +78,7 @@ enum ATHLTHWorkoutSportMode: Equatable {
                 return Self(category: activity.rawValue)
             }
             if block.wellnessKind == .meditation { return .meditation }
+            if block.wellnessKind == .yoga { return .yoga }
             return block.wellnessKind == nil ? .instructions : .mobility
         }
     }
