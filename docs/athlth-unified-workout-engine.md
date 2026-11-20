@@ -1,3 +1,9 @@
+## 2.2.6 – sikker opptaksplass ved Watch-oppstart uten livespeil
+
+- `ATHLTHUniversalActiveCapture.current` kan ikke lenger returnere «ingen aktiv økt» når original Apple Watch faktisk opptar HealthKit-plassen, men iPhone ennå ikke har mottatt et gyldig speil. Ingen ny iPhone-økt eller duplikatjournal kan startes på grunnlag av et slikt tomt livesignal.
+- En allerede eksisterende styrkejournal som beviselig eies av Apple Watch kan fortsatt vises mens Watch er aktiv. Konflikt med iPhone-løp eller manuell tidtaker avvises. Original ID, klokke, checkpoint og eier beholdes, og etterfølgende gyldig Watch-snapshot kan gjenopprettes på normal måte.
+- Nye policy-XCTest dekker fraværende speil, aktiv Watch, motstridende iPhone-kilde og legitim Watch-eid styrke. Full fysisk HealthKit / iPhone / Watch-verifikasjon kreves fortsatt.
+
 ## 2.2.6 – iPad-livekort med riktig sykkel- og romåling
 
 - iPad sin eksisterende private livevisning velger nå sportens faktiske måleenheter. Løp/gå beholder min/km, sykling får faktisk beregnet km/t fra målt distanse og aktiv tid, roing får min/500 m; styrke/yoga får ikke tilfeldige distansefelter.

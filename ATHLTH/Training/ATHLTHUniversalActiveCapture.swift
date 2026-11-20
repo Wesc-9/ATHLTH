@@ -31,6 +31,22 @@ struct ATHLTHUniversalActiveCaptureState: Equatable {
     let stageCount: Int?
 }
 
+/// An active Watch HealthKit session may exist before the first iPhone
+/// mirror packet. Its recording slot is occupied even without a renderable
+/// live projection. Only an already-owned original Watch strength journal
+/// may coexist with that pre-mirror activity; it is not a second recording.
+enum ATHLTHPreMirrorWatchCapturePolicy {
+    static func permitsExisting(
+        _ state: ATHLTHUniversalActiveCaptureState?,
+        watchActive: Bool
+    ) -> Bool {
+        guard watchActive else { return true }
+        guard let state else { return false }
+        return state.recordingOwner == .appleWatch &&
+            state.source == .strength
+    }
+}
+
 enum ATHLTHUniversalActiveCapture {
     /// Fail closed when two different original recordings are simultaneously
     /// visible after reconnect. An iPhone/Watch hybrid projection may overlap
@@ -342,6 +358,16 @@ enum ATHLTHUniversalActiveCapture {
                 throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
             }
             return confirmed
+        }
+        // A genuine Watch launch/pre-mirror HKWorkoutSession is still using
+        // the one recording slot. Never present an empty idle state or
+        // prefer a simultaneous unrelated phone workout after reconnect.
+        guard ATHLTHPreMirrorWatchCapturePolicy.permitsExisting(
+            result,
+            watchActive:
+                ATHLTHWorkoutRecordingArbiter.unmirroredWatchRecordingActive
+        ) else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         return result
     }

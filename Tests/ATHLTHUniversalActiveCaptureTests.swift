@@ -555,4 +555,39 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         }
     }
 
+
+    func testPremirrorWatchHealthKitOccupiesSharedRecordingSlot() {
+        XCTAssertTrue(ATHLTHPreMirrorWatchCapturePolicy.permitsExisting(
+            nil, watchActive: false
+        ))
+        XCTAssertFalse(ATHLTHPreMirrorWatchCapturePolicy.permitsExisting(
+            nil, watchActive: true
+        ))
+
+        let started = Date(timeIntervalSince1970: 1_900_000_000)
+        func original(_ owner: ATHLTHWorkoutRecordingOwner,
+                      _ source: ATHLTHUniversalCaptureSource)
+            -> ATHLTHUniversalActiveCaptureState {
+            ATHLTHUniversalActiveCaptureState(
+                workoutID: UUID(), plannedSessionID: nil,
+                recordingOwner: owner, source: source,
+                activityCategory: "strength", engine: .strength,
+                phase: .work, startedAt: started,
+                elapsedSeconds: 60, stageIndex: nil, stageCount: nil
+            )
+        }
+        XCTAssertFalse(ATHLTHPreMirrorWatchCapturePolicy.permitsExisting(
+            original(.iPhone, .phoneRunWalk), watchActive: true
+        ))
+        XCTAssertFalse(ATHLTHPreMirrorWatchCapturePolicy.permitsExisting(
+            original(.iPhone, .manualTimer), watchActive: true
+        ))
+        XCTAssertFalse(ATHLTHPreMirrorWatchCapturePolicy.permitsExisting(
+            original(.appleWatch, .watchMirror), watchActive: true
+        ))
+        XCTAssertTrue(ATHLTHPreMirrorWatchCapturePolicy.permitsExisting(
+            original(.appleWatch, .strength), watchActive: true
+        ))
+    }
+
 }
