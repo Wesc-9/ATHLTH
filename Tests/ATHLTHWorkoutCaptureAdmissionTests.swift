@@ -97,4 +97,35 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         XCTAssertNoThrow(try ATHLTHWorkoutCaptureAdmission
             .requireSupportedStrengthCapture(for: session(.strength)))
     }
+
+    func testEveryOtherTaggedSportCannotBecomeFakeStrengthCapture() {
+        for tag in [
+            "cycling", "rowing", "stairClimber", "HIIT",
+            "circuit", "functional", "sports", "mobility", "yoga", "other"
+        ] {
+            var activity = block(.note)
+            activity.activityTag = tag
+            XCTAssertThrowsError(try ATHLTHWorkoutCaptureAdmission
+                .requireSupportedStrengthCapture(
+                    for: session(.strength, blocks: [
+                        block(.exercise), activity
+                    ])
+                ), "Tagged sport \(tag) cannot be recorded as strength")
+            XCTAssertThrowsError(try ATHLTHWorkoutCaptureAdmission
+                .requireSupportedStrengthCapture(
+                    for: session(.strength, blocks: [activity])
+                ))
+        }
+    }
+
+    func testLegacyStrengthKindCannotOverrideExplicitOtherSportCategory() {
+        for category in ["rowing", "stairclimber", "hiit", "functional",
+                         "cycling", "yoga", "meditation"] {
+            XCTAssertThrowsError(try ATHLTHWorkoutCaptureAdmission
+                .requireSupportedStrengthCapture(
+                    for: session(.strength, category: category)
+                ))
+        }
+    }
+
 }

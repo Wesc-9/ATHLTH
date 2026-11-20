@@ -180,4 +180,50 @@ final class ATHLTHUnifiedActivityProfileTests: XCTestCase {
         XCTAssertNil(plan.runningWorkouts)
         XCTAssertEqual(plan.workoutBlocks?.count, 2)
     }
+
+    func testTaggedSportsShareUnifiedClassificationAndLiveRouter() {
+        let kinds: [(String, String, ATHLTHLiveWorkoutEngine)] = [
+            ("cycling", "cycling", .cycling),
+            ("rowing", "rowing", .endurance),
+            ("stairClimber", "stairclimber", .endurance),
+            ("HIIT", "hiit", .instructions),
+            ("circuit", "circuit", .instructions),
+            ("functional", "functional", .instructions),
+            ("sports", "sports", .instructions),
+            ("yoga", "mobility", .mobility),
+            ("mobility", "mobility", .mobility)
+        ]
+        for (tag, category, engine) in kinds {
+            var note = block(.note)
+            note.activityTag = tag
+            let saved = workout(kind: .custom, blocks: [note])
+            XCTAssertEqual(ATHLTHUnifiedActivityProfile.category(for: saved),
+                category, "Wrong activity tag: \(tag)")
+            XCTAssertEqual(ATHLTHLiveWorkoutEngineRouter.engine(for: note),
+                engine, "Wrong live engine: \(tag)")
+            XCTAssertEqual(saved.resolvedWorkoutBlocks.first?.id, note.id)
+        }
+    }
+
+    func testTwoDifferentTaggedActivitiesStayOneHybridRecipe() {
+        var rowing = block(.note)
+        rowing.activityTag = "rowing"
+        var cycling = block(.note, sequence: 2)
+        cycling.activityTag = "cycling"
+        let saved = workout(kind: .custom, blocks: [rowing, cycling])
+        XCTAssertEqual(ATHLTHUnifiedActivityProfile.category(for: saved), "hybrid")
+        XCTAssertEqual(saved.resolvedWorkoutBlocks.map(\.id), [rowing.id, cycling.id])
+
+        var yoga = block(.note)
+        yoga.activityTag = "yoga"
+        yoga.wellnessKind = .yoga
+        XCTAssertEqual(ATHLTHUnifiedActivityProfile(
+            blocks: [yoga]
+        ).category, "mobility", "A tagged yoga instruction is only one sport")
+        let instruction = block(.note)
+        XCTAssertEqual(ATHLTHUnifiedActivityProfile(
+            blocks: [instruction], fallbackKind: .strength
+        ).category, "strength")
+    }
+
 }

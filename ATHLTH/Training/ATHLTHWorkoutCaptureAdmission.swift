@@ -32,8 +32,8 @@ enum ATHLTHWorkoutCaptureAdmission {
         for workout: PlannedSession
     ) throws {
         let blocks = workout.resolvedWorkoutBlocks
-        let hasCycling = blocks.contains {
-            $0.kind == .note && $0.activityTag?.lowercased() == "cycling"
+        let hasOtherActivity = blocks.contains {
+            ATHLTHWorkoutActivityTagPolicy.activity(for: $0) != nil
         }
         let hasWellness = blocks.contains { $0.wellnessKind != nil }
         let hasRunning = blocks.contains {
@@ -43,7 +43,7 @@ enum ATHLTHWorkoutCaptureAdmission {
             blocks.contains { $0.kind == .exercise }
         let category = ATHLTHUnifiedActivityProfile.category(for: workout)
 
-        guard !hasCycling, !hasWellness else {
+        guard !hasOtherActivity, !hasWellness else {
             throw Rejection.requiresDedicatedActivityCapture
         }
         // A run-only or unrelated 'custom' session cannot be started
@@ -51,9 +51,15 @@ enum ATHLTHWorkoutCaptureAdmission {
         if hasRunning && !hasStrength {
             throw Rejection.requiresDedicatedActivityCapture
         }
-        if category == "cycling" || category == "mobility" ||
-           category == "recovery" || category == "walking" ||
-           category == "running" || category == "treadmill" {
+        guard ["strength", "hybrid", "custom"].contains(category) else {
+            throw Rejection.requiresDedicatedActivityCapture
+        }
+        // Some old plans keep a broad .strength kind even after their
+        // explicit sport category changes. Never record those as strength.
+        let declared = workout.workoutCategory?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !hasStrength, let declared,
+           !["strength", "custom"].contains(declared) {
             throw Rejection.requiresDedicatedActivityCapture
         }
         if category == "hybrid" && !(hasStrength && hasRunning) {

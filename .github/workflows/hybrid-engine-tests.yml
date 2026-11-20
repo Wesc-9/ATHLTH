@@ -91,6 +91,10 @@ on:
       - Tests/ATHLTHWorkoutSessionFoundationTests.swift
       - Tests/ATHLTHUniversalActiveCaptureTests.swift
       - Tests/ATHLTHCustomWorkoutTimelineTests.swift
+      - Tests/ATHLTHUnifiedActivityProfileTests.swift
+      - Tests/ATHLTHWorkoutCaptureAdmissionTests.swift
+      - ATHLTH/Planning/ATHLTHUnifiedActivityProfile.swift
+      - ATHLTH/Training/ATHLTHWorkoutCaptureAdmission.swift
       - Tests/ATHLTHManualTimedCaptureTests.swift
       - Tests/ATHLTHStructuredCaptureAdmissionTests.swift
       - Tests/WorkoutDeviceRelayClaimPolicyTests.swift
@@ -275,6 +279,8 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHWorkoutSessionFoundationTests \
             -only-testing:ATHLTHTests/ATHLTHUniversalActiveCaptureTests \
             -only-testing:ATHLTHTests/ATHLTHCustomWorkoutTimelineTests \
+            -only-testing:ATHLTHTests/ATHLTHUnifiedActivityProfileTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutCaptureAdmissionTests \
             -only-testing:ATHLTHTests/ATHLTHManualTimedCaptureTests \
             -only-testing:ATHLTHTests/ATHLTHStructuredCaptureAdmissionTests \
             -only-testing:ATHLTHTests/WorkoutDeviceRelayClaimPolicyTests \

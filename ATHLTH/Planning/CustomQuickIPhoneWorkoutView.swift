@@ -509,10 +509,7 @@ struct CustomQuickIPhoneWorkoutView: View {
                 return tr("Intervals complete", "Alle drag fullført")
             }
             let round = timeline.roundNumber ?? 1
-            let isRest = timeline.phase == .recovery ||
-                (resumedAt == nil && timeline.stageIndex.map {
-                    $0 % 2 == 1
-                } == true)
+            let isRest = timeline.inRestInterval
             return tr(
                 "Round \(round)/\(configuration.rounds) · \(isRest ? "Rest" : "Work")",
                 "Drag \(round)/\(configuration.rounds) · \(isRest ? "Pause" : "Jobb")"

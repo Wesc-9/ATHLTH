@@ -9,6 +9,8 @@ enum ATHLTHCustomWorkoutTimeline {
         let roundNumber: Int?
         let stageIndex: Int?
         let stageCount: Int?
+        /// True for a rest interval even when the whole workout is paused.
+        let inRestInterval: Bool
         /// Next phase boundary for intervals/EMOM; workout cap for AMRAP/For Time.
         let remainingSeconds: TimeInterval?
         /// Prescribed intervals ended; the athlete must still explicitly finish.
@@ -42,6 +44,7 @@ enum ATHLTHCustomWorkoutTimeline {
             Snapshot(
                 phase: isPaused ? .paused : (inRest ? .recovery : .work),
                 roundNumber: round, stageIndex: index, stageCount: count,
+                inRestInterval: inRest,
                 remainingSeconds: remaining, intervalsComplete: complete
             )
         }

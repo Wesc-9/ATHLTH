@@ -5,6 +5,34 @@ import Foundation
 /// This is a projection only: it never opens a HealthKit workout, changes
 /// capture ownership or writes a second history record. Legacy workouts
 /// retain their original Codable schema and original plan/workout IDs.
+/// Normalizes a known activity tag on an existing note block. Unrecognized
+/// tags remain instructions; titles are never guessed to be sport names.
+/// The same policy is used by the planner, live router and launch admission.
+enum ATHLTHWorkoutActivityTagPolicy {
+    static func activity(for block: WorkoutTemplateBlock)
+        -> CustomQuickWorkoutActivity? {
+        guard block.kind == .note,
+              let raw = block.activityTag?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ).lowercased(),
+              !raw.isEmpty else { return nil }
+        let tag = raw.filter { $0.isLetter || $0.isNumber }
+        switch tag {
+        case "cycling", "bicycle", "biking": return .cycling
+        case "rowing", "row": return .rowing
+        case "stairclimber", "stairclimbing", "stairs": return .stairClimber
+        case "hiit": return .hiit
+        case "circuit", "circuittraining": return .circuit
+        case "functional", "functionaltraining": return .functional
+        case "mobility": return .mobility
+        case "yoga": return .yoga
+        case "sports", "sport": return .sports
+        case "other": return .other
+        default: return nil
+        }
+    }
+}
+
 struct ATHLTHUnifiedActivityProfile: Equatable {
     let category: String
     let workoutKind: WorkoutKind
@@ -27,13 +55,20 @@ struct ATHLTHUnifiedActivityProfile: Equatable {
             $0.cardioActivity != .walking
         }
         let strength = blocks.contains { $0.kind == .exercise }
-        let cycling = blocks.contains {
-            $0.kind == .note && $0.activityTag?.lowercased() == "cycling"
-        }
+        let tagged = Set(blocks.compactMap {
+            ATHLTHWorkoutActivityTagPolicy.activity(for: $0)
+        })
+        let cycling = tagged.contains(.cycling)
         let wellness = blocks.compactMap(\.wellnessKind)
-        let mobility = !wellness.isEmpty
+        let mobility = !wellness.isEmpty ||
+            tagged.contains(.mobility) || tagged.contains(.yoga)
+        // Yoga and mobility are one wellness family, not two workout
+        // recordings. Other explicitly tagged sports have distinct segments.
+        let otherSports = tagged.subtracting([
+            .cycling, .yoga, .mobility
+        ])
         let activities = [running, walking, strength, cycling, mobility]
-            .filter { $0 }.count
+            .filter { $0 }.count + otherSports.count
 
         if activities > 1 {
             category = "hybrid"
@@ -57,9 +92,16 @@ struct ATHLTHUnifiedActivityProfile: Equatable {
             category = "cycling"
             workoutKind = .custom
         } else if mobility {
-            let meditationOnly = wellness.allSatisfy { $0 == .meditation }
+            let meditationOnly = !wellness.isEmpty &&
+                wellness.allSatisfy { $0 == .meditation } &&
+                !tagged.contains(.yoga) && !tagged.contains(.mobility)
             category = meditationOnly ? "recovery" : "mobility"
             workoutKind = meditationOnly ? .recovery : .mobility
+        } else if let sport = otherSports.first {
+            // These use the shared plan format while preserving a dedicated
+            // sport identity until a verified capture adapter is available.
+            category = sport.rawValue.lowercased()
+            workoutKind = .custom
         } else {
             // Only notes/rests have no specific activity; preserve legacy
             // intent and never fabricate exercise volume or GPS distance.
@@ -91,6 +133,9 @@ struct ATHLTHUnifiedActivityProfile: Equatable {
             return saved!
         case "yoga", "stretching", "meditation":
             return saved == "meditation" ? "recovery" : "mobility"
+        case "rowing", "stairclimber", "stair_climbing", "hiit",
+             "circuit", "functional", "sports", "other":
+            return saved == "stair_climbing" ? "stairclimber" : saved!
         case "hiking":
             return "walking"
         default:
