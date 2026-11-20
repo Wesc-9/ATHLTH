@@ -1,3 +1,13 @@
+## 2.2.6 – felles aktiv økttilstand for alle eksisterende treningsformer
+
+- Ny skrivebeskyttet ATHLTHUniversalActiveCapture projiserer fire eksisterende originalkilder: iPhone-løp/gå, styrkelogg, Custom Quick iPhone-tidtaker og strukturert øktcheckpoint. Det opprettes ikke nye HealthKit-sesjoner, historikklagre eller kopier av en fullført økt.
+- Felles live-tilstand inneholder stabil økt-ID, kilde, aktivitet, motor, fase, faktisk tid og (når lagret) kronologisk steg. Alle Custom Quick-aktiviteter, inkludert sykling, roing, HIIT, sirkel, funksjonell trening, yoga, mobilitet og øvrige typer, får samme lesemodell som løp/styrke.
+- For tidsstyrte intervaller utledes drag og hvile fra den opprinnelige lagrede konfigurasjonen. Manuelt registrert tid og data merkes fortsatt som manuelle: ingen oppdiktet GPS, puls, distanse eller Apple Health-opptak.
+- Samtidige urelaterte kilder avvises. Den samme historiske løp+styrke-hybriden kan fremdeles ha to avledede visninger av ett opptak. En uleselig eller annen konto-checkpoint blir ikke behandlet som ledig opptaksplass.
+- Custom Quick kan ikke gjenoppta en eksisterende tidtaker med endrede runder, drag-/pausetid, varighetsmål eller tittel selv om aktivitet og metode er like. Original økt-ID og tid bevares.
+- Train-kortet bruker den felles aktivitetstolkningen og tidsprojeksjonen. Nye XCTest-regresjoner dekker aktivitetsbredde, drag/hvile, fryst pause, blandede strukturer, motstridende opptak, korrupt kilde og kontoisolasjon. Motor-XCTest-workflowen inkluderer testene.
+- Dette er første lesende integrasjonssteg, ikke en komplett sensor-/opptaksmigrering: løpe-/styrke-/tidsmotorer er fortsatt autoritative. iPad/Watch/HealthKit/Spotify krever full CI og fysisk test før produksjon. Ingen TestFlight-opplasting autorisert for 2.2.6.
+
 # ATHLTH: én planleggingsmotor, tilpassede live-motorer
 
 ## Overgang til ATHLTH 2.2.6 (20. november 2026)
