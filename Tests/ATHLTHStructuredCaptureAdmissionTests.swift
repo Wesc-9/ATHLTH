@@ -132,4 +132,48 @@ final class ATHLTHStructuredCaptureAdmissionTests: XCTestCase {
         ))
         XCTAssertEqual(defaults.data(forKey: key), raw)
     }
+
+    func testReadOnlyActiveCheckpointRejectsOtherAccountAndAlteredBytes() throws {
+        let suite = "ATHLTH.structured.original.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer {
+            ATHLTHStructuredCaptureAdmission.switchAccount(nil, defaults: defaults)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let owner = UUID(), id = UUID()
+        let now = Date()
+        var yoga = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Yoga",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 600,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        yoga.wellnessKind = .yoga
+        let checkpoint = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: id, savedAt: now,
+            startedAt: now, stepEnteredAt: now,
+            currentIndex: 0, completedIDs: [], results: [:],
+            modeStarts: [:], executionBlocks: [yoga],
+            emomWaiting: false, timedOutGroups: [],
+            enteredReps: 0, enteredWeight: ""
+        )
+        let key = AccountLocalStorage.key(
+            "structuredWorkoutInProgress.v1.\(id.uuidString)", userID: owner
+        )
+        defaults.set(try JSONEncoder().encode(checkpoint), forKey: key)
+        ATHLTHStructuredCaptureAdmission.switchAccount(owner, defaults: defaults)
+        XCTAssertEqual(ATHLTHStructuredCaptureAdmission.activeCheckpoint(
+            for: owner, defaults: defaults
+        )?.workoutID, id)
+        XCTAssertNil(ATHLTHStructuredCaptureAdmission.activeCheckpoint(
+            for: UUID(), defaults: defaults
+        ))
+        defaults.set(Data("unknown schema".utf8), forKey: key)
+        XCTAssertNil(ATHLTHStructuredCaptureAdmission.activeCheckpoint(
+            for: owner, defaults: defaults
+        ))
+        XCTAssertTrue(ATHLTHStructuredCaptureAdmission.hasActiveCapture)
+    }
+
 }
