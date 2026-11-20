@@ -378,4 +378,63 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
     }
 
 
+
+    @MainActor
+    func testManualAndStructuredSpectatorsCannotPublishFakeSensors() {
+        for evidence in ["manualTimer", "structuredManual"] {
+            var source = snapshot()
+            source.captureEvidence = evidence
+            source.heartRateBPM = 155
+            source.activeCalories = 160
+            source.currentPaceSecondsPerKilometer = 270
+            source.liveLatitude = 63.4
+            source.liveLongitude = 10.4
+            source.livePositionAt = .now
+            let result = ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(
+                source
+            )
+            XCTAssertEqual(result.sessionID, source.sessionID)
+            XCTAssertEqual(result.elapsedSeconds, source.elapsedSeconds)
+            XCTAssertNil(result.distanceMeters)
+            XCTAssertNil(result.heartRateBPM)
+            XCTAssertNil(result.activeCalories)
+            XCTAssertNil(result.currentPaceSecondsPerKilometer)
+            XCTAssertNil(result.liveLatitude)
+            XCTAssertNil(result.liveLongitude)
+            XCTAssertNil(result.livePositionAt)
+        }
+    }
+
+    @MainActor
+    func testSportsCannotAccidentallyInheritRunningPaceInIpadRelay() {
+        for sport in ["cycling", "rowing", "hiit", "functional", "yoga", "strength"] {
+            var source = ATHLTHCrossDeviceWorkoutSnapshot(
+                sessionID: UUID(), kind: sport, title: sport,
+                startedAt: Date(), elapsedSeconds: 1200,
+                distanceMeters: 4000,
+                currentStep: nil, nextStep: nil,
+                completedSets: nil, totalSets: nil
+            )
+            source.captureEvidence = "watchHealthKit"
+            source.currentPaceSecondsPerKilometer = 280
+            source.targetPaceSecondsPerKilometer = 300
+            let result = ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(source)
+            XCTAssertNil(result.currentPaceSecondsPerKilometer, sport)
+            XCTAssertNil(result.targetPaceSecondsPerKilometer, sport)
+            if !ATHLTHSpectatorSportMetricPolicy.supportsDistance(sport) {
+                XCTAssertNil(result.distanceMeters, sport)
+            }
+        }
+        XCTAssertTrue(ATHLTHSpectatorSportMetricPolicy.supportsDistance("cycling"))
+        XCTAssertTrue(ATHLTHSpectatorSportMetricPolicy.supportsDistance("rowing"))
+        XCTAssertFalse(ATHLTHSpectatorSportMetricPolicy.supportsRunningPace("cycling"))
+        XCTAssertFalse(ATHLTHSpectatorSportMetricPolicy.supportsDistance("yoga"))
+    }
+
+    func testOptionalEvidenceSurvivesOldSnapshotDecoding() throws {
+        let old = try JSONEncoder().encode(snapshot())
+        let read = try JSONDecoder().decode(ATHLTHCrossDeviceWorkoutSnapshot.self, from: old)
+        XCTAssertNil(read.captureEvidence)
+    }
+
 }

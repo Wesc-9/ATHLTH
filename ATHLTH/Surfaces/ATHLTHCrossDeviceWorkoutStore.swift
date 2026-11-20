@@ -26,6 +26,8 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     // Optional live data; older cross-device snapshots remain decodable.
     // Only the source device can publish these values. iPad never measures.
     var sourceDevice: String? = nil
+    /// Original recorder; optional for compatibility with old snapshots.
+    var captureEvidence: String? = nil
     var heartRateBPM: Double? = nil
     var activeCalories: Double? = nil
     var currentPaceSecondsPerKilometer: Double? = nil
@@ -87,6 +89,37 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
         case "yoga": return "figure.yoga"
         default: return "figure.mixed.cardio"
         }
+    }
+}
+
+ 
+/// Shared read-only sensor provenance and sport-unit eligibility.
+/// A spectator is NEVER another recording owner.
+enum ATHLTHSpectatorSportMetricPolicy {
+    static func supportsDistance(_ category: String) -> Bool {
+        switch ATHLTHWorkoutSportMode(category: category) {
+        case .running, .walking, .cycling, .rowing: return true
+        default: return false
+        }
+    }
+
+    static func supportsRunningPace(_ category: String) -> Bool {
+        switch ATHLTHWorkoutSportMode(category: category) {
+        case .running, .walking: return true
+        default: return false
+        }
+    }
+
+    static func showsHeartRateZones(_ category: String) -> Bool {
+        switch ATHLTHWorkoutSportMode(category: category) {
+        case .running, .walking, .cycling, .rowing, .stairClimber,
+             .hiit, .circuit, .functional: return true
+        default: return false
+        }
+    }
+
+    static func isManual(_ evidence: String?) -> Bool {
+        evidence == "manualTimer" || evidence == "structuredManual"
     }
 }
 
@@ -195,7 +228,8 @@ enum ATHLTHManualSpectatorSnapshot {
             runningInRecovery: timeline.inRestInterval,
             runningStepRemainingSeconds: timeline.remainingSeconds,
             capturedAt: now,
-            sourceDevice: "iphone"
+            sourceDevice: "iphone",
+            captureEvidence: "manualTimer"
         )
     }
 }
@@ -516,6 +550,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 capturedAt: .now,
                 sourceDevice: log.captureDevice == .appleWatch
                     ? "watch" : "iphone",
+                captureEvidence: log.captureDevice == .appleWatch
+                    ? "watchHealthKit" : "strengthLog",
                 strengthSetNumber: strength.currentSet?.setNumber,
                 strengthSetTotal: strength.currentExercise?.sets.count,
                 strengthReps: strength.currentSet?.plannedReps,
@@ -576,6 +612,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     ? remaining : nil,
                 capturedAt: .now,
                 sourceDevice: "iphone",
+                captureEvidence: run.runEnvironment == .treadmill
+                    ? "treadmillEstimate" : "phoneGPS",
                 currentPaceSecondsPerKilometer: {
                     if run.runEnvironment == .treadmill {
                         guard let speed = run.treadmillSpeedKilometersPerHour,
@@ -707,6 +745,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 runningStepRemainingSeconds: remaining,
                 capturedAt: .now,
                 sourceDevice: "iphone",
+                captureEvidence: "structuredManual",
                 runningSteps: structured.steps,
                 runningStepIndex: structured.stepIndex,
                 runningStepCount: structured.steps.count
@@ -793,6 +832,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             snapshot.runningStepRemainingSeconds = watch.runningStepRemainingSeconds
             snapshot.capturedAt = watch.capturedAt
             snapshot.sourceDevice = "watch"
+            snapshot.captureEvidence = "watchHealthKit"
             snapshot.heartRateBPM = freshHeartRate
             snapshot.activeCalories = watch.activeCalories > 0
                 ? Double(watch.activeCalories) : nil
@@ -891,6 +931,16 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         output.targetPaceSecondsPerKilometer = finite(
             input.targetPaceSecondsPerKilometer
         )
+        // min/km only applies to running and walking. Cycling and rowing
+        // calculate their sport-specific average from measured distance.
+        if !ATHLTHSpectatorSportMetricPolicy.supportsRunningPace(input.kind) {
+            output.currentPaceSecondsPerKilometer = nil
+            output.targetPaceSecondsPerKilometer = nil
+            output.paceIsTreadmillTarget = nil
+        }
+        if !ATHLTHSpectatorSportMetricPolicy.supportsDistance(input.kind) {
+            output.distanceMeters = nil
+        }
         output.maximumHeartRateBPM = finite(input.maximumHeartRateBPM)
         output.targetHeartRateMinimumBPM = finite(
             input.targetHeartRateMinimumBPM
@@ -924,6 +974,16 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             } : nil
         output.liveLatitude = finite(input.liveLatitude)
         output.liveLongitude = finite(input.liveLongitude)
+        // Never treat timer-based iPhone activities as HealthKit telemetry.
+        if ATHLTHSpectatorSportMetricPolicy.isManual(input.captureEvidence) {
+            output.distanceMeters = nil
+            output.currentPaceSecondsPerKilometer = nil
+            output.heartRateBPM = nil
+            output.activeCalories = nil
+            output.liveLatitude = nil
+            output.liveLongitude = nil
+            output.livePositionAt = nil
+        }
         if output.liveLatitude == nil || output.liveLongitude == nil {
             output.liveLatitude = nil
             output.liveLongitude = nil

@@ -1,3 +1,9 @@
+## 2.2.6 – bekreftet originalkilde i privat iPad-livekanal
+
+- Den eksisterende, samtykkestyrte iPad-synken skiller nå eksplisitt mellom `watchHealthKit`, `phoneGPS`, `treadmillEstimate`, `strengthLog`, `manualTimer` og `structuredManual`. Dette er ekstra metadata i opprinnelig snapshot, aldri en ekstra opptaker. Gamle snapshots dekodes uten kildemerket.
+- Utgående spektator-snapshot fjerner alle puls-, GPS-, kalorier-, pace- og distanseverdier fra tidsstyrte/manuelle økter, også hvis gamle eller feilaktige felt blir satt. Sykling, roing og øvrige treningsformer får ikke løpspace. Korrekt opprinnelig UUID, treningsklokke, samtykke og opptakseier beholdes.
+- Regresjonstester dekker manuell kilde og feilaktige idrettsmålinger; samme-commit build og fysiske Watch/iPad/HealthKit-tester gjenstår.
+
 ## 2.2.6 – Audio Coach-oppsummering fra samme målesystem for flere idretter
 
 - Den delte, offline talte øktoppsummeringen er nå aktivitetstilpasset. Original Watch-opptaker og iPhone sin eksisterende Watch-mirrorspeaker bruker kildens faktiske sportstype. Løp/gå har min/km, sykling har km/t og roing har tid/500 m når ekte distanse og aktiv tid finnes. Styrke, yoga, HIIT og annen trening får ikke oppdiktet løpsdistanse eller pace.
