@@ -204,4 +204,75 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
             .matchesCompletedWatchKind(unsupported, actual: .yoga))
     }
 
+
+    func testOneCaptureRoutePreservesMixedRunAndYogaOnPhone() {
+        var source = session(.running, blocks: [block(.run)])
+        var yoga = block(.note, sequence: 2)
+        yoga.wellnessKind = .yoga
+        source.workoutBlocks = [block(.run), yoga]
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                source, device: .iPhone
+            ), .phoneStructuredManual
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                source, device: .appleWatch
+            ), .unavailable
+        )
+    }
+
+    func testOneRouteForEverySimpleSportAndBothCaptureDevices() {
+        let sports: [(String, WatchWorkoutKind)] = [
+            ("cycling", .cycling), ("rowing", .rowing),
+            ("stairclimber", .stairClimbing), ("hiit", .hiit),
+            ("circuit", .functional), ("functional", .functional),
+            ("yoga", .yoga), ("mobility", .other)
+        ]
+        for (category, watchKind) in sports {
+            let plan = session(.custom, category: category)
+            XCTAssertEqual(
+                ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                    plan, device: .iPhone
+                ), .phoneStructuredManual
+            )
+            XCTAssertEqual(
+                ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                    plan, device: .appleWatch
+                ), .watchSport(watchKind)
+            )
+        }
+    }
+
+    func testStructuredStrengthWatchKeepsOneRealRecorder() {
+        let plan = session(.strength, blocks: [
+            block(.exercise), block(.rest, sequence: 2)
+        ])
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                plan, device: .iPhone
+            ), .phoneStructuredManual
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                plan, device: .appleWatch
+            ), .watchStrength
+        )
+    }
+
+    func testUnavailableCustomWorkoutsDoNotGetFakeCapture() {
+        var unconfigured = session(.custom, category: "custom")
+        unconfigured.durationMinutes = nil
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                unconfigured, device: .iPhone
+            ), .unavailable
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                unconfigured, device: .appleWatch
+            ), .unavailable
+        )
+    }
+
 }

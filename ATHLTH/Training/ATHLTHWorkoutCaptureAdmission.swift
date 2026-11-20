@@ -6,6 +6,90 @@ import Foundation
 ///
 /// No new session is allocated here. The existing recording arbiter still
 /// reserves the only recording slot after this validation succeeds.
+/// One physical recorder choice per complete planned recipe, irrespective
+/// of whether the start action originated in Train, Home or the calendar.
+/// This never creates an extra HealthKit session or rewrites a saved plan.
+enum ATHLTHPlannedWorkoutCaptureRoute: Equatable {
+    case phoneEndurance
+    case phoneStrength
+    case phoneStructuredManual
+    case phoneHybridStrength
+    case watchEndurance
+    case watchStrength
+    case watchSport(WatchWorkoutKind)
+    case watchHybridStrength
+    case unavailable
+
+    static func resolve(
+        _ workout: PlannedSession, device: WorkoutCaptureDevice
+    ) -> Self {
+        guard !workout.isExplicitRestDay else { return .unavailable }
+        if ATHLTHHybridWorkoutLaunchPlan.isCandidate(workout) {
+            guard ATHLTHHybridWorkoutLaunchPlan.parts(
+                for: workout, allowOutdoorGPS: device == .appleWatch
+            ) != nil else { return .unavailable }
+            return device == .iPhone ? .phoneHybridStrength : .watchHybridStrength
+        }
+
+        let category = ATHLTHUnifiedActivityProfile.category(for: workout)
+        let endurance = (workout.kind == .running &&
+            ["running", "treadmill"].contains(category)) ||
+            (workout.kind == .walking && category == "walking")
+        let strength = workout.kind == .strength && category == "strength"
+
+        if workout.isStructuredWorkout {
+            if device == .iPhone {
+                // Run-only plans keep their measured run recorder; mixed
+                // plans stay intact in the original structured manual player.
+                return endurance ? .phoneEndurance : .phoneStructuredManual
+            }
+            if endurance { return .watchEndurance }
+            if strength { return .watchStrength }
+            // Watch's current prepared transfer cannot execute an arbitrary
+            // run+yoga, strength+rowing or other mixed block timeline.
+            return .unavailable
+        }
+        if endurance {
+            return device == .iPhone ? .phoneEndurance : .watchEndurance
+        }
+        if strength {
+            return device == .iPhone ? .phoneStrength : .watchStrength
+        }
+        if device == .iPhone {
+            return ATHLTHUnifiedWorkout.timedNonCardioProjection(
+                from: workout
+            ) != nil ? .phoneStructuredManual : .unavailable
+        }
+        guard workout.routeID == nil,
+              let kind = ATHLTHWorkoutCaptureAdmission.watchKind(
+                for: workout
+              ) else { return .unavailable }
+        return .watchSport(kind)
+    }
+}
+
+/// The start slot is shared across all existing authoritative recorders.
+/// Checkpoint recovery and pending HealthKit/Watch preflight both occupy it.
+/// The arbiter token remains mandatory for asynchronous actual starts.
+@MainActor
+enum ATHLTHUniversalWorkoutAdmission {
+    static func isOccupied(
+        phone: IPhoneWorkoutStore,
+        strength: StrengthWorkoutStore,
+        remoteWatchActive: Bool
+    ) -> Bool {
+        phone.active != nil || phone.activeSessionState != nil ||
+        phone.hasPendingLaunch ||
+        strength.activeWorkout != nil || strength.activeSessionState != nil ||
+        ATHLTHManualTimedCapture.hasActiveCapture ||
+        ATHLTHStructuredCaptureAdmission.hasActiveCapture ||
+        ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
+        ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive ||
+        ATHLTHWorkoutRecordingArbiter.mirror?.hasActiveMirroredWorkout == true ||
+        remoteWatchActive
+    }
+}
+
 enum ATHLTHWorkoutCaptureAdmission {
     /// A legacy Watch result without an explicit source workout ID may be
     /// reconciled only with one pending plan of exactly the recorded sport.

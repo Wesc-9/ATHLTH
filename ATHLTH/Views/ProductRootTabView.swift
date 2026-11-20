@@ -3269,9 +3269,7 @@ struct ATHLTHHomeView: View {
                 .flatMap(\.sessions).first(where: { $0.id == selected.id }),
               !workout.isExplicitRestDay,
               session.recordedTimes(for: workout.id)?.endedAt == nil,
-              phoneWorkout.active == nil,
-              strengthWorkout.activeWorkout == nil,
-              !watchConnection.hasActiveWatchWorkout
+              !universalRecordingOccupied
         else { return }
         let planID = HomeWeeklyProgressCalendar.containingPlanID(
             for: workout, in: session.activePlan
@@ -3313,13 +3311,7 @@ struct ATHLTHHomeView: View {
               ),
               !workout.isExplicitRestDay,
               session.recordedTimes(for: workout.id)?.endedAt == nil,
-              phoneWorkout.active == nil,
-              strengthWorkout.activeWorkout == nil,
-              !watchConnection.hasActiveWatchWorkout,
-              !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive,
-              !ATHLTHManualTimedCapture.hasActiveCapture,
-              !ATHLTHStructuredCaptureAdmission.hasActiveCapture,
-              !ATHLTHWorkoutRecordingArbiter.hasPendingLaunch
+              !universalRecordingOccupied
         else {
             homeWatchTransferError = ATHLTHLocalization.choose(
                 english: "This workout cannot be sent to Apple Watch right now.",
@@ -4535,13 +4527,7 @@ struct ATHLTHHomeView: View {
                 return
             }
             guard !homeDirectStartInProgress,
-                  phoneWorkout.active == nil,
-                  strengthWorkout.activeWorkout == nil,
-                  !ATHLTHManualTimedCapture.hasActiveCapture,
-                  !ATHLTHStructuredCaptureAdmission.hasActiveCapture,
-                  !ATHLTHWorkoutRecordingArbiter.hasPendingLaunch,
-                  !watchConnection.hasActiveWatchWorkout,
-                  !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+                  !universalRecordingOccupied
             else {
                 await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError = ATHLTHLocalization.choose(
@@ -4561,74 +4547,47 @@ struct ATHLTHHomeView: View {
                 return
             }
 
-            // A mixed planned recipe must never start as a run-only or
-            // strength-only workout and silently drop the other motor.
-            if ATHLTHHybridWorkoutLaunchPlan.isCandidate(persisted) {
-                guard let validatedParts =
-                    ATHLTHHybridWorkoutLaunchPlan.parts(
-                        for: persisted,
-                        allowOutdoorGPS: device == .appleWatch
-                    )
-                else {
-                    await social.markCurrentJoinedWorkoutLaunchFailed()
+            switch ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                persisted, device: device
+            ) {
+            case .phoneHybridStrength, .watchHybridStrength:
+                guard let parts = ATHLTHHybridWorkoutLaunchPlan.parts(
+                    for: persisted, allowOutdoorGPS: device == .appleWatch
+                ) else {
                     homeWatchTransferError = ATHLTHLocalization.choose(
-                        english: "Mixed workouts support timed treadmill + strength on iPhone, or explicitly timed outdoor GPS + strength on Apple Watch. Distance-only intervals and saved-route mixes are not supported yet.",
-                        norwegian: "Kombinerte økter støtter tidsstyrt tredemølle + styrke på iPhone, eller tydelig planlagt tidsstyrt GPS-løping + styrke på Apple Watch. Distansebaserte drag og lagrede ruter støttes ikke i kombinasjonsøkten ennå."
+                        english: "This mixed workout requires a compatible recorder.",
+                        norwegian: "Denne kombinerte økten krever en støttet opptaker."
                     )
                     return
                 }
                 startHomePlannedStrengthWorkout(
-                    persisted,
-                    device: device,
-                    hybridParts: validatedParts
+                    persisted, device: device, hybridParts: parts
                 )
-                return
-            }
-
-            switch persisted.kind {
-            case .strength:
-                if device == .iPhone && persisted.isStructuredWorkout {
-                    selectedHomeStructuredWorkout = persisted
-                } else {
-                    startHomePlannedStrengthWorkout(
-                        persisted, device: device
-                    )
-                }
-            case .running, .walking:
-                if device == .appleWatch {
-                    startHomePlannedWorkoutOnWatch(persisted, startMode: watchStartMode)
-                } else {
-                    startHomeStandalonePhoneEndurance(persisted, planID: planID)
-                }
-            case .mobility, .recovery, .custom:
-                if device == .appleWatch {
-                    // Native sport recording is supported only for a simple
-                    // activity: a structured recipe must not lose its steps.
-                    guard ATHLTHWorkoutCaptureAdmission.watchKind(
-                        for: persisted
-                    ) != nil else {
-                        homeWatchTransferError = ATHLTHLocalization.choose(
-                            english: "This workout needs a compatible Watch recorder.",
-                            norwegian: "Økten krever en støttet Watch-opptaker."
-                        )
-                        return
-                    }
-                    // A new sport is prepared for an explicit tap on Watch
-                    // until its complete activity-handoff is verified.
-                    prepareHomeCalendarWorkoutForWatch(
-                        persisted, mode: .onWatch
-                    )
-                } else if persisted.isStructuredWorkout {
-                    selectedHomeStructuredWorkout = persisted
-                } else if let timed = ATHLTHUnifiedWorkout
-                    .timedNonCardioProjection(from: persisted) {
-                    selectedHomeStructuredWorkout = timed
-                } else {
-                    homeWatchTransferError = ATHLTHLocalization.choose(
-                        english: "This activity needs a supported recorder or a timed workout.",
-                        norwegian: "Aktiviteten trenger en støttet opptaker eller en tidsstyrt økt."
-                    )
-                }
+            case .phoneEndurance:
+                startHomeStandalonePhoneEndurance(
+                    persisted, planID: planID
+                )
+            case .watchEndurance:
+                startHomePlannedWorkoutOnWatch(
+                    persisted, startMode: watchStartMode
+                )
+            case .phoneStrength, .watchStrength:
+                startHomePlannedStrengthWorkout(persisted, device: device)
+            case .phoneStructuredManual:
+                selectedHomeStructuredWorkout =
+                    ATHLTHUnifiedWorkout.timedNonCardioProjection(
+                        from: persisted
+                    ) ?? persisted
+            case .watchSport:
+                prepareHomeCalendarWorkoutForWatch(
+                    persisted, mode: .onWatch
+                )
+            case .unavailable:
+                await social.markCurrentJoinedWorkoutLaunchFailed()
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "This workout needs a recorder that preserves every activity in the plan.",
+                    norwegian: "Denne økten trenger en opptaker som tar vare på alle aktivitetene i planen."
+                )
             }
         }
     }
@@ -4991,10 +4950,7 @@ struct ATHLTHHomeView: View {
         // athlete has already initiated this calendar start.
         guard !homeDirectStartInProgress,
               strengthWorkout.isLoaded(for: session.profile.userID),
-              strengthWorkout.activeWorkout == nil,
-              phoneWorkout.active == nil,
-              !watchConnection.hasActiveWatchWorkout,
-              !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+              !universalRecordingOccupied
         else {
             homeWatchTransferError = ATHLTHLocalization.choose(
                 english: "A workout is already starting, active, or your training data is still loading.",
@@ -6930,18 +6886,16 @@ struct ATHLTHTrainView: View {
         return nil
     }
 
-    // A single live-session priority surface, independent of plan status.
-    // Recovered workouts already have a dedicated checkpoint review above;
-    // never show two competing resume buttons for the same session.
+    // One shared launch gate across every Train and Calendar surface.
+    private var universalRecordingOccupied: Bool {
+        ATHLTHUniversalWorkoutAdmission.isOccupied(
+            phone: phoneWorkout, strength: strengthWorkout,
+            remoteWatchActive: watchConnection.hasActiveWatchWorkout
+        )
+    }
+
     private var hasOngoingTrainWorkout: Bool {
-        ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
-        phoneWorkout.hasPendingLaunch ||
-        phoneWorkout.active != nil ||
-        strengthWorkout.activeWorkout != nil ||
-        ATHLTHManualTimedCapture.hasActiveCapture ||
-        ATHLTHStructuredCaptureAdmission.hasActiveCapture ||
-        watchConnection.hasActiveWatchWorkout ||
-        ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+        universalRecordingOccupied
     }
 
     @ViewBuilder
@@ -8168,14 +8122,7 @@ struct ATHLTHTrainView: View {
             return
         }
         // Never replace a live workout with a second one from the plan.
-        if ATHLTHStructuredCaptureAdmission.hasActiveCapture ||
-            ATHLTHManualTimedCapture.hasActiveCapture ||
-            ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
-            phoneWorkout.hasPendingLaunch ||
-            phoneWorkout.active != nil ||
-            strengthWorkout.activeWorkout != nil ||
-            watchConnection.hasActiveWatchWorkout ||
-            ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive {
+        if universalRecordingOccupied {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "A workout is already in progress. Finish it before starting a planned session.",
                 norwegian: "En økt pågår allerede. Avslutt den før du starter en planlagt økt."
@@ -9583,14 +9530,7 @@ struct ATHLTHTrainView: View {
     }
 
     private var customQuickStartAvailable: Bool {
-        !ATHLTHWorkoutRecordingArbiter.hasPendingLaunch &&
-        !phoneWorkout.hasPendingLaunch &&
-        phoneWorkout.active == nil &&
-        strengthWorkout.activeWorkout == nil &&
-        !ATHLTHManualTimedCapture.hasActiveCapture &&
-        !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
-        !watchConnection.hasActiveWatchWorkout &&
-        !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+        !universalRecordingOccupied
     }
 
     private var quickStartCustomSubtitle: String {

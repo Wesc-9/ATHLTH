@@ -1,3 +1,7 @@
+## 2.2.6 – én felles opptaks- og planrute
+
+`ATHLTHPlannedWorkoutCaptureRoute.resolve` er nå kanonisk beslutningspunkt for Hjem-kalenderens planlagte økter. Blokker med flere aktiviteter kan ikke lenger bli feilaktig startet som bare løping, styrke eller en annen Watch-idrett. En gyldig løp/styrke-hybrid bruker samme originale styrkehybridjournal; en økt med løping og yoga blir en strukturert manuell iPhone-økt eller avvist på Watch. Støttede enkle idretter beholder eksisterende Watch HealthKit-opptaker. `ATHLTHUniversalWorkoutAdmission.isOccupied` samler åtte opptakstilstander og brukes av Train, Custom Quick, Hjem-kalender, planstart og styrke. Endelig start krever fortsatt den opprinnelige globale opptaksreservasjonen. Ingen ny HKWorkoutSession, GPS-kilde, historikkfil eller datamigrering er introdusert. Må testes på samme commit og fysiske enheter før release.
+
 ## 2.2.6 – manuelle økter i iPad-spektator og felles startkontroll
 
 - iPhone-tidsstyrte Custom Quick-økter for alle aktiviteter vises nå i den **eksisterende samtykkestyrte** iPad-livekanalen. Økt-ID, start, aktiv tid, drag og pause kommer fra original tidscheckpoint via universalmotorens projeksjon.
