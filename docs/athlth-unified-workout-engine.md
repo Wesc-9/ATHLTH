@@ -1,3 +1,9 @@
+## 2.2.6 – opprinnelse ved planbundet Watch-start
+
+- Klargjort økt brukt av automatisk `HKHealthStore.startWatchApp` merkes nå som telefoninitiert, mens en START-knapp som faktisk trykkes på Apple Watch fortsatt er Watch-initiert. Begge bruker samme originale HKWorkoutSession; dette oppretter ingen ekstra HealthKit-opptak.
+- Skillet er viktig: tidligere kalte både de to rutene `startPreparedWorkout`, som alltid satte `workoutInitiatedLocallyOnWatch=true`. Dermed kunne `activeRelayRequestID` nullstilles i den private Watch-starteren, selv om iPad-fjernstart hadde en bekreftet `clientRequestID`. Nå bevares staged remote-korrelasjon for automatisk planlagt løp og gå.
+- WatchHome/Watch-knapp benytter uendret standardparameter (lokal start), mens WatchApp automatisk start eksplisitt setter telefoninitiert. Nye regresjonstester dekker opprinnelsesvalget. Samme-commit iOS/WatchOS-build og faktisk relay-test gjenstår.
+
 ## 2.2.6 – Watch-resultater kun én gang fra korrekt HealthKit-opptak
 
 - Ved sluttføring kreves både original start, matching HealthKit `startDate` (±5 sek), faktisk avslutning, aktiv finish-prosess og ingen tidligere publisert kvittering. Et sent GPS-rute-/HealthKit-callback fra en gammel økt kan derfor ikke fullføre eller overskrive en nyere aktivitet.

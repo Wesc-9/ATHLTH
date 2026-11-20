@@ -426,4 +426,15 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
         ))
     }
 
+
+    func testPreparedWatchLaunchOriginRetainsRemoteReceipt() {
+        // A phone-initiated planned run/walk must not clear a staged
+        // remote request ID while entering the original Watch HK session.
+        XCTAssertFalse(ATHLTHWatchPreparedLaunchOriginPolicy
+            .startedLocallyOnWatch(initiatedByIPhone: true))
+        // Pressing START on the Watch itself remains user-initiated there.
+        XCTAssertTrue(ATHLTHWatchPreparedLaunchOriginPolicy
+            .startedLocallyOnWatch(initiatedByIPhone: false))
+    }
+
 }

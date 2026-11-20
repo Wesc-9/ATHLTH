@@ -442,7 +442,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @discardableResult
     func launchPreparedWorkout(
         _ workout: WatchPreparedWorkoutTransfer,
-        manager: WatchWorkoutManager
+        manager: WatchWorkoutManager,
+        initiatedByIPhone: Bool = false
     ) async -> Bool {
         guard manager.canAcceptPreparedWorkout(),
               ATHLTHWatchPreparedPlanIdentityPolicy.allows(
@@ -482,7 +483,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
         await manager.startPreparedWorkout(
             kind: workout.kind,
             route: route,
-            indoor: workout.indoor
+            indoor: workout.indoor,
+            initiatedByIPhone: initiatedByIPhone
         )
 
         // A failed, completed or idle session is not proof that this

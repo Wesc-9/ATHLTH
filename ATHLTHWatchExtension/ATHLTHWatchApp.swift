@@ -110,7 +110,8 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
                     routeStore.setAutomaticStartCountdown(nil)
                     await routeStore.launchPreparedWorkout(
                         workout,
-                        manager: manager
+                        manager: manager,
+                        initiatedByIPhone: true
                     )
                     return
                 }

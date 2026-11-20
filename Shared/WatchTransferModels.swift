@@ -1370,6 +1370,14 @@ enum ATHLTHWatchPreparedPlanIdentityPolicy {
     }
 }
 
+/// Remote auto-start MUST retain its iPad/iPhone relay identity; pressing
+/// START on the Watch is a genuinely local start with separate semantics.
+enum ATHLTHWatchPreparedLaunchOriginPolicy {
+    static func startedLocallyOnWatch(initiatedByIPhone: Bool) -> Bool {
+        !initiatedByIPhone
+    }
+}
+
 /// The final HealthKit callback is the ONLY place which may publish the
 /// original Watch recording. Duplicate/late route callbacks cannot generate
 /// a second result receipt or close a newer workout.

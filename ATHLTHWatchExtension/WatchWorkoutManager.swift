@@ -3873,7 +3873,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func startPreparedWorkout(
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil,
-        indoor: Bool? = nil
+        indoor: Bool? = nil,
+        initiatedByIPhone: Bool = false
     ) async {
         guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive,
@@ -3901,7 +3902,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         ) else { return }
 
 
-        workoutInitiatedLocallyOnWatch = true
+        workoutInitiatedLocallyOnWatch =
+            ATHLTHWatchPreparedLaunchOriginPolicy.startedLocallyOnWatch(
+                initiatedByIPhone: initiatedByIPhone
+            )
 
         if kind == .strength {
             ensureStandaloneStrengthSession()
