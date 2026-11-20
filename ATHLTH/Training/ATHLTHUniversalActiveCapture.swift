@@ -166,8 +166,12 @@ enum ATHLTHUniversalActiveCapture {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         if let recordedState {
+            // The same hybrid may be projected by both original stores.
+            // After identity validation, prefer the strength stage cursor
+            // rather than displaying the run projection as a strength phase.
             return recorded(
-                recordedState, source: strength == nil ? .phoneRunWalk : .strength
+                strength ?? recordedState,
+                source: strength == nil ? .phoneRunWalk : .strength
             )
         }
         return timedState ?? structuredState
@@ -200,6 +204,8 @@ enum ATHLTHUniversalActiveCapture {
         // A Watch mirror may still own the real session before its phone
         // checkpoint is available. Never report that state as an empty slot.
         if result == nil && (
+            ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
+            ATHLTHWorkoutRecordingArbiter.phone?.hasPendingLaunch == true ||
             ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive ||
             ATHLTHWorkoutRecordingArbiter.mirror?.hasActiveMirroredWorkout == true
         ) {
