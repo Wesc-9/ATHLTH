@@ -493,34 +493,39 @@ struct CustomQuickIPhoneWorkoutView: View {
     }
 
     private func intervalCue(at now: Date) -> String? {
-        let time = Int(elapsed(at: now))
+        guard let timeline = ATHLTHCustomWorkoutTimeline.state(
+            method: configuration.method,
+            durationMinutes: configuration.durationMinutes,
+            workSeconds: configuration.workSeconds,
+            restSeconds: configuration.restSeconds,
+            rounds: configuration.rounds,
+            elapsedSeconds: elapsed(at: now),
+            isPaused: resumedAt == nil
+        ) else { return nil }
+
         switch configuration.method {
         case .intervals, .tabata:
-            let work = configuration.method == .tabata
-                ? 20 : configuration.workSeconds
-            let rest = configuration.method == .tabata
-                ? 10 : configuration.restSeconds
-            let cycle = max(1, work + rest)
-            let round = min(time / cycle + 1, configuration.rounds)
-            if time >= configuration.rounds * work +
-                max(0, configuration.rounds - 1) * rest {
+            if timeline.intervalsComplete {
                 return tr("Intervals complete", "Alle drag fullført")
             }
-            let offset = time % cycle
-            let isWorking = offset < work
+            let round = timeline.roundNumber ?? 1
+            let isRest = timeline.phase == .recovery ||
+                (resumedAt == nil && timeline.stageIndex.map {
+                    $0 % 2 == 1
+                } == true)
             return tr(
-                "Round \(round)/\(configuration.rounds) · \(isWorking ? "Work" : "Rest")",
-                "Drag \(round)/\(configuration.rounds) · \(isWorking ? "Jobb" : "Pause")"
+                "Round \(round)/\(configuration.rounds) · \(isRest ? "Rest" : "Work")",
+                "Drag \(round)/\(configuration.rounds) · \(isRest ? "Pause" : "Jobb")"
             )
         case .emom:
-            return tr(
-                "Minute \(time / 60 + 1) · EMOM",
-                "Minutt \(time / 60 + 1) · EMOM"
-            )
+            let minute = timeline.roundNumber ?? 1
+            return tr("Minute \(minute) · EMOM", "Minutt \(minute) · EMOM")
         case .amrap, .forTime:
-            let remaining = max(0, configuration.durationMinutes * 60 - time)
-            return tr("Remaining \(clockText(seconds: Double(remaining)))",
-                      "Gjenstår \(clockText(seconds: Double(remaining)))")
+            let remaining = timeline.remainingSeconds ?? 0
+            return tr(
+                "Remaining \(clockText(seconds: remaining))",
+                "Gjenstår \(clockText(seconds: remaining))"
+            )
         case .open:
             return nil
         }

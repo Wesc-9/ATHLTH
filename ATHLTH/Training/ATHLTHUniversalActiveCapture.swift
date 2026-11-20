@@ -70,38 +70,27 @@ enum ATHLTHUniversalActiveCapture {
         }
 
         let elapsed = checkpoint.elapsed(at: now)
-        let intervals = checkpoint.method == .intervals ||
-            checkpoint.method == .tabata
-        let restBetweenRounds = checkpoint.restSeconds > 0 &&
-            checkpoint.rounds > 1
-        let cycleSeconds = max(1, checkpoint.workSeconds + checkpoint.restSeconds)
-        let round = intervals
-            ? min(checkpoint.rounds - 1, Int(elapsed / Double(cycleSeconds)))
-            : 0
-        let elapsedInRound = elapsed - Double(round * cycleSeconds)
-        let inRest = intervals && restBetweenRounds &&
-            round < checkpoint.rounds - 1 &&
-            elapsedInRound >= Double(checkpoint.workSeconds)
-        let index = intervals
-            ? round * (restBetweenRounds ? 2 : 1) + (inRest ? 1 : 0)
-            : nil
-        let count = intervals
-            ? checkpoint.rounds * (restBetweenRounds ? 2 : 1) -
-                (restBetweenRounds ? 1 : 0)
-            : nil
+        guard let timeline = ATHLTHCustomWorkoutTimeline.state(
+            method: checkpoint.method,
+            durationMinutes: checkpoint.durationMinutes,
+            workSeconds: checkpoint.workSeconds,
+            restSeconds: checkpoint.restSeconds,
+            rounds: checkpoint.rounds,
+            elapsedSeconds: elapsed,
+            isPaused: checkpoint.resumedAt == nil
+        ) else { return nil }
         return ATHLTHUniversalActiveCaptureState(
             workoutID: checkpoint.id,
             plannedSessionID: nil,
             recordingOwner: .iPhone,
             source: .manualTimer,
             activityCategory: category,
-            engine: inRest ? .recovery : activityEngine,
-            phase: checkpoint.resumedAt == nil ? .paused :
-                (inRest ? .recovery : .work),
+            engine: timeline.phase == .recovery ? .recovery : activityEngine,
+            phase: timeline.phase,
             startedAt: checkpoint.startedAt,
             elapsedSeconds: elapsed,
-            stageIndex: index,
-            stageCount: count
+            stageIndex: timeline.stageIndex,
+            stageCount: timeline.stageCount
         )
     }
 
