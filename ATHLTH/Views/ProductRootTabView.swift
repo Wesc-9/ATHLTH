@@ -1144,6 +1144,17 @@ struct ATHLTHHomeView: View {
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
 
+    // Home and Train must consult the same authoritative capture gate.
+    // A live Watch session, structured/manual timer or pending HealthKit
+    // launch occupies the slot even when the Home tab is not active.
+    private var universalRecordingOccupied: Bool {
+        ATHLTHUniversalWorkoutAdmission.isOccupied(
+            phone: phoneWorkout,
+            strength: strengthWorkout,
+            remoteWatchActive: watchConnection.hasActiveWatchWorkout
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
