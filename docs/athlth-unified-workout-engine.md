@@ -1,3 +1,10 @@
+## 2.2.6 – Watch start, reset og feil ved HealthKit-sluttlagring
+
+- Watch lokalt/forberedt og HealthKit-initiert start bruker én policy som blokkerer nye økter mens original `HKWorkoutSession` finnes eller `recoverActiveWorkoutSession()` venter. Dobbelstart kan ikke tømme gammel eier, rute eller Audio Coach før preflight.
+- `reset()` kan ikke nullstille en faktisk aktiv/stoppet/ended, men ennå ikke korrekt fullført HealthKit-økt; en vellykket fullført økt kan fortsatt lukkes. `end()` krever en eksisterende session før status endres til avslutning.
+- Ved HealthKit-finish/collection-feil beholdes original gjenopprettings-ID/checkpoint hvis den originale sessionen faktisk var startet. Før en reell sesjon oppstår, fjernes mislykket oppstart som før. Ingen separat recorder/historikk og ingen falsk fullføringskvittering.
+- Nye stateløse tester dekker alle Watch-aktiviteter, recovery, Reset og save-failure. Native same-commit Watch-bygg og fysisk recovery må fortsatt verifiseres.
+
 ## 2.2.6 – ingen oppdiktet ro-distanse fra Apple Watch / Audio Coach
 
 - Apple Watch og iPhone-speilets rutine- og custom Audio Coach bruker nå den **opprinnelige HealthKit-kildens** distansekapabilitet i tillegg til generisk sportkategori. Watch registrerer ikke verifisert ro-distanse med dagens konfigurasjon; derfor skal en roøkt ikke lese opp «distanse 0» på en tidsstyrt varsling eller forsøke å behandle programmert distanse som sensoravlesning.

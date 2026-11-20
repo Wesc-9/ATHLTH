@@ -3868,7 +3868,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             active: isActive,
             preparing: state == .preparing,
             ending: state == .ending,
-            finishing: finishing
+            finishing: finishing,
+            recovering: recoveryInProgress,
+            hasExistingSession: workoutSession != nil
         ) else { return }
 
         guard await localWorkoutStartAllowed()
@@ -3882,7 +3884,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             active: isActive,
             preparing: state == .preparing,
             ending: state == .ending,
-            finishing: finishing
+            finishing: finishing,
+            recovering: recoveryInProgress,
+            hasExistingSession: workoutSession != nil
         ) else { return }
 
 
@@ -4106,7 +4110,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             active: isActive,
             preparing: state == .preparing,
             ending: state == .ending,
-            finishing: finishing
+            finishing: finishing,
+            recovering: recoveryInProgress,
+            hasExistingSession: workoutSession != nil
         ) else { return }
 
         guard await localWorkoutStartAllowed()
@@ -4120,7 +4126,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             active: isActive,
             preparing: state == .preparing,
             ending: state == .ending,
-            finishing: finishing
+            finishing: finishing,
+            recovering: recoveryInProgress,
+            hasExistingSession: workoutSession != nil
         ) else { return }
 
 
@@ -4190,6 +4198,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func start(configuration: HKWorkoutConfiguration) async {
+        // A recovered or pre-existing recorder must not lose its source flag.
+        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+            active: isActive, preparing: state == .preparing,
+            ending: state == .ending, finishing: finishing,
+            recovering: recoveryInProgress,
+            hasExistingSession: workoutSession != nil
+        ) else { return }
         workoutInitiatedLocallyOnWatch = false
         let resolvedKind = kind(for: configuration.activityType)
         await start(
@@ -4235,12 +4250,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // Ignore repeated end taps while HealthKit is finishing the same
         // workout. Finishing and route persistence remain owned by the
         // existing session delegate and live workout builder.
-        guard isActive, state != .ending, !finishing else { return }
+        guard isActive, state != .ending, !finishing,
+              let session = workoutSession else { return }
         publishState(.ending)
-        workoutSession?.end()
+        session.end()
     }
 
     func reset() {
+        let hkState = workoutSession?.state
+        let healthKitUnfinished = state != .completed &&
+            (hkState == .running || hkState == .paused ||
+             hkState == .stopped || hkState == .ended)
+        guard ATHLTHWatchWorkoutResetPolicy.mayClear(
+            active: isActive, preparing: state == .preparing,
+            ending: state == .ending, finishing: finishing,
+            recovering: recoveryInProgress,
+            healthKitSessionInProgress: healthKitUnfinished
+        ) else { return }
         pendingWatchCoachReplay = nil
         pendingLocalCoachEvent = nil
         audioCoachActivationGeneration = UUID()
@@ -4372,7 +4398,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer?
     ) async {
-        guard !isActive, state != .preparing, state != .ending else { return }
+        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+            active: isActive, preparing: state == .preparing,
+            ending: state == .ending, finishing: finishing,
+            recovering: recoveryInProgress,
+            hasExistingSession: workoutSession != nil
+        ) else { return }
 
         if workoutInitiatedLocallyOnWatch {
             activeRelayRequestID = nil
@@ -9525,6 +9556,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// Keep the original recovery journal on a real HealthKit collection
+    /// or finish failure, but clear preflight-only phantom checkpoints.
+    private func reconcileCheckpointAfterFailure() {
+        let hkState = workoutSession?.state
+        let hkStartedOrEnded =
+            hkState == .running || hkState == .paused ||
+            hkState == .stopped || hkState == .ended
+        if ATHLTHWatchWorkoutFailureRecoveryPolicy.shouldRetainCheckpoint(
+            hasBuilder: workoutBuilder != nil,
+            hasOriginalStart: startedAt != nil,
+            healthKitStartedOrEnded: hkStartedOrEnded
+        ) {
+            persistWorkoutRecoveryState()
+        } else {
+            clearPersistedWorkoutState()
+        }
+    }
+
     private func fail(
         message: String
     ) {
@@ -9535,7 +9584,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         state = .failed(message)
         WatchHomeAssistantBridge.shared
             .workoutStopped()
-        clearPersistedWorkoutState()
+        reconcileCheckpointAfterFailure()
 
         Task { @MainActor [weak self] in
             await self?.sendLiveSnapshot(
@@ -9555,7 +9604,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
         WatchHomeAssistantBridge.shared
             .workoutStopped()
-        clearPersistedWorkoutState()
+        reconcileCheckpointAfterFailure()
 
         Task { @MainActor [weak self] in
             guard let self else { return }

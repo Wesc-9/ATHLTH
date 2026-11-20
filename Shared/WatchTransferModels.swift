@@ -324,9 +324,36 @@ enum ATHLTHWatchWorkoutStartAdmissionPolicy {
         active: Bool,
         preparing: Bool,
         ending: Bool,
-        finishing: Bool
+        finishing: Bool,
+        recovering: Bool = false,
+        hasExistingSession: Bool = false
     ) -> Bool {
-        !active && !preparing && !ending && !finishing
+        !active && !preparing && !ending && !finishing &&
+            !recovering && !hasExistingSession
+    }
+}
+
+/// Only the original finish delegate may release a live HealthKit recorder.
+enum ATHLTHWatchWorkoutResetPolicy {
+    static func mayClear(
+        active: Bool, preparing: Bool, ending: Bool,
+        finishing: Bool, recovering: Bool,
+        healthKitSessionInProgress: Bool
+    ) -> Bool {
+        !active && !preparing && !ending && !finishing &&
+            !recovering && !healthKitSessionInProgress
+    }
+}
+
+/// Failed start must not leave a phantom checkpoint; failed save must not
+/// discard the last durable identity of an already-started HKWorkoutSession.
+enum ATHLTHWatchWorkoutFailureRecoveryPolicy {
+    static func shouldRetainCheckpoint(
+        hasBuilder: Bool,
+        hasOriginalStart: Bool,
+        healthKitStartedOrEnded: Bool
+    ) -> Bool {
+        hasBuilder && hasOriginalStart && healthKitStartedOrEnded
     }
 }
 

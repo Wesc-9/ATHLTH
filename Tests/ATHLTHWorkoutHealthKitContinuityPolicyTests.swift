@@ -125,4 +125,61 @@ final class ATHLTHWorkoutHealthKitContinuityPolicyTests: XCTestCase {
         }
     }
 
+
+    func testWatchRecoveryAndOriginalHKSessionPreventNewWorkoutForEverySport() {
+        for kind in WatchWorkoutKind.allCases {
+            XCTAssertFalse(ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+                active: false, preparing: false, ending: false,
+                finishing: false, recovering: true
+            ), kind.rawValue)
+            XCTAssertFalse(ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+                active: false, preparing: false, ending: false,
+                finishing: false, hasExistingSession: true
+            ), kind.rawValue)
+            XCTAssertFalse(ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+                active: false, preparing: false, ending: false,
+                finishing: false, recovering: true, hasExistingSession: true
+            ), kind.rawValue)
+        }
+    }
+
+    func testWatchResetNeverDropsLiveRecordingOrRecovery() {
+        func mayReset(active: Bool = false, preparing: Bool = false,
+                      ending: Bool = false, finishing: Bool = false,
+                      recovering: Bool = false, hkLive: Bool = false) -> Bool {
+            ATHLTHWatchWorkoutResetPolicy.mayClear(
+                active: active, preparing: preparing, ending: ending,
+                finishing: finishing, recovering: recovering,
+                healthKitSessionInProgress: hkLive
+            )
+        }
+        XCTAssertTrue(mayReset())
+        XCTAssertFalse(mayReset(active: true))
+        XCTAssertFalse(mayReset(preparing: true))
+        XCTAssertFalse(mayReset(ending: true))
+        XCTAssertFalse(mayReset(finishing: true))
+        XCTAssertFalse(mayReset(recovering: true))
+        XCTAssertFalse(mayReset(hkLive: true))
+    }
+
+    func testWatchFailedHealthKitSaveRetainsOnlyRealCheckpoint() {
+        let p = ATHLTHWatchWorkoutFailureRecoveryPolicy.self
+        XCTAssertTrue(p.shouldRetainCheckpoint(
+            hasBuilder: true, hasOriginalStart: true,
+            healthKitStartedOrEnded: true
+        ))
+        XCTAssertFalse(p.shouldRetainCheckpoint(
+            hasBuilder: false, hasOriginalStart: true,
+            healthKitStartedOrEnded: true
+        ))
+        XCTAssertFalse(p.shouldRetainCheckpoint(
+            hasBuilder: true, hasOriginalStart: false,
+            healthKitStartedOrEnded: true
+        ))
+        XCTAssertFalse(p.shouldRetainCheckpoint(
+            hasBuilder: true, hasOriginalStart: true,
+            healthKitStartedOrEnded: false
+        ))
+    }
+
 }
