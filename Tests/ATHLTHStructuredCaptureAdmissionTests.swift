@@ -176,4 +176,28 @@ final class ATHLTHStructuredCaptureAdmissionTests: XCTestCase {
         XCTAssertTrue(ATHLTHStructuredCaptureAdmission.hasActiveCapture)
     }
 
+    func testStructuredClockFreezesElapsedTimeAndRejectsCorruption() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        let pause = start.addingTimeInterval(45)
+        XCTAssertEqual(ATHLTHStructuredWorkoutClock.elapsed(
+            start: start, now: start.addingTimeInterval(900),
+            pause: pause, pausedSeconds: 0
+        ), 45)
+        XCTAssertEqual(ATHLTHStructuredWorkoutClock.resumeOffset(
+            from: pause, at: start.addingTimeInterval(900)
+        ), 855)
+        XCTAssertEqual(ATHLTHStructuredWorkoutClock.elapsed(
+            start: start, now: start.addingTimeInterval(910),
+            pause: nil, pausedSeconds: 855
+        ), 55)
+        XCTAssertNil(ATHLTHStructuredWorkoutClock.elapsed(
+            start: start, now: start.addingTimeInterval(10),
+            pause: nil, pausedSeconds: 999
+        ))
+        XCTAssertNil(ATHLTHStructuredWorkoutClock.elapsed(
+            start: start, now: start.addingTimeInterval(10),
+            pause: nil, pausedSeconds: .nan
+        ))
+    }
+
 }

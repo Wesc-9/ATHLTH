@@ -1,3 +1,7 @@
+## 2.2.6 – vedvarende pause og aktiv tidsmåling
+
+Strukturert iPhone-motor har nå én pauseklokke i originalcheckpointen. Pause stopper deltrinns-/EMOM-/AMRAP-klokken, gjenoppta forskyver deres eksisterende ankere, og aktiv varighet i sammendraget ekskluderer brukerpauser. Historiske checkpoints og fullføringer dekodes via valgfrie felt. Universalmotor og privat iPad-spektator ser samme pause og fryste tid. Ugyldig pause beskyttes, ikke overstyres. Ingen separat HealthKit-opptaker eller ekstra historikk.
+
 ## 2.2.6 – felles aktiv økttilstand for alle eksisterende treningsformer
 
 - Ny skrivebeskyttet ATHLTHUniversalActiveCapture projiserer fire eksisterende originalkilder: iPhone-løp/gå, styrkelogg, Custom Quick iPhone-tidtaker og strukturert øktcheckpoint. Det opprettes ikke nye HealthKit-sesjoner, historikklagre eller kopier av en fullført økt.

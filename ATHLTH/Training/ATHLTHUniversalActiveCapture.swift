@@ -111,6 +111,11 @@ enum ATHLTHUniversalActiveCapture {
             blocks: checkpoint.executionBlocks
         ).category
         let inRest = current.kind == .rest || current.isActiveRecovery
+        guard let activeSeconds = ATHLTHStructuredWorkoutClock.elapsed(
+            start: checkpoint.startedAt, now: now,
+            pause: checkpoint.pausedAt,
+            pausedSeconds: checkpoint.completedPauseSeconds ?? 0
+        ) else { return nil }
         return ATHLTHUniversalActiveCaptureState(
             workoutID: checkpoint.workoutID,
             plannedSessionID: nil,
@@ -119,11 +124,9 @@ enum ATHLTHUniversalActiveCapture {
             activityCategory: category,
             engine: inRest ? .recovery :
                 ATHLTHLiveWorkoutEngineRouter.engine(for: current),
-            phase: inRest ? .recovery : .work,
+            phase: checkpoint.pausedAt != nil ? .paused : (inRest ? .recovery : .work),
             startedAt: checkpoint.startedAt,
-            elapsedSeconds: max(0, now.timeIntervalSince(
-                checkpoint.startedAt
-            )),
+            elapsedSeconds: activeSeconds,
             stageIndex: checkpoint.currentIndex,
             stageCount: checkpoint.executionBlocks.count
         )

@@ -40,7 +40,12 @@ enum ATHLTHStructuredCaptureAdmission {
                   checkpoint.savedAt.timeIntervalSince1970.isFinite,
                   checkpoint.executionBlocks.indices.contains(
                     checkpoint.currentIndex
-                  ) else {
+                  ),
+                  ATHLTHStructuredWorkoutClock.elapsed(
+                    start: checkpoint.startedAt, now: Date(),
+                    pause: checkpoint.pausedAt,
+                    pausedSeconds: checkpoint.completedPauseSeconds ?? 0
+                  ) != nil else {
                 unresolvedCheckpoint = true
                 continue
             }
@@ -84,6 +89,11 @@ enum ATHLTHStructuredCaptureAdmission {
               checkpoint.startedAt.timeIntervalSince1970.isFinite,
               checkpoint.savedAt.timeIntervalSince1970.isFinite,
               checkpoint.executionBlocks.indices.contains(checkpoint.currentIndex),
+              ATHLTHStructuredWorkoutClock.elapsed(
+                  start: checkpoint.startedAt, now: Date(),
+                  pause: checkpoint.pausedAt,
+                  pausedSeconds: checkpoint.completedPauseSeconds ?? 0
+              ) != nil,
               checkpoint.savedAt > Date().addingTimeInterval(-7 * 86_400),
               checkpoint.savedAt <= Date().addingTimeInterval(3600)
         else { return nil }

@@ -204,4 +204,29 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         ))
     }
 
+    func testStructuredPausePreservesWorkoutIDAndClock() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        let note = block(kind: .note, sequence: 1)
+        var checkpoint = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: UUID(), savedAt: start, startedAt: start,
+            stepEnteredAt: start, currentIndex: 0,
+            completedIDs: [], results: [:], modeStarts: [:],
+            executionBlocks: [note], emomWaiting: false,
+            timedOutGroups: [], enteredReps: 0, enteredWeight: ""
+        )
+        checkpoint.pausedAt = start.addingTimeInterval(45)
+        let paused = try XCTUnwrap(ATHLTHUniversalActiveCapture.structured(
+            checkpoint, at: start.addingTimeInterval(900)
+        ))
+        XCTAssertEqual(paused.elapsedSeconds, 45)
+        XCTAssertEqual(paused.phase, .paused)
+        checkpoint.pausedAt = nil
+        checkpoint.completedPauseSeconds = 855
+        let resumed = try XCTUnwrap(ATHLTHUniversalActiveCapture.structured(
+            checkpoint, at: start.addingTimeInterval(910)
+        ))
+        XCTAssertEqual(resumed.elapsedSeconds, 55)
+        XCTAssertEqual(resumed.workoutID, paused.workoutID)
+    }
+
 }

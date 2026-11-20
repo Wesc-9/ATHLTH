@@ -138,6 +138,8 @@ struct ATHLTHLocalStructuredWorkoutStatus {
     var stepIndex: Int
     var stepEnteredAt: Date
     var completedCount: Int
+    var pausedAt: Date? = nil
+    var completedPauseSeconds: TimeInterval = 0
 }
 
 /// Polling deliberately shares only a compact spectator state; no second
@@ -574,22 +576,29 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             let step = structured.steps.indices.contains(structured.stepIndex)
                 ? structured.steps[structured.stepIndex] : nil
             let nextIndex = structured.stepIndex + 1
+            let now = Date()
+            let effective = ATHLTHStructuredWorkoutClock.at(now, pause: structured.pausedAt) ?? now
             let remaining = step?.durationSeconds.map {
-                max(0, $0 - Date().timeIntervalSince(structured.stepEnteredAt))
+                max(0, $0 - effective.timeIntervalSince(structured.stepEnteredAt))
             }
+            let elapsed = ATHLTHStructuredWorkoutClock.elapsed(
+                start: structured.startedAt, now: now,
+                pause: structured.pausedAt,
+                pausedSeconds: structured.completedPauseSeconds
+            ) ?? 0
             return ATHLTHCrossDeviceWorkoutSnapshot(
                 sessionID: structured.workoutID,
                 kind: structured.kind,
                 title: structured.title,
                 startedAt: structured.startedAt,
-                elapsedSeconds: max(0, Date().timeIntervalSince(structured.startedAt)),
+                elapsedSeconds: elapsed,
                 distanceMeters: nil,
                 currentStep: step?.title,
                 nextStep: structured.steps.indices.contains(nextIndex)
                     ? structured.steps[nextIndex].title : nil,
                 completedSets: structured.completedCount,
                 totalSets: structured.steps.count,
-                paused: false,
+                paused: structured.pausedAt != nil,
                 runningStepRemainingSeconds: remaining,
                 capturedAt: .now,
                 sourceDevice: "iphone",

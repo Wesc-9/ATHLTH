@@ -83,6 +83,8 @@ struct ATHLTHStructuredWorkoutCheckpoint: Codable {
     var timedOutGroups: Set<UUID>
     var enteredReps: Int
     var enteredWeight: String
+    var pausedAt: Date? = nil
+    var completedPauseSeconds: TimeInterval? = nil
 }
 
 struct StructuredWorkoutCompletion: Identifiable, Codable, Hashable {
@@ -100,9 +102,12 @@ struct StructuredWorkoutCompletion: Identifiable, Codable, Hashable {
     /// Optional so older histories continue decoding.
     var actualStepResults: [StructuredWorkoutStepResult]? = nil
     var timedOutModes: [String]? = nil
+    var activeDurationSeconds: TimeInterval? = nil
 
     var duration: TimeInterval {
-        max(endedAt.timeIntervalSince(startedAt), 0)
+        if let activeDurationSeconds, activeDurationSeconds.isFinite,
+           activeDurationSeconds >= 0 { return activeDurationSeconds }
+        return max(endedAt.timeIntervalSince(startedAt), 0)
     }
 }
 
@@ -189,6 +194,8 @@ struct StructuredWorkoutSessionView: View {
     @State private var results: [String: StructuredWorkoutStepResult] = [:]
     @State private var modeStarts: [UUID: Date] = [:]
     @State private var stepEnteredAt = Date()
+    @State private var pausedAt: Date?
+    @State private var completedPauseSeconds: TimeInterval = 0
     @State private var emomWaitingForMinute = false
     @State private var amrapTimedOutGroups: Set<UUID> = []
     @State private var enteredReps = 0
@@ -238,6 +245,17 @@ struct StructuredWorkoutSessionView: View {
                                 dismiss()
                             }
                             Spacer(minLength: 5)
+                            Button {
+                                toggleStructuredPause()
+                            } label: {
+                                Label(
+                                    pausedAt == nil ? "Pause" : "Fortsett",
+                                    systemImage: pausedAt == nil ? "pause.fill" : "play.fill"
+                                ).font(.caption.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accentDeep)
+                            .accessibilityIdentifier("structuredWorkoutPauseToggle")
                             ATHLTHLiveWorkoutControlButton(kind: .add) {
                                 showAllSteps.toggle()
                             }
@@ -352,7 +370,7 @@ struct StructuredWorkoutSessionView: View {
                             title: ATHLTHLocalization.choose(
                                 english: "Elapsed", norwegian: "Varighet"
                             ),
-                            value: "\(max(0, Int(Date().timeIntervalSince(startedAt) / 60))) min",
+                            value: "\(max(0, Int(activeElapsed(at: Date()) / 60))) min",
                             symbol: "clock"
                         ),
                         ATHLTHWorkoutFinishMetric(
@@ -716,7 +734,8 @@ struct StructuredWorkoutSessionView: View {
         guard let id = block.executionGroupID,
               let started = modeStarts[id],
               let kind = block.executionGroupKind else { return nil }
-        let elapsed = max(date.timeIntervalSince(started), 0)
+        let clockDate = ATHLTHStructuredWorkoutClock.at(date, pause: pausedAt) ?? date
+        let elapsed = max(clockDate.timeIntervalSince(started), 0)
         switch kind {
         case .emom:
             return max(0, (Double(ordinal + 1) *
@@ -729,7 +748,7 @@ struct StructuredWorkoutSessionView: View {
     }
 
     private func checkTimedMode(at date: Date) {
-        guard !savedCompletion, let block = currentBlock,
+        guard !savedCompletion, pausedAt == nil, let block = currentBlock,
               let id = block.executionGroupID,
               let started = modeStarts[id],
               let kind = block.executionGroupKind else { return }
@@ -1249,7 +1268,7 @@ struct StructuredWorkoutSessionView: View {
     }
 
     private func completeCurrentAndAdvance() {
-        guard hasStarted, let block = currentBlock else { return }
+        guard hasStarted, pausedAt == nil, let block = currentBlock else { return }
         if let id = block.executionGroupID,
            amrapTimedOutGroups.contains(id) { return }
         guard !emomWaitingForMinute else { return }
@@ -1264,6 +1283,7 @@ struct StructuredWorkoutSessionView: View {
     }
 
     private func goToNextStep() {
+        guard pausedAt == nil else { return }
         emomWaitingForMinute = false
         if let block = currentBlock,
            let id = block.executionGroupID,
@@ -1294,7 +1314,7 @@ struct StructuredWorkoutSessionView: View {
             repetitions: completed && block.kind == .exercise && block.durationSeconds == nil
                 ? max(0, enteredReps) : nil,
             weightKilograms: completed && block.kind == .exercise ? value : nil,
-            elapsedSeconds: max(Date().timeIntervalSince(stepEnteredAt), 0),
+            elapsedSeconds: max((ATHLTHStructuredWorkoutClock.at(Date(), pause: pausedAt) ?? Date()).timeIntervalSince(stepEnteredAt), 0),
             completed: completed
         )
         results[block.id] = recorded
@@ -1310,6 +1330,41 @@ struct StructuredWorkoutSessionView: View {
         if let id = block.executionGroupID, modeStarts[id] == nil {
             modeStarts[id] = Date()
         }
+    }
+
+    private func activeElapsed(at now: Date) -> TimeInterval {
+        ATHLTHStructuredWorkoutClock.elapsed(
+            start: startedAt, now: now, pause: pausedAt,
+            pausedSeconds: completedPauseSeconds
+        ) ?? 0
+    }
+
+    /// Stop all timed groups and the stage clock without changing the
+    /// original workout ID, actual start, HealthKit owner, or history.
+    private func toggleStructuredPause() {
+        guard hasStarted, !savedCompletion else { return }
+        let now = Date(), oldPause = pausedAt
+        let oldTotal = completedPauseSeconds
+        let oldStep = stepEnteredAt, oldGroups = modeStarts
+        if let pausedAt {
+            guard let delta = ATHLTHStructuredWorkoutClock.resumeOffset(
+                from: pausedAt, at: now
+            ) else { return }
+            completedPauseSeconds += delta
+            stepEnteredAt = stepEnteredAt.addingTimeInterval(delta)
+            modeStarts = modeStarts.mapValues { $0.addingTimeInterval(delta) }
+            self.pausedAt = nil
+        } else {
+            pausedAt = now
+        }
+        guard persistCheckpoint() else {
+            pausedAt = oldPause
+            completedPauseSeconds = oldTotal
+            stepEnteredAt = oldStep
+            modeStarts = oldGroups
+            return
+        }
+        updateScreenAwakeState()
     }
 
     @discardableResult
@@ -1331,7 +1386,9 @@ struct StructuredWorkoutSessionView: View {
             emomWaiting: emomWaitingForMinute,
             timedOutGroups: amrapTimedOutGroups,
             enteredReps: enteredReps,
-            enteredWeight: enteredWeight
+            enteredWeight: enteredWeight,
+            pausedAt: pausedAt,
+            completedPauseSeconds: completedPauseSeconds
         )
         do {
             try AccountLocalStorage.writeChecked(
@@ -1382,7 +1439,9 @@ struct StructuredWorkoutSessionView: View {
                 steps: stages,
                 stepIndex: currentIndex,
                 stepEnteredAt: stepEnteredAt,
-                completedCount: completedBlockIDs.count
+                completedCount: completedBlockIDs.count,
+                pausedAt: pausedAt,
+                completedPauseSeconds: completedPauseSeconds
             )
         )
     }
@@ -1395,13 +1454,19 @@ struct StructuredWorkoutSessionView: View {
         ), saved.workoutID == workout.id,
            saved.savedAt > Date().addingTimeInterval(-7 * 24 * 3600),
            !saved.executionBlocks.isEmpty,
-           saved.executionBlocks.indices.contains(saved.currentIndex)
+           saved.executionBlocks.indices.contains(saved.currentIndex),
+           ATHLTHStructuredWorkoutClock.elapsed(
+               start: saved.startedAt, now: Date(), pause: saved.pausedAt,
+               pausedSeconds: saved.completedPauseSeconds ?? 0
+           ) != nil
         else { return false }
         restoringCheckpoint = true
         activeExecutionBlocks = saved.executionBlocks
         completionID = saved.completionID ?? UUID()
         startedAt = saved.startedAt
         stepEnteredAt = saved.stepEnteredAt
+        pausedAt = saved.pausedAt
+        completedPauseSeconds = saved.completedPauseSeconds ?? 0
         currentIndex = saved.currentIndex
         completedBlockIDs = saved.completedIDs
         results = saved.results
@@ -1437,7 +1502,7 @@ struct StructuredWorkoutSessionView: View {
     @MainActor
     private func updateScreenAwakeState() {
         ATHLTHWorkoutScreenAwake.set(
-            !savedCompletion &&
+            !savedCompletion && pausedAt == nil &&
                 scenePhase == .active,
             reason:
                 "iphone-structured-workout"
@@ -1467,6 +1532,7 @@ struct StructuredWorkoutSessionView: View {
                 sourcePlanID: linkedPlanID
             )
 
+        completion.activeDurationSeconds = activeElapsed(at: completion.endedAt)
         completion.actualStepResults = results.values.sorted {
             $0.stepID < $1.stepID
         }
@@ -1502,14 +1568,7 @@ struct StructuredWorkoutSessionView: View {
     private func elapsedText(
         at date: Date
     ) -> String {
-        let seconds = max(
-            Int(
-                date.timeIntervalSince(
-                    startedAt
-                )
-            ),
-            0
-        )
+        let seconds = max(Int(activeElapsed(at: date)), 0)
 
         return String(
             format: "%d:%02d:%02d",
