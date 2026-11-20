@@ -63,4 +63,18 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
         )
         XCTAssertNil(decoded.ownerID)
     }
+    func testCompletedWatchResultKeepsOriginalATHLTHIdentityOffline() throws {
+        var result = completedResult()
+        let originalID = UUID()
+        result.universalWorkoutID = originalID
+        let decoded = try JSONDecoder().decode(
+            WatchWorkoutResult.self, from: JSONEncoder().encode(result)
+        )
+        XCTAssertEqual(decoded.universalWorkoutID, originalID)
+        XCTAssertNotEqual(decoded.universalWorkoutID, decoded.id)
+        XCTAssertNotEqual(decoded.universalWorkoutID, decoded.healthKitWorkoutUUID)
+        XCTAssertNil(completedResult().universalWorkoutID)
+    }
+
+
 }

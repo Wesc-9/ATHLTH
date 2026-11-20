@@ -1836,6 +1836,9 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     // Stable iPad request identity only when Watch actually finished its
     // HealthKit recording. Optional for older Watch/phone builds.
     var relayRequestID: UUID? = nil
+    /// Stable ATHLTH ID for the original Watch recording; separate from
+    /// HealthKit UUID and queued result receipt. Nil in legacy results.
+    var universalWorkoutID: UUID? = nil
 }
 
 /// Minimal terminal proof, independent of the workout-history import queue.
@@ -1904,6 +1907,9 @@ enum WatchWorkoutMirrorState: String, Codable, Hashable {
 }
 
 struct WatchWorkoutLiveSnapshot: Codable, Hashable {
+    /// Originates on Watch once per actual HKWorkoutSession and survives
+    /// recovery. Nil on old Watch builds; iPhone must never invent it.
+    var universalWorkoutID: UUID? = nil
     /// Stable ATHLTH session identity for Watch-strength mirror updates.
     /// Optional for older paired Watch apps; no new HealthKit session.
     var strengthWorkoutID: UUID? = nil

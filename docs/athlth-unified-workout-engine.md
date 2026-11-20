@@ -1,3 +1,9 @@
+## 2.2.6 – stabil original Watch-ID for alle støttede native idretter
+
+Watch-opptak bruker nå én ATHLTH-øktidentitet per faktisk HealthKit-opptak. For styrke er ID lik original styrkelogg-ID; for løping, gåing, sykling, roing, trapper, HIIT, funksjonell, yoga og annet lages ID-en bare på Watch ved ny sesjon. ID lagres i det opprinnelige recovery-checkpointet, sends med live-snapshotet og det ferdige Watch-resultatet. HealthKit-UUID og sluttresultat-ID forblir separate. En gammel eller uleselig recovery uten verifiserbar ID får aldri automatisk ny ID fra iPhone.
+
+Universalmotoren bruker Watch sin bekreftede aktive økttid og kan vise alle støttede Watch-idretter uten å åpne en ekstra HKWorkoutSession. Mismatch i styrke-ID, umulige tidsmålinger, gamle snapshots og økter uten verifisert ID avvises. Ingen duplisert historikk eller endret resultatskriver. Krever samme-commit full CI og fysisk Watch HealthKit-verifikasjon før produksjon.
+
 ## 2.2.6 – én identitet for bekreftet Watch-styrke før iPhone-sjekkpunkt
 
 - Universell aktiv økttilstand kan nå lese et nylig bekreftet Watch-speil for styrke direkte fra faktisk Watch UUID, HealthKit-aktiv tid og startklokke. Dette er én skrivebeskyttet visning av originalt Watch-opptak, aldri en ekstra økt, lokal journal eller HealthKit-writer.

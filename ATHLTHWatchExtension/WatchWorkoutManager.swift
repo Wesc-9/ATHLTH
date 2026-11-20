@@ -132,6 +132,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var workoutLocationMetadataAttached = false
     private var timer: Timer?
     private var startedAt: Date?
+    private var universalWorkoutID: UUID?
     // Set only by a named planned card, never guessed from a workout title.
     private var plannedCalendarSessionID: UUID?
     /// Immutable within one HealthKit workout, even if iPhone changes user.
@@ -3758,6 +3759,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             collectingHybridTreadmillDistance = false
             finishing = false
             kind = recoveredKind
+            universalWorkoutID = nil
             startedAt =
                 recovered.startDate ??
                 builder.startDate ??
@@ -3905,6 +3907,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let snapshot =
             WatchPersistedWorkoutState(
                 kind: kind,
+                universalWorkoutID: universalWorkoutID,
                 startedAt: startedAt,
                 accountOwnerID: workoutOwnerID,
                 initiatedLocallyOnWatch: workoutInitiatedLocallyOnWatch,
@@ -3979,6 +3982,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         startedAt =
             startedAt ??
             snapshot.startedAt
+        // Only restore an original ID when the recovered HK session has
+        // the same start. Older checkpoints stay explicitly unidentified.
+        if let savedStart = snapshot.startedAt,
+           let originalStart = startedAt,
+           abs(savedStart.timeIntervalSince(originalStart)) <= 5 {
+            if expectedKind == .strength {
+                universalWorkoutID = snapshot.universalWorkoutID ==
+                    snapshot.strengthSession?.workoutID
+                    ? snapshot.universalWorkoutID : nil
+            } else {
+                universalWorkoutID = snapshot.universalWorkoutID
+            }
+        } else {
+            universalWorkoutID = nil
+        }
         workoutOwnerID = snapshot.accountOwnerID
         workoutInitiatedLocallyOnWatch =
             snapshot.initiatedLocallyOnWatch ?? false
@@ -4203,6 +4221,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workoutLocation = nil
         workoutLocationMetadataAttached = false
         startedAt = nil
+        universalWorkoutID = nil
         plannedCalendarSessionID = nil
         workoutOwnerID = nil
         resetIndoorProbeForNewWorkout()
@@ -4456,6 +4475,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             workoutSession = session
             workoutBuilder = builder
+            // One ATHLTH identity, never a second recorder. Strength uses
+            // its existing immutable strength-workout journal identity.
+            universalWorkoutID = kind == .strength
+                ? strengthSession?.workoutID : UUID()
             collectingHybridTreadmillDistance = false
             synchronizeHybridTreadmillSensors()
             finishing = false
@@ -8497,6 +8520,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
 
         result.accountOwnerID = workoutOwnerID
+        result.universalWorkoutID = universalWorkoutID
         // Do not publish an identity on a prepared/failed activity. This
         // result exists only after HealthKit finishWorkout() succeeded.
         result.relayRequestID = activeRelayRequestID
@@ -9006,6 +9030,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // by its sport or by a nearby finish/start timestamp.
         snapshot.strengthWorkoutID =
             kind == .strength ? strengthSession?.workoutID : nil
+        snapshot.universalWorkoutID = universalWorkoutID
 
         if let progress = runningStepProgress, let structure = structuredRunningWorkout {
             snapshot.runningOverallProgress = ATHLTHRunningStepEngine.overallProgress(

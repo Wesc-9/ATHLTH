@@ -8,8 +8,8 @@ enum ATHLTHUniversalCaptureSource: String, Codable, Hashable {
     case strength
     case manualTimer
     case structuredTimer
-    /// Read-only projection of a provably identified Watch strength session.
-    /// The Watch remains the sole HealthKit owner of its workout.
+    /// Read-only projection of the original, identity-proven Watch session.
+    /// HealthKit ownership remains exclusively on the Watch.
     case watchMirror
 
     var isManualTiming: Bool {
@@ -177,17 +177,13 @@ enum ATHLTHUniversalActiveCapture {
         )
     }
 
-    /// Recover a confirmed mirrored Watch strength workout while its
-    /// iPhone strength log has not been materialized yet. The Watch's
-    /// real UUID and HealthKit active clock are required; never invent a
-    /// local workout ID for older Watch snapshots that lack these fields.
-    static func mirroredStrength(
+    /// All native Watch sports share one original HealthKit session and
+    /// its confirmed active time. iPhone makes NO new ID or HK recording.
+    static func mirroredWatch(
         _ snapshot: WatchWorkoutLiveSnapshot,
         at now: Date = Date()
     ) -> ATHLTHUniversalActiveCaptureState? {
-        guard snapshot.kind == .strength,
-              snapshot.state == .running || snapshot.state == .paused,
-              let id = snapshot.strengthWorkoutID,
+        guard snapshot.state == .running || snapshot.state == .paused,
               let start = snapshot.startedAt,
               start.timeIntervalSince1970.isFinite,
               snapshot.capturedAt.timeIntervalSince1970.isFinite,
@@ -195,25 +191,59 @@ enum ATHLTHUniversalActiveCapture {
               start <= snapshot.capturedAt,
               snapshot.elapsedTime.isFinite,
               snapshot.elapsedTime >= 0,
-              snapshot.elapsedTime <= snapshot.capturedAt.timeIntervalSince(
-                  start
-              ) + 10,
+              snapshot.elapsedTime <= snapshot.capturedAt.timeIntervalSince(start) + 10,
               now.timeIntervalSince(snapshot.capturedAt) >= -10,
               now.timeIntervalSince(snapshot.capturedAt) <= 35
         else { return nil }
+        let id: UUID
+        if snapshot.kind == .strength {
+            guard let original = snapshot.strengthWorkoutID,
+                  snapshot.universalWorkoutID == nil ||
+                      snapshot.universalWorkoutID == original else { return nil }
+            id = original
+        } else {
+            guard let original = snapshot.universalWorkoutID else { return nil }
+            id = original
+        }
+        let category: String
+        let engine: ATHLTHLiveWorkoutEngine
+        switch snapshot.kind {
+        case .running: category = "running"; engine = .endurance
+        case .walking: category = "walking"; engine = .endurance
+        case .strength: category = "strength"; engine = .strength
+        case .cycling: category = "cycling"; engine = .cycling
+        case .rowing: category = "rowing"; engine = .endurance
+        case .stairClimbing: category = "stairclimber"; engine = .endurance
+        case .hiit: category = "hiit"; engine = .instructions
+        case .functional: category = "functional"; engine = .instructions
+        case .yoga: category = "yoga"; engine = .mobility
+        case .other: category = "other"; engine = .instructions
+        }
+        let endurance = snapshot.kind == .running || snapshot.kind == .walking
+        let index = endurance ? snapshot.runningStepIndex : nil
+        let count = endurance ? snapshot.runningStepCount : nil
+        let verified: Int?
+        if let index, let count, count > 0, index >= 0, index < count {
+            verified = index
+        } else {
+            verified = nil
+        }
         return ATHLTHUniversalActiveCaptureState(
-            workoutID: id,
-            plannedSessionID: nil,
-            recordingOwner: .appleWatch,
-            source: .watchMirror,
-            activityCategory: "strength",
-            engine: .strength,
+            workoutID: id, plannedSessionID: nil,
+            recordingOwner: .appleWatch, source: .watchMirror,
+            activityCategory: category, engine: engine,
             phase: snapshot.state == .paused ? .paused : .work,
-            startedAt: start,
-            elapsedSeconds: snapshot.elapsedTime,
-            stageIndex: nil,
-            stageCount: nil
+            startedAt: start, elapsedSeconds: snapshot.elapsedTime,
+            stageIndex: verified, stageCount: verified == nil ? nil : count
         )
+    }
+
+    static func mirroredStrength(
+        _ snapshot: WatchWorkoutLiveSnapshot,
+        at now: Date = Date()
+    ) -> ATHLTHUniversalActiveCaptureState? {
+        guard snapshot.kind == .strength else { return nil }
+        return mirroredWatch(snapshot, at: now)
     }
 
     /// A hybrid run+strength may have TWO projections of the SAME recorded
@@ -300,7 +330,7 @@ enum ATHLTHUniversalActiveCapture {
         }
         if result == nil && mirrorActive {
             guard let snapshot = mirror?.snapshot,
-                  let confirmed = mirroredStrength(snapshot, at: now) else {
+                  let confirmed = mirroredWatch(snapshot, at: now) else {
                 throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
             }
             return confirmed
