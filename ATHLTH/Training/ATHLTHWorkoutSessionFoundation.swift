@@ -75,6 +75,10 @@ enum ATHLTHWorkoutRecordingArbiter {
     /// session and cannot be restored as a recorded activity.
     private static var pendingLaunchID: UUID?
 
+    /// A pending cross-device/HealthKit preflight also occupies the one
+    /// universal slot before its original recorder is committed.
+    static var hasPendingLaunch: Bool { pendingLaunchID != nil }
+
     static func reserveLaunch() throws -> UUID {
         guard pendingLaunchID == nil,
               !ATHLTHManualTimedCapture.hasActiveCapture,
