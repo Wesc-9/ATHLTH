@@ -729,12 +729,14 @@ final class MirroredWorkoutAudioCoach:
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> [ATHLTHAudioCoachDueAnnouncement] {
         let sport = snapshot.kind.rawValue
-        let distance = ATHLTHAudioCoachSportPolicy.supportsDistance(sport) &&
-            snapshot.distanceMeters.isFinite
+        let measuredDistanceSupported = snapshot.kind.supportsDistanceMetric &&
+            snapshot.distanceMeters.isFinite && snapshot.distanceMeters > 0
+        let distance = measuredDistanceSupported
             ? max(0, snapshot.distanceMeters) : 0
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: ATHLTHAudioCoachSportPolicy.eligibleRules(
-                configuration.activeCustomRules, sport: sport
+                configuration.activeCustomRules, sport: sport,
+                measuredDistanceSupported: measuredDistanceSupported
             ),
             distanceMeters: distance,
             elapsedSeconds: snapshot.elapsedTime,
@@ -931,9 +933,8 @@ final class MirroredWorkoutAudioCoach:
         var due = false
         var milestoneKeys: [String] = []
 
-        if ATHLTHAudioCoachSportPolicy.supportsDistance(
-               snapshot.kind.rawValue
-           ), snapshot.distanceMeters.isFinite,
+        if snapshot.kind.supportsDistanceMetric,
+           snapshot.distanceMeters.isFinite,
            let next = nextDistanceMeters,
            snapshot.distanceMeters >= next {
             due = true
@@ -1009,7 +1010,7 @@ final class MirroredWorkoutAudioCoach:
         var norwegian: [String] = []
 
         if configuration.announceDistance,
-           ATHLTHAudioCoachSportPolicy.supportsDistance(snapshot.kind.rawValue),
+           snapshot.kind.supportsDistanceMetric,
            snapshot.distanceMeters.isFinite, snapshot.distanceMeters > 0,
            !metrics.contains(.distance) {
             let kilometers =

@@ -1133,4 +1133,46 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         )
     }
 
+
+    func testVoiceOwnersNeverTreatUnmeasuredRowingDistanceAsRecorded() {
+        let time = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .elapsedTime, interval: 60
+        )
+        let distanceTrigger = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 500
+        )
+        let distanceReadout = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .distance, interval: 60
+        )
+        let mixed = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .elapsedTime, interval: 60,
+            additionalMetrics: [.distance]
+        )
+        let rules = [time, distanceTrigger, distanceReadout, mixed]
+        XCTAssertFalse(WatchWorkoutKind.rowing.supportsDistanceMetric)
+        XCTAssertTrue(WatchWorkoutKind.cycling.supportsDistanceMetric)
+        XCTAssertEqual(
+            ATHLTHAudioCoachSportPolicy.eligibleRules(
+                rules, sport: "rowing",
+                measuredDistanceSupported:
+                    WatchWorkoutKind.rowing.supportsDistanceMetric
+            ).map(\.id),
+            [time.id]
+        )
+        XCTAssertEqual(
+            ATHLTHAudioCoachSportPolicy.eligibleRules(
+                rules, sport: "cycling", measuredDistanceSupported: true
+            ).map(\.id),
+            rules.map(\.id)
+        )
+        XCTAssertEqual(
+            ATHLTHAudioCoachSportPolicy.eligibleRules(
+                rules, sport: "cycling", measuredDistanceSupported: false
+            ).map(\.id),
+            [time.id]
+        )
+        // The original persisted configuration is never changed.
+        XCTAssertEqual(rules.count, 4)
+    }
+
 }

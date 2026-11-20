@@ -5227,12 +5227,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 audioCoachConfiguration.activeCustomRules
             )
             : ATHLTHAudioCoachSportPolicy.eligibleRules(
-                audioCoachConfiguration.activeCustomRules, sport: sport
+                audioCoachConfiguration.activeCustomRules,
+                sport: sport,
+                measuredDistanceSupported: kind.supportsDistanceMetric &&
+                    distanceMeters.isFinite && distanceMeters > 0
             )
         guard !rules.isEmpty else { return [] }
         let running = ATHLTHAudioCoachSportPolicy.supportsRunningPace(sport)
-        let eligibleDistance = ATHLTHAudioCoachSportPolicy.supportsDistance(sport)
-            && distanceMeters.isFinite ? max(0, distanceMeters) : 0
+        let eligibleDistance = kind.supportsDistanceMetric &&
+            distanceMeters.isFinite ? max(0, distanceMeters) : 0
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: rules,
             distanceMeters: eligibleDistance,
@@ -5387,7 +5390,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         var shouldAnnounce = false
         var milestoneKeys: [String] = []
 
-        if ATHLTHAudioCoachSportPolicy.supportsDistance(kind.rawValue),
+        if kind.supportsDistanceMetric,
            distanceMeters.isFinite,
            let interval = audioCoachConfiguration.distanceIntervalMeters,
            interval > 0,
@@ -5886,7 +5889,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let configuration = audioCoachConfiguration
 
         if configuration.announceDistance,
-           ATHLTHAudioCoachSportPolicy.supportsDistance(kind.rawValue),
+           kind.supportsDistanceMetric,
            !metrics.contains(.distance),
            distanceMeters.isFinite, distanceMeters > 0 {
             parts.append(

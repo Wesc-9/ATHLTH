@@ -1,3 +1,9 @@
+## 2.2.6 – ingen oppdiktet ro-distanse fra Apple Watch / Audio Coach
+
+- Apple Watch og iPhone-speilets rutine- og custom Audio Coach bruker nå den **opprinnelige HealthKit-kildens** distansekapabilitet i tillegg til generisk sportkategori. Watch registrerer ikke verifisert ro-distanse med dagens konfigurasjon; derfor skal en roøkt ikke lese opp «distanse 0» på en tidsstyrt varsling eller forsøke å behandle programmert distanse som sensoravlesning.
+- Løp, gå og faktisk målt sykkeldistanse beholder distansevarsler. Brukerens lagrede coach-regler endres ikke; bare aktive, ikke-verifiserbare metrikker utelates fra opplesning. Ved en fremtidig dokumentert ro-sensoradapter kan distansekapabiliteten aktiveres i samme motor.
+- Regresjonstest dekker rene tidstriggere, distansetriggere, tid+distanseregler og sykling med/uten gyldig distansekilde. Samme-commit CI og fysiske Watch-lydtester gjenstår.
+
 ## 2.2.6 – opprinnelig plan er alltid fasit ved løpeopptak
 
 - Den samme planen som er validert mot `plannedPlanID/plannedSessionID` prioriteres nå som kilden til både 1) treningsintervaller som lastes til Watch/iPhone, 2) validering før opptaksstart og 3) eventuell planlagt rute. Dermed kan et gammelt Quick Run-utkast eller en mottatt kopi med annet routeID/drag ikke overstyre treningsplanen mens den bokføres som original.

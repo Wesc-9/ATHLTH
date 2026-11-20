@@ -1425,14 +1425,18 @@ enum ATHLTHAudioCoachSportPolicy {
     /// distance rules on non-running sports. Do not misread running pace,
     /// route, PR, or step evidence as cycling/rowing/HIIT measurements.
     static func eligibleRules(
-        _ rules: [ATHLTHAudioCoachRule], sport: String
+        _ rules: [ATHLTHAudioCoachRule],
+        sport: String,
+        measuredDistanceSupported: Bool = true
     ) -> [ATHLTHAudioCoachRule] {
         guard !supportsRunningSteps(sport) else { return rules }
+        let distanceAvailable = supportsDistance(sport) &&
+            measuredDistanceSupported
         return rules.filter { rule in
             if rule.trigger.needsStructuredStep ||
                 rule.trigger.isPaceCondition ||
                 rule.trigger == .personalRecordConfirmed { return false }
-            if rule.trigger == .distance && !supportsDistance(sport) {
+            if rule.trigger == .distance && !distanceAvailable {
                 return false
             }
             return rule.selectedMetrics.allSatisfy { metric in
@@ -1446,7 +1450,7 @@ enum ATHLTHAudioCoachSportPolicy {
                      .speed:
                     return false
                 case .distance:
-                    return supportsDistance(sport)
+                    return distanceAvailable
                 default: return true
                 }
             }
