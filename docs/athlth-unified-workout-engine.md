@@ -1,3 +1,9 @@
+## 2.2.6 – én sann aktiv sport og ett bekreftet sett-/intervalnummer
+
+- Den universelle read-only statusen for den eksisterende iPhone-/Watch-styrkejournalen bruker nå aktiv motor/fase ved aktivitetsnavn: innebygd løpeintervall vises som løp, løft som styrke og hvile som pause. Den opprinnelige strength/HealthKit-opptakstypen, økt-ID-en og eier endres aldri. Pausetilstanden beholder aktuell sport, uten å starte en ny session.
+- Watch styrke/hybrid viser kun en gyldig 1-basert original settposisjon normalisert til 0-basert universell cursor med oppgitt setCount. Ved eldre, negative eller motstridende data vises ingen oppdiktet progresjon.
+- XCTest dekker løp/gå/styrke, hybrid med paused/recovery, stabil plan-/eier-/øktidentitet, Watch-styrkesett og ugyldige/legacy setposisjoner. Samme-commit iOS/watchOS CI og fysisk Watch→iPad-test gjenstår.
+
 ## 2.2.6 – iPad viser original aktiv styrkeklokke og faktisk Watch-hybridfase
 
 - Den private, allerede samtykkestyrte iPad-spektatoren har sluttet å beregne styrkevarighet fra rå veggklokke. Den bruker original styrkejournal sin aktive sesjonstid (med pause/offline-regnskap); ingen ny timer, journal eller HealthKit-session.

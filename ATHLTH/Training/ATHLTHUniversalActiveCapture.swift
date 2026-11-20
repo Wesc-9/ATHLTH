@@ -90,6 +90,25 @@ enum ATHLTHUniversalActiveCapture {
         return true
     }
 
+    /// One canonical ACTIVE sport for the old run/strength recording states.
+    /// A strength-owned hybrid keeps its original strength HealthKit session,
+    /// while an embedded run interval uses the endurance live presentation.
+    /// Pausing freezes the current sport; recovery is its own active phase.
+    /// This is a read-only projection and never changes activity in HealthKit.
+    static func activeRecordedSport(
+        _ state: ATHLTHWorkoutSessionState
+    ) -> ATHLTHWorkoutSportMode {
+        if state.phase == .recovery || state.engine == .recovery {
+            return .recovery
+        }
+        switch state.activity {
+        case .running: return .running
+        case .walking: return .walking
+        case .strength:
+            return state.engine == .endurance ? .running : .strength
+        }
+    }
+
     /// Running and strength continue to own their historical checkpoints,
     /// HealthKit writer, and final results. No extra mutable store is created.
     static func recorded(
@@ -101,7 +120,7 @@ enum ATHLTHUniversalActiveCapture {
             plannedSessionID: state.plannedSessionID,
             recordingOwner: state.recordingOwner,
             source: source,
-            activityCategory: state.activity.rawValue,
+            activityCategory: activeRecordedSport(state).category,
             engine: state.engine,
             phase: state.phase,
             startedAt: state.startedAt,
@@ -223,9 +242,21 @@ enum ATHLTHUniversalActiveCapture {
         // source HKWorkoutSession and universal workout ID stay unchanged.
         let category = ATHLTHWatchLiveSportPolicy.activityCategory(snapshot)
         let engine = ATHLTHWorkoutSportMode(category: category).engine
-        let endurance = snapshot.kind == .running || snapshot.kind == .walking
-        let index = endurance ? snapshot.runningStepIndex : nil
-        let count = endurance ? snapshot.runningStepCount : nil
+        // Native endurance stages are zero-based. Strength carries the
+        // ORIGINAL set number as a one-based display index; converting it
+        // does not change set history or construct missing stage progress.
+        let index: Int?
+        let count: Int?
+        if snapshot.kind == .strength {
+            index = snapshot.strengthSetIndex.map { $0 - 1 }
+            count = snapshot.strengthSetCount
+        } else if snapshot.kind == .running || snapshot.kind == .walking {
+            index = snapshot.runningStepIndex
+            count = snapshot.runningStepCount
+        } else {
+            index = nil
+            count = nil
+        }
         let verified: Int?
         if let index, let count, count > 0, index >= 0, index < count {
             verified = index

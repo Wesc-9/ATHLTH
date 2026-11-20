@@ -138,6 +138,55 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         XCTAssertFalse(single.source.isManualTiming)
     }
 
+    func testRecordedRunningStrengthHybridAndRecoveryUseActualActiveSport() {
+        let workoutID = UUID()
+        let plannedID = UUID()
+        func original(
+            activity: ATHLTHWorkoutSessionActivity,
+            phase: ATHLTHWorkoutSessionPhase,
+            engine: ATHLTHLiveWorkoutEngine
+        ) -> ATHLTHWorkoutSessionState {
+            ATHLTHWorkoutSessionState(
+                workoutID: workoutID, plannedSessionID: plannedID,
+                recordingOwner: .iPhone,
+                activity: activity, phase: phase, engine: engine,
+                startedAt: started, activeElapsedSeconds: 175,
+                stageIndex: 2, stageCount: 6
+            )
+        }
+        let expected: [(ATHLTHWorkoutSessionState, String)] = [
+            (original(activity: .running, phase: .work, engine: .endurance),
+             "running"),
+            (original(activity: .walking, phase: .work, engine: .endurance),
+             "walking"),
+            (original(activity: .strength, phase: .work, engine: .strength),
+             "strength"),
+            (original(activity: .strength, phase: .work, engine: .endurance),
+             "running"),
+            (original(activity: .strength, phase: .paused, engine: .endurance),
+             "running"),
+            (original(activity: .strength, phase: .recovery, engine: .recovery),
+             "recovery"),
+            (original(activity: .running, phase: .recovery, engine: .recovery),
+             "recovery")
+        ]
+        for (state, category) in expected {
+            let projected = ATHLTHUniversalActiveCapture.recorded(
+                state, source: state.activity == .strength
+                    ? .strength : .phoneRunWalk
+            )
+            XCTAssertEqual(projected.activityCategory, category)
+            XCTAssertEqual(projected.engine, state.engine)
+            XCTAssertEqual(projected.phase, state.phase)
+            XCTAssertEqual(projected.workoutID, workoutID)
+            XCTAssertEqual(projected.plannedSessionID, plannedID)
+            XCTAssertEqual(projected.recordingOwner, .iPhone)
+            XCTAssertEqual(projected.elapsedSeconds, 175)
+            XCTAssertEqual(projected.stageIndex, 2)
+            XCTAssertEqual(projected.stageCount, 6)
+        }
+    }
+
     func testMalformedStructuredCursorAndManualTimerNeverBecomeLiveState() {
         var corrupt = timer(resumedAt: started)
         corrupt.accumulatedSeconds = -.infinity
@@ -725,6 +774,67 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         XCTAssertEqual(
             ATHLTHWatchLiveSportPolicy.activityCategory(mirror), "cycling"
         )
+    }
+
+    func testWatchStrengthSetCursorIsValidatedWithoutCreatingNewStages() throws {
+        let now = started.addingTimeInterval(120)
+        let owner = UUID(), workoutID = UUID()
+        var snapshot = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running, startedAt: started,
+            capturedAt: now, elapsedTime: 115,
+            heartRate: 125, activeCalories: 25,
+            distanceMeters: 0, averageHeartRate: nil,
+            maxHeartRate: nil, routePointCount: 0
+        )
+        snapshot.accountOwnerID = owner
+        snapshot.universalWorkoutID = workoutID
+        snapshot.strengthWorkoutID = workoutID
+        snapshot.strengthHybridRunningActive = true
+        snapshot.strengthSetIndex = 2
+        snapshot.strengthSetCount = 4
+        let run = try XCTUnwrap(
+            ATHLTHUniversalActiveCapture.mirroredWatch(
+                snapshot, for: owner, at: now
+            )
+        )
+        XCTAssertEqual(run.stageIndex, 1)
+        XCTAssertEqual(run.stageCount, 4)
+        XCTAssertEqual(run.activityCategory, "running")
+        XCTAssertEqual(run.workoutID, workoutID)
+
+        snapshot.strengthRecoveryActive = true
+        let rest = try XCTUnwrap(
+            ATHLTHUniversalActiveCapture.mirroredWatch(
+                snapshot, for: owner, at: now
+            )
+        )
+        XCTAssertEqual(rest.stageIndex, 1)
+        XCTAssertEqual(rest.stageCount, 4)
+        XCTAssertEqual(rest.phase, .recovery)
+
+        // Legacy snapshots may not have a cursor. Never infer one from
+        // elapsed time, exercise name or a synthetic hybrid step count.
+        snapshot.strengthSetIndex = nil
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            snapshot, for: owner, at: now
+        )?.stageIndex)
+        snapshot.strengthSetIndex = 0
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            snapshot, for: owner, at: now
+        )?.stageIndex)
+        snapshot.strengthSetIndex = 5
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            snapshot, for: owner, at: now
+        )?.stageIndex)
+        snapshot.strengthSetIndex = 2
+        snapshot.strengthSetCount = 0
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            snapshot, for: owner, at: now
+        )?.stageIndex)
+        snapshot.strengthSetCount = 4
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            snapshot, for: UUID(), at: now
+        ))
     }
 
     func testStructuredWellnessKeepsActiveYogaAndMeditationIdentity() throws {
