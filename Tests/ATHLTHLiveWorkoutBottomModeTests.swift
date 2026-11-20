@@ -62,4 +62,41 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
         XCTAssertEqual(strength.mode, .strengthWorking)
         XCTAssertNotNil(strength.onSecondary)
     }
+
+    func testStructuredSportsUseOneDockWithSportSpecificActions() {
+        let modes: [ATHLTHWorkoutSportMode] = [
+            .running, .walking, .strength, .cycling, .rowing, .stairClimber,
+            .hiit, .circuit, .functional, .yoga, .mobility, .sports,
+            .other, .recovery, .instructions
+        ]
+        for sport in modes {
+            let mode = ATHLTHLiveWorkoutBottomMode.structuredActivity(
+                sport, isFinalStep: false
+            )
+            XCTAssertEqual(mode.phaseTitle, sport.title.uppercased())
+            XCTAssertEqual(mode.primaryTitle, sport.nextActionTitle)
+            XCTAssertEqual(mode.primarySymbol, "checkmark.circle.fill")
+            XCTAssertEqual(mode.secondarySymbol, "stop.circle")
+            XCTAssertNotNil(mode.secondaryTitle)
+            XCTAssertFalse(mode.recordsCompletedSet)
+            let final = ATHLTHLiveWorkoutBottomMode.structuredActivity(
+                sport, isFinalStep: true
+            )
+            XCTAssertNotEqual(final.primaryTitle, "")
+            XCTAssertEqual(final.secondarySymbol, mode.secondarySymbol)
+        }
+    }
+
+    func testSharedDockSupportsStructuredSportActions() {
+        let dock = ATHLTHLiveWorkoutBottomDock(
+            mode: .structuredActivity(.cycling, isFinalStep: false),
+            subtitle: "Cycling interval",
+            onPrimary: {},
+            onSecondary: {}
+        ) { Text("1 / 4") }
+        XCTAssertNotNil(dock.onSecondary)
+        XCTAssertEqual(dock.mode.primaryTitle,
+                       ATHLTHWorkoutSportMode.cycling.nextActionTitle)
+    }
+
 }

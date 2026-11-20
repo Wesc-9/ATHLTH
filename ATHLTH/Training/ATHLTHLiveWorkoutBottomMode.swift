@@ -1,6 +1,7 @@
 import Foundation
 
-/// Phase 2: one actionable bottom control model for running and strength.
+/// One actionable bottom control model for running, strength and structured
+/// multi-sport workouts. Commands delegate to the original recording owner.
 /// Recording is still owned by the existing session stores; this model
 /// describes what the athlete can do next, never writes training results.
 enum ATHLTHLiveWorkoutBottomMode: Equatable {
@@ -15,9 +16,12 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
     case strengthNextExercise
     case strengthAddExercise
     case strengthFinish
+    case structuredActivity(ATHLTHWorkoutSportMode, isFinalStep: Bool)
 
     var phaseTitle: String {
         switch self {
+        case .structuredActivity(let sport, _):
+            return sport.title.uppercased()
         case .runningMain, .runningInterval, .runningNext:
             return ATHLTHLocalization.choose(
                 english: "NEXT SECTION", norwegian: "NESTE DEL")
@@ -48,6 +52,11 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var primaryTitle: String {
         switch self {
+        case .structuredActivity(let sport, let isFinalStep):
+            return isFinalStep
+                ? ATHLTHLocalization.choose(
+                    english: "Complete block", norwegian: "Fullfør blokk")
+                : sport.nextActionTitle
         case .runningMain:
             return ATHLTHLocalization.choose(
                 english: "Start main section", norwegian: "Start hoveddel")
@@ -83,6 +92,8 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var primarySymbol: String {
         switch self {
+        case .structuredActivity:
+            return "checkmark.circle.fill"
         case .runningFree, .strengthAddExercise:
             return "plus.circle.fill"
         case .runningMain, .runningInterval, .strengthReady, .strengthRest:
@@ -98,6 +109,9 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var secondaryTitle: String? {
         switch self {
+        case .structuredActivity:
+            return ATHLTHLocalization.choose(
+                english: "Finish", norwegian: "Avslutt")
         case .strengthRest, .strengthExerciseRest:
             return ATHLTHLocalization.choose(
                 english: "+30 sec", norwegian: "+30 sek")
@@ -113,6 +127,7 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var secondarySymbol: String? {
         switch self {
+        case .structuredActivity: "stop.circle"
         case .strengthRest, .strengthExerciseRest: "plus"
         case .strengthReady, .strengthWorking, .strengthNextExercise,
              .strengthFinish: "list.bullet"

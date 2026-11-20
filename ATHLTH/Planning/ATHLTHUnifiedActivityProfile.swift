@@ -152,6 +152,91 @@ enum ATHLTHWorkoutSportMode: Equatable {
     var showsPlannedTargets: Bool { self != .instructions }
 }
 
+ 
+/// One planned-target schema for ALL sport modes, including mixed sessions.
+/// These are prescriptions from the existing recipe, never measured values.
+/// Callers must supply separately verified sensor metrics for actual results.
+enum ATHLTHPlannedLiveTargetKind: String, Hashable {
+    case time, distance, pace, incline, repetitions, weight, heartRateZone, effort
+}
+
+struct ATHLTHPlannedLiveTarget: Hashable {
+    let kind: ATHLTHPlannedLiveTargetKind
+    let label: String
+    let systemImage: String
+}
+
+enum ATHLTHUniversalPlannedTargetPolicy {
+    static func targets(for block: WorkoutTemplateBlock) -> [ATHLTHPlannedLiveTarget] {
+        let mode = ATHLTHWorkoutSportMode.forBlock(block)
+        guard mode.showsPlannedTargets else { return [] }
+
+        var result: [ATHLTHPlannedLiveTarget] = []
+        func append(
+            _ kind: ATHLTHPlannedLiveTargetKind,
+            _ label: String,
+            _ icon: String
+        ) {
+            result.append(.init(kind: kind, label: label, systemImage: icon))
+        }
+
+        if let seconds = block.durationSeconds, seconds.isFinite, seconds > 0 {
+            let time = seconds < 60
+                ? "\(Int(seconds)) sek"
+                : "\(Int(seconds / 60)) min"
+            append(.time, time, "clock")
+        }
+
+        switch mode {
+        case .running, .walking, .cycling, .rowing, .stairClimber:
+            if let distance = block.distanceMeters,
+               distance.isFinite, distance > 0 {
+                append(.distance, String(format: "%.2f km mål", distance / 1000),
+                       "point.topleft.down.curvedto.point.bottomright.up")
+            }
+        default: break
+        }
+
+        if mode == .running || mode == .walking {
+            if let pace = block.targetPaceSecondsPerKilometer,
+               pace.isFinite, (100...2400).contains(pace) {
+                let rounded = Int(pace.rounded())
+                append(.pace, String(format: "%d:%02d/km mål",
+                                     rounded / 60, rounded % 60), "speedometer")
+            }
+            if let incline = block.treadmillInclinePercent,
+               incline.isFinite, (0...40).contains(incline) {
+                append(.incline, String(format: "%.1f %% mål", incline),
+                       "mountain.2")
+            }
+        }
+
+        if mode == .strength {
+            if let reps = block.repetitions, reps > 0 {
+                append(.repetitions, "\(reps) reps mål", "number")
+            }
+            if let kg = block.targetWeightKilograms, kg.isFinite, kg > 0 {
+                append(.weight, String(format: "%.1f kg mål", kg), "scalemass")
+            }
+        }
+
+        if mode != .recovery {
+            if let zoneLabel = block.sourceIntensityZoneLabel,
+               !zoneLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                append(.heartRateZone, "Sone \(zoneLabel)", "heart")
+            } else if let zone = block.targetHeartRateZone,
+                      (1...5).contains(zone) {
+                append(.heartRateZone, "Sone \(zone)", "heart")
+            }
+            if let effort = block.targetEffortRPE,
+               (1...10).contains(effort) {
+                append(.effort, "RPE \(effort)/10", "gauge")
+            }
+        }
+        return result
+    }
+}
+
 struct ATHLTHUnifiedActivityProfile: Equatable {
     let category: String
     let workoutKind: WorkoutKind

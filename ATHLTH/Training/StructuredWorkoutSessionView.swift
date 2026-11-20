@@ -259,9 +259,6 @@ struct StructuredWorkoutSessionView: View {
                             ATHLTHLiveWorkoutControlButton(kind: .add) {
                                 showAllSteps.toggle()
                             }
-                            ATHLTHLiveWorkoutControlButton(kind: .finish) {
-                                showingFinishConfirmation = true
-                            }
                         }
                     }
                     sessionHeader
@@ -925,160 +922,24 @@ struct StructuredWorkoutSessionView: View {
         )
     }
 
-    /// Show only the targets relevant to the active motor. These are
-    /// planned targets, never presented as measured live sensor data.
+    /// Use the same plan-only target policy for every sport. Never expose
+    /// manual targets as observed GPS, power, pulse or completed repetitions.
     @ViewBuilder
     private func liveTargets(for block: WorkoutTemplateBlock) -> some View {
-        switch ATHLTHLiveWorkoutEngineRouter.engine(for: block) {
-        case .endurance:
-            HStack(spacing: 12) {
-                if let seconds = block.durationSeconds, seconds > 0 {
-                    Label(
-                        "\(Int(seconds / 60)) min",
-                        systemImage: "clock"
-                    )
+        let targets = ATHLTHUniversalPlannedTargetPolicy.targets(for: block)
+        if !targets.isEmpty {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 120), spacing: 8)],
+                alignment: .leading, spacing: 8
+            ) {
+                ForEach(targets, id: \.kind) { target in
+                    Label(target.label, systemImage: target.systemImage)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if let pace = block.targetPaceSecondsPerKilometer,
-                   pace > 0 {
-                    Label(
-                        String(
-                            format: "%d:%02d/km",
-                            Int(pace) / 60,
-                            Int(pace) % 60
-                        ),
-                        systemImage: "speedometer"
-                    )
-                }
-                if let normalized = block.sourceIntensityZoneLabel {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Zone \(normalized)", norwegian: "Sone \(normalized)"
-                        ),
-                        systemImage: "heart"
-                    )
-                } else if let zone = block.targetHeartRateZone {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Zone \(zone)", norwegian: "Sone \(zone)"
-                        ),
-                        systemImage: "heart"
-                    )
-                }
-                if let incline = block.treadmillInclinePercent {
-                    Label(
-                        String(format: "%.1f %%", incline),
-                        systemImage: "mountain.2"
-                    )
-                }
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.white.opacity(0.72))
-
-        case .cycling:
-            HStack(spacing: 12) {
-                if let seconds = block.durationSeconds, seconds > 0 {
-                    Label("\(Int(seconds / 60)) min",
-                          systemImage: "clock")
-                }
-                if let normalized = block.sourceIntensityZoneLabel {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Zone \(normalized)", norwegian: "Sone \(normalized)"
-                        ),
-                        systemImage: "heart"
-                    )
-                } else if let zone = block.targetHeartRateZone, (1...5).contains(zone) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Zone \(zone)",
-                            norwegian: "Sone \(zone)"
-                        ),
-                        systemImage: "heart"
-                    )
-                }
-                if let effort = block.targetEffortRPE, (1...10).contains(effort) {
-                    Label("RPE \(effort)/10", systemImage: "gauge")
-                }
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.white.opacity(0.72))
-
-        case .strength:
-            HStack(spacing: 12) {
-                if let repetitions = block.repetitions {
-                    Label(
-                        "\(repetitions) reps",
-                        systemImage: "number"
-                    )
-                }
-                if let weight = block.targetWeightKilograms {
-                    Label(
-                        String(format: "%.1f kg", weight),
-                        systemImage: "scalemass"
-                    )
-                }
-                if let seconds = block.durationSeconds {
-                    Label(
-                        "\(Int(seconds)) s",
-                        systemImage: "timer"
-                    )
-                }
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.white.opacity(0.72))
-
-        case .recovery:
-            if let seconds = block.durationSeconds {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Planned pause: \(Int(seconds)) s",
-                        norwegian: "Planlagt pause: \(Int(seconds)) sek"
-                    ),
-                    systemImage: "pause.circle"
-                )
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.white.opacity(0.72))
-            }
-
-        case .mobility, .instructions:
-            // A tagged HIIT, rowing, yoga or circuit block is a real
-            // planned activity, not a free-text instruction. Show only
-            // saved targets; never present them as observed HR or distance.
-            if ATHLTHWorkoutSportMode.forBlock(block).showsPlannedTargets {
-                HStack(spacing: 12) {
-                    if let seconds = block.durationSeconds,
-                       seconds.isFinite, seconds > 0 {
-                        Label("\(Int(seconds / 60)) min", systemImage: "clock")
-                    }
-                    if let meters = block.distanceMeters,
-                       meters.isFinite, meters > 0 {
-                        Label(String(format: "%.2f km mål", meters / 1000),
-                              systemImage: "point.topleft.down.curvedto.point.bottomright.up")
-                    }
-                    if let normalized = block.sourceIntensityZoneLabel {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Zone \(normalized)",
-                                norwegian: "Sone \(normalized)"
-                            ),
-                            systemImage: "heart"
-                        )
-                    } else if let zone = block.targetHeartRateZone,
-                              (1...5).contains(zone) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Zone \(zone)", norwegian: "Sone \(zone)"
-                            ),
-                            systemImage: "heart"
-                        )
-                    }
-                    if let effort = block.targetEffortRPE,
-                       (1...10).contains(effort) {
-                        Label("RPE \(effort)/10", systemImage: "gauge")
-                    }
-                }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.white.opacity(0.72))
             }
         }
     }
@@ -1261,77 +1122,71 @@ struct StructuredWorkoutSessionView: View {
         }
     }
 
+    /// The original structured checkpoint is still the sole state machine.
+    /// The common bottom dock is a control surface, not a second recorder.
+    @ViewBuilder
     private var bottomControls: some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            HStack(spacing: 10) {
-                if savedCompletion {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Done", norwegian: "Ferdig"
-                        ))
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-                } else {
-                    Button {
-                        showingFinishConfirmation = true
-                    } label: {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Finish", norwegian: "Avslutt"
-                        ))
-                            .font(.subheadline.weight(.semibold))
-                            .frame(width: 88, height: 50)
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        completeCurrentAndAdvance()
-                    } label: {
-                        Label(
-                            emomWaitingForMinute
-                                ? ATHLTHLocalization.choose(
-                                    english: "Waiting for next minute", norwegian: "Venter på neste minutt"
-                                )
-                                : currentIndex >= blocks.count - 1
-                                ? ATHLTHLocalization.choose(
-                                    english: "Complete block",
-                                    norwegian: "Fullfør blokk"
-                                )
-                                : (currentBlock.map {
-                                    ATHLTHWorkoutSportMode.forBlock($0).nextActionTitle
-                                } ??
-                                    ATHLTHLocalization.choose(
-                                        english: "Complete & next",
-                                        norwegian: "Fullfør og neste"
-                                    )),
-                            systemImage:
-                                "checkmark.circle.fill"
-                        )
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-                    .disabled(blocks.isEmpty || emomWaitingForMinute ||
-                        currentBlock.flatMap { block in
-                            block.executionGroupID.map {
-                                amrapTimedOutGroups.contains($0)
-                            }
-                        } == true)
-                }
+        if savedCompletion {
+            Button {
+                dismiss()
+            } label: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Done", norwegian: "Ferdig"
+                ))
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
+            .background(.ultraThinMaterial)
+        } else {
+            let mode = ATHLTHLiveWorkoutBottomMode.structuredActivity(
+                currentBlock.map { ATHLTHWorkoutSportMode.forBlock($0) }
+                    ?? .instructions,
+                isFinalStep: currentIndex >= blocks.count - 1
+            )
+            let disabled = !hasStarted || pausedAt != nil ||
+                blocks.isEmpty || emomWaitingForMinute ||
+                currentBlock.flatMap { block in
+                    block.executionGroupID.map {
+                        amrapTimedOutGroups.contains($0)
+                    }
+                } == true
+
+            ATHLTHLiveWorkoutBottomDock(
+                mode: mode,
+                subtitle: emomWaitingForMinute
+                    ? ATHLTHLocalization.choose(
+                        english: "Waiting for next minute",
+                        norwegian: "Venter på neste minutt"
+                    )
+                    : currentBlock?.title,
+                primaryDisabled: disabled,
+                onPrimary: { completeCurrentAndAdvance() },
+                onSecondary: { showingFinishConfirmation = true }
+            ) {
+                HStack {
+                    Label(
+                        "\(min(currentIndex + 1, blocks.count)) / \(blocks.count)",
+                        systemImage: "list.number"
+                    )
+                    if pausedAt != nil {
+                        Spacer()
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Paused", norwegian: "Pauset"
+                            ),
+                            systemImage: "pause.fill"
+                        )
+                    }
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
         }
-        .background(.ultraThinMaterial)
     }
 
     private func completeCurrentAndAdvance() {

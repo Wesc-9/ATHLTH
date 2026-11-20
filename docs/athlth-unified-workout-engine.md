@@ -1,3 +1,9 @@
+## 2.2.6 – felles livekontroll og målvisning for alle treningsformer
+
+- Den opprinnelige strukturerte øktspilleren bruker nå `ATHLTHLiveWorkoutBottomDock`, samme felles bunnkontroll som løp/styrke. Én aktivitetsbasert `structuredActivity`-modus gir korrekt progresjonshandling, bekreftet avslutt og blokkposisjon. Pause og EMOM-/AMRAP-blokkering deaktiverer progresjon; eksisterende checkpoint, fullføringsjournal, opptakseier og original workout-ID beholdes.
+- `ATHLTHUniversalPlannedTargetPolicy` genererer én planlagt målvisning fra faktiske blokkfelter for alle sportene. Løpspace/stigning vises ikke som treningsmål for roing/trapp. Styrke får reps og kg, HIIT/sirkel får tid/sone/RPE, og tekstinstruksjoner får ingen oppdiktet treningsmålverdi. Alle disse dataene er planlagte mål – aldri sensormålte resultater.
+- Regresjonstester for felles dock, måltyper og alle sporter er lagt til. Dette er ingen ny sensor-writer eller datamigrering. Krever full samme-commit CI og fysiske iPhone/iPad/Watch/HealthKit-prøver før TestFlight.
+
 ## 2.2.6 – aktivitetsspesifikk styring fra én felles treningsmotor
 
 - Den eksisterende blokk- og opptaksmotoren får nå én delt `ATHLTHWorkoutSportMode`-tolkning for løping, gåing, styrke, sykling, roing, trappetrening, HIIT, sirkel, funksjonell trening, yoga, mobilitet og øvrige aktiviteter. Både planlagt live-ruting, manuell iPhone-tidtaker og verifisert Watch-projeksjon bruker samme klassifisering av aktivitet til eksisterende motor. Det opprettes ingen ekstra HealthKit-opptak eller skrivejournal.

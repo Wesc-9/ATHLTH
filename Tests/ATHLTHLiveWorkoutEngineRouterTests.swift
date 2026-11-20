@@ -267,4 +267,59 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
                        .stairClimber)
     }
 
+
+    func testPlannedTargetsFollowSportNotGenericEnduranceGroup() {
+        var run = block("Run", kind: .run, sequence: 1)
+        run.targetPaceSecondsPerKilometer = 300
+        run.treadmillInclinePercent = 4
+        run.targetHeartRateZone = 3
+        let runningKinds = Set(
+            ATHLTHUniversalPlannedTargetPolicy.targets(for: run).map(\.kind)
+        )
+        XCTAssertTrue(runningKinds.contains(.pace))
+        XCTAssertTrue(runningKinds.contains(.incline))
+        XCTAssertTrue(runningKinds.contains(.heartRateZone))
+
+        var row = block("Row", kind: .note, sequence: 2)
+        row.activityTag = "rowing"
+        row.targetPaceSecondsPerKilometer = 300
+        row.treadmillInclinePercent = 8
+        row.targetHeartRateZone = 2
+        row.targetEffortRPE = 6
+        let rowKinds = Set(
+            ATHLTHUniversalPlannedTargetPolicy.targets(for: row).map(\.kind)
+        )
+        XCTAssertTrue(rowKinds.contains(.heartRateZone))
+        XCTAssertTrue(rowKinds.contains(.effort))
+        XCTAssertFalse(rowKinds.contains(.pace))
+        XCTAssertFalse(rowKinds.contains(.incline))
+    }
+
+    func testPlannedStrengthAndCircuitTargetsNeverPretendToBeSensorResults() {
+        var strength = block("Squat", kind: .exercise, sequence: 1)
+        strength.repetitions = 8
+        strength.targetWeightKilograms = 65
+        let strengthTargets = ATHLTHUniversalPlannedTargetPolicy.targets(
+            for: strength
+        )
+        XCTAssertTrue(strengthTargets.contains(where: { $0.kind == .repetitions }))
+        XCTAssertTrue(strengthTargets.contains(where: { $0.kind == .weight }))
+        XCTAssertFalse(strengthTargets.contains(where: { $0.kind == .pace }))
+
+        var hiit = block("HIIT", kind: .note, sequence: 2)
+        hiit.activityTag = "hiit"
+        hiit.targetEffortRPE = 8
+        let hiitKinds = Set(
+            ATHLTHUniversalPlannedTargetPolicy.targets(for: hiit).map(\.kind)
+        )
+        XCTAssertTrue(hiitKinds.contains(.time))
+        XCTAssertTrue(hiitKinds.contains(.effort))
+        XCTAssertFalse(hiitKinds.contains(.repetitions))
+
+        let instructions = block("Technique note", kind: .note, sequence: 3)
+        XCTAssertTrue(ATHLTHUniversalPlannedTargetPolicy.targets(
+            for: instructions
+        ).isEmpty)
+    }
+
 }

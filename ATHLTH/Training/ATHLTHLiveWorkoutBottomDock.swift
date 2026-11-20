@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// One fixed bottom action surface shared by iPhone running and strength.
+/// One fixed bottom action surface shared by iPhone running, strength,
+/// and the structured multi-sport workout player.
 /// Strength keeps its existing media, instructions and inline set inputs;
 /// the content slot provides context without duplicating action buttons.
 /// No additional model, timer or HealthKit recording is created here.
