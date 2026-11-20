@@ -5182,36 +5182,37 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         return context
     }
 
+    /// The same rule policy runs on Watch and the iPhone voice mirror.
+    /// Watch supplies original HealthKit measurements; unsupported sports
+    /// never inherit running pace, route, lap or strength-set readouts.
     private func evaluateCustomAudioCoachRules() -> [ATHLTHAudioCoachDueAnnouncement] {
-        guard !coachSpeechPaused,
-              kind == .running || kind == .walking || kind == .strength
-        else { return [] }
-        let rules = audioCoachConfiguration.activeCustomRules.filter { rule in
-            guard kind == .strength else { return true }
-            // Strength-specific voice data must come from a real exercise
-            // queue; running pace and distance prompts are excluded.
-            return rule.selectedMetrics.contains {
-                switch $0 {
-                case .remainingExercises, .nextExercise, .previousExerciseSummary,
-                     .previousMainSectionSummary, .stepName, .elapsedTime:
-                    return true
-                default: return false
-                }
-            }
-        }
+        guard !coachSpeechPaused else { return [] }
+        let sport = kind.rawValue
+        let rules = kind == .strength
+            ? ATHLTHAudioCoachSportPolicy.eligibleStrengthRules(
+                audioCoachConfiguration.activeCustomRules
+            )
+            : ATHLTHAudioCoachSportPolicy.eligibleRules(
+                audioCoachConfiguration.activeCustomRules, sport: sport
+            )
+        guard !rules.isEmpty else { return [] }
+        let running = ATHLTHAudioCoachSportPolicy.supportsRunningPace(sport)
+        let eligibleDistance = ATHLTHAudioCoachSportPolicy.supportsDistance(sport)
+            && distanceMeters.isFinite ? max(0, distanceMeters) : 0
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: rules,
-            distanceMeters: distanceMeters,
+            distanceMeters: eligibleDistance,
             elapsedSeconds: elapsedTime,
             paceSecondsPerKilometer:
-                ATHLTHCoachSensorFreshness.validPace(
+                running && ATHLTHCoachSensorFreshness.validPace(
                     currentPaceSecondsPerKilometer, sampledAt: coachPaceSampleAt
                 ) ? currentPaceSecondsPerKilometer : nil,
             heartRateBPM: hasFreshHeartRate ? heartRate : nil,
             norwegian: coachPhrase(english: "en", norwegian: "no") == "no",
             maximumHeartRateBPM: audioCoachConfiguration.smartPrompts?
                 .maximumHeartRateBPM ?? structuredRunningWorkout?.heartRateZoneMaximumBPM,
-            context: coachReadoutContext,
+            context: running || kind == .strength
+                ? coachReadoutContext : .init(),
             lastSlots: &customAudioCoachLastSlots
         )
     }
@@ -5352,8 +5353,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         var shouldAnnounce = false
         var milestoneKeys: [String] = []
 
-        if let interval =
-                audioCoachConfiguration.distanceIntervalMeters,
+        if ATHLTHAudioCoachSportPolicy.supportsDistance(kind.rawValue),
+           distanceMeters.isFinite,
+           let interval = audioCoachConfiguration.distanceIntervalMeters,
            interval > 0,
            let nextDistance = nextDistanceAnnouncementMeters,
            distanceMeters >= nextDistance {
@@ -5850,8 +5852,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let configuration = audioCoachConfiguration
 
         if configuration.announceDistance,
+           ATHLTHAudioCoachSportPolicy.supportsDistance(kind.rawValue),
            !metrics.contains(.distance),
-           distanceMeters > 0 {
+           distanceMeters.isFinite, distanceMeters > 0 {
             parts.append(
                 coachPhrase(
                     english: "Distance",
@@ -5885,6 +5888,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }()
 
         if configuration.announceAveragePace,
+           ATHLTHAudioCoachSportPolicy.supportsRunningPace(kind.rawValue),
            !metrics.contains(.pace),
            let averageSecondsPerKilometer {
             parts.append(

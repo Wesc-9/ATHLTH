@@ -1,3 +1,9 @@
+## 2.2.6 – én aktivitetssikker Audio Coach-policy også direkte på Watch
+
+- Watch sin eksisterende `evaluateCustomAudioCoachRules` tar nå generiske tid-, puls- og gyldige distanseregler gjennom samme `ATHLTHAudioCoachSportPolicy` som iPhone sitt speil. Sykling og roing kan få målt distanse; HIIT, yoga, meditasjon og andre tidsstyrte økter kan få tid og faktisk målt puls uten å få løpspace/rute/PR.
+- Styrke beholder egen ekte sett-/øvelseskontekst, men blandingsregler med pace eller løpe-PR filtreres for å unngå misvisende lyd. Standard distansemilepæler og gjennomsnittspace er begrenset til relevante treningsformer.
+- Opprinnelig Watch HealthKit-session, lydleie, samtykke og opptakslag er uendret; ingen ny TTS- eller journalmotor. Regresjonstester dekker sykling, roing, HIIT, yoga og styrke. Krever fortsatt samme-commit CI og fysisk lydtest.
+
 ## 2.2.6 – meditasjon, aktivitetsrelevante manuelle felt og tryggere iPad-lesing
 
 - Meditasjonsblokker bruker egen `ATHLTHWorkoutSportMode.meditation`-presentasjon innen den eksisterende bevegelighets-/restitusjonsmotoren, uten ny helseopptaker. Quick Train tilbyr kun manuelt distansefelt for aktiviteter med distanse, så yoga/HIIT/sirkel får ikke et misvisende kilometerfelt.

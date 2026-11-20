@@ -1398,6 +1398,29 @@ enum ATHLTHAudioCoachSportPolicy {
         supportsRunningSteps(sport)
     }
 
+    /// Strength has a separately verified exercise queue. Do not combine
+    /// its exercise readouts with a running PR or pace in one spoken cue.
+    static func eligibleStrengthRules(
+        _ rules: [ATHLTHAudioCoachRule]
+    ) -> [ATHLTHAudioCoachRule] {
+        rules.filter { rule in
+            guard rule.trigger != .distance,
+                  !rule.trigger.isPaceCondition,
+                  rule.trigger != .personalRecordConfirmed else {
+                return false
+            }
+            return rule.selectedMetrics.allSatisfy { metric in
+                switch metric {
+                case .remainingExercises, .nextExercise,
+                     .previousExerciseSummary, .previousMainSectionSummary,
+                     .stepName, .elapsedTime:
+                    return true
+                default: return false
+                }
+            }
+        }
+    }
+
     /// Keep generic time, measured pulse, hydration and eligible measured
     /// distance rules on non-running sports. Do not misread running pace,
     /// route, PR, or step evidence as cycling/rowing/HIIT measurements.

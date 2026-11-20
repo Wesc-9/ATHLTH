@@ -1079,4 +1079,58 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertFalse(ATHLTHAudioCoachSportPolicy.supportsDistance("yoga"))
     }
 
+
+    func testWatchAndMirrorUseSameNonRunningRuleFilter() {
+        let time = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .elapsedTime, interval: 60
+        )
+        let heart = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .heartRate, interval: 60
+        )
+        let distance = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 500
+        )
+        let pace = ATHLTHAudioCoachRule(
+            trigger: .paceFasterOverall, metric: .pace, interval: 300
+        )
+        let step = ATHLTHAudioCoachRule(
+            trigger: .stepStart, metric: .stepName, interval: 1
+        )
+        let all = [time, heart, distance, pace, step]
+        for sport in ["cycling", "rowing"] {
+            XCTAssertEqual(
+                ATHLTHAudioCoachSportPolicy.eligibleRules(all, sport: sport)
+                    .map(\.id),
+                [time.id, heart.id, distance.id]
+            )
+        }
+        for sport in ["hiit", "functional", "yoga", "meditation", "other"] {
+            XCTAssertEqual(
+                ATHLTHAudioCoachSportPolicy.eligibleRules(all, sport: sport)
+                    .map(\.id),
+                [time.id, heart.id]
+            )
+        }
+    }
+
+    func testWatchStrengthCoachDoesNotMixRunningMeasurements() {
+        let valid = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .elapsedTime, interval: 60,
+            additionalMetrics: [.remainingExercises]
+        )
+        let invalid = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .elapsedTime, interval: 60,
+            additionalMetrics: [.pace]
+        )
+        let runOnly = ATHLTHAudioCoachRule(
+            trigger: .paceFasterOverall, metric: .pace, interval: 300
+        )
+        XCTAssertEqual(
+            ATHLTHAudioCoachSportPolicy.eligibleStrengthRules(
+                [valid, invalid, runOnly]
+            ).map(\.id),
+            [valid.id]
+        )
+    }
+
 }
