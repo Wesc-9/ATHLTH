@@ -2179,6 +2179,11 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var strengthHybridRunningActive: Bool? = nil
     var strengthRecoveryActive: Bool? = nil
     var strengthExerciseName: String? = nil
+    /// The zero-based ORIGINAL exercise cursor shared with iPhone.
+    /// This is separate from the one-based set display below.
+    /// Optional for old Watch builds; a missing cursor stays unknown.
+    var strengthExerciseIndex: Int? = nil
+    var strengthExerciseCount: Int? = nil
     var strengthSetIndex: Int? = nil
     var strengthSetCount: Int? = nil
     var strengthReps: Int? = nil

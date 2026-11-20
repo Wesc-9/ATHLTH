@@ -242,14 +242,15 @@ enum ATHLTHUniversalActiveCapture {
         // source HKWorkoutSession and universal workout ID stay unchanged.
         let category = ATHLTHWatchLiveSportPolicy.activityCategory(snapshot)
         let engine = ATHLTHWorkoutSportMode(category: category).engine
-        // Native endurance stages are zero-based. Strength carries the
-        // ORIGINAL set number as a one-based display index; converting it
-        // does not change set history or construct missing stage progress.
+        // Universal stages are the original EXERCISES, not strength sets.
+        // The original Watch exercise cursor is zero-based just like
+        // the iPhone strength journal. One-based set labels stay separate
+        // on the original strength UI and do not imply extra workout stages.
         let index: Int?
         let count: Int?
         if snapshot.kind == .strength {
-            index = snapshot.strengthSetIndex.map { $0 - 1 }
-            count = snapshot.strengthSetCount
+            index = snapshot.strengthExerciseIndex
+            count = snapshot.strengthExerciseCount
         } else if snapshot.kind == .running || snapshot.kind == .walking {
             index = snapshot.runningStepIndex
             count = snapshot.runningStepCount

@@ -1,3 +1,9 @@
+## 2.2.6 – øvelse og sett er to separate kursorkontrakter
+
+- Felles live `stageIndex/stageCount` betyr nå ORIGINAL 0-basert øvelse/antall øvelser på alle styrke- og hybridopptak, inkludert Apple Watch. Watch publiserer valgfri `strengthExerciseIndex` og `strengthExerciseCount` fra sin allerede eksisterende styrkejournal; eldre payload gir ukjent fase, aldri et syntetisk sett.
+- `strengthSetIndex`/`strengthSetCount` forblir en separat 1-basert settvisning. Øving av neste sett uten å bytte øvelse endrer ikke universell fase. Den originale HealthKit-opptakstypen og økt-/planidentiteten er uendret.
+- Regresjoner dekker styrkehybrid/aktiv rest, endret sett uten ny øvelse, feil/negative kursorer, gammelt Watch-snapshot og kontobytte. Samme-commit native CI og fysisk enhetstest gjenstår.
+
 ## 2.2.6 – én sann aktiv sport og ett bekreftet sett-/intervalnummer
 
 - Den universelle read-only statusen for den eksisterende iPhone-/Watch-styrkejournalen bruker nå aktiv motor/fase ved aktivitetsnavn: innebygd løpeintervall vises som løp, løft som styrke og hvile som pause. Den opprinnelige strength/HealthKit-opptakstypen, økt-ID-en og eier endres aldri. Pausetilstanden beholder aktuell sport, uten å starte en ny session.

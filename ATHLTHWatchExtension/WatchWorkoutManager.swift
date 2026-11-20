@@ -9096,6 +9096,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             workoutAutoPaused: automaticPauseActive,
             strengthExerciseName:
                 strengthSession?.exerciseName,
+            strengthExerciseIndex: strengthSession?.exerciseIndex,
+            strengthExerciseCount: strengthSession?.exerciseCount,
             strengthSetIndex:
                 strengthSession.map { $0.setIndex + 1 },
             strengthSetCount:

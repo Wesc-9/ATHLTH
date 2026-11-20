@@ -776,7 +776,7 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         )
     }
 
-    func testWatchStrengthSetCursorIsValidatedWithoutCreatingNewStages() throws {
+    func testWatchStrengthExerciseCursorMatchesIPhoneAndNeverCountsSetsAsStages() throws {
         let now = started.addingTimeInterval(120)
         let owner = UUID(), workoutID = UUID()
         var snapshot = WatchWorkoutLiveSnapshot(
@@ -790,15 +790,17 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         snapshot.universalWorkoutID = workoutID
         snapshot.strengthWorkoutID = workoutID
         snapshot.strengthHybridRunningActive = true
-        snapshot.strengthSetIndex = 2
-        snapshot.strengthSetCount = 4
+        snapshot.strengthExerciseIndex = 1
+        snapshot.strengthExerciseCount = 3
+        snapshot.strengthSetIndex = 5
+        snapshot.strengthSetCount = 8
         let run = try XCTUnwrap(
             ATHLTHUniversalActiveCapture.mirroredWatch(
                 snapshot, for: owner, at: now
             )
         )
         XCTAssertEqual(run.stageIndex, 1)
-        XCTAssertEqual(run.stageCount, 4)
+        XCTAssertEqual(run.stageCount, 3)
         XCTAssertEqual(run.activityCategory, "running")
         XCTAssertEqual(run.workoutID, workoutID)
 
@@ -809,32 +811,58 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
             )
         )
         XCTAssertEqual(rest.stageIndex, 1)
-        XCTAssertEqual(rest.stageCount, 4)
+        XCTAssertEqual(rest.stageCount, 3)
         XCTAssertEqual(rest.phase, .recovery)
 
-        // Legacy snapshots may not have a cursor. Never infer one from
-        // elapsed time, exercise name or a synthetic hybrid step count.
-        snapshot.strengthSetIndex = nil
+        // Set numbers may change without advancing to another exercise.
+        snapshot.strengthSetIndex = 1
+        XCTAssertEqual(ATHLTHUniversalActiveCapture.mirroredWatch(
+            snapshot, for: owner, at: now
+        )?.stageIndex, 1)
+
+        // Legacy snapshots and malformed zero-based exercise cursors must
+        // not invent stages from set count, names or elapsed time.
+        snapshot.strengthExerciseIndex = nil
         XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
             snapshot, for: owner, at: now
         )?.stageIndex)
-        snapshot.strengthSetIndex = 0
+        snapshot.strengthExerciseIndex = -1
         XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
             snapshot, for: owner, at: now
         )?.stageIndex)
-        snapshot.strengthSetIndex = 5
+        snapshot.strengthExerciseIndex = Int.min
         XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
             snapshot, for: owner, at: now
         )?.stageIndex)
-        snapshot.strengthSetIndex = 2
-        snapshot.strengthSetCount = 0
+        snapshot.strengthExerciseIndex = 3
         XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
             snapshot, for: owner, at: now
         )?.stageIndex)
-        snapshot.strengthSetCount = 4
+        snapshot.strengthExerciseIndex = 1
+        snapshot.strengthExerciseCount = 0
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            snapshot, for: owner, at: now
+        )?.stageIndex)
+        snapshot.strengthExerciseCount = 3
         XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
             snapshot, for: UUID(), at: now
         ))
+
+        // An old paired Watch omits the optional exercise cursor entirely.
+        var legacyJSON = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(snapshot)
+        ) as? [String: Any])
+        legacyJSON.removeValue(forKey: "strengthExerciseIndex")
+        legacyJSON.removeValue(forKey: "strengthExerciseCount")
+        let legacy = try JSONDecoder().decode(
+            WatchWorkoutLiveSnapshot.self,
+            from: JSONSerialization.data(withJSONObject: legacyJSON)
+        )
+        XCTAssertNil(legacy.strengthExerciseIndex)
+        XCTAssertNil(legacy.strengthExerciseCount)
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            legacy, for: owner, at: now
+        )?.stageIndex)
     }
 
     func testStructuredWellnessKeepsActiveYogaAndMeditationIdentity() throws {
