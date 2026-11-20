@@ -87,18 +87,22 @@ final class WatchRouteStore: NSObject, ObservableObject {
         "athlth.watch.preparedWorkout.v1"
     private let preparedWorkoutSnapshotDateKey =
         "athlth.watch.preparedWorkoutSnapshotDate.v1"
+    private let confirmedTodayLaunchesKey =
+        "athlth.watch.confirmedTodayLaunches.v1"
+    private var confirmedTodayLaunches: [ATHLTHWatchTodayLaunchReceipt] = []
     private var pendingWorkoutRouteID: UUID?
     private var latestTransportTimestampByKind:
         [String: TimeInterval] = [:]
 
     override init() {
         super.init()
+        restoreCompanionAccountIdentity()
+        restoreConfirmedTodayLaunches()
         loadRoutes()
         loadTodayWorkout()
         loadTodayWorkouts()
         loadPreparedWorkout()
         restorePetCatalog()
-        restoreCompanionAccountIdentity()
         activateConnectivity()
     }
 
@@ -304,6 +308,48 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
     }
 
+    private func restoreConfirmedTodayLaunches() {
+        guard let data = UserDefaults.standard.data(
+            forKey: confirmedTodayLaunchesKey
+        ), let receipts = try? JSONDecoder().decode(
+            [ATHLTHWatchTodayLaunchReceipt].self, from: data
+        ) else { return }
+        confirmedTodayLaunches = Array(receipts.filter {
+            let age = Date().timeIntervalSince($0.confirmedAt)
+            return age >= 0 &&
+                age < ATHLTHWatchTodayReplayPolicy.retention
+        }.suffix(120))
+    }
+
+    private func wasTodaySessionLaunched(_ id: UUID) -> Bool {
+        ATHLTHWatchTodayReplayPolicy.wasConfirmed(
+            sessionID: id, ownerID: companionAccountID,
+            receipts: confirmedTodayLaunches
+        )
+    }
+
+    func canLaunchTodayWorkout(_ id: UUID) -> Bool {
+        !wasTodaySessionLaunched(id)
+    }
+
+    private func recordConfirmedTodayLaunch(_ sessionID: UUID) {
+        guard todayWorkouts.contains(where: { $0.workoutID == sessionID }) ||
+              todayWorkout?.workoutID == sessionID,
+              !wasTodaySessionLaunched(sessionID) else { return }
+        confirmedTodayLaunches.append(ATHLTHWatchTodayLaunchReceipt(
+            sessionID: sessionID, ownerID: companionAccountID,
+            confirmedAt: Date()
+        ))
+        confirmedTodayLaunches = Array(confirmedTodayLaunches.suffix(120))
+        if let data = try? JSONEncoder().encode(confirmedTodayLaunches) {
+            UserDefaults.standard.set(data, forKey: confirmedTodayLaunchesKey)
+        }
+        todayWorkouts.removeAll { $0.workoutID == sessionID }
+        if todayWorkout?.workoutID == sessionID {
+            todayWorkout = nil
+        }
+    }
+
     private func loadTodayWorkout() {
         guard let data =
                 UserDefaults.standard.data(
@@ -332,13 +378,16 @@ final class WatchRouteStore: NSObject, ObservableObject {
             return
         }
 
-        todayWorkout = workout
+        todayWorkout = wasTodaySessionLaunched(workout.workoutID)
+            ? nil : workout
     }
 
     private func storeTodayWorkout(
         _ workout: WatchTodayWorkoutTransfer?
     ) {
-        todayWorkout = workout
+        todayWorkout = workout.flatMap {
+            wasTodaySessionLaunched($0.workoutID) ? nil : $0
+        }
 
         guard let workout else {
             UserDefaults.standard.removeObject(
@@ -371,12 +420,15 @@ final class WatchRouteStore: NSObject, ObservableObject {
             guard let start = workout.scheduledStart else {
                 return Calendar.current.isDateInToday(snapshot.updatedAt)
             }
-            return start >= startOfToday
+            return start >= startOfToday &&
+                !wasTodaySessionLaunched(workout.workoutID)
         }
     }
 
     private func storeTodayWorkouts(_ workouts: [WatchTodayWorkoutTransfer]) {
-        todayWorkouts = workouts
+        todayWorkouts = workouts.filter {
+            !wasTodaySessionLaunched($0.workoutID)
+        }
         let snapshot = WatchTodaySnapshot(
             workout: workouts.first, updatedAt: Date(), workouts: workouts)
         if let data = try? JSONEncoder().encode(snapshot) {
@@ -459,7 +511,16 @@ final class WatchRouteStore: NSObject, ObservableObject {
               ATHLTHWatchPreparedPlanIdentityPolicy.allows(
                   planID: workout.plannedPlanID,
                   sessionID: workout.plannedSessionID
-              ) else {
+              ),
+              ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(
+                  kind: workout.kind,
+                  hasRunningRecipe: workout.runningWorkout != nil,
+                  hasStrengthRecipe: workout.strengthWorkout != nil,
+                  hasRoute: workout.routeID != nil
+              ),
+              workout.plannedSessionID.map({
+                  !wasTodaySessionLaunched($0)
+              }) ?? true else {
             return false
         }
 
@@ -477,6 +538,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 pendingPreparedLaunchID = nil
             }
         }
+
+        // Remove staged configuration from an earlier rejected attempt
+        // before configuring THIS original workout. Never reset active HK.
+        guard manager.prepareForIncomingWatchWorkout() else { return false }
 
         // Claim the preflight synchronously on the MainActor before the
         // asynchronous phone check; another card cannot replace this payload.
@@ -519,6 +584,9 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 manager.state == .paused
         ) else { return false }
 
+        if let sessionID = workout.plannedSessionID {
+            recordConfirmedTodayLaunch(sessionID)
+        }
         consumePreparedWorkout(workout.id)
         // A Today card has a fresh transport UUID, but may represent the
         // same previously prepared calendar session. Hide only the older

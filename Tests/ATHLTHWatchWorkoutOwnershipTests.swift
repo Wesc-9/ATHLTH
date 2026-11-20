@@ -305,4 +305,79 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
                      "Never launch free strength instead of the missing saved recipe")
     }
 
+    func testTodayLaunchReceiptsDedupeOnlyOriginalAccountAndSession() {
+        let id = UUID(), owner = UUID(), anotherOwner = UUID()
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let receipts = [ATHLTHWatchTodayLaunchReceipt(
+            sessionID: id, ownerID: owner, confirmedAt: now
+        )]
+        XCTAssertTrue(ATHLTHWatchTodayReplayPolicy.wasConfirmed(
+            sessionID: id, ownerID: owner,
+            receipts: receipts, now: now.addingTimeInterval(10)
+        ))
+        XCTAssertFalse(ATHLTHWatchTodayReplayPolicy.wasConfirmed(
+            sessionID: id, ownerID: anotherOwner,
+            receipts: receipts, now: now.addingTimeInterval(10)
+        ))
+        XCTAssertFalse(ATHLTHWatchTodayReplayPolicy.wasConfirmed(
+            sessionID: UUID(), ownerID: owner,
+            receipts: receipts, now: now.addingTimeInterval(10)
+        ))
+        XCTAssertFalse(ATHLTHWatchTodayReplayPolicy.wasConfirmed(
+            sessionID: id, ownerID: owner, receipts: receipts,
+            now: now.addingTimeInterval(
+                ATHLTHWatchTodayReplayPolicy.retention + 1
+            )
+        ))
+    }
+
+    func testPreparedPrescriptionRejectsCrossSportAndMissingStrength() {
+        for kind in WatchWorkoutKind.allCases {
+            XCTAssertTrue(ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(
+                kind: kind, hasRunningRecipe: false,
+                hasStrengthRecipe: kind == .strength, hasRoute: false
+            ))
+            if kind != .running && kind != .walking {
+                XCTAssertFalse(ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(
+                    kind: kind, hasRunningRecipe: true,
+                    hasStrengthRecipe: kind == .strength, hasRoute: false
+                ))
+            }
+            if kind != .strength {
+                XCTAssertFalse(ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(
+                    kind: kind, hasRunningRecipe: false,
+                    hasStrengthRecipe: true, hasRoute: false
+                ))
+            }
+            if !kind.usesOutdoorLocation {
+                XCTAssertFalse(ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(
+                    kind: kind, hasRunningRecipe: false,
+                    hasStrengthRecipe: kind == .strength, hasRoute: true
+                ))
+            }
+        }
+        XCTAssertFalse(ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(
+            kind: .strength, hasRunningRecipe: false,
+            hasStrengthRecipe: false, hasRoute: false
+        ))
+    }
+
+    func testTodayIndoorSportSurvivesPreparedTransferAndCodec() throws {
+        let today = WatchTodayWorkoutTransfer(
+            planID: UUID(), workoutID: UUID(), title: "Indoor cycling",
+            summary: "Original indoor workout", kind: .cycling,
+            scheduledStart: nil, durationMinutes: 30,
+            distanceKilometers: nil, routeID: nil, runningWorkout: nil,
+            audioCoach: .disabled, indoor: true, updatedAt: Date()
+        )
+        let copy = try JSONDecoder().decode(
+            WatchTodayWorkoutTransfer.self,
+            from: JSONEncoder().encode(today)
+        )
+        XCTAssertEqual(copy.indoor, true)
+        let prepared = ATHLTHWatchTodayLaunchAdapter.prepared(from: copy)
+        XCTAssertEqual(prepared?.indoor, true)
+        XCTAssertEqual(prepared?.kind, .cycling)
+    }
+
 }

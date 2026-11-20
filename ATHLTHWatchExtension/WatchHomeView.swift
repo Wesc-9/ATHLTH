@@ -274,8 +274,16 @@ struct WatchHomeView: View {
         let canStart =
             routeReady &&
             routeStore.automaticStartCountdownSeconds == nil &&
-            workoutManager.state !=
-                .preparing
+            workoutManager.canAcceptPreparedWorkout() &&
+            ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(
+                kind: workout.kind,
+                hasRunningRecipe: workout.runningWorkout != nil,
+                hasStrengthRecipe: workout.strengthWorkout != nil,
+                hasRoute: workout.routeID != nil
+            ) &&
+            (workout.plannedSessionID.map {
+                routeStore.canLaunchTodayWorkout($0)
+            } ?? true)
 
         return Button {
             startPreparedWorkout(workout)
@@ -606,13 +614,15 @@ struct WatchHomeView: View {
             !workoutManager.canAcceptPreparedWorkout() ||
             (workout.routeID != nil &&
              workout.routeID.flatMap { routeStore.route(with: $0) } == nil) ||
-            ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) == nil
+            ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) == nil ||
+            !routeStore.canLaunchTodayWorkout(workout.workoutID)
         )
         .opacity(
             workoutManager.canAcceptPreparedWorkout() &&
             (workout.routeID == nil ||
              workout.routeID.flatMap { routeStore.route(with: $0) } != nil) &&
-            ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) != nil
+            ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) != nil &&
+            routeStore.canLaunchTodayWorkout(workout.workoutID)
                 ? 1 : 0.55
         )
     }

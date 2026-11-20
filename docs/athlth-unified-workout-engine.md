@@ -1,3 +1,11 @@
+## 2.2.6 – én samlet pakke for øvrige Watch-sporter og trygge planstarter
+
+- Originale Today-kalenderøkter får en kortlivet, kontobundet **bekreftelse først etter ekte Watch HealthKit-start**. Gamle offline kalenderlister eller nye overføringer viser ikke økten på nytt med START etter at den samme planlagte økten ble startet. Andre økter, planer og brukerkontoer beholder sine knapper; kvitteringene (kun UUID og tidspunkt, ingen helseopplysninger) utløper etter åtte dager.
+- Alle klargjorte sportskort, også styrke, sykling, roing, HIIT, funksjonell trening og yoga, valideres mot den **opprinnelige** oppskriftens idrett og rute. En styrkeplan uten sitt styrkesnapshot kan ikke bli feilregistrert som fri styrke, og en fremmed løpeoppskrift eller GPS-rute kan ikke endre en annen sport.
+- En ny `prepareForIncomingWatchWorkout` nullstiller bare **ikke-startet** tidligere Watch-preskripsjon (rute, strukturert løp, Coach, Ghost, styrke og mølle) før en ny original oppskrift konfigureres. Aktive eller gjenopprettede HealthKit-økter kan ikke nullstilles.
+- `WatchTodayWorkoutTransfer` har nå valgfritt, bakoverkompatibelt `indoor` som går gjennom Today→prepared→HealthKit. Dersom iPhone ikke sender miljøet, gjelder eldre standard. Dette er ikke en påstand om ferdig kildeintegrasjon for alle planlagte innendørsaktiviteter.
+- Nye XCTest dekker kontobundet restart-vern, aktiv sport, manglende styrkeoppskrift, GPS-støtte og innemiljø ved Codable. Samme-commit native CI og fysiske enhetstester gjenstår.
+
 ## 2.2.6 – Dagens økt bruker samme HealthKit-oppstart som klargjort Watch-kort
 
 - Watch-kortet `Dagens økt` bruker nå `ATHLTHWatchTodayLaunchAdapter` og den **samme eksisterende** `WatchRouteStore.launchPreparedWorkout` som klargjort/utsatt Watch-start. Tidligere gikk Today-kortet utenom felles kontroll av opptaksreservasjon, rutetilgjengelighet og bekreftet HealthKit-original.

@@ -1440,6 +1440,8 @@ struct WatchTodayWorkoutTransfer: Codable, Hashable {
     // Optional so older iPhone/Watch pairs still decode. When present, the
     // Watch has the entire strength prescription before it leaves the phone.
     var strengthWorkout: WatchStrengthSessionSnapshot? = nil
+    /// Optional, preserving the exact indoor intent when the phone sends it.
+    var indoor: Bool? = nil
     var updatedAt: Date
 }
 
@@ -1459,12 +1461,58 @@ enum ATHLTHWatchTodayLaunchAdapter {
             kind: today.kind, routeID: today.routeID,
             runningWorkout: today.runningWorkout,
             audioCoach: today.audioCoach,
+            indoor: today.indoor,
             startMode: .onWatch,
             strengthWorkout: today.strengthWorkout,
             plannedPlanID: today.planID,
             plannedSessionID: today.workoutID,
             updatedAt: today.updatedAt
         )
+    }
+}
+
+/// A short-lived confirmation of a Today card that actually started an
+/// original HealthKit recording. This is NOT a second training journal.
+struct ATHLTHWatchTodayLaunchReceipt: Codable, Hashable {
+    let sessionID: UUID
+    let ownerID: UUID?
+    let confirmedAt: Date
+}
+
+enum ATHLTHWatchTodayReplayPolicy {
+    static let retention: TimeInterval = 8 * 24 * 60 * 60
+
+    static func wasConfirmed(
+        sessionID: UUID, ownerID: UUID?,
+        receipts: [ATHLTHWatchTodayLaunchReceipt],
+        now: Date = Date()
+    ) -> Bool {
+        receipts.contains { receipt in
+            receipt.sessionID == sessionID &&
+            receipt.ownerID == ownerID &&
+            receipt.confirmedAt.timeIntervalSince1970.isFinite &&
+            now.timeIntervalSince(receipt.confirmedAt) >= 0 &&
+            now.timeIntervalSince(receipt.confirmedAt) < retention
+        }
+    }
+}
+
+/// Prepared transfers are only admitted with their original sport-specific
+/// prescription. A truncated card cannot be disguised as Free Strength.
+enum ATHLTHWatchPreparedRecipeAdmissionPolicy {
+    static func permits(
+        kind: WatchWorkoutKind,
+        hasRunningRecipe: Bool,
+        hasStrengthRecipe: Bool,
+        hasRoute: Bool
+    ) -> Bool {
+        if hasStrengthRecipe && kind != .strength { return false }
+        if hasRunningRecipe && kind != .running && kind != .walking {
+            return false
+        }
+        if kind == .strength && !hasStrengthRecipe { return false }
+        if hasRoute && !kind.usesOutdoorLocation { return false }
+        return true
     }
 }
 

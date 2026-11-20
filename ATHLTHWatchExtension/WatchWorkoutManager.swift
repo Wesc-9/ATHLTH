@@ -4145,6 +4145,29 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    /// Clear only an unstarted Watch card's stale route, intervals,
+    /// strength, Coach and treadmill settings. Never mutate an active HK owner.
+    @discardableResult
+    func prepareForIncomingWatchWorkout() -> Bool {
+        guard canAcceptPreparedWorkout() else { return false }
+        prepareForLocalWorkoutStart()
+        strengthRestCoachTask?.cancel()
+        strengthRestCoachTask = nil
+        strengthStatusCoachTask?.cancel()
+        strengthStatusCoachTask = nil
+        pendingStrengthWeight = nil
+        strengthCommandJournal = []
+        publish {
+            self.strengthSession = nil
+            self.strengthActionPending = false
+            self.beltSpeedKilometersPerHour = nil
+            self.beltSpeedTimeline = []
+            self.quickBeltSpeedsKilometersPerHour = [6, 8, 10, 12]
+            self.automaticPauseEnabled = false
+        }
+        return true
+    }
+
     func start(
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil
