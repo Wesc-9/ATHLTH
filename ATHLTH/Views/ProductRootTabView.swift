@@ -6859,6 +6859,26 @@ struct ATHLTHTrainView: View {
             return workout.walking ? .walking : .running
         }
         if strengthWorkout.activeWorkout != nil { return .strength }
+        // Read the original timed/structured checkpoint through the same
+        // universal activity interpretation as the workout engine.
+        if let timed = ATHLTHManualTimedCapture.current(
+            for: session.profile.userID
+        ), let active = ATHLTHUniversalActiveCapture.manual(timed) {
+            return active.activityCategory == "yoga" ||
+                active.activityCategory == "mobility" ? .mobility : .custom
+        }
+        if let checkpoint = ATHLTHStructuredCaptureAdmission.activeCheckpoint(
+            for: session.profile.userID
+        ), let active = ATHLTHUniversalActiveCapture.structured(checkpoint) {
+            switch active.activityCategory {
+            case "running", "treadmill": return .running
+            case "walking": return .walking
+            case "strength": return .strength
+            case "mobility": return .mobility
+            case "recovery": return .recovery
+            default: return .custom
+            }
+        }
         // An unconfirmed Watch-only session has no trustworthy activity kind.
         return nil
     }
@@ -6952,7 +6972,10 @@ struct ATHLTHTrainView: View {
                     english: "Phone-timed session · manual measurements",
                     norwegian: "Tidsmålt økt · øvrige målinger er manuelle"
                 ),
-                elapsed: { timed.elapsed(at: $0) },
+                elapsed: {
+                    ATHLTHUniversalActiveCapture.manual(timed, at: $0)?
+                        .elapsedSeconds ?? timed.elapsed(at: $0)
+                },
                 elapsedCaption: "Målt tid"
             ) {
                 activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
