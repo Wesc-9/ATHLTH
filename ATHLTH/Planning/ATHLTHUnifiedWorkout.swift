@@ -61,16 +61,29 @@ enum ATHLTHUnifiedWorkout {
         // and labeling every measurement as manual/timed on iPhone.
         if blocks.isEmpty, let minutes = workout.durationMinutes,
            (1...240).contains(minutes) {
-            let category = workout.workoutCategory?
+            let savedCategory = workout.workoutCategory?
                 .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+            // Older simple mobility/recovery plans sometimes have only
+            // WorkoutKind + duration, without an explicit category.
+            let category: String
+            switch savedCategory {
+            case "" where workout.kind == .mobility:
+                category = "mobility"
+            case "" where workout.kind == .recovery:
+                category = "recovery"
+            case "stair_climbing":
+                category = "stairclimber"
+            case "stretching":
+                category = "mobility"
+            default:
+                category = savedCategory
+            }
             let taggedCategories = [
                 "cycling", "rowing", "stairclimber", "hiit",
                 "circuit", "functional", "sports", "other"
             ]
             let timedCategory = taggedCategories.contains(category) ||
-                category == "yoga" || category == "meditation" ||
-                (category == "mobility" && workout.kind == .mobility) ||
-                (category == "recovery" && workout.kind == .recovery)
+                ["yoga", "meditation", "mobility", "recovery"].contains(category)
             if timedCategory {
                 var timed = WorkoutTemplateBlock(
                     sequence: 1, kind: .note, title: workout.title,
