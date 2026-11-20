@@ -162,6 +162,94 @@ struct ATHLTHLocalStructuredWorkoutStatus {
     var completedCount: Int
     var pausedAt: Date? = nil
     var completedPauseSeconds: TimeInterval = 0
+
+    /// Derive the iPad spectator's live model exclusively from the original
+    /// committed, account-scoped structured checkpoint after app restart.
+    /// This has no effect on live-sharing authorization or HealthKit.
+    static func restored(
+        from checkpoint: ATHLTHStructuredWorkoutCheckpoint,
+        ownerID: UUID
+    ) -> ATHLTHLocalStructuredWorkoutStatus? {
+        guard checkpoint.executionBlocks.indices.contains(checkpoint.currentIndex),
+              checkpoint.startedAt.timeIntervalSince1970.isFinite,
+              checkpoint.stepEnteredAt.timeIntervalSince1970.isFinite,
+              checkpoint.completedPauseSeconds.map({
+                  $0.isFinite && $0 >= 0
+              }) ?? true else { return nil }
+        let current = checkpoint.executionBlocks[checkpoint.currentIndex]
+        let category = current.kind == .rest || current.isActiveRecovery
+            ? ATHLTHWorkoutSportMode.recovery.category
+            : ATHLTHWorkoutSportMode.forBlock(current).category
+        return ATHLTHLocalStructuredWorkoutStatus(
+            ownerID: ownerID,
+            workoutID: checkpoint.workoutID,
+            title: checkpoint.sourceTitle ?? ATHLTHLocalization.choose(
+                english: "Workout", norwegian: "Treningsøkt"
+            ),
+            kind: category,
+            startedAt: checkpoint.startedAt,
+            steps: checkpoint.executionBlocks.enumerated().map { index, block in
+                ATHLTHLiveWorkoutStage(
+                    index: index,
+                    title: block.title,
+                    phase: block.resolvedPhase.rawValue,
+                    durationSeconds: block.durationSeconds,
+                    distanceMeters: block.distanceMeters
+                )
+            },
+            stepIndex: checkpoint.currentIndex,
+            stepEnteredAt: checkpoint.stepEnteredAt,
+            completedCount: checkpoint.completedIDs.count,
+            pausedAt: checkpoint.pausedAt,
+            completedPauseSeconds: checkpoint.completedPauseSeconds ?? 0
+        )
+    }
+}
+
+/// The private spectator relays ONE original structured checkpoint with
+/// manual-source evidence, and never turns programmed targets into sensors.
+enum ATHLTHStructuredSpectatorSnapshot {
+    static func make(
+        _ structured: ATHLTHLocalStructuredWorkoutStatus,
+        at now: Date = Date()
+    ) -> ATHLTHCrossDeviceWorkoutSnapshot? {
+        guard structured.steps.indices.contains(structured.stepIndex),
+              let elapsed = ATHLTHStructuredWorkoutClock.elapsed(
+                start: structured.startedAt,
+                now: now,
+                pause: structured.pausedAt,
+                pausedSeconds: structured.completedPauseSeconds
+              ) else { return nil }
+        let step = structured.steps[structured.stepIndex]
+        let nextIndex = structured.stepIndex + 1
+        let effective = ATHLTHStructuredWorkoutClock.at(
+            now, pause: structured.pausedAt
+        ) ?? now
+        let remaining = step.durationSeconds.map {
+            max(0, $0 - effective.timeIntervalSince(structured.stepEnteredAt))
+        }
+        return ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: structured.workoutID,
+            kind: structured.kind,
+            title: structured.title,
+            startedAt: structured.startedAt,
+            elapsedSeconds: elapsed,
+            distanceMeters: nil,
+            currentStep: step.title,
+            nextStep: structured.steps.indices.contains(nextIndex)
+                ? structured.steps[nextIndex].title : nil,
+            completedSets: structured.completedCount,
+            totalSets: structured.steps.count,
+            paused: structured.pausedAt != nil,
+            runningStepRemainingSeconds: remaining,
+            capturedAt: now,
+            sourceDevice: "iphone",
+            captureEvidence: "structuredManual",
+            runningSteps: structured.steps,
+            runningStepIndex: structured.stepIndex,
+            runningStepCount: structured.steps.count
+        )
+    }
 }
 
 /// Read-only same-account manual timer rendering. It contains no HealthKit
@@ -702,43 +790,25 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 spotifyArtistName: spotify.isPlaying ? spotify.watchArtistName : nil
             )
         }
-        if let structured = structuredSession,
-           structured.ownerID == trackingAccountID,
-           !mirroredWatch.hasActiveMirroredWorkout {
-            let step = structured.steps.indices.contains(structured.stepIndex)
-                ? structured.steps[structured.stepIndex] : nil
-            let nextIndex = structured.stepIndex + 1
-            let now = Date()
-            let effective = ATHLTHStructuredWorkoutClock.at(now, pause: structured.pausedAt) ?? now
-            let remaining = step?.durationSeconds.map {
-                max(0, $0 - effective.timeIntervalSince(structured.stepEnteredAt))
+        // SwiftUI's transient live status is lost on process termination.
+        // Restore only from the same-account, original persisted checkpoint.
+        // This remains behind reconcileSession's existing opt-in consent.
+        let recoveredStructured: ATHLTHLocalStructuredWorkoutStatus? =
+            trackingAccountID.flatMap { accountID in
+                ATHLTHStructuredCaptureAdmission.activeCheckpoint(
+                    for: accountID
+                ).flatMap {
+                    ATHLTHLocalStructuredWorkoutStatus.restored(
+                        from: $0, ownerID: accountID
+                    )
+                }
             }
-            let elapsed = ATHLTHStructuredWorkoutClock.elapsed(
-                start: structured.startedAt, now: now,
-                pause: structured.pausedAt,
-                pausedSeconds: structured.completedPauseSeconds
-            ) ?? 0
-            return ATHLTHCrossDeviceWorkoutSnapshot(
-                sessionID: structured.workoutID,
-                kind: structured.kind,
-                title: structured.title,
-                startedAt: structured.startedAt,
-                elapsedSeconds: elapsed,
-                distanceMeters: nil,
-                currentStep: step?.title,
-                nextStep: structured.steps.indices.contains(nextIndex)
-                    ? structured.steps[nextIndex].title : nil,
-                completedSets: structured.completedCount,
-                totalSets: structured.steps.count,
-                paused: structured.pausedAt != nil,
-                runningStepRemainingSeconds: remaining,
-                capturedAt: .now,
-                sourceDevice: "iphone",
-                captureEvidence: "structuredManual",
-                runningSteps: structured.steps,
-                runningStepIndex: structured.stepIndex,
-                runningStepCount: structured.steps.count
-            )
+        let activeStructured = recoveredStructured ??
+            (structuredSession?.ownerID == trackingAccountID
+                ? structuredSession : nil)
+        if let activeStructured,
+           !mirroredWatch.hasActiveMirroredWorkout {
+            return ATHLTHStructuredSpectatorSnapshot.make(activeStructured)
         }
         // Manual timed sessions now participate in the same opt-in iPad
         // spectator pipeline. Never publish a false pulse, pace, calorie,

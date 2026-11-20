@@ -494,4 +494,99 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         }
     }
 
+
+    func testStructuredSpectatorRebuildsOriginalMixedWorkoutAfterRestart() throws {
+        let owner = UUID(), id = UUID(), plan = UUID()
+        let now = Date(timeIntervalSince1970: 1_900_000_300)
+        let started = now.addingTimeInterval(-240)
+        let cycling = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Cycle",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 300,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        var tagged = cycling
+        tagged.activityTag = "cycling"
+        let strength = WorkoutTemplateBlock(
+            sequence: 2, kind: .exercise, title: "Squats",
+            exerciseSlug: "squat", distanceMeters: nil,
+            repetitions: 8, durationSeconds: nil,
+            targetWeightKilograms: 60, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        let checkpoint = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: id, sourcePlanID: plan, sourceTitle: "Mixed session",
+            savedAt: now, startedAt: started,
+            stepEnteredAt: started.addingTimeInterval(120),
+            currentIndex: 1, completedIDs: [tagged.id],
+            results: [:], modeStarts: [:],
+            executionBlocks: [tagged, strength],
+            emomWaiting: false, timedOutGroups: [],
+            enteredReps: 0, enteredWeight: ""
+        )
+        let restored = try XCTUnwrap(
+            ATHLTHLocalStructuredWorkoutStatus.restored(
+                from: checkpoint, ownerID: owner
+            )
+        )
+        XCTAssertEqual(restored.ownerID, owner)
+        XCTAssertEqual(restored.workoutID, id)
+        XCTAssertEqual(restored.kind, "strength")
+        XCTAssertEqual(restored.title, "Mixed session")
+        XCTAssertEqual(restored.completedCount, 1)
+        let snapshot = try XCTUnwrap(
+            ATHLTHStructuredSpectatorSnapshot.make(restored, at: now)
+        )
+        XCTAssertEqual(snapshot.sessionID, id)
+        XCTAssertEqual(snapshot.kind, "strength")
+        XCTAssertEqual(snapshot.elapsedSeconds, 240)
+        XCTAssertEqual(snapshot.captureEvidence, "structuredManual")
+        XCTAssertEqual(snapshot.currentStep, "Squats")
+        XCTAssertNil(snapshot.distanceMeters)
+        XCTAssertNil(snapshot.heartRateBPM)
+        XCTAssertNil(snapshot.liveLatitude)
+        XCTAssertEqual(snapshot.runningStepIndex, 1)
+    }
+
+    func testStructuredSpectatorRecoveryRetainsPausedClockAndNoFakeSensors() throws {
+        let owner = UUID(), id = UUID()
+        let started = Date(timeIntervalSince1970: 1_900_000_000)
+        let step = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Yoga",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 600,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        var yoga = step
+        yoga.activityTag = "yoga"
+        let saved = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: id, savedAt: started.addingTimeInterval(180),
+            startedAt: started, stepEnteredAt: started,
+            currentIndex: 0, completedIDs: [], results: [:],
+            modeStarts: [:], executionBlocks: [yoga],
+            emomWaiting: false, timedOutGroups: [],
+            enteredReps: 0, enteredWeight: "",
+            pausedAt: started.addingTimeInterval(180),
+            completedPauseSeconds: 0
+        )
+        let restored = try XCTUnwrap(
+            ATHLTHLocalStructuredWorkoutStatus.restored(
+                from: saved, ownerID: owner
+            )
+        )
+        let snapshot = try XCTUnwrap(
+            ATHLTHStructuredSpectatorSnapshot.make(
+                restored, at: started.addingTimeInterval(360)
+            )
+        )
+        XCTAssertTrue(snapshot.paused == true)
+        XCTAssertEqual(snapshot.elapsedSeconds, 180)
+        XCTAssertEqual(snapshot.kind, "yoga")
+        XCTAssertEqual(snapshot.title, "Workout") // English localization fallback
+        XCTAssertNil(snapshot.activeCalories)
+        XCTAssertNil(snapshot.currentPaceSecondsPerKilometer)
+    }
+
 }

@@ -249,4 +249,32 @@ final class ATHLTHStructuredCaptureAdmissionTests: XCTestCase {
         ))
     }
 
+
+    func testStructuredOriginalTitleAndPlanSurvivePersistedCheckpoint() throws {
+        let plan = UUID(), id = UUID()
+        let started = Date(timeIntervalSince1970: 1_900_000_000)
+        let step = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Mobility",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 180,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        let checkpoint = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: id, sourcePlanID: plan, sourceTitle: "Mobility plan",
+            savedAt: started, startedAt: started,
+            stepEnteredAt: started, currentIndex: 0,
+            completedIDs: [], results: [:], modeStarts: [:],
+            executionBlocks: [step], emomWaiting: false,
+            timedOutGroups: [], enteredReps: 0, enteredWeight: ""
+        )
+        let restored = try JSONDecoder().decode(
+            ATHLTHStructuredWorkoutCheckpoint.self,
+            from: JSONEncoder().encode(checkpoint)
+        )
+        XCTAssertEqual(restored.workoutID, id)
+        XCTAssertEqual(restored.sourcePlanID, plan)
+        XCTAssertEqual(restored.sourceTitle, "Mobility plan")
+    }
+
 }

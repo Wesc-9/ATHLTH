@@ -1,3 +1,10 @@
+## 2.2.6 – iPad kan hente tilbake den faktiske strukturerte økten
+
+- Den originale strukturerte iPhone-checkpointen lagrer nå valgfri `sourceTitle`, og iPad-spektatorens eksisterende iPhone-publisher kan gjenoppbygge read-only livevisning fra den verifiserte, kontotilhørende checkpointen etter prosessomstart. Samme trenings-ID, aktiv deløkt, tid, pause og stegposisjon beholdes. Historikk og motor opprettes ikke på nytt.
+- `ATHLTHStructuredSpectatorSnapshot` deler én manuell kildekontrakt for normal livebruk og gjenopprettet status. Verken planlagt distanse, puls, GPS, fart eller kalorier presenteres som sensorverdier.
+- iPad får IKKE automatisk tilgang: opprinnelig iPhone-eiers godkjenning for akkurat denne økten gjelder fortsatt, og etter appstart må samtykket bekreftes på nytt. Utgått eller korrupt checkpoint gir ingen speilet treningsstatus.
+- XCTest dekker rekonstruert hybridøkt, original plan/tittel og pause uten fiktive sensormålinger. Samme-commit CI og ekte iPhone/iPad-verifikasjon gjenstår.
+
 ## 2.2.6 – bevar opprinnelig planlenke i den faktiske strukturerte økten
 
 - Det eksisterende strukturerte iPhone-sjekkpunktet lagrer nå en valgfri `sourcePlanID` sammen med original workout-ID, aktivt steg, klokke og fullføringskvittering. Gamle sjekkpunkter uten feltet kan fortsatt dekodes og gjenopprettes.

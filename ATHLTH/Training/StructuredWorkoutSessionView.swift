@@ -71,6 +71,9 @@ struct ATHLTHStructuredWorkoutCheckpoint: Codable {
     /// Original linked training-plan identity. Optional for decoding
     /// legacy, unlinked checkpoints without a destructive migration.
     var sourcePlanID: UUID? = nil
+    /// The original display title allows read-only recovery after app launch
+    /// without inventing a new workout, plan or exercise template.
+    var sourceTitle: String? = nil
     /// Stable completion receipt even if history commits before a crash
     /// prevents checkpoint cleanup. Optional for old checkpoints.
     var completionID: UUID? = nil
@@ -1359,6 +1362,7 @@ struct StructuredWorkoutSessionView: View {
         let state = ATHLTHStructuredWorkoutCheckpoint(
             workoutID: workout.id,
             sourcePlanID: activeSourcePlanID,
+            sourceTitle: workout.title,
             completionID: completionID,
             savedAt: Date(),
             startedAt: startedAt,
