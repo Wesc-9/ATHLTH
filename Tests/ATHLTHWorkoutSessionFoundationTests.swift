@@ -832,4 +832,30 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.watchConnection === connection)
     }
 
+
+    func testUnifiedSlotRejectsWatchBeforeMirrorAndPendingPreflights() {
+        func available(
+            phone: Bool = false,
+            manual: Bool = false,
+            structured: Bool = false,
+            mirror: Bool = false,
+            watch: Bool = false
+        ) -> Bool {
+            ATHLTHWorkoutSessionFoundation.canStartNewRecorder(
+                phonePending: phone, manualActive: manual,
+                structuredActive: structured,
+                mirroredWatchActive: mirror,
+                unmirroredWatchActive: watch
+            )
+        }
+        XCTAssertTrue(available())
+        XCTAssertFalse(available(phone: true))
+        XCTAssertFalse(available(manual: true))
+        XCTAssertFalse(available(structured: true))
+        XCTAssertFalse(available(mirror: true))
+        XCTAssertFalse(available(watch: true))
+        XCTAssertFalse(available(mirror: true, watch: true))
+        XCTAssertFalse(available(manual: true, watch: true))
+    }
+
 }

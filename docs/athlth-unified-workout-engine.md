@@ -1,3 +1,9 @@
+## 2.2.6 – enhetlig opptaksplass også ved Watch-start uten speil
+
+- `ATHLTHWorkoutSessionFoundation.requireAvailableRecordingSlot` bruker nå én testbar regel for pending iPhone, manuell og strukturert tidtaker, aktive Watch-speil og Watch-opptak som er startet før speilet kommer. Det hindrer at et kildeopptak på Watch blir tolket som et ledig iPhone-opptak bare fordi overføringen er forsinket.
+- Dette er en kontroll av eksisterende opptakere, ikke en ekstra HealthKit-sesjon eller nytt lagret øktobjekt. Regresjonstester dekker samtidige kilder og oppstartsforsøk. Identitet og samtykke på iPad er uendret.
+- Full iPhone/iPad/Watch/HealthKit-reell verifikasjon og samkjørt CI kreves fortsatt.
+
 ## 2.2.6 – én aktivitetssikker Audio Coach-policy også direkte på Watch
 
 - Watch sin eksisterende `evaluateCustomAudioCoachRules` tar nå generiske tid-, puls- og gyldige distanseregler gjennom samme `ATHLTHAudioCoachSportPolicy` som iPhone sitt speil. Sykling og roing kan få målt distanse; HIIT, yoga, meditasjon og andre tidsstyrte økter kan få tid og faktisk målt puls uten å få løpspace/rute/PR.

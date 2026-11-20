@@ -277,6 +277,20 @@ enum ATHLTHWorkoutSessionFoundation {
         )
     }
 
+    /// A Watch launch without a mirror already occupies the shared slot.
+    /// Make the rule pure so interrupted cross-device starts can be tested
+    /// without opening HealthKit or signing into a second device.
+    static func canStartNewRecorder(
+        phonePending: Bool,
+        manualActive: Bool,
+        structuredActive: Bool,
+        mirroredWatchActive: Bool,
+        unmirroredWatchActive: Bool
+    ) -> Bool {
+        !phonePending && !manualActive && !structuredActive &&
+            !mirroredWatchActive && !unmirroredWatchActive
+    }
+
     /// All activity-specific launch paths can call this before allocating a
     /// recording. A recovered workout is a live workout, not a free slot.
     @MainActor
@@ -284,11 +298,15 @@ enum ATHLTHWorkoutSessionFoundation {
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore
     ) throws {
-        guard !phone.hasPendingLaunch,
-              !ATHLTHManualTimedCapture.hasActiveCapture,
-              !ATHLTHStructuredCaptureAdmission.hasActiveCapture,
-              !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
-        else {
+        guard canStartNewRecorder(
+            phonePending: phone.hasPendingLaunch,
+            manualActive: ATHLTHManualTimedCapture.hasActiveCapture,
+            structuredActive: ATHLTHStructuredCaptureAdmission.hasActiveCapture,
+            mirroredWatchActive: ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive ||
+                ATHLTHWorkoutRecordingArbiter.mirror?.hasActiveMirroredWorkout == true,
+            unmirroredWatchActive:
+                ATHLTHWorkoutRecordingArbiter.unmirroredWatchRecordingActive
+        ) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         try requireNoActiveRecording(currentSession(phone: phone, strength: strength))
