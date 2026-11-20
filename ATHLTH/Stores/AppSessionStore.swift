@@ -75,6 +75,9 @@ struct AccountTrainingContent: Codable {
 @MainActor
 final class AppSessionStore: ObservableObject {
     @Published var profile: UserProfile
+    /// Never report a failed training save as a successful data change.
+    /// Keep the in-memory edits visible so the athlete can retry.
+    @Published private(set) var trainingStorageError: String?
     @Published var activePlan: TrainingPlan? {
         didSet {
             persistActivePlan()
@@ -5795,21 +5798,32 @@ final class AppSessionStore: ObservableObject {
             }
     }
 
+    @discardableResult
     private func writeAccountContent(
         _ content: AccountTrainingContent,
         userID: UUID
-    ) {
+    ) -> Bool {
         let signpost = ATHLTHPerformance.begin("TrainingLocalWrite")
         defer { ATHLTHPerformance.end("TrainingLocalWrite", id: signpost) }
-        AccountLocalStorage.write(
-            content,
-            name: "training",
-            userID: userID,
-            defaults: defaults
-        )
-        ATHLTHTrainingDataChangeSignal.post(
-            userID: userID
-        )
+        do {
+            try ATHLTHAccountTrainingCommit.save(
+                content, userID: userID, defaults: defaults
+            ) {
+                ATHLTHTrainingDataChangeSignal.post(userID: userID)
+            }
+            trainingStorageError = nil
+            return true
+        } catch {
+            // A missing save must not notify the cloud, reset the editor,
+            // or be presented to the athlete as a successful checkpoint.
+            // Keep the in-memory snapshot available for a manual retry.
+            ATHLTHPerformance.event("TrainingLocalWriteFailed")
+            trainingStorageError = ATHLTHLocalization.choose(
+                english: "Training changes could not be saved on this device. Your edits remain open. Please retry before leaving the app.",
+                norwegian: "Treningsendringene ble ikke lagret på enheten. Endringene er fortsatt åpne. Prøv igjen før du lukker appen."
+            )
+            return false
+        }
     }
 
     func reloadTrainingContent() {
@@ -5820,6 +5834,10 @@ final class AppSessionStore: ObservableObject {
 
     func checkpointTrainingContent() {
         persistAccountContent(immediate: true)
+    }
+
+    func dismissTrainingStorageError() {
+        trainingStorageError = nil
     }
 
     private func activateLocalAccount(_ userID: UUID) {

@@ -228,6 +228,42 @@ private struct ATHLTHSceneRootView: View {
                 )
                 .preferredColorScheme(.light)
                 .tint(ATHLTHPlanDesign.accentInk)
+                // A failed account-training serialization must never look
+                // like a saved edit. Offer an explicit local retry while
+                // retaining the current editor and in-memory state.
+                .alert(
+                    ATHLTHLocalization.choose(
+                        english: "Training changes not saved",
+                        norwegian: "Treningsendringene er ikke lagret"
+                    ),
+                    isPresented: Binding(
+                        get: {
+                            appSession.signedIn &&
+                            !appSession.previewModeEnabled &&
+                            appSession.trainingStorageError != nil
+                        },
+                        set: { shown in
+                            if !shown {
+                                appSession.dismissTrainingStorageError()
+                            }
+                        }
+                    )
+                ) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Retry save",
+                        norwegian: "Prøv å lagre igjen"
+                    )) {
+                        appSession.checkpointTrainingContent()
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Keep editing",
+                        norwegian: "Fortsett å redigere"
+                    ), role: .cancel) {
+                        appSession.dismissTrainingStorageError()
+                    }
+                } message: {
+                    Text(appSession.trainingStorageError ?? "")
+                }
             }
         }
         .onAppear {
@@ -367,6 +403,10 @@ private struct ATHLTHSceneRootView: View {
         .task(id: "\(appSession.profile.userID)-\(appSession.signedIn)-\(scenePhase == .active)") {
             guard appSession.signedIn, scenePhase == .active else { return }
             while !Task.isCancelled {
+                // One foreground cadence owns all low-priority account
+                // reconciliation. Goal edits still schedule an immediate
+                // debounced sync from their existing change observers.
+                goalAccountSync.scheduleSync(session: appSession, goals: goals)
                 studioPlanSync.scheduleSync(session: appSession)
                 audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
                 strengthAccountSync.scheduleSync(

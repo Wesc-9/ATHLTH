@@ -19,14 +19,46 @@ enum AccountLocalStorage {
         return try? JSONDecoder().decode(type, from: data)
     }
 
+    // Legacy best-effort writes remain source-compatible. Critical
+    // training updates must instead use writeChecked + a success receipt.
     static func write<T: Encodable>(_ value: T, name: String, userID: UUID, defaults: UserDefaults = .standard) {
         try? writeChecked(value, name: name, userID: userID, defaults: defaults)
     }
 
-    /// Critical transitions must handle encoding failure instead of discarding it.
-    static func writeChecked<T: Encodable>(_ value: T, name: String, userID: UUID, defaults: UserDefaults = .standard) throws {
+    enum StorageError: Error {
+        case readBackMismatch
+    }
+
+    /// A checked write never claims success when serialization fails or
+    /// the new bytes cannot be read back immediately. UserDefaults does not
+    /// offer a disk-fsync guarantee; workout finish journals remain separate.
+    static func writeChecked<T: Encodable>(
+        _ value: T, name: String, userID: UUID,
+        defaults: UserDefaults = .standard
+    ) throws {
         let data = try JSONEncoder().encode(value)
-        defaults.set(data, forKey: key(name, userID: userID))
+        let storageKey = key(name, userID: userID)
+        defaults.set(data, forKey: storageKey)
+        guard defaults.data(forKey: storageKey) == data else {
+            throw StorageError.readBackMismatch
+        }
+    }
+}
+
+/// Only announce a training-data update once its account-scoped
+/// serialized snapshot was actually accepted by local storage.
+/// Failed writes do not clobber the last good value or tell cloud
+/// coordinators that a new durable revision exists.
+enum ATHLTHAccountTrainingCommit {
+    static func save<Value: Encodable>(
+        _ value: Value, userID: UUID,
+        defaults: UserDefaults = .standard,
+        onCommitted: () -> Void
+    ) throws {
+        try AccountLocalStorage.writeChecked(
+            value, name: "training", userID: userID, defaults: defaults
+        )
+        onCommitted()
     }
 }
 

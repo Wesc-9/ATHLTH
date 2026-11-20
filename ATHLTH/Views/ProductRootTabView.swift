@@ -385,18 +385,9 @@ struct ProductRootTabView: View {
 
     private var tabsWithNotifications: some View {
         tabsWithNotificationSheets
-        // Keep another already-open device up to date without requiring the
-        // user to background or reopen the app. No polling in the background.
-        .task(id: "\(session.profile.userID.uuidString)|\(session.signedIn)|\(String(describing: scenePhase))") {
-            guard session.signedIn, scenePhase == .active else { return }
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(20)) }
-                catch { return }
-                guard !Task.isCancelled, scenePhase == .active,
-                      session.signedIn else { return }
-                await goalAccountSync.sync(session: session, goals: goalStore)
-            }
-        }
+        // Goal sync shares the scene's foreground cadence rather than
+        // running a second, independent 20-second polling loop. Goal edits
+        // still use their existing event-driven, debounced scheduleSync.
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .athlthRemoteNotificationTapped
