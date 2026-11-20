@@ -200,6 +200,40 @@ enum ATHLTHManualSpectatorSnapshot {
     }
 }
 
+/// Session identity and account authorization for the existing private
+/// Watch-to-iPad spectator. It is read-only; it never starts a workout.
+enum ATHLTHWatchSpectatorSessionPolicy {
+    static func canRelay(
+        _ snapshot: WatchWorkoutLiveSnapshot,
+        to accountID: UUID?
+    ) -> Bool {
+        guard let accountID,
+              let sourceOwner = snapshot.accountOwnerID else {
+            return false
+        }
+        return sourceOwner == accountID
+    }
+
+    static func hasContradictoryIdentity(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) -> Bool {
+        snapshot.kind == .strength &&
+            snapshot.universalWorkoutID != nil &&
+            snapshot.strengthWorkoutID != nil &&
+            snapshot.universalWorkoutID != snapshot.strengthWorkoutID
+    }
+
+    static func verifiedID(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) -> UUID? {
+        guard !hasContradictoryIdentity(snapshot) else { return nil }
+        if snapshot.kind == .strength {
+            return snapshot.strengthWorkoutID ?? snapshot.universalWorkoutID
+        }
+        return snapshot.universalWorkoutID
+    }
+}
+
 /// Polling deliberately shares only a compact spectator state; no second
 /// HKWorkoutSession, no mirrored GPS track, no public/social presence.
 /// Server-side RLS additionally enforces user_id = auth.uid().
@@ -687,9 +721,15 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             return ATHLTHManualSpectatorSnapshot.make(manual)
         }
         if let watch = mirroredWatch.snapshot,
-           watch.state == .preparing ||
-           watch.state == .running ||
-           watch.state == .paused {
+           (watch.state == .preparing ||
+            watch.state == .running ||
+            watch.state == .paused),
+           ATHLTHWatchSpectatorSessionPolicy.canRelay(
+               watch, to: trackingAccountID
+           ),
+           !ATHLTHWatchSpectatorSessionPolicy.hasContradictoryIdentity(
+               watch
+           ) {
             // Watch remains the only HealthKit sensor/recording source. The
             // iPhone only relays a private summary to the signed-in iPad.
             let startedAt = watch.startedAt ??
@@ -698,14 +738,24 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             // different inferred start every poll. That is not a new
             // workout; rotating the ID would accidentally revoke this
             // session's one-time iPad approval.
+            let verifiedWatchID =
+                ATHLTHWatchSpectatorSessionPolicy.verifiedID(watch)
             let isNewWatchSession: Bool = {
+                // For current Watch sessions, the original UUID replaces
+                // ephemeral timestamp correlation. A reconnect must retain
+                // the same spectator identity and one-time consent.
+                if let verifiedWatchID {
+                    return mirroredSessionID != verifiedWatchID
+                }
                 guard let previous = mirroredStartedAt else { return true }
                 if watch.startedAt != nil { return previous != startedAt }
                 return abs(previous.timeIntervalSince(startedAt)) > 5
             }()
             if isNewWatchSession || mirroredSessionID == nil {
                 mirroredStartedAt = startedAt
-                mirroredSessionID = UUID()
+                // Older Watch versions have no stable workout UUID.
+                // Preserve their existing ephemeral, source-local ID.
+                mirroredSessionID = verifiedWatchID ?? UUID()
             }
             guard let sessionID = mirroredSessionID else { return nil }
             // Split the large snapshot into typed assignments: a single

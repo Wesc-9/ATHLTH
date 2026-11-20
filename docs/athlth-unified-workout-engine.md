@@ -1,3 +1,9 @@
+## 2.2.6 – identitetsbevarende, privat Watch-til-iPad-relé
+
+iPhone-reléet til den eksisterende iPad-livespektatoren bruker nå den opprinnelige bekreftede Watch-økts-ID-en, ikke en ny tilfeldig iPhone-generert ID. Dette beholder samme visnings-/samtykkekontekst etter gjenoppkobling. Eldre Watch-økter uten ID får fremdeles en lokalt midlertidig identitet uten at det endrer HealthKit eller historikk.
+
+Watch-livesnapshotet inkluderer valgfritt konto-ID-en som ble fanget ved faktisk HKWorkoutSession-start. iPad-reléet krever dokumentert samme konto før private Watch-målinger deles; gamle snapshots uten eieridentitet kan ikke autorisere deling. Motstridende Watch/strength-ID-er avvises. Tester dekker eier, avbrudd, pause og identitetskonflikt. Fysiske samtykke-/frakoblingstester og samme-commit CI gjenstår.
+
 ## 2.2.6 – Watch-resultat og livespeil for samme opprinnelige opptak
 
 - Livepakker med en bekreftet universell Watch-ID kan nå ikke lenger erstattes av forsinkede pakker som mangler ID eller tilhører en annen Watch-økt. Dette gjelder alle native aktivitetskategorier, ikke bare styrke.

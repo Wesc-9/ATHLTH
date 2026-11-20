@@ -9031,6 +9031,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         snapshot.strengthWorkoutID =
             kind == .strength ? strengthSession?.workoutID : nil
         snapshot.universalWorkoutID = universalWorkoutID
+        snapshot.accountOwnerID = workoutOwnerID
 
         if let progress = runningStepProgress, let structure = structuredRunningWorkout {
             snapshot.runningOverallProgress = ATHLTHRunningStepEngine.overallProgress(

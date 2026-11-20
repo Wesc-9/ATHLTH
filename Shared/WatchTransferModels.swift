@@ -1910,6 +1910,9 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     /// Originates on Watch once per actual HKWorkoutSession and survives
     /// recovery. Nil on old Watch builds; iPhone must never invent it.
     var universalWorkoutID: UUID? = nil
+    /// Exact owner captured when the Watch HealthKit workout began. Missing
+    /// on older paired builds; cannot authorize private iPad telemetry.
+    var accountOwnerID: UUID? = nil
     /// Stable ATHLTH session identity for Watch-strength mirror updates.
     /// Optional for older paired Watch apps; no new HealthKit session.
     var strengthWorkoutID: UUID? = nil

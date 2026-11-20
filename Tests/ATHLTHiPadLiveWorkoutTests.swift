@@ -316,4 +316,66 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
     }
 
 
+    func testWatchSpectatorKeepsOneSessionIDAfterReconnect() throws {
+        let owner = UUID()
+        let workoutID = UUID()
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        var mirror = WatchWorkoutLiveSnapshot(
+            kind: .cycling, state: .running,
+            startedAt: start, capturedAt: start.addingTimeInterval(60),
+            elapsedTime: 45, heartRate: 120,
+            activeCalories: 30, distanceMeters: 100,
+            averageHeartRate: nil, maxHeartRate: nil,
+            routePointCount: 0
+        )
+        mirror.accountOwnerID = owner
+        mirror.universalWorkoutID = workoutID
+        XCTAssertTrue(ATHLTHWatchSpectatorSessionPolicy.canRelay(
+            mirror, to: owner
+        ))
+        XCTAssertEqual(
+            ATHLTHWatchSpectatorSessionPolicy.verifiedID(mirror), workoutID
+        )
+        mirror.state = .paused
+        mirror.capturedAt = start.addingTimeInterval(120)
+        XCTAssertEqual(
+            ATHLTHWatchSpectatorSessionPolicy.verifiedID(mirror), workoutID
+        )
+        XCTAssertFalse(ATHLTHWatchSpectatorSessionPolicy.canRelay(
+            mirror, to: UUID()
+        ))
+        XCTAssertFalse(ATHLTHWatchSpectatorSessionPolicy.canRelay(
+            mirror, to: nil
+        ))
+        mirror.accountOwnerID = nil
+        XCTAssertFalse(ATHLTHWatchSpectatorSessionPolicy.canRelay(
+            mirror, to: owner
+        ))
+    }
+
+    func testWatchSpectatorRejectsConflictingStrengthIDs() {
+        var mirror = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running,
+            startedAt: Date(), capturedAt: Date(),
+            elapsedTime: 10, heartRate: 100, activeCalories: 5,
+            distanceMeters: 0, averageHeartRate: nil,
+            maxHeartRate: nil, routePointCount: 0
+        )
+        mirror.strengthWorkoutID = UUID()
+        mirror.universalWorkoutID = UUID()
+        XCTAssertTrue(
+            ATHLTHWatchSpectatorSessionPolicy.hasContradictoryIdentity(mirror)
+        )
+        XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.verifiedID(mirror))
+        mirror.universalWorkoutID = mirror.strengthWorkoutID
+        XCTAssertFalse(
+            ATHLTHWatchSpectatorSessionPolicy.hasContradictoryIdentity(mirror)
+        )
+        XCTAssertEqual(
+            ATHLTHWatchSpectatorSessionPolicy.verifiedID(mirror),
+            mirror.strengthWorkoutID
+        )
+    }
+
+
 }
