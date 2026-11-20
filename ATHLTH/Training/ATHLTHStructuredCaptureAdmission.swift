@@ -63,6 +63,33 @@ enum ATHLTHStructuredCaptureAdmission {
         activeWorkoutID = candidate
     }
 
+    /// Recover only the canonical checkpoint for the current account.
+    /// An admission slot without a persisted checkpoint cannot be rendered
+    /// as an active recording; an unreadable checkpoint remains protected.
+    static func activeCheckpoint(
+        for userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> ATHLTHStructuredWorkoutCheckpoint? {
+        guard owner == userID, !unresolvedCheckpoint,
+              let workoutID = activeWorkoutID else { return nil }
+        let key = AccountLocalStorage.key(
+            "structuredWorkoutInProgress.v1.\(workoutID.uuidString)",
+            userID: userID
+        )
+        guard let data = defaults.data(forKey: key),
+              let checkpoint = try? JSONDecoder().decode(
+                ATHLTHStructuredWorkoutCheckpoint.self, from: data
+              ),
+              checkpoint.workoutID == workoutID,
+              checkpoint.startedAt.timeIntervalSince1970.isFinite,
+              checkpoint.savedAt.timeIntervalSince1970.isFinite,
+              checkpoint.executionBlocks.indices.contains(checkpoint.currentIndex),
+              checkpoint.savedAt > Date().addingTimeInterval(-7 * 86_400),
+              checkpoint.savedAt <= Date().addingTimeInterval(3600)
+        else { return nil }
+        return checkpoint
+    }
+
     static func admit(workoutID: UUID, userID: UUID) throws {
         if owner == userID && activeWorkoutID == workoutID &&
            !unresolvedCheckpoint { return }
