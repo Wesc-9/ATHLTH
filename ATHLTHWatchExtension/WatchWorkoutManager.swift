@@ -690,6 +690,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// Use the same HKWorkoutSession for a running interval added from the
     /// iPhone. Existing route, pulse, distance, completed steps and elapsed
     /// time are preserved. No second workout is started on Apple Watch.
+    /// Queue intervals on the SAME live Watch HealthKit recording.
+    /// When the runner is currently free, an OPEN phase preserves every
+    /// original minute and meter until an explicit Next/Start interval tap.
     private func appendRunningPart(
         _ addition: WatchRunningWorkoutTransfer,
         startNow: Bool,
@@ -710,26 +713,52 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let hasActivePart =
             structuredRunningWorkout != nil && !structuredWorkoutComplete
+        var upcoming = addition
+        if !hasActivePart && !startNow {
+            upcoming.steps =
+                ATHLTHRunningWorkoutAppendPolicy.stepsAfterExistingFreeRun(
+                    upcoming.steps
+                )
+        }
         guard ATHLTHRunningWorkoutAppendPolicy.canAppend(
             hasInProgressStructuredSteps: hasActivePart,
             startNow: startNow,
-            steps: addition.steps
+            steps: upcoming.steps
         ) else { return }
 
-        let firstNewIndex = structuredRunningWorkout?.steps.count ?? 0
-        if var existing = structuredRunningWorkout {
-            existing.steps.append(contentsOf: addition.steps)
+        let priorSteps = structuredRunningWorkout?.steps ?? []
+        if !hasActivePart && !startNow {
+            // A previously completed interval program remains in recorded
+            // evidence. Add a new free portion instead of restarting it.
+            let freeStep =
+                ATHLTHRunningWorkoutAppendPolicy.freeRunningStage()
+            upcoming.steps = priorSteps + [freeStep] + upcoming.steps
+            upcoming.sourceWorkoutID = nil
+            if priorSteps.isEmpty {
+                // The full free portion begins with this HealthKit recording.
+                structuredStepStartElapsedTime = 0
+                structuredStepStartDistanceMeters = 0
+            } else {
+                // This free portion starts after an older structured program.
+                structuredStepStartElapsedTime = elapsedTime
+                structuredStepStartDistanceMeters = distanceMeters
+            }
+            publish {
+                self.structuredRunningWorkout = upcoming
+                self.structuredStepIndex = priorSteps.count
+                self.awaitingMainStart = false
+            }
+        } else if var existing = structuredRunningWorkout {
+            existing.steps.append(contentsOf: upcoming.steps)
             existing.sourceWorkoutID = nil
             publish { self.structuredRunningWorkout = existing }
         } else {
-            publish { self.structuredRunningWorkout = addition }
-        }
-
-        if !hasActivePart {
+            publish { self.structuredRunningWorkout = upcoming }
             structuredStepStartElapsedTime = elapsedTime
             structuredStepStartDistanceMeters = distanceMeters
-            publish { self.structuredStepIndex = firstNewIndex }
+            publish { self.structuredStepIndex = 0 }
         }
+
         structuredWorkoutComplete = false
         targetViolationStartedAt = nil
         lastTargetAlertAt = nil
@@ -742,7 +771,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             appliedRunningAppendCommands.insert(commandID)
         }
         persistWorkoutRecoveryState()
-        if !hasActivePart {
+        if !hasActivePart && startNow {
             announceCurrentStructuredStep(prefix: "Starting")
         }
         Task { @MainActor [weak self] in

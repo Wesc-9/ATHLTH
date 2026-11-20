@@ -178,10 +178,10 @@ struct ActiveHybridWorkoutPicker: View {
         } else {
             unsupportedMessage = ATHLTHLocalization.choose(
                 english: runningOnly
-                    ? "This interval could not be added right now. If another interval is running, choose Queue. If no interval is running, choose Start this part. Strength additions require the hybrid strength session."
+                    ? "These intervals could not be queued. Check that your run is still active and the selected program contains valid intervals. No second recording will start."
                     : "This workout has no supported exercises or time-based running phases. Distance-only GPS workouts need a separate outdoor recording.",
                 norwegian: runningOnly
-                    ? "Intervalløkten kunne ikke legges til nå. Hvis et intervall pågår, velg Legg til senere. Ellers velger du Start denne delen. Styrkedeler må legges til fra hybrid styrkeøkt."
+                    ? "Intervallene kunne ikke legges i kø. Kontroller at løpeøkten fortsatt er aktiv, og at intervallene er gyldige. Det startes ikke et nytt opptak."
                     : "Økten har ingen støttede øvelser eller tidsstyrte løpefaser. Distansebasert GPS-løping må fortsatt registreres separat."
             )
         }

@@ -23,11 +23,11 @@ final class ATHLTHRunningWorkoutAppendPolicyTests: XCTestCase {
             startNow: true,
             steps: [step()]
         ))
-        XCTAssertFalse(ATHLTHRunningWorkoutAppendPolicy.canAppend(
+        XCTAssertTrue(ATHLTHRunningWorkoutAppendPolicy.canAppend(
             hasInProgressStructuredSteps: false,
             startNow: false,
             steps: [step()]
-        ))
+        ), "Selecting intervals while free running queues them for manual Next")
     }
 
     func testActiveIntervalsMayBeQueuedButNotOverwritten() {
@@ -73,4 +73,62 @@ final class ATHLTHRunningWorkoutAppendPolicyTests: XCTestCase {
             steps: (0..<151).map { _ in step() }
         ))
     }
+    func testExistingFreeRunningDropsDuplicateWarmupAndWaitsForManualAdvance() {
+        let warmup = WatchRunningWorkoutStep(
+            id: UUID(), title: "10 minute warmup", measure: .time,
+            distanceMeters: nil, durationSeconds: 600,
+            intensityText: nil, phase: "warmup"
+        )
+        let interval = WatchRunningWorkoutStep(
+            id: UUID(), title: "4 minute interval", measure: .time,
+            distanceMeters: nil, durationSeconds: 240,
+            intensityText: nil, phase: "interval"
+        )
+        let recovery = WatchRunningWorkoutStep(
+            id: UUID(), title: "2 minute recovery", measure: .time,
+            distanceMeters: nil, durationSeconds: 120,
+            intensityText: nil, phase: "recovery"
+        )
+        let prepared = ATHLTHRunningWorkoutAppendPolicy
+            .stepsAfterExistingFreeRun([warmup, interval, recovery])
+        XCTAssertEqual(prepared.map(\.phase), ["interval", "recovery"])
+        XCTAssertTrue(ATHLTHRunningWorkoutAppendPolicy.canAppend(
+            hasInProgressStructuredSteps: false,
+            startNow: false,
+            steps: prepared
+        ))
+        let free = ATHLTHRunningWorkoutAppendPolicy.freeRunningStage()
+        XCTAssertEqual(free.measure, .open)
+        XCTAssertEqual(free.phase, "free")
+        XCTAssertFalse(ATHLTHRunningStepEngine.isCompleted(
+            step: free, elapsedTime: 3600, distanceMeters: 13000,
+            stepStartElapsedTime: 0, stepStartDistanceMeters: 0
+        ), "Free stage must never auto-start the queued interval")
+    }
+
+    func testQueueOnlyAllowedWhenProgramAlreadyInProgress() {
+        let interval = step()
+        XCTAssertTrue(ATHLTHRunningWorkoutAppendPolicy.canAppend(
+            hasInProgressStructuredSteps: true,
+            startNow: false,
+            steps: [interval]
+        ))
+        XCTAssertFalse(ATHLTHRunningWorkoutAppendPolicy.canAppend(
+            hasInProgressStructuredSteps: true,
+            startNow: true,
+            steps: [interval]
+        ))
+        XCTAssertEqual(
+            ATHLTHRunningWorkoutAppendPolicy
+                .stepsAfterExistingFreeRun([interval]).count,
+            1
+        )
+        XCTAssertTrue(
+            ATHLTHRunningWorkoutAppendPolicy
+                .stepsAfterExistingFreeRun([step(
+                    measure: .time, seconds: 600
+                )]).count == 1
+        )
+    }
+
 }

@@ -2705,14 +2705,18 @@ final class IPhoneWorkoutStore:
         _ template: RunningWorkoutTemplate,
         startNow: Bool
     ) -> Bool {
+        // Queuing intervals is safe during a deliberate pause, too.
+        // Only manual Next after resuming may start the new interval.
         guard var workout = active,
-              !workout.walking, !saving,
-              workout.resumedAt != nil else { return false }
+              !workout.walking, !saving else { return false }
 
         var addition = watchRunningWorkoutTransfer(from: template)
         // The user may already have warmed up during free running.
         // Keep the selected interval program but do not add a second warm-up.
-        let intervalSteps = Array(addition.steps.drop(while: { $0.phase == "warmup" }))
+        let intervalSteps =
+            ATHLTHRunningWorkoutAppendPolicy.stepsAfterExistingFreeRun(
+                addition.steps
+            )
         guard !intervalSteps.isEmpty,
               ATHLTHRunningWorkoutAppendPolicy.canAppend(
                 hasInProgressStructuredSteps: false,
@@ -2742,18 +2746,13 @@ final class IPhoneWorkoutStore:
                 // Synthetic open stage represents the actual running already
                 // completed, from its original first second and first meter.
                 // This is not an additional warm-up exercise.
-                let free = WatchRunningWorkoutStep(
-                    id: UUID(),
-                    title: ATHLTHLocalization.choose(
-                        english: "Free running", norwegian: "Fri løping"
-                    ),
-                    measure: .open,
-                    distanceMeters: nil,
-                    durationSeconds: nil,
-                    intensityText: nil,
-                    phase: "free"
+                addition.steps.insert(
+                    ATHLTHRunningWorkoutAppendPolicy.freeRunningStage(),
+                    at: 0
                 )
-                addition.steps.insert(free, at: 0)
+                // A manually attached program is not a fully completed
+                // unmodified copy of the original library template.
+                addition.sourceWorkoutID = nil
                 workout.structuredStepIndex = 0
                 workout.structuredStepStartElapsedTime = 0
                 workout.structuredStepStartDistanceMeters = 0

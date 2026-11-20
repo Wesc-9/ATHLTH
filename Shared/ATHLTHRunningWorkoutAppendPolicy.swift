@@ -1,9 +1,33 @@
 import Foundation
 
 /// Shared preflight guard before appending intervals to a live iPhone/Watch run.
-/// A new program may start only if the previous structured program is absent
-/// or complete. Queue is available only behind an unfinished program.
+/// When free running, both "start now" and "queue for manual start"
+/// are valid. An active structured block cannot be replaced, only queued.
 enum ATHLTHRunningWorkoutAppendPolicy {
+    /// Free running already counts toward total time and distance. Do not
+    /// insert the template's suggested warm-up as a second workout phase.
+    static func stepsAfterExistingFreeRun(
+        _ steps: [WatchRunningWorkoutStep]
+    ) -> [WatchRunningWorkoutStep] {
+        Array(steps.drop(while: { $0.phase == "warmup" }))
+    }
+
+    /// One explicit, unbounded free segment; only the original recorder
+    /// supplies elapsed seconds/meters. No new HealthKit session or timer.
+    static func freeRunningStage() -> WatchRunningWorkoutStep {
+        WatchRunningWorkoutStep(
+            id: UUID(),
+            title: ATHLTHLocalization.choose(
+                english: "Free running", norwegian: "Fri løping"
+            ),
+            measure: .open,
+            distanceMeters: nil,
+            durationSeconds: nil,
+            intensityText: nil,
+            phase: "free"
+        )
+    }
+
     static func canAppend(
         hasInProgressStructuredSteps: Bool,
         startNow: Bool,
@@ -26,8 +50,9 @@ enum ATHLTHRunningWorkoutAppendPolicy {
             }
         }) else { return false }
 
-        return startNow
-            ? !hasInProgressStructuredSteps
-            : hasInProgressStructuredSteps
+        // Free running has no active structured block: selecting intervals
+        // must be allowed to queue an OPEN phase until the user taps Next.
+        // An existing structured workout may only accept queued additions.
+        return !hasInProgressStructuredSteps || !startNow
     }
 }

@@ -1,3 +1,11 @@
+## 2.2.6 – korrigert «Legg til intervaller i samme økt» på iPhone og Watch
+
+- Feilen i aktiv løpeøkt kom fra `ATHLTHRunningWorkoutAppendPolicy.canAppend`: løpevelgeren sendte korrekt `startNow=false` (behold fri løping inntil «Start intervall»), men den felles regelen tillot bare kølegging når et annet strukturert intervall *allerede* pågikk. Nå kan en fri løpeøkt både motta en valgfri umiddelbar start og en **kølagt, manuelt startet intervalløkt**. En pågående strukturert blokk kan fortsatt bare legge senere trinn i kø.
+- iPhone beholder ett originalt opptak, med opprinnelig fri løpefase og uendret samlet tid/distanse; kølegging er også mulig mens økten er pauset. Forslagets allerede gjennomførte warmup droppes (ikke en ny oppvarming), og neste intervall starter kun når utøveren trykker «Start intervall». En ny økt-ID/HealthKit-workout opprettes ikke.
+- Watch-speilingen sender den samme køkommandoen med den originale opptaksidentiteten. Watch legger ved fri `.open`-fase før de nye intervallene og oppdaterer live-snapshot; `.open` kan aldri fullføres automatisk. Den originale frie tiden og distansen blir med i resultater. Avsluttede tidligere intervallfaser beholdes i samme Watch-økts evidens.
+- Dialogen som feilaktig ba løperen velge «Start denne delen» (en knapp som ikke fantes i denne visningen), er erstattet med en situasjonsbestemt feilmelding.
+- Rene XCTest dekker fri løping + kø, pågående intervaller + kø, automatisk oppvarmingsfiltrering, åpen fase uten auto-advance og ugyldige trinn. Samme-commit iPhone/Watch CI og fysisk treningstest gjenstår.
+
 ## 2.2.6 – én samlet pakke for øvrige Watch-sporter og trygge planstarter
 
 - Originale Today-kalenderøkter får en kortlivet, kontobundet **bekreftelse først etter ekte Watch HealthKit-start**. Gamle offline kalenderlister eller nye overføringer viser ikke økten på nytt med START etter at den samme planlagte økten ble startet. Andre økter, planer og brukerkontoer beholder sine knapper; kvitteringene (kun UUID og tidspunkt, ingen helseopplysninger) utløper etter åtte dager.
