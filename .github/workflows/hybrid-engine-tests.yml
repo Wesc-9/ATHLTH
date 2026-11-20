@@ -127,6 +127,7 @@ on:
       - ATHLTH/Watch/WorkoutMirroringStore.swift
       - ATHLTH/Watch/ATHLTHWorkoutMirrorStatePolicy.swift
       - Tests/ATHLTHWorkoutMirrorContinuityTests.swift
+      - Tests/ATHLTHWatchWorkoutOwnershipTests.swift
       - Tests/ATHLTHCompletedRunningPerformanceTests.swift
       - Tests/ATHLTHWorkoutLibraryPersonalizationTests.swift
       - Shared/WatchTransferModels.swift
@@ -313,6 +314,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHWorkoutContentSummaryTests \
             -only-testing:ATHLTHTests/StrengthWorkoutCompletionRecoveryTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutMirrorContinuityTests \
+            -only-testing:ATHLTHTests/ATHLTHWatchWorkoutOwnershipTests \
             -only-testing:ATHLTHTests/ATHLTHCompletedRunningPerformanceTests \
             -only-testing:ATHLTHTests/ATHLTHGuidanceStudioConfigurationTests \
             -only-testing:ATHLTHTests/ATHLTHAudioCoachRuleDeliveryTests \

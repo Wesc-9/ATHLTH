@@ -1,3 +1,7 @@
+## 2.2.6 – deduplicate the same recorded HealthKit session
+
+Watch completion relays may arrive twice after reconnection, sometimes with a different transfer receipt ID even though the saved HKWorkout UUID is identical. AppleWatchConnectionStore now compares the actual recorded HealthKit UUID, or the original ATHLTH universal ID when HealthKit UUID is missing. Handled source identities survive app restart in a separate backward-compatible local list, and recovered pending queues collapse repeated copies before they can create duplicate calendar, strength or workout history. Legacy results with no source identity still use the prior receipt-only guard. Receipts continue to be saved before queue dedup. Targeted XCTest now includes source-owner/offline-queue regressions. No secondary HealthKit writer or history migration.
+
 ## 2.2.6 – one shared recording slot including pre-mirror Watch activity
 
 The global recording arbiter now observes the original AppleWatchConnectionStore through a weak reference. An active Watch HealthKit workout or launch preflight occupies the same recording slot before iPhone mirroring appears. iPhone run/walk, strength, calendar and Quick Train retain the original launch reservation. The identity-matching Watch strength recovery exception remains. Tests cover the pre-mirror occupied slot. No new HealthKit writer or duplicated history.

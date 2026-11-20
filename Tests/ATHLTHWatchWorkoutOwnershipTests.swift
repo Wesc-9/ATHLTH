@@ -77,4 +77,68 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
     }
 
 
+    func testSameHealthKitWorkoutCannotBeQueuedWithNewReceipt() {
+        let recorded = completedResult()
+        var deliveredAgain = completedResult()
+        deliveredAgain.healthKitWorkoutUUID = recorded.healthKitWorkoutUUID
+        XCTAssertNotEqual(recorded.id, deliveredAgain.id)
+        XCTAssertTrue(ATHLTHWatchWorkoutResultIdentity.shouldEnqueue(
+            recorded, handledReceiptIDs: [],
+            handledOriginalIDs: [], pending: []
+        ))
+        XCTAssertFalse(ATHLTHWatchWorkoutResultIdentity.shouldEnqueue(
+            deliveredAgain, handledReceiptIDs: [],
+            handledOriginalIDs: [], pending: [recorded]
+        ))
+        XCTAssertFalse(ATHLTHWatchWorkoutResultIdentity.shouldEnqueue(
+            deliveredAgain, handledReceiptIDs: [recorded.id],
+            handledOriginalIDs: [recorded.healthKitWorkoutUUID!],
+            pending: []
+        ))
+    }
+
+    func testRecoveryCollapsesDuplicateOfflineWatchResultDelivery() {
+        let first = completedResult()
+        var replay = completedResult()
+        replay.healthKitWorkoutUUID = first.healthKitWorkoutUUID
+        let recovered = ATHLTHWatchWorkoutResultIdentity.restorePending(
+            [replay, first],
+            handledReceiptIDs: [], handledOriginalIDs: []
+        )
+        XCTAssertEqual(recovered.count, 1)
+        XCTAssertEqual(recovered.first?.healthKitWorkoutUUID,
+                       first.healthKitWorkoutUUID)
+        XCTAssertTrue(ATHLTHWatchWorkoutResultIdentity.restorePending(
+            [replay], handledReceiptIDs: [],
+            handledOriginalIDs: [first.healthKitWorkoutUUID!]
+        ).isEmpty)
+    }
+
+    func testLegacySourceFallbackAndTwoDistinctWorkoutsStayDistinct() {
+        var first = completedResult()
+        var second = completedResult()
+        first.healthKitWorkoutUUID = nil
+        second.healthKitWorkoutUUID = nil
+        let identity = UUID()
+        first.universalWorkoutID = identity
+        second.universalWorkoutID = identity
+        XCTAssertEqual(ATHLTHWatchWorkoutResultIdentity.originalID(first),
+                       identity)
+        XCTAssertFalse(ATHLTHWatchWorkoutResultIdentity.shouldEnqueue(
+            second, handledReceiptIDs: [], handledOriginalIDs: [],
+            pending: [first]
+        ))
+        second.universalWorkoutID = UUID()
+        XCTAssertTrue(ATHLTHWatchWorkoutResultIdentity.shouldEnqueue(
+            second, handledReceiptIDs: [], handledOriginalIDs: [],
+            pending: [first]
+        ))
+        second.universalWorkoutID = nil
+        first.universalWorkoutID = nil
+        XCTAssertTrue(ATHLTHWatchWorkoutResultIdentity.shouldEnqueue(
+            second, handledReceiptIDs: [], handledOriginalIDs: [],
+            pending: [first]
+        ), "Legacy unknown originals can use their distinct receipt IDs")
+    }
+
 }

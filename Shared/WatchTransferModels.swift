@@ -1841,6 +1841,50 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var universalWorkoutID: UUID? = nil
 }
 
+/// The same saved HKWorkout may be delivered with different transfer
+/// receipts after Watch reconnects. The original HealthKit UUID (or newer
+/// exact ATHLTH original ID) is the immutable deduplication key.
+enum ATHLTHWatchWorkoutResultIdentity {
+    static func originalID(_ result: WatchWorkoutResult) -> UUID? {
+        result.healthKitWorkoutUUID ?? result.universalWorkoutID
+    }
+
+    static func shouldEnqueue(
+        _ incoming: WatchWorkoutResult,
+        handledReceiptIDs: [UUID],
+        handledOriginalIDs: [UUID],
+        pending: [WatchWorkoutResult]
+    ) -> Bool {
+        guard !handledReceiptIDs.contains(incoming.id),
+              !pending.contains(where: { $0.id == incoming.id })
+        else { return false }
+        if let original = originalID(incoming) {
+            guard !handledOriginalIDs.contains(original),
+                  !pending.contains(where: { originalID($0) == original })
+            else { return false }
+        }
+        return true
+    }
+
+    /// Recovery accepts at most one queued receipt per original HKWorkout.
+    /// Receipts lacking any original identity use legacy receipt-ID fallback.
+    static func restorePending(
+        _ candidates: [WatchWorkoutResult],
+        handledReceiptIDs: [UUID],
+        handledOriginalIDs: [UUID]
+    ) -> [WatchWorkoutResult] {
+        var accepted: [WatchWorkoutResult] = []
+        for candidate in candidates.sorted(by: { $0.endedAt < $1.endedAt }) {
+            guard shouldEnqueue(
+                candidate, handledReceiptIDs: handledReceiptIDs,
+                handledOriginalIDs: handledOriginalIDs, pending: accepted
+            ) else { continue }
+            accepted.append(candidate)
+        }
+        return accepted
+    }
+}
+
 /// Minimal terminal proof, independent of the workout-history import queue.
 /// This stores no health measurements, route or exercise data.
 struct WatchRemoteLaunchCompletionReceipt: Codable, Hashable {

@@ -283,6 +283,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
     func setCurrentAccount(_ userID: UUID?) {
         currentATHLTHAccountID = userID
+        // Reattach the canonical account's Watch activity observer after
+        // temporary inspection/test stores have been deallocated.
+        ATHLTHWorkoutRecordingArbiter.watchConnection = self
     }
 
     // Diagnostics are intentionally separate from isReady. Apple's
@@ -301,10 +304,13 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     private var lastProbeID: String?
     private var handledWorkoutResultIDs:
         [UUID] = []
+    private var handledWorkoutOriginalIDs: [UUID] = []
     private var handledStrengthCommandIDs:
         [UUID] = []
     private static let handledWorkoutResultsKey =
         "athlth.watch.handledWorkoutResultIDs.v1"
+    private static let handledWorkoutOriginalsKey =
+        "athlth.watch.handledWorkoutOriginalIDs.v1"
     private static let handledStrengthCommandsKey =
         "athlth.watch.handledStrengthCommandIDs.v1"
     private static let pendingStrengthCommandsKey =
@@ -359,6 +365,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                     )
         }
 
+        if let stored = UserDefaults.standard.stringArray(
+            forKey: Self.handledWorkoutOriginalsKey
+        ) {
+            handledWorkoutOriginalIDs = stored.compactMap(UUID.init(uuidString:))
+        }
+
         if let stored =
                 UserDefaults.standard
                     .stringArray(
@@ -383,14 +395,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                     from: data
                 ) {
             pendingWorkoutResults =
-                pending
-                    .filter {
-                        !handledWorkoutResultIDs
-                            .contains($0.id)
-                    }
-                    .sorted {
-                        $0.endedAt < $1.endedAt
-                    }
+                ATHLTHWatchWorkoutResultIdentity.restorePending(
+                    pending,
+                    handledReceiptIDs: handledWorkoutResultIDs,
+                    handledOriginalIDs: handledWorkoutOriginalIDs
+                )
             lastCompletedWorkout =
                 pendingWorkoutResults.first
         }
@@ -1283,10 +1292,17 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     func consumeCompletedWorkout(
         _ id: UUID
     ) {
-        pendingWorkoutResults
-            .removeAll {
-                $0.id == id
-            }
+        let originals = pendingWorkoutResults
+            .filter { $0.id == id }
+            .compactMap(ATHLTHWatchWorkoutResultIdentity.originalID)
+        pendingWorkoutResults.removeAll { $0.id == id }
+        for original in originals where !handledWorkoutOriginalIDs.contains(original) {
+            handledWorkoutOriginalIDs.append(original)
+        }
+        if handledWorkoutOriginalIDs.count > 256 {
+            handledWorkoutOriginalIDs =
+                Array(handledWorkoutOriginalIDs.suffix(192))
+        }
 
         if !handledWorkoutResultIDs
             .contains(id) {
@@ -1313,6 +1329,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 .map(\.uuidString),
             forKey:
                 Self.handledWorkoutResultsKey
+        )
+
+        UserDefaults.standard.set(
+            handledWorkoutOriginalIDs.map(\.uuidString),
+            forKey: Self.handledWorkoutOriginalsKey
         )
 
         if let data =
@@ -1712,17 +1733,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         // Watch sends a fast message AND a durable transfer for the same
         // completion. De-duplicate before touching pet participation, current
         // workout state or Live Activity, not only before queue insertion.
-        guard !handledWorkoutResultIDs
-                .contains(result.id),
-              !pendingWorkoutResults
-                .contains(
-                    where: {
-                        $0.id == result.id
-                    }
-                )
-        else {
-            return
-        }
+        guard ATHLTHWatchWorkoutResultIdentity.shouldEnqueue(
+            result,
+            handledReceiptIDs: handledWorkoutResultIDs,
+            handledOriginalIDs: handledWorkoutOriginalIDs,
+            pending: pendingWorkoutResults
+        ) else { return }
 
         // Watch workout activity is a device-level lock, not an account's
         // training history. Release the completed session even after an
