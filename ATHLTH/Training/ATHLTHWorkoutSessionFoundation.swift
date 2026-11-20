@@ -77,6 +77,7 @@ enum ATHLTHWorkoutRecordingArbiter {
 
     static func reserveLaunch() throws -> UUID {
         guard pendingLaunchID == nil,
+              !ATHLTHManualTimedCapture.hasActiveCapture,
               ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
                   running: phone?.activeSessionState,
                   runningAuthorizationPending: phone?.hasPendingLaunch == true,
@@ -97,12 +98,14 @@ enum ATHLTHWorkoutRecordingArbiter {
     }
 
     static func mayStartRunning() -> Bool {
-        strength?.activeSessionState == nil &&
+        !ATHLTHManualTimedCapture.hasActiveCapture &&
+            strength?.activeSessionState == nil &&
             (!mirroredRecordingActive || pendingLaunchID != nil)
     }
 
     static func mayStartStrength() -> Bool {
-        phone?.activeSessionState == nil &&
+        !ATHLTHManualTimedCapture.hasActiveCapture &&
+            phone?.activeSessionState == nil &&
             phone?.hasPendingLaunch != true &&
             (!mirroredRecordingActive || pendingLaunchID != nil)
     }
@@ -114,6 +117,7 @@ enum ATHLTHWorkoutRecordingArbiter {
         snapshot: WatchStrengthSessionSnapshot? = nil
     ) -> Bool {
         pendingLaunchID == nil &&
+            !ATHLTHManualTimedCapture.hasActiveCapture &&
             ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
                 running: phone?.activeSessionState,
                 runningAuthorizationPending: phone?.hasPendingLaunch == true,
@@ -240,7 +244,12 @@ enum ATHLTHWorkoutSessionFoundation {
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore
     ) throws -> ATHLTHWorkoutSessionState? {
-        try uniqueActiveSession(
+        // A manual timer is not a running or strength recording projection.
+        // Never misreport an available HealthKit slot while one is active.
+        guard !ATHLTHManualTimedCapture.hasActiveCapture else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
+        return try uniqueActiveSession(
             running: phone.activeSessionState,
             strength: strength.activeSessionState
         )
@@ -254,6 +263,7 @@ enum ATHLTHWorkoutSessionFoundation {
         strength: StrengthWorkoutStore
     ) throws {
         guard !phone.hasPendingLaunch,
+              !ATHLTHManualTimedCapture.hasActiveCapture,
               !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
         else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording

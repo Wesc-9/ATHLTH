@@ -133,6 +133,32 @@ final class CustomQuickWorkoutJournalTests: XCTestCase {
         XCTAssertEqual(roundTrip.title, "Fri trening")
     }
 
+    func testCheckedManualJournalIsIdempotentAndAccountScoped() throws {
+        let suite = "ATHLTHManualJournal.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let owner = UUID(), stranger = UUID()
+        let id = UUID()
+        let record = try XCTUnwrap(CustomQuickWorkoutRecord.make(
+            configuration: setup, recordedAt: .now,
+            durationSeconds: 600, distanceKilometers: nil,
+            perceivedEffort: nil, notes: nil,
+            evidence: .phoneTimer, id: id
+        ))
+        XCTAssertTrue(CustomQuickWorkoutJournal.save(
+            record, userID: owner, defaults: defaults
+        ))
+        XCTAssertTrue(CustomQuickWorkoutJournal.save(
+            record, userID: owner, defaults: defaults
+        ))
+        XCTAssertEqual(CustomQuickWorkoutJournal.load(
+            userID: owner, defaults: defaults
+        ).filter { $0.id == id }.count, 1)
+        XCTAssertTrue(CustomQuickWorkoutJournal.load(
+            userID: stranger, defaults: defaults
+        ).isEmpty)
+    }
+
     func testCustomOtherActivityRetainsItsOwnName() {
         let custom = CustomQuickWorkoutConfiguration(
             activity: .other, method: .open,

@@ -86,14 +86,15 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
         distanceKilometers: Double?,
         perceivedEffort: Int?,
         notes: String?,
-        evidence: CustomQuickWorkoutEvidence
+        evidence: CustomQuickWorkoutEvidence,
+        id: UUID = UUID()
     ) -> CustomQuickWorkoutRecord? {
         guard validDuration(durationSeconds),
               validDistance(distanceKilometers, durationSeconds: durationSeconds, activity: configuration.activity),
               perceivedEffort.map({ (1...10).contains($0) }) ?? true
         else { return nil }
         return CustomQuickWorkoutRecord(
-            id: UUID(),
+            id: id,
             activity: configuration.activity,
             method: configuration.method,
             recordedAt: recordedAt,
@@ -110,20 +111,39 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
 enum CustomQuickWorkoutJournal {
     private static let key = "customQuickManualWorkoutHistory"
 
-    static func load(userID: UUID) -> [CustomQuickWorkoutRecord] {
+    static func load(
+        userID: UUID, defaults: UserDefaults = .standard
+    ) -> [CustomQuickWorkoutRecord] {
         AccountLocalStorage.read(
-            [CustomQuickWorkoutRecord].self, name: key, userID: userID
+            [CustomQuickWorkoutRecord].self, name: key,
+            userID: userID, defaults: defaults
         ) ?? []
     }
 
-    static func save(_ record: CustomQuickWorkoutRecord, userID: UUID) {
-        var entries = load(userID: userID)
-        guard !entries.contains(where: { $0.id == record.id }) else { return }
+    /// Exactly one history receipt for a stable timer ID, including a retry
+    /// after an interrupted finish. No notification on a failed write.
+    /// UserDefaults readback is not a substitute for physical crash testing.
+    @discardableResult
+    static func save(
+        _ record: CustomQuickWorkoutRecord,
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        var entries = load(userID: userID, defaults: defaults)
+        if entries.contains(where: { $0.id == record.id }) { return true }
         entries.insert(record, at: 0)
         entries.sort { $0.recordedAt > $1.recordedAt }
-        AccountLocalStorage.write(
-            Array(entries.prefix(300)), name: key, userID: userID
-        )
-        ATHLTHTrainingDataChangeSignal.post(userID: userID)
+        do {
+            try AccountLocalStorage.writeChecked(
+                Array(entries.prefix(300)), name: key,
+                userID: userID, defaults: defaults
+            )
+            guard load(userID: userID, defaults: defaults)
+                .contains(where: { $0 == record }) else { return false }
+            ATHLTHTrainingDataChangeSignal.post(userID: userID)
+            return true
+        } catch {
+            return false
+        }
     }
 }

@@ -23,6 +23,7 @@ struct CustomQuickIPhoneWorkoutView: View {
 
     @State private var resumedAt: Date?
     @State private var accumulatedSeconds: TimeInterval = 0
+    @State private var manualCaptureID: UUID?
     @State private var approvedTimeLimit: TimeInterval = 5 * 3600
     @State private var manualMinutes = 30
     @State private var workoutDate = Date()
@@ -114,6 +115,18 @@ struct CustomQuickIPhoneWorkoutView: View {
                 isPresented: $showingDiscard
             ) {
                 Button(tr("Discard", "Forkast"), role: .destructive) {
+                    if isTimed, let manualCaptureID {
+                        guard ATHLTHManualTimedCapture.discard(
+                            id: manualCaptureID,
+                            userID: session.profile.userID
+                        ) else {
+                            invalidInputMessage = tr(
+                                "Cannot discard the protected timer. Try again.",
+                                "Kunne ikke forkaste den lagrede tidtakeren. Prøv igjen."
+                            )
+                            return
+                        }
+                    }
                     dismiss()
                 }
                 Button(tr("Keep workout", "Fortsett økten"), role: .cancel) {}
@@ -133,15 +146,26 @@ struct CustomQuickIPhoneWorkoutView: View {
                 Text(invalidInputMessage ?? "")
             }
             .onAppear {
-                if isTimed && resumedAt == nil && savedRecord == nil {
-                    resumedAt = Date()
-                    // Only confirm an invited session after the actual
-                    // iPhone recording timer has begun.
+                guard isTimed, savedRecord == nil,
+                      manualCaptureID == nil else { return }
+                do {
+                    let snapshot = try ATHLTHManualTimedCapture.beginOrResume(
+                        configuration: configuration,
+                        userID: session.profile.userID
+                    )
+                    manualCaptureID = snapshot.id
+                    accumulatedSeconds = snapshot.accumulatedSeconds
+                    resumedAt = snapshot.resumedAt
+                    approvedTimeLimit = snapshot.approvedTimeLimit
+                    // A social lobby is confirmed only after a real protected
+                    // timer exists. A failed admission never sends started.
                     if !configuration.selectedFriendIDs.isEmpty {
                         Task {
                             _ = await social.confirmCurrentJoinedWorkoutStarted()
                         }
                     }
+                } catch {
+                    invalidInputMessage = error.localizedDescription
                 }
             }
         }
@@ -191,9 +215,24 @@ struct CustomQuickIPhoneWorkoutView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.orange)
                         Button(tr("Continue for one hour", "Fortsett én time til")) {
-                            accumulatedSeconds = elapsed(at: Date())
-                            resumedAt = Date()
-                            approvedTimeLimit += 3600
+                            let now = Date()
+                            guard let manualCaptureID else { return }
+                            let seconds = elapsed(at: now)
+                            let cap = min(24 * 3600, approvedTimeLimit + 3600)
+                            if ATHLTHManualTimedCapture.update(
+                                id: manualCaptureID, userID: session.profile.userID,
+                                accumulatedSeconds: seconds, resumedAt: now,
+                                approvedTimeLimit: cap
+                            ) {
+                                accumulatedSeconds = seconds
+                                resumedAt = now
+                                approvedTimeLimit = cap
+                            } else {
+                                invalidInputMessage = tr(
+                                    "Cannot save the updated timer.",
+                                    "Kunne ikke lagre den oppdaterte tidtakeren."
+                                )
+                            }
                         }
                         .font(.subheadline.weight(.semibold))
                     }
@@ -208,12 +247,23 @@ struct CustomQuickIPhoneWorkoutView: View {
 
             Button {
                 let now = Date()
-                if resumedAt != nil {
-                    accumulatedSeconds = elapsed(at: now)
-                    resumedAt = nil
-                } else {
-                    resumedAt = now
+                guard let manualCaptureID else { return }
+                let nextAccumulated = resumedAt != nil
+                    ? elapsed(at: now) : accumulatedSeconds
+                let nextResumed: Date? = resumedAt != nil ? nil : now
+                guard ATHLTHManualTimedCapture.update(
+                    id: manualCaptureID, userID: session.profile.userID,
+                    accumulatedSeconds: nextAccumulated, resumedAt: nextResumed,
+                    approvedTimeLimit: approvedTimeLimit
+                ) else {
+                    invalidInputMessage = tr(
+                        "Cannot save pause/resume. Try again.",
+                        "Kunne ikke lagre pause eller fortsett. Prøv igjen."
+                    )
+                    return
                 }
+                accumulatedSeconds = nextAccumulated
+                resumedAt = nextResumed
             } label: {
                 Label(
                     resumedAt == nil ? tr("Resume", "Fortsett")
@@ -356,6 +406,15 @@ struct CustomQuickIPhoneWorkoutView: View {
 
     private func save() {
         guard savedRecord == nil else { return }
+        if isTimed && (manualCaptureID == nil ||
+           ATHLTHManualTimedCapture.current(for: session.profile.userID)?.id
+                != manualCaptureID) {
+            invalidInputMessage = tr(
+                "This timer is not the active workout. Restore it before saving.",
+                "Denne tidtakeren er ikke den aktive økten. Gjenopprett den før lagring."
+            )
+            return
+        }
         let raw = distanceText.trimmingCharacters(in: .whitespacesAndNewlines)
         let distance = raw.isEmpty ? nil :
             Double(raw.replacingOccurrences(of: ",", with: "."))
@@ -386,7 +445,8 @@ struct CustomQuickIPhoneWorkoutView: View {
             perceivedEffort: effort == 0 ? nil : effort,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? nil : notes,
-            evidence: evidence
+            evidence: evidence,
+            id: manualCaptureID ?? UUID()
         ) else {
             invalidInputMessage = tr(
                 "Record at least one second and use a distance between 0 and 1,000 km.",
@@ -394,7 +454,25 @@ struct CustomQuickIPhoneWorkoutView: View {
             )
             return
         }
-        CustomQuickWorkoutJournal.save(record, userID: session.profile.userID)
+        guard CustomQuickWorkoutJournal.save(
+            record, userID: session.profile.userID
+        ) else {
+            invalidInputMessage = tr(
+                "Your workout could not be saved. It remains open for retry.",
+                "Økten kunne ikke lagres. Den er fortsatt åpen for nytt forsøk."
+            )
+            return
+        }
+        if isTimed, let manualCaptureID,
+           !ATHLTHManualTimedCapture.closeAfterSavedRecord(
+                id: manualCaptureID, userID: session.profile.userID
+           ) {
+            invalidInputMessage = tr(
+                "The workout was saved, but the active timer could not be closed. Retry Finish to release it.",
+                "Økten ble lagret, men tidtakeren kunne ikke avsluttes. Prøv Avslutt på nytt."
+            )
+            return
+        }
         accumulatedSeconds = seconds
         resumedAt = nil
         savedRecord = record

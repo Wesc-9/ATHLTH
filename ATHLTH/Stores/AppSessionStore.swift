@@ -729,7 +729,7 @@ final class AppSessionStore: ObservableObject {
             GoalStore.removeAccountImagesAfterDeletion(deletedID)
             defaults.removeObject(forKey: AccountLocalStorage.key("training", userID: deletedID))
             defaults.removeObject(forKey: AccountLocalStorage.key("coach", userID: deletedID))
-            for name in ["arenaDrafts", "goals", "goalAccountSyncAcknowledgement", "personalTrainingProfile", "profileRecordDisplayCache", "featuredProfileRecords", "featuredProfileRecordsPending", "strengthHistory", "strengthHistoryBeforeTimedFixV1", "strengthBarDefaultMassV1", "strengthBarExerciseMassV1", "strengthActive", "phoneHistory", "phoneActive", "workoutCompletionImpacts", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt", "spotifyMusicPresets"] {
+            for name in ["arenaDrafts", "goals", "goalAccountSyncAcknowledgement", "personalTrainingProfile", "profileRecordDisplayCache", "featuredProfileRecords", "featuredProfileRecordsPending", "strengthHistory", "strengthHistoryBeforeTimedFixV1", "strengthBarDefaultMassV1", "strengthBarExerciseMassV1", "strengthActive", "phoneHistory", "phoneActive", "manualTimedActiveV1", "customQuickManualWorkoutHistory", "workoutCompletionImpacts", "coachHistoryConsent", "aiHealthDataConsent", "cloudBackupConsent", "cloudBackupConsentChangedAt", "spotifyMusicPresets"] {
                 defaults.removeObject(forKey: AccountLocalStorage.key(name, userID: deletedID))
             }
             AccountLocalStorage.write([RunningWorkoutTemplate](), name: "runningLibrary", userID: deletedID, defaults: defaults)
@@ -749,6 +749,9 @@ final class AppSessionStore: ObservableObject {
 
     func resetAuthenticationState() {
         persistAccountContent(immediate: true)
+        // Preserve the previous account's unfinished custom workout file,
+        // but release its in-process ownership on sign-out.
+        ATHLTHManualTimedCapture.switchAccount(nil, defaults: defaults)
         localAccountID = nil
         loadingAccountContent = true
         activePlan = nil
@@ -5885,6 +5888,10 @@ final class AppSessionStore: ObservableObject {
         persistAccountContent(immediate: true)
         loadingAccountContent = true
         localAccountID = userID
+        // Restore a single per-account manual timer before any new workout
+        // admission on this installation. A valid checkpoint occupies the
+        // same universal recording slot as running and strength.
+        ATHLTHManualTimedCapture.switchAccount(userID, defaults: defaults)
         aiHealthDataSharingEnabled =
             AccountLocalStorage.read(
                 Bool.self,

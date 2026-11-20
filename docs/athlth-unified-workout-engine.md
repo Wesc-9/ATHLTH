@@ -157,6 +157,15 @@ Dette dokumentet beskriver arkitektur og krav. Det er **ikke** en påstand om
 at sensorbasert hybridmotor eller automatisk Watch-overgang er ferdig.
 
 
+### 2.2.6 – samme opptaksreservasjon for iPhone-tidsmålte aktiviteter (20.11.2026)
+
+- `ATHLTHManualTimedCapture` er en kontoavgrenset, gjenopprettbar tidtaker for eksisterende CustomQuick-aktiviteter (sykling, yoga, mobilitet, roing, HIIT, øvrige). Den erstatter ikke `CustomQuickWorkoutJournal` som autoritativ ferdighistorikk og lager ikke en HealthKit-økt.
+- Ett aktivt tidscheckpoint blokkerer `ATHLTHWorkoutRecordingArbiter.reserveLaunch`, `mayStartRunning`, `mayStartStrength`, Watch-bootstrapping og tilgjengelig opptaksslot. Dermed kan ikke en ny løpe-/styrkeøkt starte over den aktive iPhone-tidtakeren. Et allerede aktivt opptak hindrer tidsstarten.
+- Tidsmålt aktivitet får stabil ID fra første start. Pause, fortsett, forlenget tidsgrense og ferdig/avbryt blir verifisert mot kontoens eget checkpoint. Prosessavslutning, bakgrunn og utlogging forkaster **ikke** ulagrede tidsdata, men en annen konto kan ikke overta økten.
+- `CustomQuickWorkoutJournal.save` bekrefter nå lagring bare når originalrecord kan leses tilbake; feil sender ikke feilaktig treningsoppdateringssignal eller viser «lagret». Nytt forsøk bruker samme ID og lager ikke to resultater.
+- Manuell distanse, opplevd innsats og tidsmåling forblir ærlig merket som manuelt/uverifisert. Dette er **ikke** et løfte om GPS, sanntidspuls, bakgrunnsopptak på iOS eller automatisk Apple Health-eksport. Dedikert sensor-/HealthKit-overføringsadapter for sykkel/yoga/mobilitet krever egen implementering og fysiske enhetstester.
+- Nye regresjoner verifiserer opptaksblokkering, konto-/krasj-gjenoppretting, korrupte checkpoints, ikke-overtakelse av annen aktivitet og idempotent historikk. Full CI og fysisk test er utsatt etter brukerens ønske.
+
 ## 2.2.5 — ny felles motor: gjennomføringsplan og oppryddingslogg (18.11.2026)
 
 Den eldre 1.9.1-beskrivelsen over er bevart som historikk. Dette er den aktive
