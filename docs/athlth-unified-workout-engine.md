@@ -1,3 +1,11 @@
+## 2.2.6 – Dagens økt bruker samme HealthKit-oppstart som klargjort Watch-kort
+
+- Watch-kortet `Dagens økt` bruker nå `ATHLTHWatchTodayLaunchAdapter` og den **samme eksisterende** `WatchRouteStore.launchPreparedWorkout` som klargjort/utsatt Watch-start. Tidligere gikk Today-kortet utenom felles kontroll av opptaksreservasjon, rutetilgjengelighet og bekreftet HealthKit-original.
+- Opprinnelig `planID` og `workoutID` føres over som `plannedPlanID` og `plannedSessionID`, mens kortet får en ny, separat transport-ID. Opprinnelig sport, rute, løpeintervaller, Audio Coach og styrkeøvelsessnapshot bevares, og ingen ekstra treningsjournal opprettes. En styrkeplan uten øvelsessnapshot kan **ikke** startes som feilregistrert fri styrke.
+- Today-kortet blir deaktivert når aktuell rute ikke er synkronisert eller opptak allerede har en eier. En ferdig startet Today-økt kan rydde bort et eldre, bekreftet kort for samme planlagte økt, men ikke en nyere redigert overføring.
+- `CustomQuickWorkoutActivity.mobility` bruker nå Watch-kategori `.other` (som planlagte mobilitetsøkter), mens eksplisitt Yoga beholder `.yoga`. Det hindrer feil HealthKit-kategori av mobilitet.
+- Nye pure XCTest dekker ti Watch-sporter, original plan-/øktidentitet, Codable-overføring, separat transport-ID, avvist manglende styrkeoppskrift og korrekt Quick/Plan-klassifisering. Full native CI/fysisk iPhone/Watch/iPad-verifisering gjenstår.
+
 ## 2.2.6 – avsluttet Watch-styrke verifiserer samme original-ID i begge resultatfelt
 
 - `ATHLTHWatchStrengthResultIdentityPolicy.canReconcile` og `.matches` kontrollerer nå at et Watch-styrkeresultat med både `universalWorkoutID` og `strengthSnapshot.workoutID` peker på **samme opprinnelige styrkejournal**. Et motstridende resultatsnapshot avvises før gjenopprettelse, kalorikobling og fullføring.

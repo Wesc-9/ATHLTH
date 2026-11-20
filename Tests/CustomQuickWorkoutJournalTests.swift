@@ -195,4 +195,14 @@ final class CustomQuickWorkoutJournalTests: XCTestCase {
         XCTAssertNil(custom.titleOverride)
     }
 
+    func testQuickAndPlannedWatchMobilityHaveSameRealHealthKitSport() {
+        // A generic mobility workout is not automatically a yoga workout.
+        // Previously Quick labeled it Yoga while planned Watch used Other.
+        XCTAssertEqual(CustomQuickWorkoutActivity.mobility.watchKind, .other)
+        XCTAssertEqual(CustomQuickWorkoutActivity.yoga.watchKind, .yoga)
+        XCTAssertEqual(CustomQuickWorkoutActivity.cycling.watchKind, .cycling)
+        XCTAssertEqual(CustomQuickWorkoutActivity.rowing.watchKind, .rowing)
+        XCTAssertEqual(CustomQuickWorkoutActivity.stairClimber.watchKind, .stairClimbing)
+    }
+
 }

@@ -100,7 +100,8 @@ enum CustomQuickWorkoutActivity: String, CaseIterable, Identifiable, Hashable, C
         case .cycling: return .cycling
         case .rowing: return .rowing
         case .stairClimber: return .stairClimbing
-        case .mobility, .yoga: return .yoga
+        case .mobility: return .other
+        case .yoga: return .yoga
         case .sports, .other: return .other
         }
     }

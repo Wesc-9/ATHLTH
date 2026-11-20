@@ -1443,6 +1443,31 @@ struct WatchTodayWorkoutTransfer: Codable, Hashable {
     var updatedAt: Date
 }
 
+/// One canonical launch adapter for the Watch's Today and prepared cards.
+/// Today cards are transport snapshots, never the recorder's identity.
+/// The existing WatchRouteStore/HealthKit owner performs the actual start.
+enum ATHLTHWatchTodayLaunchAdapter {
+    static func prepared(
+        from today: WatchTodayWorkoutTransfer
+    ) -> WatchPreparedWorkoutTransfer? {
+        // Starting a planned strength session without its original exercises
+        // would silently turn it into an unrelated free-strength recording.
+        guard today.kind != .strength ||
+              today.strengthWorkout != nil else { return nil }
+        return WatchPreparedWorkoutTransfer(
+            id: UUID(), title: today.title, summary: today.summary,
+            kind: today.kind, routeID: today.routeID,
+            runningWorkout: today.runningWorkout,
+            audioCoach: today.audioCoach,
+            startMode: .onWatch,
+            strengthWorkout: today.strengthWorkout,
+            plannedPlanID: today.planID,
+            plannedSessionID: today.workoutID,
+            updatedAt: today.updatedAt
+        )
+    }
+}
+
 struct WatchTodaySnapshot: Codable, Hashable {
     var workout: WatchTodayWorkoutTransfer?
     var updatedAt: Date

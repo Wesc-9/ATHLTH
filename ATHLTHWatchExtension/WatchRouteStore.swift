@@ -520,6 +520,15 @@ final class WatchRouteStore: NSObject, ObservableObject {
         ) else { return false }
 
         consumePreparedWorkout(workout.id)
+        // A Today card has a fresh transport UUID, but may represent the
+        // same previously prepared calendar session. Hide only the older
+        // matching card once the original HealthKit workout was confirmed.
+        if let sessionID = workout.plannedSessionID,
+           let existing = preparedWorkout,
+           existing.plannedSessionID == sessionID,
+           existing.updatedAt <= workout.updatedAt {
+            consumePreparedWorkout(existing.id)
+        }
         return true
     }
 

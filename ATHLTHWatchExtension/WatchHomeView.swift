@@ -603,82 +603,35 @@ struct WatchHomeView: View {
         }
         .buttonStyle(.plain)
         .disabled(
-            workoutManager.isActive ||
-            workoutManager.state == .preparing ||
-            workoutManager.state == .ending
+            !workoutManager.canAcceptPreparedWorkout() ||
+            (workout.routeID != nil &&
+             workout.routeID.flatMap { routeStore.route(with: $0) } == nil) ||
+            ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) == nil
         )
         .opacity(
-            workoutManager.isActive ||
-            workoutManager.state == .preparing ||
-            workoutManager.state == .ending
-                ? 0.55
-                : 1
+            workoutManager.canAcceptPreparedWorkout() &&
+            (workout.routeID == nil ||
+             workout.routeID.flatMap { routeStore.route(with: $0) } != nil) &&
+            ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) != nil
+                ? 1 : 0.55
         )
     }
 
     private func startTodayWorkout(
-        _ workout:
-            WatchTodayWorkoutTransfer
+        _ workout: WatchTodayWorkoutTransfer
     ) {
-        guard !workoutManager.isActive,
-              workoutManager.state != .preparing,
-              workoutManager.state != .ending else { return }
-        workoutManager.configureCalendarSessionID(workout.workoutID)
-        let route =
-            workout.routeID.flatMap {
-                routeStore.route(
-                    with: $0
-                )
-            }
-
-        workoutManager
-            .configurePlannedRoute(
-                route
-            )
-        workoutManager
-            .configureAudioCoach(
-                workout.audioCoach ??
-                    .disabled
-            )
-
-        if let running =
-                workout.runningWorkout {
-            workoutManager
-                .configureRunningWorkout(
-                    running
-                )
-        } else if workout.kind ==
-                    .running ||
-                    workout.kind ==
-                    .walking {
-            workoutManager
-                .configureRunningWorkout(
-                    WatchRunningWorkoutTransfer(
-                        title:
-                            workout.title,
-                        steps: [],
-                        routeAlerts:
-                            .standard
-                    )
-                )
-        }
-
-        if workout.kind == .strength,
-           let strength =
-                workout.strengthWorkout {
-            workoutManager
-                .configureStrengthSession(
-                    strength
-                )
-        }
-
+        // Today follows exactly the same one-recorder HealthKit admission,
+        // route validation, Audio Coach staging and start acknowledgement as
+        // an explicitly prepared Watch card. No legacy side-door start.
+        guard workoutManager.canAcceptPreparedWorkout(),
+              let card = ATHLTHWatchTodayLaunchAdapter.prepared(
+                  from: workout
+              )
+        else { return }
         Task {
-            await workoutManager
-                .startPreparedWorkout(
-                    kind:
-                        workout.kind,
-                    route: route
-                )
+            _ = await routeStore.launchPreparedWorkout(
+                card, manager: workoutManager
+            )
         }
     }
 

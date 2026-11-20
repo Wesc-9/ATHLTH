@@ -250,4 +250,59 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
         XCTAssertFalse(confirms(expected, expected, requested: .strength))
     }
 
+    func testTodayWatchLaunchUsesSamePreparedHealthKitAdmissionAcrossSports() throws {
+        let planID = UUID(), scheduledID = UUID()
+        let capturedAt = Date(timeIntervalSince1970: 1_900_000_000)
+        let routeID = UUID()
+        for kind in WatchWorkoutKind.allCases where kind != .strength {
+            let today = WatchTodayWorkoutTransfer(
+                planID: planID, workoutID: scheduledID,
+                title: "Original planned session",
+                summary: "Preserve original recipe",
+                kind: kind, scheduledStart: capturedAt,
+                durationMinutes: 35, distanceKilometers: 6,
+                routeID: kind == .running ? routeID : nil,
+                runningWorkout: nil, audioCoach: .disabled,
+                updatedAt: capturedAt
+            )
+            guard let prepared = ATHLTHWatchTodayLaunchAdapter.prepared(
+                from: today
+            ) else {
+                XCTFail("The existing HealthKit sport was discarded: \\(kind)")
+                continue
+            }
+            XCTAssertNotEqual(prepared.id, scheduledID,
+                              "A transport card is never the workout ID")
+            XCTAssertEqual(prepared.plannedPlanID, planID)
+            XCTAssertEqual(prepared.plannedSessionID, scheduledID)
+            XCTAssertEqual(prepared.kind, kind)
+            XCTAssertEqual(prepared.routeID, today.routeID)
+            XCTAssertEqual(prepared.updatedAt, capturedAt)
+            XCTAssertEqual(prepared.startMode, .onWatch)
+            XCTAssertTrue(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                planID: prepared.plannedPlanID,
+                sessionID: prepared.plannedSessionID
+            ))
+            let copied = try JSONDecoder().decode(
+                WatchPreparedWorkoutTransfer.self,
+                from: JSONEncoder().encode(prepared)
+            )
+            XCTAssertEqual(copied, prepared)
+        }
+    }
+
+    func testTodayPlannedStrengthCannotDiscardMissingExerciseRecipe() {
+        let today = WatchTodayWorkoutTransfer(
+            planID: UUID(), workoutID: UUID(),
+            title: "Original strength session",
+            summary: "Five planned exercises",
+            kind: .strength, scheduledStart: nil,
+            durationMinutes: 45, distanceKilometers: nil,
+            routeID: nil, runningWorkout: nil,
+            audioCoach: .disabled, updatedAt: Date()
+        )
+        XCTAssertNil(ATHLTHWatchTodayLaunchAdapter.prepared(from: today),
+                     "Never launch free strength instead of the missing saved recipe")
+    }
+
 }
