@@ -48,8 +48,13 @@ struct ATHLTHiPadLiveWorkoutView: View {
 
     private var isStrength: Bool { snapshot.kind == "strength" }
     private var isCardio: Bool {
-        snapshot.kind == "running" || snapshot.kind == "walking" ||
-        snapshot.kind == "cycling" || snapshot.kind == "rowing"
+        ATHLTHSpectatorSportMetricPolicy.showsHeartRateZones(snapshot.kind)
+    }
+    private var isPaceSport: Bool {
+        ATHLTHSpectatorSportMetricPolicy.supportsRunningPace(snapshot.kind)
+    }
+    private var hasDistanceMetric: Bool {
+        ATHLTHSpectatorSportMetricPolicy.supportsDistance(snapshot.kind)
     }
     private var isWatch: Bool { snapshot.sourceDevice == "watch" }
 
@@ -93,7 +98,9 @@ struct ATHLTHiPadLiveWorkoutView: View {
                                     ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
                                 }
                                 ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
-                                if snapshot.kind == "running" || snapshot.kind == "walking" {
+                                if isPaceSport || ATHLTHWorkoutSportMode(
+                                    category: snapshot.kind
+                                ) == .cycling {
                                     ATHLTHiPadLiveGPSMap(snapshot: snapshot)
                                 }
                                 ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
@@ -121,7 +128,9 @@ struct ATHLTHiPadLiveWorkoutView: View {
                             ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
                         }
                         ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
-                        if snapshot.kind == "running" || snapshot.kind == "walking" {
+                        if isPaceSport || ATHLTHWorkoutSportMode(
+                            category: snapshot.kind
+                        ) == .cycling {
                             ATHLTHiPadLiveGPSMap(snapshot: snapshot)
                         }
                         ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
@@ -236,7 +245,11 @@ struct ATHLTHiPadLiveWorkoutView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 Label(
-                    isWatch
+                    ATHLTHSpectatorSportMetricPolicy.isManual(
+                        snapshot.captureEvidence
+                    )
+                        ? tr("IPHONE TIMER · MANUAL DATA", "IPHONE-TIDTAKER · MANUELLE DATA")
+                        : isWatch
                         ? tr("LIVE FROM APPLE WATCH", "LIVE FRA APPLE WATCH")
                         : tr("LIVE FROM IPHONE", "LIVE FRA IPHONE"),
                     systemImage: isWatch ? "applewatch" : "iphone"
@@ -311,7 +324,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
                     symbol: "checkmark.circle",
                     detail: tr("Workout progress", "Fremdrift")
                 )
-            } else {
+            } else if hasDistanceMetric {
                 metric(
                     tr("Distance", "Distanse"),
                     value: ATHLTHiPadLiveMetrics.distance(snapshot.distanceMeters),
@@ -321,7 +334,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
                 )
             }
 
-            if isCardio {
+            if isPaceSport {
                 metric(
                     tr("Current pace", "Nåværende tempo"),
                     value: ATHLTHiPadLiveMetrics.pace(
@@ -368,13 +381,29 @@ struct ATHLTHiPadLiveWorkoutView: View {
                                    "Venter på puls og makspuls")
                     )
                 }
-                metric(
-                    tr("Average pace", "Snittempo"),
-                    value: ATHLTHiPadLiveMetrics.averagePace(snapshot),
-                    symbol: "chart.line.uptrend.xyaxis",
-                    detail: tr("Based on distance and active time",
-                               "Beregnet fra distanse og aktiv tid")
-                )
+                if isPaceSport {
+                    metric(
+                        tr("Average pace", "Snittempo"),
+                        value: ATHLTHiPadLiveMetrics.averagePace(snapshot),
+                        symbol: "chart.line.uptrend.xyaxis",
+                        detail: tr("Measured distance and active time",
+                                   "Målt distanse og aktiv tid")
+                    )
+                } else if ATHLTHWorkoutSportMode(category: snapshot.kind) == .cycling {
+                    metric(
+                        tr("Average speed", "Snittfart"),
+                        value: ATHLTHiPadLiveMetrics.averageSpeed(snapshot),
+                        symbol: "speedometer",
+                        detail: "km/t"
+                    )
+                } else if ATHLTHWorkoutSportMode(category: snapshot.kind) == .rowing {
+                    metric(
+                        tr("Average split", "Snittid per 500 m"),
+                        value: ATHLTHiPadLiveMetrics.averageRowingSplit(snapshot),
+                        symbol: "timer",
+                        detail: "min/500 m"
+                    )
+                }
             } else {
                 metric(
                     tr("Active calories", "Aktive kalorier"),
@@ -724,6 +753,35 @@ enum ATHLTHiPadLiveMetrics {
               meters.isFinite, meters >= 40,
               snapshot.elapsedSeconds >= 20 else { return "—" }
         return pace(snapshot.elapsedSeconds / (meters / 1_000))
+    }
+
+    /// Derived only from actual source distance and active time; a manual
+    /// timer never receives invented HealthKit speed or rowing split.
+    static func averageSpeed(
+        _ snapshot: ATHLTHCrossDeviceWorkoutSnapshot
+    ) -> String {
+        guard ATHLTHWorkoutSportMode(category: snapshot.kind) == .cycling,
+              !ATHLTHSpectatorSportMetricPolicy.isManual(snapshot.captureEvidence),
+              let meters = snapshot.distanceMeters, meters.isFinite,
+              meters >= 250, snapshot.elapsedSeconds.isFinite,
+              snapshot.elapsedSeconds > 0 else { return "—" }
+        let speed = meters * 3.6 / snapshot.elapsedSeconds
+        guard speed.isFinite, (1...100).contains(speed) else { return "—" }
+        return String(format: "%.1f", speed)
+    }
+
+    static func averageRowingSplit(
+        _ snapshot: ATHLTHCrossDeviceWorkoutSnapshot
+    ) -> String {
+        guard ATHLTHWorkoutSportMode(category: snapshot.kind) == .rowing,
+              !ATHLTHSpectatorSportMetricPolicy.isManual(snapshot.captureEvidence),
+              let meters = snapshot.distanceMeters, meters.isFinite,
+              meters >= 250, snapshot.elapsedSeconds.isFinite,
+              snapshot.elapsedSeconds > 0 else { return "—" }
+        let split = snapshot.elapsedSeconds * 500 / meters
+        guard split.isFinite, (40...1800).contains(split) else { return "—" }
+        let rounded = Int(split.rounded())
+        return String(format: "%d:%02d", rounded / 60, rounded % 60)
     }
 
     static func heartRate(_ bpm: Double?) -> String {

@@ -1,3 +1,9 @@
+## 2.2.6 – iPad-livekort med riktig sykkel- og romåling
+
+- iPad sin eksisterende private livevisning velger nå sportens faktiske måleenheter. Løp/gå beholder min/km, sykling får faktisk beregnet km/t fra målt distanse og aktiv tid, roing får min/500 m; styrke/yoga får ikke tilfeldige distansefelter.
+- Kildemerket viser når iPhone-økten bare er en manuell tidtaker, og hastighet/splitt kan da ikke avledes fra oppgitt tid. Kartvisning er tilgjengelig også ved sykkeløkt, forutsatt at opprinnelig kilde deler gyldig GPS-posisjon med samtykke.
+- Tester for måleenheter og manglende sensorer er lagt til. Ingen ny iPad HealthKit-opptaker eller endret samtykkelogikk.
+
 ## 2.2.6 – bekreftet originalkilde i privat iPad-livekanal
 
 - Den eksisterende, samtykkestyrte iPad-synken skiller nå eksplisitt mellom `watchHealthKit`, `phoneGPS`, `treadmillEstimate`, `strengthLog`, `manualTimer` og `structuredManual`. Dette er ekstra metadata i opprinnelig snapshot, aldri en ekstra opptaker. Gamle snapshots dekodes uten kildemerket.

@@ -437,4 +437,40 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertNil(read.captureEvidence)
     }
 
+
+    @MainActor
+    func testIpadCyclingAndRowingUseSportSpecificAverageUnits() {
+        func sensorSport(_ category: String, meters: Double, elapsed: Double)
+            -> ATHLTHCrossDeviceWorkoutSnapshot {
+            var s = ATHLTHCrossDeviceWorkoutSnapshot(
+                sessionID: UUID(), kind: category, title: category,
+                startedAt: Date(), elapsedSeconds: elapsed,
+                distanceMeters: meters, currentStep: nil, nextStep: nil,
+                completedSets: nil, totalSets: nil
+            )
+            s.captureEvidence = "watchHealthKit"
+            return ATHLTHCrossDeviceWorkoutStore.boundedSpectatorSnapshot(s)
+        }
+        let cycling = sensorSport("cycling", meters: 30_000, elapsed: 3_600)
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.averageSpeed(cycling), "30.0")
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.averageRowingSplit(cycling), "—")
+        let rowing = sensorSport("rowing", meters: 5_000, elapsed: 1_200)
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.averageRowingSplit(rowing), "2:00")
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.averageSpeed(rowing), "—")
+    }
+
+    func testIpadManualSpectatorNeverInfersSportSpeedOrRowingSplit() {
+        for category in ["cycling", "rowing"] {
+            var s = ATHLTHCrossDeviceWorkoutSnapshot(
+                sessionID: UUID(), kind: category, title: category,
+                startedAt: Date(), elapsedSeconds: 500,
+                distanceMeters: 3_000, currentStep: nil,
+                nextStep: nil, completedSets: nil, totalSets: nil
+            )
+            s.captureEvidence = "manualTimer"
+            XCTAssertEqual(ATHLTHiPadLiveMetrics.averageSpeed(s), "—")
+            XCTAssertEqual(ATHLTHiPadLiveMetrics.averageRowingSplit(s), "—")
+        }
+    }
+
 }
