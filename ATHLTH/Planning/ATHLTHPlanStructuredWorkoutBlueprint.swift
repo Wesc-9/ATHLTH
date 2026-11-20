@@ -37,40 +37,9 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     }
 
     var category: String {
-        let hasRun = blocks.contains {
-            $0.kind == .run && $0.cardioActivity != .walking &&
-                    !$0.isActiveRecovery
-        }
-        let hasWalking = blocks.contains {
-            $0.kind == .run && $0.cardioActivity == .walking
-        }
-        let hasStrength = blocks.contains { $0.kind == .exercise }
-        let hasCycling = blocks.contains { $0.activityTag == "cycling" }
-        let hasWellness = blocks.contains { $0.wellnessKind != nil }
-        if [hasRun, hasWalking, hasStrength, hasCycling, hasWellness]
-            .filter({ $0 }).count > 1 {
-            return "hybrid"
-        }
-        if hasRun {
-            let running = blocks.filter {
-                $0.kind == .run && $0.cardioActivity != .walking
-            }
-            if !running.isEmpty && running.allSatisfy({
-                $0.isIndoor == true && $0.treadmillInclinePercent != nil
-            }) {
-                return "treadmill"
-            }
-            return "running"
-        }
-        if hasWalking { return "walking" }
-        if hasStrength { return "strength" }
-        if hasCycling { return "cycling" }
-        let wellness = blocks.compactMap(\.wellnessKind)
-        if !wellness.isEmpty {
-            return wellness.allSatisfy { $0 == .meditation }
-                ? "recovery" : "mobility"
-        }
-        return "custom"
+        ATHLTHUnifiedActivityProfile(
+            blocks: blocks, fallbackKind: kind
+        ).category
     }
 
     /// Structured execution is authoritative. Do not also execute legacy
@@ -95,7 +64,11 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
             workout.scheduledStart = calendar.date(byAdding: .minute,
                 value: startMinuteOfDay, to: calendar.startOfDay(for: day))
         }
-        workout.kind = kind
+        // The recipe, not a stale launcher tile, determines the activity.
+        // Retain one workout ID and the original legacy storage schema.
+        workout.kind = ATHLTHUnifiedActivityProfile(
+            blocks: blocks, fallbackKind: kind
+        ).workoutKind
         workout.durationMinutes = min(max(durationMinutes, 5), 240)
         workout.routeID = blocks.contains(where: {
             $0.kind == .run && !$0.isActiveRecovery && $0.isIndoor != true

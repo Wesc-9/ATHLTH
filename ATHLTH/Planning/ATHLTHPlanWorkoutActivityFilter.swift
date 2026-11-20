@@ -33,42 +33,16 @@ enum ATHLTHPlanWorkoutActivityFilter: String, CaseIterable, Identifiable {
 
     func matches(_ workout: PlannedSession) -> Bool {
         if self == .all { return true }
-
-        let category = workout.workoutCategory?.lowercased() ?? ""
-        let blocks = workout.resolvedWorkoutBlocks
-        let running = blocks.contains {
-            $0.kind == .run && $0.cardioActivity != .walking &&
-                !$0.isActiveRecovery
-        }
-        let walking = blocks.contains {
-            $0.kind == .run && $0.cardioActivity == .walking
-        }
-        let strength = blocks.contains { $0.kind == .exercise }
-        let cycling = blocks.contains { $0.activityTag == "cycling" }
-        let wellness = blocks.contains { $0.wellnessKind != nil }
-        let kinds = [running, walking, strength, cycling, wellness].filter { $0 }.count
-        let isHybrid = category == "hybrid" || kinds > 1
-
-        if isHybrid { return self == .hybrid }
+        let activity = ATHLTHUnifiedActivityProfile.category(for: workout)
+        if activity == "hybrid" { return self == .hybrid }
         switch self {
         case .all: return true
-        case .running:
-            return category == "running" || category == "treadmill" ||
-                running || (category.isEmpty && workout.kind == .running)
-        case .walking:
-            return category == "walking" || walking ||
-                (category.isEmpty && workout.kind == .walking)
-        case .strength:
-            return category == "strength" || strength ||
-                (category.isEmpty && workout.kind == .strength)
-        case .cycling:
-            return category == "cycling" || cycling
-        case .mobility:
-            return category == "mobility" || category == "recovery" ||
-                wellness || (category.isEmpty &&
-                    (workout.kind == .mobility || workout.kind == .recovery))
-        case .hybrid:
-            return isHybrid
+        case .running: return activity == "running" || activity == "treadmill"
+        case .walking: return activity == "walking"
+        case .strength: return activity == "strength"
+        case .cycling: return activity == "cycling"
+        case .mobility: return activity == "mobility" || activity == "recovery"
+        case .hybrid: return false
         }
     }
 }

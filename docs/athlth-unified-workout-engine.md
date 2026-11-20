@@ -8,6 +8,16 @@
 
 Historisk status (1.9.1): planprosjeksjon, UI-ruting og begrenset fellesopptak for planlagt styrke + tidsstyrt tredemølle er koblet inn i kalendervisningen. Kode-/simulatortester er satt opp; fysisk Watch-verifikasjon gjenstår.
 
+## 2.2.6 – felles aktivitetstolkning på tvers av treningsformer (20.11.2026)
+
+- `ATHLTHUnifiedActivityProfile` er ett, rent og skrivebeskyttet klassifiseringslag for den eksisterende blokktidslinjen. Plan Studio, Coach-blueprints, treningsbibliotekets filter og aktivitetsvelger deler nå samme regler.
+- Løping, gåing, styrke, sykling, yoga, meditasjon og mobilitet identifiseres fra lagrede blokker eller eksplisitte eldre kategorier, aldri fra øktnavn. Hybrid identifiseres når en plan inneholder mer enn én aktiv treningsform. Aktiv gåpause i et løp blir ikke en falsk hybrid.
+- `ATHLTHUnifiedWorkout.apply` beholder én kilde-ID, originale blokker og én lagret plan. `ATHLTHPlanStructuredWorkoutBlueprint.applying` bruker nå aktivitetsklassen fra faktisk oppskrift, også hvis den opprinnelige valgknappen har en annen kind. Det opprettes ikke parallelle øvelses-/løpeoppskrifter.
+- Eldre enkle sykkel- og velværeøkter med eksplisitt kategori og tidsmål kan projiseres til én tidsstyrt `.note`-blokk for planredigering. Det er en visning av eksisterende data, ikke en ny GPS-/HealthKit-måling, ny historikk eller automatisk opptaksstart.
+- Dette **sammenstiller plan-, bibliotek- og visningslogikk, men er IKKE en ferdig felles opptaksmotor for sykling/yoga/meditasjon**. Løping og styrke har fortsatt ulike autoritative opptaks-/historikklagre. Watch har egne sensor- og opptakskontrollere. Ingen fysiske enhetstester eller full samme-commit CI er utført på 2.2.6-koden.
+- Neste integrasjonsdel må være en eksplisitt opptakskapabilitets-/start-policy for aktivitetene som ennå ikke har et fysisk verifisert opptak, med samme `ATHLTHWorkoutRecordingArbiter`. Først etter dette kan sykkel-/velvære-livemotor, Watch og HealthKit påstås ferdig. Ingen shadow-økt eller stille konvertering til løping/styrke.
+- Nye XCTest-regresjoner dekker hybridklassifisering, aktiv gåpause, legacy-walking, sykkel/styrke, yoga/meditasjon, legacy Codable og ingen duplisert oppskrift. De står for senere samlet testing.
+
 ## Ett felles øktoppsett
 
 Alle innganger (Plan, Planlegg ekstra økt, Quick Train, lagrede maler og Tren sammen)

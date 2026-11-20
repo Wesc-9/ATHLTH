@@ -102,7 +102,7 @@ enum ATHLTHLiveWorkoutEngineRouter {
         case .rest:
             return .recovery
         case .note:
-            if block.activityTag == "cycling" {
+            if block.activityTag?.lowercased() == "cycling" {
                 // Display-only timed cycling phase within the same workout;
                 // no invented speed, cadence or separate HealthKit session.
                 return .cycling
