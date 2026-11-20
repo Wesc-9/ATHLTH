@@ -268,4 +268,30 @@ final class ATHLTHUnifiedActivityProfileTests: XCTestCase {
         XCTAssertNil(ATHLTHUnifiedWorkout.timedNonCardioProjection(from: strength))
     }
 
+
+    func testUncategorizedLegacyWellnessAndStairAliasesStillRunOnIPhone() throws {
+        let cases: [(WorkoutKind, String?, String)] = [
+            (.mobility, nil, "mobility"),
+            (.recovery, nil, "recovery"),
+            (.custom, "mobility", "mobility"),
+            (.custom, "stretching", "mobility"),
+            (.custom, "stair_climbing", "stairclimber")
+        ]
+        for (kind, category, expected) in cases {
+            let source = workout(kind: kind, category: category)
+            let projected = try XCTUnwrap(
+                ATHLTHUnifiedWorkout.timedNonCardioProjection(from: source),
+                "Missing fallback for \(category ?? kind.title)"
+            )
+            XCTAssertEqual(projected.id, source.id)
+            XCTAssertEqual(projected.workoutCategory, category)
+            XCTAssertEqual(projected.resolvedWorkoutBlocks.count, 1)
+            XCTAssertEqual(
+                ATHLTHUnifiedActivityProfile.category(for: projected),
+                expected
+            )
+            XCTAssertNil(projected.resolvedWorkoutBlocks.first?.distanceMeters)
+        }
+    }
+
 }
