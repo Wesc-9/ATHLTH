@@ -4749,13 +4749,24 @@ struct ATHLTHHomeView: View {
             return
         }
 
-        Task {
+        Task { @MainActor in
             do {
+                // Hold the ONE cross-sport recording slot through Watch
+                // HealthKit's async start; two quick taps cannot race.
+                let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+                defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+                let initiatingAccount = session.profile.userID
+                watchConnection.sendAudioCoachConfiguration(audioCoach)
                 try await watchConnection.startWorkoutOnWatch(watchKind)
+                guard session.profile.userID == initiatingAccount else {
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
+                    homeWatchTransferError = ATHLTHLocalization.choose(
+                        english: "The account changed during Apple Watch launch.",
+                        norwegian: "Kontoen ble endret mens Apple Watch startet."
+                    )
+                    return
+                }
                 gear.prepareNextWorkoutGear(gearIDs)
-                watchConnection.sendAudioCoachConfiguration(
-                    audioCoach
-                )
                 _ = await social
                     .confirmCurrentJoinedWorkoutStarted()
                 homeWatchTransferMessage =
@@ -4935,9 +4946,21 @@ struct ATHLTHHomeView: View {
             }
 
             do {
+                let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+                defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+                let initiatingAccount = session.profile.userID
                 try await watchConnection
                     .startWorkoutOnWatch(watchKind, indoor: treadmill)
-
+                // Watch may have accepted HealthKit just as a logout began;
+                // do not attach that recording to the new account's plan.
+                guard session.profile.userID == initiatingAccount else {
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
+                    homeWatchTransferError = ATHLTHLocalization.choose(
+                        english: "Apple Watch started under the previous account.",
+                        norwegian: "Apple Watch startet på forrige konto."
+                    )
+                    return
+                }
                 if let plannedGearIDs = workout.gearIDs {
                     gear.prepareNextWorkoutGear(
                         Set(plannedGearIDs)
@@ -9940,8 +9963,10 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        Task {
+        Task { @MainActor in
             do {
+                let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+                defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
                 try await watchConnection
                     .startWorkoutOnWatch(.running)
 
@@ -9993,13 +10018,16 @@ struct ATHLTHTrainView: View {
 
     private func startQuickWorkoutOnWatch(_ kind: WorkoutKind) {
         guard watchConnection.isReady,
+              !universalRecordingOccupied,
               let watchKind = watchWorkoutKind(for: kind)
         else {
             return
         }
 
-        Task {
+        Task { @MainActor in
             do {
+                let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+                defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
                 try await watchConnection.startWorkoutOnWatch(watchKind)
                 watchTransferMessage = "\(watchKind.title) started on Apple Watch."
             } catch {
@@ -10038,8 +10066,10 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        Task {
+        Task { @MainActor in
             do {
+                let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+                defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
                 try await watchConnection.startWorkoutOnWatch(.running)
                 gear.prepareNextWorkoutGear(gearIDs)
                 watchConnection.sendAudioCoachConfiguration(

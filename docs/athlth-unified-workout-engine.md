@@ -1,3 +1,9 @@
+## 2.2.6 – globale HealthKit-startreservasjoner på Hjem og Train
+
+- Fem ytterligere Watch-startveier (Hjem Quick, Hjem planlagt umiddelbar løp/gå, Train Quick, Train avansert Quick Run, bibliotekets Running Template) har nå samme `ATHLTHWorkoutRecordingArbiter.reserveLaunch`/tokenbasert `releaseLaunch` gjennom hele asynkrone Watch HealthKit-oppstarten. Tidligere hadde noen kun en usikret UI-kontroll før `Task`. Den globale sperren omfatter også manuell/stukturert timer, iPhone-opptak, Watch-oppstart og styrkehybrid, uten at det skapes en ekstra skribent.
+- Hjem Quick sender Audio Coach-konfigurasjon før den initierer Watch, og verifiserer original innlogget konto **etter** asynkron start før kontotilknyttede gir- og sosialoppdateringer. Hjem umiddelbar planlagt økt har samme kontobyttebeskyttelse før kalender/utstyr oppdateres. Den opprinnelige Watch-økten beholdes dersom en kontobyttehendelse oppstår.
+- XCTest kontrollerer globalt token for alle `WatchWorkoutKind`, parallell start og at en feil tokenutløsing ikke frigjør reservasjonen. Koden er ikke en fullført, testet fysisk sensor/HealthKit-koordinator; samme-commit CI og fysiske Watch-startkonflikter gjenstår.
+
 ## 2.2.6 – kontoeier valideres ved selve kalenderfullføringen
 
 - `AppSessionStore.recordPlannedWatchWorkoutFinished` avviser nå Watch-resultater som ikke bærer samme original `accountOwnerID` som den **nå** innloggede kontoens profil, også etter at resultater har ligget offline i kø. Dette er en ekstra sikkerhetsbarriere ved siste persistente kalenderoppdatering, i tillegg til tidligere kontroll ved mottak.

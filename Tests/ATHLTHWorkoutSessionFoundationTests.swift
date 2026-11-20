@@ -16,6 +16,25 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testEveryNativeWatchSportReservesOneCrossActivityStartUntilReleased() throws {
+        let phone = IPhoneWorkoutStore()
+        let strength = StrengthWorkoutStore()
+        XCTAssertNil(phone.active)
+        XCTAssertNil(strength.activeWorkout)
+        for kind in WatchWorkoutKind.allCases {
+            let reservation = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+            XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.hasPendingLaunch,
+                          kind.rawValue)
+            XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch(),
+                                 "Different Watch kinds must share a launch slot")
+            ATHLTHWorkoutRecordingArbiter.releaseLaunch(UUID())
+            XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.hasPendingLaunch)
+            ATHLTHWorkoutRecordingArbiter.releaseLaunch(reservation)
+            XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.hasPendingLaunch)
+        }
+    }
+
     func testRemoteRelayRejectsExpiredAndMismatchedClaims() {
         let now = Date(timeIntervalSince1970: 1_900_000_000)
         func accepted(
