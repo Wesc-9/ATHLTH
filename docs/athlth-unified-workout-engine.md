@@ -1,3 +1,9 @@
+## 2.2.6 – én ekte opptakssperre ved fjernstart, ikke egne UI-varianter
+
+- Mottak av iPad-fjernstart bruker nå `ATHLTHUniversalWorkoutAdmission.isOccupied` i stedet for ad hoc-sjekker av bare PhoneWorkout, StrengthWorkout og WatchMirror. En gjenopprettet strukturert økt, aktiv manuell tidtaker, iPhone pending launch og Watch-start før speiling blokkerer samme nye opptaksplass før eventuelle relay-sideeffekter.
+- Valideringen av komplett plan-ID og session-ID skjer også på iPad **før** fjernkommandoen sendes til serveren, og på iPhone ved mottak. Den tidligere eksisterende reservasjonen i opptakskoordinatoren forblir siste autoritative sperre når asynkrone HealthKit-kall foretas.
+- Ingen ny HealthKit-eier, workouthistorikk eller automatisk iPad-samtykke. Samme-commit CI og fysisk test gjenstår.
+
 ## 2.2.6 – ende-til-ende bevaring av plan-ID ved iPad-fjernstart
 
 - Original `plannedPlanID` og `plannedSessionID` følger nå de eksisterende versjon-1-relémeldingene for Quick Run og Quick Walk. Mottaker-iPhone krever begge eller ingen, og sender dem videre til original `WorkoutLaunchCoordinator`, som kontrollerer sport og faktisk eksisterende plan før opptak.

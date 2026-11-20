@@ -782,6 +782,16 @@ final class WorkoutDeviceRelayStore:
         _ envelope:
             WorkoutDeviceRelayEnvelope
     ) async throws {
+        // Reject an incomplete planned-workout link before persisting a
+        // remote command: the iPhone must never guess a free workout here.
+        guard ATHLTHDeviceRelayPlanLinkPolicy.allows(
+            kind: envelope.kind,
+            planID: envelope.plannedPlanID,
+            sessionID: envelope.plannedSessionID
+        ) else {
+            throw ATHLTHWorkoutCaptureAdmission.Rejection
+                .requiresDedicatedActivityCapture
+        }
         guard ATHLTHDeviceRole.isIPad else {
             // A no-op falsely tells the launch coordinator that a workout
             // was handed off. Only iPad may create this remote command.

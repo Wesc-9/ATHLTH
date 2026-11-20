@@ -934,10 +934,15 @@ struct AppRootView: View {
             )
         }
 
+        // The same universal admission gate covers restored manual,
+        // structured, strength, phone, pre-mirror Watch and pending launches.
+        // Remote commands must not bypass it through a separate UI guard.
         guard Date() >= relayedWorkoutLaunchGuardUntil,
-              phoneWorkout.active == nil,
-              strengthWorkout.activeWorkout == nil,
-              !workoutMirroring.hasActiveMirroredWorkout
+              !ATHLTHUniversalWorkoutAdmission.isOccupied(
+                  phone: phoneWorkout,
+                  strength: strengthWorkout,
+                  remoteWatchActive: watchConnection.hasActiveWatchWorkout
+              )
         else {
             throw NSError(
                 domain:
