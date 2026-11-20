@@ -10003,34 +10003,67 @@ struct ATHLTHTrainView: View {
                     watchConnection.sendWorkoutRouteSelection(nil)
                 }
 
-                watchConnection.sendAudioCoachConfiguration(
-                    configuration.audioCoach
-                )
+                let runningTransfer: WatchRunningWorkoutTransfer
                 if let advanced {
-                    // Preserve ALL ordered Advanced stages, pace/HR zones,
-                    // rests and distance goals from the canonical plan.
-                    let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+                    // All original Advanced stages, target pace and zones
+                    // survive manual/delayed Watch launch as well.
+                    runningTransfer = PlannedWorkoutWatchBuilder.runningTransfer(
                         from: advanced,
                         routeAlerts: settings.routeAlertConfiguration,
                         autoPauseEnabled: configuration.autoPauseEnabled
                     )
-                    watchConnection.sendRunningWorkout(transfer)
                 } else if let source = original {
                     var transfer = watchRunningWorkoutTransfer(from: source)
                     transfer.routeAlerts = settings.routeAlertConfiguration
                     transfer.autoPauseEnabled = configuration.autoPauseEnabled
-                    watchConnection.sendRunningWorkout(transfer)
+                    runningTransfer = transfer
                 } else {
-                    watchConnection.sendRunningWorkout(
-                        WatchRunningWorkoutTransfer(
-                            title: "",
-                            steps: [],
-                            routeAlerts: settings.routeAlertConfiguration,
-                            autoPauseEnabled: configuration.autoPauseEnabled
-                        )
+                    runningTransfer = WatchRunningWorkoutTransfer(
+                        title: "",
+                        steps: [],
+                        routeAlerts: settings.routeAlertConfiguration,
+                        autoPauseEnabled: configuration.autoPauseEnabled
                     )
                 }
-                // The original recipe is now queued before Watch starts.
+
+                if configuration.watchStartMode != .immediate {
+                    // A delayed prepared card must never be misreported as
+                    // a recording already started by HealthKit. Ghost
+                    // races require an independently verified target and
+                    // cannot silently fall back to a plain run.
+                    guard configuration.ghostTargetDurationSeconds == nil else {
+                        watchTransferError = ATHLTHLocalization.choose(
+                            english: "Prepare the Ghost Race route before scheduling its Watch start.",
+                            norwegian: "Klargjør Ghost Race-ruten før du planlegger Watch-start."
+                        )
+                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                        return
+                    }
+                    watchConnection.sendPreparedWorkout(
+                        WatchPreparedWorkoutTransfer(
+                            id: UUID(),
+                            title: configuration.title,
+                            summary: configuration.title,
+                            kind: .running,
+                            routeID: route?.id,
+                            runningWorkout: runningTransfer,
+                            audioCoach: configuration.audioCoach,
+                            indoor: isIndoor,
+                            startMode: configuration.watchStartMode,
+                            updatedAt: Date()
+                        )
+                    )
+                    watchTransferMessage =
+                        configuration.watchStartMode.confirmationText
+                    return
+                }
+
+                // Immediate: queue the entire original recipe before the
+                // ONE Watch HealthKit session begins.
+                watchConnection.sendAudioCoachConfiguration(
+                    configuration.audioCoach
+                )
+                watchConnection.sendRunningWorkout(runningTransfer)
                 try await watchConnection.startWorkoutOnWatch(
                     .running, indoor: isIndoor
                 )

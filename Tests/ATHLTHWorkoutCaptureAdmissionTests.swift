@@ -28,6 +28,38 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         return workout
     }
 
+    func testAdvancedQuickRunPreparedCardRetainsModeAndOriginalIntervals() throws {
+        let planned = session(.running, blocks: [
+            block(.run, sequence: 1),
+            block(.rest, sequence: 2),
+            block(.run, sequence: 3)
+        ])
+        let watchRecipe = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: planned, routeAlerts: .standard,
+            autoPauseEnabled: false
+        )
+        for startMode: WatchWorkoutStartMode in [.onWatch, .afterThirtySeconds] {
+            let card = WatchPreparedWorkoutTransfer(
+                id: UUID(),
+                title: planned.title, summary: planned.title,
+                kind: .running, routeID: nil,
+                runningWorkout: watchRecipe,
+                audioCoach: nil, indoor: true,
+                startMode: startMode, updatedAt: Date()
+            )
+            let decoded = try JSONDecoder().decode(
+                WatchPreparedWorkoutTransfer.self,
+                from: JSONEncoder().encode(card)
+            )
+            XCTAssertEqual(decoded.startMode, startMode)
+            XCTAssertEqual(decoded.kind, .running)
+            XCTAssertEqual(decoded.indoor, true)
+            XCTAssertEqual(decoded.runningWorkout?.sourceWorkoutID, planned.id)
+            XCTAssertEqual(decoded.runningWorkout?.steps.count, 3)
+            XCTAssertEqual(decoded.runningWorkout?.steps[1].phase, "recovery")
+        }
+    }
+
     func testAdvancedQuickRunWatchKeepsEveryOrderedPlanStageAndRejectsHybrid() throws {
         let planned = session(.running, blocks: [
             block(.run, sequence: 1),

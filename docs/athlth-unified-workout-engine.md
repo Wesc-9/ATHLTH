@@ -1,3 +1,9 @@
+## 2.2.6 – Quick Run respekterer manuell og 30-sekunders Watch-start
+
+- `RunQuickStartConfiguration.watchStartMode` brukes nå også på Advanced Quick Run. `.onWatch` og `.afterThirtySeconds` oppretter **kun ett klargjort kort**, med original rutetilknytning, all løpe-/intervalloppskrift, Audio Coach og korrekt `indoor`-miljø. De starter aldri en økt umiddelbart i HealthKit i strid med brukerens valg.
+- Direkte `.immediate` start beholder én global opptaksreservasjon og sender original Watch-oppskrift før HK-start. Et Ghost Race-mål som trenger egen verifisert rute kan ikke stille om til vanlig løp ved utsatt start; denne kombinasjonen avvises synlig inntil Ghost-overføringen er klar.
+- Codable XCTest tester både `onWatch` og `afterThirtySeconds`, original plan-`sourceWorkoutID`, tre ordnede intervalltrinn, recovery og innendørsmiljø. Trenger fortsatt samme-commit iOS/watchOS/iPad CI og fysisk Watch-forsinkelse før release-godkjenning.
+
 ## 2.2.6 – Advanced Quick Run overfører hele Watch-oppskriften
 
 - `ATHLTHTrainView.startRunQuickWorkout` prioriterer nå den faktiske `RunQuickStartConfiguration.advancedWorkout` foran en eventuell enkel `RunningWorkoutTemplate` og foran fri løp. Før HealthKit-start valideres hele Advanced-oppskriften mot den eksisterende, godkjente `watchEndurance`-recorderen; en blandet/ikke-støttet økt avvises i stedet for å startes som «Free Run».
