@@ -40,6 +40,39 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
         ))
     }
 
+    func testPlannedOfflineWatchResultNeedsSameOwnerAndSameCalendarID() throws {
+        let owner = UUID(), planned = UUID()
+        var result = completedResult()
+        result.accountOwnerID = owner
+        result.plannedCalendarSessionID = planned
+        result.universalWorkoutID = UUID()
+        let replay = try JSONDecoder().decode(
+            WatchWorkoutResult.self,
+            from: JSONEncoder().encode(result)
+        )
+        XCTAssertEqual(replay.plannedCalendarSessionID, planned)
+        XCTAssertEqual(replay.accountOwnerID, owner)
+        XCTAssertTrue(ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+            resultOwnerID: replay.accountOwnerID, signedInUserID: owner
+        ))
+        XCTAssertFalse(ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+            resultOwnerID: replay.accountOwnerID, signedInUserID: UUID()
+        ))
+        XCTAssertFalse(ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+            resultOwnerID: replay.accountOwnerID, signedInUserID: nil
+        ))
+        XCTAssertFalse(
+            ATHLTHWatchPlannedCompletionIdentityPolicy.allowsLegacyTimeMatch(
+                calendarSessionID: replay.plannedCalendarSessionID,
+                structuredSourceID: replay.structuredWorkoutSourceID
+            )
+        )
+        result.accountOwnerID = nil
+        XCTAssertFalse(ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+            resultOwnerID: result.accountOwnerID, signedInUserID: owner
+        ))
+    }
+
     func testOwnerSurvivesWatchResultEncodingAndQueuedDelivery() throws {
         let owner = UUID()
         var result = completedResult()

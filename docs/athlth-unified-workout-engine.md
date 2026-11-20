@@ -1,3 +1,9 @@
+## 2.2.6 – kontoeier valideres ved selve kalenderfullføringen
+
+- `AppSessionStore.recordPlannedWatchWorkoutFinished` avviser nå Watch-resultater som ikke bærer samme original `accountOwnerID` som den **nå** innloggede kontoens profil, også etter at resultater har ligget offline i kø. Dette er en ekstra sikkerhetsbarriere ved siste persistente kalenderoppdatering, i tillegg til tidligere kontroll ved mottak.
+- Legacy Watch-resultater med manglende eier får ikke overta en annen brukers plan. Ny regresjon tester kildeeier + original `plannedCalendarSessionID` over Codable/offline levering, kontobytte og at eksplisitt kilde-ID aldri faller tilbake til tidsbasert korrelasjon.
+- Ingen nye opptaks- eller historikkmodeller. Fysisk testing på Watch/iPhone, konto A→B, offline replay og same-commit CI kreves fortsatt.
+
 ## 2.2.6 – eksplisitt Watch-økt-ID går alltid foran tidsbasert gjetting
 
 - `AppSessionStore.recordPlannedWatchWorkoutFinished` bruker fortsatt eksakt original kalender-/struktur-ID når Watch leverer en slik identitet, også etter offline overføring. Når denne ID-en ikke finnes lokalt, har systemet nå **ikke** lov å falle tilbake til en annen planlagt økt med tilfeldig likt klokkeslett og samme sportsgren.

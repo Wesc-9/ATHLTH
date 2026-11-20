@@ -2261,6 +2261,15 @@ final class AppSessionStore: ObservableObject {
     /// Match by a real source ID, or by a single pending Watch start within
     /// three minutes of the Watch's own recorded start. Never use title only.
     func recordPlannedWatchWorkoutFinished(_ result: WatchWorkoutResult) {
+        // A queued Watch result belongs to the account that actually
+        // recorded it. Re-check at calendar mutation time: the user may
+        // have changed accounts after the transport was first validated.
+        // Unknown-owner legacy results must not claim the new account.
+        guard ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+            resultOwnerID: result.accountOwnerID,
+            signedInUserID: profile.userID
+        ) else { return }
+
         let explicitIDs = [
             result.plannedCalendarSessionID,
             result.structuredWorkoutSourceID,
