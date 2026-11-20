@@ -112,6 +112,62 @@ enum ATHLTHSpectatorSportMetricPolicy {
     }
 }
 
+/// Presentation derived from the original recorded strength session.
+struct ATHLTHStrengthSpectatorPresentation: Equatable {
+    let kind: String
+    let elapsedSeconds: TimeInterval
+    let paused: Bool
+}
+
+/// The strength journal stays authoritative. When a fresh, same-owner
+/// same-UUID Watch mirror is available it can describe the current hybrid
+/// segment and HealthKit active clock without creating another recording.
+enum ATHLTHStrengthSpectatorLivePolicy {
+    static func resolve(
+        workoutID: UUID,
+        startedAt: Date,
+        recordingOwner: ATHLTHWorkoutRecordingOwner,
+        local: ATHLTHWorkoutSessionState?,
+        journalElapsedSeconds: TimeInterval,
+        mirror: WatchWorkoutLiveSnapshot?,
+        accountID: UUID?,
+        at now: Date = Date()
+    ) -> ATHLTHStrengthSpectatorPresentation {
+        let original = local.flatMap {
+            $0.workoutID == workoutID &&
+                $0.recordingOwner == recordingOwner &&
+                abs($0.startedAt.timeIntervalSince(startedAt)) <= 5
+                ? $0 : nil
+        }
+        // No wall-clock subtraction: the strength journal owns pause and
+        // offline downtime. A non-finite value is not a sensor measurement.
+        let baseSeconds = original?.activeElapsedSeconds ?? journalElapsedSeconds
+        let seconds = baseSeconds.isFinite && baseSeconds >= 0 ? baseSeconds : 0
+        let base = ATHLTHStrengthSpectatorPresentation(
+            kind: original?.engine == .endurance ? "running" : "strength",
+            elapsedSeconds: seconds,
+            paused: original?.phase == .paused
+        )
+
+        guard recordingOwner == .appleWatch,
+              let mirror, mirror.kind == .strength,
+              let accountID,
+              let verified = ATHLTHUniversalActiveCapture.mirroredWatch(
+                mirror, for: accountID, at: now
+              ),
+              verified.workoutID == workoutID,
+              verified.recordingOwner == .appleWatch,
+              abs(verified.startedAt.timeIntervalSince(startedAt)) <= 5
+        else { return base }
+
+        return ATHLTHStrengthSpectatorPresentation(
+            kind: verified.activityCategory,
+            elapsedSeconds: verified.elapsedSeconds,
+            paused: verified.phase == .paused
+        )
+    }
+}
+
 private struct ATHLTHCrossDeviceWorkoutRow: Codable {
     let userID: UUID
     let snapshot: ATHLTHCrossDeviceWorkoutSnapshot
@@ -609,22 +665,37 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             mirrorStartedAt: mirroredWatch.snapshot?.startedAt
         ) else { return nil }
         if let log = strength.activeWorkout {
+            let now = Date()
+            let display = ATHLTHStrengthSpectatorLivePolicy.resolve(
+                workoutID: log.id,
+                startedAt: log.startedAt,
+                recordingOwner: log.captureDevice == .appleWatch
+                    ? .appleWatch : .iPhone,
+                local: strength.activeSessionState,
+                journalElapsedSeconds: log.elapsedSessionSeconds(
+                    at: now, suspendedAt: nil
+                ),
+                mirror: mirroredWatch.snapshot,
+                accountID: trackingAccountID,
+                at: now
+            )
             let exercise = strength.currentExerciseIndex
             let activeName = log.exercises.indices.contains(exercise)
                 ? log.exercises[exercise].exercise.displayName
                 : nil
             return ATHLTHCrossDeviceWorkoutSnapshot(
                 sessionID: log.id,
-                kind: "strength",
+                kind: display.kind,
                 title: log.title,
                 startedAt: log.startedAt,
-                elapsedSeconds: max(0, Date().timeIntervalSince(log.startedAt)),
+                elapsedSeconds: display.elapsedSeconds,
                 distanceMeters: nil,
                 currentStep: activeName,
                 nextStep: nil,
                 completedSets: log.totalCompletedSets,
                 totalSets: log.exercises.reduce(0) { $0 + $1.sets.count },
-                capturedAt: .now,
+                paused: display.paused,
+                capturedAt: now,
                 sourceDevice: log.captureDevice == .appleWatch
                     ? "watch" : "iphone",
                 captureEvidence: log.captureDevice == .appleWatch

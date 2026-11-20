@@ -33,6 +33,97 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         )
     }
 
+    func testStrengthSpectatorUsesActiveClockNotWallTime() {
+        let started = Date(timeIntervalSince1970: 1_900_000_000)
+        let id = UUID()
+        let state = ATHLTHWorkoutSessionState(
+            workoutID: id, plannedSessionID: nil,
+            recordingOwner: .iPhone, activity: .strength,
+            phase: .paused, engine: .strength,
+            startedAt: started, activeElapsedSeconds: 45,
+            stageIndex: 1, stageCount: 4
+        )
+        let view = ATHLTHStrengthSpectatorLivePolicy.resolve(
+            workoutID: id, startedAt: started,
+            recordingOwner: .iPhone, local: state,
+            journalElapsedSeconds: 180, mirror: nil, accountID: UUID(),
+            at: started.addingTimeInterval(900)
+        )
+        XCTAssertEqual(view.elapsedSeconds, 45)
+        XCTAssertEqual(view.kind, "strength")
+        XCTAssertTrue(view.paused)
+        let recovered = ATHLTHStrengthSpectatorLivePolicy.resolve(
+            workoutID: id, startedAt: started,
+            recordingOwner: .iPhone, local: nil,
+            journalElapsedSeconds: 50, mirror: nil, accountID: UUID(),
+            at: started.addingTimeInterval(900)
+        )
+        XCTAssertEqual(recovered.elapsedSeconds, 50)
+        XCTAssertEqual(recovered.kind, "strength")
+    }
+
+    func testStrengthSpectatorTrustsOnlyMatchingWatchHybridPhase() throws {
+        let started = Date(timeIntervalSince1970: 1_900_000_000)
+        let owner = UUID(), id = UUID()
+        let state = ATHLTHWorkoutSessionState(
+            workoutID: id, plannedSessionID: nil,
+            recordingOwner: .appleWatch, activity: .strength,
+            phase: .work, engine: .strength,
+            startedAt: started, activeElapsedSeconds: 60,
+            stageIndex: 0, stageCount: 4
+        )
+        var mirror = WatchWorkoutLiveSnapshot(
+            kind: .strength, state: .running, startedAt: started,
+            capturedAt: started.addingTimeInterval(180),
+            elapsedTime: 165, heartRate: 155,
+            activeCalories: 55, distanceMeters: 800,
+            averageHeartRate: nil, maxHeartRate: nil,
+            routePointCount: 0
+        )
+        mirror.strengthWorkoutID = id
+        mirror.universalWorkoutID = id
+        mirror.accountOwnerID = owner
+        mirror.strengthHybridRunningActive = true
+        let at = mirror.capturedAt
+        func resolve(_ snapshot: WatchWorkoutLiveSnapshot?,
+                     for account: UUID = owner,
+                     at date: Date = started.addingTimeInterval(180))
+            -> ATHLTHStrengthSpectatorPresentation {
+            ATHLTHStrengthSpectatorLivePolicy.resolve(
+                workoutID: id, startedAt: started,
+                recordingOwner: .appleWatch, local: state,
+                journalElapsedSeconds: 60, mirror: snapshot,
+                accountID: account, at: date
+            )
+        }
+
+        let running = resolve(mirror)
+        XCTAssertEqual(running.kind, "running")
+        XCTAssertEqual(running.elapsedSeconds, 165)
+        XCTAssertFalse(running.paused)
+        mirror.strengthHybridRunningActive = false
+        mirror.strengthRecoveryActive = true
+        let rest = resolve(mirror)
+        XCTAssertEqual(rest.kind, "recovery")
+        XCTAssertEqual(rest.elapsedSeconds, 165)
+        mirror.state = .paused
+        XCTAssertTrue(resolve(mirror).paused)
+        XCTAssertEqual(resolve(mirror).kind, "recovery")
+
+        XCTAssertEqual(resolve(mirror, for: UUID()).kind, "strength")
+        XCTAssertEqual(resolve(mirror, for: UUID()).elapsedSeconds, 60)
+        XCTAssertEqual(resolve(mirror, at: at.addingTimeInterval(60)).kind,
+                       "strength")
+        mirror.state = .running
+        mirror.universalWorkoutID = UUID()
+        XCTAssertEqual(resolve(mirror).kind, "strength")
+        // Matching a timestamp alone is never permission to take over
+        // a new or unrelated strength session.
+        mirror.universalWorkoutID = id
+        mirror.strengthWorkoutID = UUID()
+        XCTAssertEqual(resolve(mirror).kind, "strength")
+    }
+
     func testTimerExtrapolatesOnlyBrieflyAndNeverPastSourceTTL() {
         let now = Date(timeIntervalSince1970: 1_020)
         let remote = snapshot()

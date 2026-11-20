@@ -1,3 +1,10 @@
+## 2.2.6 – iPad viser original aktiv styrkeklokke og faktisk Watch-hybridfase
+
+- Den private, allerede samtykkestyrte iPad-spektatoren har sluttet å beregne styrkevarighet fra rå veggklokke. Den bruker original styrkejournal sin aktive sesjonstid (med pause/offline-regnskap); ingen ny timer, journal eller HealthKit-session.
+- Når styrkeopptaket eies av Watch og den samme opprinnelige HealthKit-økten er bekreftet med korrekt konto, UUID, start og ferskt livesnapshot, kan iPad vise aktuell løp/styrke/pause-fase og Watch sin aktive tid. Ved gammel/feil konto, ugyldig UUID eller forsinket Watch-telemetri beholdes journalens trygge lokale visning.
+- Kilden deles fortsatt bare gjennom eksisterende eksplisitt iPad-samtykke. Ukjente sensorverdier for styrke/hybrid fylles ikke inn fra planmål. Tester dekker pausetid, frakobling, hybridfase, kontobytte og ugyldig Watch-UUID.
+- Fysisk treenhetstest og grønn samme-commit CI kreves fortsatt.
+
 ## 2.2.6 – riktig aktiv deløkt for Watch-hybrid og velvære
 
 - Watch styrke/hybrid publiserer to valgfrie, bakoverkompatible presentasjonsflagg fra original styrkejournal: aktiv løpedel og aktiv hvile. Den felles live-projeksjonen bruker nå aktiv sport (løp / pause / styrke), mens ÉN opprinnelig Watch HealthKit-økt, UUID, planlenke og eier beholdes.
