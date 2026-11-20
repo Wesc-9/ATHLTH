@@ -480,17 +480,24 @@ final class WatchRouteStore: NSObject, ObservableObject {
             )
         }
 
-        await manager.startPreparedWorkout(
+        let launchedWorkoutID = await manager.startPreparedWorkout(
             kind: workout.kind,
             route: route,
             indoor: workout.indoor,
             initiatedByIPhone: initiatedByIPhone
         )
 
-        // A failed, completed or idle session is not proof that this
-        // prepared transfer actually opened a new HealthKit workout.
-        guard manager.state == .running ||
-              manager.state == .paused else { return false }
+        // An unrelated session may have started during the asynchronous
+        // Watch preflight. Only this exact HealthKit invocation can consume
+        // the prepared card; a generic .running state is never sufficient.
+        guard ATHLTHWatchPreparedLaunchConfirmationPolicy.confirms(
+            acknowledgedWorkoutID: launchedWorkoutID,
+            currentWorkoutID: manager.activeWorkoutIdentity,
+            requestedKind: workout.kind,
+            activeKind: manager.kind,
+            isRecording: manager.state == .running ||
+                manager.state == .paused
+        ) else { return false }
 
         consumePreparedWorkout(workout.id)
         return true

@@ -1,3 +1,9 @@
+## 2.2.6 – klargjort Watch-kort bekreftes mot samme originale opptak
+
+- `WatchRouteStore.launchPreparedWorkout` godtar ikke lenger bare at en tilfeldig Watch-økt står som `running` eller `paused` etter en asynkron start. Den opprinnelige Watch-starteren returnerer nå bare UUID-en til HealthKit-økten som **akkurat dette** startkallet fikk opprettet; kortet konsumeres kun når startbekreftelsen matcher aktiv original økt-ID og sport.
+- Hvis autorisasjon venter mens en annen Watch-økt gjenopprettes eller overtar, revaliderer starteren HealthKit-slottet **etter** tillatelsesdialogen og lager ikke en ny `HKWorkoutSession`. Avvist/feilet oppstart får ingen positiv bekreftelse selv om en annen aktivitet er aktiv.
+- Ren XCTest dekker korrekt original-ID, manglende/konkurrerende ID, feil sportsgren og ikke-aktiv økt. Ingen ekstra opptak, journal eller endring i eksisterende plan-/resultatidentitet. Samme-commit native CI og fysisk Watch/iPhone-samtidighet gjenstår.
+
 ## 2.2.6 – token-eid opptaksadgang helt inn i originale HealthKit-opptak
 
 - `ATHLTHWorkoutRecordingArbiter.mayStartRunning` og `.mayStartStrength` krever nå nøyaktig **samme UUID** som `reserveLaunch` når en asynkron start allerede har reservert opptaksplassen. Ingen annen Quick, Home, Train eller sosial start kan snike seg forbi bare fordi «en» reservasjon finnes. Gammelt, feil og utløpt token avvises.

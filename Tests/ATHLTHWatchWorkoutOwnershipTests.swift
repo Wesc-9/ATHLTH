@@ -217,4 +217,37 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
         ))
     }
 
+
+    func testPreparedWatchCardCannotBeConsumedByAnotherActiveSession() {
+        let expected = UUID()
+        let unrelated = UUID()
+        func confirms(
+            _ acknowledged: UUID?,
+            _ live: UUID?,
+            requested: WatchWorkoutKind = .running,
+            active: WatchWorkoutKind = .running,
+            recording: Bool = true
+        ) -> Bool {
+            ATHLTHWatchPreparedLaunchConfirmationPolicy.confirms(
+                acknowledgedWorkoutID: acknowledged,
+                currentWorkoutID: live,
+                requestedKind: requested,
+                activeKind: active,
+                isRecording: recording
+            )
+        }
+        XCTAssertTrue(confirms(expected, expected))
+        XCTAssertFalse(confirms(nil, expected),
+                       "Denied start cannot acknowledge a competing recording")
+        XCTAssertFalse(confirms(expected, unrelated),
+                       "A different HealthKit owner cannot consume this card")
+        XCTAssertFalse(confirms(expected, nil),
+                       "A missing original ID must fail closed")
+        XCTAssertFalse(confirms(expected, expected, recording: false),
+                       "Preparing, ending or failed is not a started workout")
+        XCTAssertFalse(confirms(expected, expected, active: .cycling),
+                       "A different sport cannot acknowledge the prepared card")
+        XCTAssertFalse(confirms(expected, expected, requested: .strength))
+    }
+
 }

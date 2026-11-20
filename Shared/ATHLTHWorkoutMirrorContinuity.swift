@@ -173,3 +173,23 @@ enum ATHLTHWorkoutMirrorContinuity {
         activeSession == incomingSession
     }
 }
+
+ 
+/// Prepared Today cards have transport identity separate from the original
+/// workout. A competing local/remote start must never falsely acknowledge
+/// or consume a card simply because Watch happens to be recording.
+enum ATHLTHWatchPreparedLaunchConfirmationPolicy {
+    static func confirms(
+        acknowledgedWorkoutID: UUID?,
+        currentWorkoutID: UUID?,
+        requestedKind: WatchWorkoutKind,
+        activeKind: WatchWorkoutKind,
+        isRecording: Bool
+    ) -> Bool {
+        guard isRecording,
+              requestedKind == activeKind,
+              let acknowledgedWorkoutID,
+              let currentWorkoutID else { return false }
+        return acknowledgedWorkoutID == currentWorkoutID
+    }
+}

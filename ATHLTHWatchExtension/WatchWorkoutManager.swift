@@ -133,6 +133,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var timer: Timer?
     private var startedAt: Date?
     private var universalWorkoutID: UUID?
+    /// The original ATHLTH identity of the *current* HealthKit recording.
+    /// Read-only: prepared-card confirmation must never infer it from state.
+    var activeWorkoutIdentity: UUID? { universalWorkoutID }
     // Set only by a named planned card, never guessed from a workout title.
     private var plannedCalendarSessionID: UUID?
     /// Immutable within one HealthKit workout, even if iPhone changes user.
@@ -3870,12 +3873,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    @discardableResult
     func startPreparedWorkout(
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil,
         indoor: Bool? = nil,
         initiatedByIPhone: Bool = false
-    ) async {
+    ) async -> UUID? {
         guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive,
             preparing: state == .preparing,
@@ -3883,11 +3887,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             finishing: finishing,
             recovering: recoveryInProgress,
             hasExistingSession: workoutSession != nil
-        ) else { return }
+        ) else { return nil }
 
         guard await localWorkoutStartAllowed()
         else {
-            return
+            return nil
         }
 
         // A new start may have claimed the session while we awaited
@@ -3899,7 +3903,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             finishing: finishing,
             recovering: recoveryInProgress,
             hasExistingSession: workoutSession != nil
-        ) else { return }
+        ) else { return nil }
 
 
         workoutInitiatedLocallyOnWatch =
@@ -3926,7 +3930,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     : .indoor
             )
 
-        await start(
+        return await start(
             configuration: configuration,
             kind: kind,
             route: route
@@ -4421,13 +4425,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         configuration: HKWorkoutConfiguration,
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer?
-    ) async {
+    ) async -> UUID? {
         guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive, preparing: state == .preparing,
             ending: state == .ending, finishing: finishing,
             recovering: recoveryInProgress,
             hasExistingSession: workoutSession != nil
-        ) else { return }
+        ) else { return nil }
 
         if workoutInitiatedLocallyOnWatch {
             activeRelayRequestID = nil
@@ -4540,6 +4544,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         do {
             try await requestAuthorization()
 
+            // HealthKit permission is asynchronous. Recovery or another
+            // authorized start may have attached while the prompt was open.
+            // Never allocate a second HKWorkoutSession after losing this slot.
+            guard state == .preparing, workoutSession == nil,
+                  !recoveryInProgress, !finishing else { return nil }
+
             let session = try HKWorkoutSession(
                 healthStore: healthStore,
                 configuration: configuration
@@ -4568,6 +4578,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // its existing immutable strength-workout journal identity.
             universalWorkoutID = kind == .strength
                 ? strengthSession?.workoutID : UUID()
+            let startedWorkoutID = universalWorkoutID
             collectingHybridTreadmillDistance = false
             synchronizeHybridTreadmillSensors()
             finishing = false
@@ -4644,8 +4655,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             announceAudioCoachReadyIfNeeded()
             announceCurrentStructuredStep(prefix: "Starting")
+            // Return only the identity opened by THIS invocation. A different
+            // active workout cannot acknowledge a competing prepared card.
+            return workoutSession === session ? startedWorkoutID : nil
         } catch {
             fail(error)
+            return nil
         }
     }
 
