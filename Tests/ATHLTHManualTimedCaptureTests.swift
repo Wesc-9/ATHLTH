@@ -136,4 +136,37 @@ final class ATHLTHManualTimedCaptureTests: XCTestCase {
             id: started.id, userID: owner, defaults: defaults
         ))
     }
+
+    func testResumeCannotReplaceExistingTimedConfiguration() throws {
+        let (defaults, suite) = try suite()
+        defer {
+            ATHLTHManualTimedCapture.switchAccount(nil, defaults: defaults)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let owner = UUID()
+        ATHLTHManualTimedCapture.switchAccount(owner, defaults: defaults)
+        let started = try ATHLTHManualTimedCapture.beginOrResume(
+            configuration: bike(), userID: owner, defaults: defaults
+        )
+        var changed = bike()
+        changed.rounds = 9
+        XCTAssertThrowsError(try ATHLTHManualTimedCapture.beginOrResume(
+            configuration: changed, userID: owner, defaults: defaults
+        ))
+        changed = bike()
+        changed.workSeconds = 75
+        XCTAssertThrowsError(try ATHLTHManualTimedCapture.beginOrResume(
+            configuration: changed, userID: owner, defaults: defaults
+        ))
+        changed = bike()
+        changed.titleOverride = "Different workout"
+        XCTAssertThrowsError(try ATHLTHManualTimedCapture.beginOrResume(
+            configuration: changed, userID: owner, defaults: defaults
+        ))
+        XCTAssertEqual(ATHLTHManualTimedCapture.current(for: owner)?.id, started.id)
+        XCTAssertTrue(ATHLTHManualTimedCapture.discard(
+            id: started.id, userID: owner, defaults: defaults
+        ))
+    }
+
 }
