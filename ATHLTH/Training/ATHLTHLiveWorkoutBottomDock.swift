@@ -9,6 +9,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
     let mode: ATHLTHLiveWorkoutBottomMode
     let subtitle: String?
     let primaryDisabled: Bool
+    let secondaryDisabled: Bool
     let onPrimary: () -> Void
     let onSecondary: (() -> Void)?
     let details: Details
@@ -17,6 +18,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         mode: ATHLTHLiveWorkoutBottomMode,
         subtitle: String? = nil,
         primaryDisabled: Bool = false,
+        secondaryDisabled: Bool = false,
         onPrimary: @escaping () -> Void,
         onSecondary: (() -> Void)? = nil,
         @ViewBuilder details: () -> Details
@@ -24,6 +26,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         self.mode = mode
         self.subtitle = subtitle
         self.primaryDisabled = primaryDisabled
+        self.secondaryDisabled = secondaryDisabled
         self.onPrimary = onPrimary
         self.onSecondary = onSecondary
         self.details = details()
@@ -131,6 +134,8 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
                     )
             }
             .buttonStyle(.plain)
+            .disabled(secondaryDisabled)
+            .opacity(secondaryDisabled ? 0.48 : 1)
             .accessibilityIdentifier("athlth-shared-live-secondary-action")
         }
     }

@@ -99,4 +99,36 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
                        ATHLTHWorkoutSportMode.cycling.nextActionTitle)
     }
 
+
+    func testManualQuickTimerSharesDockButCannotRecordStrengthSet() {
+        let sports: [ATHLTHWorkoutSportMode] = [
+            .running, .walking, .strength, .cycling, .rowing, .stairClimber,
+            .hiit, .circuit, .functional, .yoga, .mobility, .sports, .other
+        ]
+        for sport in sports {
+            let paused = ATHLTHLiveWorkoutBottomMode.manualTimed(
+                sport, isPaused: true
+            )
+            let active = ATHLTHLiveWorkoutBottomMode.manualTimed(
+                sport, isPaused: false
+            )
+            XCTAssertEqual(paused.phaseTitle, sport.title.uppercased())
+            XCTAssertEqual(paused.secondarySymbol, "play.fill")
+            XCTAssertEqual(active.secondarySymbol, "pause.fill")
+            XCTAssertEqual(paused.primarySymbol, "checkmark.circle.fill")
+            XCTAssertNotNil(paused.secondaryTitle)
+            XCTAssertFalse(paused.recordsCompletedSet)
+            XCTAssertFalse(active.recordsCompletedSet)
+        }
+        let dock = ATHLTHLiveWorkoutBottomDock(
+            mode: .manualTimed(.cycling, isPaused: true),
+            primaryDisabled: true,
+            secondaryDisabled: true,
+            onPrimary: {},
+            onSecondary: {}
+        ) { Text("Manual timing") }
+        XCTAssertTrue(dock.primaryDisabled)
+        XCTAssertTrue(dock.secondaryDisabled)
+    }
+
 }

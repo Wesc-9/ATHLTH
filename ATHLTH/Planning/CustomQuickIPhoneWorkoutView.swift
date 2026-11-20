@@ -245,39 +245,6 @@ struct CustomQuickIPhoneWorkoutView: View {
                 .frame(maxWidth: .infinity)
             }
 
-            Button {
-                let now = Date()
-                guard let manualCaptureID else { return }
-                let nextAccumulated = resumedAt != nil
-                    ? elapsed(at: now) : accumulatedSeconds
-                let nextResumed: Date? = resumedAt != nil ? nil : now
-                guard ATHLTHManualTimedCapture.update(
-                    id: manualCaptureID, userID: session.profile.userID,
-                    accumulatedSeconds: nextAccumulated, resumedAt: nextResumed,
-                    approvedTimeLimit: approvedTimeLimit
-                ) else {
-                    invalidInputMessage = tr(
-                        "Cannot save pause/resume. Try again.",
-                        "Kunne ikke lagre pause eller fortsett. Prøv igjen."
-                    )
-                    return
-                }
-                accumulatedSeconds = nextAccumulated
-                resumedAt = nextResumed
-            } label: {
-                Label(
-                    resumedAt == nil ? tr("Resume", "Fortsett")
-                                     : tr("Pause", "Pause"),
-                    systemImage: resumedAt == nil ? "play.fill" : "pause.fill"
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(accent)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background(ATHLTHTheme.accentSoft,
-                            in: Capsule())
-            }
-            .buttonStyle(.plain)
         }
         .padding(23)
         .background(.white, in: RoundedRectangle(cornerRadius: 24))
@@ -360,7 +327,54 @@ struct CustomQuickIPhoneWorkoutView: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 21))
     }
 
+
+    /// The shared live dock delegates pause/resume to the ORIGINAL persisted
+    /// iPhone timer; neither a second clock nor a HealthKit writer is created.
+    private func toggleTimedPause() {
+        guard isTimed, savedRecord == nil,
+              let manualCaptureID else { return }
+        let now = Date()
+        let nextAccumulated = resumedAt != nil
+            ? elapsed(at: now) : accumulatedSeconds
+        let nextResumed: Date? = resumedAt != nil ? nil : now
+        guard ATHLTHManualTimedCapture.update(
+            id: manualCaptureID, userID: session.profile.userID,
+            accumulatedSeconds: nextAccumulated, resumedAt: nextResumed,
+            approvedTimeLimit: approvedTimeLimit
+        ) else {
+            invalidInputMessage = tr(
+                "Cannot save pause/resume. Try again.",
+                "Kunne ikke lagre pause eller fortsett. Prøv igjen."
+            )
+            return
+        }
+        accumulatedSeconds = nextAccumulated
+        resumedAt = nextResumed
+    }
+
+    @ViewBuilder
     private var bottomBar: some View {
+        if isTimed {
+            ATHLTHLiveWorkoutBottomDock(
+                mode: .manualTimed(
+                    ATHLTHWorkoutSportMode(category: configuration.activity.rawValue),
+                    isPaused: resumedAt == nil
+                ),
+                subtitle: configuration.title,
+                primaryDisabled: manualCaptureID == nil,
+                secondaryDisabled: manualCaptureID == nil,
+                onPrimary: save,
+                onSecondary: toggleTimedPause
+            ) {
+                Label(
+                    tr("iPhone timer · manual metrics",
+                       "iPhone-tidtaker · manuelle målinger"),
+                    systemImage: "iphone"
+                )
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+        } else {
         Button(action: save) {
             Label(
                 isTimed ? tr("Finish and save", "Avslutt og lagre")
@@ -377,6 +391,7 @@ struct CustomQuickIPhoneWorkoutView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
+        }
     }
 
     private func savedSummary(_ record: CustomQuickWorkoutRecord) -> some View {

@@ -17,10 +17,12 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
     case strengthAddExercise
     case strengthFinish
     case structuredActivity(ATHLTHWorkoutSportMode, isFinalStep: Bool)
+    case manualTimed(ATHLTHWorkoutSportMode, isPaused: Bool)
 
     var phaseTitle: String {
         switch self {
-        case .structuredActivity(let sport, _):
+        case .structuredActivity(let sport, _),
+             .manualTimed(let sport, _):
             return sport.title.uppercased()
         case .runningMain, .runningInterval, .runningNext:
             return ATHLTHLocalization.choose(
@@ -52,6 +54,9 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var primaryTitle: String {
         switch self {
+        case .manualTimed:
+            return ATHLTHLocalization.choose(
+                english: "Finish and save", norwegian: "Avslutt og lagre")
         case .structuredActivity(let sport, let isFinalStep):
             return isFinalStep
                 ? ATHLTHLocalization.choose(
@@ -92,7 +97,7 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var primarySymbol: String {
         switch self {
-        case .structuredActivity:
+        case .structuredActivity, .manualTimed:
             return "checkmark.circle.fill"
         case .runningFree, .strengthAddExercise:
             return "plus.circle.fill"
@@ -109,6 +114,10 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var secondaryTitle: String? {
         switch self {
+        case .manualTimed(_, let paused):
+            return paused
+                ? ATHLTHLocalization.choose(english: "Resume", norwegian: "Fortsett")
+                : ATHLTHLocalization.choose(english: "Pause", norwegian: "Pause")
         case .structuredActivity:
             return ATHLTHLocalization.choose(
                 english: "Finish", norwegian: "Avslutt")
@@ -127,6 +136,7 @@ enum ATHLTHLiveWorkoutBottomMode: Equatable {
 
     var secondarySymbol: String? {
         switch self {
+        case .manualTimed(_, let paused): paused ? "play.fill" : "pause.fill"
         case .structuredActivity: "stop.circle"
         case .strengthRest, .strengthExerciseRest: "plus"
         case .strengthReady, .strengthWorking, .strengthNextExercise,

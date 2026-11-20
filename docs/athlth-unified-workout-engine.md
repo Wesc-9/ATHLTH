@@ -1,3 +1,9 @@
+## 2.2.6 – Quick Train-tidtaker på samme universelle livekontroll
+
+- Tidsstyrt Quick Train for sykling, roing, HIIT, sirkel, yoga, mobilitet og andre manuelle aktiviteter bruker nå den samme `ATHLTHLiveWorkoutBottomDock` som løping, styrke og den strukturerte øktspilleren. Pause, Fortsett og Avslutt og lagre er aktivitetstilpasset i ett kontrollkort.
+- Tidtakeren oppdaterer bare eksisterende `ATHLTHManualTimedCapture` og `CustomQuickWorkoutJournal`; ingen ekstra klokke, HealthKit-sesjon eller historikkskriver. Manuelle kilometer og RPE fortsetter å være merket som manuelle. Etterregistrering beholder egen lagreknapp siden den ikke er en liveøkt.
+- Beskyttelse: både pause og lagring er deaktivert før originalt opptak er opprettet. Test dekker sportene, pause-/fortsettikon og deaktivering. Fysisk enhetstest og samlet CI gjenstår.
+
 ## 2.2.6 – felles livekontroll og målvisning for alle treningsformer
 
 - Den opprinnelige strukturerte øktspilleren bruker nå `ATHLTHLiveWorkoutBottomDock`, samme felles bunnkontroll som løp/styrke. Én aktivitetsbasert `structuredActivity`-modus gir korrekt progresjonshandling, bekreftet avslutt og blokkposisjon. Pause og EMOM-/AMRAP-blokkering deaktiverer progresjon; eksisterende checkpoint, fullføringsjournal, opptakseier og original workout-ID beholdes.
