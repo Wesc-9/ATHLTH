@@ -793,8 +793,13 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         // SwiftUI's transient live status is lost on process termination.
         // Restore only from the same-account, original persisted checkpoint.
         // This remains behind reconcileSession's existing opt-in consent.
+        // While the original screen is open, use its committed status:
+        // avoid decoding a possibly large multi-sport recipe each poll.
+        // Only a missing transient status requires account-scoped recovery.
+        let liveStructured = structuredSession?.ownerID == trackingAccountID
+            ? structuredSession : nil
         let recoveredStructured: ATHLTHLocalStructuredWorkoutStatus? =
-            trackingAccountID.flatMap { accountID in
+            liveStructured == nil ? trackingAccountID.flatMap { accountID in
                 ATHLTHStructuredCaptureAdmission.activeCheckpoint(
                     for: accountID
                 ).flatMap {
@@ -802,10 +807,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         from: $0, ownerID: accountID
                     )
                 }
-            }
-        let activeStructured = recoveredStructured ??
-            (structuredSession?.ownerID == trackingAccountID
-                ? structuredSession : nil)
+            } : nil
+        let activeStructured = liveStructured ?? recoveredStructured
         if let activeStructured,
            !mirroredWatch.hasActiveMirroredWorkout {
             return ATHLTHStructuredSpectatorSnapshot.make(activeStructured)

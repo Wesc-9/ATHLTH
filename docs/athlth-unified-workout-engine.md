@@ -1,3 +1,8 @@
+## 2.2.6 – effektiv og sikker iPad-rekonstruksjon
+
+- Når original strukturert livevisning fortsatt er åpen, benyttes siste bekreftede interne UI-status. Bare ved faktisk prosess-/scene-gjenoppretting dekodes original, kontotilhørende checkpoint fra disk. Slik unngår vi å dekode store intervallplaner hvert fjerde sekund ved vanlig iPhone-bruk.
+- Manglende stegindeks eller ugyldig pauseregnskap gir ingen rekonstruert liveøkt. Norsk/engelsk fallback testes språk-uavhengig. Originalt samtykke, trenings-ID og kildeeiere beholdes.
+
 ## 2.2.6 – iPad kan hente tilbake den faktiske strukturerte økten
 
 - Den originale strukturerte iPhone-checkpointen lagrer nå valgfri `sourceTitle`, og iPad-spektatorens eksisterende iPhone-publisher kan gjenoppbygge read-only livevisning fra den verifiserte, kontotilhørende checkpointen etter prosessomstart. Samme trenings-ID, aktiv deløkt, tid, pause og stegposisjon beholdes. Historikk og motor opprettes ikke på nytt.

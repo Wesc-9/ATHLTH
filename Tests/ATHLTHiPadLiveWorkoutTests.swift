@@ -584,9 +584,38 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertTrue(snapshot.paused == true)
         XCTAssertEqual(snapshot.elapsedSeconds, 180)
         XCTAssertEqual(snapshot.kind, "yoga")
-        XCTAssertEqual(snapshot.title, "Workout") // English localization fallback
+        XCTAssertFalse(snapshot.title.isEmpty) // Locale-specific fallback
         XCTAssertNil(snapshot.activeCalories)
         XCTAssertNil(snapshot.currentPaceSecondsPerKilometer)
+    }
+
+
+    func testStructuredSpectatorCannotRestoreInvalidOriginalCheckpoint() {
+        let owner = UUID(), started = Date(timeIntervalSince1970: 1_900_000_000)
+        let block = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Mobility",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 120,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        let invalid = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: UUID(), savedAt: started,
+            startedAt: started, stepEnteredAt: started,
+            currentIndex: 1, completedIDs: [], results: [:],
+            modeStarts: [:], executionBlocks: [block],
+            emomWaiting: false, timedOutGroups: [],
+            enteredReps: 0, enteredWeight: ""
+        )
+        XCTAssertNil(ATHLTHLocalStructuredWorkoutStatus.restored(
+            from: invalid, ownerID: owner
+        ))
+        var corruptPause = invalid
+        corruptPause.currentIndex = 0
+        corruptPause.completedPauseSeconds = -.infinity
+        XCTAssertNil(ATHLTHLocalStructuredWorkoutStatus.restored(
+            from: corruptPause, ownerID: owner
+        ))
     }
 
 }
