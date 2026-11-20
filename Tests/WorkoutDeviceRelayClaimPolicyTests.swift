@@ -309,24 +309,23 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
 
     func testUnknownWatchStartRequiresExactLiveRequestIdentity() {
         let request = UUID()
-        let confirm = WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch
-        XCTAssertTrue(confirm(
+        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
             target: "apple_watch", serverRequestID: request,
             watchRequestID: request, failedAt: nil
         ))
-        XCTAssertFalse(confirm(
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
             target: "apple_watch", serverRequestID: request,
             watchRequestID: UUID(), failedAt: nil
         ))
-        XCTAssertFalse(confirm(
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
             target: "apple_watch", serverRequestID: request,
             watchRequestID: nil, failedAt: nil
         ))
-        XCTAssertFalse(confirm(
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
             target: "iphone", serverRequestID: request,
             watchRequestID: request, failedAt: nil
         ))
-        XCTAssertFalse(confirm(
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsUncertainWatchLaunch(
             target: "apple_watch", serverRequestID: request,
             watchRequestID: request, failedAt: Date()
         ))
@@ -360,13 +359,12 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
     func testServerCompletionReconciliationRequiresConfirmedMatchingRow() {
         let id = UUID()
         let now = Date()
-        let verify = WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion
-        XCTAssertTrue(verify([(id: id, completedAt: now, failedAt: nil)], commandID: id))
-        XCTAssertFalse(verify([], commandID: id))
-        XCTAssertFalse(verify([(id: UUID(), completedAt: now, failedAt: nil)], commandID: id))
-        XCTAssertFalse(verify([(id: id, completedAt: nil, failedAt: nil)], commandID: id))
-        XCTAssertFalse(verify([(id: id, completedAt: now, failedAt: now)], commandID: id))
-        XCTAssertFalse(verify([(id: id, completedAt: now, failedAt: nil),
+        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion([(id: id, completedAt: now, failedAt: nil)], commandID: id))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion([], commandID: id))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion([(id: UUID(), completedAt: now, failedAt: nil)], commandID: id))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion([(id: id, completedAt: nil, failedAt: nil)], commandID: id))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion([(id: id, completedAt: now, failedAt: now)], commandID: id))
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.confirmsPersistedCompletion([(id: id, completedAt: now, failedAt: nil),
                                (id: id, completedAt: now, failedAt: nil)], commandID: id))
     }
 
