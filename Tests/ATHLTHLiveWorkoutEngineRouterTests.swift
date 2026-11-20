@@ -217,8 +217,7 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
     func testDuplicateStageIdentityCannotAdvanceOrInventAnExtraWorkout() {
         let id = UUID()
         let first = block("Work", kind: .exercise, sequence: 1)
-        var duplicated = block("Rest", kind: .rest, sequence: 2)
-        duplicated.id = first.id
+        let duplicated = block("Work", kind: .exercise, sequence: 1)
         XCTAssertNil(ATHLTHLiveWorkoutEngineRouter.advance(
             workoutID: id, blocks: [first, duplicated], from: 0
         ))
