@@ -1,3 +1,9 @@
+## 2.2.6 – avsluttet Watch-styrke verifiserer samme original-ID i begge resultatfelt
+
+- `ATHLTHWatchStrengthResultIdentityPolicy.canReconcile` og `.matches` kontrollerer nå at et Watch-styrkeresultat med både `universalWorkoutID` og `strengthSnapshot.workoutID` peker på **samme opprinnelige styrkejournal**. Et motstridende resultatsnapshot avvises før gjenopprettelse, kalorikobling og fullføring.
+- Eldre Watch-resultater som aldri hadde universal-ID, kan fortsatt behandles under de eksisterende eier-/starttid-/journalreglene. Ingen historikk migreres eller skrives om, og ingen ekstra HealthKit-opptaker opprettes.
+- Pure XCTest dekker matching ID, konflikt og gammel manglende universal-ID. Full same-commit native CI og fysisk offline Watch→iPhone-resultatprøve gjenstår.
+
 ## 2.2.6 – asynkron HealthKit-fullføring og kommandokø verifiserer original eier
 
 - På Watch kontrolleres den eksakte originale `HKLiveWorkoutBuilder`-identiteten i `endCollection`-, `finishWorkout`- og `finishRoute`-callbacker, også **etter** venting på HealthKit. Et forsinket resultat eller feil fra en eldre sesjon kan ikke avslutte eller markere den nye økten som mislykket.

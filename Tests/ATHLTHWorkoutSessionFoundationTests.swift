@@ -931,4 +931,23 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
             .requireAvailableRecordingSlot(phone: phone, strength: strength))
     }
 
+    func testWatchStrengthCompletionRequiresOneConsistentOriginalIdentity() {
+        let strengthJournalID = UUID()
+        XCTAssertTrue(ATHLTHWatchStrengthResultIdentityPolicy
+            .hasConsistentRecordedIdentity(
+                universalWorkoutID: strengthJournalID,
+                strengthWorkoutID: strengthJournalID
+            ))
+        XCTAssertFalse(ATHLTHWatchStrengthResultIdentityPolicy
+            .hasConsistentRecordedIdentity(
+                universalWorkoutID: UUID(),
+                strengthWorkoutID: strengthJournalID
+            ), "Conflicting universal/strength identities must not finish another log")
+        XCTAssertTrue(ATHLTHWatchStrengthResultIdentityPolicy
+            .hasConsistentRecordedIdentity(
+                universalWorkoutID: nil,
+                strengthWorkoutID: strengthJournalID
+            ), "Legacy Watch strength result without universal ID stays compatible")
+    }
+
 }

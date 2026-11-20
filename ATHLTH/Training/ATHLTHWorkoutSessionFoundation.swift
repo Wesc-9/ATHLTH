@@ -494,6 +494,16 @@ enum ATHLTHWorkoutSessionFoundation {
 /// are accepted only for a phone-initiated Watch session with a very close
 /// HealthKit start time. Never match by workout kind or finish time alone.
 enum ATHLTHWatchStrengthResultIdentityPolicy {
+    /// A modern Watch result may contain both an ATHLTH session ID and the
+    /// original strength journal snapshot. They must refer to ONE recording.
+    /// A genuinely legacy Watch result can omit the universal ID.
+    static func hasConsistentRecordedIdentity(
+        universalWorkoutID: UUID?,
+        strengthWorkoutID: UUID
+    ) -> Bool {
+        universalWorkoutID == nil || universalWorkoutID == strengthWorkoutID
+    }
+
     /// A completed Watch strength result with the authoritative session
     /// snapshot is NOT a generic workout. When its matching strength log
     /// cannot be restored yet, leave the result in the durable queue
@@ -511,7 +521,12 @@ enum ATHLTHWatchStrengthResultIdentityPolicy {
             // use the existing Watch completion import path.
             return true
         }
-        guard strengthAccountReady else { return false }
+        guard strengthAccountReady,
+              let snapshot = result.strengthSnapshot,
+              hasConsistentRecordedIdentity(
+                  universalWorkoutID: result.universalWorkoutID,
+                  strengthWorkoutID: snapshot.workoutID
+              ) else { return false }
         if let activeStrength,
            matches(result: result, workout: activeStrength) {
             return true
@@ -544,7 +559,11 @@ enum ATHLTHWatchStrengthResultIdentityPolicy {
         }
 
         if let snapshot = result.strengthSnapshot {
-            return snapshot.workoutID == workout.id
+            return snapshot.workoutID == workout.id &&
+                hasConsistentRecordedIdentity(
+                    universalWorkoutID: result.universalWorkoutID,
+                    strengthWorkoutID: snapshot.workoutID
+                )
         }
 
         // Compatibility-only: Watch-only offline workouts without a stable
