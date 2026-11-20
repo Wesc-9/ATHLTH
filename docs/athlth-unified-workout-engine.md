@@ -1,3 +1,10 @@
+## 2.2.6 – HealthKit-delegater og Watch-klargjøring følger én original økt
+
+- Alle Watch `HKWorkoutSessionDelegate`-hendelser (tilstand, systemevent, feil og remote kommandoer) sjekker nå **objektidentiteten til økten som sendte hendelsen** før de endrer aktiv økt. En forsinket stopp/pause fra en gammel økt kan ikke fullføre eller pause et nytt opptak. Tilsvarende gjelder `HKLiveWorkoutBuilderDelegate`: gammelt puls-/kaloribatch kan ikke oppdatere en nyere builder.
+- Den asynkrone Watch-starten sjekker original `HKWorkoutSession` igjen etter HealthKit-mirroring og ved feil; en sen tilkoblingsmelding kan ikke starte timer/Coach/GPS for en annen økt. Feil fra opprinnelig start får ikke sette en ny/gjenopprettet økt til `failed`.
+- `WatchRouteStore.launchPreparedWorkout` reserverer én transient forberedelse på MainActor **før** rute, Audio Coach eller intervaller settes. To samtidige klargjorte kort kan ikke overskrive hverandres startkonfigurasjon mens Watch venter på iPhone/HealthKit. Reservasjonen frigjøres ved avvist eller fullført start.
+- Regresjoner dekker identitet ved sene HealthKit-delegater og eksklusiv preflight på tvers av Watch-aktiviteter. Ingen nye HealthKit-opptak eller persistente journaler. Native samme-commit CI og fysisk Watch/iPhone-/iPad-test må fortsatt gjennomføres.
+
 ## 2.2.6 – klargjort Watch-kort bekreftes mot samme originale opptak
 
 - `WatchRouteStore.launchPreparedWorkout` godtar ikke lenger bare at en tilfeldig Watch-økt står som `running` eller `paused` etter en asynkron start. Den opprinnelige Watch-starteren returnerer nå bare UUID-en til HealthKit-økten som **akkurat dette** startkallet fikk opprettet; kortet konsumeres kun når startbekreftelsen matcher aktiv original økt-ID og sport.

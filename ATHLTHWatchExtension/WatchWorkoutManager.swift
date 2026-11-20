@@ -4541,6 +4541,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastCoachMessage = nil
         resetAudioCoachThresholds()
 
+        var originalStartSessionIdentity: ObjectIdentifier?
         do {
             try await requestAuthorization()
 
@@ -4573,6 +4574,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
 
             workoutSession = session
+            originalStartSessionIdentity = ObjectIdentifier(session)
             workoutBuilder = builder
             // One ATHLTH identity, never a second recorder. Strength uses
             // its existing immutable strength-workout journal identity.
@@ -4611,8 +4613,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 }
             }
 
+            guard workoutSession === session else { return nil }
             do {
                 try await session.startMirroringToCompanionDevice()
+                guard workoutSession === session else { return nil }
                 mirroringActive = true
                 mirroringRetryPending = false
                 await sendLiveSnapshot(
@@ -4620,10 +4624,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     force: true
                 )
             } catch {
+                guard workoutSession === session else { return nil }
                 // Keep the workout running even when iPhone mirroring fails.
                 mirroringActive = false
                 mirroringRetryPending = true
             }
+
+            // Do not revive an ended session, nor mutate a replacement's
+            // GPS, live timer or Audio Coach after an awaited mirror send.
+            guard workoutSession === session,
+                  state != .ending, state != .completed,
+                  !finishing else { return nil }
 
             if configuration.locationType != .outdoor {
                 locationManager.stopUpdatingLocation()
@@ -4659,6 +4670,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // active workout cannot acknowledge a competing prepared card.
             return workoutSession === session ? startedWorkoutID : nil
         } catch {
+            // A late error from an old start must not mark a newer or
+            // restored HealthKit session as failed.
+            if let originalStartSessionIdentity {
+                guard ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                    activeSession: workoutSession.map { ObjectIdentifier($0) },
+                    incomingSession: originalStartSessionIdentity
+                ) else { return nil }
+            } else {
+                guard workoutSession == nil, state == .preparing else {
+                    return nil
+                }
+            }
             fail(error)
             return nil
         }
@@ -9812,9 +9835,16 @@ extension WatchWorkoutManager:
         date: Date
     ) {
         let rawState = toState.rawValue
+        let callbackIdentity = ObjectIdentifier(workoutSession)
 
         Task { @MainActor [weak self] in
             guard let self,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: self.workoutSession.map {
+                          ObjectIdentifier($0)
+                      },
+                      incomingSession: callbackIdentity
+                  ),
                   let state =
                     HKWorkoutSessionState(
                         rawValue: rawState
@@ -9836,9 +9866,16 @@ extension WatchWorkoutManager:
     ) {
         let rawType =
             event.type.rawValue
+        let callbackIdentity = ObjectIdentifier(workoutSession)
 
         Task { @MainActor [weak self] in
             guard let self,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: self.workoutSession.map {
+                          ObjectIdentifier($0)
+                      },
+                      incomingSession: callbackIdentity
+                  ),
                   let type =
                     HKWorkoutEventType(
                         rawValue: rawType
@@ -9858,9 +9895,17 @@ extension WatchWorkoutManager:
         didFailWithError error: Error
     ) {
         let message = error.localizedDescription
+        let callbackIdentity = ObjectIdentifier(workoutSession)
 
         Task { @MainActor [weak self] in
-            self?.fail(message: message)
+            guard let self,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: self.workoutSession.map {
+                          ObjectIdentifier($0)
+                      },
+                      incomingSession: callbackIdentity
+                  ) else { return }
+            self.fail(message: message)
         }
     }
 
@@ -9869,8 +9914,15 @@ extension WatchWorkoutManager:
         didReceiveDataFromRemoteWorkoutSession
             data: [Data]
     ) {
+        let callbackIdentity = ObjectIdentifier(workoutSession)
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: self.workoutSession.map {
+                          ObjectIdentifier($0)
+                      },
+                      incomingSession: callbackIdentity
+                  ) else { return }
 
             for payload in data {
                 if let receipt = try? JSONDecoder().decode(
@@ -10009,11 +10061,15 @@ extension WatchWorkoutManager:
                     \.identifier
                 )
             )
+        let callbackIdentity = ObjectIdentifier(workoutBuilder)
 
         Task { @MainActor [weak self] in
             guard let self,
-                  let builder =
-                    self.workoutBuilder
+                  let builder = self.workoutBuilder,
+                  ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                      activeSession: ObjectIdentifier(builder),
+                      incomingSession: callbackIdentity
+                  )
             else {
                 return
             }

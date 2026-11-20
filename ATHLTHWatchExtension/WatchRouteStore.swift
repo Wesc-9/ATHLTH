@@ -64,6 +64,9 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var todayWorkout: WatchTodayWorkoutTransfer?
     @Published private(set) var todayWorkouts: [WatchTodayWorkoutTransfer] = []
     @Published private(set) var preparedWorkout: WatchPreparedWorkoutTransfer?
+    // One transient preflight at a time, before any card can mutate the
+    // shared manager's route, coach or interval configuration.
+    private var pendingPreparedLaunchID: UUID?
     @Published private(set) var petCatalog: [WatchPetIdentity] = []
     @Published private(set) var selectedPetIDs: Set<UUID> = []
     private(set) var companionAccountID: UUID?
@@ -456,10 +459,20 @@ final class WatchRouteStore: NSObject, ObservableObject {
         let route = workout.routeID.flatMap {
             self.route(with: $0)
         }
-        guard workout.routeID == nil || route != nil else {
-            return false
+        guard workout.routeID == nil || route != nil,
+              ATHLTHWatchPreparedLaunchReservationPolicy.mayBegin(
+                  pendingID: pendingPreparedLaunchID
+              ) else { return false }
+
+        pendingPreparedLaunchID = workout.id
+        defer {
+            if pendingPreparedLaunchID == workout.id {
+                pendingPreparedLaunchID = nil
+            }
         }
 
+        // Claim the preflight synchronously on the MainActor before the
+        // asynchronous phone check; another card cannot replace this payload.
         manager.configureCalendarSessionID(workout.plannedSessionID)
         manager.configurePlannedRoute(route)
         manager.configureAudioCoach(workout.audioCoach ?? .disabled)

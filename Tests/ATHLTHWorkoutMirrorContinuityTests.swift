@@ -405,4 +405,42 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
     }
 
 
+    func testWatchDelegateAndBuilderCallbacksRequireTheOriginalSession() {
+        // Events are queued between HealthKit's delegate queue and MainActor.
+        // Session A must not stop/alter B after a restart or recovery.
+        let old = NSObject(), current = NSObject()
+        for incoming: ObjectIdentifier? in [
+            ObjectIdentifier(old), nil
+        ] {
+            XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+                activeSession: ObjectIdentifier(current),
+                incomingSession: incoming ?? ObjectIdentifier(old)
+            ))
+        }
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+            activeSession: ObjectIdentifier(current),
+            incomingSession: ObjectIdentifier(current)
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+            activeSession: nil,
+            incomingSession: ObjectIdentifier(current)
+        ))
+    }
+
+    func testPreparedWatchLaunchPreflightIsExclusiveUntilReleased() {
+        XCTAssertTrue(ATHLTHWatchPreparedLaunchReservationPolicy.mayBegin(
+            pendingID: nil
+        ))
+        for kind in WatchWorkoutKind.allCases {
+            XCTAssertFalse(ATHLTHWatchPreparedLaunchReservationPolicy.mayBegin(
+                pendingID: UUID()
+            ), "Concurrent prepared launch must be rejected: \\(kind.rawValue)")
+        }
+        // After the originating async launch returns, that reservation can
+        // be released even on denied authorization or failed HealthKit start.
+        XCTAssertTrue(ATHLTHWatchPreparedLaunchReservationPolicy.mayBegin(
+            pendingID: nil
+        ))
+    }
+
 }
