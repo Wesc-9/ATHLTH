@@ -243,7 +243,8 @@ enum ATHLTHUniversalActiveCapture {
             verified = nil
         }
         return ATHLTHUniversalActiveCaptureState(
-            workoutID: id, plannedSessionID: nil,
+            workoutID: id,
+            plannedSessionID: snapshot.plannedCalendarSessionID,
             recordingOwner: .appleWatch, source: .watchMirror,
             activityCategory: category, engine: engine,
             phase: snapshot.state == .paused ? .paused : .work,
@@ -342,6 +343,15 @@ enum ATHLTHUniversalActiveCapture {
             mirrorStartedAt: mirror?.snapshot?.startedAt
         ) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
+        // Validate the ORIGINAL Watch account even when a matching
+        // Watch-owned strength journal is already available on iPhone.
+        // An old or cross-account mirror cannot authorize live telemetry.
+        if mirrorActive {
+            guard let snapshot = mirror?.snapshot,
+                  mirroredWatch(snapshot, for: userID, at: now) != nil else {
+                throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+            }
         }
         let result = try unique(
             running: running, strength: strength,

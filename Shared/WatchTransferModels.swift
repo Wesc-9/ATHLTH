@@ -2061,6 +2061,9 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     /// Exact owner captured when the Watch HealthKit workout began. Missing
     /// on older paired builds; cannot authorize private iPad telemetry.
     var accountOwnerID: UUID? = nil
+    /// Exact planned session captured by the original Watch HealthKit
+    /// recording. Nil for free workouts and older paired Watch builds.
+    var plannedCalendarSessionID: UUID? = nil
     /// Stable ATHLTH session identity for Watch-strength mirror updates.
     /// Optional for older paired Watch apps; no new HealthKit session.
     var strengthWorkoutID: UUID? = nil

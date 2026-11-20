@@ -1,3 +1,10 @@
+## 2.2.6 – planbundet Watch-live uten tapt originalidentitet
+
+- Watch inkluderer nå `plannedCalendarSessionID` i det opprinnelige live-snapshotet, i tillegg til allerede lagret Watch-gjenoppretting og resultat. Universell aktiv Watch-projeksjon viser original planlagt session-ID for alle støttede Watch-aktiviteter; fri trening og legacy Watch-overføringer forblir uten plan-ID.
+- Ved aktivt Watch-speil kontrolleres original konto og gyldig snapshot også hvis et matchende styrkecheckpoint allerede finnes på iPhone. Fremmed/gammel melding kan ikke autorisere et livespeil.
+- Nye XCTest dekker alle native Watch-idretter, pause, fri økt, legacy Codable og kontobytte. Ingen ny HealthKit-sesjon, opptaker eller treningshistorikk.
+- Samme-commit iPhone/iPad/watchOS-build, XCTest og fysiske HealthKit/samtykke-prøver kreves før releasegodkjenning.
+
 ## 2.2.6 – planlenken overlever Apple Watch-appomstart
 
 - Eksisterende Watch HealthKit-gjenopprettingscheckpoint har nå `plannedCalendarSessionID` som et valgfritt, bakoverkompatibelt felt, i tillegg til original ATHLTH-ID, eier, fjernstart-ID, rute og tidslinje. Ved ny appstart tas kalenderkoblingen med videre til originalt resultat og planoppfølging.

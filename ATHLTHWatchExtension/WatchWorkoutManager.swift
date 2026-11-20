@@ -9139,6 +9139,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             kind == .strength ? strengthSession?.workoutID : nil
         snapshot.universalWorkoutID = universalWorkoutID
         snapshot.accountOwnerID = workoutOwnerID
+        // Publish only the actual session's original calendar identity.
+        snapshot.plannedCalendarSessionID = plannedCalendarSessionID
 
         if let progress = runningStepProgress, let structure = structuredRunningWorkout {
             snapshot.runningOverallProgress = ATHLTHRunningStepEngine.overallProgress(

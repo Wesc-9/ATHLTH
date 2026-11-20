@@ -669,4 +669,87 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         XCTAssertEqual(state.elapsedSeconds, 90)
     }
 
+
+    func testWatchPlannedLiveIdentitySurvivesPauseAndLegacyDecoding() throws {
+        let planned = UUID(), owner = UUID(), original = UUID()
+        let kinds: [WatchWorkoutKind] = [
+            .running, .walking, .strength, .cycling, .rowing,
+            .stairClimbing, .hiit, .functional, .yoga, .other
+        ]
+        for kind in kinds {
+            var snapshot = WatchWorkoutLiveSnapshot(
+                kind: kind, state: .running, startedAt: started,
+                capturedAt: started.addingTimeInterval(90),
+                elapsedTime: 75, heartRate: 125,
+                activeCalories: 20, distanceMeters: 0,
+                averageHeartRate: nil, maxHeartRate: nil,
+                routePointCount: 0
+            )
+            snapshot.universalWorkoutID = original
+            snapshot.accountOwnerID = owner
+            if kind == .strength { snapshot.strengthWorkoutID = original }
+            snapshot.plannedCalendarSessionID = planned
+            let decoded = try JSONDecoder().decode(
+                WatchWorkoutLiveSnapshot.self,
+                from: JSONEncoder().encode(snapshot)
+            )
+            let live = try XCTUnwrap(
+                ATHLTHUniversalActiveCapture.mirroredWatch(
+                    decoded, for: owner, at: decoded.capturedAt
+                )
+            )
+            XCTAssertEqual(live.workoutID, original)
+            XCTAssertEqual(live.plannedSessionID, planned, kind.rawValue)
+            XCTAssertNil(
+                ATHLTHUniversalActiveCapture.mirroredWatch(
+                    decoded, for: UUID(), at: decoded.capturedAt
+                )
+            )
+            snapshot.state = .paused
+            let paused = try XCTUnwrap(
+                ATHLTHUniversalActiveCapture.mirroredWatch(
+                    snapshot, for: owner, at: snapshot.capturedAt
+                )
+            )
+            XCTAssertEqual(paused.phase, .paused)
+            XCTAssertEqual(paused.plannedSessionID, planned)
+            snapshot.plannedCalendarSessionID = nil
+            let free = try XCTUnwrap(
+                ATHLTHUniversalActiveCapture.mirroredWatch(
+                    snapshot, for: owner, at: snapshot.capturedAt
+                )
+            )
+            XCTAssertNil(free.plannedSessionID)
+        }
+
+        var legacy = WatchWorkoutLiveSnapshot(
+            kind: .cycling, state: .running, startedAt: started,
+            capturedAt: started.addingTimeInterval(90),
+            elapsedTime: 75, heartRate: 125,
+            activeCalories: 20, distanceMeters: 0,
+            averageHeartRate: nil, maxHeartRate: nil,
+            routePointCount: 0
+        )
+        legacy.universalWorkoutID = original
+        legacy.accountOwnerID = owner
+        var json = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(legacy)
+            ) as? [String: Any]
+        )
+        json.removeValue(forKey: "plannedCalendarSessionID")
+        let legacyData = try JSONSerialization.data(withJSONObject: json)
+        let decodedLegacy = try JSONDecoder().decode(
+            WatchWorkoutLiveSnapshot.self, from: legacyData
+        )
+        XCTAssertNil(decodedLegacy.plannedCalendarSessionID)
+        let restored = try XCTUnwrap(
+            ATHLTHUniversalActiveCapture.mirroredWatch(
+                decodedLegacy, for: owner, at: decodedLegacy.capturedAt
+            )
+        )
+        XCTAssertEqual(restored.workoutID, original)
+        XCTAssertNil(restored.plannedSessionID)
+    }
+
 }
