@@ -450,6 +450,19 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         mirroredWatch: WorkoutMirroringStore,
         spotify: SpotifyPlaybackStore
     ) -> ATHLTHCrossDeviceWorkoutSnapshot? {
+        // This spectator can only publish one verified source at a time.
+        // No priority branch may hide a second competing active journal.
+        guard ATHLTHUniversalActiveCapture.sourcesConsistent(
+            running: phone.activeSessionState,
+            strength: strength.activeSessionState,
+            manualActive: ATHLTHManualTimedCapture.hasActiveCapture,
+            structuredActive: ATHLTHStructuredCaptureAdmission.hasActiveCapture,
+            watchMirrorActive: mirroredWatch.hasActiveMirroredWorkout ||
+                ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive,
+            mirrorStrengthWorkoutID:
+                mirroredWatch.snapshot?.strengthWorkoutID,
+            mirrorStartedAt: mirroredWatch.snapshot?.startedAt
+        ) else { return nil }
         if let log = strength.activeWorkout {
             let exercise = strength.currentExerciseIndex
             let activeName = log.exercises.indices.contains(exercise)

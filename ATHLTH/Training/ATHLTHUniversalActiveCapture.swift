@@ -29,6 +29,48 @@ struct ATHLTHUniversalActiveCaptureState: Equatable {
 }
 
 enum ATHLTHUniversalActiveCapture {
+    /// Fail closed when two different original recordings are simultaneously
+    /// visible after reconnect. An iPhone/Watch hybrid projection may overlap
+    /// only when the existing stores prove the SAME recorded workout.
+    static func sourcesConsistent(
+        running: ATHLTHWorkoutSessionState?,
+        strength: ATHLTHWorkoutSessionState?,
+        manualActive: Bool,
+        structuredActive: Bool,
+        watchMirrorActive: Bool,
+        mirrorStrengthWorkoutID: UUID?,
+        mirrorStartedAt: Date?
+    ) -> Bool {
+        if running != nil && strength != nil {
+            guard (try? ATHLTHWorkoutSessionFoundation.uniqueActiveSession(
+                running: running, strength: strength
+            )) != nil else { return false }
+        }
+
+        let timedCount = (manualActive ? 1 : 0) +
+            (structuredActive ? 1 : 0)
+        guard timedCount <= 1 else { return false }
+        if timedCount > 0 {
+            guard running == nil, strength == nil,
+                  !watchMirrorActive else { return false }
+        }
+        if watchMirrorActive {
+            // A mirrored Watch recording cannot share the slot with an
+            // unrelated iPhone recording. Watch-run has no durable local ID,
+            // so never guess that a running phone checkpoint is the mirror.
+            guard running == nil else { return false }
+            if let strength {
+                guard strength.recordingOwner == .appleWatch,
+                      mirrorStrengthWorkoutID == strength.workoutID,
+                      let mirrorStartedAt,
+                      abs(strength.startedAt.timeIntervalSince(
+                          mirrorStartedAt
+                      )) <= 5 else { return false }
+            }
+        }
+        return true
+    }
+
     /// Running and strength continue to own their historical checkpoints,
     /// HealthKit writer, and final results. No extra mutable store is created.
     static func recorded(
@@ -189,18 +231,28 @@ enum ATHLTHUniversalActiveCapture {
         }
         let running = ATHLTHWorkoutRecordingArbiter.phone?.activeSessionState
         let strength = ATHLTHWorkoutRecordingArbiter.strength?.activeSessionState
+        let mirror = ATHLTHWorkoutRecordingArbiter.mirror
+        let mirrorActive = ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive ||
+            mirror?.hasActiveMirroredWorkout == true
+        guard sourcesConsistent(
+            running: running, strength: strength,
+            manualActive: ATHLTHManualTimedCapture.hasActiveCapture,
+            structuredActive: ATHLTHStructuredCaptureAdmission.hasActiveCapture,
+            watchMirrorActive: mirrorActive,
+            mirrorStrengthWorkoutID: mirror?.snapshot?.strengthWorkoutID,
+            mirrorStartedAt: mirror?.snapshot?.startedAt
+        ) else {
+            throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
+        }
         let result = try unique(
             running: running, strength: strength,
             manual: manual, structured: structured, at: now
         )
-        // A Watch mirror may still own the real session before its phone
-        // checkpoint is available. Never report that state as an empty slot.
-        if result == nil && (
-            ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
-            ATHLTHWorkoutRecordingArbiter.phone?.hasPendingLaunch == true ||
-            ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive ||
-            ATHLTHWorkoutRecordingArbiter.mirror?.hasActiveMirroredWorkout == true
-        ) {
+        // An in-flight launch cannot silently coexist with an already
+        // active journal, and an orphan Watch mirror is not a free slot.
+        if ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
+           ATHLTHWorkoutRecordingArbiter.phone?.hasPendingLaunch == true ||
+           (result == nil && mirrorActive) {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         return result

@@ -200,4 +200,28 @@ final class ATHLTHStructuredCaptureAdmissionTests: XCTestCase {
         ))
     }
 
+
+    func testActiveRecoveryNeverCreatesFreshCheckpointOverExistingAdmission() {
+        XCTAssertTrue(
+            ATHLTHStructuredRecoveryWritePolicy.canCreateFreshCheckpoint(
+                alreadyAdmitted: false, restored: false
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHStructuredRecoveryWritePolicy.canCreateFreshCheckpoint(
+                alreadyAdmitted: true, restored: false
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHStructuredRecoveryWritePolicy.canCreateFreshCheckpoint(
+                alreadyAdmitted: true, restored: true
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHStructuredRecoveryWritePolicy.canCreateFreshCheckpoint(
+                alreadyAdmitted: false, restored: true
+            )
+        )
+    }
+
 }

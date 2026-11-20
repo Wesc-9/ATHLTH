@@ -1,3 +1,10 @@
+## ATHLTH 2.2.6 – sikker sammenkobling av opptaksjournaler
+
+- Den universelle lesemotoren og den samtykkestyrte iPad-spektatoren avviser nå motstridende samtidige opptak, i stedet for å plukke én tilfeldig kilde. En Watch-eid styrkeøkt kan speiles ved bekreftet samme opprinnelige UUID og starttid; et annet aktivt iPhone-opptak skal aldri skjules.
+- Pending opptaksreservasjon kan ikke behandles som en ekstra ledig økt etter at opptaket begynner.
+- Ved gjenåpning av en tidligere innlagt strukturert økt kreves original lesbar checkpoint. Skadet/manglende data overskrives ikke med tom økt eller ny historikk. Bare en faktisk ny start kan opprette første checkpoint.
+- Nye rene regresjonstester dekker konflikt, Watch-identitet, pause og trygg gjenoppretting. Full iOS/iPad/watchOS/HealthKit test foreligger fortsatt ikke.
+
 ## 2.2.6 – én felles opptaks- og planrute
 
 `ATHLTHPlannedWorkoutCaptureRoute.resolve` er nå kanonisk beslutningspunkt for Hjem-kalenderens planlagte økter. Blokker med flere aktiviteter kan ikke lenger bli feilaktig startet som bare løping, styrke eller en annen Watch-idrett. En gyldig løp/styrke-hybrid bruker samme originale styrkehybridjournal; en økt med løping og yoga blir en strukturert manuell iPhone-økt eller avvist på Watch. Støttede enkle idretter beholder eksisterende Watch HealthKit-opptaker. `ATHLTHUniversalWorkoutAdmission.isOccupied` samler åtte opptakstilstander og brukes av Train, Custom Quick, Hjem-kalender, planstart og styrke. Endelig start krever fortsatt den opprinnelige globale opptaksreservasjonen. Ingen ny HKWorkoutSession, GPS-kilde, historikkfil eller datamigrering er introdusert. Må testes på samme commit og fysiske enheter før release.

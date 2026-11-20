@@ -4,6 +4,16 @@ import Foundation
 /// checkpoint and completion journal. This admission index only reserves
 /// the existing universal recording slot; it never records a second workout,
 /// changes HealthKit ownership or rewrites a planned recipe.
+/// An existing admitted session must restore the original valid checkpoint.
+/// If its bytes are missing/corrupt, never overwrite them with an empty run.
+enum ATHLTHStructuredRecoveryWritePolicy {
+    static func canCreateFreshCheckpoint(
+        alreadyAdmitted: Bool, restored: Bool
+    ) -> Bool {
+        !alreadyAdmitted && !restored
+    }
+}
+
 @MainActor
 enum ATHLTHStructuredCaptureAdmission {
     private static var owner: UUID?

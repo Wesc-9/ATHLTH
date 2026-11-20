@@ -292,4 +292,68 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         }
     }
 
+
+    func testConflictingCaptureSourcesCannotHideAnotherWorkout() {
+        let now = started
+        let running = ATHLTHWorkoutSessionState(
+            workoutID: UUID(), plannedSessionID: nil,
+            recordingOwner: .iPhone, activity: .running,
+            phase: .work, engine: .endurance,
+            startedAt: now, activeElapsedSeconds: 35,
+            stageIndex: nil, stageCount: nil
+        )
+        let strength = ATHLTHWorkoutSessionState(
+            workoutID: UUID(), plannedSessionID: nil,
+            recordingOwner: .iPhone, activity: .strength,
+            phase: .work, engine: .strength,
+            startedAt: now, activeElapsedSeconds: 35,
+            stageIndex: nil, stageCount: nil
+        )
+        func consistent(
+            run: ATHLTHWorkoutSessionState? = nil,
+            lifting: ATHLTHWorkoutSessionState? = nil,
+            manual: Bool = false, structured: Bool = false,
+            mirror: Bool = false, watchID: UUID? = nil,
+            watchStart: Date? = nil
+        ) -> Bool {
+            ATHLTHUniversalActiveCapture.sourcesConsistent(
+                running: run, strength: lifting,
+                manualActive: manual, structuredActive: structured,
+                watchMirrorActive: mirror,
+                mirrorStrengthWorkoutID: watchID,
+                mirrorStartedAt: watchStart
+            )
+        }
+        XCTAssertTrue(consistent(run: running))
+        XCTAssertTrue(consistent(manual: true))
+        XCTAssertTrue(consistent(structured: true))
+        XCTAssertFalse(consistent(run: running, lifting: strength))
+        XCTAssertFalse(consistent(run: running, manual: true))
+        XCTAssertFalse(consistent(lifting: strength, structured: true))
+        XCTAssertFalse(consistent(manual: true, structured: true))
+        XCTAssertFalse(consistent(run: running, mirror: true))
+        XCTAssertFalse(consistent(manual: true, mirror: true))
+        XCTAssertFalse(consistent(lifting: strength, mirror: true))
+        let watchStrength = ATHLTHWorkoutSessionState(
+            workoutID: strength.workoutID, plannedSessionID: nil,
+            recordingOwner: .appleWatch, activity: .strength,
+            phase: .work, engine: .strength,
+            startedAt: now, activeElapsedSeconds: 35,
+            stageIndex: nil, stageCount: nil
+        )
+        XCTAssertTrue(consistent(
+            lifting: watchStrength, mirror: true,
+            watchID: watchStrength.workoutID, watchStart: now
+        ))
+        XCTAssertFalse(consistent(
+            lifting: watchStrength, mirror: true,
+            watchID: UUID(), watchStart: now
+        ))
+        XCTAssertFalse(consistent(
+            lifting: watchStrength, mirror: true,
+            watchID: watchStrength.workoutID,
+            watchStart: now.addingTimeInterval(-100)
+        ))
+    }
+
 }

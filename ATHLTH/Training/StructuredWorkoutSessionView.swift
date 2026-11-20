@@ -411,6 +411,19 @@ struct StructuredWorkoutSessionView: View {
             }
             .onAppear {
                 guard !hasStarted else { return }
+                let hadOriginalAdmission =
+                    ATHLTHStructuredCaptureAdmission.activeWorkoutID ==
+                        workout.id
+                if hadOriginalAdmission &&
+                   ATHLTHStructuredCaptureAdmission.activeCheckpoint(
+                       for: session.profile.userID
+                   ) == nil {
+                    persistenceErrorMessage = ATHLTHLocalization.choose(
+                        english: "The previous workout checkpoint is unavailable or damaged. It has not been replaced.",
+                        norwegian: "Forrige øktsjekkpunkt kan ikke leses eller er skadet. Det er ikke overskrevet."
+                    )
+                    return
+                }
                 do {
                     try ATHLTHStructuredCaptureAdmission.admit(
                         workoutID: workout.id,
@@ -421,6 +434,17 @@ struct StructuredWorkoutSessionView: View {
                     return
                 }
                 if !restoreCheckpoint() {
+                    guard ATHLTHStructuredRecoveryWritePolicy
+                        .canCreateFreshCheckpoint(
+                            alreadyAdmitted: hadOriginalAdmission,
+                            restored: false
+                        ) else {
+                        persistenceErrorMessage = ATHLTHLocalization.choose(
+                            english: "Workout recovery failed. The original checkpoint is preserved.",
+                            norwegian: "Kunne ikke gjenopprette økten. Det opprinnelige sjekkpunktet er bevart."
+                        )
+                        return
+                    }
                     activeExecutionBlocks = ATHLTHStructuredAMRAPProgression.initialSteps(
                         from: workout.resolvedWorkoutBlocks
                     )
