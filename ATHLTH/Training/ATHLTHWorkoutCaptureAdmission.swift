@@ -7,6 +7,15 @@ import Foundation
 /// No new session is allocated here. The existing recording arbiter still
 /// reserves the only recording slot after this validation succeeds.
 enum ATHLTHWorkoutCaptureAdmission {
+    /// A legacy Watch result without an explicit source workout ID may be
+    /// reconciled only with one pending plan of exactly the recorded sport.
+    /// Time-window + unique pending ID checks stay in AppSessionStore.
+    static func matchesCompletedWatchKind(
+        _ workout: PlannedSession, actual: WatchWorkoutKind
+    ) -> Bool {
+        watchKind(for: workout) == actual
+    }
+
     /// Resolve the correct already-supported Watch HealthKit activity for
     /// an explicitly named simple workout. This is only a capture *choice*;
     /// it does not allocate a new workout, change the saved plan, or claim

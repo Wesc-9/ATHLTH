@@ -2309,8 +2309,9 @@ final class AppSessionStore: ObservableObject {
                     .flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
                     .first(where: { $0.id == id })
             guard let planned,
-                  PlannedWorkoutWatchBuilder.watchKind(for: planned.kind) ==
-                    result.kind else { return nil }
+                  ATHLTHWorkoutCaptureAdmission.matchesCompletedWatchKind(
+                      planned, actual: result.kind
+                  ) else { return nil }
             return id
         }
         guard candidates.count == 1, let matchedID = candidates.first else {

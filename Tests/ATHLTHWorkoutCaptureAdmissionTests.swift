@@ -184,4 +184,24 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         ))
     }
 
+
+    func testWatchCompletionCorrelatesOnlyWithActualSupportedSport() {
+        for (category, expected) in [
+            ("cycling", WatchWorkoutKind.cycling),
+            ("rowing", .rowing), ("hiit", .hiit),
+            ("stairclimber", .stairClimbing), ("yoga", .yoga)
+        ] {
+            let planned = session(.custom, category: category)
+            XCTAssertTrue(ATHLTHWorkoutCaptureAdmission
+                .matchesCompletedWatchKind(planned, actual: expected))
+            XCTAssertFalse(ATHLTHWorkoutCaptureAdmission
+                .matchesCompletedWatchKind(planned, actual: .strength))
+            XCTAssertFalse(ATHLTHWorkoutCaptureAdmission
+                .matchesCompletedWatchKind(planned, actual: .running))
+        }
+        let unsupported = session(.custom, category: "meditation")
+        XCTAssertFalse(ATHLTHWorkoutCaptureAdmission
+            .matchesCompletedWatchKind(unsupported, actual: .yoga))
+    }
+
 }

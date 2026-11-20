@@ -1,3 +1,7 @@
+## 2.2.6 – Watch-resultater for flere treningsformer
+
+Eldre Watch-resultater uten eksplisitt plan-ID kan nå knyttes til korrekt planlagt sykling, roing, HIIT, trapp, yoga og andre støttede aktiviteter når den eksisterende tre-minuttersregelen finner nøyaktig én gyldig, aktiv plan. Vi matcher aldri en meditasjonsøkt som yoga eller en annen aktivitet som styrke, og lager ingen ekstra historikk.
+
 ## 2.2.6 – vedvarende pause og aktiv tidsmåling
 
 Strukturert iPhone-motor har nå én pauseklokke i originalcheckpointen. Pause stopper deltrinns-/EMOM-/AMRAP-klokken, gjenoppta forskyver deres eksisterende ankere, og aktiv varighet i sammendraget ekskluderer brukerpauser. Historiske checkpoints og fullføringer dekodes via valgfrie felt. Universalmotor og privat iPad-spektator ser samme pause og fryste tid. Ugyldig pause beskyttes, ikke overstyres. Ingen separat HealthKit-opptaker eller ekstra historikk.
