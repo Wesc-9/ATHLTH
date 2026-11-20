@@ -1,3 +1,9 @@
+## 2.2.6 – opprinnelig plan er alltid fasit ved løpeopptak
+
+- Den samme planen som er validert mot `plannedPlanID/plannedSessionID` prioriteres nå som kilden til både 1) treningsintervaller som lastes til Watch/iPhone, 2) validering før opptaksstart og 3) eventuell planlagt rute. Dermed kan et gammelt Quick Run-utkast eller en mottatt kopi med annet routeID/drag ikke overstyre treningsplanen mens den bokføres som original.
+- Vanlige frie Quick Run-konfigurasjoner bruker fremdeles sitt eget Advanced-utkast. Et bevisst manuelt rutevalg (`configuration.route`) har fortsatt forrang over planruten. Ingen endring i workout UUID, HealthKit-writer eller opptakslagring.
+- XCTest dekker gammel plan-kopi med motsigende intervaller og rute, samt fortsatt støtte for Quick Run uten plan. Native compile/test på samme commit og fysisk enhetsverifikasjon gjenstår.
+
 ## 2.2.6 – originale opptakslogger styrer den felles opptaksplassen
 
 - Alle nye iPhone/Watch-preflight-sperrer kontrollerer både de opprinnelige `PhoneWorkout`- og `StrengthWorkoutLog`-objektene og de avledede universelle sesjonsprojeksjonene. Dersom en eksisterende journal er lastet inn, men en Live/HealthKit-projeksjon mangler et øyeblikk under gjenoppretting, skal en ny treningsform IKKE kunne overta det opptaket.

@@ -20,6 +20,27 @@ enum ATHLTHPlannedLaunchIdentityPolicy {
     }
 }
 
+/// A plan-bound run must always use the saved original recipe and route.
+/// Draft Quick Run settings may provide explicit personal playback choices,
+/// but a stale editor/relay copy cannot silently replace scheduled stages.
+enum ATHLTHPlannedEnduranceRecipePolicy {
+    static func canonicalSource(
+        planned: PlannedSession?,
+        quickAdvanced: PlannedSession?
+    ) -> PlannedSession? {
+        planned ?? quickAdvanced
+    }
+
+    static func canonicalRouteID(
+        planned: PlannedSession?,
+        quickAdvanced: PlannedSession?,
+        quickWorkoutRouteID: UUID?
+    ) -> UUID? {
+        if let planned { return planned.routeID }
+        return quickAdvanced?.routeID ?? quickWorkoutRouteID
+    }
+}
+
 enum ATHLTHPlannedWorkoutCaptureRoute: Equatable {
     case phoneEndurance
     case phoneStrength

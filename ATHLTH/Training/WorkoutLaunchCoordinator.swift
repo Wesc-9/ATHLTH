@@ -831,7 +831,11 @@ enum WorkoutLaunchCoordinator {
 
         // Validate the shared timeline before handing a workout to iPad,
         // HealthKit, Apple Watch or the iPhone recording store.
-        if let advanced = configuration.advancedWorkout,
+        let sourceAdvanced = ATHLTHPlannedEnduranceRecipePolicy.canonicalSource(
+            planned: plannedRunningWorkout,
+            quickAdvanced: configuration.advancedWorkout
+        )
+        if let advanced = sourceAdvanced,
            let issue = ATHLTHQuickRunTimelineAdapter.validationError(for: advanced) {
             throw NSError(
                 domain: "ATHLTH.QuickRunTimeline", code: 1,
@@ -907,8 +911,11 @@ enum WorkoutLaunchCoordinator {
             }
 
             guard let routeID =
-                    configuration.advancedWorkout?.routeID ??
-                    configuration.workout?.routeID
+                    ATHLTHPlannedEnduranceRecipePolicy.canonicalRouteID(
+                        planned: plannedRunningWorkout,
+                        quickAdvanced: configuration.advancedWorkout,
+                        quickWorkoutRouteID: configuration.workout?.routeID
+                    )
             else {
                 return nil
             }
@@ -962,7 +969,13 @@ enum WorkoutLaunchCoordinator {
         // iPhone/Watch running transfer rather than launching an untargeted
         // Free Run. The plan/session IDs come from an explicit plan launch.
         let structuredWorkout =
-            configuration.advancedWorkout.flatMap {
+            plannedRunningWorkout.map {
+                PlannedWorkoutWatchBuilder.runningTransfer(
+                    from: $0,
+                    routeAlerts: configuration.routeAlerts,
+                    autoPauseEnabled: configuration.autoPauseEnabled
+                )
+            } ?? configuration.advancedWorkout.flatMap {
                 ATHLTHQuickRunTimelineAdapter.transfer(
                     from: $0,
                     title: configuration.title,
@@ -980,12 +993,6 @@ enum WorkoutLaunchCoordinator {
                             configuration
                                 .autoPauseEnabled
                     )
-            } ?? plannedRunningWorkout.map {
-                PlannedWorkoutWatchBuilder.runningTransfer(
-                    from: $0,
-                    routeAlerts: configuration.routeAlerts,
-                    autoPauseEnabled: configuration.autoPauseEnabled
-                )
             } ?? (
                 configuration.mode == .route
                     ? configuration.routeWarmup.runningTransfer(

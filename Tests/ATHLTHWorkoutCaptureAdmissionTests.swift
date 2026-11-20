@@ -421,4 +421,45 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         ))
     }
 
+
+    func testOriginalPlannedRecipeCannotBeOverwrittenByRelayedQuickDraft() {
+        var original = session(.running)
+        let route = UUID(), wrongRoute = UUID()
+        original.routeID = route
+        let stale = session(.running, blocks: [
+            block(.run), block(.rest, sequence: 2)
+        ])
+        var changed = stale
+        changed.routeID = wrongRoute
+        XCTAssertEqual(
+            ATHLTHPlannedEnduranceRecipePolicy.canonicalSource(
+                planned: original, quickAdvanced: changed
+            )?.id, original.id
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedEnduranceRecipePolicy.canonicalRouteID(
+                planned: original, quickAdvanced: changed,
+                quickWorkoutRouteID: wrongRoute
+            ), route
+        )
+        original.routeID = nil
+        XCTAssertNil(
+            ATHLTHPlannedEnduranceRecipePolicy.canonicalRouteID(
+                planned: original, quickAdvanced: changed,
+                quickWorkoutRouteID: wrongRoute
+            )
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedEnduranceRecipePolicy.canonicalSource(
+                planned: nil, quickAdvanced: changed
+            )?.id, changed.id
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedEnduranceRecipePolicy.canonicalRouteID(
+                planned: nil, quickAdvanced: changed,
+                quickWorkoutRouteID: wrongRoute
+            ), wrongRoute
+        )
+    }
+
 }
