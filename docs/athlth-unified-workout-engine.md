@@ -1,3 +1,10 @@
+## 2.2.6 – Watch-resultater kun én gang fra korrekt HealthKit-opptak
+
+- Ved sluttføring kreves både original start, matching HealthKit `startDate` (±5 sek), faktisk avslutning, aktiv finish-prosess og ingen tidligere publisert kvittering. Et sent GPS-rute-/HealthKit-callback fra en gammel økt kan derfor ikke fullføre eller overskrive en nyere aktivitet.
+- En korrupt, ufullstendig, planbundet prepared-overføring stopper på Watch i stedet for å bli startet som en vanlig fri løpe-/gåøkt etter timeout. En normal legacy/fri overføring forblir kompatibel.
+- Deduplisering på iPhone etter kilde-HealthKit UUID brukes fortsatt som før; dette er i tillegg en sender-side sperre, ikke en ny historikk.
+- Tester dekker dobbelpublisering, manglende original start, forsinket gammel callback, ugyldig sluttid og starttids-jitter. Fysisk HealthKit-oppførsel og siste commit må bekreftes med CI.
+
 ## 2.2.6 – én planbundet Watch-handoff for løp OG gå
 
 - `WatchPreparedWorkoutTransfer` får to valgfrie, bakoverkompatible felter for original plan og økt. Ved planbundet iPhone-/iPad-oppstart settes begge, og Watch binder faktisk `plannedCalendarSessionID` til den autoritative HKWorkoutSession uten å opprette en ny opptaker.

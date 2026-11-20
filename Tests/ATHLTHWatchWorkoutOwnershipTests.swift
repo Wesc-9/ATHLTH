@@ -141,4 +141,47 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
         ), "Legacy unknown originals can use their distinct receipt IDs")
     }
 
+
+    func testWatchFinishCanPublishOnlyOnceForOriginalHealthKitSession() {
+        let began = Date(timeIntervalSince1970: 1_900_000_000)
+        let policy = ATHLTHWatchResultPublicationPolicy.self
+        func mayPublish(
+            finishing: Bool = true, ending: Bool = true,
+            published: Bool = false, originalStart: Date? = nil,
+            hkStart: Date? = nil, end: Date? = nil
+        ) -> Bool {
+            policy.mayPublish(
+                finishing: finishing, ending: ending,
+                hasPublishedResult: published,
+                originalStartedAt: originalStart ?? began,
+                healthKitStartedAt: hkStart ?? began,
+                endedAt: end ?? began.addingTimeInterval(600)
+            )
+        }
+        XCTAssertTrue(mayPublish())
+        XCTAssertFalse(mayPublish(finishing: false))
+        XCTAssertFalse(mayPublish(ending: false))
+        XCTAssertFalse(mayPublish(published: true))
+        XCTAssertFalse(mayPublish(
+            hkStart: began.addingTimeInterval(45)
+        ), "Delayed previous workout cannot close a newer recording")
+        XCTAssertFalse(mayPublish(
+            end: began.addingTimeInterval(-1)
+        ))
+        XCTAssertTrue(mayPublish(
+            hkStart: began.addingTimeInterval(1)
+        ), "Minor HealthKit start jitter is permissible")
+    }
+
+    func testWatchFinishWithoutOriginalStartCannotEmitUnknownResult() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        XCTAssertFalse(ATHLTHWatchResultPublicationPolicy.mayPublish(
+            finishing: true, ending: true,
+            hasPublishedResult: false,
+            originalStartedAt: nil,
+            healthKitStartedAt: start,
+            endedAt: start.addingTimeInterval(180)
+        ))
+    }
+
 }

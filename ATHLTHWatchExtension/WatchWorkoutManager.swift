@@ -8551,6 +8551,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workout: HKWorkout,
         endDate: Date
     ) {
+        // A delayed route/collection callback must never deliver a second
+        // completion receipt or finalize a newly started Watch workout.
+        guard ATHLTHWatchResultPublicationPolicy.mayPublish(
+            finishing: finishing,
+            ending: state == .ending,
+            hasPublishedResult: completedResult != nil,
+            originalStartedAt: startedAt,
+            healthKitStartedAt: workout.startDate,
+            endedAt: endDate
+        ) else { return }
         recordRunningMinuteIfDue(force: true)
         let start =
             startedAt ?? workout.startDate

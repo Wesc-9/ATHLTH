@@ -1370,6 +1370,29 @@ enum ATHLTHWatchPreparedPlanIdentityPolicy {
     }
 }
 
+/// The final HealthKit callback is the ONLY place which may publish the
+/// original Watch recording. Duplicate/late route callbacks cannot generate
+/// a second result receipt or close a newer workout.
+enum ATHLTHWatchResultPublicationPolicy {
+    static func mayPublish(
+        finishing: Bool,
+        ending: Bool,
+        hasPublishedResult: Bool,
+        originalStartedAt: Date?,
+        healthKitStartedAt: Date,
+        endedAt: Date
+    ) -> Bool {
+        guard finishing, ending, !hasPublishedResult,
+              let originalStartedAt,
+              originalStartedAt.timeIntervalSince1970.isFinite,
+              healthKitStartedAt.timeIntervalSince1970.isFinite,
+              endedAt.timeIntervalSince1970.isFinite,
+              abs(originalStartedAt.timeIntervalSince(healthKitStartedAt)) <= 5,
+              endedAt >= healthKitStartedAt else { return false }
+        return true
+    }
+}
+
 enum WatchPreparedWorkoutTransport {
     static let kind = "preparedWorkout"
 }

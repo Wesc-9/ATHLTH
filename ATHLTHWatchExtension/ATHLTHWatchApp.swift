@@ -55,6 +55,21 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
             // A second request must never create a second HKWorkoutSession.
             if !manager.canAcceptPreparedWorkout() { return }
 
+            // A partial planned-workout transfer must never fall through
+            // to a generic free HealthKit start while its route is pending.
+            if let candidate = routeStore.preparedWorkout,
+               candidate.kind == requestedKind,
+               candidate.startMode != nil,
+               candidate.startMode != .onWatch,
+               candidate.updatedAt >= requestedAt.addingTimeInterval(-20),
+               !ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                   planID: candidate.plannedPlanID,
+                   sessionID: candidate.plannedSessionID
+               ) {
+                routeStore.setAutomaticStartCountdown(nil)
+                return
+            }
+
             if let workout = routeStore.preparedWorkout,
                workout.kind == requestedKind,
                ATHLTHWatchPreparedPlanIdentityPolicy.allows(
