@@ -6976,7 +6976,33 @@ struct ATHLTHTrainView: View {
                     ATHLTHUniversalActiveCapture.manual(timed, at: $0)?
                         .elapsedSeconds ?? timed.elapsed(at: $0)
                 },
-                elapsedCaption: "Målt tid"
+                elapsedCaption: "Målt tid",
+                livePhase: { now in
+                    guard let active = ATHLTHUniversalActiveCapture.manual(
+                        timed, at: now
+                    ) else { return nil }
+                    if let index = active.stageIndex,
+                       let total = active.stageCount {
+                        let current = min(total, index + 1)
+                        let phase = active.phase == .paused
+                            ? ATHLTHLocalization.choose(
+                                english: "Paused", norwegian: "Pauset")
+                            : active.phase == .recovery
+                            ? ATHLTHLocalization.choose(
+                                english: "Rest", norwegian: "Pause")
+                            : ATHLTHLocalization.choose(
+                                english: "Work", norwegian: "Arbeid")
+                        return ATHLTHLocalization.choose(
+                            english: "Step \(current) of \(total) · \(phase)",
+                            norwegian: "Del \(current) av \(total) · \(phase)"
+                        )
+                    }
+                    if active.phase == .paused {
+                        return ATHLTHLocalization.choose(
+                            english: "Paused", norwegian: "Pauset")
+                    }
+                    return nil
+                }
             ) {
                 activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
                     configuration: timed.recoveryConfiguration,
@@ -7086,6 +7112,7 @@ struct ATHLTHTrainView: View {
         elapsed: @escaping (Date) -> TimeInterval,
         elapsedCaption: String,
         restEndsAt: Date? = nil,
+        livePhase: ((Date) -> String?)? = nil,
         onContinue: @escaping () -> Void
     ) -> some View {
         Button(action: onContinue) {
@@ -7131,6 +7158,12 @@ struct ATHLTHTrainView: View {
                             Text(elapsedCaption)
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            if let phase = livePhase?(context.date) {
+                                Text(phase)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                    .monospacedDigit()
+                            }
                             if let restEndsAt, restEndsAt > context.date {
                                 Text(ATHLTHLocalization.choose(
                                     english: "Rest", norwegian: "Pause"
