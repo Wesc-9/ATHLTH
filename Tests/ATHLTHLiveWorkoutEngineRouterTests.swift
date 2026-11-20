@@ -322,4 +322,17 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
         ).isEmpty)
     }
 
+
+    func testMeditationHasOwnSportControlsNotGenericMobility() {
+        var meditation = block("Meditation", kind: .note, sequence: 1)
+        meditation.wellnessKind = .meditation
+        let sport = ATHLTHWorkoutSportMode.forBlock(meditation)
+        XCTAssertEqual(sport, .meditation)
+        XCTAssertEqual(sport.engine, .mobility)
+        XCTAssertFalse(sport.title.isEmpty)
+        XCTAssertNotEqual(sport.title, ATHLTHWorkoutSportMode.mobility.title)
+        XCTAssertTrue(sport.showsPlannedTargets)
+        XCTAssertEqual(ATHLTHWorkoutSportMode(category: "meditation"), .meditation)
+    }
+
 }

@@ -1,3 +1,9 @@
+## 2.2.6 – meditasjon, aktivitetsrelevante manuelle felt og tryggere iPad-lesing
+
+- Meditasjonsblokker bruker egen `ATHLTHWorkoutSportMode.meditation`-presentasjon innen den eksisterende bevegelighets-/restitusjonsmotoren, uten ny helseopptaker. Quick Train tilbyr kun manuelt distansefelt for aktiviteter med distanse, så yoga/HIIT/sirkel får ikke et misvisende kilometerfelt.
+- Sportikon i privat iPad-snapshot gjenbruker nøyaktig samme aktivitetspolicy som de øvrige liveflatene. Den eksisterende iPad-leseren sanitiserer nå også mottatte snapshot etter å ha kontrollert friskhet og konto, ikke bare utgående snapshot fra iPhone. En eldre/ugyldig synkpakke med manuelle sensorfelt kan dermed ikke bli vist som verifisert GPS/puls.
+- Regresjonstester dekker meditasjon og sportikon. Ingen nye historier, migreringer, HealthKit-writers eller TestFlight-opplasting.
+
 ## 2.2.6 – sikker opptaksplass ved Watch-oppstart uten livespeil
 
 - `ATHLTHUniversalActiveCapture.current` kan ikke lenger returnere «ingen aktiv økt» når original Apple Watch faktisk opptar HealthKit-plassen, men iPhone ennå ikke har mottatt et gyldig speil. Ingen ny iPhone-økt eller duplikatjournal kan startes på grunnlag av et slikt tomt livesignal.

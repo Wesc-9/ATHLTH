@@ -473,4 +473,25 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         }
     }
 
+
+    func testEverySportUsesOneUniversalSpectatorSymbolPolicy() {
+        for kind in [
+            "running", "walking", "strength", "cycling", "rowing",
+            "stairClimbing", "hiit", "circuit", "functional",
+            "yoga", "mobility", "meditation", "sports", "other"
+        ] {
+            let snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
+                sessionID: UUID(), kind: kind, title: kind,
+                startedAt: Date(), elapsedSeconds: 20,
+                distanceMeters: nil, currentStep: nil, nextStep: nil,
+                completedSets: nil, totalSets: nil
+            )
+            XCTAssertEqual(
+                snapshot.symbol,
+                ATHLTHWorkoutSportMode(category: kind).systemImage,
+                kind
+            )
+        }
+    }
+
 }

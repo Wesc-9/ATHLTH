@@ -275,6 +275,9 @@ struct CustomQuickIPhoneWorkoutView: View {
     private var manualMetrics: some View {
         VStack(alignment: .leading, spacing: 15) {
             sectionHeading(tr("Manual details", "Manuelle opplysninger"))
+            if ATHLTHSpectatorSportMetricPolicy.supportsDistance(
+                configuration.activity.rawValue
+            ) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 7) {
                     Text(tr("Distance (optional)", "Distanse (valgfritt)"))
@@ -295,6 +298,7 @@ struct CustomQuickIPhoneWorkoutView: View {
                 .padding(13)
                 .background(ATHLTHTheme.canvasTop,
                             in: RoundedRectangle(cornerRadius: 13))
+            }
             }
 
             HStack {

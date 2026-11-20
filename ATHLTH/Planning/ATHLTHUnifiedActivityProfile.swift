@@ -39,7 +39,7 @@ enum ATHLTHWorkoutActivityTagPolicy {
 /// or claim that a planned metric was measured by a sensor.
 enum ATHLTHWorkoutSportMode: Equatable {
     case running, walking, strength, cycling, rowing, stairClimber
-    case hiit, circuit, functional, yoga, mobility, sports, other
+    case hiit, circuit, functional, yoga, meditation, mobility, sports, other
     case recovery, instructions
 
     init(category: String) {
@@ -56,7 +56,8 @@ enum ATHLTHWorkoutSportMode: Equatable {
         case "circuit", "circuittraining": self = .circuit
         case "functional", "functionaltraining": self = .functional
         case "yoga": self = .yoga
-        case "mobility", "stretching", "meditation": self = .mobility
+        case "meditation": self = .meditation
+        case "mobility", "stretching": self = .mobility
         case "sports", "sport": self = .sports
         case "recovery", "rest": self = .recovery
         case "instructions", "note": self = .instructions
@@ -76,6 +77,7 @@ enum ATHLTHWorkoutSportMode: Equatable {
             if let activity = ATHLTHWorkoutActivityTagPolicy.activity(for: block) {
                 return Self(category: activity.rawValue)
             }
+            if block.wellnessKind == .meditation { return .meditation }
             return block.wellnessKind == nil ? .instructions : .mobility
         }
     }
@@ -87,7 +89,7 @@ enum ATHLTHWorkoutSportMode: Equatable {
         case .running, .walking, .rowing, .stairClimber: return .endurance
         case .strength: return .strength
         case .cycling: return .cycling
-        case .yoga, .mobility: return .mobility
+        case .yoga, .meditation, .mobility: return .mobility
         case .recovery: return .recovery
         case .hiit, .circuit, .functional, .sports, .other, .instructions:
             return .instructions
@@ -106,6 +108,7 @@ enum ATHLTHWorkoutSportMode: Equatable {
         case .circuit: return ATHLTHLocalization.choose(english: "Circuit training", norwegian: "Sirkeltrening")
         case .functional: return ATHLTHLocalization.choose(english: "Functional training", norwegian: "Funksjonell trening")
         case .yoga: return "Yoga"
+        case .meditation: return ATHLTHLocalization.choose(english: "Meditation", norwegian: "Meditasjon")
         case .mobility: return ATHLTHLocalization.choose(english: "Mobility", norwegian: "Bevegelighet")
         case .sports: return ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett")
         case .other: return ATHLTHLocalization.choose(english: "Other workout", norwegian: "Annen trening")
@@ -126,6 +129,7 @@ enum ATHLTHWorkoutSportMode: Equatable {
         case .circuit: return "repeat"
         case .functional: return "figure.strengthtraining.functional"
         case .yoga: return "figure.yoga"
+        case .meditation: return "brain.head.profile"
         case .mobility: return "figure.cooldown"
         case .sports: return "sportscourt"
         case .other: return "figure.mixed.cardio"
@@ -143,7 +147,7 @@ enum ATHLTHWorkoutSportMode: Equatable {
             return ATHLTHLocalization.choose(english: "Complete interval & next", norwegian: "Fullfør intervall og neste")
         case .recovery:
             return ATHLTHLocalization.choose(english: "End rest & next", norwegian: "Avslutt pause og neste")
-        case .yoga, .mobility, .sports, .other, .instructions:
+        case .yoga, .meditation, .mobility, .sports, .other, .instructions:
             return ATHLTHLocalization.choose(english: "Next step", norwegian: "Neste del")
         }
     }

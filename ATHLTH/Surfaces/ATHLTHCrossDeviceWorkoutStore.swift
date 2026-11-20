@@ -77,18 +77,7 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
 
     var id: UUID { sessionID }
     var symbol: String {
-        switch kind {
-        case "running": return "figure.run"
-        case "walking": return "figure.walk"
-        case "cycling": return "figure.outdoor.cycle"
-        case "strength": return "dumbbell.fill"
-        case "hiit": return "figure.highintensity.intervaltraining"
-        case "functional": return "figure.cross.training"
-        case "rowing": return "figure.rower"
-        case "stairClimbing", "stairClimber": return "figure.stair.stepper"
-        case "yoga": return "figure.yoga"
-        default: return "figure.mixed.cardio"
-        }
+        ATHLTHWorkoutSportMode(category: kind).systemImage
     }
 }
 
@@ -1371,7 +1360,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     $0.snapshot,
                     updatedAt: $0.updatedAt,
                     expiresAt: $0.expiresAt
-                ) ? $0.snapshot : nil
+                ) ? Self.boundedSpectatorSnapshot($0.snapshot) : nil
             }
             // Polls can complete out of order after a connection drop.
             // Do not rewind an approved live session with an older snapshot,
