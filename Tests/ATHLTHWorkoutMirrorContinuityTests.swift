@@ -443,4 +443,19 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testEveryWatchHealthKitStartPathSharesTransientPreflightAdmission() {
+        XCTAssertTrue(ATHLTHWatchStartPreflightAdmissionPolicy.canReserve(
+            pendingID: nil
+        ))
+        let existing = UUID()
+        for _ in WatchWorkoutKind.allCases {
+            XCTAssertFalse(ATHLTHWatchStartPreflightAdmissionPolicy.canReserve(
+                pendingID: existing
+            ), "Concurrent manual, prepared and remote Watch starts must be rejected")
+        }
+        XCTAssertTrue(ATHLTHWatchStartPreflightAdmissionPolicy.canReserve(
+            pendingID: nil
+        ), "Admission must be released after all async start outcomes")
+    }
+
 }

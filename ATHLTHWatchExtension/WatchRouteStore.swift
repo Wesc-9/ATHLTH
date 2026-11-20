@@ -280,6 +280,12 @@ final class WatchRouteStore: NSObject, ObservableObject {
     private func applyRouteSelection(
         rawRouteID: String
     ) {
+        // Incoming next-card routes must not replace a recorder awaiting
+        // authorization for the original prepared card.
+        if pendingPreparedLaunchID != nil {
+            pendingWorkoutRouteID = UUID(uuidString: rawRouteID)
+            return
+        }
         guard !rawRouteID.isEmpty,
               let routeID = UUID(uuidString: rawRouteID)
         else {

@@ -1,3 +1,9 @@
+## 2.2.6 – én felles Watch-reservasjon i hele oppstartsperioden
+
+- Manuell Watch-start, klargjorte treningskort og automatisk HealthKit-initiert start deler nå ett transient `pendingWorkoutStartAdmissionID` før iPhone-/HealthKit-autorisasjon. Reservasjonen holdes gjennom den opprinnelige asynkrone oppstarten, og frigjøres med `defer` også ved avvisning eller feil.
+- Original oppstartstoken kontrolleres også etter HealthKit-autorisasjon. En eldre, sen tillatelsesrespons kan ikke fortsette som en annen Watch-økt. Nye ruteoverføringer kan lagres for neste klargjorte kort uten å endre den forrige øktens rute under oppstart.
+- Pure XCTest kontrollerer eksklusiv oppstart for alle native Watch-sporter og frigivelse av den transiente reservasjonen. Dette skaper ingen ny HealthKit-session eller treningsjournal. Grønn samme-commit CI og fysisk Watch/iPhone-test gjenstår.
+
 ## 2.2.6 – HealthKit-delegater og Watch-klargjøring følger én original økt
 
 - Alle Watch `HKWorkoutSessionDelegate`-hendelser (tilstand, systemevent, feil og remote kommandoer) sjekker nå **objektidentiteten til økten som sendte hendelsen** før de endrer aktiv økt. En forsinket stopp/pause fra en gammel økt kan ikke fullføre eller pause et nytt opptak. Tilsvarende gjelder `HKLiveWorkoutBuilderDelegate`: gammelt puls-/kaloribatch kan ikke oppdatere en nyere builder.

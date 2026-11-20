@@ -203,3 +203,11 @@ enum ATHLTHWatchPreparedLaunchReservationPolicy {
         pendingID == nil
     }
 }
+
+ 
+/// Single transient Watch preflight admission shared by all HK start paths.
+enum ATHLTHWatchStartPreflightAdmissionPolicy {
+    static func canReserve(pendingID: UUID?) -> Bool {
+        pendingID == nil
+    }
+}

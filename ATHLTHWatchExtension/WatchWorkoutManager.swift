@@ -124,6 +124,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private let locationManager = CLLocationManager()
 
     private var workoutSession: HKWorkoutSession?
+    /// One admission for local, prepared and system-initiated starts.
+    private var pendingWorkoutStartAdmissionID: UUID?
     private var workoutBuilder: HKLiveWorkoutBuilder?
     private var collectingHybridTreadmillDistance = false
     private var hybridDistanceAnchor: ATHLTHHybridWatchDistanceAnchor?
@@ -3865,7 +3867,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// A prepared card must not rewrite the old source's route, interval
     /// plan or owner during HealthKit recovery or after a failed save.
     func canAcceptPreparedWorkout() -> Bool {
-        ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+        ATHLTHWatchStartPreflightAdmissionPolicy.canReserve(
+            pendingID: pendingWorkoutStartAdmissionID
+        ) && ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive, preparing: state == .preparing,
             ending: state == .ending, finishing: finishing,
             recovering: recoveryInProgress,
@@ -3880,7 +3884,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         indoor: Bool? = nil,
         initiatedByIPhone: Bool = false
     ) async -> UUID? {
-        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+        guard ATHLTHWatchStartPreflightAdmissionPolicy.canReserve(
+            pendingID: pendingWorkoutStartAdmissionID
+        ), ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive,
             preparing: state == .preparing,
             ending: state == .ending,
@@ -3889,6 +3895,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             hasExistingSession: workoutSession != nil
         ) else { return nil }
 
+        let admissionID = UUID()
+        pendingWorkoutStartAdmissionID = admissionID
+        defer {
+            if pendingWorkoutStartAdmissionID == admissionID {
+                pendingWorkoutStartAdmissionID = nil
+            }
+        }
+
         guard await localWorkoutStartAllowed()
         else {
             return nil
@@ -3896,7 +3910,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         // A new start may have claimed the session while we awaited
         // iPhone connectivity. Do not reset another live workout.
-        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+        guard pendingWorkoutStartAdmissionID == admissionID,
+              ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive,
             preparing: state == .preparing,
             ending: state == .ending,
@@ -4134,7 +4149,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil
     ) async {
-        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+        guard ATHLTHWatchStartPreflightAdmissionPolicy.canReserve(
+            pendingID: pendingWorkoutStartAdmissionID
+        ), ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive,
             preparing: state == .preparing,
             ending: state == .ending,
@@ -4143,6 +4160,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             hasExistingSession: workoutSession != nil
         ) else { return }
 
+        let admissionID = UUID()
+        pendingWorkoutStartAdmissionID = admissionID
+        defer {
+            if pendingWorkoutStartAdmissionID == admissionID {
+                pendingWorkoutStartAdmissionID = nil
+            }
+        }
+
         guard await localWorkoutStartAllowed()
         else {
             return
@@ -4150,7 +4175,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         // A new start may have claimed the session while we awaited
         // iPhone connectivity. Do not reset another live workout.
-        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+        guard pendingWorkoutStartAdmissionID == admissionID,
+              ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive,
             preparing: state == .preparing,
             ending: state == .ending,
@@ -4227,12 +4253,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     func start(configuration: HKWorkoutConfiguration) async {
         // A recovered or pre-existing recorder must not lose its source flag.
-        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+        guard ATHLTHWatchStartPreflightAdmissionPolicy.canReserve(
+            pendingID: pendingWorkoutStartAdmissionID
+        ), ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive, preparing: state == .preparing,
             ending: state == .ending, finishing: finishing,
             recovering: recoveryInProgress,
             hasExistingSession: workoutSession != nil
         ) else { return }
+        let admissionID = UUID()
+        pendingWorkoutStartAdmissionID = admissionID
+        defer {
+            if pendingWorkoutStartAdmissionID == admissionID {
+                pendingWorkoutStartAdmissionID = nil
+            }
+        }
+
         workoutInitiatedLocallyOnWatch = false
         let resolvedKind = kind(for: configuration.activityType)
         await start(
@@ -4426,7 +4462,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer?
     ) async -> UUID? {
-        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+        guard let admittedStartID = pendingWorkoutStartAdmissionID,
+              ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
             active: isActive, preparing: state == .preparing,
             ending: state == .ending, finishing: finishing,
             recovering: recoveryInProgress,
@@ -4548,7 +4585,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // HealthKit permission is asynchronous. Recovery or another
             // authorized start may have attached while the prompt was open.
             // Never allocate a second HKWorkoutSession after losing this slot.
-            guard state == .preparing, workoutSession == nil,
+            guard pendingWorkoutStartAdmissionID == admittedStartID,
+                  state == .preparing, workoutSession == nil,
                   !recoveryInProgress, !finishing else { return nil }
 
             let session = try HKWorkoutSession(
