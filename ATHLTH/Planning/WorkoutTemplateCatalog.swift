@@ -6128,88 +6128,61 @@ struct WorkoutTemplateBuilderView: View {
         VStack(alignment: .leading, spacing: 14) {
             studioPlanHeader
 
-            ATHLTHPlanSurface(density: .compact) {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text(tr("What would you like to do?", "Hva vil du gjøre?"))
-                        .font(.system(size: 21, weight: .medium, design: .serif))
-                        .foregroundStyle(studioInk)
-                    Text(tr(
-                        "Choose an activity, or select a ready-made workout.",
-                        "Velg en aktivitet, eller hent en ferdig treningsøkt."
-                    ))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            // The sport has already been selected before entering this
+            // editor. Do not show a second "What would you like to do?"
+            // chooser or offer to replace running with an unrelated sport.
+            // Strength retains its two meaningful Basic recording options.
+            if initialActivity == .strength {
+                basicStrengthChoices
+            }
 
-                    if initialActivity == .strength {
-                        basicStrengthChoices
-                    } else {
-                        LazyVGrid(columns: [
-                            GridItem(.adaptive(minimum: 104), spacing: 8)
-                        ], spacing: 8) {
-                        basicActivityButton("walking", icon: "figure.walk",
-                            title: tr("Walk", "Gå"))
-                        basicActivityButton("running", icon: "figure.run",
-                            title: tr("Run", "Løping"))
-                        basicActivityButton("strength", icon: "dumbbell",
-                            title: tr("Strength", "Styrke"))
-                        basicActivityButton("cycling", icon: "bicycle",
-                            title: tr("Cycling", "Sykling"))
-                        basicActivityButton("yoga", icon: "figure.yoga",
-                            title: "Yoga")
-                        basicActivityButton("meditation", icon: "leaf",
-                            title: tr("Meditation", "Meditasjon"))
-                        }
-                    }
-
-                    // Routes belong to the same walking/running recipe,
-                    // in both Quick Plan and a day inside a training plan.
-                    if initialActivity == .walking || initialActivity == .running ||
-                        hasWalking || hasActualRunning {
-                        HStack(spacing: 10) {
-                            Button {
-                                selectedPhase = .main
-                                studioRoutePhase = .main
-                                showingStudioRoutePicker = true
-                            } label: {
-                                Label(activeRoute?.title ??
-                                    tr("Choose route", "Velg rute"),
-                                    systemImage: "map")
-                                .font(.system(size: 14, weight: .semibold))
-                                .frame(maxWidth: .infinity, minHeight: 50)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(ATHLTHPlanDesign.accentInk)
-
-                            if activeRouteID != nil {
-                                Button {
-                                    selectedRouteID = nil
-                                    blocks.removeAll { $0.routeID != nil }
-                                    resequence()
-                                } label: {
-                                    Image(systemName: "xmark.circle")
-                                        .frame(minWidth: 44, minHeight: 44)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(tr("Remove route", "Fjern rute"))
-                            }
-                        }
-                    }
-
+            // Keep route and library available as compact contextual actions,
+            // not inside a competing activity-selection card.
+            HStack(spacing: 9) {
+                if initialActivity == .walking || initialActivity == .running ||
+                   hasWalking || hasActualRunning {
                     Button {
                         selectedPhase = .main
-                        showingSavedWorkoutPicker = true
+                        studioRoutePhase = .main
+                        showingStudioRoutePicker = true
                     } label: {
-                        Label(tr("Choose workout from library",
-                                 "Velg treningsøkt fra biblioteket"),
-                              systemImage: "books.vertical")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            .frame(maxWidth: .infinity, minHeight: 50)
-                            .background(ATHLTHPlanDesign.selectedSurface,
-                                        in: RoundedRectangle(cornerRadius: 15))
+                        Label(
+                            activeRoute?.title ?? tr("Choose route", "Velg rute"),
+                            systemImage: "map"
+                        )
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    .accessibilityIdentifier("athlth-basic-workout-route")
+
+                    if activeRouteID != nil {
+                        Button {
+                            selectedRouteID = nil
+                            blocks.removeAll { $0.routeID != nil }
+                            resequence()
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                                .frame(minWidth: 35, minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(tr("Remove route", "Fjern rute"))
+                    }
                 }
+
+                Button {
+                    selectedPhase = .main
+                    showingSavedWorkoutPicker = true
+                } label: {
+                    Label(tr("Library", "Bibliotek"), systemImage: "books.vertical")
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.accentInk)
+                .accessibilityIdentifier("athlth-basic-workout-library")
             }
 
             if !blocks.isEmpty {
@@ -6325,42 +6298,6 @@ struct WorkoutTemplateBuilderView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("athlth-basic-strength-exercises")
         }
-    }
-
-    private func basicActivityButton(
-        _ key: String, icon: String, title displayTitle: String
-    ) -> some View {
-        Button {
-            let currentQuickActivity = key == category ||
-                (key == "yoga" && category == "mobility") ||
-                (key == "meditation" && category == "recovery")
-            if currentQuickActivity && blocks.count == 1 { return }
-            if !blocks.isEmpty {
-                pendingBasicActivityReplacement = key
-                confirmingBasicActivityReplacement = true
-            } else {
-                applyBasicQuickActivity(key)
-            }
-        } label: {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 19, weight: .regular))
-                Text(displayTitle)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-            .frame(maxWidth: .infinity, minHeight: 70)
-            .background(ATHLTHPlanDesign.selectedSurface.opacity(0.54),
-                        in: RoundedRectangle(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.7),
-                                  lineWidth: 0.7)
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     /// A complete saved workout is one selection in Basic. It must never
