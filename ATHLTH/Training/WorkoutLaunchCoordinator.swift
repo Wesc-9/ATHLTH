@@ -1564,6 +1564,13 @@ enum WorkoutLaunchCoordinator {
         spotify: SpotifyPlaybackStore,
         relayRequestID: UUID? = nil
     ) async throws -> Bool {
+        // The universal planner now recognizes more activities than this
+        // strength capture owner implements. Reject unsupported recipes
+        // *before* HealthKit, iPad relay or social invitations; no fake
+        // strength workout may stand in for cycling/yoga/meditation.
+        try ATHLTHWorkoutCaptureAdmission.requireSupportedStrengthCapture(
+            for: workout
+        )
         let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
         defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
 
