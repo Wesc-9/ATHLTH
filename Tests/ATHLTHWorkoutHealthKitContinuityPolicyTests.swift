@@ -182,4 +182,38 @@ final class ATHLTHWorkoutHealthKitContinuityPolicyTests: XCTestCase {
         ))
     }
 
+
+    func testWatchRecoveryOnlyReattachesExactOriginalSessionIdentity() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        let policy = ATHLTHWatchRecoveredIdentityPolicy.self
+        for kind in WatchWorkoutKind.allCases {
+            XCTAssertTrue(policy.matchesOriginalSession(
+                expectedKind: kind, savedKind: kind,
+                healthKitStartedAt: start, savedStartedAt: start
+            ), kind.rawValue)
+            XCTAssertTrue(policy.matchesOriginalSession(
+                expectedKind: kind, savedKind: kind,
+                healthKitStartedAt: start.addingTimeInterval(1),
+                savedStartedAt: start
+            ), kind.rawValue)
+            XCTAssertFalse(policy.matchesOriginalSession(
+                expectedKind: kind, savedKind: kind,
+                healthKitStartedAt: start.addingTimeInterval(120),
+                savedStartedAt: start
+            ), kind.rawValue)
+            XCTAssertFalse(policy.matchesOriginalSession(
+                expectedKind: kind, savedKind: kind,
+                healthKitStartedAt: nil, savedStartedAt: start
+            ), kind.rawValue)
+            XCTAssertFalse(policy.matchesOriginalSession(
+                expectedKind: kind, savedKind: kind,
+                healthKitStartedAt: start, savedStartedAt: nil
+            ), kind.rawValue)
+        }
+        XCTAssertFalse(policy.matchesOriginalSession(
+            expectedKind: .running, savedKind: .walking,
+            healthKitStartedAt: start, savedStartedAt: start
+        ))
+    }
+
 }

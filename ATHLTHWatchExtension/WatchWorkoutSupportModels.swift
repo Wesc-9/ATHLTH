@@ -94,6 +94,9 @@ struct WatchPersistedWorkoutState: Codable {
     /// Authoritative request ID saved with the HealthKit recovery checkpoint.
     /// Absent for local Watch starts and snapshots from older app versions.
     var relayRequestID: UUID? = nil
+    /// Original calendar workout, not a transient prepared Watch card.
+    /// Optional for recovery checkpoints created by older versions.
+    var plannedCalendarSessionID: UUID? = nil
     var plannedRoute: WatchRouteTransfer?
     var audioCoach: WatchAudioCoachConfiguration
     var structuredRunningWorkout: WatchRunningWorkoutTransfer?

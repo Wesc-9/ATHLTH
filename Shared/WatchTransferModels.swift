@@ -1378,6 +1378,26 @@ enum ATHLTHWatchPreparedLaunchOriginPolicy {
     }
 }
 
+/// An offline recovery checkpoint may only restore plan, relay, owner and
+/// stage identity into the original matched HealthKit workout. A stale
+/// checkpoint from another activity must never claim the new session.
+enum ATHLTHWatchRecoveredIdentityPolicy {
+    static func matchesOriginalSession(
+        expectedKind: WatchWorkoutKind,
+        savedKind: WatchWorkoutKind,
+        healthKitStartedAt: Date?,
+        savedStartedAt: Date?
+    ) -> Bool {
+        guard expectedKind == savedKind,
+              let actual = healthKitStartedAt,
+              let saved = savedStartedAt,
+              actual.timeIntervalSince1970.isFinite,
+              saved.timeIntervalSince1970.isFinite
+        else { return false }
+        return abs(actual.timeIntervalSince(saved)) <= 5
+    }
+}
+
 /// The final HealthKit callback is the ONLY place which may publish the
 /// original Watch recording. Duplicate/late route callbacks cannot generate
 /// a second result receipt or close a newer workout.

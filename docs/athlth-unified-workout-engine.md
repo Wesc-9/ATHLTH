@@ -1,3 +1,10 @@
+## 2.2.6 – planlenken overlever Apple Watch-appomstart
+
+- Eksisterende Watch HealthKit-gjenopprettingscheckpoint har nå `plannedCalendarSessionID` som et valgfritt, bakoverkompatibelt felt, i tillegg til original ATHLTH-ID, eier, fjernstart-ID, rute og tidslinje. Ved ny appstart tas kalenderkoblingen med videre til originalt resultat og planoppfølging.
+- Verifisering av original Watch-aktivitet og faktisk HealthKit-start (±5 sek) gjøres nå FØR noe av eldre checkpoint-eier, remote-ID, rute, Audio Coach, intervalldata eller styrkefremdrift kan reetableres. Et gammelt checkpoint kan ikke knyttes til en annen HKWorkoutSession med samme sport.
+- Ukjent/eldre snapshot uten dokumentert original start skal ikke tilordnes en vilkårlig økt. Den faktiske gjenopprettede HealthKit-sesjonen vises fortsatt, men uten ubekreftede plan-/kontodata.
+- Regresjonstester dekker alle Watch-treningsformer, samtidighet, feil sport og manglende/avvikende starttid. Native samme-commit build og fysisk HealthKit-recovery gjenstår.
+
 ## 2.2.6 – opprinnelse ved planbundet Watch-start
 
 - Klargjort økt brukt av automatisk `HKHealthStore.startWatchApp` merkes nå som telefoninitiert, mens en START-knapp som faktisk trykkes på Apple Watch fortsatt er Watch-initiert. Begge bruker samme originale HKWorkoutSession; dette oppretter ingen ekstra HealthKit-opptak.

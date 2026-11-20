@@ -3948,6 +3948,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 accountOwnerID: workoutOwnerID,
                 initiatedLocallyOnWatch: workoutInitiatedLocallyOnWatch,
                 relayRequestID: activeRelayRequestID,
+                plannedCalendarSessionID: plannedCalendarSessionID,
                 plannedRoute: plannedRoute,
                 audioCoach:
                     audioCoachConfiguration,
@@ -4010,8 +4011,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     WatchPersistedWorkoutState.self,
                     from: data
                 ),
-              snapshot.kind == expectedKind
+              ATHLTHWatchRecoveredIdentityPolicy.matchesOriginalSession(
+                  expectedKind: expectedKind,
+                  savedKind: snapshot.kind,
+                  healthKitStartedAt: startedAt,
+                  savedStartedAt: snapshot.startedAt
+              )
         else {
+            // The HKWorkout is real, but this snapshot belongs to another
+            // recording. Never attach its account, relay, goals or stages.
             return
         }
 
@@ -4037,6 +4045,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workoutInitiatedLocallyOnWatch =
             snapshot.initiatedLocallyOnWatch ?? false
         activeRelayRequestID = snapshot.relayRequestID
+        plannedCalendarSessionID = snapshot.plannedCalendarSessionID
         switchedIndoorVenue = snapshot.indoorVenue
         if let venue = snapshot.indoorVenue {
             indoorPromptedInThisWorkout = true
