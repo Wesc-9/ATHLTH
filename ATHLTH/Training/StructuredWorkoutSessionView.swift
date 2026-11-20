@@ -1308,21 +1308,26 @@ struct StructuredWorkoutSessionView: View {
 
     private func goToNextStep() {
         guard pausedAt == nil else { return }
-        emomWaitingForMinute = false
+        // Validate prospective AMRAP expansion BEFORE mutating the
+        // persisted step array or advancing the original journal cursor.
+        // Invalid or duplicated IDs cannot leave a half-applied round.
+        let candidateRound: [WorkoutTemplateBlock]?
         if let block = currentBlock,
-           let id = block.executionGroupID,
-           let updated = ATHLTHStructuredAMRAPProgression.appendingNextRound(
+           let id = block.executionGroupID {
+            candidateRound = ATHLTHStructuredAMRAPProgression.appendingNextRound(
                 to: blocks,
                 after: currentIndex,
                 startedAt: modeStarts[id],
                 now: Date()
-           ) {
-            activeExecutionBlocks = updated
+            )
+        } else {
+            candidateRound = nil
         }
-        if currentIndex < blocks.count - 1 {
+        let prospectiveBlocks = candidateRound ?? blocks
+        if currentIndex < prospectiveBlocks.count - 1 {
             guard ATHLTHLiveWorkoutEngineRouter.advance(
                 workoutID: workout.id,
-                blocks: blocks,
+                blocks: prospectiveBlocks,
                 from: currentIndex
             ) != nil else {
                 persistenceErrorMessage = ATHLTHLocalization.choose(
@@ -1331,8 +1336,13 @@ struct StructuredWorkoutSessionView: View {
                 )
                 return
             }
+            if let candidateRound {
+                activeExecutionBlocks = candidateRound
+            }
+            emomWaitingForMinute = false
             currentIndex += 1
         } else {
+            emomWaitingForMinute = false
             showingFinishConfirmation = true
         }
     }
