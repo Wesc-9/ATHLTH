@@ -13,7 +13,8 @@ enum PhoneWorkoutCompletionJournal {
     }
 
     static func save(_ workout: PhoneWorkout, userID: UUID) throws {
-        guard let endedAt = workout.end, endedAt >= workout.start else {
+        guard let endedAt = workout.end, endedAt >= workout.start,
+              workout.distanceMeters.isFinite, workout.distanceMeters >= 0 else {
             throw CocoaError(.fileWriteInapplicableStringEncoding)
         }
         // Late completion callbacks must not replace a newer durable receipt.

@@ -35,9 +35,10 @@ enum ATHLTHHybridWorkoutLaunchPlan {
         // is required before the user can start a mixed live recording.
         let sourceBlocks = workout.resolvedWorkoutBlocks
         let explicitlyIndoor = workout.workoutCategory == "treadmill" ||
-            sourceBlocks.filter({ $0.kind == .run })
-                .allSatisfy({ $0.isIndoor == true }) &&
-            sourceBlocks.contains(where: { $0.kind == .run })
+            (workout.workoutCategory != "running" &&
+             sourceBlocks.filter({ $0.kind == .run })
+                 .allSatisfy({ $0.isIndoor == true }) &&
+             sourceBlocks.contains(where: { $0.kind == .run }))
         let outdoorGPS = allowOutdoorGPS && isOutdoorTimedHybrid(workout)
         guard explicitlyIndoor || outdoorGPS else { return nil }
 

@@ -123,8 +123,9 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.hasMatchingRequestID(
             serverID: request, payloadID: UUID()
         ))
-        // Previously queued v1 payloads did not contain the correlation ID.
-        XCTAssertTrue(WorkoutDeviceRelayClaimPolicy.hasMatchingRequestID(
+        // Missing legacy correlation is not proof of this request's identity.
+        // Fail closed instead of confirming an unrelated HealthKit launch.
+        XCTAssertFalse(WorkoutDeviceRelayClaimPolicy.hasMatchingRequestID(
             serverID: request, payloadID: nil
         ))
     }
