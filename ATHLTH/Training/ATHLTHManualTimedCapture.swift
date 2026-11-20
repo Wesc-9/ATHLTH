@@ -129,7 +129,12 @@ enum ATHLTHManualTimedCapture {
         if let active {
             guard active.userID == userID &&
                     active.activity == configuration.activity &&
-                    active.method == configuration.method else {
+                    active.method == configuration.method &&
+                    active.durationMinutes == max(1, min(720, configuration.durationMinutes)) &&
+                    active.workSeconds == max(1, min(900, configuration.workSeconds)) &&
+                    active.restSeconds == max(0, min(900, configuration.restSeconds)) &&
+                    active.rounds == max(1, min(100, configuration.rounds)) &&
+                    active.titleOverride == configuration.titleOverride else {
                 throw CaptureError.anotherWorkoutActive
             }
             return active
