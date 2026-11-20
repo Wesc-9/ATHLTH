@@ -641,4 +641,32 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         }
     }
 
+
+    func testStructuredPlanIdentitySurvivesCursorRecovery() throws {
+        let planID = UUID(), workoutID = UUID()
+        let step = block(kind: .note, sequence: 1)
+        let original = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: workoutID, sourcePlanID: planID,
+            savedAt: started, startedAt: started,
+            stepEnteredAt: started, currentIndex: 0,
+            completedIDs: [], results: [:], modeStarts: [:],
+            executionBlocks: [step], emomWaiting: false,
+            timedOutGroups: [], enteredReps: 0, enteredWeight: ""
+        )
+        let recovered = try JSONDecoder().decode(
+            ATHLTHStructuredWorkoutCheckpoint.self,
+            from: JSONEncoder().encode(original)
+        )
+        XCTAssertEqual(recovered.workoutID, workoutID)
+        XCTAssertEqual(recovered.sourcePlanID, planID)
+        let state = try XCTUnwrap(ATHLTHUniversalActiveCapture.structured(
+            recovered, at: started.addingTimeInterval(90)
+        ))
+        XCTAssertEqual(state.workoutID, workoutID)
+        XCTAssertEqual(state.plannedSessionID, workoutID)
+        XCTAssertEqual(state.recordingOwner, .iPhone)
+        XCTAssertEqual(state.source, .structuredTimer)
+        XCTAssertEqual(state.elapsedSeconds, 90)
+    }
+
 }

@@ -1,3 +1,10 @@
+## 2.2.6 – bevar opprinnelig planlenke i den faktiske strukturerte økten
+
+- Det eksisterende strukturerte iPhone-sjekkpunktet lagrer nå en valgfri `sourcePlanID` sammen med original workout-ID, aktivt steg, klokke og fullføringskvittering. Gamle sjekkpunkter uten feltet kan fortsatt dekodes og gjenopprettes.
+- En gjenopprettet økt beholder original planlenke selv om den åpnes fra en annen inngang som ikke har plan-ID; en eksplisitt, motsigende plan-ID avvises før sjekkpunktet kan overskrives. Lagring av fullføring bruker den restaurerte planlenken, ikke en tilfeldig ny SwiftUI-inngang.
+- Den universelle, skrivebeskyttede aktivtilstanden eksponerer riktig planlagt session-ID når den opprinnelige strukturerte økten er planbundet. Identiteten til den originale journalen og opptakseieren endres aldri. Regresjonstester dekker planlenke, gjenoppretting og motstridende plan-ID.
+- Ingen ny HealthKit-writer eller egen historikk er lagt til. Same-commit build, XCTest og fysiske enhetstester gjenstår.
+
 ## 2.2.6 – korrekt aktiv treningsform og idempotent gjenoppretting
 
 - Den ene universelle strukturerte tilstanden rapporterer nå sport for AKTIV deløkt, ikke overordnet "hybrid". Løp → sykling → pause → styrke beholder samme recording owner, stable workout UUID og klokke mens aktivitet, livekontroll og fase endres. Den eksisterende private iPad-spektatoren bruker også aktiv deløkt ved publikasjon; ingen ekstra HealthKit-opptaker eller ny øktidentitet introduseres.

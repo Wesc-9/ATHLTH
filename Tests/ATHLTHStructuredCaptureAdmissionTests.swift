@@ -224,4 +224,29 @@ final class ATHLTHStructuredCaptureAdmissionTests: XCTestCase {
         )
     }
 
+
+    func testStructuredRecoveryNeverReassignsOriginalPlan() {
+        let original = UUID(), wrong = UUID()
+        XCTAssertTrue(ATHLTHStructuredPlanRecoveryPolicy.allowsRestore(
+            savedPlanID: original, requestedPlanID: original
+        ))
+        XCTAssertTrue(ATHLTHStructuredPlanRecoveryPolicy.allowsRestore(
+            savedPlanID: original, requestedPlanID: nil
+        ))
+        XCTAssertEqual(ATHLTHStructuredPlanRecoveryPolicy.effectivePlanID(
+            savedPlanID: original, requestedPlanID: nil
+        ), original)
+        XCTAssertFalse(ATHLTHStructuredPlanRecoveryPolicy.allowsRestore(
+            savedPlanID: original, requestedPlanID: wrong
+        ))
+        XCTAssertNil(ATHLTHStructuredPlanRecoveryPolicy.effectivePlanID(
+            savedPlanID: original, requestedPlanID: wrong
+        ))
+        // Previous release checkpoints did not have a plan reference.
+        // They must remain restorable without dropping their original progress.
+        XCTAssertTrue(ATHLTHStructuredPlanRecoveryPolicy.allowsRestore(
+            savedPlanID: nil, requestedPlanID: wrong
+        ))
+    }
+
 }

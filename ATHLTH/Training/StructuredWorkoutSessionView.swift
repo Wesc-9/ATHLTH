@@ -68,6 +68,9 @@ enum ATHLTHStructuredAMRAPProgression {
 /// This is not a saved workout completion and is removed on finish/discard.
 struct ATHLTHStructuredWorkoutCheckpoint: Codable {
     var workoutID: UUID
+    /// Original linked training-plan identity. Optional for decoding
+    /// legacy, unlinked checkpoints without a destructive migration.
+    var sourcePlanID: UUID? = nil
     /// Stable completion receipt even if history commits before a crash
     /// prevents checkpoint cleanup. Optional for old checkpoints.
     var completionID: UUID? = nil
@@ -85,6 +88,30 @@ struct ATHLTHStructuredWorkoutCheckpoint: Codable {
     var enteredWeight: String
     var pausedAt: Date? = nil
     var completedPauseSeconds: TimeInterval? = nil
+}
+
+/// A restore may enter from the calendar, the library, or the original
+/// plan. An explicit, conflicting plan ID is never allowed to reassign an
+/// active recording. A missing route ID inherits only the original checkpoint
+/// identity; legacy checkpoints remain readable.
+enum ATHLTHStructuredPlanRecoveryPolicy {
+    static func allowsRestore(
+        savedPlanID: UUID?,
+        requestedPlanID: UUID?
+    ) -> Bool {
+        savedPlanID == nil || requestedPlanID == nil ||
+            savedPlanID == requestedPlanID
+    }
+
+    static func effectivePlanID(
+        savedPlanID: UUID?,
+        requestedPlanID: UUID?
+    ) -> UUID? {
+        guard allowsRestore(
+            savedPlanID: savedPlanID, requestedPlanID: requestedPlanID
+        ) else { return nil }
+        return savedPlanID ?? requestedPlanID
+    }
 }
 
 struct StructuredWorkoutCompletion: Identifiable, Codable, Hashable {
@@ -196,6 +223,8 @@ struct StructuredWorkoutSessionView: View {
 
     @State private var startedAt = Date()
     @State private var completionID = UUID()
+    // Never replace an already recorded plan ID on app restoration.
+    @State private var activeSourcePlanID: UUID?
     @State private var currentIndex = 0
     @State private var completedBlockIDs = Set<String>()
     @State private var showingFinishConfirmation = false
@@ -457,6 +486,7 @@ struct StructuredWorkoutSessionView: View {
                         from: workout.resolvedWorkoutBlocks
                     )
                     startedAt = Date()
+                    activeSourcePlanID = linkedPlanID
                     hasStarted = true
                     setupCurrentStep()
                     guard persistCheckpoint() else {
@@ -1328,6 +1358,7 @@ struct StructuredWorkoutSessionView: View {
         }
         let state = ATHLTHStructuredWorkoutCheckpoint(
             workoutID: workout.id,
+            sourcePlanID: activeSourcePlanID,
             completionID: completionID,
             savedAt: Date(),
             startedAt: startedAt,
@@ -1412,6 +1443,9 @@ struct StructuredWorkoutSessionView: View {
             ATHLTHStructuredWorkoutCheckpoint.self,
             name: checkpointName, userID: session.profile.userID
         ), saved.workoutID == workout.id,
+           ATHLTHStructuredPlanRecoveryPolicy.allowsRestore(
+               savedPlanID: saved.sourcePlanID, requestedPlanID: linkedPlanID
+           ),
            saved.savedAt > Date().addingTimeInterval(-7 * 24 * 3600),
            !saved.executionBlocks.isEmpty,
            saved.executionBlocks.indices.contains(saved.currentIndex),
@@ -1423,6 +1457,9 @@ struct StructuredWorkoutSessionView: View {
         restoringCheckpoint = true
         activeExecutionBlocks = saved.executionBlocks
         completionID = saved.completionID ?? UUID()
+        activeSourcePlanID = ATHLTHStructuredPlanRecoveryPolicy.effectivePlanID(
+            savedPlanID: saved.sourcePlanID, requestedPlanID: linkedPlanID
+        )
         startedAt = saved.startedAt
         stepEnteredAt = saved.stepEnteredAt
         pausedAt = saved.pausedAt
@@ -1489,7 +1526,7 @@ struct StructuredWorkoutSessionView: View {
                 completedBlockCount:
                     completedBlockIDs.count,
                 totalBlockCount: blocks.count,
-                sourcePlanID: linkedPlanID
+                sourcePlanID: activeSourcePlanID
             )
 
         completion.activeDurationSeconds = activeElapsed(at: completion.endedAt)

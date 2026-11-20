@@ -175,7 +175,10 @@ enum ATHLTHUniversalActiveCapture {
         ) else { return nil }
         return ATHLTHUniversalActiveCaptureState(
             workoutID: checkpoint.workoutID,
-            plannedSessionID: nil,
+            // A linked structured workout's ID is its planned session ID.
+            // The plan UUID itself remains on the original checkpoint.
+            plannedSessionID: checkpoint.sourcePlanID == nil
+                ? nil : checkpoint.workoutID,
             recordingOwner: .iPhone,
             source: .structuredTimer,
             activityCategory: category,
