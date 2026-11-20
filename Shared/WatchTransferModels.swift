@@ -2244,6 +2244,53 @@ enum ATHLTHWatchLiveSportPolicy {
     }
 }
 
+/// One source-provenance contract for Watch live readouts, iPad's
+/// consent-protected spectator and the iPhone-mirrored Audio Coach.
+/// Nothing here allocates HealthKit, estimates speed or records a workout.
+/// A strength-owned running PHASE is not a native running sensor source.
+enum ATHLTHWatchVerifiedLiveMetrics {
+    static func measuredDistanceMeters(
+        from snapshot: WatchWorkoutLiveSnapshot
+    ) -> Double? {
+        guard snapshot.kind.supportsDistanceMetric,
+              snapshot.distanceMeters.isFinite,
+              snapshot.distanceMeters > 0 else { return nil }
+        return snapshot.distanceMeters
+    }
+
+    static func measuredHeartRateBPM(
+        from snapshot: WatchWorkoutLiveSnapshot,
+        at now: Date = Date()
+    ) -> Double? {
+        guard ATHLTHCoachSensorFreshness.validHeartRate(
+            snapshot.heartRate,
+            sampledAt: snapshot.coachHeartRateSampleAt,
+            now: now
+        ) else { return nil }
+        return snapshot.heartRate
+    }
+
+    static func measuredPaceSecondsPerKilometer(
+        from snapshot: WatchWorkoutLiveSnapshot,
+        at now: Date = Date()
+    ) -> TimeInterval? {
+        guard snapshot.kind == .running || snapshot.kind == .walking,
+              ATHLTHCoachSensorFreshness.validPace(
+                snapshot.currentPaceSecondsPerKilometer,
+                sampledAt: snapshot.coachPaceSampleAt,
+                now: now
+              ) else { return nil }
+        return snapshot.currentPaceSecondsPerKilometer
+    }
+
+    static func measuredActiveCalories(
+        from snapshot: WatchWorkoutLiveSnapshot
+    ) -> Double? {
+        let value = snapshot.activeCalories
+        return value.isFinite && value > 0 ? value : nil
+    }
+}
+
 struct WatchGhostRaceTimingPoint: Codable, Hashable {
     var elapsedTime: TimeInterval
     var cumulativeMeters: Double

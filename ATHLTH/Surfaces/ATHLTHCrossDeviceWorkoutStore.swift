@@ -380,11 +380,13 @@ enum ATHLTHWatchSpectatorSessionPolicy {
     /// Only native Watch running/walking sources can supply MEASURED pace.
     /// A treadmill target carried inside a strength-owned hybrid is a
     /// prescription, never proof that HealthKit sampled current run pace.
-    static func measuredPace(_ watch: WatchWorkoutLiveSnapshot) -> Double? {
-        guard (watch.kind == .running || watch.kind == .walking),
-              let seconds = watch.currentPaceSecondsPerKilometer,
-              seconds.isFinite, seconds > 0 else { return nil }
-        return seconds
+    static func measuredPace(
+        _ watch: WatchWorkoutLiveSnapshot,
+        at now: Date = Date()
+    ) -> Double? {
+        ATHLTHWatchVerifiedLiveMetrics.measuredPaceSecondsPerKilometer(
+            from: watch, at: now
+        )
     }
 
     static func canRelay(
@@ -958,18 +960,20 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                       ) else { return nil }
                 return (latitude, longitude, sampled)
             }()
-            let freshHeartRate = ATHLTHCoachSensorFreshness.validHeartRate(
-                watch.heartRate, sampledAt: watch.coachHeartRateSampleAt
-            ) ? watch.heartRate : nil
+            let freshHeartRate =
+                ATHLTHWatchVerifiedLiveMetrics.measuredHeartRateBPM(
+                    from: watch
+                )
             var snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
                 sessionID: sessionID,
                 kind: ATHLTHWatchSpectatorSessionPolicy.activeCategory(watch),
                 title: watch.workoutDisplayTitle ?? watch.kind.title,
                 startedAt: startedAt,
                 elapsedSeconds: watch.confirmedActiveDuration,
-                distanceMeters: watch.kind.supportsDistanceMetric &&
-                    watch.distanceMeters.isFinite
-                    ? max(0, watch.distanceMeters) : nil,
+                distanceMeters:
+                    ATHLTHWatchVerifiedLiveMetrics.measuredDistanceMeters(
+                        from: watch
+                    ),
                 currentStep: watch.runningStepTitle ?? watch.strengthExerciseName,
                 nextStep: watch.runningNextStepTitle ?? watch.strengthNextExerciseName,
                 completedSets: nil,
@@ -988,8 +992,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             snapshot.sourceDevice = "watch"
             snapshot.captureEvidence = "watchHealthKit"
             snapshot.heartRateBPM = freshHeartRate
-            snapshot.activeCalories = watch.activeCalories > 0
-                ? Double(watch.activeCalories) : nil
+            snapshot.activeCalories =
+                ATHLTHWatchVerifiedLiveMetrics.measuredActiveCalories(
+                    from: watch
+                )
             snapshot.currentPaceSecondsPerKilometer =
                 ATHLTHWatchSpectatorSessionPolicy.measuredPace(watch)
             // A target may remain visible on a strength-owned running

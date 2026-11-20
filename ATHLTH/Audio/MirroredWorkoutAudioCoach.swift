@@ -728,11 +728,17 @@ final class MirroredWorkoutAudioCoach:
     private func announceCustomAudioCoachRules(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> [ATHLTHAudioCoachDueAnnouncement] {
-        let sport = snapshot.kind.rawValue
-        let measuredDistanceSupported = snapshot.kind.supportsDistanceMetric &&
-            snapshot.distanceMeters.isFinite && snapshot.distanceMeters > 0
-        let distance = measuredDistanceSupported
-            ? max(0, snapshot.distanceMeters) : 0
+        // A single strength-owned HealthKit workout may execute running,
+        // lifting and recovery phases. Sport-specific rules follow the
+        // ORIGINAL active segment, not the immutable HK workout category.
+        // All measurements still require proof from their native sensor.
+        let sport = ATHLTHWatchLiveSportPolicy.activityCategory(snapshot)
+        let verifiedDistance =
+            ATHLTHWatchVerifiedLiveMetrics.measuredDistanceMeters(
+                from: snapshot
+            )
+        let measuredDistanceSupported = verifiedDistance != nil
+        let distance = verifiedDistance ?? 0
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: ATHLTHAudioCoachSportPolicy.eligibleRules(
                 configuration.activeCustomRules, sport: sport,
@@ -740,13 +746,11 @@ final class MirroredWorkoutAudioCoach:
             ),
             distanceMeters: distance,
             elapsedSeconds: snapshot.elapsedTime,
-            paceSecondsPerKilometer:
-                ATHLTHCoachSensorFreshness.validPace(
-                    resolvedPace(snapshot), sampledAt: snapshot.coachPaceSampleAt
-                ) ? resolvedPace(snapshot) : nil,
-            heartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
-                snapshot.heartRate, sampledAt: snapshot.coachHeartRateSampleAt
-            ) ? snapshot.heartRate : nil,
+            paceSecondsPerKilometer: resolvedPace(snapshot),
+            heartRateBPM:
+                ATHLTHWatchVerifiedLiveMetrics.measuredHeartRateBPM(
+                    from: snapshot
+                ),
             norwegian: phrase(english: "en", norwegian: "no") == "no",
             maximumHeartRateBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
                 configuration.smartPrompts?.maximumHeartRateBPM,
@@ -1212,15 +1216,9 @@ final class MirroredWorkoutAudioCoach:
     private func resolvedPace(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) -> TimeInterval? {
-        guard ATHLTHAudioCoachSportPolicy.supportsRunningPace(
-            snapshot.kind.rawValue
-        ),
-        ATHLTHCoachSensorFreshness.validPace(
-            snapshot.currentPaceSecondsPerKilometer,
-            sampledAt: snapshot.coachPaceSampleAt
-        ) else { return nil }
-
-        return snapshot.currentPaceSecondsPerKilometer
+        ATHLTHWatchVerifiedLiveMetrics.measuredPaceSecondsPerKilometer(
+            from: snapshot
+        )
     }
 
     private func phrase(

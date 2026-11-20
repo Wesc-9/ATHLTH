@@ -507,12 +507,17 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror),
                      "Strength HealthKit cannot prove running pace")
         mirror.kind = .running
+        mirror.coachPaceSampleAt = mirror.capturedAt
         XCTAssertEqual(
-            ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror), 290
+            ATHLTHWatchSpectatorSessionPolicy.measuredPace(
+                mirror, at: mirror.capturedAt
+            ), 290
         )
         mirror.kind = .walking
         XCTAssertEqual(
-            ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror), 290
+            ATHLTHWatchSpectatorSessionPolicy.measuredPace(
+                mirror, at: mirror.capturedAt
+            ), 290
         )
         mirror.kind = .cycling
         XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror))
@@ -521,6 +526,135 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror))
         mirror.currentPaceSecondsPerKilometer = -3
         XCTAssertNil(ATHLTHWatchSpectatorSessionPolicy.measuredPace(mirror))
+    }
+
+    func testOneWatchSensorProvenanceForAllLiveAndCoachSports() throws {
+        let started = Date(timeIntervalSince1970: 1_900_000_000)
+        let now = started.addingTimeInterval(140)
+        for kind in WatchWorkoutKind.allCases {
+            var watch = WatchWorkoutLiveSnapshot(
+                kind: kind, state: .running, startedAt: started,
+                capturedAt: now, elapsedTime: 130,
+                heartRate: 142, activeCalories: 95,
+                distanceMeters: 3_200, averageHeartRate: nil,
+                maxHeartRate: nil, routePointCount: 0
+            )
+            watch.coachHeartRateSampleAt = now.addingTimeInterval(-2)
+            watch.coachPaceSampleAt = now.addingTimeInterval(-2)
+            watch.currentPaceSecondsPerKilometer = 305
+
+            XCTAssertEqual(
+                ATHLTHWatchVerifiedLiveMetrics.measuredDistanceMeters(
+                    from: watch
+                ) != nil,
+                kind.supportsDistanceMetric,
+                "No fictional distance for \(kind.rawValue)"
+            )
+            XCTAssertEqual(
+                ATHLTHWatchVerifiedLiveMetrics.measuredPaceSecondsPerKilometer(
+                    from: watch, at: now
+                ),
+                (kind == .running || kind == .walking) ? 305 : nil,
+                "Only native run/walk may claim measured pace"
+            )
+            XCTAssertEqual(
+                ATHLTHWatchSpectatorSessionPolicy.measuredPace(
+                    watch, at: now
+                ),
+                ATHLTHWatchVerifiedLiveMetrics.measuredPaceSecondsPerKilometer(
+                    from: watch, at: now
+                )
+            )
+            XCTAssertEqual(
+                ATHLTHWatchVerifiedLiveMetrics.measuredHeartRateBPM(
+                    from: watch, at: now
+                ), 142
+            )
+            XCTAssertEqual(
+                ATHLTHWatchVerifiedLiveMetrics.measuredActiveCalories(
+                    from: watch
+                ), 95
+            )
+
+            // The active running segment inside a strength HealthKit
+            // recording is still a STRENGTH sensor source.
+            if kind == .strength {
+                watch.strengthHybridRunningActive = true
+                XCTAssertEqual(
+                    ATHLTHWatchLiveSportPolicy.activityCategory(watch),
+                    "running"
+                )
+                XCTAssertNil(
+                    ATHLTHWatchVerifiedLiveMetrics
+                        .measuredPaceSecondsPerKilometer(from: watch, at: now)
+                )
+                XCTAssertNil(
+                    ATHLTHWatchVerifiedLiveMetrics
+                        .measuredDistanceMeters(from: watch)
+                )
+            }
+        }
+    }
+
+    func testOldAndStaleWatchSensorsDoNotMasqueradeAsMeasured() {
+        let now = Date(timeIntervalSince1970: 1_900_000_150)
+        var watch = WatchWorkoutLiveSnapshot(
+            kind: .running, state: .running,
+            startedAt: now.addingTimeInterval(-120),
+            capturedAt: now, elapsedTime: 110, heartRate: 150,
+            activeCalories: 25, distanceMeters: 500,
+            averageHeartRate: nil, maxHeartRate: nil,
+            routePointCount: 0
+        )
+        watch.currentPaceSecondsPerKilometer = 300
+        XCTAssertNil(
+            ATHLTHWatchVerifiedLiveMetrics.measuredPaceSecondsPerKilometer(
+                from: watch, at: now
+            )
+        )
+        XCTAssertNil(
+            ATHLTHWatchVerifiedLiveMetrics.measuredHeartRateBPM(
+                from: watch, at: now
+            )
+        )
+        watch.coachPaceSampleAt = now.addingTimeInterval(-10)
+        watch.coachHeartRateSampleAt = now.addingTimeInterval(-14)
+        XCTAssertNil(
+            ATHLTHWatchVerifiedLiveMetrics.measuredPaceSecondsPerKilometer(
+                from: watch, at: now
+            )
+        )
+        XCTAssertNil(
+            ATHLTHWatchVerifiedLiveMetrics.measuredHeartRateBPM(
+                from: watch, at: now
+            )
+        )
+        watch.coachPaceSampleAt = now.addingTimeInterval(-1)
+        watch.coachHeartRateSampleAt = now.addingTimeInterval(-1)
+        XCTAssertEqual(
+            ATHLTHWatchVerifiedLiveMetrics.measuredPaceSecondsPerKilometer(
+                from: watch, at: now
+            ), 300
+        )
+        XCTAssertEqual(
+            ATHLTHWatchVerifiedLiveMetrics.measuredHeartRateBPM(
+                from: watch, at: now
+            ), 150
+        )
+        watch.currentPaceSecondsPerKilometer = .infinity
+        watch.activeCalories = .nan
+        watch.distanceMeters = .infinity
+        XCTAssertNil(
+            ATHLTHWatchVerifiedLiveMetrics.measuredPaceSecondsPerKilometer(
+                from: watch, at: now
+            )
+        )
+        XCTAssertNil(
+            ATHLTHWatchVerifiedLiveMetrics.measuredActiveCalories(from: watch)
+        )
+        XCTAssertNil(
+            ATHLTHWatchVerifiedLiveMetrics.measuredDistanceMeters(from: watch)
+        )
     }
 
     func testWatchSpectatorRejectsConflictingStrengthIDs() {

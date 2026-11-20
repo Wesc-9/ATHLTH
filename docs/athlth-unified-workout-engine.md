@@ -1,3 +1,10 @@
+## 2.2.6 – felles dokumentert Watch-sensorproveniens for iPad og Audio Coach
+
+- Én shared read-only sensorpolicy (`ATHLTHWatchVerifiedLiveMetrics`) kontrollerer opprinnelig Watch-aktivitet og observerte tidspunkt før målt pulsslag og løpspace kan vises eller leses opp. Eldre Watch-oppdateringer uten verifisert måletid for puls/fart vises ikke som ferske sensorverdier.
+- Watch-distanse støttes bare for aktivitetene som original HealthKit/GPS-recorder faktisk måler (løp, gå, sykling), ikke roing, styrkehybrid eller yoga. For hybrid styrke+løp kan mål fortsatt presenteres som mål uten at appen fabulerer målt løpefart eller distanse. Kumulativ målt distanse og kalorier sjekkes for finitte positive tall.
+- iPad bruker samme bekreftede målepolicy som iPhone sin speilede Audio Coach. Sportsspesifikke egendefinerte coach-regler følger aktiv Watch-deløkt (løp, styrke, pause), mens ekte sensortilgjengelighet alltid følger originalen; dette starter ingen HealthKit-session eller egen voice owner.
+- Regresjoner dekker alle native Watch-aktiviteter, eldre og foreldede samples, hybrid, ikke-finitte sensorverdier og samsvar mellom iPad og coach. Same-commit CI, simulert frakobling og fysisk Watch/iPad/AirPods-verifikasjon gjenstår.
+
 ## 2.2.6 – samme aktive Watch-sport og dokumentert måleopprinnelse på iPad
 
 - iPad-spektatoren bruker nå nøyaktig den samme read-only aktivitetstolkningen som den universelle Watch-live-motoren. En styrkeeid kombinert økt kan dermed vise løp, styrke og pause uten å endre original styrke-HealthKit-opptak, eierskap eller økt-ID. Standard sporter, inkludert trappetrening, får kanoniske aktivitetsnavn.
