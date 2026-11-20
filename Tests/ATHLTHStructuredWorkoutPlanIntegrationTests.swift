@@ -131,4 +131,51 @@ final class ATHLTHStructuredWorkoutPlanIntegrationTests: XCTestCase {
         XCTAssertEqual(skipped.completedSessions, 0)
         XCTAssertEqual(skipped.skippedSessions, 1)
     }
+
+    @MainActor
+    func testStructuredCompletionRecoveryIsIdempotentForSameRecordedStart() throws {
+        let suite = "ATHLTHStructuredCompletionOnce.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let account = UUID()
+        let source = UUID()
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        func completion(_ receipt: UUID, at began: Date) -> StructuredWorkoutCompletion {
+            StructuredWorkoutCompletion(
+                id: receipt, workoutTemplateID: source,
+                sourceWorkoutID: source, title: "Mixed session",
+                category: "hybrid", startedAt: began,
+                endedAt: began.addingTimeInterval(900),
+                completedBlockCount: 3, totalBlockCount: 3
+            )
+        }
+        let original = completion(UUID(), at: start)
+        XCTAssertTrue(StructuredWorkoutCompletionStore.save(
+            original, userID: account, defaults: defaults
+        ))
+        let replay = completion(UUID(), at: start)
+        XCTAssertTrue(StructuredWorkoutCompletionStore.save(
+            replay, userID: account, defaults: defaults
+        ))
+        let once = AccountLocalStorage.read(
+            [StructuredWorkoutCompletion].self, name: "structuredWorkoutHistory",
+            userID: account, defaults: defaults
+        )
+        XCTAssertEqual(once?.count, 1)
+        XCTAssertEqual(once?.first?.id, original.id)
+
+        // Repeating an unlinked library workout starts a distinct session,
+        // even when the user chooses the same saved exercise recipe.
+        let later = completion(UUID(), at: start.addingTimeInterval(3_600))
+        XCTAssertTrue(StructuredWorkoutCompletionStore.save(
+            later, userID: account, defaults: defaults
+        ))
+        let twice = AccountLocalStorage.read(
+            [StructuredWorkoutCompletion].self, name: "structuredWorkoutHistory",
+            userID: account, defaults: defaults
+        )
+        XCTAssertEqual(twice?.count, 2)
+        XCTAssertEqual(Set(twice?.map(\.id) ?? []), [original.id, later.id])
+    }
+
 }

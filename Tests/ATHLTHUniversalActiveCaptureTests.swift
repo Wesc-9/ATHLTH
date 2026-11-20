@@ -104,7 +104,7 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         )
         XCTAssertEqual(state.workoutID, id)
         XCTAssertEqual(state.source, .structuredTimer)
-        XCTAssertEqual(state.activityCategory, "hybrid")
+        XCTAssertEqual(state.activityCategory, "cycling")
         XCTAssertEqual(state.engine, .cycling)
         XCTAssertEqual(state.stageIndex, 1)
         XCTAssertEqual(state.stageCount, 2)
@@ -588,6 +588,57 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         XCTAssertTrue(ATHLTHPreMirrorWatchCapturePolicy.permitsExisting(
             original(.appleWatch, .strength), watchActive: true
         ))
+    }
+
+
+    func testStructuredWorkoutChangesSportWithoutChangingOriginalRecording() throws {
+        var cycle = block(kind: .note, sequence: 1)
+        cycle.activityTag = "cycling"
+        let recovery = block(kind: .rest, sequence: 2)
+        let strength = block(kind: .exercise, sequence: 3)
+        let watchFreeID = UUID()
+        let stages = [cycle, recovery, strength]
+        for (index, expectedSport, expectedEngine) in [
+            (0, "cycling", ATHLTHLiveWorkoutEngine.cycling),
+            (1, "recovery", .recovery),
+            (2, "strength", .strength)
+        ] {
+            let saved = ATHLTHStructuredWorkoutCheckpoint(
+                workoutID: watchFreeID,
+                savedAt: started, startedAt: started,
+                stepEnteredAt: started, currentIndex: index,
+                completedIDs: [], results: [:], modeStarts: [:],
+                executionBlocks: stages, emomWaiting: false,
+                timedOutGroups: [], enteredReps: 0, enteredWeight: ""
+            )
+            let projected = try XCTUnwrap(
+                ATHLTHUniversalActiveCapture.structured(
+                    saved, at: started.addingTimeInterval(90)
+                )
+            )
+            XCTAssertEqual(projected.workoutID, watchFreeID)
+            XCTAssertEqual(projected.recordingOwner, .iPhone)
+            XCTAssertEqual(projected.source, .structuredTimer)
+            XCTAssertEqual(projected.startedAt, started)
+            XCTAssertEqual(projected.activityCategory, expectedSport)
+            XCTAssertEqual(projected.engine, expectedEngine)
+            XCTAssertEqual(projected.stageIndex, index)
+        }
+    }
+
+    func testCanonicalSportCodesRoundTripAcrossAllActivityModes() {
+        let all: [ATHLTHWorkoutSportMode] = [
+            .running, .walking, .strength, .cycling, .rowing,
+            .stairClimber, .hiit, .circuit, .functional, .yoga,
+            .meditation, .mobility, .sports, .other, .recovery,
+            .instructions
+        ]
+        for mode in all {
+            XCTAssertEqual(
+                ATHLTHWorkoutSportMode(category: mode.category), mode,
+                mode.category
+            )
+        }
     }
 
 }

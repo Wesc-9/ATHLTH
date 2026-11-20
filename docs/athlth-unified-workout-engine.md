@@ -1,3 +1,9 @@
+## 2.2.6 – korrekt aktiv treningsform og idempotent gjenoppretting
+
+- Den ene universelle strukturerte tilstanden rapporterer nå sport for AKTIV deløkt, ikke overordnet "hybrid". Løp → sykling → pause → styrke beholder samme recording owner, stable workout UUID og klokke mens aktivitet, livekontroll og fase endres. Den eksisterende private iPad-spektatoren bruker også aktiv deløkt ved publikasjon; ingen ekstra HealthKit-opptaker eller ny øktidentitet introduseres.
+- Strukturert fullføringshistorikk avviser et nytt kvitterings-ID for nøyaktig samme source-workout og originale starttid etter krasj/retry. En ny start av samme *ulenkede* treningsøkt er fortsatt et nytt, gyldig treningsforsøk. Eldre låsing av gjennomførte planlagte økter beholdes.
+- Nye XCTest dekker sportsoverganger på samme økt og idempotent history-save ved gjenoppretting. Full same-commit bygg, iPhone/iPad/Watch og HealthKit-opptaksverifisering gjenstår.
+
 ## 2.2.6 – ikke mist plan-ID ved gjenopptak eller Quick Train
 
 - Før Quick Run og Quick Walk starter et planlagt opptak, kontrollerer `ATHLTHPlannedLaunchIdentityPolicy` at både plan-ID og session-ID finnes sammen. Et mangelfullt/halvt koblet planobjekt blir avvist i stedet for å bli startet som en «fri» økt hvor planens faser eller identitet kan forsvinne.

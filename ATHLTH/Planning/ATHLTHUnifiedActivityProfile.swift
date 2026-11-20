@@ -82,6 +82,31 @@ enum ATHLTHWorkoutSportMode: Equatable {
         }
     }
 
+    /// Canonical live category for the CURRENT step of a multi-sport workout.
+    /// A plan may be "hybrid" overall, but a single active step is cycling,
+    /// strength, running, recovery, and so on. This is presentation metadata,
+    /// never permission to change the original recording owner.
+    var category: String {
+        switch self {
+        case .running: return "running"
+        case .walking: return "walking"
+        case .strength: return "strength"
+        case .cycling: return "cycling"
+        case .rowing: return "rowing"
+        case .stairClimber: return "stairclimber"
+        case .hiit: return "hiit"
+        case .circuit: return "circuit"
+        case .functional: return "functional"
+        case .yoga: return "yoga"
+        case .meditation: return "meditation"
+        case .mobility: return "mobility"
+        case .sports: return "sports"
+        case .other: return "other"
+        case .recovery: return "recovery"
+        case .instructions: return "instructions"
+        }
+    }
+
     /// Existing capture engines stay authoritative. A sport changes the
     /// controls shown to the athlete, never the recording owner.
     var engine: ATHLTHLiveWorkoutEngine {

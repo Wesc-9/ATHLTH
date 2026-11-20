@@ -147,6 +147,17 @@ enum StructuredWorkoutCompletionStore {
            }) {
             return true
         }
+        // Crash recovery can generate a different completion receipt for
+        // the SAME persisted recording. Use its immutable source ID AND
+        // original start as the idempotency key, not just the receipt UUID.
+        // A later, newly started unlinked library session has a new start
+        // and remains repeatable even with the same template workout ID.
+        if history.contains(where: {
+            $0.sourceWorkoutID == completion.sourceWorkoutID &&
+                $0.startedAt == completion.startedAt
+        }) {
+            return true
+        }
         history.removeAll {
             $0.id == completion.id
         }
@@ -1377,7 +1388,13 @@ struct StructuredWorkoutSessionView: View {
                 ownerID: session.profile.userID,
                 workoutID: workout.id,
                 title: workout.title,
-                kind: String(describing: workout.kind),
+                // A mixed plan's spectator must show the actual ACTIVE
+                // sport at each checkpoint, never its generic plan kind.
+                kind: currentBlock.map {
+                    ($0.kind == .rest || $0.isActiveRecovery)
+                        ? ATHLTHWorkoutSportMode.recovery.category
+                        : ATHLTHWorkoutSportMode.forBlock($0).category
+                } ?? String(describing: workout.kind),
                 startedAt: startedAt,
                 steps: stages,
                 stepIndex: currentIndex,

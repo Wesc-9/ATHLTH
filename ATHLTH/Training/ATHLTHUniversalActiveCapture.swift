@@ -161,10 +161,13 @@ enum ATHLTHUniversalActiveCapture {
             return nil
         }
         let current = checkpoint.executionBlocks[checkpoint.currentIndex]
-        let category = ATHLTHUnifiedActivityProfile(
-            blocks: checkpoint.executionBlocks
-        ).category
+        // The original workout can be mixed; its ACTIVE stage cannot.
+        // Do not advertise a cycling segment as a "hybrid" sport or
+        // incorrectly inherit the previous running interval's metrics.
+        let activeSport = ATHLTHWorkoutSportMode.forBlock(current)
         let inRest = current.kind == .rest || current.isActiveRecovery
+        let category = inRest ? ATHLTHWorkoutSportMode.recovery.category :
+            activeSport.category
         guard let activeSeconds = ATHLTHStructuredWorkoutClock.elapsed(
             start: checkpoint.startedAt, now: now,
             pause: checkpoint.pausedAt,
@@ -176,8 +179,7 @@ enum ATHLTHUniversalActiveCapture {
             recordingOwner: .iPhone,
             source: .structuredTimer,
             activityCategory: category,
-            engine: inRest ? .recovery :
-                ATHLTHLiveWorkoutEngineRouter.engine(for: current),
+            engine: inRest ? .recovery : activeSport.engine,
             phase: checkpoint.pausedAt != nil ? .paused : (inRest ? .recovery : .work),
             startedAt: checkpoint.startedAt,
             elapsedSeconds: activeSeconds,
