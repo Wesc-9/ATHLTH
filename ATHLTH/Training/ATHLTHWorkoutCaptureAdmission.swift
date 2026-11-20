@@ -37,6 +37,20 @@ enum ATHLTHPlannedLaunchIdentityPolicy {
 /// A plan-bound run must always use the saved original recipe and route.
 /// Draft Quick Run settings may provide explicit personal playback choices,
 /// but a stale editor/relay copy cannot silently replace scheduled stages.
+/// Quick Run and the Running Library must not replace the original
+/// saved route with an unrelated or missing one during Watch preflight.
+/// Nil is valid only when the saved recipe itself has no route. A genuinely
+/// free workout may use the athlete's explicitly chosen route.
+enum ATHLTHWatchRunRoutePolicy {
+    static func matchesSource(
+        hasSourceWorkout: Bool,
+        sourceRouteID: UUID?,
+        selectedRouteID: UUID?
+    ) -> Bool {
+        !hasSourceWorkout || sourceRouteID == selectedRouteID
+    }
+}
+
 enum ATHLTHPlannedEnduranceRecipePolicy {
     static func canonicalSource(
         planned: PlannedSession?,

@@ -9941,72 +9941,75 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        do {
-            if let route = configuration.route {
-                try watchConnection.sendRoute(route)
-                watchConnection.sendWorkoutRouteSelection(route.id)
-            } else if let workout = configuration.workout,
-                      let routeID = workout.routeID,
-                      let route = session.savedRoutes.first(
-                        where: { $0.id == routeID }
-                      ) {
-                try watchConnection.sendRoute(route)
-                watchConnection.sendWorkoutRouteSelection(route.id)
-            } else {
-                watchConnection.sendWorkoutRouteSelection(nil)
-            }
-        } catch {
-            Task { @MainActor in
-                await social.markCurrentJoinedWorkoutLaunchFailed()
-            }
-            watchTransferError = error.localizedDescription
-            return
-        }
-
         Task { @MainActor in
             do {
                 let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
                 defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
-                try await watchConnection
-                    .startWorkoutOnWatch(.running)
+                let initiatingAccount = session.profile.userID
 
-                gear.prepareNextWorkoutGear(
-                    configuration.gearIDs
-                )
+                // Validate the original workout's route before sending any
+                // Watch state or starting HealthKit. Quick free run may
+                // instead use an explicitly selected personal route.
+                let original = configuration.workout
+                let route: TrainingRoute?
+                if let source = original {
+                    route = source.routeID.flatMap { routeID in
+                        configuration.route?.id == routeID
+                            ? configuration.route
+                            : session.savedRoutes.first { $0.id == routeID }
+                    }
+                } else {
+                    route = configuration.route
+                }
+                guard ATHLTHWatchRunRoutePolicy.matchesSource(
+                    hasSourceWorkout: original != nil,
+                    sourceRouteID: original?.routeID,
+                    selectedRouteID: route?.id
+                ) else {
+                    watchTransferError = ATHLTHLocalization.choose(
+                        english: "The saved running route is missing or has changed.",
+                        norwegian: "Den lagrede løperuten mangler eller er endret."
+                    )
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
+                    return
+                }
+                if let route {
+                    try watchConnection.sendRoute(route)
+                    watchConnection.sendWorkoutRouteSelection(route.id)
+                } else {
+                    watchConnection.sendWorkoutRouteSelection(nil)
+                }
 
                 watchConnection.sendAudioCoachConfiguration(
                     configuration.audioCoach
                 )
-
-                if let workout = configuration.workout {
-                    var watchTransfer =
-                        watchRunningWorkoutTransfer(
-                            from: workout
-                        )
-                    watchTransfer.routeAlerts =
-                        settings
-                            .routeAlertConfiguration
-                    watchTransfer.autoPauseEnabled =
-                        configuration.autoPauseEnabled
-                    watchConnection.sendRunningWorkout(
-                        watchTransfer
-                    )
+                if let source = original {
+                    var transfer = watchRunningWorkoutTransfer(from: source)
+                    transfer.routeAlerts = settings.routeAlertConfiguration
+                    transfer.autoPauseEnabled = configuration.autoPauseEnabled
+                    watchConnection.sendRunningWorkout(transfer)
                 } else {
                     watchConnection.sendRunningWorkout(
                         WatchRunningWorkoutTransfer(
                             title: "",
                             steps: [],
-                            routeAlerts:
-                                settings
-                                    .routeAlertConfiguration,
-                            autoPauseEnabled:
-                                configuration.autoPauseEnabled
+                            routeAlerts: settings.routeAlertConfiguration,
+                            autoPauseEnabled: configuration.autoPauseEnabled
                         )
                     )
                 }
-
-                _ = await social
-                    .confirmCurrentJoinedWorkoutStarted()
+                // The original recipe is now queued before Watch starts.
+                try await watchConnection.startWorkoutOnWatch(.running)
+                guard session.profile.userID == initiatingAccount else {
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
+                    watchTransferError = ATHLTHLocalization.choose(
+                        english: "Apple Watch started under the previous account.",
+                        norwegian: "Apple Watch startet på den forrige kontoen."
+                    )
+                    return
+                }
+                gear.prepareNextWorkoutGear(configuration.gearIDs)
+                _ = await social.confirmCurrentJoinedWorkoutStarted()
                 watchTransferMessage =
                     "\(configuration.title) started on Apple Watch."
             } catch {
@@ -10048,42 +10051,48 @@ struct ATHLTHTrainView: View {
             return
         }
 
-        do {
-            if let routeID = workout.routeID,
-               let route = session.savedRoutes.first(
-                    where: { $0.id == routeID }
-               ) {
-                try watchConnection.sendRoute(route)
-                watchConnection.sendWorkoutRouteSelection(route.id)
-            } else {
-                watchConnection.sendWorkoutRouteSelection(nil)
-            }
-        } catch {
-            Task { @MainActor in
-                await social.markCurrentJoinedWorkoutLaunchFailed()
-            }
-            watchTransferError = error.localizedDescription
-            return
-        }
-
         Task { @MainActor in
             do {
                 let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
                 defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
-                try await watchConnection.startWorkoutOnWatch(.running)
-                gear.prepareNextWorkoutGear(gearIDs)
-                watchConnection.sendAudioCoachConfiguration(
-                    audioCoach
-                )
-                var watchTransfer =
-                    watchRunningWorkoutTransfer(
-                        from: workout
+                let initiatingAccount = session.profile.userID
+                let route = workout.routeID.flatMap { routeID in
+                    session.savedRoutes.first { $0.id == routeID }
+                }
+                guard ATHLTHWatchRunRoutePolicy.matchesSource(
+                    hasSourceWorkout: true,
+                    sourceRouteID: workout.routeID,
+                    selectedRouteID: route?.id
+                ) else {
+                    watchTransferError = ATHLTHLocalization.choose(
+                        english: "The library workout's saved route is missing.",
+                        norwegian: "Den lagrede ruten til bibliotekøkten mangler."
                     )
-                watchTransfer.routeAlerts =
-                    settings.routeAlertConfiguration
-                watchConnection.sendRunningWorkout(
-                    watchTransfer
-                )
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
+                    return
+                }
+                if let route {
+                    try watchConnection.sendRoute(route)
+                    watchConnection.sendWorkoutRouteSelection(route.id)
+                } else {
+                    watchConnection.sendWorkoutRouteSelection(nil)
+                }
+
+                watchConnection.sendAudioCoachConfiguration(audioCoach)
+                var transfer = watchRunningWorkoutTransfer(from: workout)
+                transfer.routeAlerts = settings.routeAlertConfiguration
+                watchConnection.sendRunningWorkout(transfer)
+                // Do not lose the template's stages on the first Watch frame.
+                try await watchConnection.startWorkoutOnWatch(.running)
+                guard session.profile.userID == initiatingAccount else {
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
+                    watchTransferError = ATHLTHLocalization.choose(
+                        english: "Apple Watch started under the previous account.",
+                        norwegian: "Apple Watch startet på den forrige kontoen."
+                    )
+                    return
+                }
+                gear.prepareNextWorkoutGear(gearIDs)
                 watchTransferMessage =
                     "\(workout.title) started on Apple Watch."
             } catch {

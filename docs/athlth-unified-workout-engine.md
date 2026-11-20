@@ -1,3 +1,9 @@
+## 2.2.6 – kanoniske løperuter og Coach før HealthKit-start
+
+- Watch-oppstart fra **Advanced Quick Run** og løpeøkter i **Bibliotek** gjør nå hele asynkrone preflight i én global `reserveLaunch`-transaksjon: kontroller original lagret rute, send riktig rute/eller eksplisitt null, send valgt Audio Coach og original intervalloppskrift, deretter start **én** Watch HealthKit-workout. Det tidligere opplegget sendte intervaller og coach først **etter** at Watch startet, og kunne miste planlagte trinn på første live-frame.
+- En lagret rute som er slettet/ikke funnet stopper start før HealthKit. En eldre valgt annen rute får ikke overstyre den kanoniske rutekoblingen i lagret økt. Fri Quick Run kan fortsatt bruke valgt rute. Original konto sjekkes etter asynkron Watch-oppstart før kontoens gear/sosial oppdateres.
+- Pure XCTest dekker fri rute, original rute, manglende original, endret original og gammel tilfeldig Watch-rute. Dette gir ikke atomisk bekreftelse på WatchConnectivity-levering: appen må i tillegg gjennomgå samme-commit native CI og fysisk Watch test før løpeintervallet kan betegnes ferdig testet.
+
 ## 2.2.6 – globale HealthKit-startreservasjoner på Hjem og Train
 
 - Fem ytterligere Watch-startveier (Hjem Quick, Hjem planlagt umiddelbar løp/gå, Train Quick, Train avansert Quick Run, bibliotekets Running Template) har nå samme `ATHLTHWorkoutRecordingArbiter.reserveLaunch`/tokenbasert `releaseLaunch` gjennom hele asynkrone Watch HealthKit-oppstarten. Tidligere hadde noen kun en usikret UI-kontroll før `Task`. Den globale sperren omfatter også manuell/stukturert timer, iPhone-opptak, Watch-oppstart og styrkehybrid, uten at det skapes en ekstra skribent.

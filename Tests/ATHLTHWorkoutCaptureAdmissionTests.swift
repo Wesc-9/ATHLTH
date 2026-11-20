@@ -28,6 +28,34 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         return workout
     }
 
+    func testWatchRunPreflightNeverReplacesSavedRouteOrStartsWithoutIt() {
+        let originalRoute = UUID(), unrelatedRoute = UUID()
+        XCTAssertTrue(ATHLTHWatchRunRoutePolicy.matchesSource(
+            hasSourceWorkout: false, sourceRouteID: nil,
+            selectedRouteID: unrelatedRoute
+        ), "A genuinely free run can use a selected route")
+        XCTAssertTrue(ATHLTHWatchRunRoutePolicy.matchesSource(
+            hasSourceWorkout: true, sourceRouteID: nil,
+            selectedRouteID: nil
+        ), "A route-free saved recipe stays route-free")
+        XCTAssertTrue(ATHLTHWatchRunRoutePolicy.matchesSource(
+            hasSourceWorkout: true, sourceRouteID: originalRoute,
+            selectedRouteID: originalRoute
+        ))
+        XCTAssertFalse(ATHLTHWatchRunRoutePolicy.matchesSource(
+            hasSourceWorkout: true, sourceRouteID: originalRoute,
+            selectedRouteID: nil
+        ), "A missing source route blocks the Watch start")
+        XCTAssertFalse(ATHLTHWatchRunRoutePolicy.matchesSource(
+            hasSourceWorkout: true, sourceRouteID: originalRoute,
+            selectedRouteID: unrelatedRoute
+        ), "Quick selection cannot replace the original saved route")
+        XCTAssertFalse(ATHLTHWatchRunRoutePolicy.matchesSource(
+            hasSourceWorkout: true, sourceRouteID: nil,
+            selectedRouteID: unrelatedRoute
+        ), "An unrelated old Watch route must be cleared")
+    }
+
     func testOnlyIdentifierFreeLegacyWatchCompletionsCanUseTimeCorrelation() {
         let id = UUID(), another = UUID()
         XCTAssertTrue(
