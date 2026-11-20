@@ -238,7 +238,9 @@ final class ATHLTHUnifiedActivityProfileTests: XCTestCase {
                 category == "yoga" || category == "mobility" ? .mobility :
                 .custom
             let source = workout(kind: kind, category: category)
-            let before = try JSONEncoder().encode(source)
+            let stableEncoder = JSONEncoder()
+            stableEncoder.outputFormatting = [.sortedKeys]
+            let before = try stableEncoder.encode(source)
             let projected = try XCTUnwrap(
                 ATHLTHUnifiedWorkout.timedNonCardioProjection(from: source),
                 "Missing iPhone-timed fallback for \(category)"
@@ -249,7 +251,7 @@ final class ATHLTHUnifiedActivityProfileTests: XCTestCase {
             XCTAssertEqual(projected.resolvedWorkoutBlocks.count, 1)
             XCTAssertEqual(projected.resolvedWorkoutBlocks[0].durationSeconds, 1800)
             XCTAssertNil(projected.resolvedWorkoutBlocks[0].distanceMeters)
-            XCTAssertEqual(try JSONEncoder().encode(source), before,
+            XCTAssertEqual(try stableEncoder.encode(source), before,
                 "Projection must not rewrite the saved workout")
             XCTAssertEqual(ATHLTHUnifiedActivityProfile.category(for: projected),
                 ATHLTHUnifiedActivityProfile.category(for: source))
