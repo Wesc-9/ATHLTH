@@ -3309,6 +3309,9 @@ struct ATHLTHHomeView: View {
               let watchKind = ATHLTHWorkoutCaptureAdmission.watchKind(
                   for: workout
               ),
+              ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                  workout, device: .appleWatch
+              ).canUsePreparedWatchTransfer,
               !workout.isExplicitRestDay,
               session.recordedTimes(for: workout.id)?.endedAt == nil,
               !universalRecordingOccupied
@@ -4232,7 +4235,10 @@ struct ATHLTHHomeView: View {
 
         let today = session.plannedSessions(on: Date(), in: plan)
             .filter { !$0.isExplicitRestDay
-                && ATHLTHWorkoutCaptureAdmission.watchKind(for: $0) != nil }
+                && ATHLTHWorkoutCaptureAdmission.watchKind(for: $0) != nil
+                && ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                    $0, device: .appleWatch
+                ).canUsePreparedWatchTransfer }
         let workouts: [PlannedSession] = {
             if !today.isEmpty { return today }
             // On rest days show the next planned workout on Watch home,
@@ -4243,7 +4249,10 @@ struct ATHLTHHomeView: View {
                 ) else { continue }
                 let next = session.plannedSessions(on: date, in: plan)
                     .filter { !$0.isExplicitRestDay
-                        && ATHLTHWorkoutCaptureAdmission.watchKind(for: $0) != nil }
+                        && ATHLTHWorkoutCaptureAdmission.watchKind(for: $0) != nil
+                        && ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                            $0, device: .appleWatch
+                        ).canUsePreparedWatchTransfer }
                 if !next.isEmpty { return next }
             }
             return []
@@ -4252,7 +4261,9 @@ struct ATHLTHHomeView: View {
         for workout in workouts {
             guard let watchKind = ATHLTHWorkoutCaptureAdmission.watchKind(
                 for: workout
-            ) else { continue }
+            ), ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                workout, device: .appleWatch
+            ).canUsePreparedWatchTransfer else { continue }
         let selectedRoute =
             PlannedWorkoutWatchBuilder.route(
                 for: workout,
@@ -4711,6 +4722,7 @@ struct ATHLTHHomeView: View {
         audioCoach: WatchAudioCoachConfiguration
     ) {
         guard watchConnection.isReady,
+              !universalRecordingOccupied,
               let watchKind = PlannedWorkoutWatchBuilder.watchKind(for: kind)
         else {
             Task {
@@ -4744,7 +4756,12 @@ struct ATHLTHHomeView: View {
         _ workout: PlannedSession,
         startMode: WatchWorkoutStartMode = .immediate
     ) {
-        guard let watchKind = PlannedWorkoutWatchBuilder.watchKind(for: workout.kind),
+        guard ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                  workout, device: .appleWatch
+              ) == .watchEndurance,
+              let watchKind = ATHLTHWorkoutCaptureAdmission.watchKind(
+                  for: workout
+              ),
               watchConnection.isReady
         else {
             homeWatchTransferError =

@@ -275,4 +275,27 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         )
     }
 
+
+    func testWatchTodayNeverOffersAnIncompletePreparedRecipe() {
+        let cycling = session(.custom, category: "cycling")
+        XCTAssertTrue(ATHLTHPlannedWorkoutCaptureRoute.resolve(
+            cycling, device: .appleWatch
+        ).canUsePreparedWatchTransfer)
+        var savedRouteSport = cycling
+        savedRouteSport.routeID = UUID()
+        XCTAssertFalse(ATHLTHPlannedWorkoutCaptureRoute.resolve(
+            savedRouteSport, device: .appleWatch
+        ).canUsePreparedWatchTransfer)
+        var mixed = session(.running, blocks: [block(.run)])
+        var yoga = block(.note, sequence: 2)
+        yoga.wellnessKind = .yoga
+        mixed.workoutBlocks = [block(.run), yoga]
+        XCTAssertFalse(ATHLTHPlannedWorkoutCaptureRoute.resolve(
+            mixed, device: .appleWatch
+        ).canUsePreparedWatchTransfer)
+        XCTAssertTrue(ATHLTHPlannedWorkoutCaptureRoute.resolve(
+            session(.running), device: .appleWatch
+        ).canUsePreparedWatchTransfer)
+    }
+
 }

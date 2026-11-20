@@ -20,6 +20,17 @@ enum ATHLTHPlannedWorkoutCaptureRoute: Equatable {
     case watchHybridStrength
     case unavailable
 
+    /// Only these routes can be represented by the existing Today payload.
+    /// A Watch hybrid requires its own validated one-session start path.
+    var canUsePreparedWatchTransfer: Bool {
+        switch self {
+        case .watchEndurance, .watchStrength, .watchSport:
+            return true
+        default:
+            return false
+        }
+    }
+
     static func resolve(
         _ workout: PlannedSession, device: WorkoutCaptureDevice
     ) -> Self {

@@ -1,3 +1,7 @@
+## 2.2.6 – samle Watch Today og øvrige opptaksinnganger
+
+Watch Today-filter, klargjøring fra Hjem, direkte start av planlagt løp/gå og Quick Train-Watch-start bruker nå den samme rute- og beleggsbeslutningen. Watch Today tilbyr ikke fleridrettsoppskrifter som vil miste deler av planen eller en custom-idrett med lagret rute som ikke kan overføres. Den ekte Watch-hybridruten beholdes adskilt fra forenklede Watch Today-payloads, men eier fortsatt bare én treningsøkt. Testene verifiserer alle disse avvisningene. Ingen nye sensorkilder/øktopptak.
+
 ## ATHLTH 2.2.6 – sikker sammenkobling av opptaksjournaler
 
 - Den universelle lesemotoren og den samtykkestyrte iPad-spektatoren avviser nå motstridende samtidige opptak, i stedet for å plukke én tilfeldig kilde. En Watch-eid styrkeøkt kan speiles ved bekreftet samme opprinnelige UUID og starttid; et annet aktivt iPhone-opptak skal aldri skjules.
