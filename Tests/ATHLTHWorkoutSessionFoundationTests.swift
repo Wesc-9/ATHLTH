@@ -858,4 +858,34 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
         XCTAssertFalse(available(manual: true, watch: true))
     }
 
+
+    func testOriginalRecordingLogsOwnTheSlotEvenWithoutLiveProjection() {
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.originalRecordersIdle(
+            phoneWorkoutExists: false, strengthWorkoutExists: false
+        ))
+        for (phone, strength) in [
+            (true, false), (false, true), (true, true)
+        ] {
+            XCTAssertFalse(ATHLTHWorkoutSessionFoundation.originalRecordersIdle(
+                phoneWorkoutExists: phone,
+                strengthWorkoutExists: strength
+            ))
+        }
+        // A stored PhoneWorkout/StrengthWorkoutLog must never be replaced
+        // simply because the derived UI projection is temporarily nil.
+    }
+
+    @MainActor
+    func testOriginalStrengthLogPreventsEverySecondLaunchPath() throws {
+        let phone = IPhoneWorkoutStore()
+        let strength = StrengthWorkoutStore()
+        strength.startFreestyle(watchSessionID: nil)
+        XCTAssertNotNil(strength.activeWorkout)
+        XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.mayStartRunning())
+        XCTAssertFalse(ATHLTHWorkoutRecordingArbiter.mayStartStrength())
+        XCTAssertThrowsError(try ATHLTHWorkoutRecordingArbiter.reserveLaunch())
+        XCTAssertThrowsError(try ATHLTHWorkoutSessionFoundation
+            .requireAvailableRecordingSlot(phone: phone, strength: strength))
+    }
+
 }

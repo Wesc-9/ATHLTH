@@ -75,6 +75,16 @@ enum ATHLTHWorkoutRecordingArbiter {
             mirror?.hasActiveMirroredWorkout == true
     }
 
+    /// A pending or restored ORIGINAL workout journal occupies the slot
+    /// even if the read-only universal session projection is unavailable.
+    /// Never infer an idle HealthKit recorder from missing UI metadata.
+    private static var localRecorderOccupied: Bool {
+        !ATHLTHWorkoutSessionFoundation.originalRecordersIdle(
+            phoneWorkoutExists: phone?.active != nil,
+            strengthWorkoutExists: strength?.activeWorkout != nil
+        )
+    }
+
     /// One launch reservation spans every asynchronous preflight (social,
     /// HealthKit Watch launch and device relay). Without it, two independent
     /// start tasks can both observe an empty checkpoint before either writes.
@@ -88,6 +98,7 @@ enum ATHLTHWorkoutRecordingArbiter {
 
     static func reserveLaunch() throws -> UUID {
         guard pendingLaunchID == nil,
+              !localRecorderOccupied,
               !unmirroredWatchRecordingActive,
               !ATHLTHManualTimedCapture.hasActiveCapture,
               !ATHLTHStructuredCaptureAdmission.hasActiveCapture,
@@ -112,7 +123,8 @@ enum ATHLTHWorkoutRecordingArbiter {
     }
 
     static func mayStartRunning() -> Bool {
-        !ATHLTHManualTimedCapture.hasActiveCapture &&
+        !localRecorderOccupied &&
+            !ATHLTHManualTimedCapture.hasActiveCapture &&
             !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
             strength?.activeSessionState == nil &&
             (!unmirroredWatchRecordingActive || pendingLaunchID != nil) &&
@@ -120,7 +132,8 @@ enum ATHLTHWorkoutRecordingArbiter {
     }
 
     static func mayStartStrength() -> Bool {
-        !ATHLTHManualTimedCapture.hasActiveCapture &&
+        !localRecorderOccupied &&
+            !ATHLTHManualTimedCapture.hasActiveCapture &&
             !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
             phone?.activeSessionState == nil &&
             phone?.hasPendingLaunch != true &&
@@ -135,6 +148,7 @@ enum ATHLTHWorkoutRecordingArbiter {
         snapshot: WatchStrengthSessionSnapshot? = nil
     ) -> Bool {
         pendingLaunchID == nil &&
+            !localRecorderOccupied &&
             !ATHLTHManualTimedCapture.hasActiveCapture &&
             !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
             ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
@@ -151,6 +165,16 @@ enum ATHLTHWorkoutRecordingArbiter {
 }
 
 enum ATHLTHWorkoutSessionFoundation {
+    /// Original source journals are stronger evidence of active recording
+    /// than a derived state/view that may temporarily be missing after
+    /// background restoration, account reload, or a Watch reconnect.
+    static func originalRecordersIdle(
+        phoneWorkoutExists: Bool,
+        strengthWorkoutExists: Bool
+    ) -> Bool {
+        !phoneWorkoutExists && !strengthWorkoutExists
+    }
+
     /// Waiting for outdoor location permission still occupies the one
     /// universal recording slot, even before PhoneWorkout is allocated.
     static func isRecordingSlotAvailable(
@@ -298,7 +322,10 @@ enum ATHLTHWorkoutSessionFoundation {
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore
     ) throws {
-        guard canStartNewRecorder(
+        guard originalRecordersIdle(
+            phoneWorkoutExists: phone.active != nil,
+            strengthWorkoutExists: strength.activeWorkout != nil
+        ), canStartNewRecorder(
             phonePending: phone.hasPendingLaunch,
             manualActive: ATHLTHManualTimedCapture.hasActiveCapture,
             structuredActive: ATHLTHStructuredCaptureAdmission.hasActiveCapture,

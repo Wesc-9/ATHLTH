@@ -1,3 +1,9 @@
+## 2.2.6 – originale opptakslogger styrer den felles opptaksplassen
+
+- Alle nye iPhone/Watch-preflight-sperrer kontrollerer både de opprinnelige `PhoneWorkout`- og `StrengthWorkoutLog`-objektene og de avledede universelle sesjonsprojeksjonene. Dersom en eksisterende journal er lastet inn, men en Live/HealthKit-projeksjon mangler et øyeblikk under gjenoppretting, skal en ny treningsform IKKE kunne overta det opptaket.
+- Oppdatert `reserveLaunch`, `mayStartRunning`, `mayStartStrength`, `mayBootstrapWatchStrength` og `requireAvailableRecordingSlot`; ingen ekstra HealthKit-writer eller separat treningshistorikk.
+- Regresjonstester dekker opptatt original styrkejournal ved samtidig løpe-/styrkeoppstart og ren policy for originale kilder. Native samme-commit CI og fysisk verifikasjon gjenstår.
+
 ## 2.2.6 – Apple Watch: ingen nullstilling av pågående økt ved dobbel start
 
 - Både vanlig og forhåndslastet lokal Watch-start sjekker nå én felles startsperre FØR de nullstiller lydcoach, rute, styrkekø, eierskap eller treningsplan. Sperren gjentas etter et asynkront svar fra iPhone; dermed kan ikke et sent dobbelttrykk korrupttere et allerede aktivt originalt HKWorkoutSession.
