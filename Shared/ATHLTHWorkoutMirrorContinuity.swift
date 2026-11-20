@@ -35,6 +35,13 @@ enum ATHLTHWorkoutMirrorContinuity {
         }
         guard let previous else { return true }
         guard previous.kind == incoming.kind else { return false }
+        // Once Watch has proven its universal ID for this HealthKit
+        // recording, late WatchConnectivity packets may not erase or
+        // replace that identity, even for non-strength sports.
+        if let originalID = previous.universalWorkoutID,
+           incoming.universalWorkoutID != originalID {
+            return false
+        }
         // A snapshot that has already established an exact strength
         // identity may never be updated by an unidentifiable or different
         // strength session. Older Watch versions still work when neither
@@ -94,7 +101,10 @@ enum ATHLTHWorkoutMirrorContinuity {
               abs(startedAt.timeIntervalSince(workoutStartedAt)) <= 15
         else { return false }
         if let stableID = snapshot.strengthWorkoutID {
-            return stableID == workoutID
+            guard stableID == workoutID else { return false }
+        }
+        if let universalID = snapshot.universalWorkoutID {
+            return universalID == workoutID
         }
         return true
     }
@@ -125,7 +135,8 @@ enum ATHLTHWorkoutMirrorContinuity {
         kind: WatchWorkoutKind,
         startedAt: Date,
         endedAt: Date,
-        strengthWorkoutID: UUID? = nil
+        strengthWorkoutID: UUID? = nil,
+        universalWorkoutID: UUID? = nil
     ) -> Bool {
         guard snapshot.kind == kind,
               let currentStart = snapshot.startedAt,
@@ -136,6 +147,13 @@ enum ATHLTHWorkoutMirrorContinuity {
               abs(currentStart.timeIntervalSince(startedAt)) < 2,
               currentStart <= endedAt else { return false }
 
+        // A stable original Watch workout ID always outranks timestamps;
+        // this also covers repeated same-sport starts and offline result
+        // packets from the previous workout.
+        if let liveID = snapshot.universalWorkoutID,
+           universalWorkoutID != liveID {
+            return false
+        }
         // Multiple same-kind Watch workouts may have started near each
         // other. A captured stable strength ID always outranks timestamps.
         // If a modern mirror has an ID, an unidentifiable late result

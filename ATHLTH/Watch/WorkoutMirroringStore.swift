@@ -857,7 +857,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
               ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
                 snapshot: snapshot, kind: result.kind,
                 startedAt: result.startedAt, endedAt: result.endedAt,
-                strengthWorkoutID: result.strengthSnapshot?.workoutID
+                strengthWorkoutID: result.strengthSnapshot?.workoutID,
+                universalWorkoutID: result.universalWorkoutID
               )
         else {
             return

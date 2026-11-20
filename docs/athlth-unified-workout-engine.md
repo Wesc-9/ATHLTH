@@ -1,3 +1,10 @@
+## 2.2.6 – Watch-resultat og livespeil for samme opprinnelige opptak
+
+- Livepakker med en bekreftet universell Watch-ID kan nå ikke lenger erstattes av forsinkede pakker som mangler ID eller tilhører en annen Watch-økt. Dette gjelder alle native aktivitetskategorier, ikke bare styrke.
+- Fullført Watch-resultat kan bare avslutte den aktive livevisningen når original-UUID stemmer. Eldre Watch-resultater uten ID beholder eksisterende streng klokkesammenligning; de tillegges ikke en oppdiktet ID.
+- Styrkefullføring krever også at en oppgitt universell ID er lik den opprinnelige styrkelogg-ID-en. Regresjonstester dekker forsinket offline-replay og motstridende UUID.
+- Dette samler identitet og livssyklus, men overfører ikke sensoropptaket til en ny eller parallell HealthKit-writer.
+
 ## 2.2.6 – stabil original Watch-ID for alle støttede native idretter
 
 Watch-opptak bruker nå én ATHLTH-øktidentitet per faktisk HealthKit-opptak. For styrke er ID lik original styrkelogg-ID; for løping, gåing, sykling, roing, trapper, HIIT, funksjonell, yoga og annet lages ID-en bare på Watch ved ny sesjon. ID lagres i det opprinnelige recovery-checkpointet, sends med live-snapshotet og det ferdige Watch-resultatet. HealthKit-UUID og sluttresultat-ID forblir separate. En gammel eller uleselig recovery uten verifiserbar ID får aldri automatisk ny ID fra iPhone.

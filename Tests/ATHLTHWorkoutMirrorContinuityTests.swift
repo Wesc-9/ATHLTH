@@ -340,4 +340,69 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testWatchUniversalIdentityRejectsCrossWorkoutLiveReplayForEverySport() {
+        for kind: WatchWorkoutKind in [
+            .running, .walking, .cycling, .rowing, .stairClimbing,
+            .hiit, .functional, .yoga, .other
+        ] {
+            var previous = snapshot(kind: kind)
+            previous.universalWorkoutID = UUID()
+            var incoming = previous
+            incoming.capturedAt = previous.capturedAt.addingTimeInterval(1)
+            XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+                previous: previous, incoming: incoming
+            ))
+            incoming.universalWorkoutID = UUID()
+            XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+                previous: previous, incoming: incoming
+            ))
+            incoming.universalWorkoutID = nil
+            XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsLiveSnapshot(
+                previous: previous, incoming: incoming
+            ))
+        }
+    }
+
+    func testWatchCompletionRequiresSameOriginalUniversalWorkoutID() {
+        var original = snapshot(kind: .cycling)
+        original.universalWorkoutID = UUID()
+        let end = startedAt.addingTimeInterval(201)
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: original, kind: .cycling,
+            startedAt: startedAt, endedAt: end
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: original, kind: .cycling,
+            startedAt: startedAt, endedAt: end,
+            universalWorkoutID: UUID()
+        ))
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: original, kind: .cycling,
+            startedAt: startedAt, endedAt: end,
+            universalWorkoutID: original.universalWorkoutID
+        ))
+        var old = snapshot(kind: .cycling)
+        old.universalWorkoutID = nil
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canApplyCompletion(
+            snapshot: old, kind: .cycling,
+            startedAt: startedAt, endedAt: end
+        ), "Older Watch snapshots keep their existing time-gated fallback")
+    }
+
+    func testStrengthUniversalIDMustAgreeWithOriginalStrengthLog() {
+        var original = snapshot(kind: .strength, state: .completed)
+        original.strengthWorkoutID = UUID()
+        original.universalWorkoutID = UUID()
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canFinishStrength(
+            snapshot: original, workoutID: original.strengthWorkoutID!,
+            workoutStartedAt: startedAt
+        ))
+        original.universalWorkoutID = original.strengthWorkoutID
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canFinishStrength(
+            snapshot: original, workoutID: original.strengthWorkoutID!,
+            workoutStartedAt: startedAt
+        ))
+    }
+
+
 }
