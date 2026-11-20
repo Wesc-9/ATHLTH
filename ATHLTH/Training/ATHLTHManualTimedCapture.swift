@@ -11,9 +11,26 @@ struct ATHLTHManualTimedCheckpoint: Codable, Equatable {
     let activity: CustomQuickWorkoutActivity
     let method: CustomQuickWorkoutMethod
     let startedAt: Date
+    let durationMinutes: Int
+    let workSeconds: Int
+    let restSeconds: Int
+    let rounds: Int
+    let titleOverride: String?
     var accumulatedSeconds: TimeInterval
     var resumedAt: Date?
     var approvedTimeLimit: TimeInterval
+
+    /// Reopen a stopped/recovered timer with the originally selected workout
+    /// method. Do not use new default rounds, interval lengths or a new title.
+    /// Do not restore social invitations or change Audio Coach automatically.
+    var recoveryConfiguration: CustomQuickWorkoutConfiguration {
+        CustomQuickWorkoutConfiguration(
+            activity: activity, method: method,
+            durationMinutes: durationMinutes,
+            workSeconds: workSeconds, restSeconds: restSeconds,
+            rounds: rounds, titleOverride: titleOverride
+        )
+    }
 
     func elapsed(at date: Date) -> TimeInterval {
         min(approvedTimeLimit, accumulatedSeconds + (
@@ -23,6 +40,10 @@ struct ATHLTHManualTimedCheckpoint: Codable, Equatable {
 
     var isValid: Bool {
         startedAt.timeIntervalSince1970.isFinite &&
+            (1...720).contains(durationMinutes) &&
+            (1...900).contains(workSeconds) &&
+            (0...900).contains(restSeconds) &&
+            (1...100).contains(rounds) &&
             accumulatedSeconds.isFinite && accumulatedSeconds >= 0 &&
             accumulatedSeconds <= 24 * 60 * 60 &&
             approvedTimeLimit.isFinite && approvedTimeLimit > 0 &&
@@ -132,7 +153,13 @@ enum ATHLTHManualTimedCapture {
         let snapshot = ATHLTHManualTimedCheckpoint(
             id: UUID(), userID: userID,
             activity: configuration.activity, method: configuration.method,
-            startedAt: now, accumulatedSeconds: 0,
+            startedAt: now,
+            durationMinutes: max(1, min(720, configuration.durationMinutes)),
+            workSeconds: max(1, min(900, configuration.workSeconds)),
+            restSeconds: max(0, min(900, configuration.restSeconds)),
+            rounds: max(1, min(100, configuration.rounds)),
+            titleOverride: configuration.titleOverride,
+            accumulatedSeconds: 0,
             resumedAt: now, approvedTimeLimit: 5 * 3600
         )
         guard commit(snapshot, defaults: defaults) else {

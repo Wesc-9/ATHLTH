@@ -45,6 +45,9 @@ final class ATHLTHManualTimedCaptureTests: XCTestCase {
         ))
         XCTAssertEqual(restored.id, started.id)
         XCTAssertEqual(restored.elapsed(at: now.addingTimeInterval(90)), 60)
+        XCTAssertEqual(restored.recoveryConfiguration.activity, .cycling)
+        XCTAssertEqual(restored.recoveryConfiguration.workSeconds, bike().workSeconds)
+        XCTAssertEqual(restored.recoveryConfiguration.rounds, bike().rounds)
         XCTAssertTrue(ATHLTHManualTimedCapture.discard(
             id: started.id, userID: owner, defaults: defaults
         ))
@@ -69,6 +72,44 @@ final class ATHLTHManualTimedCaptureTests: XCTestCase {
             configuration: bike(), userID: owner, defaults: defaults
         ))
         XCTAssertEqual(defaults.data(forKey: key), original)
+    }
+
+    func testPausedTimerRetainsSelectedIntervalsAcrossRelaunch() throws {
+        let (defaults, suite) = try suite()
+        defer {
+            ATHLTHManualTimedCapture.switchAccount(nil, defaults: defaults)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let owner = UUID()
+        ATHLTHManualTimedCapture.switchAccount(owner, defaults: defaults)
+        var original = bike()
+        original.method = .intervals
+        original.workSeconds = 95
+        original.restSeconds = 35
+        original.rounds = 12
+        original.titleOverride = "Bike session"
+        let saved = try ATHLTHManualTimedCapture.beginOrResume(
+            configuration: original, userID: owner, defaults: defaults
+        )
+        XCTAssertTrue(ATHLTHManualTimedCapture.update(
+            id: saved.id, userID: owner,
+            accumulatedSeconds: 205, resumedAt: nil,
+            approvedTimeLimit: 18_000, defaults: defaults
+        ))
+        ATHLTHManualTimedCapture.switchAccount(nil, defaults: defaults)
+        let recovered = try XCTUnwrap(ATHLTHManualTimedCapture.switchAccount(
+            owner, defaults: defaults
+        ))
+        XCTAssertEqual(recovered.recoveryConfiguration.method, .intervals)
+        XCTAssertEqual(recovered.recoveryConfiguration.workSeconds, 95)
+        XCTAssertEqual(recovered.recoveryConfiguration.restSeconds, 35)
+        XCTAssertEqual(recovered.recoveryConfiguration.rounds, 12)
+        XCTAssertEqual(recovered.recoveryConfiguration.titleOverride, "Bike session")
+        XCTAssertEqual(recovered.accumulatedSeconds, 205)
+        XCTAssertNil(recovered.resumedAt)
+        XCTAssertTrue(ATHLTHManualTimedCapture.discard(
+            id: saved.id, userID: owner, defaults: defaults
+        ))
     }
 
     func testAnotherActivityCannotTakeOverExistingTimer() throws {

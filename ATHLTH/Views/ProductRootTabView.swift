@@ -6868,6 +6868,7 @@ struct ATHLTHTrainView: View {
     private var hasOngoingTrainWorkout: Bool {
         phoneWorkout.active != nil ||
         strengthWorkout.activeWorkout != nil ||
+        ATHLTHManualTimedCapture.hasActiveCapture ||
         watchConnection.hasActiveWatchWorkout ||
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
     }
@@ -6909,6 +6910,36 @@ struct ATHLTHTrainView: View {
                 strengthWorkout.acknowledgeRecoveredWorkout()
                 showingStrengthWorkout = true
             }
+        } else if let timed = ATHLTHManualTimedCapture.current(
+            for: session.profile.userID
+        ) {
+            liveTrainCard(
+                title: timed.recoveryConfiguration.title,
+                source: "iPhone",
+                symbol: timed.activity.systemImage,
+                activityLabel: timed.activity.localizedTitle,
+                detail: ATHLTHLocalization.choose(
+                    english: "Phone-timed session · manual measurements",
+                    norwegian: "Tidsmålt økt · øvrige målinger er manuelle"
+                ),
+                elapsed: { timed.elapsed(at: $0) },
+                elapsedCaption: "Målt tid"
+            ) {
+                activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                    configuration: timed.recoveryConfiguration,
+                    mode: .timed
+                )
+            }
+        } else if ATHLTHManualTimedCapture.hasActiveCapture {
+            // An unreadable checkpoint protects the last saved bytes.
+            // Never offer a new workout or erase it without user intent.
+            Text(ATHLTHLocalization.choose(
+                english: "A previous timed workout could not be restored. Its original checkpoint has been protected.",
+                norwegian: "En tidligere tidsmålt økt kunne ikke gjenopprettes. Originalcheckpointen er beskyttet."
+            ))
+            .font(.subheadline)
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 17))
         } else if (watchConnection.hasActiveWatchWorkout ||
                    ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive),
                   phoneWorkout.active == nil,
@@ -9394,7 +9425,9 @@ struct ATHLTHTrainView: View {
     private var customQuickStartAvailable: Bool {
         phoneWorkout.active == nil &&
         strengthWorkout.activeWorkout == nil &&
-        !watchConnection.hasActiveWatchWorkout
+        !ATHLTHManualTimedCapture.hasActiveCapture &&
+        !watchConnection.hasActiveWatchWorkout &&
+        !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
     }
 
     private var quickStartCustomSubtitle: String {
@@ -9455,6 +9488,7 @@ struct ATHLTHTrainView: View {
     }
 
     private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
+        if ATHLTHManualTimedCapture.hasActiveCapture { return false }
         if let active = phoneWorkout.active {
             switch kind {
             case .running:
@@ -9504,7 +9538,14 @@ struct ATHLTHTrainView: View {
                 showingStrengthQuickStart = true
             }
         case .custom:
-            if customQuickStartAvailable {
+            if let timed = ATHLTHManualTimedCapture.current(
+                for: session.profile.userID
+            ) {
+                activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                    configuration: timed.recoveryConfiguration,
+                    mode: .timed
+                )
+            } else if customQuickStartAvailable {
                 customQuickInitialActivity = .hiit
                 isFreeTrainingQuickStart = false
                 showingCustomQuickStart = true
@@ -9524,6 +9565,15 @@ struct ATHLTHTrainView: View {
     }
 
     private func startCustomQuick(as activity: CustomQuickWorkoutActivity) {
+        if let timed = ATHLTHManualTimedCapture.current(
+            for: session.profile.userID
+        ), timed.activity == activity {
+            activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                configuration: timed.recoveryConfiguration,
+                mode: .timed
+            )
+            return
+        }
         guard customQuickStartAvailable else {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "Finish the active workout before starting another.",
@@ -9540,6 +9590,15 @@ struct ATHLTHTrainView: View {
     /// No setup sheet, no invented workouts and no automatic retrospective log.
     /// The user's finish/discard action still owns whether the workout saves.
     private func startFreeTrainingQuick() {
+        if let timed = ATHLTHManualTimedCapture.current(
+            for: session.profile.userID
+        ), timed.activity == .other {
+            activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                configuration: timed.recoveryConfiguration,
+                mode: .timed
+            )
+            return
+        }
         guard customQuickStartAvailable,
               !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive else {
             watchTransferError = ATHLTHLocalization.choose(
@@ -9666,6 +9725,12 @@ struct ATHLTHTrainView: View {
 
         Task {
             do {
+                // Protect the entire asynchronous Watch preflight with the
+                // same cross-activity launch reservation as Run and Strength.
+                // A Watch cycling/yoga recording must not race an iPhone timer.
+                let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+                defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+                try await watchConnection.requireNoActiveWatchWorkout()
                 watchConnection.sendAudioCoachConfiguration(
                     configuration.audioCoach
                 )
