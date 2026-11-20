@@ -122,12 +122,14 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
             previous: snapshot(),
             newKind: .running,
-            newStartedAt: startedAt
+            newStartedAt: startedAt,
+            sameHealthKitSession: true
         ))
         XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
             previous: snapshot(state: .paused),
             newKind: .running,
-            newStartedAt: startedAt
+            newStartedAt: startedAt,
+            sameHealthKitSession: true
         ))
     }
 
@@ -538,6 +540,29 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
             command, currentStartedAt: startedAt,
             currentWorkoutID: nil
         ), "Never downgrade a known sender to an unknown receiver")
+    }
+
+    func testReconnectedSessionNeverInheritsUnverifiedWatchSensorValues() {
+        let previous = snapshot()
+        // Two newly created HealthKit sessions can start in the same
+        // second and report the same sport. Time similarity is not proof
+        // that old pulse, calories or distance belong to the new workout.
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
+            previous: previous, newKind: .running,
+            newStartedAt: startedAt, sameHealthKitSession: false
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
+            previous: previous, newKind: .running,
+            newStartedAt: startedAt
+        ))
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
+            previous: previous, newKind: .running,
+            newStartedAt: startedAt, sameHealthKitSession: true
+        ))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
+            previous: previous, newKind: .walking,
+            newStartedAt: startedAt, sameHealthKitSession: true
+        ))
     }
 
 }

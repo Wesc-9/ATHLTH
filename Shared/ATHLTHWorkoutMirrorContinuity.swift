@@ -7,9 +7,13 @@ enum ATHLTHWorkoutMirrorContinuity {
     static func mayCarryRecordedMetrics(
         previous: WatchWorkoutLiveSnapshot?,
         newKind: WatchWorkoutKind,
-        newStartedAt: Date?
+        newStartedAt: Date?,
+        sameHealthKitSession: Bool = false
     ) -> Bool {
-        guard let previous,
+        // Matching sport and wall-clock time are not sufficient evidence:
+        // two successive workouts may share them. Keep cached sensor data
+        // only when this is literally the same HKWorkoutSession instance.
+        guard sameHealthKitSession, let previous,
               let previousStart = previous.startedAt,
               let newStartedAt,
               previous.kind == newKind,

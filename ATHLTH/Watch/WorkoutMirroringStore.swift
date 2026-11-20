@@ -611,7 +611,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         let carry = ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
             previous: snapshot,
             newKind: incomingKind,
-            newStartedAt: session.startDate
+            newStartedAt: session.startDate,
+            sameHealthKitSession: mirroredSession === session
         )
         let previous = carry ? snapshot : nil
 

@@ -1,3 +1,9 @@
+## 2.2.6 – ingen gamle Watch-sensorverdier ved ny speiling
+
+- `WorkoutMirroringStore.attach` kan nå gjenbruke cachet puls, distanse og kalorier **bare når det er nøyaktig samme `HKWorkoutSession`-objekt** som allerede eier speilingen, i tillegg til opprinnelig sport og starttid. En ny eller gjenopprettet sesjon med lik sport og nærmest identisk starttid starter med ukjente målinger og venter på originalens ferske Watch-pakker.
+- Ren regresjonstest dekker nye HK-sesjoner med samme sport/sekund, samme originale objekt, gjenopprettet pause og feil aktivitet. Dette lager ingen ny opptaker eller treningslogg.
+- Sensoropprinnelse og HealthKit-opptak må fortsatt bekreftes med grønn samme-commit CI og fysisk Watch/iPhone/iPad-frakobling.
+
 ## 2.2.6 – fjernkontrollkommandoer knyttes til original Watch-økt
 
 - `WatchWorkoutMirrorCommand` har nå et valgfritt, bakoverkompatibelt `universalWorkoutID` fra Watch sitt faktisk registrerte opptak. iPhone sender dette sammen med original `workoutStartedAt` for pause, fortsett, avslutt, møllefart/stigning/målfart, retur til start og intervallkommandoer.
