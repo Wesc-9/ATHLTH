@@ -293,7 +293,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     func sendCommand(
         _ command: WatchWorkoutCommand
     ) -> Bool {
-        guard let mirroredSession else {
+        guard let mirroredSession,
+              let snapshot,
+              let startedAt = snapshot.startedAt,
+              startedAt.timeIntervalSince1970.isFinite,
+              snapshot.state == .running || snapshot.state == .paused
+        else {
             publish {
                 self.errorMessage =
                     ATHLTHLocalization.choose(
@@ -308,7 +313,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         guard let data = try? JSONEncoder().encode(
             WatchWorkoutMirrorCommand(
-                command: command
+                command: command,
+                workoutStartedAt: startedAt,
+                universalWorkoutID: snapshot.universalWorkoutID
             )
         ) else {
             return false
@@ -353,7 +360,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard let data = try? JSONEncoder().encode(
             WatchWorkoutMirrorCommand(
                 command: .returnToStart,
-                workoutStartedAt: startedAt
+                workoutStartedAt: startedAt,
+                universalWorkoutID: snapshot.universalWorkoutID
             )
         ) else { return false }
 
@@ -384,7 +392,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 command: .advanceRunningStep,
                 workoutStartedAt: startedAt,
                 expectedRunningStepIndex: expectedIndex,
-                startMainAfterWarmup: startMain
+                startMainAfterWarmup: startMain,
+                universalWorkoutID: snapshot?.universalWorkoutID
             )
         ) else { return false }
 
@@ -402,14 +411,16 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     func sendTreadmillInclinePercent(
         _ percent: Double
     ) -> Bool {
-        guard let mirroredSession else {
+        guard let mirroredSession,
+              let snapshot, let startedAt = snapshot.startedAt,
+              snapshot.kind == .running,
+              snapshot.state == .running || snapshot.state == .paused,
+              percent.isFinite else {
             publish {
                 self.errorMessage =
                     ATHLTHLocalization.choose(
-                        english:
-                            "The mirrored Apple Watch workout is reconnecting.",
-                        norwegian:
-                            "Den speilede Apple Watch-økten kobler til på nytt."
+                        english: "The Watch workout is unavailable for this change.",
+                        norwegian: "Watch-økten er ikke tilgjengelig for denne endringen."
                     )
             }
             return false
@@ -427,7 +438,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard let data = try? JSONEncoder().encode(
             WatchWorkoutMirrorCommand(
                 command: .setTreadmillIncline,
-                treadmillInclinePercent: value
+                treadmillInclinePercent: value,
+                workoutStartedAt: startedAt,
+                universalWorkoutID: snapshot.universalWorkoutID
             )
         ) else {
             return false
@@ -458,7 +471,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
               let data = try? JSONEncoder().encode(WatchWorkoutMirrorCommand(
                   command: .setTreadmillTargetPace,
                   treadmillTargetPaceSecondsPerKilometer: seconds,
-                  workoutStartedAt: startedAt
+                  workoutStartedAt: startedAt,
+                  universalWorkoutID: snapshot?.universalWorkoutID
               )) else { return false }
         Task {
             do {
@@ -481,7 +495,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
               let data = try? JSONEncoder().encode(WatchWorkoutMirrorCommand(
                   command: .setTreadmillBeltSpeed,
                   manualBeltSpeedKilometersPerHour: speed,
-                  workoutStartedAt: startedAt
+                  workoutStartedAt: startedAt,
+                  universalWorkoutID: snapshot?.universalWorkoutID
               )) else { return false }
         Task {
             do {
@@ -521,7 +536,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             workoutStartedAt: startedAt,
             runningWorkoutToAppend: transfer,
             runningWorkoutStartImmediately: startNow,
-            commandID: UUID()
+            commandID: UUID(),
+            universalWorkoutID: snapshot.universalWorkoutID
         )
         guard let data = try? JSONEncoder().encode(command) else {
             return false

@@ -458,4 +458,86 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ), "Admission must be released after all async start outcomes")
     }
 
+    func testWatchMirrorMutationsRequireOriginalIDAndMatchingStart() throws {
+        let originalID = UUID()
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        for type: WatchWorkoutCommand in [
+            .pause, .resume, .end, .setTreadmillIncline,
+            .setTreadmillTargetPace, .setTreadmillBeltSpeed,
+            .returnToStart, .advanceRunningStep, .appendRunningWorkout
+        ] {
+            var command = WatchWorkoutMirrorCommand(
+                command: type, workoutStartedAt: start,
+                universalWorkoutID: originalID
+            )
+            XCTAssertTrue(ATHLTHWatchMirrorCommandAdmission.permits(
+                command, currentStartedAt: start,
+                currentWorkoutID: originalID
+            ), "Valid current command: \\(type.rawValue)")
+            command.universalWorkoutID = UUID()
+            XCTAssertFalse(ATHLTHWatchMirrorCommandAdmission.permits(
+                command, currentStartedAt: start,
+                currentWorkoutID: originalID
+            ))
+            command.universalWorkoutID = nil
+            XCTAssertFalse(ATHLTHWatchMirrorCommandAdmission.permits(
+                command, currentStartedAt: start,
+                currentWorkoutID: originalID
+            ), "Missing ID must not downgrade a known recorder")
+            command.universalWorkoutID = originalID
+            command.workoutStartedAt = start.addingTimeInterval(-15)
+            XCTAssertFalse(ATHLTHWatchMirrorCommandAdmission.permits(
+                command, currentStartedAt: start,
+                currentWorkoutID: originalID
+            ), "Queued command from an older workout must not change this one")
+            command.workoutStartedAt = nil
+            XCTAssertFalse(ATHLTHWatchMirrorCommandAdmission.permits(
+                command, currentStartedAt: start,
+                currentWorkoutID: originalID
+            ))
+        }
+    }
+
+    func testMirroredMutationRoundTripKeepsOriginalIdentity() throws {
+        let originalID = UUID()
+        let startedAt = Date(timeIntervalSince1970: 1_900_000_000)
+        let command = WatchWorkoutMirrorCommand(
+            command: .end, workoutStartedAt: startedAt,
+            universalWorkoutID: originalID
+        )
+        let decoded = try JSONDecoder().decode(
+            WatchWorkoutMirrorCommand.self,
+            from: JSONEncoder().encode(command)
+        )
+        XCTAssertEqual(decoded.universalWorkoutID, originalID)
+        XCTAssertTrue(ATHLTHWatchMirrorCommandAdmission.permits(
+            decoded, currentStartedAt: startedAt,
+            currentWorkoutID: originalID
+        ))
+        // Legacy commands remain decodable but cannot mutate a modern
+        // session without its original identity and start.
+        let legacy = try JSONDecoder().decode(
+            WatchWorkoutMirrorCommand.self,
+            from: JSONEncoder().encode(
+                WatchWorkoutMirrorCommand(command: .end)
+            )
+        )
+        XCTAssertNil(legacy.universalWorkoutID)
+        XCTAssertFalse(ATHLTHWatchMirrorCommandAdmission.permits(
+            legacy, currentStartedAt: startedAt,
+            currentWorkoutID: originalID
+        ))
+        let legacyStartOnly = WatchWorkoutMirrorCommand(
+            command: .pause, workoutStartedAt: startedAt
+        )
+        XCTAssertTrue(ATHLTHWatchMirrorCommandAdmission.permits(
+            legacyStartOnly, currentStartedAt: startedAt,
+            currentWorkoutID: nil
+        ), "Unidentified restored legacy session uses strict clock fallback")
+        XCTAssertFalse(ATHLTHWatchMirrorCommandAdmission.permits(
+            command, currentStartedAt: startedAt,
+            currentWorkoutID: nil
+        ), "Never downgrade a known sender to an unknown receiver")
+    }
+
 }

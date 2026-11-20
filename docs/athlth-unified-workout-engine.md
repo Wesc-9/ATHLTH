@@ -1,3 +1,10 @@
+## 2.2.6 – fjernkontrollkommandoer knyttes til original Watch-økt
+
+- `WatchWorkoutMirrorCommand` har nå et valgfritt, bakoverkompatibelt `universalWorkoutID` fra Watch sitt faktisk registrerte opptak. iPhone sender dette sammen med original `workoutStartedAt` for pause, fortsett, avslutt, møllefart/stigning/målfart, retur til start og intervallkommandoer.
+- Original Watch HealthKit-motor krever nå **riktig starttid OG riktig original UUID** for alle slike muterende kommandoer. Forsinkede kommandoer fra tidligere økter, gamle kommandoer uten identitet og kommandoer fra en annen økt kan ikke stoppe, pause eller endre treningen. For eldre gjenopprettede Watch-økter uten identitetsbevis kan bare en like uidentifisert kommando med kontrollert starttid godtas.
+- iPhone sender ikke lenger generell pause/fortsett/avslutt uten bekreftet aktiv Watch-speiling. En stigningsendring krever gyldig, endelig verdi og løpeøkt. Watch avviser manglende eller ugyldige kildefelt, uten å lage ekstra HealthKit-opptak.
+- Nye pure XCTest dekker kommandoer på tvers av idretter, kryss-start, manglende UUID, bakoverkompatibel JSON-dekoding og avbrutt start. Full native samme-commit CI og fysisk Watch/iPhone/iPad-testing gjenstår.
+
 ## 2.2.6 – én felles Watch-reservasjon i hele oppstartsperioden
 
 - Manuell Watch-start, klargjorte treningskort og automatisk HealthKit-initiert start deler nå ett transient `pendingWorkoutStartAdmissionID` før iPhone-/HealthKit-autorisasjon. Reservasjonen holdes gjennom den opprinnelige asynkrone oppstarten, og frigjøres med `defer` også ved avvisning eller feil.

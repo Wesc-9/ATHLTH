@@ -282,7 +282,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
     ) {
         // Incoming next-card routes must not replace a recorder awaiting
         // authorization for the original prepared card.
-        if pendingPreparedLaunchID != nil {
+        if pendingPreparedLaunchID != nil ||
+            WatchWorkoutManager.shared.isActive {
             pendingWorkoutRouteID = UUID(uuidString: rawRouteID)
             return
         }

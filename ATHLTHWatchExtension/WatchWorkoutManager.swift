@@ -10018,6 +10018,16 @@ extension WatchWorkoutManager:
                     continue
                 }
 
+                // The command's transport belongs to a specific HK session,
+                // but queued commands may still outlive its original workout.
+                // Match BOTH the original UUID and startedAt before any
+                // mutating action, including pause/end and treadmill changes.
+                guard ATHLTHWatchMirrorCommandAdmission.permits(
+                    command,
+                    currentStartedAt: self.startedAt,
+                    currentWorkoutID: self.universalWorkoutID
+                ) else { continue }
+
                 switch command.command {
                 case .returnToStart:
                     // This can arrive delayed after a reconnect. It must

@@ -211,3 +211,30 @@ enum ATHLTHWatchStartPreflightAdmissionPolicy {
         pendingID == nil
     }
 }
+
+
+/// Phone-to-Watch mutations may be delivered after a reconnect or after the
+/// athlete has started another workout of the same sport. An unidentifiable
+/// command must never pause, finish or overwrite the newer HealthKit session.
+/// The actual HealthKit owner and workout UUID are not changed here.
+enum ATHLTHWatchMirrorCommandAdmission {
+    static func permits(
+        _ command: WatchWorkoutMirrorCommand,
+        currentStartedAt: Date?,
+        currentWorkoutID: UUID?
+    ) -> Bool {
+        guard let requestedStart = command.workoutStartedAt,
+              let currentStartedAt,
+              requestedStart.timeIntervalSince1970.isFinite,
+              currentStartedAt.timeIntervalSince1970.isFinite,
+              abs(requestedStart.timeIntervalSince(currentStartedAt)) < 2
+        else { return false }
+        if let currentWorkoutID {
+            return command.universalWorkoutID == currentWorkoutID
+        }
+        // Older restored sessions may have an unknown original UUID.
+        // Permit only an equally unidentified command with an exact clock
+        // match; never downgrade a known identity to the legacy fallback.
+        return command.universalWorkoutID == nil
+    }
+}

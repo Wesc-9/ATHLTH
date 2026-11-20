@@ -2498,6 +2498,10 @@ struct WatchWorkoutMirrorCommand: Codable, Hashable {
     var expectedRunningStepIndex: Int? = nil
     var startMainAfterWarmup: Bool? = nil
     var commandID: UUID? = nil
+    /// Original recording identity, not a relay receipt or planned-card ID.
+    /// Optional for decoding older queued commands; new Watch mutations
+    /// require a match when the original HealthKit workout has an ID.
+    var universalWorkoutID: UUID? = nil
 }
 
 enum WatchWorkoutCommand: String, Codable, Hashable {
