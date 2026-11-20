@@ -1271,8 +1271,7 @@ enum WorkoutLaunchCoordinator {
             watchConnection.sendLiveSurfaceConfiguration(display)
         }
 
-        watchConnection.sendPreparedWorkout(
-            WatchPreparedWorkoutTransfer(
+        var preparedWatchWorkout = WatchPreparedWorkoutTransfer(
                 id: UUID(),
                 title: plannedRunningWorkout?.title ?? configuration.title,
                 summary: preparedSummary,
@@ -1293,7 +1292,9 @@ enum WorkoutLaunchCoordinator {
                     ? configuration.watchStartMode : .immediate,
                 updatedAt: Date()
             )
-        )
+        preparedWatchWorkout.plannedPlanID = plannedPlanID
+        preparedWatchWorkout.plannedSessionID = plannedSessionID
+        watchConnection.sendPreparedWorkout(preparedWatchWorkout)
 
         // For automatic start, launch the Watch workout via HealthKit.
         // The prepared payload carries the start mode and full route/coach
@@ -1535,6 +1536,27 @@ enum WorkoutLaunchCoordinator {
             .sendRunningWorkout(
                 watchWorkout
             )
+
+        // Walking used to skip the prepared HealthKit handshake, dropping
+        // its planned calendar identity on Watch. Use the same single-session
+        // handoff as running, without creating a second activity.
+        var preparedWalking = WatchPreparedWorkoutTransfer(
+            id: UUID(),
+            title: plannedWalkingWorkout?.title ?? selectedWalkingRoute?.title ??
+                ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
+            summary: plannedWalkingWorkout?.summary ??
+                ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
+            kind: .walking,
+            routeID: selectedWalkingRoute?.id,
+            runningWorkout: watchWorkout,
+            audioCoach: watchAudioCoach,
+            indoor: false,
+            startMode: .immediate,
+            updatedAt: Date()
+        )
+        preparedWalking.plannedPlanID = plannedPlanID
+        preparedWalking.plannedSessionID = plannedSessionID
+        watchConnection.sendPreparedWorkout(preparedWalking)
 
         do {
             try await watchConnection

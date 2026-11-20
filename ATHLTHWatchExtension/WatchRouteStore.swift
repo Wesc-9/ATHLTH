@@ -444,9 +444,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
         _ workout: WatchPreparedWorkoutTransfer,
         manager: WatchWorkoutManager
     ) async -> Bool {
-        guard !manager.isActive,
-              manager.state != .preparing,
-              manager.state != .ending else {
+        guard manager.canAcceptPreparedWorkout(),
+              ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                  planID: workout.plannedPlanID,
+                  sessionID: workout.plannedSessionID
+              ) else {
             return false
         }
 
@@ -457,6 +459,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
             return false
         }
 
+        manager.configureCalendarSessionID(workout.plannedSessionID)
         manager.configurePlannedRoute(route)
         manager.configureAudioCoach(workout.audioCoach ?? .disabled)
         manager.configureGhostRace(workout.ghostRace)
@@ -482,10 +485,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
             indoor: workout.indoor
         )
 
-        if case .failed = manager.state {
-            return false
-        }
-        guard manager.state != .idle else { return false }
+        // A failed, completed or idle session is not proof that this
+        // prepared transfer actually opened a new HealthKit workout.
+        guard manager.state == .running ||
+              manager.state == .paused else { return false }
 
         consumePreparedWorkout(workout.id)
         return true

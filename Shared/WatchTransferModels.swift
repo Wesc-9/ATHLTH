@@ -1355,7 +1355,19 @@ struct WatchPreparedWorkoutTransfer: Codable, Hashable {
     var startMode: WatchWorkoutStartMode? = nil
     // Optional and backwards-compatible: full planned strength prescription.
     var strengthWorkout: WatchStrengthSessionSnapshot? = nil
+    // The original plan/session identities, never the temporary prepared-card
+    // UUID. Both are optional for legacy and free Quick Train workouts.
+    var plannedPlanID: UUID? = nil
+    var plannedSessionID: UUID? = nil
     var updatedAt: Date
+}
+
+/// A planned Watch transfer must contain the complete original link;
+/// a half-linked recipe must never be accepted as an ordinary free workout.
+enum ATHLTHWatchPreparedPlanIdentityPolicy {
+    static func allows(planID: UUID?, sessionID: UUID?) -> Bool {
+        (planID == nil) == (sessionID == nil)
+    }
 }
 
 enum WatchPreparedWorkoutTransport {

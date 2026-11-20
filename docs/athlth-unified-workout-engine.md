@@ -1,3 +1,11 @@
+## 2.2.6 – én planbundet Watch-handoff for løp OG gå
+
+- `WatchPreparedWorkoutTransfer` får to valgfrie, bakoverkompatible felter for original plan og økt. Ved planbundet iPhone-/iPad-oppstart settes begge, og Watch binder faktisk `plannedCalendarSessionID` til den autoritative HKWorkoutSession uten å opprette en ny opptaker.
+- Planlagt gåing bruker nå den eksisterende, komplette forberedte Watch-overføringen, slik løping allerede gjorde. Watch-appens automatiske start venter på matching aktivitet/innendørsstatus, og rute-/intervalldata settes før oppstart.
+- Watch kan ikke bruke en forberedt økt med ufullstendig planidentitet, en gjenopprettet eller fortsatt eksisterende HealthKit-sesjon. En forberedt økt kvitteres først som forbrukt når Watch faktisk er i `running` eller `paused`, ikke i `idle`, `failed` eller `completed`.
+- Den eksisterende eldre oppstarten brukes fortsatt dersom en prepared-melding ikke har nådd klokken innen den dokumenterte kompatibilitetsfristen. Denne forsinkelsestilstanden trenger fortsatt fysisk iPhone/Watch-reproduksjon før planmarkering kan garanteres 100 %.
+- XCTest dekker plan/session roundtrip for løp og gå og avviser halvkoblede overføringer. Native build/HealthKit/TestFlight er ikke verifisert.
+
 ## 2.2.6 – Watch start, reset og feil ved HealthKit-sluttlagring
 
 - Watch lokalt/forberedt og HealthKit-initiert start bruker én policy som blokkerer nye økter mens original `HKWorkoutSession` finnes eller `recoverActiveWorkoutSession()` venter. Dobbelstart kan ikke tømme gammel eier, rute eller Audio Coach før preflight.

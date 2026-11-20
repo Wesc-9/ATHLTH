@@ -3859,6 +3859,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// A prepared card must not rewrite the old source's route, interval
+    /// plan or owner during HealthKit recovery or after a failed save.
+    func canAcceptPreparedWorkout() -> Bool {
+        ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+            active: isActive, preparing: state == .preparing,
+            ending: state == .ending, finishing: finishing,
+            recovering: recoveryInProgress,
+            hasExistingSession: workoutSession != nil
+        )
+    }
+
     func startPreparedWorkout(
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil,

@@ -383,4 +383,47 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
         )
     }
 
+
+    func testPreparedRunAndWalkPreserveOriginalPlanAndSessionOnWatch() throws {
+        let plan = UUID(), session = UUID()
+        for sport in [WatchWorkoutKind.running, .walking] {
+            var prepared = WatchPreparedWorkoutTransfer(
+                id: UUID(), title: "Scheduled workout",
+                summary: "45 min", kind: sport,
+                routeID: nil, runningWorkout: nil, audioCoach: nil,
+                indoor: false, startMode: .immediate, updatedAt: Date()
+            )
+            prepared.plannedPlanID = plan
+            prepared.plannedSessionID = session
+            let decoded = try JSONDecoder().decode(
+                WatchPreparedWorkoutTransfer.self,
+                from: JSONEncoder().encode(prepared)
+            )
+            XCTAssertEqual(decoded.plannedPlanID, plan)
+            XCTAssertEqual(decoded.plannedSessionID, session)
+            XCTAssertNotEqual(decoded.id, session,
+                              "Prepared card ID must not replace workout identity")
+            XCTAssertTrue(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                planID: decoded.plannedPlanID,
+                sessionID: decoded.plannedSessionID
+            ))
+        }
+    }
+
+    func testPreparedPlanCannotDropOneIdentityOnWatch() {
+        let plan = UUID(), session = UUID()
+        XCTAssertTrue(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+            planID: nil, sessionID: nil
+        ))
+        XCTAssertTrue(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+            planID: plan, sessionID: session
+        ))
+        XCTAssertFalse(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+            planID: plan, sessionID: nil
+        ))
+        XCTAssertFalse(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+            planID: nil, sessionID: session
+        ))
+    }
+
 }

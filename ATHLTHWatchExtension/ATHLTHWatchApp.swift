@@ -34,29 +34,33 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
         let manager = WatchWorkoutManager.shared
         let routeStore = WatchRouteStore.shared
 
-        // Only quick runs with an explicit automatic start mode use the
-        // prepared-workout handshake. All other HealthKit launches retain
-        // their existing behavior.
-        guard configuration.activityType == .running else {
+        // Run and walk share the same prepared handoff, so the original
+        // plan ID, active steps and route reach the actual Watch recorder.
+        // Other simple sports still use their existing HealthKit start.
+        let requestedKind: WatchWorkoutKind
+        switch configuration.activityType {
+        case .running: requestedKind = .running
+        case .walking: requestedKind = .walking
+        default:
             await manager.start(configuration: configuration)
             return
         }
 
         let requestedAt = Date()
-        // Existing Watch-initiated running launches must not wait 15
-        // seconds for a Quick Train transfer they never requested.
+        // Standalone Watch starts should not wait for a phone transfer
+        // they never requested.
         let transferDeadline = requestedAt.addingTimeInterval(2)
         let routeDeadline = requestedAt.addingTimeInterval(15)
         while Date() < routeDeadline {
             // A second request must never create a second HKWorkoutSession.
-            if manager.isActive ||
-                manager.state == .preparing ||
-                manager.state == .ending {
-                return
-            }
+            if !manager.canAcceptPreparedWorkout() { return }
 
             if let workout = routeStore.preparedWorkout,
-               workout.kind == .running,
+               workout.kind == requestedKind,
+               ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                   planID: workout.plannedPlanID,
+                   sessionID: workout.plannedSessionID
+               ),
                let mode = workout.startMode,
                mode != .onWatch,
                workout.updatedAt >= requestedAt.addingTimeInterval(-20),
@@ -76,9 +80,7 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
                                 routeStore.setAutomaticStartCountdown(nil)
                                 return
                             }
-                            if manager.isActive ||
-                                manager.state == .preparing ||
-                                manager.state == .ending {
+                            if !manager.canAcceptPreparedWorkout() {
                                 routeStore.setAutomaticStartCountdown(nil)
                                 return
                             }
@@ -104,7 +106,7 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
                 // its route file. Without that transfer, keep legacy Watch
                 // launches responsive.
                 let waitingForRoute = routeStore.preparedWorkout.map {
-                    $0.kind == .running &&
+                    $0.kind == requestedKind &&
                     $0.startMode != nil &&
                     $0.startMode != .onWatch &&
                     $0.updatedAt >= requestedAt.addingTimeInterval(-20)
