@@ -160,4 +160,48 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
             manual: corrupt, structured: saved
         ))
     }
+
+    func testSameOriginalHybridUsesOneStrengthStageCursor() throws {
+        let id = UUID(), planned = UUID()
+        let running = ATHLTHWorkoutSessionState(
+            workoutID: id, plannedSessionID: planned,
+            recordingOwner: .iPhone, activity: .running,
+            phase: .work, engine: .endurance,
+            startedAt: started, activeElapsedSeconds: 250,
+            stageIndex: 1, stageCount: 4
+        )
+        let strength = ATHLTHWorkoutSessionState(
+            workoutID: id, plannedSessionID: planned,
+            recordingOwner: .iPhone, activity: .strength,
+            phase: .work, engine: .strength,
+            startedAt: started, activeElapsedSeconds: 250,
+            stageIndex: 3, stageCount: 6
+        )
+        let unified = try XCTUnwrap(
+            ATHLTHUniversalActiveCapture.unique(
+                running: running, strength: strength,
+                manual: nil, structured: nil
+            )
+        )
+        XCTAssertEqual(unified.workoutID, id)
+        XCTAssertEqual(unified.source, .strength)
+        XCTAssertEqual(unified.engine, .strength)
+        XCTAssertEqual(unified.stageIndex, 3)
+        XCTAssertEqual(unified.stageCount, 6)
+        XCTAssertThrowsError(try ATHLTHUniversalActiveCapture.unique(
+            running: running, strength: strength,
+            manual: timer(resumedAt: started), structured: nil
+        ))
+    }
+
+    @MainActor
+    func testPendingLaunchNeverLooksLikeFreeUniversalSlot() throws {
+        let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+        defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+        XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.hasPendingLaunch)
+        XCTAssertThrowsError(try ATHLTHUniversalActiveCapture.current(
+            for: UUID()
+        ))
+    }
+
 }
