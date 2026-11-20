@@ -226,4 +226,44 @@ final class ATHLTHUnifiedActivityProfileTests: XCTestCase {
         ).category, "strength")
     }
 
+
+    func testEveryLegacyTimedSportCreatesOneSourcePreservingTimeline() throws {
+        for category in [
+            "cycling", "rowing", "stairclimber", "hiit", "circuit",
+            "functional", "sports", "other", "yoga", "meditation",
+            "mobility", "recovery"
+        ] {
+            let kind: WorkoutKind = category == "recovery" ||
+                category == "meditation" ? .recovery :
+                category == "yoga" || category == "mobility" ? .mobility :
+                .custom
+            let source = workout(kind: kind, category: category)
+            let before = try JSONEncoder().encode(source)
+            let projected = try XCTUnwrap(
+                ATHLTHUnifiedWorkout.timedNonCardioProjection(from: source),
+                "Missing iPhone-timed fallback for \(category)"
+            )
+            XCTAssertEqual(projected.id, source.id)
+            XCTAssertEqual(projected.kind, source.kind)
+            XCTAssertEqual(projected.workoutCategory, source.workoutCategory)
+            XCTAssertEqual(projected.resolvedWorkoutBlocks.count, 1)
+            XCTAssertEqual(projected.resolvedWorkoutBlocks[0].durationSeconds, 1800)
+            XCTAssertNil(projected.resolvedWorkoutBlocks[0].distanceMeters)
+            XCTAssertEqual(try JSONEncoder().encode(source), before,
+                "Projection must not rewrite the saved workout")
+            XCTAssertEqual(ATHLTHUnifiedActivityProfile.category(for: projected),
+                ATHLTHUnifiedActivityProfile.category(for: source))
+        }
+    }
+
+    func testLegacyTimedProjectionRejectsMissingDurationAndUnsupportedKinds() {
+        var bare = workout(kind: .custom, category: "cycling")
+        bare.durationMinutes = nil
+        XCTAssertNil(ATHLTHUnifiedWorkout.timedNonCardioProjection(from: bare))
+        let running = workout(kind: .running, category: "running")
+        XCTAssertNil(ATHLTHUnifiedWorkout.timedNonCardioProjection(from: running))
+        let strength = workout(kind: .strength, category: "strength")
+        XCTAssertNil(ATHLTHUnifiedWorkout.timedNonCardioProjection(from: strength))
+    }
+
 }

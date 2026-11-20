@@ -128,4 +128,60 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         }
     }
 
+
+    func testSimplePlannedSportsUseRealMatchingWatchActivity() {
+        for (category, kind) in [
+            ("cycling", WatchWorkoutKind.cycling),
+            ("rowing", .rowing), ("stairclimber", .stairClimbing),
+            ("hiit", .hiit), ("circuit", .functional),
+            ("functional", .functional), ("sports", .other),
+            ("other", .other), ("yoga", .yoga), ("mobility", .other)
+        ] {
+            let plan = session(.custom, category: category)
+            XCTAssertEqual(
+                ATHLTHWorkoutCaptureAdmission.watchKind(for: plan),
+                kind, "Wrong Apple Watch HealthKit activity for \(category)"
+            )
+        }
+        XCTAssertEqual(
+            ATHLTHWorkoutCaptureAdmission.watchKind(for: session(.running)),
+            .running
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutCaptureAdmission.watchKind(for: session(.walking)),
+            .walking
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutCaptureAdmission.watchKind(for: session(.strength)),
+            .strength
+        )
+    }
+
+    func testUnsupportedOrMixedPlansCannotBeFlattenedIntoWatchSport() {
+        XCTAssertNil(ATHLTHWorkoutCaptureAdmission.watchKind(
+            for: session(.custom, category: "meditation")
+        ))
+        XCTAssertNil(ATHLTHWorkoutCaptureAdmission.watchKind(
+            for: session(.custom, category: "custom")
+        ))
+        XCTAssertNil(ATHLTHWorkoutCaptureAdmission.watchKind(
+            for: session(.strength, category: "cycling")
+        ))
+        var cycle = block(.note)
+        cycle.activityTag = "cycling"
+        XCTAssertNil(ATHLTHWorkoutCaptureAdmission.watchKind(
+            for: session(.custom, blocks: [cycle])
+        ), "Structured single-sport steps cannot be dropped on transfer")
+        XCTAssertNil(ATHLTHWorkoutCaptureAdmission.watchKind(
+            for: session(.strength, blocks: [
+                block(.exercise), cycle
+            ])
+        ), "Mixed strength+cycling cannot masquerade as strength")
+        var yoga = block(.note)
+        yoga.wellnessKind = .yoga
+        XCTAssertNil(ATHLTHWorkoutCaptureAdmission.watchKind(
+            for: session(.running, blocks: [block(.run), yoga])
+        ))
+    }
+
 }

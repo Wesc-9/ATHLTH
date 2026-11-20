@@ -95,6 +95,7 @@ on:
       - Tests/ATHLTHWorkoutCaptureAdmissionTests.swift
       - ATHLTH/Planning/ATHLTHUnifiedActivityProfile.swift
       - ATHLTH/Training/ATHLTHWorkoutCaptureAdmission.swift
+      - ATHLTH/Planning/ATHLTHUnifiedWorkout.swift
       - Tests/ATHLTHManualTimedCaptureTests.swift
       - Tests/ATHLTHStructuredCaptureAdmissionTests.swift
       - Tests/WorkoutDeviceRelayClaimPolicyTests.swift

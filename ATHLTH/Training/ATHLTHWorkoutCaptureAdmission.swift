@@ -7,6 +7,49 @@ import Foundation
 /// No new session is allocated here. The existing recording arbiter still
 /// reserves the only recording slot after this validation succeeds.
 enum ATHLTHWorkoutCaptureAdmission {
+    /// Resolve the correct already-supported Watch HealthKit activity for
+    /// an explicitly named simple workout. This is only a capture *choice*;
+    /// it does not allocate a new workout, change the saved plan, or claim
+    /// support for a mixed scripted Watch session.
+    static func watchKind(for workout: PlannedSession) -> WatchWorkoutKind? {
+        let category = ATHLTHUnifiedActivityProfile.category(for: workout)
+        guard category != "hybrid" else { return nil }
+
+        // Preserve the current dedicated running/walking/strength Watch
+        // transfer path and reject contradictory legacy sport metadata.
+        switch workout.kind {
+        case .running:
+            return ["running", "treadmill"].contains(category)
+                ? .running : nil
+        case .walking:
+            return category == "walking" ? .walking : nil
+        case .strength:
+            return category == "strength" ? .strength : nil
+        case .mobility, .recovery, .custom:
+            break
+        }
+
+        // Other structured recipes may contain multiple timing instructions,
+        // strength sets or activity changes. Current prepared Watch payloads
+        // cannot execute them and must not silently discard those steps.
+        guard !workout.isStructuredWorkout else { return nil }
+        switch category {
+        case "cycling": return .cycling
+        case "rowing": return .rowing
+        case "stairclimber": return .stairClimbing
+        case "hiit": return .hiit
+        case "circuit", "functional": return .functional
+        case "mobility":
+            let explicit = workout.workoutCategory?
+                .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return explicit == "yoga" ? .yoga : .other
+        case "sports", "other": return .other
+        // Meditation is not a yoga workout. Its dedicated kind does not
+        // exist on the current Watch target; never mislabel its HealthKit data.
+        default: return nil
+        }
+    }
+
     enum Rejection: LocalizedError, Equatable {
         case requiresDedicatedActivityCapture
 

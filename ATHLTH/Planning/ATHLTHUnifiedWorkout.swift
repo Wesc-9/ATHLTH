@@ -55,14 +55,19 @@ enum ATHLTHUnifiedWorkout {
             ))
         }
 
-        // Earlier simple plan versions represented timed cycling, yoga and
-        // meditation with category + duration only. Adapt them to the SAME
-        // ordered timeline for editing without creating a second recording
-        // or writing a new block into the saved legacy workout.
+        // Earlier simple plan versions represented timed workouts with
+        // category + duration only. Adapt all explicitly supported non-run
+        // activities to the SAME timeline, preserving the saved source ID
+        // and labeling every measurement as manual/timed on iPhone.
         if blocks.isEmpty, let minutes = workout.durationMinutes,
            (1...240).contains(minutes) {
-            let category = workout.workoutCategory?.lowercased() ?? ""
-            let timedCategory = category == "cycling" ||
+            let category = workout.workoutCategory?
+                .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+            let taggedCategories = [
+                "cycling", "rowing", "stairclimber", "hiit",
+                "circuit", "functional", "sports", "other"
+            ]
+            let timedCategory = taggedCategories.contains(category) ||
                 category == "yoga" || category == "meditation" ||
                 (category == "mobility" && workout.kind == .mobility) ||
                 (category == "recovery" && workout.kind == .recovery)
@@ -75,7 +80,9 @@ enum ATHLTHUnifiedWorkout {
                     notes: workout.notes, phase: .main
                 )
                 switch category {
-                case "cycling": timed.activityTag = "cycling"
+                case "cycling", "rowing", "stairclimber", "hiit",
+                     "circuit", "functional", "sports", "other":
+                    timed.activityTag = category
                 case "meditation", "recovery":
                     timed.wellnessKind = .meditation
                 case "yoga": timed.wellnessKind = .yoga
@@ -87,8 +94,8 @@ enum ATHLTHUnifiedWorkout {
         return blocks
     }
 
-    /// A legacy simple cycling/yoga/meditation plan may have a title, kind
-    /// and duration but no encoded timeline. Project its existing timing into
+    /// A legacy simple cycling/rowing/HIIT/mobility/etc. plan may have a title,
+    /// kind and duration but no encoded timeline. Project its timing into
     /// the shared structured player without changing the saved plan, its ID
     /// or creating a second HealthKit/Watch workout.
     ///
@@ -99,7 +106,10 @@ enum ATHLTHUnifiedWorkout {
     ) -> PlannedSession? {
         guard !workout.isStructuredWorkout else { return nil }
         let category = ATHLTHUnifiedActivityProfile.category(for: workout)
-        guard ["cycling", "mobility", "recovery"].contains(category) else {
+        guard [
+            "cycling", "rowing", "stairclimber", "hiit", "circuit",
+            "functional", "sports", "other", "mobility", "recovery"
+        ].contains(category) else {
             return nil
         }
         let projectedBlocks = editorBlocks(from: workout)

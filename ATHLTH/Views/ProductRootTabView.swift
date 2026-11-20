@@ -7993,8 +7993,8 @@ struct ATHLTHTrainView: View {
                 planID: planID, sessionID: workout.id,
                 healthWorkouts: health.workouts,
                 strengthHistory: strengthWorkout.workoutHistory),
-              let watchKind = PlannedWorkoutWatchBuilder.watchKind(
-                for: workout.kind)
+              let watchKind = ATHLTHWorkoutCaptureAdmission.watchKind(
+                for: workout)
         else {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "This workout cannot be sent to Apple Watch now.",
