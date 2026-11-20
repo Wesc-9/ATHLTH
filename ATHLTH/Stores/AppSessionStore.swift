@@ -2298,6 +2298,15 @@ final class AppSessionStore: ObservableObject {
                 return
             }
         }
+        // Missing exact planned IDs may use the strict legacy time+sport
+        // match. A PRESENT but unknown ID is stronger negative evidence:
+        // never finish a nearby unrelated scheduled activity after an
+        // offline Watch replay, plan deletion or account transition.
+        guard ATHLTHWatchPlannedCompletionIdentityPolicy.allowsLegacyTimeMatch(
+            calendarSessionID: result.plannedCalendarSessionID,
+            structuredSourceID: result.structuredWorkoutSourceID
+        ) else { return }
+
         let candidates = recordedPlannedWorkoutTimes.compactMap {
             (key, timing) -> UUID? in
             guard timing.startedOnWatch, timing.endedAt == nil,

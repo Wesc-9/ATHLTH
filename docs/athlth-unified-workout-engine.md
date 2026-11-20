@@ -1,3 +1,9 @@
+## 2.2.6 – eksplisitt Watch-økt-ID går alltid foran tidsbasert gjetting
+
+- `AppSessionStore.recordPlannedWatchWorkoutFinished` bruker fortsatt eksakt original kalender-/struktur-ID når Watch leverer en slik identitet, også etter offline overføring. Når denne ID-en ikke finnes lokalt, har systemet nå **ikke** lov å falle tilbake til en annen planlagt økt med tilfeldig likt klokkeslett og samme sportsgren.
+- Legacy Watch-resultater som mangler alle opprinnelige kalender-/struktur-ID-er kan fortsatt benytte den gamle strenge kandidatkontrollen (én eneste uferdig Watch-start, riktig kind, maks tre minutters startavvik). Watch styrkejournalens opptaks-UUID er ikke en kalender-ID og sperrer ikke fallback alene.
+- Ren policiestrategi med XCTest for identifiserte vs. uidentifiserte Watch-resultater. Ingen nye fullføringsposter, endring i historikk eller HealthKit-writer. Må gjennom samme-commit iPhone/iPad/Watch-regresjon og fysisk offline-resultatprøve.
+
 ## 2.2.6 – komplett original planlenke i alle tre Watch-klargjøringsveier
 
 - Hjem sin generiske planoverføring (styrke, sykling, roing, HIIT, funksjonell trening, yoga m.m.), Hjem sin manuelle/utsatte løpe-/gå-overføring og Train sin planlagte Watch-overføring setter nå alltid BEGGE originale felt `plannedPlanID` og `plannedSessionID` når en reell treningsplan finnes. Frittstående kalenderøkter får ingen oppdiktet plan.

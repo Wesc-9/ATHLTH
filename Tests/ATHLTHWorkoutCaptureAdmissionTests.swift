@@ -28,6 +28,37 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         return workout
     }
 
+    func testOnlyIdentifierFreeLegacyWatchCompletionsCanUseTimeCorrelation() {
+        let id = UUID(), another = UUID()
+        XCTAssertTrue(
+            ATHLTHWatchPlannedCompletionIdentityPolicy.allowsLegacyTimeMatch(
+                calendarSessionID: nil, structuredSourceID: nil
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHWatchPlannedCompletionIdentityPolicy.allowsLegacyTimeMatch(
+                calendarSessionID: id, structuredSourceID: nil
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHWatchPlannedCompletionIdentityPolicy.allowsLegacyTimeMatch(
+                calendarSessionID: nil, structuredSourceID: another
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHWatchPlannedCompletionIdentityPolicy.allowsLegacyTimeMatch(
+                calendarSessionID: id, structuredSourceID: another
+            )
+        )
+        // The source strength journal may have its own UUID unrelated to
+        // a calendar workout; it is not an explicit calendar identifier.
+        XCTAssertTrue(
+            ATHLTHWatchPlannedCompletionIdentityPolicy.allowsLegacyTimeMatch(
+                calendarSessionID: nil, structuredSourceID: nil
+            )
+        )
+    }
+
     func testPreparedWatchTransferPreservesPlanAndOriginalSessionForEverySport() throws {
         let planID = UUID(), sessionID = UUID(), cardID = UUID()
         XCTAssertNotEqual(sessionID, cardID)

@@ -12,6 +12,20 @@ import Foundation
 /// A planned launch may be free or linked to exactly one plan and session.
 /// A half-present link is not permission to silently launch Free Run and
 /// discard the original training plan's stage identity.
+/// A Watch result with an explicit planned/structured session ID must
+/// NEVER be assigned to an unrelated pending calendar entry just because
+/// its start time and sport happen to match. The strength snapshot ID is
+/// a separate recorder identity, not an exact calendar ID and therefore
+/// does not by itself disable the legacy fallback.
+enum ATHLTHWatchPlannedCompletionIdentityPolicy {
+    static func allowsLegacyTimeMatch(
+        calendarSessionID: UUID?,
+        structuredSourceID: UUID?
+    ) -> Bool {
+        calendarSessionID == nil && structuredSourceID == nil
+    }
+}
+
 enum ATHLTHPlannedLaunchIdentityPolicy {
     static func hasCompleteLink(
         planID: UUID?, sessionID: UUID?
