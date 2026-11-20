@@ -752,6 +752,7 @@ final class AppSessionStore: ObservableObject {
         // Preserve the previous account's unfinished custom workout file,
         // but release its in-process ownership on sign-out.
         ATHLTHManualTimedCapture.switchAccount(nil, defaults: defaults)
+        ATHLTHStructuredCaptureAdmission.switchAccount(nil, defaults: defaults)
         localAccountID = nil
         loadingAccountContent = true
         activePlan = nil
@@ -5892,6 +5893,7 @@ final class AppSessionStore: ObservableObject {
         // admission on this installation. A valid checkpoint occupies the
         // same universal recording slot as running and strength.
         ATHLTHManualTimedCapture.switchAccount(userID, defaults: defaults)
+        ATHLTHStructuredCaptureAdmission.switchAccount(userID, defaults: defaults)
         aiHealthDataSharingEnabled =
             AccountLocalStorage.read(
                 Bool.self,

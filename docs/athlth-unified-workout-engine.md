@@ -157,6 +157,13 @@ Dette dokumentet beskriver arkitektur og krav. Det er **ikke** en påstand om
 at sensorbasert hybridmotor eller automatisk Watch-overgang er ferdig.
 
 
+### 2.2.6 – strukturert økt får felles opptakssperre og feilkontrollert historikk (20.11.2026)
+
+- `ATHLTHStructuredCaptureAdmission` finner kontoens eksisterende, uferdige `structuredWorkoutInProgress.v1`-checkpoints ved innlogging og reserverer samme opptaksslot som løp, styrke, Watch og manuell iPhone-tidtaker. Det er kun en kontroll over ORIGINALEN, ingen ny historikk eller ny HealthKit-økt.
+- Start, fullføring og eksplisitt forkasting validerer konto og økt-ID. En minimert økt beholder opptakssperren. Train viser en fortsett-handling for eksisterende plan, men et uleselig/ukjent checkpoint blir aldri automatisk overskrevet.
+- `StructuredWorkoutCompletionStore.save` leser tilbake lagret resultat før det meldes fullført. Hvis lagring feiler, beholdes checkpointet, og brukeren ser en feil i stedet for et falskt vellykket resultat. Også checkpoint-skriving og sletting er kontrollert.
+- Dette er en trygg samordning av eksisterende strukturert iPhone-spiller; ikke full sensor-/HealthKit-implementering for alle aktivitetskategorier. Regresjonstester og full samme-commit CI/fysiske iPhone/Watch/iPad-tester gjenstår.
+
 ### 2.2.6 – samme opptaksreservasjon for iPhone-tidsmålte aktiviteter (20.11.2026)
 
 - `ATHLTHManualTimedCapture` er en kontoavgrenset, gjenopprettbar tidtaker for eksisterende CustomQuick-aktiviteter (sykling, yoga, mobilitet, roing, HIIT, øvrige). Den erstatter ikke `CustomQuickWorkoutJournal` som autoritativ ferdighistorikk og lager ikke en HealthKit-økt.

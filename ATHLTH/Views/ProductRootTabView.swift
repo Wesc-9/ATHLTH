@@ -6869,6 +6869,7 @@ struct ATHLTHTrainView: View {
         phoneWorkout.active != nil ||
         strengthWorkout.activeWorkout != nil ||
         ATHLTHManualTimedCapture.hasActiveCapture ||
+        ATHLTHStructuredCaptureAdmission.hasActiveCapture ||
         watchConnection.hasActiveWatchWorkout ||
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
     }
@@ -6910,6 +6911,33 @@ struct ATHLTHTrainView: View {
                 strengthWorkout.acknowledgeRecoveredWorkout()
                 showingStrengthWorkout = true
             }
+        } else if let structuredID =
+            ATHLTHStructuredCaptureAdmission.activeWorkoutID,
+            let structured = (
+                [session.activePlan].compactMap { $0 } + session.scheduledPlans
+            ).flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
+              .first(where: { $0.id == structuredID }) {
+            Button {
+                selectedStructuredWorkout = structured
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Continue structured workout",
+                        norwegian: "Fortsett strukturert økt"
+                    ) + " · " + structured.title,
+                    systemImage: "play.circle.fill"
+                )
+                .frame(maxWidth: .infinity, minHeight: 50)
+            }
+            .buttonStyle(.borderedProminent)
+        } else if ATHLTHStructuredCaptureAdmission.hasActiveCapture {
+            Text(ATHLTHLocalization.choose(
+                english: "A structured workout is still active. Reopen its original plan to resume or discard it.",
+                norwegian: "En strukturert økt pågår fortsatt. Åpne den opprinnelige planen for å fortsette eller forkaste."
+            ))
+            .font(.subheadline)
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 17))
         } else if let timed = ATHLTHManualTimedCapture.current(
             for: session.profile.userID
         ) {
@@ -8017,8 +8045,16 @@ struct ATHLTHTrainView: View {
             return
         }
 
+        // A minimized structured session reopens its single authoritative
+        // checkpoint, never a second session with a new workout ID.
+        if ATHLTHStructuredCaptureAdmission.activeWorkoutID == workout.id {
+            selectedStructuredWorkout = workout
+            return
+        }
         // Never replace a live workout with a second one from the plan.
-        if phoneWorkout.active != nil ||
+        if ATHLTHStructuredCaptureAdmission.hasActiveCapture ||
+            ATHLTHManualTimedCapture.hasActiveCapture ||
+            phoneWorkout.active != nil ||
             strengthWorkout.activeWorkout != nil ||
             watchConnection.hasActiveWatchWorkout ||
             ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive {
@@ -9426,6 +9462,7 @@ struct ATHLTHTrainView: View {
         phoneWorkout.active == nil &&
         strengthWorkout.activeWorkout == nil &&
         !ATHLTHManualTimedCapture.hasActiveCapture &&
+        !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
         !watchConnection.hasActiveWatchWorkout &&
         !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
     }
@@ -9488,7 +9525,8 @@ struct ATHLTHTrainView: View {
     }
 
     private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
-        if ATHLTHManualTimedCapture.hasActiveCapture { return false }
+        if ATHLTHManualTimedCapture.hasActiveCapture ||
+           ATHLTHStructuredCaptureAdmission.hasActiveCapture { return false }
         if let active = phoneWorkout.active {
             switch kind {
             case .running:

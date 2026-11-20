@@ -117,11 +117,16 @@ enum StructuredWorkoutCompletionStore {
         ) ?? []
     }
 
+    @discardableResult
     static func save(
         _ completion: StructuredWorkoutCompletion,
-        userID: UUID
-    ) {
-        var history = load(userID: userID)
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        var history = AccountLocalStorage.read(
+            [StructuredWorkoutCompletion].self, name: storageName,
+            userID: userID, defaults: defaults
+        ) ?? []
         // A planned session is a single completion target. Reopening its
         // recording screen must not generate a second history entry.
         // Unlinked library workouts remain repeatable.
@@ -132,7 +137,7 @@ enum StructuredWorkoutCompletionStore {
                $0.totalBlockCount > 0 &&
                $0.completedBlockCount == $0.totalBlockCount
            }) {
-            return
+            return true
         }
         history.removeAll {
             $0.id == completion.id
@@ -143,14 +148,21 @@ enum StructuredWorkoutCompletionStore {
             history = Array(history.prefix(200))
         }
 
-        AccountLocalStorage.write(
-            history,
-            name: storageName,
-            userID: userID
-        )
-        ATHLTHTrainingDataChangeSignal.post(
-            userID: userID
-        )
+        do {
+            try AccountLocalStorage.writeChecked(
+                history, name: storageName, userID: userID,
+                defaults: defaults
+            )
+            guard AccountLocalStorage.read(
+                [StructuredWorkoutCompletion].self,
+                name: storageName, userID: userID, defaults: defaults
+            )?.contains(where: { $0.id == completion.id }) == true
+            else { return false }
+            ATHLTHTrainingDataChangeSignal.post(userID: userID)
+            return true
+        } catch {
+            return false
+        }
     }
 }
 
@@ -180,6 +192,7 @@ struct StructuredWorkoutSessionView: View {
     @State private var showAllSteps = false
     @State private var activeExecutionBlocks: [WorkoutTemplateBlock] = []
     @State private var restoringCheckpoint = false
+    @State private var persistenceErrorMessage: String?
 
     private var checkpointName: String {
         "structuredWorkoutInProgress.v1.\(workout.id.uuidString)"
@@ -290,7 +303,13 @@ struct StructuredWorkoutSessionView: View {
                 Button(ATHLTHLocalization.choose(
                     english: "Discard workout", norwegian: "Forkast økten"
                 ), role: .destructive) {
-                    removeCheckpoint()
+                    guard removeCheckpoint() else {
+                        persistenceErrorMessage = ATHLTHLocalization.choose(
+                            english: "Could not discard the protected workout. Try again.",
+                            norwegian: "Kunne ikke forkaste den beskyttede økten. Prøv igjen."
+                        )
+                        return
+                    }
                     ATHLTHCrossDeviceWorkoutStore.shared.endStructuredSession(
                         workoutID: workout.id
                     )
@@ -307,6 +326,20 @@ struct StructuredWorkoutSessionView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 bottomControls
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "Workout was not saved",
+                    norwegian: "Økten ble ikke lagret"
+                ),
+                isPresented: Binding(
+                    get: { persistenceErrorMessage != nil },
+                    set: { if !$0 { persistenceErrorMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(persistenceErrorMessage ?? "")
             }
             .sheet(isPresented: $showingFinishConfirmation) {
                 ATHLTHWorkoutFinishSheet(
@@ -355,23 +388,37 @@ struct StructuredWorkoutSessionView: View {
                 )
             }
             .onAppear {
-                if !hasStarted && !restoreCheckpoint() {
+                guard !hasStarted else { return }
+                do {
+                    try ATHLTHStructuredCaptureAdmission.admit(
+                        workoutID: workout.id,
+                        userID: session.profile.userID
+                    )
+                } catch {
+                    persistenceErrorMessage = error.localizedDescription
+                    return
+                }
+                if !restoreCheckpoint() {
                     activeExecutionBlocks = ATHLTHStructuredAMRAPProgression.initialSteps(
                         from: workout.resolvedWorkoutBlocks
                     )
                     startedAt = Date()
                     hasStarted = true
                     setupCurrentStep()
-                    persistCheckpoint()
+                    guard persistCheckpoint() else {
+                        hasStarted = false
+                        ATHLTHStructuredCaptureAdmission.release(
+                            workoutID: workout.id, userID: session.profile.userID
+                        )
+                        return
+                    }
                     // Preserve the real start and the original planned ID.
                     _ = session.recordPlannedWorkoutStarted(
                         workoutID: workout.id,
                         startedAt: startedAt,
                         startedOnWatch: false
                     )
-                    // This view itself is the iPhone interval/strength
-                    // recorder. A ready lobby is only marked started when
-                    // its first real recording screen becomes active.
+                    // Invitations only confirm once the protected checkpoint exists.
                     Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
                 }
                 publishStructuredSpectatorStatus()
@@ -1198,7 +1245,7 @@ struct StructuredWorkoutSessionView: View {
     }
 
     private func completeCurrentAndAdvance() {
-        guard let block = currentBlock else { return }
+        guard hasStarted, let block = currentBlock else { return }
         if let id = block.executionGroupID,
            amrapTimedOutGroups.contains(id) { return }
         guard !emomWaitingForMinute else { return }
@@ -1261,8 +1308,11 @@ struct StructuredWorkoutSessionView: View {
         }
     }
 
-    private func persistCheckpoint() {
-        guard hasStarted, !savedCompletion, !restoringCheckpoint else { return }
+    @discardableResult
+    private func persistCheckpoint() -> Bool {
+        guard hasStarted, !savedCompletion, !restoringCheckpoint else {
+            return false
+        }
         let state = ATHLTHStructuredWorkoutCheckpoint(
             workoutID: workout.id,
             savedAt: Date(),
@@ -1278,10 +1328,29 @@ struct StructuredWorkoutSessionView: View {
             enteredReps: enteredReps,
             enteredWeight: enteredWeight
         )
-        AccountLocalStorage.write(
-            state, name: checkpointName, userID: session.profile.userID
-        )
+        do {
+            try AccountLocalStorage.writeChecked(
+                state, name: checkpointName, userID: session.profile.userID
+            )
+            guard AccountLocalStorage.read(
+                ATHLTHStructuredWorkoutCheckpoint.self,
+                name: checkpointName, userID: session.profile.userID
+            )?.savedAt == state.savedAt else {
+                persistenceErrorMessage = ATHLTHLocalization.choose(
+                    english: "Cannot verify the workout checkpoint. Keep the workout open.",
+                    norwegian: "Kunne ikke kontrollere øktlagringen. Hold økten åpen."
+                )
+                return false
+            }
+        } catch {
+            persistenceErrorMessage = ATHLTHLocalization.choose(
+                english: "Cannot save the current workout progress. Try again.",
+                norwegian: "Kunne ikke lagre fremdriften i økten. Prøv igjen."
+            )
+            return false
+        }
         publishStructuredSpectatorStatus()
+        return true
     }
 
     private func publishStructuredSpectatorStatus() {
@@ -1344,10 +1413,19 @@ struct StructuredWorkoutSessionView: View {
         return true
     }
 
-    private func removeCheckpoint() {
-        UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key(
+    @discardableResult
+    private func removeCheckpoint() -> Bool {
+        let key = AccountLocalStorage.key(
             checkpointName, userID: session.profile.userID
-        ))
+        )
+        UserDefaults.standard.removeObject(forKey: key)
+        guard UserDefaults.standard.data(forKey: key) == nil else {
+            return false
+        }
+        ATHLTHStructuredCaptureAdmission.release(
+            workoutID: workout.id, userID: session.profile.userID
+        )
+        return true
     }
 
     @MainActor
@@ -1387,16 +1465,28 @@ struct StructuredWorkoutSessionView: View {
             $0.stepID < $1.stepID
         }
         completion.timedOutModes = Array(amrapTimedOutGroups).map { $0.uuidString }
-        StructuredWorkoutCompletionStore.save(
+        guard StructuredWorkoutCompletionStore.save(
             completion,
             userID: session.profile.userID
-        )
+        ) else {
+            persistenceErrorMessage = ATHLTHLocalization.choose(
+                english: "The workout could not be saved. Its unfinished checkpoint remains available.",
+                norwegian: "Økten kunne ikke lagres. Den uferdige økten er bevart for nytt forsøk."
+            )
+            return
+        }
         _ = session.recordPlannedWorkoutFinished(
             workoutID: workout.id,
             recordedStart: completion.startedAt,
             endedAt: completion.endedAt
         )
-        removeCheckpoint()
+        guard removeCheckpoint() else {
+            persistenceErrorMessage = ATHLTHLocalization.choose(
+                english: "The completion is saved, but the active checkpoint could not be closed. Retry to release it.",
+                norwegian: "Fullføringen er lagret, men det aktive checkpointet kunne ikke avsluttes. Prøv igjen."
+            )
+            return
+        }
         ATHLTHCrossDeviceWorkoutStore.shared.endStructuredSession(
             workoutID: workout.id
         )
