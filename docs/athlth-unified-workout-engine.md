@@ -1,3 +1,7 @@
+## 2.2.6 – konto-sperre ved universell Watch-gjenoppretting
+
+Universell lokal øktprojeksjon krever nå bekreftet opprinnelig Watch-eier lik aktivt kontobruker-ID før et Watch-livespeil blir returnert. Et loginskifte eller et eldre Watch-snapshot uten lagret eier gir ikke tilgang til forrige brukers treningsdata, og opptaksplassen blir fortsatt behandlet som opptatt i stedet for å starte ny økt. Test dekker samme konto, annen konto og manglende eierbevis. Ingen ekstra HealthKit-writer.
+
 ## 2.2.6 – identitetsbevarende, privat Watch-til-iPad-relé
 
 iPhone-reléet til den eksisterende iPad-livespektatoren bruker nå den opprinnelige bekreftede Watch-økts-ID-en, ikke en ny tilfeldig iPhone-generert ID. Dette beholder samme visnings-/samtykkekontekst etter gjenoppkobling. Eldre Watch-økter uten ID får fremdeles en lokalt midlertidig identitet uten at det endrer HealthKit eller historikk.

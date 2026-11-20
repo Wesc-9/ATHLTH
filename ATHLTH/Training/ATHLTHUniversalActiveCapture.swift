@@ -238,6 +238,19 @@ enum ATHLTHUniversalActiveCapture {
         )
     }
 
+    /// The universal current-account projection additionally requires
+    /// proof of the exact original Watch owner. A signed-out or re-paired
+    /// Watch may still hold a real HealthKit session, but cannot expose its
+    /// metrics as the new account's workout.
+    static func mirroredWatch(
+        _ snapshot: WatchWorkoutLiveSnapshot,
+        for ownerID: UUID,
+        at now: Date = Date()
+    ) -> ATHLTHUniversalActiveCaptureState? {
+        guard snapshot.accountOwnerID == ownerID else { return nil }
+        return mirroredWatch(snapshot, at: now)
+    }
+
     static func mirroredStrength(
         _ snapshot: WatchWorkoutLiveSnapshot,
         at now: Date = Date()
@@ -330,7 +343,9 @@ enum ATHLTHUniversalActiveCapture {
         }
         if result == nil && mirrorActive {
             guard let snapshot = mirror?.snapshot,
-                  let confirmed = mirroredWatch(snapshot, at: now) else {
+                  let confirmed = mirroredWatch(
+                      snapshot, for: userID, at: now
+                  ) else {
                 throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
             }
             return confirmed

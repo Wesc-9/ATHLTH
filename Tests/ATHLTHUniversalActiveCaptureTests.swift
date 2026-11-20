@@ -512,4 +512,33 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
     }
 
 
+    func testCurrentAccountWatchProjectionNeverLeaksAcrossLogin() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        let sourceOwner = UUID()
+        let otherOwner = UUID()
+        var mirror = WatchWorkoutLiveSnapshot(
+            kind: .cycling, state: .running,
+            startedAt: start, capturedAt: start.addingTimeInterval(85),
+            elapsedTime: 70, heartRate: 140, activeCalories: 20,
+            distanceMeters: 400, averageHeartRate: nil,
+            maxHeartRate: nil, routePointCount: 0
+        )
+        let sessionID = UUID()
+        mirror.universalWorkoutID = sessionID
+        mirror.accountOwnerID = sourceOwner
+        let matching = try XCTUnwrap(
+            ATHLTHUniversalActiveCapture.mirroredWatch(
+                mirror, for: sourceOwner, at: mirror.capturedAt
+            )
+        )
+        XCTAssertEqual(matching.workoutID, sessionID)
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            mirror, for: otherOwner, at: mirror.capturedAt
+        ))
+        mirror.accountOwnerID = nil
+        XCTAssertNil(ATHLTHUniversalActiveCapture.mirroredWatch(
+            mirror, for: sourceOwner, at: mirror.capturedAt
+        ))
+    }
+
 }
