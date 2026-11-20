@@ -1,3 +1,11 @@
+## 2.2.6 – Enkel øktbygger: legg til øvelse eller ferdig treningsøkt
+
+- Den tidligere «Hva vil du gjøre?»-kategorien i Basic er erstattet av **to store, direkte knapper** under Øktdetaljer: «Legg til øvelse» (rett til eksisterende øvelsesbibliotek/løpeøvelser, uten ekstra fase- eller gruppevelger) og «Legg til treningsøkt» (rett til eksisterende bibliotek, kategorifokus fra valgt treningsform). Øktnavn, miljø og dato styrer fortsatt det originale planlagte øktobjektet.
+- Valgte øvelser og hele bibliotekøkter bruker samme `WorkoutTemplateBlock`-timeline og eksisterende plan-lagring som Advanced. Et valg av komplett bibliotekøkt erstatter allerede eksisterende Basic-innhold **bare etter den eksisterende bekreftelsen**, slik at man ikke skjult dobler en plan. Advanced beholder separat tillegging og fasebygging.
+- Basic har nå en kort liste «Lagt til i økten» basert på den eksisterende rene `ATHLTHSimpleWorkoutOutline`. Hver oppføring kan fjernes med én knapp. `ATHLTHBasicWorkoutContentsPolicy` fjerner tilhørende grupper atomisk, bevarer alle øvrige økter og oppdaterer draft, fasereferanser og rutereferanse uten ny opptaksmotor. Store økter viser de første seks radene med «Vis alle».
+- «Fri styrketrening» er et mindre tilleggsvalg **kun for en tom styrkeøkt**, ikke et ekstra aktivitetspanel. Valgfritt rutevalg for gå/løping ligger under øktinnhold, og Avansert er fortsatt tilgjengelig for detaljstyring.
+- Nye rene tester dekker enkel sletting, bevart rekkefølge, hel gruppesletting og ugyldige indekser. Same-commit native CI og fysisk UI-verifisering gjenstår.
+
 ## 2.2.6 – korrigert «Legg til intervaller i samme økt» på iPhone og Watch
 
 - Feilen i aktiv løpeøkt kom fra `ATHLTHRunningWorkoutAppendPolicy.canAppend`: løpevelgeren sendte korrekt `startNow=false` (behold fri løping inntil «Start intervall»), men den felles regelen tillot bare kølegging når et annet strukturert intervall *allerede* pågikk. Nå kan en fri løpeøkt både motta en valgfri umiddelbar start og en **kølagt, manuelt startet intervalløkt**. En pågående strukturert blokk kan fortsatt bare legge senere trinn i kø.

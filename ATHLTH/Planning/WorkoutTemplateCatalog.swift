@@ -4447,6 +4447,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var pendingBasicLibraryWorkout: PlannedSession?
     @State private var confirmingBasicLibraryReplacement = false
     @State private var studioBasicOwnedBlockIDs: Set<UUID> = []
+    @State private var basicContentsExpanded = false
     @State private var studioBasicWorkoutTitle: String?
     @State private var showingCopyPicker = false
     @State private var showingWorkoutReview = false
@@ -5837,7 +5838,7 @@ struct WorkoutTemplateBuilderView: View {
                                 if wasBlank && !blocks.isEmpty { title = workout.title }
                             }
                         },
-                        initialCategory: studioAdvanced ? initialActivity : nil
+                        initialCategory: initialActivity
                     )
                 } else {
                     savedWorkoutPickerSheet
@@ -6121,26 +6122,69 @@ struct WorkoutTemplateBuilderView: View {
         )
     }
 
-    /// Basic is intentionally a two-choice experience, not the Advanced
-    /// section/category builder with controls hidden behind a toggle.
-    /// Same canonical WorkoutTemplateBlock recipe and saving path as Advanced.
+    /// Basic is a true two-action editor, not Advanced with panels hidden.
+    /// Both actions edit the SAME canonical blocks and save the same way.
     private var simplePlannedWorkoutComposer: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 13) {
             studioPlanHeader
 
-            // The sport has already been selected before entering this
-            // editor. Do not show a second "What would you like to do?"
-            // chooser or offer to replace running with an unrelated sport.
-            // Strength retains its two meaningful Basic recording options.
-            if initialActivity == .strength {
-                basicStrengthChoices
+            VStack(spacing: 9) {
+                basicAddAction(
+                    title: tr("Add exercise", "Legg til øvelse"),
+                    detail: tr("Choose from the exercise library",
+                               "Velg fra øvelsesbiblioteket"),
+                    symbol: "plus.circle.fill",
+                    emphasized: true
+                ) {
+                    selectedPhase = .main
+                    studioVisiblePhases.insert(.main)
+                    openExercisePicker()
+                }
+                .accessibilityIdentifier("athlth-basic-add-exercise")
+
+                basicAddAction(
+                    title: tr("Add workout", "Legg til treningsøkt"),
+                    detail: tr("Use a saved workout",
+                               "Hent en ferdig økt fra biblioteket"),
+                    symbol: "books.vertical",
+                    emphasized: false
+                ) {
+                    selectedPhase = .main
+                    showingSavedWorkoutPicker = true
+                }
+                .accessibilityIdentifier("athlth-basic-add-workout")
+
+                if initialActivity == .strength && blocks.isEmpty {
+                    Button {
+                        // Only a genuinely empty strength recipe can become
+                        // a free 45-minute session without confirmation.
+                        applyBasicQuickActivity("strength")
+                    } label: {
+                        Label(
+                            tr("Or start free strength training",
+                               "Eller velg fri styrketrening"),
+                            systemImage: "stopwatch"
+                        )
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(maxWidth: .infinity, minHeight: 37)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-basic-free-strength-45min")
+                }
+            }
+            .padding(12)
+            .athlthPlanCard(radius: 20)
+
+            if !blocks.isEmpty {
+                basicWorkoutContents
             }
 
-            // Keep route and library available as compact contextual actions,
-            // not inside a competing activity-selection card.
-            HStack(spacing: 9) {
-                if initialActivity == .walking || initialActivity == .running ||
-                   hasWalking || hasActualRunning {
+            // Routes are optional context for a walk/run, not a second
+            // activity picker or an Advanced phase selector.
+            if initialActivity == .walking || initialActivity == .running ||
+               hasWalking || hasActualRunning {
+                HStack(spacing: 9) {
                     Button {
                         selectedPhase = .main
                         studioRoutePhase = .main
@@ -6151,7 +6195,6 @@ struct WorkoutTemplateBuilderView: View {
                             systemImage: "map"
                         )
                         .font(.subheadline.weight(.medium))
-                        .lineLimit(1)
                         .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.bordered)
@@ -6165,34 +6208,12 @@ struct WorkoutTemplateBuilderView: View {
                             resequence()
                         } label: {
                             Image(systemName: "xmark.circle")
-                                .frame(minWidth: 35, minHeight: 44)
+                                .frame(minWidth: 38, minHeight: 44)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(tr("Remove route", "Fjern rute"))
                     }
                 }
-
-                Button {
-                    selectedPhase = .main
-                    showingSavedWorkoutPicker = true
-                } label: {
-                    Label(tr("Library", "Bibliotek"), systemImage: "books.vertical")
-                        .font(.subheadline.weight(.medium))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHPlanDesign.accentInk)
-                .accessibilityIdentifier("athlth-basic-workout-library")
-            }
-
-            if !blocks.isEmpty {
-                ATHLTHWorkoutRecipePreview(
-                    title: title, summary: "", category: category,
-                    symbol: initialActivity?.symbol ?? "figure.run",
-                    difficulty: nil,
-                    durationMinutes: resolvedDurationMinutes,
-                    blocks: blocks, embeddedInDetails: true
-                )
             }
 
             HStack {
@@ -6210,94 +6231,148 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
-    /// One free-duration activity or a normal exercise-by-exercise
-    /// strength workout. Both are authored into the same blocks array as
-    /// the Advanced editor and Watch executor.
-    private var basicStrengthChoices: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Button {
-                if blocks.count == 1,
-                   blocks.first.map(ATHLTHFreeStrengthRecipePolicy.isFreeStrength) == true {
-                    return
-                }
-                if !blocks.isEmpty {
-                    pendingBasicActivityReplacement = "strength"
-                    confirmingBasicActivityReplacement = true
-                } else {
-                    applyBasicQuickActivity("strength")
-                }
-            } label: {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "stopwatch")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 36, height: 36)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("Free strength training", "Fri styrketrening"))
-                            .font(.headline)
-                        Text(tr(
-                            "One open 45-minute workout, without prescribed exercises, sets or reps.",
-                            "Én åpen styrkeøkt på 45 minutter, uten forhåndsvalgte øvelser, sett eller repetisjoner."
-                        ))
+    private func basicAddAction(
+        title: String,
+        detail: String,
+        symbol: String,
+        emphasized: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        ATHLTHPlanDesign.canvas,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Text(detail)
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                    Spacer(minLength: 2)
-                    if blocks.count == 1 &&
-                       blocks.first.map(ATHLTHFreeStrengthRecipePolicy.isFreeStrength) == true {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    }
+                        .lineLimit(2)
                 }
-                .padding(13)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(ATHLTHPlanDesign.selectedSurface,
-                            in: RoundedRectangle(cornerRadius: 16))
+                Spacer(minLength: 6)
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("athlth-basic-free-strength-45min")
-
-            Button {
-                // Do not replace the existing free workout until an actual
-                // library exercise is selected; Cancel preserves the draft.
-                selectedPhase = .main
-                studioVisiblePhases.insert(.main)
-                openExercisePicker()
-            } label: {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "dumbbell")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 36, height: 36)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("Strength with exercises",
-                                "Styrketrening med øvelser"))
-                            .font(.headline)
-                        Text(tr(
-                            "Choose exercises from the library and plan sets, repetitions and rest.",
-                            "Legg til øvelser fra biblioteket og planlegg sett, repetisjoner og pauser."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        Text(tr("Add exercise", "Legg til øvelse") + "  +")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            .padding(.top, 3)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(13)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(ATHLTHPlanDesign.canvas,
-                            in: RoundedRectangle(cornerRadius: 16))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("athlth-basic-strength-exercises")
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 68)
+            .background(
+                emphasized
+                    ? ATHLTHPlanDesign.selectedSurface
+                    : ATHLTHPlanDesign.canvas,
+                in: RoundedRectangle(cornerRadius: 15)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 15))
         }
+        .buttonStyle(.plain)
+    }
+
+    /// Only one compact list is visible in Basic: no phase cards, groups,
+    /// interval editors or per-set wizard until the athlete chooses Advanced.
+    private var basicWorkoutContents: some View {
+        let items = ATHLTHSimpleWorkoutOutline.stages(
+            for: blocks
+        ).flatMap(\.items)
+        let visibleCount = basicContentsExpanded ? items.count : min(6, items.count)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(tr("Added to workout", "Lagt til i økten"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer(minLength: 4)
+                Text("\(items.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+
+            ForEach(Array(items.prefix(visibleCount))) { item in
+                HStack(spacing: 10) {
+                    Image(systemName: item.symbol)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        if !item.detail.isEmpty {
+                            Text(item.detail)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(2)
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    Button {
+                        removeBasicContent(
+                            startingAt: item.id,
+                            representedSteps: item.representedSteps
+                        )
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                            .font(.system(size: 18))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .frame(minWidth: 38, minHeight: 38)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        tr("Remove", "Fjern") + " " + item.title
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .contain)
+            }
+            if items.count > 6 {
+                Button {
+                    basicContentsExpanded.toggle()
+                } label: {
+                    Text(basicContentsExpanded
+                         ? tr("Show less", "Vis færre")
+                         : tr("Show all", "Vis alle") + " (\(items.count))")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(15)
+        .athlthPlanCard(radius: 18)
+        .accessibilityIdentifier("athlth-basic-workout-contents")
+    }
+
+    private func removeBasicContent(
+        startingAt index: Int,
+        representedSteps: Int
+    ) {
+        let remaining = ATHLTHBasicWorkoutContentsPolicy.removing(
+            from: blocks,
+            startingAt: index,
+            representedSteps: representedSteps
+        )
+        guard remaining.count != blocks.count else { return }
+        blocks = remaining
+        resequence()
+        studioBasicOwnedBlockIDs.formIntersection(
+            Set(blocks.map(\.editorDragID))
+        )
+        studioVisiblePhases = Set(blocks.map(\.resolvedPhase))
+        if let routeID = selectedRouteID,
+           !blocks.contains(where: { $0.routeID == routeID }) {
+            selectedRouteID = nil
+        }
+        if blocks.isEmpty {
+            basicContentsExpanded = false
+            studioBasicWorkoutTitle = nil
+        }
+        savedToMyWorkouts = false
+        persistWorkoutDraft()
     }
 
     /// A complete saved workout is one selection in Basic. It must never

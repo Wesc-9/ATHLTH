@@ -66,6 +66,29 @@ enum ATHLTHWorkoutStepCopy {
 /// Presentation-only grouping over the canonical WorkoutTemplateBlock timeline.
 /// Used by both Quick Train/library previews and the shared plan/quick editor.
 /// Never edits, expands, reorders or rewrites a user's saved training prescription.
+/// Deleting an item in Basic acts on the real source blocks, never on
+/// the compact preview. A grouped prescription is removed atomically.
+enum ATHLTHBasicWorkoutContentsPolicy {
+    static func removing(
+        from blocks: [WorkoutTemplateBlock],
+        startingAt index: Int,
+        representedSteps: Int
+    ) -> [WorkoutTemplateBlock] {
+        guard blocks.indices.contains(index),
+              representedSteps > 0 else { return blocks }
+        let last = min(index + representedSteps, blocks.count)
+        let removedGroups = Set(
+            blocks[index..<last].compactMap(\.groupID)
+        )
+        return blocks.enumerated().compactMap { offset, block in
+            if (index..<last).contains(offset) { return nil }
+            if let groupID = block.groupID,
+               removedGroups.contains(groupID) { return nil }
+            return block
+        }
+    }
+}
+
 enum ATHLTHSimpleWorkoutOutline {
     struct Item: Identifiable {
         let id: Int

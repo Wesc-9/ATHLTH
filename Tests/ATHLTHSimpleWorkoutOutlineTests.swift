@@ -78,4 +78,51 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         XCTAssertEqual(recipe.map(\.sequence), before)
         XCTAssertEqual(recipe.count, 4)
     }
+    func testBasicRemoveOneExerciseKeepsOtherExercisesAndOrder() {
+        let a = block("Squat", kind: .exercise, phase: .main, index: 1)
+        let b = block("Press", kind: .exercise, phase: .main, index: 2)
+        let c = block("Deadlift", kind: .exercise, phase: .main, index: 3)
+        let original = [a, b, c]
+        let result = ATHLTHBasicWorkoutContentsPolicy.removing(
+            from: original, startingAt: 1, representedSteps: 1
+        )
+        XCTAssertEqual(result.map(\.title), ["Squat", "Deadlift"])
+        XCTAssertEqual(original.count, 3, "Basic must not mutate saved source")
+    }
+
+    func testBasicRemoveCompactIntervalRemovesWholeGroupSafely() {
+        let group = UUID()
+        var effort = block("4 minutes", phase: .main, index: 1)
+        effort.groupID = group
+        var rest = block(
+            "2 minutes", kind: .rest, phase: .recovery, index: 2
+        )
+        rest.groupID = group
+        let next = block("Cool down", phase: .cooldown, index: 3)
+        let original = [effort, rest, next]
+        let result = ATHLTHBasicWorkoutContentsPolicy.removing(
+            from: original, startingAt: 0, representedSteps: 1
+        )
+        XCTAssertEqual(result.map(\.title), ["Cool down"],
+            "Never keep half an imported interval or superset group")
+        XCTAssertEqual(original.count, 3)
+    }
+
+    func testBasicRemoveRejectsInvalidIndicesWithoutDataLoss() {
+        let original = [block("Run", phase: .main, index: 1)]
+        XCTAssertEqual(
+            ATHLTHBasicWorkoutContentsPolicy.removing(
+                from: original, startingAt: -1, representedSteps: 1
+            ),
+            original
+        )
+        XCTAssertEqual(
+            ATHLTHBasicWorkoutContentsPolicy.removing(
+                from: original, startingAt: 0, representedSteps: 0
+            ),
+            original
+        )
+    }
+
+
 }
