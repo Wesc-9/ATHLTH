@@ -81,6 +81,7 @@ on:
       - release/v2.2.3
       - release/v2.2.4
       - release/v2.2.5
+      - release/v2.2.6
       - fix/v1.4.2-swift6-release
   pull_request:
     branches:
@@ -120,6 +121,7 @@ on:
       - release/v2.2.3
       - release/v2.2.4
       - release/v2.2.5
+      - release/v2.2.6
 
 concurrency:
   # Previous pre-matrix builds can remain stuck in CoreSimulator teardown,
@@ -306,7 +308,7 @@ jobs:
       # symlinks. iPad launch runs on a FRESH macOS runner, not the XCTest
       # runner that has already exercised thousands of tests and simulators.
       - name: Package XCTest-tested app for iPad
-        if: github.ref == 'refs/heads/release/v2.2.5'
+        if: github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.6'
         shell: bash
         run: |
           set -euo pipefail
@@ -317,7 +319,7 @@ jobs:
           ls -lh "$RUNNER_TEMP/athlth-ipad-simulator-app.tar.gz"
 
       - name: Upload XCTest-tested simulator app
-        if: github.ref == 'refs/heads/release/v2.2.5'
+        if: github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.6'
         uses: actions/upload-artifact@v4
         with:
           name: athlth-ipad-simulator-app
@@ -382,7 +384,7 @@ jobs:
   # No second Xcode compilation; the app is identical to the tested binary.
   ipad-smoke:
     name: iPad ${{ matrix.ipad }}-inch smoke
-    if: github.ref == 'refs/heads/release/v2.2.5'
+    if: github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.6'
     needs: build
     strategy:
       fail-fast: false

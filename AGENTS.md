@@ -1,3 +1,11 @@
+# ACTIVE ATHLTH DEVELOPMENT (2026-11-20 — 2.2.6)
+
+- **CURRENT ACTIVE DEVELOPMENT: `release/v2.2.6` (build 134)**. Supersedes older active-branch instructions below. All new code, tests and workflows belong directly on this release branch, never on a parallel feature branch or frozen release.
+- **VERSION 2.2.5 (build 133) SOURCE FROZEN:** Exact snapshot `bc23640f389fcf3d7cdb558a78fb6fcaefca1ac5`. Preserved as `locked/v2.2.5` and `backup/v2.2.5-locked-before-v2.2.6-20261120`. Do not move 2.2.5 branches. Authorized 2.2.5 TestFlight upload was in progress at the branch cut; do not claim uploaded/processed until the workflow proves it. The preceding source commit `fcc832a4e2cbe3297eea6a8bacb8438aa3bbb525` passed full same-commit Build, hybrid/watchOS XCTest, backend, iPhone/iPad compatibility and independent iPad 11/13-inch checks and artifacts.
+- **ONE WORKOUT RECORDING OWNER:** Preserve the unified workout engine's Phase 1–8 progress, PhoneWorkout and StrengthWorkoutLog histories, single recording arbiter, Watch HealthKit state proofs and fail-closed recovery. No shadow workouts, simultaneous HealthKit capture, or destructive migrations. Read `docs/athlth-unified-workout-engine.md` before edits.
+- **RELEASE RULE:** Require full same-commit Build ATHLTH, Train/Hybrid XCTest plus watchOS, backend regressions, iPhone and iPad compatibility and both 11/13-inch screenshot artifacts. Physical iPhone/iPad/Watch GPS, HealthKit, Spotify and Audio Coach remain unverified. Version **2.2.6** has no TestFlight authorization; request new explicit consent before upload. The 2.2.5 permission is not transferable.
+- The lock uses independent preserved Git refs and repository policy, not yet administrator-enforced branch protection.
+
 # ACTIVE ATHLTH DEVELOPMENT (2026-11-18 — 2.2.5)
 
 - **CURRENT ACTIVE DEVELOPMENT: `release/v2.2.5`**. This instruction supersedes older 2.2.x active-branch instructions below. Make all changes directly on this release branch; do not open a parallel feature branch. Preserve previously frozen versions.

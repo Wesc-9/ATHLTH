@@ -57,6 +57,7 @@ on:
       - release/v2.2.3
       - release/v2.2.4
       - release/v2.2.5
+      - release/v2.2.6
     paths:
       - .github/testflight-trigger
 
@@ -75,9 +76,9 @@ jobs:
     timeout-minutes: 240
     steps:
       # Historical release branches preserve their existing upload contract.
-      # v2.2.5 cannot enter signing/archive until ALL test gates pass.
-      - name: Verify full 2.2.5 release gate on the exact commit
-        if: github.ref == 'refs/heads/release/v2.2.5'
+      # v2.2.5/v2.2.6 cannot enter signing/archive until ALL test gates pass.
+      - name: Verify full 2.2.x release gate on the exact commit
+        if: github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.6'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,7 +102,7 @@ jobs:
                   raise RuntimeError(f"GitHub API {path}: {response.stderr[-400:]}")
               return json.loads(response.stdout)
           
-          branch = api(f"repos/{repo}/git/ref/heads/release/v2.2.5")
+          branch = api(f"repos/{repo}/git/ref/heads/{os.environ['GITHUB_REF_NAME']}")
           if branch["object"]["sha"] != sha:
               print("::error::Release branch advanced; refusing to ship stale source.")
               sys.exit(1)
@@ -721,8 +722,8 @@ jobs:
           set -euo pipefail
           # A branch can advance while a long archive is being signed.
           # Never publish a stale SHA even if its initial CI gate passed.
-          if [ "$GITHUB_REF" = 'refs/heads/release/v2.2.5' ]; then
-            CURRENT_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/v2.2.5" --jq '.object.sha')
+          if [ "$GITHUB_REF" = 'refs/heads/release/v2.2.5' ] || [ "$GITHUB_REF" = 'refs/heads/release/v2.2.6' ]; then
+            CURRENT_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/${GITHUB_REF_NAME}" --jq '.object.sha')
             if [ "$CURRENT_SHA" != "$GITHUB_SHA" ]; then
               echo "::error::Release branch advanced during archive; abort stale upload."
               exit 1

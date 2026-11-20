@@ -1,6 +1,12 @@
 # ATHLTH: én planleggingsmotor, tilpassede live-motorer
 
-Status: 1.9.1 – planprosjeksjon, UI-ruting og begrenset fellesopptak for planlagt styrke + tidsstyrt tredemølle er koblet inn i kalendervisningen. Kode-/simulatortester er satt opp; fysisk Watch-verifikasjon gjenstår.
+## Overgang til ATHLTH 2.2.6 (20. november 2026)
+
+- Ny aktiv gren `release/v2.2.6`, markedsversjon 2.2.6 og build 134, opprettet fra den uendrede 2.2.5-snapshotten `bc23640f389fcf3d7cdb558a78fb6fcaefca1ac5`.
+- 2.2.5 er bevart i `locked/v2.2.5` og `backup/v2.2.5-locked-before-v2.2.6-20261120`. Forrige kildecommit `fcc832a4e2cbe3297eea6a8bacb8438aa3bbb525` bestod samme-commit iOS, watchOS, backend, iPhone/iPad og iPad 11/13-tommers simulatorprøver. 2.2.5 TestFlight-workflow på triggercommit `bc23640f389fcf3d7cdb558a78fb6fcaefca1ac5` var fortsatt i gang ved grenopprettelse; verifiser App Store Connect-upload separat.
+- Videre motorutvikling og feilretting skjer bare på 2.2.6, med én autoritativ treningsregistrering og uendret historikk. Fysiske iPhone/iPad/Watch GPS-, HealthKit-, Spotify- og Audio Coach-tester er ikke dokumentert. Ny 2.2.6 TestFlight-opplasting krever egen autorisasjon.
+
+Historisk status (1.9.1): planprosjeksjon, UI-ruting og begrenset fellesopptak for planlagt styrke + tidsstyrt tredemølle er koblet inn i kalendervisningen. Kode-/simulatortester er satt opp; fysisk Watch-verifikasjon gjenstår.
 
 ## Ett felles øktoppsett
 
