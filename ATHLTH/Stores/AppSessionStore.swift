@@ -5755,13 +5755,14 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    @discardableResult
     private func persistAccountContent(
         immediate: Bool = false
-    ) {
+    ) -> Bool {
         guard !loadingAccountContent,
               let userID = localAccountID
         else {
-            return
+            return false
         }
 
         accountContentSaveTask?.cancel()
@@ -5770,8 +5771,9 @@ final class AppSessionStore: ObservableObject {
         if immediate {
             // Explicit checkpoints and account changes remain synchronous to
             // guarantee durability before switching/reloading the account.
-            writeAccountContent(accountTrainingSnapshot(), userID: userID)
-            return
+            return writeAccountContent(
+                accountTrainingSnapshot(), userID: userID
+            )
         }
 
         accountContentSaveTask =
@@ -5796,6 +5798,9 @@ final class AppSessionStore: ObservableObject {
                 )
                 self.accountContentSaveTask = nil
             }
+        // A deferred write has been scheduled, not yet committed.
+        // Callers requiring durability must pass immediate: true.
+        return true
     }
 
     @discardableResult
@@ -5882,11 +5887,23 @@ final class AppSessionStore: ObservableObject {
            let data = defaults.data(forKey: "legacy.onboardingProfile") {
             onboardingProfile = try? JSONDecoder().decode(OnboardingProfileData.self, from: data)
         }
-        defaults.set(true, forKey: AccountLocalStorage.key("legacyMigrated", userID: userID))
+        // Never mark legacy data as migrated until an actual account-scoped
+        // snapshot has been encoded and verified. Otherwise a failed write
+        // could permanently hide the user's old training plans on relaunch.
         loadingAccountContent = false
         migrateLegacyTrainingPlanIfNeeded()
         refreshActivePlanForToday()
-        persistAccountContent()
+        if mayMigrate {
+            if persistAccountContent(immediate: true) {
+                defaults.set(
+                    true, forKey: AccountLocalStorage.key(
+                        "legacyMigrated", userID: userID
+                    )
+                )
+            }
+        } else {
+            persistAccountContent()
+        }
 
         // Index previously saved main workouts once on upgrade, including
         // personal sessions and all calendar plans. Later edits use the

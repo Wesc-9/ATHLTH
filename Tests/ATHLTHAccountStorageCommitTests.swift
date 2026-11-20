@@ -37,6 +37,31 @@ final class ATHLTHAccountStorageCommitTests: XCTestCase {
         )), baseline)
     }
 
+    func testLegacyMigrationReceiptRequiresCommittedSnapshot() throws {
+        let name = "ATHLTHMigrationReceipt.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let owner = UUID()
+        let marker = AccountLocalStorage.key("legacyMigrated", userID: owner)
+
+        XCTAssertThrowsError(try ATHLTHAccountTrainingCommit.save(
+            Unencodable(), userID: owner, defaults: defaults
+        ) {
+            defaults.set(true, forKey: marker)
+        })
+        XCTAssertFalse(defaults.bool(forKey: marker))
+        XCTAssertNil(defaults.data(forKey: AccountLocalStorage.key(
+            "training", userID: owner
+        )))
+
+        try ATHLTHAccountTrainingCommit.save(
+            ["kept legacy session"], userID: owner, defaults: defaults
+        ) {
+            defaults.set(true, forKey: marker)
+        }
+        XCTAssertTrue(defaults.bool(forKey: marker))
+    }
+
     func testAccountScopedTrainingWriteCannotChangeAnotherAccount() throws {
         let name = "ATHLTHStorageIsolation.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
