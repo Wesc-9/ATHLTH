@@ -1,3 +1,9 @@
+## 2.2.6 – aktivitetsspesifikk styring fra én felles treningsmotor
+
+- Den eksisterende blokk- og opptaksmotoren får nå én delt `ATHLTHWorkoutSportMode`-tolkning for løping, gåing, styrke, sykling, roing, trappetrening, HIIT, sirkel, funksjonell trening, yoga, mobilitet og øvrige aktiviteter. Både planlagt live-ruting, manuell iPhone-tidtaker og verifisert Watch-projeksjon bruker samme klassifisering av aktivitet til eksisterende motor. Det opprettes ingen ekstra HealthKit-opptak eller skrivejournal.
+- Strukturert livekort viser sportens riktige navn og ikon, sportstilpasset «neste»-handling og planlagte mål for taggede aktiviteter, ikke «Veiledning» uten innhold. Kun faktisk lagrede mål for tid, distanse, pulssone og RPE vises. Ingen GPS, puls eller distanse fabrikeres av manuell tid.
+- Nye regresjonstester dekker sportstag, opprinnelig øktidentitet, samstemt ruting og manuell aktivitetstolkning. Full fysisk HealthKit/iPhone/iPad/Watch-test og samlet release-CI gjenstår. Det er fortsatt ikke én migrert sensor-writer for alle treningsformer, og TestFlight er ikke autorisert.
+
 ## 2.2.6 – deduplicate the same recorded HealthKit session
 
 Watch completion relays may arrive twice after reconnection, sometimes with a different transfer receipt ID even though the saved HKWorkout UUID is identical. AppleWatchConnectionStore now compares the actual recorded HealthKit UUID, or the original ATHLTH universal ID when HealthKit UUID is missing. Handled source identities survive app restart in a separate backward-compatible local list, and recovered pending queues collapse repeated copies before they can create duplicate calendar, strength or workout history. Legacy results with no source identity still use the prior receipt-only guard. Receipts continue to be saved before queue dedup. Targeted XCTest now includes source-owner/offline-queue regressions. No secondary HealthKit writer or history migration.

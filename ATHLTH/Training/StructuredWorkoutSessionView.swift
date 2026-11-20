@@ -808,8 +808,11 @@ struct StructuredWorkoutSessionView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
-                if let route = currentLiveRoute {
-                    Label(route.engine.title, systemImage: route.engine.systemImage)
+                if currentLiveRoute != nil {
+                    Label(
+                        ATHLTHWorkoutSportMode.forBlock(block).title,
+                        systemImage: ATHLTHWorkoutSportMode.forBlock(block).systemImage
+                    )
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                     Spacer()
@@ -1038,7 +1041,45 @@ struct StructuredWorkoutSessionView: View {
             }
 
         case .mobility, .instructions:
-            EmptyView()
+            // A tagged HIIT, rowing, yoga or circuit block is a real
+            // planned activity, not a free-text instruction. Show only
+            // saved targets; never present them as observed HR or distance.
+            if ATHLTHWorkoutSportMode.forBlock(block).showsPlannedTargets {
+                HStack(spacing: 12) {
+                    if let seconds = block.durationSeconds,
+                       seconds.isFinite, seconds > 0 {
+                        Label("\(Int(seconds / 60)) min", systemImage: "clock")
+                    }
+                    if let meters = block.distanceMeters,
+                       meters.isFinite, meters > 0 {
+                        Label(String(format: "%.2f km mål", meters / 1000),
+                              systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+                    }
+                    if let normalized = block.sourceIntensityZoneLabel {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Zone \(normalized)",
+                                norwegian: "Sone \(normalized)"
+                            ),
+                            systemImage: "heart"
+                        )
+                    } else if let zone = block.targetHeartRateZone,
+                              (1...5).contains(zone) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Zone \(zone)", norwegian: "Sone \(zone)"
+                            ),
+                            systemImage: "heart"
+                        )
+                    }
+                    if let effort = block.targetEffortRPE,
+                       (1...10).contains(effort) {
+                        Label("RPE \(effort)/10", systemImage: "gauge")
+                    }
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.72))
+            }
         }
     }
 
@@ -1263,7 +1304,9 @@ struct StructuredWorkoutSessionView: View {
                                     english: "Complete block",
                                     norwegian: "Fullfør blokk"
                                 )
-                                : (currentLiveRoute?.engine.nextActionTitle ??
+                                : (currentBlock.map {
+                                    ATHLTHWorkoutSportMode.forBlock($0).nextActionTitle
+                                } ??
                                     ATHLTHLocalization.choose(
                                         english: "Complete & next",
                                         norwegian: "Fullfør og neste"

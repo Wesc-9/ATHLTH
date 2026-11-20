@@ -94,28 +94,7 @@ struct ATHLTHLiveWorkoutTransition: Hashable {
 enum ATHLTHLiveWorkoutEngineRouter {
     static func engine(for block: WorkoutTemplateBlock)
         -> ATHLTHLiveWorkoutEngine {
-        switch block.kind {
-        case .run:
-            return .endurance
-        case .exercise:
-            return .strength
-        case .rest:
-            return .recovery
-        case .note:
-            if let sport = ATHLTHWorkoutActivityTagPolicy.activity(for: block) {
-                switch sport {
-                case .cycling: return .cycling
-                case .rowing, .stairClimber: return .endurance
-                case .mobility, .yoga: return .mobility
-                case .hiit, .circuit, .functional, .sports, .other:
-                    return .instructions
-                }
-            }
-            if block.wellnessKind != nil {
-                return .mobility
-            }
-            return .instructions
-        }
+        ATHLTHWorkoutSportMode.forBlock(block).engine
     }
 
     static func route(

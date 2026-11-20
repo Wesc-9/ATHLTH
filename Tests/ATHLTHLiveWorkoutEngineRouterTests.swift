@@ -229,4 +229,42 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
         ))
     }
 
+
+    func testAllSportTagsShareOneRouterWithSpecificPresentation() throws {
+        let sportTags: [(String, ATHLTHWorkoutSportMode, ATHLTHLiveWorkoutEngine)] = [
+            ("cycling", .cycling, .cycling),
+            ("rowing", .rowing, .endurance),
+            ("stairClimber", .stairClimber, .endurance),
+            ("hiit", .hiit, .instructions),
+            ("circuit", .circuit, .instructions),
+            ("functional", .functional, .instructions),
+            ("yoga", .yoga, .mobility),
+            ("mobility", .mobility, .mobility),
+            ("sports", .sports, .instructions),
+            ("other", .other, .instructions)
+        ]
+        let workoutID = UUID()
+        for (tag, expectedMode, expectedEngine) in sportTags {
+            var block = self.block(tag, kind: .note, sequence: 1)
+            block.activityTag = tag
+            let mode = ATHLTHWorkoutSportMode.forBlock(block)
+            XCTAssertEqual(mode, expectedMode, tag)
+            XCTAssertEqual(ATHLTHLiveWorkoutEngineRouter.engine(for: block),
+                           expectedEngine, tag)
+            XCTAssertFalse(mode.title.isEmpty, tag)
+            XCTAssertFalse(mode.systemImage.isEmpty, tag)
+            XCTAssertTrue(mode.showsPlannedTargets, tag)
+            let route = try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
+                workoutID: workoutID, blocks: [block], index: 0
+            ))
+            XCTAssertEqual(route.workoutID, workoutID, tag)
+        }
+
+        let text = block("Instruction", kind: .note, sequence: 1)
+        XCTAssertEqual(ATHLTHWorkoutSportMode.forBlock(text), .instructions)
+        XCTAssertFalse(ATHLTHWorkoutSportMode.forBlock(text).showsPlannedTargets)
+        XCTAssertEqual(ATHLTHWorkoutSportMode(category: "stair_climbing"),
+                       .stairClimber)
+    }
+
 }

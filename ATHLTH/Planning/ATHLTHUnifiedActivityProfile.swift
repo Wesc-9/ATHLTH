@@ -33,6 +33,125 @@ enum ATHLTHWorkoutActivityTagPolicy {
     }
 }
 
+ 
+/// Sport-specific presentation and target policy for the ONE existing
+/// workout timeline. Does not allocate a HealthKit session, save a workout,
+/// or claim that a planned metric was measured by a sensor.
+enum ATHLTHWorkoutSportMode: Equatable {
+    case running, walking, strength, cycling, rowing, stairClimber
+    case hiit, circuit, functional, yoga, mobility, sports, other
+    case recovery, instructions
+
+    init(category: String) {
+        let normalized = category.lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+        switch normalized {
+        case "running", "treadmill": self = .running
+        case "walking", "hiking": self = .walking
+        case "strength": self = .strength
+        case "cycling", "biking", "bicycle": self = .cycling
+        case "rowing", "row": self = .rowing
+        case "stairclimber", "stairclimbing", "stairs": self = .stairClimber
+        case "hiit": self = .hiit
+        case "circuit", "circuittraining": self = .circuit
+        case "functional", "functionaltraining": self = .functional
+        case "yoga": self = .yoga
+        case "mobility", "stretching", "meditation": self = .mobility
+        case "sports", "sport": self = .sports
+        case "recovery", "rest": self = .recovery
+        case "instructions", "note": self = .instructions
+        default: self = .other
+        }
+    }
+
+    static func forBlock(_ block: WorkoutTemplateBlock) -> Self {
+        switch block.kind {
+        case .run:
+            return block.cardioActivity == .walking ? .walking : .running
+        case .exercise:
+            return .strength
+        case .rest:
+            return .recovery
+        case .note:
+            if let activity = ATHLTHWorkoutActivityTagPolicy.activity(for: block) {
+                return Self(category: activity.rawValue)
+            }
+            return block.wellnessKind == nil ? .instructions : .mobility
+        }
+    }
+
+    /// Existing capture engines stay authoritative. A sport changes the
+    /// controls shown to the athlete, never the recording owner.
+    var engine: ATHLTHLiveWorkoutEngine {
+        switch self {
+        case .running, .walking, .rowing, .stairClimber: return .endurance
+        case .strength: return .strength
+        case .cycling: return .cycling
+        case .yoga, .mobility: return .mobility
+        case .recovery: return .recovery
+        case .hiit, .circuit, .functional, .sports, .other, .instructions:
+            return .instructions
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .walking: return ATHLTHLocalization.choose(english: "Walking", norwegian: "Gåing")
+        case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        case .cycling: return ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
+        case .rowing: return ATHLTHLocalization.choose(english: "Rowing", norwegian: "Roing")
+        case .stairClimber: return ATHLTHLocalization.choose(english: "Stair climbing", norwegian: "Trappetrening")
+        case .hiit: return "HIIT"
+        case .circuit: return ATHLTHLocalization.choose(english: "Circuit training", norwegian: "Sirkeltrening")
+        case .functional: return ATHLTHLocalization.choose(english: "Functional training", norwegian: "Funksjonell trening")
+        case .yoga: return "Yoga"
+        case .mobility: return ATHLTHLocalization.choose(english: "Mobility", norwegian: "Bevegelighet")
+        case .sports: return ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett")
+        case .other: return ATHLTHLocalization.choose(english: "Other workout", norwegian: "Annen trening")
+        case .recovery: return ATHLTHLocalization.choose(english: "Recovery", norwegian: "Pause")
+        case .instructions: return ATHLTHLocalization.choose(english: "Instructions", norwegian: "Veiledning")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .running: return "figure.run"
+        case .walking: return "figure.walk"
+        case .strength: return "dumbbell.fill"
+        case .cycling: return "bicycle"
+        case .rowing: return "figure.rower"
+        case .stairClimber: return "figure.stairs"
+        case .hiit: return "timer"
+        case .circuit: return "repeat"
+        case .functional: return "figure.strengthtraining.functional"
+        case .yoga: return "figure.yoga"
+        case .mobility: return "figure.cooldown"
+        case .sports: return "sportscourt"
+        case .other: return "figure.mixed.cardio"
+        case .recovery: return "pause.circle"
+        case .instructions: return "text.alignleft"
+        }
+    }
+
+    var nextActionTitle: String {
+        switch self {
+        case .strength:
+            return ATHLTHLocalization.choose(english: "Complete set & next", norwegian: "Fullfør sett og neste")
+        case .running, .walking, .cycling, .rowing, .stairClimber,
+             .hiit, .circuit, .functional:
+            return ATHLTHLocalization.choose(english: "Complete interval & next", norwegian: "Fullfør intervall og neste")
+        case .recovery:
+            return ATHLTHLocalization.choose(english: "End rest & next", norwegian: "Avslutt pause og neste")
+        case .yoga, .mobility, .sports, .other, .instructions:
+            return ATHLTHLocalization.choose(english: "Next step", norwegian: "Neste del")
+        }
+    }
+
+    /// Bare instruction blocks must not display a made-up exercise target.
+    var showsPlannedTargets: Bool { self != .instructions }
+}
+
 struct ATHLTHUnifiedActivityProfile: Equatable {
     let category: String
     let workoutKind: WorkoutKind

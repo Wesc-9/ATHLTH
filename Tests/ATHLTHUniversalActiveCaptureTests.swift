@@ -541,4 +541,18 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         ))
     }
 
+
+    func testManualModesUseTheSameSportMappingAsStructuredBlocks() throws {
+        for activity in CustomQuickWorkoutActivity.allCases {
+            let mode = ATHLTHWorkoutSportMode(category: activity.rawValue)
+            let original = timer(activity: activity, resumedAt: started)
+            let state = try XCTUnwrap(ATHLTHUniversalActiveCapture.manual(
+                original, at: started.addingTimeInterval(30)
+            ))
+            XCTAssertEqual(state.engine, mode.engine)
+            XCTAssertEqual(state.workoutID, original.id)
+            XCTAssertFalse(mode.title.isEmpty)
+        }
+    }
+
 }

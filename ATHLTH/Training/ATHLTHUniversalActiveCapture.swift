@@ -105,14 +105,7 @@ enum ATHLTHUniversalActiveCapture {
             return nil
         }
         let category = checkpoint.activity.rawValue
-        let activityEngine: ATHLTHLiveWorkoutEngine
-        switch checkpoint.activity {
-        case .cycling: activityEngine = .cycling
-        case .rowing, .stairClimber: activityEngine = .endurance
-        case .mobility, .yoga: activityEngine = .mobility
-        case .hiit, .circuit, .functional, .sports, .other:
-            activityEngine = .instructions
-        }
+        let activityEngine = ATHLTHWorkoutSportMode(category: category).engine
 
         let elapsed = checkpoint.elapsed(at: now)
         guard let timeline = ATHLTHCustomWorkoutTimeline.state(
@@ -206,19 +199,19 @@ enum ATHLTHUniversalActiveCapture {
             id = original
         }
         let category: String
-        let engine: ATHLTHLiveWorkoutEngine
         switch snapshot.kind {
-        case .running: category = "running"; engine = .endurance
-        case .walking: category = "walking"; engine = .endurance
-        case .strength: category = "strength"; engine = .strength
-        case .cycling: category = "cycling"; engine = .cycling
-        case .rowing: category = "rowing"; engine = .endurance
-        case .stairClimbing: category = "stairclimber"; engine = .endurance
-        case .hiit: category = "hiit"; engine = .instructions
-        case .functional: category = "functional"; engine = .instructions
-        case .yoga: category = "yoga"; engine = .mobility
-        case .other: category = "other"; engine = .instructions
+        case .running: category = "running"
+        case .walking: category = "walking"
+        case .strength: category = "strength"
+        case .cycling: category = "cycling"
+        case .rowing: category = "rowing"
+        case .stairClimbing: category = "stairclimber"
+        case .hiit: category = "hiit"
+        case .functional: category = "functional"
+        case .yoga: category = "yoga"
+        case .other: category = "other"
         }
+        let engine = ATHLTHWorkoutSportMode(category: category).engine
         let endurance = snapshot.kind == .running || snapshot.kind == .walking
         let index = endurance ? snapshot.runningStepIndex : nil
         let count = endurance ? snapshot.runningStepCount : nil
