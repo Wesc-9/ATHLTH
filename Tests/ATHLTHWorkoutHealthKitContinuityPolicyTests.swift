@@ -89,4 +89,40 @@ final class ATHLTHWorkoutHealthKitContinuityPolicyTests: XCTestCase {
             )
         }
     }
+
+    func testWatchSecondStartCannotResetActiveWorkoutForAnySport() {
+        for kind in WatchWorkoutKind.allCases {
+            XCTAssertTrue(
+                ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+                    active: false, preparing: false,
+                    ending: false, finishing: false
+                ), kind.rawValue
+            )
+            XCTAssertFalse(
+                ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+                    active: true, preparing: false,
+                    ending: false, finishing: false
+                ), kind.rawValue
+            )
+            XCTAssertFalse(
+                ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+                    active: false, preparing: true,
+                    ending: false, finishing: false
+                ), kind.rawValue
+            )
+            XCTAssertFalse(
+                ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+                    active: false, preparing: false,
+                    ending: true, finishing: false
+                ), kind.rawValue
+            )
+            XCTAssertFalse(
+                ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+                    active: false, preparing: false,
+                    ending: false, finishing: true
+                ), kind.rawValue
+            )
+        }
+    }
+
 }

@@ -316,6 +316,20 @@ struct WatchRouteTransfer: Identifiable, Codable, Hashable {
 /// recovery intervals must never be translated to a workout-session pause.
 /// Global pause remains a deliberate action; automatic pause is limited to
 /// outdoor running/walking when the athlete enables it.
+/// Reject a second Watch START before altering the active source session's
+/// route, Audio Coach, strength queue, owner or recovery checkpoint.
+/// This is a preflight only; HealthKit remains the single recorder.
+enum ATHLTHWatchWorkoutStartAdmissionPolicy {
+    static func canPrepare(
+        active: Bool,
+        preparing: Bool,
+        ending: Bool,
+        finishing: Bool
+    ) -> Bool {
+        !active && !preparing && !ending && !finishing
+    }
+}
+
 enum ATHLTHWorkoutHealthKitContinuityPolicy {
     static func supportsAutomaticPause(_ kind: WatchWorkoutKind) -> Bool {
         kind == .running || kind == .walking

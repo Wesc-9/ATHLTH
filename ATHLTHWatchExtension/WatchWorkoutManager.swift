@@ -3864,10 +3864,27 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         route: WatchRouteTransfer? = nil,
         indoor: Bool? = nil
     ) async {
+        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+            active: isActive,
+            preparing: state == .preparing,
+            ending: state == .ending,
+            finishing: finishing
+        ) else { return }
+
         guard await localWorkoutStartAllowed()
         else {
             return
         }
+
+        // A new start may have claimed the session while we awaited
+        // iPhone connectivity. Do not reset another live workout.
+        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+            active: isActive,
+            preparing: state == .preparing,
+            ending: state == .ending,
+            finishing: finishing
+        ) else { return }
+
 
         workoutInitiatedLocallyOnWatch = true
 
@@ -4085,10 +4102,27 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil
     ) async {
+        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+            active: isActive,
+            preparing: state == .preparing,
+            ending: state == .ending,
+            finishing: finishing
+        ) else { return }
+
         guard await localWorkoutStartAllowed()
         else {
             return
         }
+
+        // A new start may have claimed the session while we awaited
+        // iPhone connectivity. Do not reset another live workout.
+        guard ATHLTHWatchWorkoutStartAdmissionPolicy.canPrepare(
+            active: isActive,
+            preparing: state == .preparing,
+            ending: state == .ending,
+            finishing: finishing
+        ) else { return }
+
 
         workoutInitiatedLocallyOnWatch = true
         activeRelayRequestID = nil

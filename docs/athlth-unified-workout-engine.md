@@ -1,3 +1,9 @@
+## 2.2.6 – Apple Watch: ingen nullstilling av pågående økt ved dobbel start
+
+- Både vanlig og forhåndslastet lokal Watch-start sjekker nå én felles startsperre FØR de nullstiller lydcoach, rute, styrkekø, eierskap eller treningsplan. Sperren gjentas etter et asynkront svar fra iPhone; dermed kan ikke et sent dobbelttrykk korrupttere et allerede aktivt originalt HKWorkoutSession.
+- Samme regel gjelder løp, gå, styrke, sykling, roing, HIIT, funksjonell trening, trappetrening, yoga og øvrige Watch-aktiviteter. Original HealthKit-sesjon, én workout UUID og avslutningsdelegaten berøres ikke.
+- Stateløs policy har regresjonstest for samtlige Watch-aktiviteter og alle opptatte oppstartstilstander. Full WatchOS-bygg og fysisk test kreves fortsatt.
+
 ## 2.2.6 – én ekte opptakssperre ved fjernstart, ikke egne UI-varianter
 
 - Mottak av iPad-fjernstart bruker nå `ATHLTHUniversalWorkoutAdmission.isOccupied` i stedet for ad hoc-sjekker av bare PhoneWorkout, StrengthWorkout og WatchMirror. En gjenopprettet strukturert økt, aktiv manuell tidtaker, iPhone pending launch og Watch-start før speiling blokkerer samme nye opptaksplass før eventuelle relay-sideeffekter.
