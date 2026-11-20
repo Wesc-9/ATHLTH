@@ -728,12 +728,11 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
     }
 
     func testStructuredWellnessKeepsActiveYogaAndMeditationIdentity() throws {
-        for (kind, expected) in [
-            (WorkoutWellnessKind.yoga, "yoga"),
-            (.meditation, "meditation")
+        for (isYoga, expected) in [
+            (true, "yoga"), (false, "meditation")
         ] {
             var stage = block(kind: .note, sequence: 1)
-            stage.wellnessKind = kind
+            stage.wellnessKind = isYoga ? .yoga : .meditation
             let workoutID = UUID()
             let checkpoint = ATHLTHStructuredWorkoutCheckpoint(
                 workoutID: workoutID, savedAt: started,
