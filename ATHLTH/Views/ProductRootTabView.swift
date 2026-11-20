@@ -9947,25 +9947,48 @@ struct ATHLTHTrainView: View {
                 defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
                 let initiatingAccount = session.profile.userID
 
-                // Validate the original workout's route before sending any
-                // Watch state or starting HealthKit. Quick free run may
-                // instead use an explicitly selected personal route.
+                // Advanced Quick Run is already a complete saved Plan
+                // timeline. Never silently replace it with the free or
+                // library-only WatchRunningWorkoutTransfer.
+                let advanced = configuration.advancedWorkout
+                if let advanced {
+                    try ATHLTHWorkoutCaptureAdmission
+                        .requireSupportedEnduranceCapture(
+                            for: advanced,
+                            expectedKind: .running,
+                            device: .appleWatch
+                        )
+                }
                 let original = configuration.workout
-                let route: TrainingRoute?
-                if let source = original {
-                    route = source.routeID.flatMap { routeID in
-                        configuration.route?.id == routeID
-                            ? configuration.route
-                            : session.savedRoutes.first { $0.id == routeID }
-                    }
+                let isIndoor = configuration.environment != .outdoor
+
+                // Advanced Quick Run may explicitly choose a route even if
+                // the draft has none. A library template instead owns its
+                // saved route unconditionally. Both retain their original
+                // identity and fail closed if that route cannot be found.
+                let canonicalRouteID: UUID?
+                if let advanced {
+                    canonicalRouteID = advanced.routeID ??
+                        configuration.route?.id
                 } else {
-                    route = configuration.route
+                    canonicalRouteID = original?.routeID
+                }
+                let sourceExists = advanced != nil || original != nil
+                let route: TrainingRoute?
+                if let canonicalRouteID {
+                    route = configuration.route?.id == canonicalRouteID
+                        ? configuration.route
+                        : session.savedRoutes.first {
+                            $0.id == canonicalRouteID
+                        }
+                } else {
+                    route = sourceExists ? nil : configuration.route
                 }
                 guard ATHLTHWatchRunRoutePolicy.matchesSource(
-                    hasSourceWorkout: original != nil,
-                    sourceRouteID: original?.routeID,
+                    hasSourceWorkout: sourceExists,
+                    sourceRouteID: canonicalRouteID,
                     selectedRouteID: route?.id
-                ) else {
+                ), (!isIndoor || route == nil) else {
                     watchTransferError = ATHLTHLocalization.choose(
                         english: "The saved running route is missing or has changed.",
                         norwegian: "Den lagrede løperuten mangler eller er endret."
@@ -9983,7 +10006,16 @@ struct ATHLTHTrainView: View {
                 watchConnection.sendAudioCoachConfiguration(
                     configuration.audioCoach
                 )
-                if let source = original {
+                if let advanced {
+                    // Preserve ALL ordered Advanced stages, pace/HR zones,
+                    // rests and distance goals from the canonical plan.
+                    let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+                        from: advanced,
+                        routeAlerts: settings.routeAlertConfiguration,
+                        autoPauseEnabled: configuration.autoPauseEnabled
+                    )
+                    watchConnection.sendRunningWorkout(transfer)
+                } else if let source = original {
                     var transfer = watchRunningWorkoutTransfer(from: source)
                     transfer.routeAlerts = settings.routeAlertConfiguration
                     transfer.autoPauseEnabled = configuration.autoPauseEnabled
@@ -9999,7 +10031,9 @@ struct ATHLTHTrainView: View {
                     )
                 }
                 // The original recipe is now queued before Watch starts.
-                try await watchConnection.startWorkoutOnWatch(.running)
+                try await watchConnection.startWorkoutOnWatch(
+                    .running, indoor: isIndoor
+                )
                 guard session.profile.userID == initiatingAccount else {
                     await social.markCurrentJoinedWorkoutLaunchFailed()
                     watchTransferError = ATHLTHLocalization.choose(

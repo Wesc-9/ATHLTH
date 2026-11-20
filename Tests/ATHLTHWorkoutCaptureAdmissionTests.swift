@@ -28,6 +28,37 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         return workout
     }
 
+    func testAdvancedQuickRunWatchKeepsEveryOrderedPlanStageAndRejectsHybrid() throws {
+        let planned = session(.running, blocks: [
+            block(.run, sequence: 1),
+            block(.rest, sequence: 2),
+            block(.run, sequence: 3)
+        ])
+        XCTAssertNoThrow(try ATHLTHWorkoutCaptureAdmission
+            .requireSupportedEnduranceCapture(
+                for: planned, expectedKind: .running,
+                device: .appleWatch
+            ))
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: planned, routeAlerts: .standard,
+            autoPauseEnabled: false
+        )
+        XCTAssertEqual(transfer.sourceWorkoutID, planned.id)
+        XCTAssertEqual(transfer.steps.count, 3,
+                       "Advanced Quick Run cannot flatten intervals into free running")
+        XCTAssertEqual(transfer.steps[1].phase, "recovery")
+        XCTAssertEqual(transfer.steps[0].durationSeconds, 300)
+
+        let hybrid = session(.running, blocks: [
+            block(.run, sequence: 1), block(.exercise, sequence: 2)
+        ])
+        XCTAssertThrowsError(try ATHLTHWorkoutCaptureAdmission
+            .requireSupportedEnduranceCapture(
+                for: hybrid, expectedKind: .running,
+                device: .appleWatch
+            ), "Unsupported hybrid must not masquerade as free Watch running")
+    }
+
     func testWatchRunPreflightNeverReplacesSavedRouteOrStartsWithoutIt() {
         let originalRoute = UUID(), unrelatedRoute = UUID()
         XCTAssertTrue(ATHLTHWatchRunRoutePolicy.matchesSource(

@@ -1,3 +1,10 @@
+## 2.2.6 – Advanced Quick Run overfører hele Watch-oppskriften
+
+- `ATHLTHTrainView.startRunQuickWorkout` prioriterer nå den faktiske `RunQuickStartConfiguration.advancedWorkout` foran en eventuell enkel `RunningWorkoutTemplate` og foran fri løp. Før HealthKit-start valideres hele Advanced-oppskriften mot den eksisterende, godkjente `watchEndurance`-recorderen; en blandet/ikke-støttet økt avvises i stedet for å startes som «Free Run».
+- Den originale `PlannedWorkoutWatchBuilder.runningTransfer` sender alle trinn med recovery, varighet, distanse, pace/puls og kildeplan-ID før Watch-økten starter. Rute hentes kanonisk fra Advanced-planen, med eksplisitt valgt Quick-rute som fallback når Advanced-utkastet selv mangler rute. Biblioteksplanens rute kan ikke overskrives av tilfeldig valgt Quick-rute.
+- HealthKit-start får nå `indoor` ut fra Quick-treningsmiljøet, så tredemølle/innendørs ikke blir registrert som utendørs GPS bare fordi Watch-kilden heter «running». En innendørs økt med motstridende utespor avvises.
+- Regresjonstest sjekker opprinnelig plan-ID, tre økttrinn inklusive pause med 300 sekunder og at run+strength som ikke passer Watch-endurance avvises. Samme-commit iOS/iPad/watchOS og fysisk Watch-fullføring gjenstår; dette lager ingen ny HealthKit-writer.
+
 ## 2.2.6 – kanoniske løperuter og Coach før HealthKit-start
 
 - Watch-oppstart fra **Advanced Quick Run** og løpeøkter i **Bibliotek** gjør nå hele asynkrone preflight i én global `reserveLaunch`-transaksjon: kontroller original lagret rute, send riktig rute/eller eksplisitt null, send valgt Audio Coach og original intervalloppskrift, deretter start **én** Watch HealthKit-workout. Det tidligere opplegget sendte intervaller og coach først **etter** at Watch startet, og kunne miste planlagte trinn på første live-frame.
