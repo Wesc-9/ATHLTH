@@ -812,4 +812,24 @@ final class ATHLTHWorkoutSessionFoundationTests: XCTestCase {
             watchSessionID: UUID()
         ))
     }
+    func testActiveWatchBeforeMirroringOccupiesSingleSlot() {
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+            running: nil, runningAuthorizationPending: false, strength: nil,
+            remoteWatchRecordingActive: true
+        ))
+        XCTAssertFalse(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+            running: nil, runningAuthorizationPending: false, strength: nil,
+            mirroredWatchRecordingActive: true
+        ))
+        XCTAssertTrue(ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
+            running: nil, runningAuthorizationPending: false, strength: nil
+        ))
+    }
+
+    @MainActor
+    func testArbiterRegistersOriginalWatchConnectionWithoutExtraRecording() {
+        let connection = AppleWatchConnectionStore()
+        XCTAssertTrue(ATHLTHWorkoutRecordingArbiter.watchConnection === connection)
+    }
+
 }

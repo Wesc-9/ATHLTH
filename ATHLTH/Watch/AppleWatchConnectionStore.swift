@@ -334,6 +334,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
     override init() {
         super.init()
+        ATHLTHWorkoutRecordingArbiter.watchConnection = self
 
         if let data = UserDefaults.standard.data(
             forKey: Self.relayCompletionReceiptsKey

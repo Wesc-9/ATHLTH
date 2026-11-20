@@ -104,6 +104,7 @@ enum ATHLTHUniversalWorkoutAdmission {
         ATHLTHManualTimedCapture.hasActiveCapture ||
         ATHLTHStructuredCaptureAdmission.hasActiveCapture ||
         ATHLTHWorkoutRecordingArbiter.hasPendingLaunch ||
+        ATHLTHWorkoutRecordingArbiter.unmirroredWatchRecordingActive ||
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive ||
         ATHLTHWorkoutRecordingArbiter.mirror?.hasActiveMirroredWorkout == true ||
         remoteWatchActive

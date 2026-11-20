@@ -62,6 +62,13 @@ enum ATHLTHWorkoutRecordingArbiter {
     static weak var phone: IPhoneWorkoutStore?
     static weak var strength: StrengthWorkoutStore?
     static weak var mirror: WorkoutMirroringStore?
+    // Watch HealthKit may be recording before iPhone mirroring attaches.
+    static weak var watchConnection: AppleWatchConnectionStore?
+
+    static var unmirroredWatchRecordingActive: Bool {
+        watchConnection?.hasActiveWatchWorkout == true ||
+            watchConnection?.workoutLaunchInProgress == true
+    }
 
     private static var mirroredRecordingActive: Bool {
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive ||
@@ -81,13 +88,15 @@ enum ATHLTHWorkoutRecordingArbiter {
 
     static func reserveLaunch() throws -> UUID {
         guard pendingLaunchID == nil,
+              !unmirroredWatchRecordingActive,
               !ATHLTHManualTimedCapture.hasActiveCapture,
               !ATHLTHStructuredCaptureAdmission.hasActiveCapture,
               ATHLTHWorkoutSessionFoundation.isRecordingSlotAvailable(
                   running: phone?.activeSessionState,
                   runningAuthorizationPending: phone?.hasPendingLaunch == true,
                   strength: strength?.activeSessionState,
-                  mirroredWatchRecordingActive: mirroredRecordingActive
+                  mirroredWatchRecordingActive: mirroredRecordingActive,
+                  remoteWatchRecordingActive: unmirroredWatchRecordingActive
               ) else {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
@@ -106,6 +115,7 @@ enum ATHLTHWorkoutRecordingArbiter {
         !ATHLTHManualTimedCapture.hasActiveCapture &&
             !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
             strength?.activeSessionState == nil &&
+            (!unmirroredWatchRecordingActive || pendingLaunchID != nil) &&
             (!mirroredRecordingActive || pendingLaunchID != nil)
     }
 
@@ -114,6 +124,7 @@ enum ATHLTHWorkoutRecordingArbiter {
             !ATHLTHStructuredCaptureAdmission.hasActiveCapture &&
             phone?.activeSessionState == nil &&
             phone?.hasPendingLaunch != true &&
+            (!unmirroredWatchRecordingActive || pendingLaunchID != nil) &&
             (!mirroredRecordingActive || pendingLaunchID != nil)
     }
 
@@ -146,10 +157,12 @@ enum ATHLTHWorkoutSessionFoundation {
         running: ATHLTHWorkoutSessionState?,
         runningAuthorizationPending: Bool,
         strength: ATHLTHWorkoutSessionState?,
-        mirroredWatchRecordingActive: Bool = false
+        mirroredWatchRecordingActive: Bool = false,
+        remoteWatchRecordingActive: Bool = false
     ) -> Bool {
         running == nil && !runningAuthorizationPending &&
-            strength == nil && !mirroredWatchRecordingActive
+            strength == nil && !mirroredWatchRecordingActive &&
+            !remoteWatchRecordingActive
     }
 
     /// Never reinterpret a mirrored run or another strength workout

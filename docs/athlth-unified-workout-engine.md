@@ -1,3 +1,7 @@
+## 2.2.6 – one shared recording slot including pre-mirror Watch activity
+
+The global recording arbiter now observes the original AppleWatchConnectionStore through a weak reference. An active Watch HealthKit workout or launch preflight occupies the same recording slot before iPhone mirroring appears. iPhone run/walk, strength, calendar and Quick Train retain the original launch reservation. The identity-matching Watch strength recovery exception remains. Tests cover the pre-mirror occupied slot. No new HealthKit writer or duplicated history.
+
 ## 2.2.6 – konto-sperre ved universell Watch-gjenoppretting
 
 Universell lokal øktprojeksjon krever nå bekreftet opprinnelig Watch-eier lik aktivt kontobruker-ID før et Watch-livespeil blir returnert. Et loginskifte eller et eldre Watch-snapshot uten lagret eier gir ikke tilgang til forrige brukers treningsdata, og opptaksplassen blir fortsatt behandlet som opptatt i stedet for å starte ny økt. Test dekker samme konto, annen konto og manglende eierbevis. Ingen ekstra HealthKit-writer.
