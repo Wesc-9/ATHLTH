@@ -961,6 +961,15 @@ struct AppRootView: View {
             Date().addingTimeInterval(20)
 
         let envelope = command.envelope
+        guard ATHLTHDeviceRelayPlanLinkPolicy.allows(
+            kind: envelope.kind,
+            planID: envelope.plannedPlanID,
+            sessionID: envelope.plannedSessionID
+        ) else {
+            throw ATHLTHWorkoutCaptureAdmission.Rejection
+                .requiresDedicatedActivityCapture
+        }
+        let isLinkedPlan = envelope.plannedSessionID != nil
         let payload = envelope.workoutPayload
         let captureDevice =
             envelope.target.captureDevice
@@ -972,7 +981,7 @@ struct AppRootView: View {
                     .resolvedRunningWorkouts
                     .first
             let hasTimeline = !payload.workout.resolvedWorkoutBlocks.isEmpty
-            if hasTimeline,
+            if !isLinkedPlan, hasTimeline,
                let issue = ATHLTHQuickRunTimelineAdapter.validationError(
                     for: payload.workout
                ) {
@@ -981,11 +990,14 @@ struct AppRootView: View {
                     userInfo: [NSLocalizedDescriptionKey: issue]
                 )
             }
+            // A relayed invite is only a transport snapshot. The original
+            // planned session is resolved from the current account on iPhone.
             let advancedWorkout: PlannedSession? =
-                hasTimeline ? payload.workout : nil
+                !isLinkedPlan && hasTimeline ? payload.workout : nil
 
             let mode: RunQuickStartMode
-            if runningWorkout != nil || advancedWorkout != nil {
+            if isLinkedPlan || runningWorkout != nil ||
+                advancedWorkout != nil {
                 mode = .structured
             } else if payload.route != nil {
                 mode = .route
@@ -997,7 +1009,7 @@ struct AppRootView: View {
                 RunQuickStartConfiguration(
                     mode: mode,
                     route: payload.route,
-                    workout: runningWorkout,
+                    workout: isLinkedPlan ? nil : runningWorkout,
                     captureDevice: captureDevice,
                     environment:
                         envelope.runEnvironment ??
@@ -1054,6 +1066,8 @@ struct AppRootView: View {
                         ghostRace,
                     workoutMirroring:
                         workoutMirroring,
+                    plannedPlanID: envelope.plannedPlanID,
+                    plannedSessionID: envelope.plannedSessionID,
                     relayRequestID: envelope.clientRequestID
                 )
 
@@ -1098,6 +1112,9 @@ struct AppRootView: View {
                         spotifyPlayback,
                     workoutMirroring:
                         workoutMirroring,
+                    plannedPlanID: envelope.plannedPlanID,
+                    plannedSessionID: envelope.plannedSessionID,
+                    session: appSession,
                     relayRequestID: envelope.clientRequestID
                 )
 

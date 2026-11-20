@@ -1,3 +1,10 @@
+## 2.2.6 – ende-til-ende bevaring av plan-ID ved iPad-fjernstart
+
+- Original `plannedPlanID` og `plannedSessionID` følger nå de eksisterende versjon-1-relémeldingene for Quick Run og Quick Walk. Mottaker-iPhone krever begge eller ingen, og sender dem videre til original `WorkoutLaunchCoordinator`, som kontrollerer sport og faktisk eksisterende plan før opptak.
+- For en planbundet fjernstart vil en eldre/kopiert inviteringsplan ikke erstatte den kanoniske treningsplanens deløkter; original plan på telefon er fasit. Manglende original plan betyr avvisning, aldri fri økt.
+- Vanlig Free Run/Walk og den eksisterende dedikerte styrkeflyten fungerer uten nye obligatoriske felt. Strukturerte blandingsopptak konverteres ikke til løping; ingen ekstra HealthKit-opptaker, sykkel-PR eller dupliserte historikkobjekter.
+- Tester validerer hele planlenken og avslår delvis og uautorisert oppstart. Full samme-commit build, Watch/iPad testing og faktisk HealthKit-verifikasjon gjenstår.
+
 ## 2.2.6 – effektiv og sikker iPad-rekonstruksjon
 
 - Når original strukturert livevisning fortsatt er åpen, benyttes siste bekreftede interne UI-status. Bare ved faktisk prosess-/scene-gjenoppretting dekodes original, kontotilhørende checkpoint fra disk. Slik unngår vi å dekode store intervallplaner hvert fjerde sekund ved vanlig iPhone-bruk.

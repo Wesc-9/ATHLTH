@@ -96,6 +96,10 @@ struct WorkoutDeviceRelayEnvelope:
     // Created on iPad and stored in both the server row and its payload.
     // Optional to decode commands queued by older releases.
     var clientRequestID: UUID? = nil
+    /// Original plan/session identity from iPad, not a generated invite ID.
+    /// Optional to retain decoding of legacy free-workout relays.
+    var plannedPlanID: UUID? = nil
+    var plannedSessionID: UUID? = nil
     let kind: WorkoutDeviceRelayKind
     let target: WorkoutDeviceRelayTarget
     let workoutPayload:
@@ -112,6 +116,21 @@ struct WorkoutDeviceRelayEnvelope:
         SpotifyPlaylistReference?
     let spotifyAutoplay: Bool
     let gearIDs: [UUID]
+}
+
+/// A remote planned run/walk must retain the WHOLE original plan link.
+enum ATHLTHDeviceRelayPlanLinkPolicy {
+    static func allows(
+        kind: WorkoutDeviceRelayKind,
+        planID: UUID?,
+        sessionID: UUID?
+    ) -> Bool {
+        guard ATHLTHPlannedLaunchIdentityPolicy.hasCompleteLink(
+            planID: planID, sessionID: sessionID
+        ) else { return false }
+        guard planID != nil else { return true }
+        return kind == .run || kind == .walk
+    }
 }
 
 struct WorkoutDeviceRelayCommand:

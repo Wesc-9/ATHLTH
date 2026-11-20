@@ -403,4 +403,31 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
         XCTAssertFalse(accepts(expiresAt: now))
     }
 
+
+    func testIPadRelayPlanLinkNeverFallsBackToFreeWorkout() {
+        let plan = UUID(), workout = UUID()
+        let policy = ATHLTHDeviceRelayPlanLinkPolicy.self
+        XCTAssertTrue(policy.allows(
+            kind: .run, planID: nil, sessionID: nil
+        ))
+        XCTAssertTrue(policy.allows(
+            kind: .walk, planID: nil, sessionID: nil
+        ))
+        XCTAssertTrue(policy.allows(
+            kind: .run, planID: plan, sessionID: workout
+        ))
+        XCTAssertTrue(policy.allows(
+            kind: .walk, planID: plan, sessionID: workout
+        ))
+        XCTAssertFalse(policy.allows(
+            kind: .run, planID: plan, sessionID: nil
+        ))
+        XCTAssertFalse(policy.allows(
+            kind: .walk, planID: nil, sessionID: workout
+        ))
+        XCTAssertFalse(policy.allows(
+            kind: .strength, planID: plan, sessionID: workout
+        ))
+    }
+
 }

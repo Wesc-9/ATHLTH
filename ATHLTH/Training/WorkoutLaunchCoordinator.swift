@@ -839,7 +839,7 @@ enum WorkoutLaunchCoordinator {
             )
         }
         if ATHLTHDeviceRole.isIPad {
-            let envelope =
+            var envelope =
                 WorkoutDeviceRelayEnvelope(
                     kind: .run,
                     target:
@@ -881,6 +881,8 @@ enum WorkoutLaunchCoordinator {
                             configuration.gearIDs
                         )
                 )
+            envelope.plannedPlanID = plannedPlanID
+            envelope.plannedSessionID = plannedSessionID
 
             try await WorkoutDeviceRelayStore
                 .shared
@@ -1350,7 +1352,7 @@ enum WorkoutLaunchCoordinator {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
         if ATHLTHDeviceRole.isIPad {
-            let envelope =
+            var envelope =
                 WorkoutDeviceRelayEnvelope(
                     kind: .walk,
                     target:
@@ -1380,6 +1382,8 @@ enum WorkoutLaunchCoordinator {
                             configuration.gearIDs
                         )
                 )
+            envelope.plannedPlanID = plannedPlanID
+            envelope.plannedSessionID = plannedSessionID
 
             try await WorkoutDeviceRelayStore
                 .shared
