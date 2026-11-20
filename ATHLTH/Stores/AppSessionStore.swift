@@ -126,6 +126,8 @@ final class AppSessionStore: ObservableObject {
     }
     private var loadingAccountContent = false
     private var accountContentSaveTask: Task<Void, Never>?
+    // Dismissing the error popup must not silently forgive an unsaved edit.
+    private var failedTrainingWriteNeedsRetry = false
     private var backendSubscriptionAccess: SubscriptionAccess
     private var storeEntitlement: StoreSubscriptionEntitlement?
 
@@ -2169,8 +2171,10 @@ final class AppSessionStore: ObservableObject {
             endedAt: nil,
             startedOnWatch: startedOnWatch
         )
+        // Do not acknowledge an account-scoped planned start or cancel its
+        // reminder until its calendar timestamp is actually committed.
+        guard checkpointTrainingContent() else { return false }
         PlannedWorkoutReminderScheduler.cancel(workoutID)
-        persistAccountContent(immediate: true)
         return true
     }
 
@@ -2244,8 +2248,9 @@ final class AppSessionStore: ObservableObject {
         }
         timing.endedAt = endedAt
         recordedPlannedWorkoutTimes[key] = timing
-        persistAccountContent(immediate: true)
-        return true
+        // Watch/HealthKit retains its own recorded workout independently.
+        // This receipt describes only the local planned-session timing.
+        return checkpointTrainingContent()
     }
 
     /// Watch completion has no mandatory calendar ID on older builds.
@@ -5832,11 +5837,13 @@ final class AppSessionStore: ObservableObject {
             ) {
                 ATHLTHTrainingDataChangeSignal.post(userID: userID)
             }
+            failedTrainingWriteNeedsRetry = false
             if trainingStorageError != nil {
                 trainingStorageError = nil
             }
             return true
         } catch {
+            failedTrainingWriteNeedsRetry = true
             // A missing save must not notify the cloud, reset the editor,
             // or be presented to the athlete as a successful checkpoint.
             // Keep the in-memory snapshot available for a manual retry.
@@ -5850,12 +5857,20 @@ final class AppSessionStore: ObservableObject {
     }
 
     func reloadTrainingContent() {
-        guard signedIn else { return }
+        guard signedIn,
+              blockedCorruptAccountID != profile.userID else { return }
+        // Reload would discard the current editor graph. A scheduled write
+        // or a previously failed save must be committed first. Dismissing
+        // the alert alone cannot turn failed data into a saved revision.
+        if accountContentSaveTask != nil || failedTrainingWriteNeedsRetry {
+            guard checkpointTrainingContent() else { return }
+        }
         localAccountID = nil
         activateLocalAccount(profile.userID)
     }
 
-    func checkpointTrainingContent() {
+    @discardableResult
+    func checkpointTrainingContent() -> Bool {
         persistAccountContent(immediate: true)
     }
 

@@ -240,6 +240,7 @@ struct ATHLTHPlanCreationDraftStore {
     var defaults: UserDefaults = .standard
     // Injection point for isolated tests; production uses Application Support.
     var directoryURL: URL? = nil
+    private static let maximumDraftBytes = 64_000_000
 
     private func legacyKey(userID: UUID) -> String {
         "athlth.planWizardDraft.v1.\(userID.uuidString)"
@@ -303,7 +304,7 @@ struct ATHLTHPlanCreationDraftStore {
         // (or a successful final Save) may remove saved work.
         guard draft.isRestorable() else { return false }
         guard let data = try? JSONEncoder().encode(draft),
-              data.count <= 64_000_000,
+              data.count <= Self.maximumDraftBytes,
               let destination = url(for: userID, draftID: draftID),
               let folder else { return false }
         do {
@@ -332,7 +333,12 @@ struct ATHLTHPlanCreationDraftStore {
         at date: Date = Date()
     ) -> ATHLTHPlanCreationDraft? {
         if let url = url(for: userID, draftID: draftID),
+           // Do not synchronously allocate an unexpectedly huge/corrupt
+           // file when Train restores a draft on its first frame.
+           let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+           size <= Self.maximumDraftBytes,
            let bytes = try? Data(contentsOf: url),
+           bytes.count <= Self.maximumDraftBytes,
            let draft = try? JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: bytes),
            draft.isRestorable(at: date) {
             return draft

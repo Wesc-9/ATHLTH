@@ -82,7 +82,9 @@ final class ATHLTHAccountStorageCommitTests: XCTestCase {
         XCTAssertNotNil(session.trainingStorageError)
         XCTAssertEqual(defaults.data(forKey: key), unreadable)
 
-        session.checkpointTrainingContent()
+        XCTAssertFalse(session.checkpointTrainingContent())
+        session.reloadTrainingContent()
+        XCTAssertTrue(session.trainingStorageRequiresRecovery)
         XCTAssertEqual(defaults.data(forKey: key), unreadable)
     }
 

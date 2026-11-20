@@ -5802,6 +5802,7 @@ struct ATHLTHTrainView: View {
 
     @State private var selectedSection: ATHLTHTrainSection = .today
     @SceneStorage("athlth.train.selectedSection") private var persistedTrainSection = "today"
+    @SceneStorage("athlth.train.selectedSectionAccount") private var persistedTrainSectionAccount = ""
     @State private var restoredTrainSectionAccount: UUID?
     // A warm foreground resume must never re-present the editor.
     // A cold view mount is allowed to recover exactly one unfinished draft.
@@ -6482,16 +6483,16 @@ struct ATHLTHTrainView: View {
             .athlthStablePresentationBoundary()
             .onAppear {
                 if restoredTrainSectionAccount != session.profile.userID {
-                    restoredTrainSectionAccount = session.profile.userID
-                    switch persistedTrainSection {
-                    case "plan": selectedSection = .plan
-                    case "progress": selectedSection = .progress
-                    default: selectedSection = .today
-                    }
+                    restoreTrainSection(for: session.profile.userID)
                 }
                 restoreInterruptedPlanDestinationIfNeeded()
             }
+            .onChange(of: session.profile.userID) { _, userID in
+                // Never reuse another athlete's selected Train subsection.
+                restoreTrainSection(for: userID)
+            }
             .onChange(of: selectedSection) { _, section in
+                persistedTrainSectionAccount = session.profile.userID.uuidString
                 switch section {
                 case .today:
                     persistedTrainSection = "today"
@@ -7075,6 +7076,23 @@ struct ATHLTHTrainView: View {
             english: "Return to the current workout",
             norwegian: "Åpner økten som allerede pågår"
         ))
+    }
+
+    private func restoreTrainSection(for userID: UUID) {
+        let section = ATHLTHTrainSectionContinuityPolicy.restoredSection(
+            persistedTrainSection,
+            persistedAccountID: persistedTrainSectionAccount,
+            currentAccountID: userID
+        )
+        // Bind the owner before changing the selected SwiftUI state.
+        persistedTrainSectionAccount = userID.uuidString
+        persistedTrainSection = section
+        restoredTrainSectionAccount = userID
+        switch section {
+        case "plan": selectedSection = .plan
+        case "progress": selectedSection = .progress
+        default: selectedSection = .today
+        }
     }
 
     /// Runs once on a cold Train mount. It MUST NOT run again merely because

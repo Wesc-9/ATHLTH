@@ -712,6 +712,39 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertEqual(store.recentDraftID(userID: account), savedID)
     }
 
+    func testOversizedDraftIsNotLoadedOrDeleted() throws {
+        let (settings, suite) = defaults()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHOversizedDraft.\(UUID().uuidString)",
+                                    isDirectory: true)
+        defer {
+            settings.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        try FileManager.default.createDirectory(
+            at: folder, withIntermediateDirectories: true
+        )
+        let owner = UUID()
+        let file = folder.appendingPathComponent(
+            "plan-\(owner.uuidString.lowercased()).json"
+        )
+        XCTAssertTrue(FileManager.default.createFile(
+            atPath: file.path, contents: Data()
+        ))
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.truncate(atOffset: 64_000_001)
+        try handle.close()
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: settings, directoryURL: folder
+        )
+        XCTAssertNil(store.load(userID: owner))
+        XCTAssertEqual(
+            try file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+            64_000_001
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+    }
+
     func testInvalidNewCheckpointCannotEraseExistingGoodDraft() {
         let (defaults, suite) = defaults()
         let folder = FileManager.default.temporaryDirectory
