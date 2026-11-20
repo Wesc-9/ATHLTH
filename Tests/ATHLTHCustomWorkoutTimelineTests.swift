@@ -104,14 +104,14 @@ final class ATHLTHCustomWorkoutTimelineTests: XCTestCase {
     }
 
     func testPausedZeroRestIntervalsAreNeverLabelledAsRest() throws {
-        let state = try XCTUnwrap(ATHLTHCustomWorkoutTimeline.state(
+        let zeroRest = try XCTUnwrap(ATHLTHCustomWorkoutTimeline.state(
             method: .intervals, durationMinutes: 10,
             workSeconds: 40, restSeconds: 0, rounds: 3,
             elapsedSeconds: 41, isPaused: true
         ))
-        XCTAssertEqual(state.stageIndex, 1)
-        XCTAssertEqual(state.phase, .paused)
-        XCTAssertFalse(state.inRestInterval)
+        XCTAssertEqual(zeroRest.stageIndex, 1)
+        XCTAssertEqual(zeroRest.phase, .paused)
+        XCTAssertFalse(zeroRest.inRestInterval)
         let actualRest = try state(method: .tabata, time: 22, paused: true)
         XCTAssertTrue(actualRest.inRestInterval)
         XCTAssertEqual(actualRest.phase, .paused)
