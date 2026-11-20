@@ -765,6 +765,30 @@ enum WorkoutLaunchCoordinator {
         }
     }
 
+
+    /// Resolve the exact original plan, never quietly substituting a free run
+    /// when a previously scheduled workout has disappeared or changed sport.
+    private static func approvedEndurancePlan(
+        planID: UUID?,
+        workoutID: UUID?,
+        session: AppSessionStore?,
+        expectedKind: WorkoutKind,
+        device: WorkoutCaptureDevice
+    ) throws -> PlannedSession? {
+        guard let planID, let workoutID else { return nil }
+        guard let session,
+              let plan = session.trainingPlan(withID: planID),
+              let workout = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+                  .first(where: { $0.id == workoutID }) else {
+            throw ATHLTHWorkoutCaptureAdmission.Rejection
+                .requiresDedicatedActivityCapture
+        }
+        try ATHLTHWorkoutCaptureAdmission.requireSupportedEnduranceCapture(
+            for: workout, expectedKind: expectedKind, device: device
+        )
+        return workout
+    }
+
     static func startRunQuick(
         configuration: RunQuickStartConfiguration,
         session: AppSessionStore,
@@ -780,6 +804,13 @@ enum WorkoutLaunchCoordinator {
         plannedSessionID: UUID? = nil,
         relayRequestID: UUID? = nil
     ) async throws {
+        let plannedRunningWorkout = try approvedEndurancePlan(
+            planID: plannedPlanID,
+            workoutID: plannedSessionID,
+            session: session,
+            expectedKind: .running,
+            device: configuration.captureDevice
+        )
         let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
         defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
 
@@ -922,17 +953,6 @@ enum WorkoutLaunchCoordinator {
         // without a library template. Carry that target into the existing
         // iPhone/Watch running transfer rather than launching an untargeted
         // Free Run. The plan/session IDs come from an explicit plan launch.
-        let plannedRunningWorkout: PlannedSession? = {
-            guard let planID = plannedPlanID,
-                  let workoutID = plannedSessionID,
-                  let plan = session.trainingPlan(withID: planID)
-            else { return nil }
-            return plan.weeks.flatMap(\.days).flatMap(\.sessions)
-                .first(where: {
-                    $0.id == workoutID && $0.kind == .running
-                })
-        }()
-
         let structuredWorkout =
             configuration.advancedWorkout.flatMap {
                 ATHLTHQuickRunTimelineAdapter.transfer(
@@ -1307,6 +1327,13 @@ enum WorkoutLaunchCoordinator {
         session: AppSessionStore? = nil,
         relayRequestID: UUID? = nil
     ) async throws {
+        let plannedWalkingWorkout = try approvedEndurancePlan(
+            planID: plannedPlanID,
+            workoutID: plannedSessionID,
+            session: session,
+            expectedKind: .walking,
+            device: configuration.captureDevice
+        )
         let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
         defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
 
@@ -1362,14 +1389,6 @@ enum WorkoutLaunchCoordinator {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
-        let plannedWalkingWorkout: PlannedSession? = {
-            guard let planID = plannedPlanID,
-                  let workoutID = plannedSessionID,
-                  let plan = session?.trainingPlan(withID: planID) else { return nil }
-            return plan.weeks.flatMap(\.days).flatMap(\.sessions).first {
-                $0.id == workoutID && $0.kind == .walking
-            }
-        }()
         // A planned walk can carry its route independently of Quick Train.
         // A manually picked route always takes precedence over the plan.
         let selectedWalkingRoute: TrainingRoute? = configuration.suppressPlannedRoute

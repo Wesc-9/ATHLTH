@@ -354,4 +354,53 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         )
     }
 
+
+    func testPlannedQuickEnduranceCannotSilentlyDiscardOtherActivities() throws {
+        for kind in [WorkoutKind.running, .walking] {
+            let simple = session(kind)
+            XCTAssertNoThrow(
+                try ATHLTHWorkoutCaptureAdmission.requireSupportedEnduranceCapture(
+                    for: simple, expectedKind: kind, device: .iPhone
+                )
+            )
+            XCTAssertNoThrow(
+                try ATHLTHWorkoutCaptureAdmission.requireSupportedEnduranceCapture(
+                    for: simple, expectedKind: kind, device: .appleWatch
+                )
+            )
+        }
+        var runWithNotes = session(.running, blocks: [block(.run)])
+        var note = block(.note, sequence: 2)
+        note.notes = "Technique"
+        runWithNotes.workoutBlocks = [block(.run), note]
+        for device in [WorkoutCaptureDevice.iPhone, .appleWatch] {
+            XCTAssertThrowsError(
+                try ATHLTHWorkoutCaptureAdmission.requireSupportedEnduranceCapture(
+                    for: runWithNotes, expectedKind: .running, device: device
+                )
+            )
+            XCTAssertThrowsError(
+                try ATHLTHWorkoutCaptureAdmission.requireSupportedEnduranceCapture(
+                    for: session(.strength),
+                    expectedKind: .running, device: device
+                )
+            )
+        }
+    }
+
+    func testPlannedQuickEnduranceRejectsHybridAndPreservesPlanIdentity() {
+        var mixed = session(.running, blocks: [block(.run)])
+        var yoga = block(.note, sequence: 2)
+        yoga.wellnessKind = .yoga
+        mixed.workoutBlocks = [block(.run), yoga]
+        let sourceID = mixed.id
+        XCTAssertThrowsError(
+            try ATHLTHWorkoutCaptureAdmission.requireSupportedEnduranceCapture(
+                for: mixed, expectedKind: .running, device: .iPhone
+            )
+        )
+        XCTAssertEqual(mixed.id, sourceID)
+        XCTAssertEqual(mixed.resolvedWorkoutBlocks.count, 2)
+    }
+
 }

@@ -181,6 +181,29 @@ enum ATHLTHWorkoutCaptureAdmission {
         }
     }
 
+
+    /// Validate the entire original plan before any Quick run/walk launch
+    /// can open HealthKit, relay to iPad/Watch or invite other athletes.
+    /// A mixed or instruction-bearing plan needs its full structured player,
+    /// not an accidental loss of steps through a run/walk transfer.
+    static func requireSupportedEnduranceCapture(
+        for workout: PlannedSession,
+        expectedKind: WorkoutKind,
+        device: WorkoutCaptureDevice
+    ) throws {
+        guard (expectedKind == .running || expectedKind == .walking),
+              workout.kind == expectedKind else {
+            throw Rejection.requiresDedicatedActivityCapture
+        }
+        let approved: ATHLTHPlannedWorkoutCaptureRoute =
+            device == .iPhone ? .phoneEndurance : .watchEndurance
+        guard ATHLTHPlannedWorkoutCaptureRoute.resolve(
+            workout, device: device
+        ) == approved else {
+            throw Rejection.requiresDedicatedActivityCapture
+        }
+    }
+
     /// Existing supported starts:
     /// - ordinary strength;
     /// - already validated running + strength hybrids.
