@@ -28,6 +28,51 @@ final class ATHLTHWorkoutCaptureAdmissionTests: XCTestCase {
         return workout
     }
 
+    func testPreparedWatchTransferPreservesPlanAndOriginalSessionForEverySport() throws {
+        let planID = UUID(), sessionID = UUID(), cardID = UUID()
+        XCTAssertNotEqual(sessionID, cardID)
+        for kind in WatchWorkoutKind.allCases {
+            let prepared = WatchPreparedWorkoutTransfer(
+                id: cardID, title: "Scheduled sport",
+                summary: "One original workout", kind: kind,
+                routeID: nil, runningWorkout: nil, audioCoach: nil,
+                plannedPlanID: planID, plannedSessionID: sessionID,
+                updatedAt: Date(timeIntervalSince1970: 1_900_000_000)
+            )
+            XCTAssertTrue(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                planID: prepared.plannedPlanID,
+                sessionID: prepared.plannedSessionID
+            ), kind.rawValue)
+            let decoded = try JSONDecoder().decode(
+                WatchPreparedWorkoutTransfer.self,
+                from: JSONEncoder().encode(prepared)
+            )
+            XCTAssertEqual(decoded.id, cardID, kind.rawValue)
+            XCTAssertEqual(decoded.plannedPlanID, planID, kind.rawValue)
+            XCTAssertEqual(decoded.plannedSessionID, sessionID, kind.rawValue)
+
+            var free = prepared
+            free.plannedPlanID = nil
+            free.plannedSessionID = nil
+            XCTAssertTrue(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                planID: free.plannedPlanID,
+                sessionID: free.plannedSessionID
+            ))
+            XCTAssertNil(free.plannedSessionID)
+            free.plannedPlanID = planID
+            XCTAssertFalse(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                planID: free.plannedPlanID,
+                sessionID: free.plannedSessionID
+            ))
+            free.plannedPlanID = nil
+            free.plannedSessionID = sessionID
+            XCTAssertFalse(ATHLTHWatchPreparedPlanIdentityPolicy.allows(
+                planID: free.plannedPlanID,
+                sessionID: free.plannedSessionID
+            ))
+        }
+    }
+
     func testSupportedStrengthAndRunStrengthHybridRemainAdmissible() {
         XCTAssertNoThrow(try ATHLTHWorkoutCaptureAdmission
             .requireSupportedStrengthCapture(

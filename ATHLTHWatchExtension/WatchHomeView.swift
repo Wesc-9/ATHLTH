@@ -442,7 +442,8 @@ struct WatchHomeView: View {
     private func startPreparedWorkout(
         _ workout: WatchPreparedWorkoutTransfer
     ) {
-        workoutManager.configureCalendarSessionID(workout.id)
+        // RouteStore first validates the original complete plan link,
+        // then applies plannedSessionID; prepared.id is only the card ID.
         Task {
             await routeStore.launchPreparedWorkout(
                 workout,

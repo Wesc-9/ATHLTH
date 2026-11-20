@@ -1,3 +1,9 @@
+## 2.2.6 – komplett original planlenke i alle tre Watch-klargjøringsveier
+
+- Hjem sin generiske planoverføring (styrke, sykling, roing, HIIT, funksjonell trening, yoga m.m.), Hjem sin manuelle/utsatte løpe-/gå-overføring og Train sin planlagte Watch-overføring setter nå alltid BEGGE originale felt `plannedPlanID` og `plannedSessionID` når en reell treningsplan finnes. Frittstående kalenderøkter får ingen oppdiktet plan.
+- Klargjøringskortet har egen transport-ID (ikke økt-ID), og `WatchHomeView` har sluttet å legge kortets UUID på treningsloggen før Watch-kontrollene er passert. `WatchRouteStore.launchPreparedWorkout` krever allerede komplett planlenke og bruker `plannedSessionID` ved oppstart.
+- XCTest for alle Watch-kind bekrefter at plan-/øktlenke overlever Codable, at kort-ID er separat, og at halvlenkede overføringer avvises. Verken opptakseier, sensoropptak, HealthKit-økt eller tidligere resultater endres. Full same-commit CI og fysisk kalender/Watch-verifikasjon gjenstår.
+
 ## 2.2.6 – felles dokumentert Watch-sensorproveniens for iPad og Audio Coach
 
 - Én shared read-only sensorpolicy (`ATHLTHWatchVerifiedLiveMetrics`) kontrollerer opprinnelig Watch-aktivitet og observerte tidspunkt før målt pulsslag og løpspace kan vises eller leses opp. Eldre Watch-oppdateringer uten verifisert måletid for puls/fart vises ikke som ferske sensorverdier.

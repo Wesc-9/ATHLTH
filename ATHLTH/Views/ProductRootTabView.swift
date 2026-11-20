@@ -3368,7 +3368,7 @@ struct ATHLTHHomeView: View {
         }
         watchConnection.sendPreparedWorkout(
             WatchPreparedWorkoutTransfer(
-                id: workout.id,
+                id: UUID(),
                 title: workout.title,
                 summary: workout.durationMinutes.map { "\($0) min" }
                     ?? workout.kind.title,
@@ -3387,6 +3387,10 @@ struct ATHLTHHomeView: View {
                 strengthWorkout: watchKind == .strength
                     ? PlannedWorkoutWatchBuilder.strengthSnapshot(workout)
                     : nil,
+                // Preserve the original training-plan link, separate from
+                // this ephemeral prepared card's UUID.
+                plannedPlanID: planID,
+                plannedSessionID: planID == nil ? nil : workout.id,
                 updatedAt: Date()
             )
         )
@@ -4780,6 +4784,9 @@ struct ATHLTHHomeView: View {
             return
         }
 
+        let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: session.activePlan
+        )
         let treadmill = RunEnvironment.forPlannedSession(workout) == .treadmill
         let selectedRoute: TrainingRoute? =
             treadmill ? nil : PlannedWorkoutWatchBuilder.route(
@@ -4891,7 +4898,7 @@ struct ATHLTHHomeView: View {
 
             watchConnection.sendPreparedWorkout(
                 WatchPreparedWorkoutTransfer(
-                    id: workout.id,
+                    id: UUID(),
                     title: workout.title,
                     summary: workout.title,
                     kind: watchKind,
@@ -4905,6 +4912,8 @@ struct ATHLTHHomeView: View {
                         ),
                     indoor: treadmill,
                     startMode: startMode,
+                    plannedPlanID: planID,
+                    plannedSessionID: planID == nil ? nil : workout.id,
                     updatedAt: Date()
                 )
             )
@@ -8082,6 +8091,8 @@ struct ATHLTHTrainView: View {
                 strengthWorkout: watchKind == .strength
                     ? PlannedWorkoutWatchBuilder.strengthSnapshot(workout)
                     : nil,
+                plannedPlanID: planID,
+                plannedSessionID: workout.id,
                 updatedAt: Date()
             )
         )
