@@ -242,3 +242,19 @@ enum ATHLTHWatchMirrorCommandAdmission {
         return command.universalWorkoutID == nil
     }
 }
+
+
+/// A HealthKit save and route attachment may finish after a different
+/// workout has recovered. Only the original builder may publish completion.
+enum ATHLTHWatchFinishContinuationPolicy {
+    static func mayContinue(
+        originalBuilderID: ObjectIdentifier,
+        activeBuilderID: ObjectIdentifier?,
+        finishing: Bool
+    ) -> Bool {
+        finishing && ATHLTHWorkoutMirrorContinuity.acceptsDelegateCallback(
+            activeSession: activeBuilderID,
+            incomingSession: originalBuilderID
+        )
+    }
+}

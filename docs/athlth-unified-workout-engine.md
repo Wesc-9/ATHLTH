@@ -1,3 +1,9 @@
+## 2.2.6 – asynkron HealthKit-fullføring og kommandokø verifiserer original eier
+
+- På Watch kontrolleres den eksakte originale `HKLiveWorkoutBuilder`-identiteten i `endCollection`-, `finishWorkout`- og `finishRoute`-callbacker, også **etter** venting på HealthKit. Et forsinket resultat eller feil fra en eldre sesjon kan ikke avslutte eller markere den nye økten som mislykket.
+- iPhone sender speilede treningskommandoer gjennom en felles, transient dispatch-funksjon som sjekker original `HKWorkoutSession` både før utsending og før eventuell feilmelding etter et asynkront svar. Gamle feilsvar kan ikke legge seg over en nyere treningsøkt.
+- Nye rene regresjonstester dekker gjeldende, manglende, byttet og avsluttet original builder. Ingen ekstra HealthKit-opptak eller journaler. Samme-commit native CI og fysisk Watch–iPhone-verifisering gjenstår.
+
 ## 2.2.6 – ingen gamle Watch-sensorverdier ved ny speiling
 
 - `WorkoutMirroringStore.attach` kan nå gjenbruke cachet puls, distanse og kalorier **bare når det er nøyaktig samme `HKWorkoutSession`-objekt** som allerede eier speilingen, i tillegg til opprinnelig sport og starttid. En ny eller gjenopprettet sesjon med lik sport og nærmest identisk starttid starter med ukjente målinger og venter på originalens ferske Watch-pakker.

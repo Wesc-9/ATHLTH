@@ -289,6 +289,23 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             state == .ending
     }
 
+    /// Async commands and their errors must belong to the original mirror.
+    private func dispatchMirroredCommand(
+        _ data: Data,
+        using originalSession: HKWorkoutSession
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.mirroredSession === originalSession else { return }
+            do {
+                try await originalSession.sendToRemoteWorkoutSession(data: data)
+            } catch {
+                guard self.mirroredSession === originalSession else { return }
+                self.publish { self.errorMessage = error.localizedDescription }
+            }
+        }
+    }
+
     @discardableResult
     func sendCommand(
         _ command: WatchWorkoutCommand
@@ -321,19 +338,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             return false
         }
 
-        Task {
-            do {
-                try await mirroredSession
-                    .sendToRemoteWorkoutSession(
-                        data: data
-                    )
-            } catch {
-                publish {
-                    self.errorMessage =
-                        error.localizedDescription
-                }
-            }
-        }
+        dispatchMirroredCommand(data, using: mirroredSession)
 
         return true
     }
@@ -365,13 +370,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             )
         ) else { return false }
 
-        Task {
-            do {
-                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
-            } catch {
-                publish { self.errorMessage = error.localizedDescription }
-            }
-        }
+        dispatchMirroredCommand(data, using: mirroredSession)
         return true
     }
 
@@ -397,13 +396,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             )
         ) else { return false }
 
-        Task {
-            do {
-                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
-            } catch {
-                publish { self.errorMessage = error.localizedDescription }
-            }
-        }
+        dispatchMirroredCommand(data, using: mirroredSession)
         return true
     }
 
@@ -446,19 +439,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             return false
         }
 
-        Task {
-            do {
-                try await mirroredSession
-                    .sendToRemoteWorkoutSession(
-                        data: data
-                    )
-            } catch {
-                publish {
-                    self.errorMessage =
-                        error.localizedDescription
-                }
-            }
-        }
+        dispatchMirroredCommand(data, using: mirroredSession)
 
         return true
     }
@@ -474,13 +455,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                   workoutStartedAt: startedAt,
                   universalWorkoutID: snapshot?.universalWorkoutID
               )) else { return false }
-        Task {
-            do {
-                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
-            } catch {
-                publish { self.errorMessage = error.localizedDescription }
-            }
-        }
+        dispatchMirroredCommand(data, using: mirroredSession)
         return true
     }
 
@@ -498,13 +473,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                   workoutStartedAt: startedAt,
                   universalWorkoutID: snapshot?.universalWorkoutID
               )) else { return false }
-        Task {
-            do {
-                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
-            } catch {
-                publish { self.errorMessage = error.localizedDescription }
-            }
-        }
+        dispatchMirroredCommand(data, using: mirroredSession)
         return true
     }
 
@@ -543,13 +512,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             return false
         }
 
-        Task { @MainActor in
-            do {
-                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
-            } catch {
-                publish { self.errorMessage = error.localizedDescription }
-            }
-        }
+        dispatchMirroredCommand(data, using: mirroredSession)
         return true
     }
 

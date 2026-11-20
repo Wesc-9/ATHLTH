@@ -8560,6 +8560,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func finishWorkout(at endDate: Date) {
         guard !finishing, let builder = workoutBuilder else { return }
+        let originalBuilderID = ObjectIdentifier(builder)
         finishing = true
         stopTimer()
         locationManager.stopUpdatingLocation()
@@ -8571,7 +8572,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             withEnd: endDate
         ) { [weak self] success, error in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard let self,
+                      ATHLTHWatchFinishContinuationPolicy.mayContinue(
+                          originalBuilderID: originalBuilderID,
+                          activeBuilderID: self.workoutBuilder.map(ObjectIdentifier.init),
+                          finishing: self.finishing
+                      ) else { return }
 
                 if let error {
                     self.fail(error)
@@ -8586,21 +8592,29 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 }
 
                 do {
-                    guard let workout =
-                            try await builder.finishWorkout()
-                    else {
-                        self.fail(
-                            WatchWorkoutError
-                                .workoutCouldNotSave
-                        )
+                    let saved = try await builder.finishWorkout()
+                    // A late HealthKit save must not finalize a replacement.
+                    guard ATHLTHWatchFinishContinuationPolicy.mayContinue(
+                        originalBuilderID: originalBuilderID,
+                        activeBuilderID: self.workoutBuilder.map(ObjectIdentifier.init),
+                        finishing: self.finishing
+                    ) else { return }
+                    guard let workout = saved else {
+                        self.fail(WatchWorkoutError.workoutCouldNotSave)
                         return
                     }
 
                     self.finishRouteIfNeeded(
                         workout: workout,
-                        endDate: endDate
+                        endDate: endDate,
+                        originalBuilderID: originalBuilderID
                     )
                 } catch {
+                    guard ATHLTHWatchFinishContinuationPolicy.mayContinue(
+                        originalBuilderID: originalBuilderID,
+                        activeBuilderID: self.workoutBuilder.map(ObjectIdentifier.init),
+                        finishing: self.finishing
+                    ) else { return }
                     self.fail(error)
                 }
             }
@@ -8609,8 +8623,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func finishRouteIfNeeded(
         workout: HKWorkout,
-        endDate: Date
+        endDate: Date,
+        originalBuilderID: ObjectIdentifier
     ) {
+        guard ATHLTHWatchFinishContinuationPolicy.mayContinue(
+            originalBuilderID: originalBuilderID,
+            activeBuilderID: workoutBuilder.map(ObjectIdentifier.init),
+            finishing: finishing
+        ) else { return }
         guard let routeBuilder, !routePoints.isEmpty else {
             complete(workout: workout, endDate: endDate)
             return
@@ -8621,7 +8641,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             metadata: nil
         ) { [weak self] _, error in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                guard let self,
+                      ATHLTHWatchFinishContinuationPolicy.mayContinue(
+                          originalBuilderID: originalBuilderID,
+                          activeBuilderID: self.workoutBuilder.map(ObjectIdentifier.init),
+                          finishing: self.finishing
+                      ) else { return }
 
                 if let error {
                     self.errorMessage =

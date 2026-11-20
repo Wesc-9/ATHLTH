@@ -565,4 +565,24 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testWatchFinishCollectionSaveAndGPSRouteOwnOriginalBuilder() {
+        let original = NSObject(), replacement = NSObject()
+        let originalID = ObjectIdentifier(original)
+        XCTAssertTrue(ATHLTHWatchFinishContinuationPolicy.mayContinue(
+            originalBuilderID: originalID, activeBuilderID: originalID,
+            finishing: true
+        ))
+        XCTAssertFalse(ATHLTHWatchFinishContinuationPolicy.mayContinue(
+            originalBuilderID: originalID,
+            activeBuilderID: ObjectIdentifier(replacement), finishing: true
+        ), "Late finish/route callbacks cannot finalize another workout")
+        XCTAssertFalse(ATHLTHWatchFinishContinuationPolicy.mayContinue(
+            originalBuilderID: originalID, activeBuilderID: nil, finishing: true
+        ))
+        XCTAssertFalse(ATHLTHWatchFinishContinuationPolicy.mayContinue(
+            originalBuilderID: originalID, activeBuilderID: originalID,
+            finishing: false
+        ))
+    }
+
 }
