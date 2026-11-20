@@ -8569,7 +8569,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
                     elapsedSeconds: savedResult.duration,
                     distanceMeters: savedResult.distanceMeters,
-                    averageHeartRateBPM: savedResult.averageHeartRate
+                    averageHeartRateBPM: savedResult.averageHeartRate,
+                    activity: savedResult.kind.rawValue
                 )
                 guidancePriorityGate.reset()
                 speak(

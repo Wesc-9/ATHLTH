@@ -1,3 +1,9 @@
+## 2.2.6 – Audio Coach-oppsummering fra samme målesystem for flere idretter
+
+- Den delte, offline talte øktoppsummeringen er nå aktivitetstilpasset. Original Watch-opptaker og iPhone sin eksisterende Watch-mirrorspeaker bruker kildens faktiske sportstype. Løp/gå har min/km, sykling har km/t og roing har tid/500 m når ekte distanse og aktiv tid finnes. Styrke, yoga, HIIT og annen trening får ikke oppdiktet løpsdistanse eller pace.
+- Eksisterende løpeoppsummering og verifiserte PR-er beholdes; ingen ny stemme-/lydopptaksmotor eller helsejournal opprettes. Regresjonstester dekker løp, sykkel, roing, styrke, yoga og ugyldige målinger.
+- Dette oppdaterer avslutningsmeldingen, men ikke hele den aktivitetsspesifikke live Audio Coach-triggerpakken. Fysisk Watch/lydtest og samme-commit CI gjenstår.
+
 ## 2.2.6 – Quick Train-tidtaker på samme universelle livekontroll
 
 - Tidsstyrt Quick Train for sykling, roing, HIIT, sirkel, yoga, mobilitet og andre manuelle aktiviteter bruker nå den samme `ATHLTHLiveWorkoutBottomDock` som løping, styrke og den strukturerte øktspilleren. Pause, Fortsett og Avslutt og lagre er aktivitetstilpasset i ett kontrollkort.

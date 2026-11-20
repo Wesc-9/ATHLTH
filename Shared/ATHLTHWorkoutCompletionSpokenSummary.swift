@@ -9,7 +9,8 @@ enum ATHLTHWorkoutCompletionSpokenSummary {
         distanceMeters: Double,
         averageHeartRateBPM: Double? = nil,
         verifiedRecordEnglish: String? = nil,
-        verifiedRecordNorwegian: String? = nil
+        verifiedRecordNorwegian: String? = nil,
+        activity: String = "running"
     ) -> (english: String, norwegian: String) {
         let seconds = elapsedSeconds.isFinite
             ? max(0, Int(elapsedSeconds.rounded())) : 0
@@ -32,19 +33,41 @@ enum ATHLTHWorkoutCompletionSpokenSummary {
             norwegian.append("Tid: \(remaining) sekunder.")
         }
 
-        if distanceMeters.isFinite, distanceMeters > 0 {
+        // Sport-specific, actually measured distance is meaningful only
+        // for distance activities. Never narrate running pace during cycling,
+        // rowing, HIIT, strength or yoga.
+        let sport = activity.lowercased().filter { $0.isLetter || $0.isNumber }
+        let running = ["running", "walking", "treadmill", "hiking"].contains(sport)
+        let cycling = ["cycling", "bicycle"].contains(sport)
+        let rowing = ["rowing", "row"].contains(sport)
+        if (running || cycling || rowing),
+           distanceMeters.isFinite, distanceMeters > 0 {
             let km = distanceMeters / 1_000
             let decimal = String(format: "%.2f", km)
             english.append("Distance: \(decimal) kilometres.")
             norwegian.append("Distanse: \(decimal.replacingOccurrences(of: ".", with: ",")) kilometer.")
 
-            if distanceMeters >= 250 && elapsedSeconds.isFinite,
-               elapsedSeconds > 0 {
-                let paceSeconds = elapsedSeconds / km
-                if paceSeconds.isFinite, (120...3_600).contains(paceSeconds) {
-                    let pace = Int(paceSeconds.rounded())
-                    english.append("Average pace: \(pace / 60) minutes and \(pace % 60) seconds per kilometre.")
-                    norwegian.append("Snittempo: \(pace / 60) minutter og \(pace % 60) sekunder per kilometer.")
+            if elapsedSeconds.isFinite, elapsedSeconds > 0 {
+                if running, distanceMeters >= 250 {
+                    let paceSeconds = elapsedSeconds / km
+                    if paceSeconds.isFinite, (120...3_600).contains(paceSeconds) {
+                        let pace = Int(paceSeconds.rounded())
+                        english.append("Average pace: \(pace / 60) minutes and \(pace % 60) seconds per kilometre.")
+                        norwegian.append("Snittempo: \(pace / 60) minutter og \(pace % 60) sekunder per kilometer.")
+                    }
+                } else if cycling, distanceMeters >= 250 {
+                    let speed = km * 3_600 / elapsedSeconds
+                    if speed.isFinite, (1...100).contains(speed) {
+                        english.append(String(format: "Average speed: %.1f kilometres per hour.", speed))
+                        norwegian.append(String(format: "Snittfart: %.1f kilometer i timen.", speed))
+                    }
+                } else if rowing, distanceMeters >= 250 {
+                    let split = elapsedSeconds * 500 / distanceMeters
+                    if split.isFinite, (40...1800).contains(split) {
+                        let seconds = Int(split.rounded())
+                        english.append("Average split: \(seconds / 60) minutes and \(seconds % 60) seconds per 500 metres.")
+                        norwegian.append("Snittid: \(seconds / 60) minutter og \(seconds % 60) sekunder per 500 meter.")
+                    }
                 }
             }
         }

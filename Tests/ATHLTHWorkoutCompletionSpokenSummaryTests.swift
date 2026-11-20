@@ -92,4 +92,48 @@ final class ATHLTHWorkoutCompletionSpokenSummaryTests: XCTestCase {
         XCTAssertTrue(positive.norwegian.contains("S3"))
         XCTAssertNotEqual(positive.norwegian, recovered.norwegian)
     }
+
+    func testCyclingCompletionUsesSpeedNotRunningPace() {
+        let summary = ATHLTHWorkoutCompletionSpokenSummary.make(
+            elapsedSeconds: 3600, distanceMeters: 30_000,
+            averageHeartRateBPM: 135, activity: "cycling"
+        )
+        XCTAssertTrue(summary.english.contains("Average speed: 30.0"))
+        XCTAssertTrue(summary.norwegian.contains("Snittfart"))
+        XCTAssertFalse(summary.english.contains("Average pace"))
+    }
+
+    func testRowingCompletionUses500MeterSplit() {
+        let summary = ATHLTHWorkoutCompletionSpokenSummary.make(
+            elapsedSeconds: 1200, distanceMeters: 5_000, activity: "rowing"
+        )
+        XCTAssertTrue(summary.english.contains("per 500 metres"))
+        XCTAssertTrue(summary.norwegian.contains("2 minutter og 0 sekunder per 500 meter"))
+        XCTAssertFalse(summary.english.contains("Average pace"))
+    }
+
+    func testStrengthAndYogaNeverPretendToHaveRunningDistance() {
+        for sport in ["strength", "yoga", "hiit", "functional", "other"] {
+            let summary = ATHLTHWorkoutCompletionSpokenSummary.make(
+                elapsedSeconds: 600, distanceMeters: 2000,
+                averageHeartRateBPM: 120, activity: sport
+            )
+            XCTAssertFalse(summary.english.contains("Distance:"), sport)
+            XCTAssertFalse(summary.english.contains("Average pace"), sport)
+            XCTAssertTrue(summary.english.contains("Average heart rate"), sport)
+        }
+    }
+
+    func testIncompleteCyclingAndRowingSensorDataIsNotInvented() {
+        let shortCycle = ATHLTHWorkoutCompletionSpokenSummary.make(
+            elapsedSeconds: 0, distanceMeters: 500, activity: "cycling"
+        )
+        XCTAssertFalse(shortCycle.english.contains("Average speed"))
+        let invalidRow = ATHLTHWorkoutCompletionSpokenSummary.make(
+            elapsedSeconds: 1200, distanceMeters: .infinity, activity: "rowing"
+        )
+        XCTAssertFalse(invalidRow.english.contains("Distance:"))
+        XCTAssertFalse(invalidRow.english.contains("Average split"))
+    }
+
 }

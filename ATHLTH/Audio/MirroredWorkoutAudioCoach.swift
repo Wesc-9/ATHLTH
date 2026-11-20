@@ -316,7 +316,8 @@ final class MirroredWorkoutAudioCoach:
                 let highlights = ATHLTHWorkoutCompletionSpokenSummary.make(
                     elapsedSeconds: snapshot.confirmedActiveDuration,
                     distanceMeters: snapshot.distanceMeters,
-                    averageHeartRateBPM: snapshot.averageHeartRate
+                    averageHeartRateBPM: snapshot.averageHeartRate,
+                    activity: snapshot.kind.rawValue
                 )
                 // Never rely on an Azure fallback after 'finished' becomes
                 // true: its asynchronous completion callback is deliberately
