@@ -160,7 +160,8 @@ at sensorbasert hybridmotor eller automatisk Watch-overgang er ferdig.
 ### 2.2.6 – strukturert økt får felles opptakssperre og feilkontrollert historikk (20.11.2026)
 
 - `ATHLTHStructuredCaptureAdmission` finner kontoens eksisterende, uferdige `structuredWorkoutInProgress.v1`-checkpoints ved innlogging og reserverer samme opptaksslot som løp, styrke, Watch og manuell iPhone-tidtaker. Det er kun en kontroll over ORIGINALEN, ingen ny historikk eller ny HealthKit-økt.
-- Start, fullføring og eksplisitt forkasting validerer konto og økt-ID. En minimert økt beholder opptakssperren. Train viser en fortsett-handling for eksisterende plan, men et uleselig/ukjent checkpoint blir aldri automatisk overskrevet.
+- Start, fullføring og eksplisitt forkasting validerer konto og økt-ID. En minimert økt beholder opptakssperren. Train viser en fortsett-handling for eksisterende plan, men et uleselig/ukjent checkpoint blir aldri automatisk overskrevet. Et nytt valgfritt `completionID` i checkpointet beholdes ved gjenoppretting, slik at fullføringen ikke dupliseres hvis journalen ble skrevet før en krasj/stanset cleanup.
+- Train overfører nå faktisk kildeplan-ID til `StructuredWorkoutSessionView` når originaløkten ligger i treningsplanen. Fullføringsjournalen beholder dermed planrelasjonen uten å gjette ut fra tittel.
 - `StructuredWorkoutCompletionStore.save` leser tilbake lagret resultat før det meldes fullført. Hvis lagring feiler, beholdes checkpointet, og brukeren ser en feil i stedet for et falskt vellykket resultat. Også checkpoint-skriving og sletting er kontrollert.
 - Dette er en trygg samordning av eksisterende strukturert iPhone-spiller; ikke full sensor-/HealthKit-implementering for alle aktivitetskategorier. Regresjonstester og full samme-commit CI/fysiske iPhone/Watch/iPad-tester gjenstår.
 

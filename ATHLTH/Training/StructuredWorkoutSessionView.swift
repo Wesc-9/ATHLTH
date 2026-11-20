@@ -68,6 +68,9 @@ enum ATHLTHStructuredAMRAPProgression {
 /// This is not a saved workout completion and is removed on finish/discard.
 struct ATHLTHStructuredWorkoutCheckpoint: Codable {
     var workoutID: UUID
+    /// Stable completion receipt even if history commits before a crash
+    /// prevents checkpoint cleanup. Optional for old checkpoints.
+    var completionID: UUID? = nil
     var savedAt: Date
     var startedAt: Date
     var stepEnteredAt: Date
@@ -176,6 +179,7 @@ struct StructuredWorkoutSessionView: View {
     var linkedPlanID: UUID? = nil
 
     @State private var startedAt = Date()
+    @State private var completionID = UUID()
     @State private var currentIndex = 0
     @State private var completedBlockIDs = Set<String>()
     @State private var showingFinishConfirmation = false
@@ -1315,6 +1319,7 @@ struct StructuredWorkoutSessionView: View {
         }
         let state = ATHLTHStructuredWorkoutCheckpoint(
             workoutID: workout.id,
+            completionID: completionID,
             savedAt: Date(),
             startedAt: startedAt,
             stepEnteredAt: stepEnteredAt,
@@ -1394,6 +1399,7 @@ struct StructuredWorkoutSessionView: View {
         else { return false }
         restoringCheckpoint = true
         activeExecutionBlocks = saved.executionBlocks
+        completionID = saved.completionID ?? UUID()
         startedAt = saved.startedAt
         stepEnteredAt = saved.stepEnteredAt
         currentIndex = saved.currentIndex
@@ -1446,7 +1452,7 @@ struct StructuredWorkoutSessionView: View {
         else { return }
         var completion =
             StructuredWorkoutCompletion(
-                id: UUID(),
+                id: completionID,
                 workoutTemplateID:
                     workout.workoutTemplateID,
                 sourceWorkoutID: workout.id,

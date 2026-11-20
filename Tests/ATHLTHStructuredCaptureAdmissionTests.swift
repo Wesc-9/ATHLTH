@@ -48,6 +48,34 @@ final class ATHLTHStructuredCaptureAdmissionTests: XCTestCase {
         XCTAssertNil(ATHLTHStructuredCaptureAdmission.activeWorkoutID)
     }
 
+    func testSavedCompletionReceiptIsIdempotentOnRetry() throws {
+        let suite = "ATHLTH.structured.history.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let owner = UUID(), source = UUID()
+        let firstID = UUID()
+        let record = StructuredWorkoutCompletion(
+            id: firstID, workoutTemplateID: nil,
+            sourceWorkoutID: source, title: "Hybrid",
+            category: "hybrid",
+            startedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            endedAt: Date(timeIntervalSince1970: 1_800_000_900),
+            completedBlockCount: 2, totalBlockCount: 2
+        )
+        XCTAssertTrue(StructuredWorkoutCompletionStore.save(
+            record, userID: owner, defaults: defaults
+        ))
+        XCTAssertTrue(StructuredWorkoutCompletionStore.save(
+            record, userID: owner, defaults: defaults
+        ))
+        let saved = AccountLocalStorage.read(
+            [StructuredWorkoutCompletion].self,
+            name: "structuredWorkoutHistory", userID: owner, defaults: defaults
+        ) ?? []
+        XCTAssertEqual(saved.filter { $0.id == firstID }.count, 1)
+        XCTAssertEqual(saved.first?.sourceWorkoutID, source)
+    }
+
     func testCorruptStructuredCheckpointDoesNotGetOverwritten() throws {
         let suite = "ATHLTH.structured.corrupt.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

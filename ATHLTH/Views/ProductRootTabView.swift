@@ -6476,7 +6476,8 @@ struct ATHLTHTrainView: View {
                 item: $selectedStructuredWorkout
             ) { workout in
                 StructuredWorkoutSessionView(
-                    workout: workout
+                    workout: workout,
+                    linkedPlanID: structuredSourcePlanID(for: workout.id)
                 )
                 .environmentObject(session)
             }
@@ -7999,6 +8000,14 @@ struct ATHLTHTrainView: View {
             english: "Sent to Apple Watch. Tap the ready card there to start.",
             norwegian: "Sendt til Apple Watch. Trykk på kortet der når du vil starte."
         )
+    }
+
+    private func structuredSourcePlanID(for workoutID: UUID) -> UUID? {
+        ([session.activePlan].compactMap { $0 } + session.scheduledPlans)
+            .first { plan in
+                plan.weeks.flatMap(\.days).flatMap(\.sessions)
+                    .contains { $0.id == workoutID }
+            }?.id
     }
 
     private func openTodayPrimaryWorkout(
