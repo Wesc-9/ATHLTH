@@ -39,7 +39,11 @@ enum AccountLocalStorage {
         let data = try JSONEncoder().encode(value)
         let storageKey = key(name, userID: userID)
         defaults.set(data, forKey: storageKey)
-        guard defaults.data(forKey: storageKey) == data else {
+        // Readback is reserved for this critical account-training path;
+        // do not duplicate multi-MB HealthKit and strength-history reads
+        // for every other checked write in the app.
+        if name == "training",
+           defaults.data(forKey: storageKey) != data {
             throw StorageError.readBackMismatch
         }
     }

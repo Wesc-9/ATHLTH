@@ -249,15 +249,17 @@ private struct ATHLTHSceneRootView: View {
                         }
                     )
                 ) {
-                    Button(ATHLTHLocalization.choose(
-                        english: "Retry save",
-                        norwegian: "Prøv å lagre igjen"
-                    )) {
-                        appSession.checkpointTrainingContent()
+                    if !appSession.trainingStorageRequiresRecovery {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Retry save",
+                            norwegian: "Prøv å lagre igjen"
+                        )) {
+                            appSession.checkpointTrainingContent()
+                        }
                     }
                     Button(ATHLTHLocalization.choose(
-                        english: "Keep editing",
-                        norwegian: "Fortsett å redigere"
+                        english: "OK",
+                        norwegian: "OK"
                     ), role: .cancel) {
                         appSession.dismissTrainingStorageError()
                     }

@@ -117,6 +117,13 @@ final class AppSessionStore: ObservableObject {
     // This is local UI identity, never a replacement for server credentials.
     private let verifiedOfflineProfileKey = "session.verifiedOfflineProfile.v1"
     private var localAccountID: UUID?
+    // A corrupt but present snapshot is never treated as a fresh empty
+    // account. Preserve its bytes until an explicit verified recovery.
+    private var blockedCorruptAccountID: UUID?
+    var trainingStorageRequiresRecovery: Bool {
+        blockedCorruptAccountID != nil &&
+        blockedCorruptAccountID == localAccountID
+    }
     private var loadingAccountContent = false
     private var accountContentSaveTask: Task<Void, Never>?
     private var backendSubscriptionAccess: SubscriptionAccess
@@ -5768,6 +5775,12 @@ final class AppSessionStore: ObservableObject {
         accountContentSaveTask?.cancel()
         accountContentSaveTask = nil
 
+        // A newer/incompatible or corrupted snapshot must not be replaced
+        // by an empty model merely because JSON decoding returned nil.
+        if blockedCorruptAccountID == userID {
+            return false
+        }
+
         if immediate {
             // Explicit checkpoints and account changes remain synchronous to
             // guarantee durability before switching/reloading the account.
@@ -5810,13 +5823,18 @@ final class AppSessionStore: ObservableObject {
     ) -> Bool {
         let signpost = ATHLTHPerformance.begin("TrainingLocalWrite")
         defer { ATHLTHPerformance.end("TrainingLocalWrite", id: signpost) }
+        guard blockedCorruptAccountID != userID else {
+            return false
+        }
         do {
             try ATHLTHAccountTrainingCommit.save(
                 content, userID: userID, defaults: defaults
             ) {
                 ATHLTHTrainingDataChangeSignal.post(userID: userID)
             }
-            trainingStorageError = nil
+            if trainingStorageError != nil {
+                trainingStorageError = nil
+            }
             return true
         } catch {
             // A missing save must not notify the cloud, reset the editor,
@@ -5859,7 +5877,23 @@ final class AppSessionStore: ObservableObject {
                 userID: userID,
                 defaults: defaults
             ) ?? false
-        let stored = AccountLocalStorage.read(AccountTrainingContent.self, name: "training", userID: userID, defaults: defaults)
+        let rawTrainingSnapshot = defaults.data(
+            forKey: AccountLocalStorage.key("training", userID: userID)
+        )
+        let stored = rawTrainingSnapshot.flatMap {
+            try? JSONDecoder().decode(AccountTrainingContent.self, from: $0)
+        }
+        blockedCorruptAccountID = rawTrainingSnapshot != nil && stored == nil
+            ? userID : nil
+        if blockedCorruptAccountID == userID {
+            // Do not erase unrecognized on-device data during a future-version
+            // rollback or an interrupted upgrade. Leave recovery to a
+            // deliberate restore while retaining the original bytes.
+            trainingStorageError = ATHLTHLocalization.choose(
+                english: "Saved training data could not be read. ATHLTH has protected the original data and will not overwrite it. Restore a verified backup or contact support before making changes.",
+                norwegian: "Lagrede treningsdata kunne ikke leses. ATHLTH har beskyttet originaldataene og vil ikke overskrive dem. Gjenopprett en verifisert sikkerhetskopi eller kontakt brukerstøtte før du gjør endringer."
+            )
+        }
         let mayMigrate = !defaults.bool(forKey: AccountLocalStorage.key("legacyMigrated", userID: userID))
         let ownsUnlabelledLegacy = defaults.string(forKey: "legacy.trainingOwner") == userID.uuidString
         let legacyPlan = mayMigrate ? Self.loadActivePlan(from: defaults) : nil
@@ -5904,6 +5938,10 @@ final class AppSessionStore: ObservableObject {
         } else {
             persistAccountContent()
         }
+
+        // Do not create an index from empty fallback state while a valid
+        // account snapshot is temporarily unreadable.
+        guard blockedCorruptAccountID != userID else { return }
 
         // Index previously saved main workouts once on upgrade, including
         // personal sessions and all calendar plans. Later edits use the

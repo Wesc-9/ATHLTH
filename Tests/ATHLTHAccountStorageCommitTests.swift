@@ -62,6 +62,30 @@ final class ATHLTHAccountStorageCommitTests: XCTestCase {
         XCTAssertTrue(defaults.bool(forKey: marker))
     }
 
+    @MainActor
+    func testUndecodableTrainingSnapshotIsNotOverwrittenByAccountRecovery() throws {
+        let name = "ATHLTHCorruptRecovery.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let owner = UUID()
+        let key = AccountLocalStorage.key("training", userID: owner)
+        let unreadable = Data("{incompatible training schema".utf8)
+        defaults.set(true, forKey: "session.signedIn")
+        defaults.set(true, forKey: AccountLocalStorage.key(
+            "legacyMigrated", userID: owner
+        ))
+        defaults.set(unreadable, forKey: key)
+
+        let session = AppSessionStore(defaults: defaults)
+        XCTAssertTrue(session.restoreOfflineAccount(persistedAuthUserID: owner))
+        XCTAssertTrue(session.trainingStorageRequiresRecovery)
+        XCTAssertNotNil(session.trainingStorageError)
+        XCTAssertEqual(defaults.data(forKey: key), unreadable)
+
+        session.checkpointTrainingContent()
+        XCTAssertEqual(defaults.data(forKey: key), unreadable)
+    }
+
     func testAccountScopedTrainingWriteCannotChangeAnotherAccount() throws {
         let name = "ATHLTHStorageIsolation.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
