@@ -1,3 +1,9 @@
+## 2.2.6 – CI: korrigert Basic Quick Step-regresjonstest
+
+- CI på `140b2244` feilet i `ATHLTHSimpleWorkoutOutlineTests.testBasicOneTapActivitiesKeepTheirOriginalSport` fordi testen fortsatt brukte ikke-eksisterende `ATHLTHPlannedWorkoutType.yoga` og `.meditation` etter at produksjonskoden var korrigert til `.mobility`.
+- Testen forventer nå den reelle `.mobility`-inngangen med `.yoga` som sport og 15 minutters varighet, i tillegg til gåing og sykling. Den oppretter ikke en fiktiv meditasjonsaktivitet.
+- Endringen berører kun test og dokumentasjon. Ingen HealthKit-opptak, eier, original historikk eller migrering endres. Krever full grønn samme-commit CI.
+
 ## 2.2.6 – CI: iPad snapshot XCTest-kompilering
 
 - Samme-commit Build ATHLTH på `f58bc1c` feilet i `Tests/ATHLTHiPadLiveWorkoutTests.swift` på fire `extraneous argument labels`-feil. En lagret Swift-funksjonsverdi mister parameteretikettene; testene kaller nå `ATHLTHCrossDeviceSnapshotOrderPolicy.decision` direkte med opprinnelige etiketter.

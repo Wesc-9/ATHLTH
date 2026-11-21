@@ -351,8 +351,7 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         let expected: [(ATHLTHPlannedWorkoutType, ATHLTHWorkoutSportMode, Int)] = [
             (.walking, .walking, 30),
             (.cycling, .cycling, 30),
-            (.yoga, .yoga, 15),
-            (.meditation, .meditation, 5)
+            (.mobility, .yoga, 15)
         ]
         for (type, expectedSport, minutes) in expected {
             let created = ATHLTHBasicWorkoutQuickStepPolicy.makeStep(
