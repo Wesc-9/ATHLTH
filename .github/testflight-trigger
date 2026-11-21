@@ -274,3 +274,5 @@ ATHLTH 2.2.6 TestFlight retry 2026-11-21 — user-authorized after restoring sin
 ATHLTH 2.2.6 gated TestFlight request after full acceptance validation and CoreSimulator recovery, 2026-11-21. Do not upload unless all five gates succeed on this exact SHA.
 
 ATHLTH 2.2.6 explicitly authorized TestFlight retry 2026-11-21: validate all same-commit required CI gates; sign and upload only on success.
+
+ATHLTH 2.2.6 user-authorized gated TestFlight attempt after iPad screenshot recovery c8852f3; same-commit CI required, 2026-11-21.
