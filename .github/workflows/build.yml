@@ -124,10 +124,8 @@ on:
       - release/v2.2.6
 
 concurrency:
-  # Previous pre-matrix builds can remain stuck in CoreSimulator teardown,
-  # even after cancellation. Use a new concurrency group for the isolated
-  # 11/13-inch iPad matrix. Later release pushes cancel their predecessors.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.ref == 'refs/heads/release/v2.2.5' && '-ipad-matrix-v2' || '' }}
+  # Keep the single main build; iPad compatibility has its own dedicated CI gate.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   # Prefer the newest release/v2.2.5 commit: a stale 2,930-test
   # workflow otherwise holds this concurrency group indefinitely, leaving
   # the new independent iPad matrix queued even after its code has changed.
@@ -309,27 +307,6 @@ jobs:
       # Upload a tarball to preserve executable permissions and framework
       # symlinks. iPad launch runs on a FRESH macOS runner, not the XCTest
       # runner that has already exercised thousands of tests and simulators.
-      - name: Package XCTest-tested app for iPad
-        if: github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.6'
-        shell: bash
-        run: |
-          set -euo pipefail
-          PRODUCT_DIR="$RUNNER_TEMP/ATHLTHDerivedData/Build/Products/Debug-iphonesimulator"
-          test -d "$PRODUCT_DIR/ATHLTH.app"
-          tar -czf "$RUNNER_TEMP/athlth-ipad-simulator-app.tar.gz" \
-            -C "$PRODUCT_DIR" ATHLTH.app
-          ls -lh "$RUNNER_TEMP/athlth-ipad-simulator-app.tar.gz"
-
-      - name: Upload XCTest-tested simulator app
-        if: github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.6'
-        uses: actions/upload-artifact@v4
-        with:
-          name: athlth-ipad-simulator-app
-          path: ${{ runner.temp }}/athlth-ipad-simulator-app.tar.gz
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 3
-
       - name: Summarize failed XCTest cases for phase 4–8 triage
         if: failure()
         shell: bash
@@ -380,67 +357,3 @@ jobs:
           path: ${{ runner.temp }}/ATHLTHTests.xcresult
           if-no-files-found: warn
           retention-days: 14
-
-  # This isolated runner prevents CoreSimulator left over by the XCTest
-  # simulator from stalling iPad creation and application installation.
-  # No second Xcode compilation; the app is identical to the tested binary.
-  ipad-smoke:
-    name: iPad ${{ matrix.ipad }}-inch smoke
-    if: github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.6'
-    needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        ipad: [11, 13]
-    runs-on: xcode-27
-    # CoreSimulator can require three bounded boot attempts plus a retrying
-    # install on hosted macOS. Keep the job budget above those explicit
-    # per-command limits; otherwise GitHub cancels before diagnostics finish.
-    timeout-minutes: 75
-    steps:
-      - uses: actions/checkout@v4
-      - name: Select Xcode 27
-        run: |
-          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
-          xcodebuild -version
-
-      - name: Install screenshot validation tool
-        run: brew install imagemagick
-
-      - name: Download tested simulator app
-        uses: actions/download-artifact@v4
-        with:
-          name: athlth-ipad-simulator-app
-          path: ${{ runner.temp }}/athlth-ipad-test-input
-
-      - name: Extract identical tested simulator build
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/athlth-ipad-test-app"
-          tar -xzf "$RUNNER_TEMP/athlth-ipad-test-input/athlth-ipad-simulator-app.tar.gz" \
-            -C "$RUNNER_TEMP/athlth-ipad-test-app"
-          test -d "$RUNNER_TEMP/athlth-ipad-test-app/ATHLTH.app"
-          test -x "$RUNNER_TEMP/athlth-ipad-test-app/ATHLTH.app/ATHLTH"
-          echo "::notice::iPad validates the same app that passed XCTest."
-
-      - name: Open the app across iPad layouts
-        shell: bash
-        # Allows bounded CoreSimulator recovery to finish; an actual
-        # installation/render failure still exits nonzero.
-        timeout-minutes: 65
-        env:
-          ATHLTH_IPAD_SMOKE_APP: ${{ runner.temp }}/athlth-ipad-test-app/ATHLTH.app
-          ATHLTH_IPAD_SMOKE_SIZE: ${{ matrix.ipad }}
-        run: bash scripts/run_ipad_smoke.sh
-
-      - name: Upload iPad screenshots and logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: athlth-ipad-smoke-screenshots-${{ matrix.ipad }}
-          path: |
-            ${{ runner.temp }}/athlth-ipad-*.png
-            ${{ runner.temp }}/athlth-ipad-diagnostics.txt
-          if-no-files-found: warn
-          retention-days: 7
