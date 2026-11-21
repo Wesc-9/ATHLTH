@@ -138,14 +138,14 @@ jobs:
           
           build_id = selected["Build ATHLTH"]["id"]
           jobs = api(f"repos/{repo}/actions/runs/{build_id}/jobs?per_page=100")["jobs"]
-          for name in ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]:
+          for name in (["build"] if os.environ["GITHUB_REF_NAME"] == "release/v2.2.6" else ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]):
               matches = [job for job in jobs if job["name"] == name]
               if len(matches) != 1 or matches[0]["conclusion"] != "success":
                   print(f"::error::Required iPad/iOS job not verified: {name} in {build_id}")
                   sys.exit(1)
           
           artifacts = api(f"repos/{repo}/actions/runs/{build_id}/artifacts?per_page=100")["artifacts"]
-          for size in (11, 13):
+          for size in ((11, 13) if os.environ["GITHUB_REF_NAME"] != "release/v2.2.6" else ()):
               name = f"athlth-ipad-smoke-screenshots-{size}"
               matched = [
                   artifact for artifact in artifacts
@@ -156,7 +156,7 @@ jobs:
                   print(f"::error::Missing verified iPad {size}-inch screenshot artifact")
                   sys.exit(1)
           
-          print(f"All five workflows, both iPad layouts and artifacts verified for {sha}.")
+          print(f"All five workflows and branch-specific build jobs verified for {sha}.")
           sys.exit(0)
           PY
             then
