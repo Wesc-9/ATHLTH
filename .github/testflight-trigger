@@ -278,3 +278,5 @@ ATHLTH 2.2.6 explicitly authorized TestFlight retry 2026-11-21: validate all sam
 ATHLTH 2.2.6 user-authorized gated TestFlight attempt after iPad screenshot recovery c8852f3; same-commit CI required, 2026-11-21.
 
 ATHLTH 2.2.6 user-authorized TestFlight retry after iPad recovery shell fix 9e0eccd, 2026-11-21. Require all five CI gates on this exact commit.
+
+ATHLTH 2.2.6 explicitly authorized gated TestFlight retry after bounded iPhone simulator build diagnostics fe351ad, 2026-11-21. Upload only after all five same-commit checks succeed.
