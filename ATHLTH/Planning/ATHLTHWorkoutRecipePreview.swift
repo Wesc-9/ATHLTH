@@ -91,19 +91,41 @@ enum ATHLTHBasicFreeRunPolicy {
         return block
     }
 
+    /// Only the explicit Basic placeholder can be replaced automatically.
+    /// A custom open-ended single-step run may contain athlete intent and
+    /// must NEVER disappear merely because the athlete selects an exercise.
     static func isFreeRunning(_ blocks: [WorkoutTemplateBlock]) -> Bool {
         guard blocks.count == 1, let block = blocks.first else {
             return false
         }
         return block.kind == .run &&
-            block.cardioActivity != .walking &&
+            (block.title == "Free running" || block.title == "Fri løping") &&
+            block.cardioActivity == .running &&
+            block.resolvedPhase == .main &&
             block.groupID == nil &&
+            block.groupKind == nil &&
+            block.routeID == nil &&
+            block.exerciseID == nil &&
+            block.exerciseSlug == nil &&
+            block.notes == nil &&
+            block.assessmentMethod == nil &&
             block.distanceMeters == nil &&
             block.durationSeconds == nil &&
             block.targetPaceSecondsPerKilometer == nil &&
             block.targetHeartRateZone == nil &&
             block.targetHeartRatePercentMin == nil &&
             block.targetHeartRatePercentMax == nil
+    }
+
+    /// A saved single-interval exercise is still structured: number of
+    /// blocks is not enough to infer "Free running" on re-entry.
+    static func initialMode(
+        blocks: [WorkoutTemplateBlock],
+        routeID: UUID?
+    ) -> RunQuickStartMode {
+        if routeID != nil { return .route }
+        return blocks.isEmpty || isFreeRunning(blocks)
+            ? .free : .structured
     }
 
     /// A weekly plan requires a duration for calendar layout only.

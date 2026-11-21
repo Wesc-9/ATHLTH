@@ -1,3 +1,11 @@
+## 2.2.6 – sikker gjenåpning og redigering i Enkel
+
+- Initialisering av redigeringsmodus brukte tidligere bare antallet blokker: en lagret **enkelt intervalløkt** ble dermed klassifisert som «Fri løping». Modus utledes nå fra reell oppskrift og eventuell rute. Ett mål- eller tidsstyrt løp forblir strukturert ved gjenåpning.
+- Bare den eksplisitte, målløse «Fri løping»-plassholderen kan fjernes automatisk når brukeren legger inn øvelser. Egennavngitte, kommenterte, mål- og rutestyrte enkeltøkter kan ikke bli overskrevet stille.
+- Når brukeren fjerner den eneste friløpsblokken med X-knappen, skifter redigereren bort fra Free Run slik at lagringssnapshotet ikke uventet gjenoppretter den slettede blokken.
+- Enkel sin bibliotekimport bruker samme styrkegruppe-/sportsbegrensning som Avansert; en lagret superset kan ikke feilaktig importeres som løpeintervall. Modus for importert økt bestemmes av faktisk innhold.
+- Rene regresjonstester er lagt til for alle disse kanttilfellene. Same-commit CI og fysisk iPhone/iPad-verifisering gjenstår.
+
 ## 2.2.6 – korrigert byggkontroll og trygg ruteredigering i Enkel
 
 - Backend- og hovedbygg ble blokkert av `scripts/audit_train_together_draft_entry.py`, som fortsatt krevde `workout.workoutBlocks = blocks` fra før Basic fri løping ble innført. Kontrollene validerer nå både den originale blokklisten og at en tom fri løping får én eksplisitt åpen blokk, uten å tillate at Train Together mister øktinnhold, Spotify eller utstyr.

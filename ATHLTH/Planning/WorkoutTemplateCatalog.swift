@@ -4606,8 +4606,9 @@ struct WorkoutTemplateBuilderView: View {
         _studioAdvanced = State(initialValue:
             initialStudioAdvanced ?? (initialActivity == nil))
         _studioBasicRunMode = State(initialValue:
-            initialRouteID != nil ? .route :
-            initialRecipe.count > 1 ? .structured : .free
+            ATHLTHBasicFreeRunPolicy.initialMode(
+                blocks: initialRecipe, routeID: initialRouteID
+            )
         )
         let firstRun = initialRecipe.first { $0.kind == .run }
         _studioBasicRunEnvironment = State(initialValue:
@@ -6399,6 +6400,9 @@ struct WorkoutTemplateBuilderView: View {
         representedSteps: Int
     ) {
         let previousBlocks = blocks
+        let removedFreeRun = initialActivity == .running &&
+            studioBasicRunMode == .free &&
+            ATHLTHBasicFreeRunPolicy.isFreeRunning(previousBlocks)
         let remaining = ATHLTHBasicWorkoutContentsPolicy.removing(
             from: previousBlocks,
             startingAt: index,
@@ -6406,6 +6410,11 @@ struct WorkoutTemplateBuilderView: View {
         )
         guard remaining.count != previousBlocks.count else { return }
         blocks = remaining
+        if removedFreeRun && blocks.isEmpty {
+            // The athlete deliberately deleted Free running. Do not
+            // recreate it silently through workoutSnapshot() on Save.
+            studioBasicRunMode = .structured
+        }
         resequence()
         studioBasicOwnedBlockIDs.formIntersection(
             Set(blocks.map(\.editorDragID))
@@ -6429,7 +6438,17 @@ struct WorkoutTemplateBuilderView: View {
     /// append a second hidden recipe to the quick activity behind the card.
     private func applyBasicLibraryWorkout(_ workout: PlannedSession) {
         let recipe = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-        guard !recipe.isEmpty else { return }
+        guard !recipe.isEmpty,
+              ATHLTHStrengthModeAvailability.canImport(
+                  recipe, initialActivity: initialActivity,
+                  containsStrength: hasStrength
+              ) else {
+            actionNotice = tr(
+                "This workout is not compatible with the selected activity.",
+                "Denne økten passer ikke med den valgte treningsformen."
+            )
+            return
+        }
         blocks = recipe.map { source in
             var copy = source
             copy.editorDragID = UUID()
@@ -6442,7 +6461,9 @@ struct WorkoutTemplateBuilderView: View {
         manualDurationMinutes = workout.durationMinutes
         durationInputText = workout.durationMinutes.map(String.init) ?? ""
         title = workout.title
-        studioBasicRunMode = .structured
+        studioBasicRunMode = ATHLTHBasicFreeRunPolicy.initialMode(
+            blocks: blocks, routeID: selectedRouteID
+        )
         studioBasicWorkoutTitle = workout.title
         resequence()
         persistWorkoutDraft()

@@ -230,4 +230,60 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         ))
     }
 
+    func testBasicRestoresSingleStructuredRunningStepAsStructured() {
+        var oneInterval = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        oneInterval.title = "4-minute interval"
+        oneInterval.durationSeconds = 240
+        XCTAssertEqual(
+            ATHLTHBasicFreeRunPolicy.initialMode(
+                blocks: [oneInterval], routeID: nil
+            ).rawValue,
+            RunQuickStartMode.structured.rawValue
+        )
+        XCTAssertEqual(
+            ATHLTHBasicFreeRunPolicy.initialMode(
+                blocks: [ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()],
+                routeID: nil
+            ).rawValue,
+            RunQuickStartMode.free.rawValue
+        )
+        XCTAssertEqual(
+            ATHLTHBasicFreeRunPolicy.initialMode(
+                blocks: [], routeID: UUID()
+            ).rawValue,
+            RunQuickStartMode.route.rawValue
+        )
+    }
+
+    func testBasicNeverSilentlyReplacesCustomOpenEndedRunningExercise() {
+        let free = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        var named = free
+        named.title = "My long slow run"
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([named]))
+        var routed = free
+        routed.routeID = UUID()
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([routed]))
+        var annotated = free
+        annotated.notes = "Stay at easy effort and check form"
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([annotated]))
+        var strength = free
+        strength.kind = .exercise
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([strength]))
+    }
+
+    func testBasicSavedStrengthModesCannotEnterRunningComposer() {
+        var strength = block(
+            "Superset press", kind: .exercise,
+            phase: .main, index: 1
+        )
+        strength.groupID = UUID()
+        strength.groupKind = .superset
+        XCTAssertFalse(ATHLTHStrengthModeAvailability.canImport(
+            [strength], initialActivity: .running, containsStrength: false
+        ))
+        XCTAssertTrue(ATHLTHStrengthModeAvailability.canImport(
+            [strength], initialActivity: .strength, containsStrength: false
+        ))
+    }
+
 }
