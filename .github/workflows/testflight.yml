@@ -64,7 +64,8 @@ on:
 concurrency:
   # Independent release trains must not cancel one another's authorized upload.
   group: athlth-testflight-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel an authorized release mid-signing/upload because another trigger arrived.
+  cancel-in-progress: false
 
 permissions:
   contents: write
