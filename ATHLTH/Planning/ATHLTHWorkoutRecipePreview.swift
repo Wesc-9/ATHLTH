@@ -204,9 +204,9 @@ enum ATHLTHBasicWorkoutRoutePolicy {
     }
 }
 
-/// Basic never opens the strength-equipment catalogue when the athlete
-/// selected walking, cycling, yoga or meditation. These four already have
-/// canonical timeline step types, so adding one activity is a single tap.
+/// Basic uses the actual planner categories; mobility maps to a yoga step.
+/// Meditation is not a planner category and must not be invented here.
+/// These timeline steps do not create independent HealthKit recordings.
 enum ATHLTHBasicWorkoutQuickStepPolicy {
     static func makeStep(
         for activity: ATHLTHPlannedWorkoutType?
@@ -214,15 +214,14 @@ enum ATHLTHBasicWorkoutQuickStepPolicy {
         guard let activity else { return nil }
         let isWalking = activity == .walking
         let isCycling = activity == .cycling
-        let isYoga = activity == .yoga
-        let isMeditation = activity == .meditation
-        guard isWalking || isCycling || isYoga || isMeditation else {
+        let isMobility = activity == .mobility
+        guard isWalking || isCycling || isMobility else {
             return nil
         }
 
         let duration: TimeInterval =
             isWalking || isCycling ? 30 * 60 :
-            isYoga ? 15 * 60 : 5 * 60
+            15 * 60
         let kind: WorkoutTemplateBlockKind = isWalking ? .run : .note
         var block = WorkoutTemplateBlock(
             sequence: 0, kind: kind,
@@ -234,8 +233,7 @@ enum ATHLTHBasicWorkoutQuickStepPolicy {
         )
         if isWalking { block.cardioActivity = .walking }
         if isCycling { block.activityTag = "cycling" }
-        if isYoga { block.wellnessKind = .yoga }
-        if isMeditation { block.wellnessKind = .meditation }
+        if isMobility { block.wellnessKind = .yoga }
         return block
     }
 }

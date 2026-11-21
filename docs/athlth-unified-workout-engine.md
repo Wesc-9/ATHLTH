@@ -1,3 +1,9 @@
+## 2.2.6 – CI: Basic planleggingskategori
+
+- Samme-commit CI på `a6d34787` feilet på iPhone, iPad, Build og Hybrid XCTest: `ATHLTHPlannedWorkoutType` har ikke `.yoga` eller `.meditation`.
+- `ATHLTHBasicWorkoutQuickStepPolicy` bruker nå eksisterende `.mobility` for et 15-minutters yogasteg, mens gå og sykkel fortsatt bruker 30 minutter. Meditasjon legges ikke inn som en fiktiv kategori; dette krever en egen eksplisitt støttet inngang.
+- Ingen HealthKit-opptak, historikk, autoritative eiere eller migreringer endres. Full samme-commit CI gjenstår.
+
 ## 2.2.6 – oppfølging: auth-refresh og midlertidig nettverkstap
 
 - Scenens aktive vindus-ID-er må ikke slettes under `clearLocalState()` ved kontobytte/autentiseringsoppfriskning: det er UI-vinduer, ikke kontoautorisasjon. De bevares derfor mens kun konto-/samtykkedata og auto-åpne-ID nullstilles. Ny pålogging kan dermed åpne en faktisk ny, godkjent liveøkt uten at scenen først må lukkes og åpnes igjen.

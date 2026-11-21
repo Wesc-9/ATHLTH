@@ -9,6 +9,24 @@ final class ATHLTHPlannedWorkoutTypePickerTests: XCTestCase {
         ))
     }
 
+    func testBasicQuickStepsUseOnlyActualPlannerCategories() {
+        let walking = ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .walking)
+        XCTAssertEqual(walking?.cardioActivity, .walking)
+        XCTAssertEqual(walking?.durationSeconds, 1800)
+
+        let cycling = ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .cycling)
+        XCTAssertEqual(cycling?.activityTag, "cycling")
+        XCTAssertEqual(cycling?.durationSeconds, 1800)
+
+        let mobility = ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .mobility)
+        XCTAssertEqual(mobility?.wellnessKind, .yoga)
+        XCTAssertEqual(mobility?.durationSeconds, 900)
+
+        XCTAssertNil(ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .running))
+        XCTAssertNil(ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .strength))
+        XCTAssertNil(ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .custom))
+    }
+
     func testFirstOpenUsesPhotoReferenceOrder() throws {
         let defaults = try suite()
         let user = UUID()
