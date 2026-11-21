@@ -123,16 +123,19 @@ jobs:
           set -euo pipefail
           # Keep an on-runner build log and periodic progress output so a
           # stalled Xcode build can be distinguished from a slow compile.
+          # Smoke tests validate launch and rendering; Release compilation is
+          # already verified separately by the required Build ATHLTH gate.
           LOG="$RUNNER_TEMP/athlth-iphone-simulator-build.log"
           set +e
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
-            -configuration Release \
+            -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=NO \
+            SWIFT_OPTIMIZATION_LEVEL=-Onone \
             build > "$LOG" 2>&1 &
           build_pid=$!
           while kill -0 "$build_pid" 2>/dev/null; do
@@ -197,7 +200,7 @@ jobs:
 
           # The app was built in an earlier workflow step. Explicitly
           # resolve it in this shell; step-local variables are not inherited.
-          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" \
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator" \
             -maxdepth 1 -name 'ATHLTH.app' -print -quit)
           test -n "$APP"
           test -d "$APP"
