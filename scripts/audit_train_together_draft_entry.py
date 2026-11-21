@@ -25,7 +25,20 @@ assert not re.search(
     r"initialWorkout:\s*blocks\.isEmpty\s*\?\s*nil",
     action,
 ), "Planner must never reopen workout selection for an existing draft"
-assert "workout.workoutBlocks = blocks" in builder, "Snapshot lost workout steps"
+# Basic can legitimately create an open Free Run block when the visible
+# timeline is empty. The snapshot must still preserve all authored blocks
+# and must not mutate the original timeline just for the invitation.
+assert re.search(
+    r"let\s+snapshotBlocks\s*:\s*\[WorkoutTemplateBlock\]"
+    r"\s*=\s*isPlannedWorkout[\s\S]*?blocks\.isEmpty"
+    r"[\s\S]*?ATHLTHBasicFreeRunPolicy\.makeOpenRunningBlock\(\)"
+    r"[\s\S]*?:\s*blocks",
+    builder,
+), "Snapshot must preserve edited blocks or create the explicit open Free Run"
+assert re.search(
+    r"workout\.workoutBlocks\s*=\s*snapshotBlocks\b",
+    builder,
+), "Snapshot lost workout steps"
 assert "workout.spotifyPlaylist = selectedSpotifyPlaylist" in builder, "Snapshot lost Spotify"
 assert "workout.gearIDs = Array(selectedWorkoutGearIDs)" in builder, "Snapshot lost gear"
 

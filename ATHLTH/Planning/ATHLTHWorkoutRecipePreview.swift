@@ -120,6 +120,50 @@ enum ATHLTHBasicFreeRunPolicy {
     }
 }
 
+/// Basic route actions must never destroy unrelated training exercises.
+/// Outdoor route selection can replace the single open Free Run placeholder,
+/// not append an accidental second run to the same planned workout.
+enum ATHLTHBasicWorkoutRoutePolicy {
+    static func attachingToOpenRun(
+        routeID: UUID,
+        title: String,
+        distanceMeters: Double,
+        in blocks: [WorkoutTemplateBlock]
+    ) -> [WorkoutTemplateBlock]? {
+        guard blocks.count == 1,
+              ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks),
+              distanceMeters.isFinite, distanceMeters > 0 else { return nil }
+        var run = blocks[0]
+        run.routeID = routeID
+        run.distanceMeters = distanceMeters
+        run.title = title
+        run.isIndoor = false
+        return [run]
+    }
+
+    static func clearingRoute(
+        _ routeID: UUID,
+        in blocks: [WorkoutTemplateBlock]
+    ) -> [WorkoutTemplateBlock] {
+        blocks.map { block in
+            var copy = block
+            if copy.routeID == routeID {
+                copy.routeID = nil
+            }
+            return copy
+        }
+    }
+
+    static func shouldClearSelectedRoute(
+        routeID: UUID,
+        before: [WorkoutTemplateBlock],
+        after: [WorkoutTemplateBlock]
+    ) -> Bool {
+        before.contains { $0.routeID == routeID } &&
+            !after.contains { $0.routeID == routeID }
+    }
+}
+
 /// Deleting an item in Basic acts on the real source blocks, never on
 /// the compact preview. A grouped prescription is removed atomically.
 enum ATHLTHBasicWorkoutContentsPolicy {

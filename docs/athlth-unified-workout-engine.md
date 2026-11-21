@@ -1,3 +1,10 @@
+## 2.2.6 – korrigert byggkontroll og trygg ruteredigering i Enkel
+
+- Backend- og hovedbygg ble blokkert av `scripts/audit_train_together_draft_entry.py`, som fortsatt krevde `workout.workoutBlocks = blocks` fra før Basic fri løping ble innført. Kontrollene validerer nå både den originale blokklisten og at en tom fri løping får én eksplisitt åpen blokk, uten å tillate at Train Together mister øktinnhold, Spotify eller utstyr.
+- I «Enkel» fjernet ruteknappen tidligere **hele** blokker med `routeID` og dermed tilhørende øvelser/intervalldata. Nå fjernes bare rutekoblingen; brukerens tids-/distansemål og øvrige øktinnhold beholdes. Å fjerne en helt annen øvelse nullstiller heller ikke en aktiv global rute.
+- Når en bruker velger en rute for den ene tomme «Fri løping»-blokken, brukes den samme blokken med nytt rutemål og tittel. Det legges ikke til en utilsiktet ekstra løpedel.
+- Rene XCTest dekker gjenbruk av fri løping, rute-fjerning uten datatap, bevaring av annen valgt rute og avvisning av ugyldig rutelengde. Fysisk UI-test og samlet same-commit build er fortsatt nødvendig.
+
 ## 2.2.6 – Enkel: ett trykk på «Fri løping», uten tids-/distansemål
 
 - For valgt idrett **Løping** vises nå «Fri løping» som første, tydelige valg i Enkel. Beskrivelsen er «Ingen fast tid eller distanse. Løp så lenge du vil.» Når det er aktivt, viser kortet avhuking; ved helt tom ny løpeøkt er fri løping allerede standard, slik at «Lagre og gå videre» fungerer uten ekstra spørsmål.

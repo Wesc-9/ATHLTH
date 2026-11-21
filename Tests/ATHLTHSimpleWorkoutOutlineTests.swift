@@ -175,4 +175,59 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
     }
 
 
+    func testBasicRouteUsesSameFreeRunInsteadOfAppendingSecondRun() {
+        let original = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        let id = UUID()
+        let attached = ATHLTHBasicWorkoutRoutePolicy.attachingToOpenRun(
+            routeID: id, title: "Park loop", distanceMeters: 5300,
+            in: [original]
+        )
+        XCTAssertEqual(attached?.count, 1)
+        XCTAssertEqual(attached?.first?.routeID, id)
+        XCTAssertEqual(attached?.first?.distanceMeters, 5300)
+        XCTAssertEqual(attached?.first?.editorDragID, original.editorDragID)
+        XCTAssertNil(ATHLTHBasicWorkoutRoutePolicy.attachingToOpenRun(
+            routeID: id, title: "Invalid", distanceMeters: .nan,
+            in: [original]
+        ))
+    }
+
+    func testRemovingRouteNeverDeletesWorkoutStepsOrTargets() {
+        let routeID = UUID()
+        var routedRun = block("Run", phase: .main, index: 1)
+        routedRun.routeID = routeID
+        routedRun.distanceMeters = 5000
+        let strength = block(
+            "Squats", kind: .exercise, phase: .main, index: 2
+        )
+        let before = [routedRun, strength]
+        let after = ATHLTHBasicWorkoutRoutePolicy.clearingRoute(
+            routeID, in: before
+        )
+        XCTAssertEqual(after.count, 2)
+        XCTAssertNil(after[0].routeID)
+        XCTAssertEqual(after[0].distanceMeters, 5000)
+        XCTAssertEqual(after[1], strength)
+        XCTAssertEqual(before[0].routeID, routeID,
+                       "Never mutate original recipe while previewing")
+    }
+
+    func testRemovingExerciseDoesNotUnselectUnrelatedGlobalRoute() {
+        let selectedID = UUID()
+        let exercise = block(
+            "Squats", kind: .exercise, phase: .main, index: 1
+        )
+        let after = ATHLTHBasicWorkoutContentsPolicy.removing(
+            from: [exercise], startingAt: 0, representedSteps: 1
+        )
+        XCTAssertFalse(ATHLTHBasicWorkoutRoutePolicy.shouldClearSelectedRoute(
+            routeID: selectedID, before: [exercise], after: after
+        ))
+        var routed = block("Run", phase: .main, index: 1)
+        routed.routeID = selectedID
+        XCTAssertTrue(ATHLTHBasicWorkoutRoutePolicy.shouldClearSelectedRoute(
+            routeID: selectedID, before: [routed], after: []
+        ))
+    }
+
 }

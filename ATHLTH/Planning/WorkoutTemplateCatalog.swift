@@ -6235,9 +6235,15 @@ struct WorkoutTemplateBuilderView: View {
 
                     if activeRouteID != nil {
                         Button {
+                            if let routeID = selectedRouteID {
+                                // Clearing the route must not erase interval
+                                // steps, exercise rows or the running session.
+                                blocks = ATHLTHBasicWorkoutRoutePolicy
+                                    .clearingRoute(routeID, in: blocks)
+                            }
                             selectedRouteID = nil
-                            blocks.removeAll { $0.routeID != nil }
                             resequence()
+                            persistWorkoutDraft()
                         } label: {
                             Image(systemName: "xmark.circle")
                                 .frame(minWidth: 38, minHeight: 44)
@@ -6392,12 +6398,13 @@ struct WorkoutTemplateBuilderView: View {
         startingAt index: Int,
         representedSteps: Int
     ) {
+        let previousBlocks = blocks
         let remaining = ATHLTHBasicWorkoutContentsPolicy.removing(
-            from: blocks,
+            from: previousBlocks,
             startingAt: index,
             representedSteps: representedSteps
         )
-        guard remaining.count != blocks.count else { return }
+        guard remaining.count != previousBlocks.count else { return }
         blocks = remaining
         resequence()
         studioBasicOwnedBlockIDs.formIntersection(
@@ -6405,7 +6412,9 @@ struct WorkoutTemplateBuilderView: View {
         )
         studioVisiblePhases = Set(blocks.map(\.resolvedPhase))
         if let routeID = selectedRouteID,
-           !blocks.contains(where: { $0.routeID == routeID }) {
+           ATHLTHBasicWorkoutRoutePolicy.shouldClearSelectedRoute(
+               routeID: routeID, before: previousBlocks, after: blocks
+           ) {
             selectedRouteID = nil
         }
         if blocks.isEmpty {
@@ -6981,6 +6990,22 @@ struct WorkoutTemplateBuilderView: View {
         if isPlannedWorkout && !studioAdvanced &&
             (initialActivity == .running || isWalkingRoute) {
             removeBasicOwnedBlocks()
+        }
+        if !studioAdvanced, initialActivity == .running,
+           let replaced = ATHLTHBasicWorkoutRoutePolicy.attachingToOpenRun(
+               routeID: route.id,
+               title: route.title,
+               distanceMeters: route.distanceKilometers * 1_000,
+               in: blocks
+           ) {
+            // The athlete chose ONE free run and ONE route. Update that
+            // original step, rather than creating two runnable steps.
+            blocks = replaced
+            selectedRouteID = route.id
+            studioVisiblePhases.insert(phase)
+            resequence()
+            persistWorkoutDraft()
+            return
         }
         // Selecting a course for a Basic free walk replaces the single
         // untargeted placeholder instead of silently doubling the workout.
