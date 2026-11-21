@@ -151,7 +151,14 @@ jobs:
           
           if pending:
               sys.exit(2)
-          
+
+          # Verify the branch again after waiting for the slowest gate.
+          # A release must not pass on evidence from an obsolete commit.
+          branch = api(f"repos/{repo}/git/ref/heads/{os.environ['GITHUB_REF_NAME']}")
+          if branch["object"]["sha"] != sha:
+              print("::error::Release branch advanced during acceptance checks.")
+              sys.exit(1)
+
           build_id = selected["Build ATHLTH"]["id"]
           jobs = []
           for page in range(1, 6):
