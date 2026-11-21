@@ -278,8 +278,7 @@ jobs:
               {
                 echo "Device: $DEVICE_NAME ($UDID), boot attempt $boot_attempt"
                 date -u
-                xcrun simctl list devices available || true
-                xcrun simctl diagnose -h || true
+                simctl_bounded "list devices after failed boot" 30 list devices available || true
               } >> "$RUNNER_TEMP/athlth-iphone-boot-diagnostics.txt" 2>&1
               if [ "$boot_attempt" -lt 2 ]; then
                 simctl_bounded "shutdown unresponsive $DEVICE_NAME" 35 shutdown "$UDID" || true
