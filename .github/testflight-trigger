@@ -282,3 +282,5 @@ ATHLTH 2.2.6 user-authorized TestFlight retry after iPad recovery shell fix 9e0e
 ATHLTH 2.2.6 explicitly authorized gated TestFlight retry after bounded iPhone simulator build diagnostics fe351ad, 2026-11-21. Upload only after all five same-commit checks succeed.
 
 ATHLTH 2.2.6 gated TestFlight retry after iPhone simulator smoke Debug build fix 87ac0fa, 2026-11-21. Keep all five same-commit gates mandatory.
+
+ATHLTH 2.2.6 gated TestFlight rerun after simulator recovery and bounded diagnostics bd265ac, 2026-11-21. Require all five checks to pass before upload.
