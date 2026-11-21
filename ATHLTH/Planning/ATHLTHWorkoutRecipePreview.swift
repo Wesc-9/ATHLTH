@@ -148,7 +148,6 @@ enum ATHLTHBasicFreeRunPolicy {
 enum ATHLTHBasicWorkoutRoutePolicy {
     static func attachingToOpenRun(
         routeID: UUID,
-        title: String,
         distanceMeters: Double,
         in blocks: [WorkoutTemplateBlock]
     ) -> [WorkoutTemplateBlock]? {
@@ -157,8 +156,8 @@ enum ATHLTHBasicWorkoutRoutePolicy {
               distanceMeters.isFinite, distanceMeters > 0 else { return nil }
         var run = blocks[0]
         run.routeID = routeID
-        run.distanceMeters = distanceMeters
-        run.title = title
+        // A selected route is navigation, not a target distance for a
+        // deliberately open-ended Free Run. Preserve the free run identity.
         run.isIndoor = false
         return [run]
     }
@@ -183,6 +182,31 @@ enum ATHLTHBasicWorkoutRoutePolicy {
     ) -> Bool {
         before.contains { $0.routeID == routeID } &&
             !after.contains { $0.routeID == routeID }
+    }
+}
+
+/// In the simple editor, the athlete already selected a sport. Importing
+/// another sport's exercise collection as if it belonged to that sport
+/// would produce a misleading HealthKit recording and live card. Mixed
+/// workouts remain possible in Advanced, but not through this quick path.
+enum ATHLTHBasicWorkoutImportPolicy {
+    static func accepts(
+        blocks: [WorkoutTemplateBlock],
+        initialActivity: ATHLTHPlannedWorkoutType?
+    ) -> Bool {
+        guard let initialActivity else { return true }
+        return blocks.allSatisfy { block in
+            let category = ATHLTHWorkoutSportMode.forBlock(block)
+            if category == .instructions || category == .recovery {
+                return true
+            }
+            switch initialActivity {
+            case .running: return category == .running
+            case .walking: return category == .walking
+            case .strength: return category == .strength
+            default: return true
+            }
+        }
     }
 }
 

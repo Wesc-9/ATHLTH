@@ -1,3 +1,10 @@
+## 2.2.6 – feilkontroll: rute og bibliotek i Enkel
+
+- SwiftUI `onChange(of: selectedRouteID)` hadde en eldre restregel som slettet alle løpesteg med tidligere rute-ID eller samme tittel – selv etter at den nye «Fjern rute»-knappen hadde fjernet rute-ID. Den destruktive regelen er nå erstattet med en ren fjerning av rutekobling. Eksisterende øvelser, drag og treningsmål overlever.
+- Å legge til en rute i «Fri løping» beholder fortsatt **ett åpent løpesteg uten tids- eller distansemål**. Ruten brukes kun til veivisning, ikke som automatisk sluttgrense. Å fjerne ruten gir den opprinnelige frie økten tilbake.
+- Enkel sin bibliotekimport avviser nå også vanlige styrkeøvelser i en løpeøkt (og omvendt), ikke bare styrkegrupper. Dette holder Basic trygg og forutsigbar, mens kombinerte økter fortsatt kan konstrueres i Avansert.
+- Egne regresjonstester dekker krysset løping/styrke, fri løping med rute og rute-fjerning uten skjult datatap. Full native same-commit CI og fysisk iPhone/iPad/Watch-verifisering gjenstår.
+
 ## 2.2.6 – sikker gjenåpning og redigering i Enkel
 
 - Initialisering av redigeringsmodus brukte tidligere bare antallet blokker: en lagret **enkelt intervalløkt** ble dermed klassifisert som «Fri løping». Modus utledes nå fra reell oppskrift og eventuell rute. Ett mål- eller tidsstyrt løp forblir strukturert ved gjenåpning.

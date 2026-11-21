@@ -179,15 +179,17 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         let original = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
         let id = UUID()
         let attached = ATHLTHBasicWorkoutRoutePolicy.attachingToOpenRun(
-            routeID: id, title: "Park loop", distanceMeters: 5300,
+            routeID: id, distanceMeters: 5300,
             in: [original]
         )
         XCTAssertEqual(attached?.count, 1)
         XCTAssertEqual(attached?.first?.routeID, id)
-        XCTAssertEqual(attached?.first?.distanceMeters, 5300)
+        XCTAssertNil(attached?.first?.distanceMeters,
+                     "A route must not convert free running into a distance target")
+        XCTAssertEqual(attached?.first?.title, original.title)
         XCTAssertEqual(attached?.first?.editorDragID, original.editorDragID)
         XCTAssertNil(ATHLTHBasicWorkoutRoutePolicy.attachingToOpenRun(
-            routeID: id, title: "Invalid", distanceMeters: .nan,
+            routeID: id, distanceMeters: .nan,
             in: [original]
         ))
     }
@@ -284,6 +286,41 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         XCTAssertTrue(ATHLTHStrengthModeAvailability.canImport(
             [strength], initialActivity: .strength, containsStrength: false
         ))
+    }
+
+    func testBasicImportDeniesOtherSportsEvenWithoutStrengthGroups() {
+        let run = block("Run", kind: .run, phase: .main, index: 1)
+        let squat = block("Squat", kind: .exercise, phase: .main, index: 2)
+        let rest = block("Rest", kind: .rest, phase: .recovery, index: 3)
+        XCTAssertTrue(ATHLTHBasicWorkoutImportPolicy.accepts(
+            blocks: [run, rest], initialActivity: .running
+        ))
+        XCTAssertTrue(ATHLTHBasicWorkoutImportPolicy.accepts(
+            blocks: [squat, rest], initialActivity: .strength
+        ))
+        XCTAssertFalse(ATHLTHBasicWorkoutImportPolicy.accepts(
+            blocks: [squat], initialActivity: .running
+        ), "A plain strength exercise must not silently become a run")
+        XCTAssertFalse(ATHLTHBasicWorkoutImportPolicy.accepts(
+            blocks: [run, squat], initialActivity: .strength
+        ), "Hybrid recipes belong in Advanced, not a one-tap Basic session")
+    }
+
+    func testRemovingRouteFromFreeRunLeavesOpenBlockUntargeted() {
+        let original = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        let id = UUID()
+        let routed = ATHLTHBasicWorkoutRoutePolicy.attachingToOpenRun(
+            routeID: id, distanceMeters: 3500, in: [original]
+        )!
+        let cleared = ATHLTHBasicWorkoutRoutePolicy.clearingRoute(
+            id, in: routed
+        )
+        XCTAssertEqual(cleared.count, 1)
+        XCTAssertEqual(cleared[0].editorDragID, original.editorDragID)
+        XCTAssertTrue(ATHLTHBasicFreeRunPolicy.isFreeRunning(cleared),
+                      "Free run should still be Free run after removing navigation")
+        XCTAssertNil(cleared[0].durationSeconds)
+        XCTAssertNil(cleared[0].distanceMeters)
     }
 
 }

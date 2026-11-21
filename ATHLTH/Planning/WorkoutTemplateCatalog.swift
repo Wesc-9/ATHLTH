@@ -5444,18 +5444,16 @@ struct WorkoutTemplateBuilderView: View {
             .onChange(of: selectedRouteID) { oldValue, newValue in
                 savedToMyWorkouts = false
                 if let oldValue, newValue == nil {
-                    let routeTitle = session.savedRoutes.first {
-                        $0.id == oldValue
-                    }?.title
-                    // A route deselected from the picker must not leave
-                    // its distance-only step behind.
-                    blocks.removeAll { block in
-                        block.kind == .run &&
-                            (block.routeID == oldValue ||
-                             (block.routeID == nil && routeTitle != nil &&
-                              block.title == routeTitle))
+                    // Deselecting navigation must never erase authored
+                    // exercises, intervals, goals or an open Free Run.
+                    // The old title-based removal also deleted steps with
+                    // matching titles after their route had been cleared.
+                    let withoutRoute = ATHLTHBasicWorkoutRoutePolicy
+                        .clearingRoute(oldValue, in: blocks)
+                    if withoutRoute != blocks {
+                        blocks = withoutRoute
+                        resequence()
                     }
-                    resequence()
                 }
                 if studioBasicGhostSelected, let route = activeRoute {
                     ghostDraft.enabled = true
@@ -6442,6 +6440,9 @@ struct WorkoutTemplateBuilderView: View {
               ATHLTHStrengthModeAvailability.canImport(
                   recipe, initialActivity: initialActivity,
                   containsStrength: hasStrength
+              ),
+              ATHLTHBasicWorkoutImportPolicy.accepts(
+                  blocks: recipe, initialActivity: initialActivity
               ) else {
             actionNotice = tr(
                 "This workout is not compatible with the selected activity.",
@@ -7015,7 +7016,6 @@ struct WorkoutTemplateBuilderView: View {
         if !studioAdvanced, initialActivity == .running,
            let replaced = ATHLTHBasicWorkoutRoutePolicy.attachingToOpenRun(
                routeID: route.id,
-               title: route.title,
                distanceMeters: route.distanceKilometers * 1_000,
                in: blocks
            ) {
