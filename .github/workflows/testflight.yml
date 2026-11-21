@@ -108,7 +108,16 @@ jobs:
               print("::error::Release branch advanced; refusing to ship stale source.")
               sys.exit(1)
           
-          runs = api(f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")["workflow_runs"]
+          # GitHub may paginate workflow runs when a commit is retried repeatedly.
+          runs = []
+          for page in range(1, 6):
+              batch = api(f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100&page={page}")["workflow_runs"]
+              runs.extend(batch)
+              if len(batch) < 100:
+                  break
+          else:
+              print("::error::More than 500 workflow runs on this commit; refusing incomplete verification.")
+              sys.exit(1)
           required = [
               "Build ATHLTH",
               "ATHLTH backend regressions",
@@ -138,14 +147,30 @@ jobs:
               sys.exit(2)
           
           build_id = selected["Build ATHLTH"]["id"]
-          jobs = api(f"repos/{repo}/actions/runs/{build_id}/jobs?per_page=100")["jobs"]
+          jobs = []
+          for page in range(1, 6):
+              batch = api(f"repos/{repo}/actions/runs/{build_id}/jobs?per_page=100&page={page}")["jobs"]
+              jobs.extend(batch)
+              if len(batch) < 100:
+                  break
+          else:
+              print("::error::Build job list exceeds verification limit.")
+              sys.exit(1)
           for name in (["build"] if os.environ["GITHUB_REF_NAME"] == "release/v2.2.6" else ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]):
               matches = [job for job in jobs if job["name"] == name]
               if len(matches) != 1 or matches[0]["conclusion"] != "success":
                   print(f"::error::Required iPad/iOS job not verified: {name} in {build_id}")
                   sys.exit(1)
           
-          artifacts = api(f"repos/{repo}/actions/runs/{build_id}/artifacts?per_page=100")["artifacts"]
+          artifacts = []
+          for page in range(1, 6):
+              batch = api(f"repos/{repo}/actions/runs/{build_id}/artifacts?per_page=100&page={page}")["artifacts"]
+              artifacts.extend(batch)
+              if len(batch) < 100:
+                  break
+          else:
+              print("::error::Build artifact list exceeds verification limit.")
+              sys.exit(1)
           for size in ((11, 13) if os.environ["GITHUB_REF_NAME"] != "release/v2.2.6" else ()):
               name = f"athlth-ipad-smoke-screenshots-{size}"
               matched = [
