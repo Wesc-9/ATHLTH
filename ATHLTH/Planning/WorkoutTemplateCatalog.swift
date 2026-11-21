@@ -3235,13 +3235,14 @@ struct WorkoutTemplateDetailView: View {
     let entry: WorkoutTemplateCatalogEntry
 
     @AppStorage("athlth.workoutPreview.advanced.v1") private var advancedMode = false
-    @State private var saved = false
     @State private var showingWorkout = false
     @State private var showingEditor = false
     @State private var askingForPersonalTargets = false
     @State private var detailQuickGoalDecision: ATHLTHWorkoutGoalSheetDecision?
     @State private var editingPersonalTargets = false
     @State private var personalBlocks: [WorkoutTemplateBlock]?
+    @State private var activePersonalBlocks: [WorkoutTemplateBlock]?
+    @State private var showingResetConfirmation = false
     @State private var originalCompletions: [StructuredWorkoutCompletion] = []
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
@@ -3257,55 +3258,104 @@ struct WorkoutTemplateDetailView: View {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 
-    private var savedPersonalWorkout: PlannedSession? {
-        session.savedWorkoutTemplates.first {
-            $0.workoutTemplateID == entry.id || $0.sharedSourceSessionID == entry.id
-        }
+    private var accountKey: String {
+        String(describing: session.profile.userID)
     }
 
     private var libraryDisplayBlocks: [WorkoutTemplateBlock] {
-        // The original catalogue page never inherits personalized targets.
         ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
     }
 
+    private var displayedBlocks: [WorkoutTemplateBlock] {
+        activePersonalBlocks ?? libraryDisplayBlocks
+    }
+
     private var workoutForStarting: PlannedSession {
-        // A stable source ID lets original completions remain separate from
-        // personal My Workouts copies and their distinct session IDs.
+        // Preserve the original catalogue identity and recording path.
         var original = entry.plannedSession(useOriginalID: true)
-        original.workoutBlocks = libraryDisplayBlocks
+        original.workoutBlocks = displayedBlocks
         _ = ATHLTHWorkoutExerciseBinding.bind(
             &original, library: exerciseLibrary.allExercises
         )
         return original
     }
 
-    @discardableResult
-    private func savePersonalWorkout(blocks: [WorkoutTemplateBlock]) -> Bool {
-        // Legacy quick-target flow has no name editor. It must not persist a
-        // same-named public recipe; only the full template builder can save
-        // a changed workout with a distinct title.
-        showingEditor = true
-        return false
+    private var heroImageName: String {
+        switch entry.category {
+        case "running": return "ATHLTHHillRun"
+        case "strength": return "StrengthQuickHero"
+        case "walking": return "GoalWalking"
+        default: return "TrainHero"
+        }
     }
 
-    private func addToMyWorkouts() {
-        // Save must go through the editor: unchanged recipes and copies with
-        // the original name are not valid new library entries.
-        showingEditor = true
+    private var heroMetadata: String {
+        var parts: [String] = [
+            tr("\(entry.blocks.count) steps", "\(entry.blocks.count) deler")
+        ]
+        if let minutes = entry.estimatedDurationMinutes {
+            parts.append("~\(minutes) min")
+        }
+        parts.append(entry.difficulty)
+        return parts.joined(separator: "  ·  ")
     }
 
-    /// The library detail uses the same quick goal behavior as Plan and Train.
+    private func reloadPersonalTargets() {
+        activePersonalBlocks = ATHLTHWorkoutUserTargetsStore.load(
+            userID: accountKey, workoutID: entry.id, original: libraryDisplayBlocks
+        )
+    }
+
+    private func saveTargets(_ blocks: [WorkoutTemplateBlock]) {
+        guard ATHLTHWorkoutUserTargetsStore.save(
+            userID: accountKey, workoutID: entry.id,
+            original: libraryDisplayBlocks, customized: blocks
+        ) else {
+            shareError = tr(
+                "Personal targets could not be saved.",
+                "Kunne ikke lagre personlige mål."
+            )
+            return
+        }
+        reloadPersonalTargets()
+        editingPersonalTargets = false
+    }
+
+    private func resetPersonalTargets() {
+        ATHLTHWorkoutUserTargetsStore.reset(
+            userID: accountKey, workoutID: entry.id
+        )
+        activePersonalBlocks = nil
+        personalBlocks = nil
+    }
+
+    private func shareOriginalWorkout() {
+        // Never send private pace, load or heart-rate preferences to a friend.
+        do {
+            var original = entry.plannedSession()
+            original.workoutBlocks = libraryDisplayBlocks
+            preparedShare = try ATHLTHShareDraftFactory.workout(
+                original,
+                library: exerciseLibrary.allExercises,
+                ownerID: session.profile.userID
+            )
+        } catch {
+            shareError = error.localizedDescription
+        }
+    }
+
     private func finishDetailGoalSelection() {
         let decision = detailQuickGoalDecision
         detailQuickGoalDecision = nil
         switch decision {
         case .continueWith(let goal):
-            let clean = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
-            savePersonalWorkout(
-                blocks: ATHLTHWorkoutQuickGoalApplier.apply(goal, to: clean)
+            guard goal != .none else { return }
+            let targets = ATHLTHWorkoutQuickGoalApplier.apply(
+                goal, to: displayedBlocks
             )
+            saveTargets(targets)
         case .advanced:
-            personalBlocks = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+            personalBlocks = displayedBlocks
             editingPersonalTargets = true
         case .cancel, .none:
             break
@@ -3314,7 +3364,60 @@ struct WorkoutTemplateDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    Text(tr("WORKOUT DETAILS", "ØKTDETALJER"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Spacer(minLength: 8)
+                    Picker(tr("Detail level", "Detaljnivå"), selection: $advancedMode) {
+                        Text(tr("Simple", "Enkel")).tag(false)
+                        Text(tr("Advanced", "Avansert")).tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 196)
+                    .accessibilityIdentifier("workout-recipe-detail-mode")
+                }
+                .padding(.horizontal, 3)
+
+                QuickTrainingHeroCard(
+                    imageName: heroImageName,
+                    title: entry.title,
+                    subtitle: entry.summary,
+                    icon: entry.systemImage,
+                    height: 205,
+                    eyebrow: entry.category.uppercased(),
+                    metadata: heroMetadata
+                )
+
+                HStack(spacing: 10) {
+                    Button {
+                        askingForPersonalTargets = true
+                    } label: {
+                        Label(
+                            activePersonalBlocks == nil
+                                ? tr("Set my targets", "Sett mine mål")
+                                : tr("Adjust my targets", "Juster mine mål"),
+                            systemImage: "scope"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer(minLength: 8)
+
+                    if activePersonalBlocks != nil {
+                        Label(tr("Saved for you", "Lagret for deg"),
+                              systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                }
+                .padding(.horizontal, 3)
+
                 ATHLTHWorkoutRecipePreview(
                     title: entry.title,
                     summary: entry.summary,
@@ -3322,12 +3425,11 @@ struct WorkoutTemplateDetailView: View {
                     symbol: entry.systemImage,
                     difficulty: entry.difficulty,
                     durationMinutes: entry.estimatedDurationMinutes,
-                    blocks: libraryDisplayBlocks
+                    blocks: displayedBlocks,
+                    compactDetailLayout: true,
+                    detailAdvancedMode: $advancedMode
                 )
 
-                // All bundled Zoned sessions include genuine coaching notes
-                // beyond the numeric workout steps. Keep this optional and
-                // collapsed so the training timeline remains primary.
                 if let original = ATHLTHZonedPlanLibrary
                     .workout(forCatalogSlug: entry.slug) {
                     ATHLTHZonedWorkoutGuidanceCard(workout: original)
@@ -3339,32 +3441,20 @@ struct WorkoutTemplateDetailView: View {
                     )
                 )
 
-                Button {
-                    showingEditor = true
-                } label: {
-                    Label(tr("Customize a copy", "Tilpass en kopi"),
-                          systemImage: "slider.horizontal.3")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHPlanDesign.ink)
-
                 if let source = entry.sourceLabel {
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "checkmark.seal")
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(source)
                                 .font(.subheadline.weight(.semibold))
                             if entry.tags.contains("hyrox") {
                                 Text(tr(
-                                    "HYROX loads differ by division. Confirm the correct race load before starting.",
+                                    "HYROX loads vary by division. Confirm race load before starting.",
                                     "HYROX-belastning varierer med klasse. Kontroller konkurransevekten før start."
                                 ))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         Spacer(minLength: 0)
@@ -3375,7 +3465,7 @@ struct WorkoutTemplateDetailView: View {
 
                 if hasActiveWorkout {
                     Label(tr(
-                        "Finish the active workout before starting another.",
+                        "Finish your active workout before starting another.",
                         "Fullfør økten som pågår før du starter en ny."
                     ), systemImage: "info.circle")
                     .font(.caption)
@@ -3391,65 +3481,58 @@ struct WorkoutTemplateDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    do {
-                        preparedShare = try ATHLTHShareDraftFactory.workout(
-                            entry.plannedSession(),
-                            library: exerciseLibrary.allExercises,
-                            ownerID: session.profile.userID
-                        )
-                    } catch {
-                        shareError = error.localizedDescription
+                Menu {
+                    Button {
+                        showingEditor = true
+                    } label: {
+                        Label(tr("Customize a copy", "Tilpass en kopi"),
+                              systemImage: "square.on.square")
                     }
+                    Button(action: shareOriginalWorkout) {
+                        Label(tr("Send to user", "Send til bruker"),
+                              systemImage: "person.crop.circle.badge.plus")
+                    }
+                    Button {
+                        showingResetConfirmation = true
+                    } label: {
+                        Label(tr("Reset personal targets", "Nullstill"),
+                              systemImage: "arrow.counterclockwise")
+                    }
+                    .disabled(activePersonalBlocks == nil)
                 } label: {
-                    Label(tr("Share", "Del"), systemImage: "square.and.arrow.up")
+                    Image(systemName: "ellipsis")
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel(tr("Workout actions", "Økthandlinger"))
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            HStack(spacing: 12) {
-                Button {
-                    addToMyWorkouts()
-                } label: {
-                    Label(
-                        saved || savedPersonalWorkout != nil
-                            ? tr("Saved in My Workouts", "Lagret i Mine økter")
-                            : tr("Save to My Workouts", "Lagre i Mine økter"),
-                        systemImage: saved ? "checkmark.circle.fill" : "square.and.arrow.down"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 51)
+            Button {
+                guard !hasActiveWorkout else { return }
+                var workout = workoutForStarting
+                let report = ATHLTHWorkoutExerciseBinding.bind(
+                    &workout, library: exerciseLibrary.allExercises
+                )
+                guard report.isReady else {
+                    shareError = tr(
+                        "Resolve library exercises before starting: ",
+                        "Koble øvelsene til biblioteket før start: "
+                    ) + report.unresolved.prefix(4).joined(separator: ", ")
+                    return
                 }
-                .buttonStyle(.bordered)
-                .disabled(saved || savedPersonalWorkout != nil)
-
-                Button {
-                    guard !hasActiveWorkout else { return }
-                    var workout = workoutForStarting
-                    let report = ATHLTHWorkoutExerciseBinding.bind(
-                        &workout, library: exerciseLibrary.allExercises
-                    )
-                    guard report.isReady else {
-                        shareError = tr(
-                            "Resolve library exercises before starting: ",
-                            "Koble øvelsene til biblioteket før start: "
-                        ) + report.unresolved.prefix(4).joined(separator: ", ")
-                        return
-                    }
-                    showingWorkout = true
-                } label: {
-                    Label(tr("Start workout", "Start økt"),
-                          systemImage: "play.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 51)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
-                .disabled(hasActiveWorkout)
+                showingWorkout = true
+            } label: {
+                Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, minHeight: 54)
             }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
+            .disabled(hasActiveWorkout)
             .padding(.horizontal, 18)
             .padding(.vertical, 11)
-            .background(.regularMaterial)
+            .background(ATHLTHPlanDesign.canvas)
         }
         .sheet(
             isPresented: $askingForPersonalTargets,
@@ -3460,8 +3543,8 @@ struct WorkoutTemplateDetailView: View {
                 isRunning: entry.plannedSession().kind == .running,
                 durationMinutes: entry.estimatedDurationMinutes,
                 partCount: entry.blocks.count,
-                workoutSteps: entry.blocks,
-                savingToLibrary: true
+                workoutSteps: displayedBlocks,
+                savingToLibrary: false
             ) { decision in
                 detailQuickGoalDecision = decision
                 askingForPersonalTargets = false
@@ -3477,11 +3560,12 @@ struct WorkoutTemplateDetailView: View {
                         symbol: entry.systemImage,
                         difficulty: entry.difficulty,
                         durationMinutes: entry.estimatedDurationMinutes,
-                        blocks: personalBlocks ?? [],
+                        blocks: personalBlocks ?? displayedBlocks,
+                        compactDetailLayout: true,
+                        detailAdvancedMode: .constant(true),
                         onUpdateBlock: { index, updated in
-                            guard var draft = personalBlocks, draft.indices.contains(index) else {
-                                return
-                            }
+                            guard var draft = personalBlocks,
+                                  draft.indices.contains(index) else { return }
                             draft[index] = updated
                             personalBlocks = draft
                         }
@@ -3498,11 +3582,9 @@ struct WorkoutTemplateDetailView: View {
                         }
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button(tr("Save workout", "Lagre økt")) {
+                        Button(tr("Save targets", "Lagre mål")) {
                             guard let personalBlocks else { return }
-                            if savePersonalWorkout(blocks: personalBlocks) {
-                                editingPersonalTargets = false
-                            }
+                            saveTargets(personalBlocks)
                         }
                     }
                 }
@@ -3510,6 +3592,20 @@ struct WorkoutTemplateDetailView: View {
         }
         .sheet(item: $preparedShare) { draft in
             ATHLTHDirectShareSheet(draft: draft)
+        }
+        .confirmationDialog(
+            tr("Reset your personal targets?", "Nullstille dine personlige mål?"),
+            isPresented: $showingResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Reset", "Nullstill"), role: .destructive) {
+                resetPersonalTargets()
+            }
+        } message: {
+            Text(tr(
+                "Your pace, load and other personal targets will be removed. The original workout stays unchanged.",
+                "Målfart, belastning og andre personlige mål fjernes. Originaløkten endres ikke."
+            ))
         }
         .alert(tr("Could not complete action", "Kunne ikke fullføre"),
                isPresented: Binding(
@@ -3525,9 +3621,13 @@ struct WorkoutTemplateDetailView: View {
                 .environmentObject(session)
         }
         .onAppear {
+            reloadPersonalTargets()
             originalCompletions = StructuredWorkoutCompletionStore.load(
                 userID: session.profile.userID
             )
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            reloadPersonalTargets()
         }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             originalCompletions = StructuredWorkoutCompletionStore.load(
@@ -3537,7 +3637,7 @@ struct WorkoutTemplateDetailView: View {
         .sheet(isPresented: $showingEditor) {
             WorkoutTemplateBuilderView(
                 initialTitle: entry.title,
-                initialBlocks: libraryDisplayBlocks,
+                initialBlocks: displayedBlocks,
                 draftContext: "catalog-copy-\(entry.slug)",
                 sourceTemplateID: entry.id
             )

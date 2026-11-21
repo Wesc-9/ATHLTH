@@ -999,25 +999,31 @@ private struct QuickStartAutoPauseCard: View {
     }
 }
 
-private struct QuickTrainingHeroCard: View {
+struct QuickTrainingHeroCard: View {
     let imageName: String
     let title: String
     let subtitle: String?
     let icon: String
     let height: CGFloat
+    let eyebrow: String?
+    let metadata: String?
 
     init(
         imageName: String,
         title: String,
         subtitle: String? = nil,
         icon: String,
-        height: CGFloat = 148
+        height: CGFloat = 148,
+        eyebrow: String? = nil,
+        metadata: String? = nil
     ) {
         self.imageName = imageName
         self.title = title
         self.subtitle = subtitle
         self.icon = icon
         self.height = height
+        self.eyebrow = eyebrow
+        self.metadata = metadata
     }
 
     var body: some View {
@@ -1083,14 +1089,9 @@ private struct QuickTrainingHeroCard: View {
                                 )
                             )
 
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "QUICK TRAIN",
-                                norwegian:
-                                    "QUICK TRAIN"
-                            )
-                        )
+                        Text(eyebrow ?? ATHLTHLocalization.choose(
+                            english: "QUICK TRAIN", norwegian: "QUICK TRAIN"
+                        ))
                         .font(
                             .system(
                                 size: 9,
@@ -1119,19 +1120,17 @@ private struct QuickTrainingHeroCard: View {
                     if let subtitle,
                        !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(
-                                .subheadline
-                                    .weight(.medium)
-                            )
-                            .foregroundStyle(
-                                Color.white
-                                    .opacity(0.86)
-                            )
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.white.opacity(0.86))
                             .lineLimit(2)
-                            .fixedSize(
-                                horizontal: false,
-                                vertical: true
-                            )
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let metadata, !metadata.isEmpty {
+                        Text(metadata)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.white.opacity(0.96))
+                            .lineLimit(2)
                     }
                 }
 

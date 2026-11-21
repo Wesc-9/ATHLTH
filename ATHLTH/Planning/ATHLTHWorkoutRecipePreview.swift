@@ -492,6 +492,9 @@ struct ATHLTHWorkoutRecipePreview: View {
     // Hide the duplicate hero/statistics when this detailed timeline is
     // embedded below an existing workout overview sheet.
     var embeddedInDetails = false
+    /// Library detail owns its own hero and compact mode selector.
+    var compactDetailLayout = false
+    var detailAdvancedMode: Binding<Bool>? = nil
     var onUpdateBlock: ((Int, WorkoutTemplateBlock) -> Void)? = nil
 
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
@@ -514,6 +517,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     private var recipeTint: Color { ATHLTHPlanDesign.accentInk }
+    private var isAdvanced: Bool { detailAdvancedMode?.wrappedValue ?? advanced }
 
     private var maximumHeartRateBPM: Double? {
         ATHLTHHeartRateZones.resolvedMaximumBPM(
@@ -535,7 +539,7 @@ struct ATHLTHWorkoutRecipePreview: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 17) {
-            if !embeddedInDetails {
+            if !embeddedInDetails && !compactDetailLayout {
                 introduction
             }
             if ATHLTHThreeMinuteAllOut.isRunningTest(
@@ -543,8 +547,10 @@ struct ATHLTHWorkoutRecipePreview: View {
             ) {
                 ATHLTHThreeMinuteAllOutProtocol()
             }
-            modeControl
-            if advanced && !embeddedInDetails {
+            if !compactDetailLayout {
+                modeControl
+            }
+            if isAdvanced && !embeddedInDetails && !compactDetailLayout {
                 statistics
             }
             if let meters = ATHLTHRunningEstimate.distanceMeters(for: normalizedBlocks),
@@ -566,7 +572,7 @@ struct ATHLTHWorkoutRecipePreview: View {
                     "Beregnet fra planlagte hastigheter og distanser – ikke en registrert økt"
                 ))
             }
-            if advanced {
+            if isAdvanced {
                 expandableOutline
             } else {
                 simpleOutline
@@ -740,14 +746,14 @@ struct ATHLTHWorkoutRecipePreview: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                 Spacer(minLength: 4)
-                Text(advanced
+                Text(isAdvanced
                     ? tr("All details", "Alle detaljer")
                     : tr("At a glance", "Kort oversikt"))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
-            Picker(tr("Detail level", "Detaljnivå"), selection: $advanced) {
+            Picker(tr("Detail level", "Detaljnivå"), selection: detailAdvancedMode ?? $advanced) {
                 Text(tr("Simple", "Enkel")).tag(false)
                 Text(tr("Advanced", "Avansert")).tag(true)
             }
@@ -1023,7 +1029,7 @@ struct ATHLTHWorkoutRecipePreview: View {
                     }
                     .padding(.bottom, 12)
                 }
-                if advanced, let suggested = ATHLTHWorkoutStepCopy.suggestedZone(
+                if isAdvanced, let suggested = ATHLTHWorkoutStepCopy.suggestedZone(
                     for: block, workoutTitle: title
                 ) {
                     Label(suggested, systemImage: "heart")
