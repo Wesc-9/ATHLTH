@@ -639,6 +639,10 @@ private struct ATHLTHSceneRootView: View {
 
 
 private struct ATHLTHCompatibilityPreviewRootView: View {
+    // Preview and smoke launch bypass AppRootView. Give this independent
+    // iPad window the same scene-local state so the status card never
+    // encounters a missing EnvironmentObject while rendering.
+    @StateObject private var ipadLiveScene = ATHLTHiPadLiveScenePresentation()
     @State private var trainNavigationRequest:
         ATHLTHTrainNavigationRequest?
 
@@ -676,6 +680,7 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
         // of displaying five enlarged legacy iPhone tabs.
         if ATHLTHDeviceRole.isIPad {
             ATHLTHiPadStudioRootView()
+                .environmentObject(ipadLiveScene)
         } else {
             // Preserve the existing five-tab iPhone compatibility surface.
             switch requestedTab {
