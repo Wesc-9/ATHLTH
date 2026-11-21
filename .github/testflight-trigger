@@ -267,3 +267,5 @@ ATHLTH 2.2.4 build 132 — authorized recovery retry 2026-11-18 after three XCTe
 
 
 ATHLTH 2.2.5 build 133 — TestFlight upload explicitly authorized by user on 2026-11-19; full five-workflow release CI verified green on source fcc832a4e2cbe3297eea6a8bacb8438aa3bbb525 on 2026-11-20, including independent iPhone/iPad compatibility, watchOS, complete XCTest and iPad 11/13-inch screenshot artifacts. This trigger commit must independently pass the SAME-COMMIT release gate before signing iPhone/Watch/widgets and uploading to App Store Connect. No version bump, no source feature changes or frozen branch updates; physical GPS/HealthKit/Spotify/Audio Coach device acceptance remains untested.
+
+ATHLTH 2.2.6 build 134 — user-authorized TestFlight attempt 2026-11-21. Trigger on release/v2.2.6 only. Require full five-workflow same-commit release gate before signing and uploading; do not bypass CI, modify frozen branches, or claim Apple processing complete.
