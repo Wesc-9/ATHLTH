@@ -442,7 +442,42 @@ enum ATHLTHCrossDeviceLiveReadPolicy {
             sampleAge >= -10 && sampleAge <= 35 &&
             startAge >= -10 &&
             snapshot.elapsedSeconds.isFinite &&
-            snapshot.elapsedSeconds >= 0
+            snapshot.elapsedSeconds >= 0 &&
+            // An original source may be paused for a long time, but active
+            // workout duration must never exceed wall-clock time. Reject
+            // corrupted/incorrectly decoded values before they reach iPad.
+            snapshot.elapsedSeconds <= max(0, startAge) + 120 &&
+            snapshot.elapsedSeconds <= 366 * 86_400
+    }
+}
+
+/// A valid row can arrive out of order after a reconnect. Keep the last
+/// verified frame only while its own lease remains fresh; after expiry,
+/// clear the display rather than rewinding an old session by accepting an
+/// older but newly re-heartbeated database row.
+enum ATHLTHCrossDeviceSnapshotOrderPolicy {
+    enum Decision: Equatable {
+        case acceptIncoming, keepCurrent, clearExpired
+    }
+
+    static func decision(
+        current: ATHLTHCrossDeviceWorkoutSnapshot?,
+        incoming: ATHLTHCrossDeviceWorkoutSnapshot?,
+        currentExpiry: Date?,
+        at now: Date = Date()
+    ) -> Decision {
+        guard let current, let incoming,
+              current.sessionID == incoming.sessionID,
+              let previousTime = current.capturedAt,
+              let incomingTime = incoming.capturedAt,
+              incomingTime < previousTime else {
+            return .acceptIncoming
+        }
+        guard let currentExpiry, currentExpiry > now,
+              now.timeIntervalSince(previousTime) <= 35 else {
+            return .clearExpired
+        }
+        return .keepCurrent
     }
 }
 
@@ -1605,23 +1640,22 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                   client.auth.currentUser?.id == accountID,
                   !Task.isCancelled else { return }
             let row = rows.first
-            let next = row.flatMap {
+            let candidate = row.flatMap {
                 ATHLTHCrossDeviceLiveReadPolicy.accepts(
                     $0.snapshot,
                     updatedAt: $0.updatedAt,
                     expiresAt: $0.expiresAt
                 ) ? Self.boundedSpectatorSnapshot($0.snapshot) : nil
             }
-            // Polls can complete out of order after a connection drop.
-            // Do not rewind an approved live session with an older snapshot,
-            // even when its server row is still within the expiry window.
-            if let current = remote, let incoming = next,
-               current.sessionID == incoming.sessionID,
-               let currentCapturedAt = current.capturedAt,
-               let incomingCapturedAt = incoming.capturedAt,
-               incomingCapturedAt < currentCapturedAt {
-                return
-            }
+            let order = ATHLTHCrossDeviceSnapshotOrderPolicy.decision(
+                current: remote,
+                incoming: candidate,
+                currentExpiry: lastRemoteExpiry
+            )
+            if order == .keepCurrent { return }
+            // If the existing verified frame expired, never resurrect it
+            // from an older snapshot for the same session.
+            let next = order == .clearExpired ? nil : candidate
             let previous = remote?.id
             if previous != next?.id {
                 if foregroundedSinceLastPoll &&

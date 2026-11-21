@@ -778,6 +778,10 @@ enum ATHLTHiPadLiveMetrics {
     }
 
     static func duration(_ seconds: TimeInterval) -> String {
+        // The UI may receive a malformed/legacy metric before a new poll.
+        // Never convert NaN, infinity, or an unbounded Double to Int:
+        // Swift traps on such conversions and would crash the entire iPad.
+        guard seconds.isFinite, seconds <= 366 * 86_400 else { return "—" }
         let total = max(0, Int(seconds.rounded(.down)))
         let sec = total % 60
         let min = (total / 60) % 60
@@ -841,7 +845,8 @@ enum ATHLTHiPadLiveMetrics {
     }
 
     static func calories(_ calories: Double?) -> String {
-        guard let calories, calories.isFinite, calories > 0 else { return "—" }
+        guard let calories, calories.isFinite, (0...1_000_000).contains(calories),
+              calories > 0 else { return "—" }
         return "\(Int(calories.rounded()))"
     }
 

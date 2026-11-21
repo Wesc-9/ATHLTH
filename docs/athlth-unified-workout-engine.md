@@ -1,3 +1,10 @@
+## 2.2.6 – iPad: foreldede livesnapshots og ugyldige målinger
+
+- Et nettverkssvar fra en gammel Watch/iPhone-snapshot kunne tidligere få iPad til å beholde det siste bildet selv om dette var utløpt, eller i et omkoblingsvindu tilbakeføre et eldre tidspunkt. `ATHLTHCrossDeviceSnapshotOrderPolicy` skiller nå mellom å bruke et nyere gyldig svar, holde den ferske eksisterende rammen og rydde en utløpt lokal ramme. Ingen kilde-sesjon, autorisasjon eller opptaksdata endres.
+- `ATHLTHCrossDeviceLiveReadPolicy` avviser nå også urealistisk aktiv varighet som er større enn tid siden oppstart pluss klokkeslingringsmonn, eller over ett år. Dette er en defensiv parserkontroll for private snapshots, ikke en varighetsgrense på HealthKit.
+- `ATHLTHiPadLiveMetrics.duration` og `.calories` kontrollerer tallgrenser før `Double` konverteres til `Int`; feilaktig NaN, infinity eller ekstremverdier gir «—» i stedet for krasj.
+- Nye XCTest dekker sorteringsregelen ved reconnect og utløp, nye HealthKit-sesjoner, enorme/ugyldige tall og normalt gyldige klokker. Native CI / fysisk iPad-test er utsatt til samlet testfase.
+
 ## 2.2.6 – unngå dobbel polling fra Stage Manager-vinduer
 
 - `ATHLTHCrossDeviceWorkoutStore.shared` er én konto- og HealthKit-eierskapsavgrenset butikk, men hver `AppRootView` kjørte tidligere en egen uendelig `.task` / `track`-sløyfe. I Stage Manager kunne to vinduer dermed sende de samme Supabase-forespørslene og konkurrere om `remote`, `remotePresence` og forespørselsstatus.

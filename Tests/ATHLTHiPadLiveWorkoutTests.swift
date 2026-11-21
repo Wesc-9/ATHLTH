@@ -1093,4 +1093,52 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
                        "A previous account must never cancel new-account polling")
     }
 
+    func testIPadExpiredLiveFrameDoesNotRewindToOlderNetworkData() {
+        let now = Date(timeIntervalSince1970: 2_100_000_000)
+        var current = snapshot()
+        current.capturedAt = now.addingTimeInterval(-5)
+        var older = current
+        older.capturedAt = now.addingTimeInterval(-7)
+        let decision = ATHLTHCrossDeviceSnapshotOrderPolicy.decision
+        XCTAssertEqual(decision(
+            current: current, incoming: older,
+            currentExpiry: now.addingTimeInterval(20), at: now
+        ), .keepCurrent)
+        XCTAssertEqual(decision(
+            current: current, incoming: older,
+            currentExpiry: now.addingTimeInterval(-1), at: now
+        ), .clearExpired)
+        XCTAssertEqual(decision(
+            current: current, incoming: nil,
+            currentExpiry: now.addingTimeInterval(20), at: now
+        ), .acceptIncoming,
+        "A revoked/expired database row must clear a previously live session")
+        older.sessionID = UUID()
+        XCTAssertEqual(decision(
+            current: current, incoming: older,
+            currentExpiry: now.addingTimeInterval(20), at: now
+        ), .acceptIncoming, "A new source session can replace an old one")
+    }
+
+    func testIPadRejectsImpossibleElapsedAndNeverConvertsBadNumbers() {
+        let now = Date(timeIntervalSince1970: 2_100_000_000)
+        var remote = snapshot(elapsed: 600)
+        remote.startedAt = now.addingTimeInterval(-600)
+        remote.capturedAt = now.addingTimeInterval(-2)
+        XCTAssertTrue(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            remote, updatedAt: now.addingTimeInterval(-1),
+            expiresAt: now.addingTimeInterval(25), at: now
+        ))
+        remote.elapsedSeconds = 1_000_000_000
+        XCTAssertFalse(ATHLTHCrossDeviceLiveReadPolicy.accepts(
+            remote, updatedAt: now.addingTimeInterval(-1),
+            expiresAt: now.addingTimeInterval(25), at: now
+        ))
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.duration(.infinity), "—")
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.duration(.nan), "—")
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.duration(Double.greatestFiniteMagnitude), "—")
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.calories(Double.greatestFiniteMagnitude), "—")
+        XCTAssertEqual(ATHLTHiPadLiveMetrics.duration(0), "00:00")
+    }
+
 }
