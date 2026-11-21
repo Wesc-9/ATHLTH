@@ -1,3 +1,10 @@
+## 2.2.6 – unngå dobbel polling fra Stage Manager-vinduer
+
+- `ATHLTHCrossDeviceWorkoutStore.shared` er én konto- og HealthKit-eierskapsavgrenset butikk, men hver `AppRootView` kjørte tidligere en egen uendelig `.task` / `track`-sløyfe. I Stage Manager kunne to vinduer dermed sende de samme Supabase-forespørslene og konkurrere om `remote`, `remotePresence` og forespørselsstatus.
+- `ATHLTHCrossDevicePollingLease` velger nå én faktisk leser/avsender per konto. Andre iPad/iPhone-scener forblir **standby** og gjør ikke dobbel datalesing. Når eierens SwiftUI-task kanselleres, frigjøres leasingen; neste levende scene overtar neste syklus. En kontobytte-/utloggings-reset opphever gammelt eierskap, og gamle vinduer kan ikke frigjøre nye kontoers lease.
+- Uavhengig lokal expiry-kontroll av tilgangsforespørsel kjører fortsatt i hvert aktive view uten å være avhengig av polling-eierskapet. Eksisterende eier- og RLS-kontroller på live-data beholdes.
+- Rene XCTest dekker flere vinduer, gjentatt claim, standby, overtakelse og kontobytte. Same-commit iPad CI og fysisk multiwindow-verifisering gjenstår.
+
 ## 2.2.6 – iPad: utløp av tilgangsforespørsel og scene-livssyklus
 
 - Tidligere kunne en `outgoingRequestState == .pending` bli stående på iPad for alltid dersom Supabase-/auth-forespørsler feilet mens tillatelse var underveis: nettverksfeil ble korrekt avvist, men forespørselen fikk ingen **lokal utløpskontroll**. `ATHLTHiPadLiveRequestExpiryPolicy` og `outgoingRequestExpiresAt` avslutter nå 120-sekundersforespørselen også uten nett, ved foreground og i polling-sløyfen. Nytt forsøk nullstiller gamle request-ID-er for å unngå forsinkede callback-tilstander. Ingen lokal utløpskontroll kan godkjenne en økt; bare faktisk kildeenhet kan godkjenne.

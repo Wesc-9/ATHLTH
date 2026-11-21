@@ -463,6 +463,27 @@ enum ATHLTHiPadLiveRequestExpiryPolicy {
     }
 }
 
+/// Stage Manager may create one AppRoot .task per scene. The account's
+/// spectator status is a shared store, so concurrent scene pollers must not
+/// race to publish or clear the same status row. Waiting scenes take over
+/// after the owner task is canceled, without canceling each other's work.
+struct ATHLTHCrossDevicePollingLease {
+    private(set) var ownerToken: UUID?
+
+    mutating func claim(_ token: UUID) -> Bool {
+        if ownerToken == nil { ownerToken = token }
+        return ownerToken == token
+    }
+
+    mutating func release(_ token: UUID) {
+        if ownerToken == token { ownerToken = nil }
+    }
+
+    mutating func reset() {
+        ownerToken = nil
+    }
+}
+
 @MainActor
 final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     static let shared = ATHLTHCrossDeviceWorkoutStore()
@@ -489,6 +510,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private var nextWorkoutSharingExpiresAt: Date?
     private var outgoingRequestID: UUID?
     private var outgoingRequestExpiresAt: Date?
+    private var pollingLease = ATHLTHCrossDevicePollingLease()
 
     /// Only this phone's live, locally confirmed session authorizes publishing.
     func isApprovedForSession(_ sessionID: UUID) -> Bool {
@@ -589,6 +611,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     func clearLocalState() {
         remoteReadGeneration &+= 1
         presenceReadGeneration &+= 1
+        pollingLease.reset()
         remote = nil
         remotePresence = nil
         presenceConnectionIssue = false
@@ -640,15 +663,22 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             clearLocalState()
             trackingAccountID = accountID
         }
-        hasLoadedRemote = false
         let isPad = ATHLTHDeviceRole.isIPad
+        let thisPoller = UUID()
+        defer {
+            pollingLease.release(thisPoller)
+        }
         while !Task.isCancelled && trackingAccountID == accountID {
             // Expiration is local: a network outage or auth refresh cannot
             // keep a superseded iPad permission request pending indefinitely.
             if isPad { expireOutgoingRequestIfNeeded() }
+            // Only one scene of a signed-in account may poll/update
+            // Supabase at a time. A standby scene never clears the live
+            // UI while the owner is still reading network responses.
+            let ownsPolling = pollingLease.claim(thisPoller)
             // Do not trust local profile IDs as authorization: every request
             // also requires the active Supabase session to match that ID.
-            if client.auth.currentUser?.id == accountID {
+            if ownsPolling && client.auth.currentUser?.id == accountID {
                 if isPad {
                     await readPresence(accountID: accountID)
                     guard !Task.isCancelled, trackingAccountID == accountID else {
@@ -680,7 +710,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     )
                     await pollIncomingRequests(accountID: accountID)
                 }
-            } else if isPad {
+            } else if ownsPolling && isPad {
                 // Authentication may be refreshing after launch. This isn't
                 // proof that the iPhone is idle; show a reconnecting status.
                 remote = nil

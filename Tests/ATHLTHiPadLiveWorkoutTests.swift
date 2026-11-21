@@ -1063,4 +1063,34 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         ), false)
     }
 
+    func testMultipleIPadWindowsUseOneSharedSpectatorPoller() {
+        var lease = ATHLTHCrossDevicePollingLease()
+        let primary = UUID(), secondary = UUID(), third = UUID()
+        XCTAssertTrue(lease.claim(primary))
+        XCTAssertTrue(lease.claim(primary), "One scene may retain its lease")
+        XCTAssertFalse(lease.claim(secondary),
+                       "Second Stage Manager scene must not run duplicate polls")
+        XCTAssertFalse(lease.claim(third))
+        lease.release(secondary)
+        XCTAssertEqual(lease.ownerToken, primary,
+                       "A standby window cannot release an active poller")
+        lease.release(primary)
+        XCTAssertTrue(lease.claim(secondary),
+                      "Remaining scene takes over after the owner disappears")
+        lease.release(secondary)
+        XCTAssertTrue(lease.claim(third))
+    }
+
+    func testSpectatorPollerLeaseResetInvalidatesOldAccount() {
+        var lease = ATHLTHCrossDevicePollingLease()
+        let priorAccountScene = UUID(), currentAccountScene = UUID()
+        XCTAssertTrue(lease.claim(priorAccountScene))
+        lease.reset()
+        XCTAssertNil(lease.ownerToken)
+        XCTAssertTrue(lease.claim(currentAccountScene))
+        lease.release(priorAccountScene)
+        XCTAssertEqual(lease.ownerToken, currentAccountScene,
+                       "A previous account must never cancel new-account polling")
+    }
+
 }
