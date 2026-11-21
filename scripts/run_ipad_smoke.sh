@@ -239,7 +239,24 @@ validate_screen() {
   # Still fail when every sample stays visually blank.
   for attempt in 1 2 3 4; do
     sleep 8
-    simctl_bounded "screenshot iPad $label" 50 io "$UDID" screenshot "$screenshot"
+    # A screenshot service can hang after many successful preview launches.
+    # Retry a capture only when the app and simulator remain responsive;
+    # never convert a crash, blank frame, or unavailable simulator to success.
+    if ! simctl_bounded "screenshot iPad $label (attempt $attempt)" 50 io "$UDID" screenshot "$screenshot"; then
+      echo "::warning::Screenshot capture failed for $label; verifying app and simulator before retry."
+      simctl_bounded "diagnose screenshot device services" 30 spawn "$UDID" launchctl list \\
+        >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || return 1
+      simctl_bounded "diagnose screenshot app process" 30 spawn "$UDID" launchctl procinfo \\
+        com.wesc9.athlth >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
+      simctl_bounded "capture screenshot failure logs" 45 spawn "$UDID" log show --last 2m --style compact \\
+        --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' \\
+        >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
+      if [ "$attempt" -eq 4 ]; then
+        echo "::error::iPad $label screenshot capture failed four times."
+        return 1
+      fi
+      continue
+    fi
     test -s "$screenshot"
 
     entropy=$(magick "$screenshot" -colorspace Gray -format "%[entropy]" info:)
