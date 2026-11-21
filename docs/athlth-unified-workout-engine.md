@@ -1,3 +1,10 @@
+## 2.2.6 – iPad-gjennomgang: tilgangsdialog, scenes og kontobytte
+
+- `ATHLTHiPadLiveWorkoutStatusCard` var en betinget SwiftUI-view: kortet og dets `.sheet` forsvant samtidig når både godkjent live-data og statusheartbeat ble kortvarig borte. Dette passer tidligere rapport om at «Be om tilgang» forsvant. Kortet holdes nå montert mens en forespørsel sendes, venter eller arket står åpent. Tap av heartbeat gir nøktern «Venter på tilkobling» uten å eksponere HR, GPS, øvelser eller tittelen på en ikke-godkjent økt. Konto-utlogging lukker arket.
+- iPad Studio gjenopprettet `SceneStorage` på hver `.onAppear`, selv etter at brukeren hadde byttet side, lukket et modalvindu eller returnert fra bakgrunnen. Nå gjenopprettes scenens navigasjon kun én gang per scene-view. Manuelle sidemenyvalg og fokus beholdes gjennom midlertidige livssyklushendelser.
+- Ved reelt kontobytte eller utlogging nullstiller Studio nå **kun scene-bundne presentasjoner**: åpne inspeksjonsark, det valgte WorkoutSummary, enkeltøktmodaler, navigasjon, pending launch og sidevalget. Dette oppretter ingen ny opptaker og påvirker ikke treningshistorikk eller synkronisering. Ingen tidligere kontos økt kan bli stående i en iPad-sheet på den nye kontoen.
+- Rene iPad XCTest dekker varig forespørsel under heartbeat-utfall, ingen falske åpne økter i idle og lukking ved utlogging. Hele iPad 11-/13-tommer, fullførte Swift/XCTest og fysisk Watch→iPad godkjenning gjenstår.
+
 ## 2.2.6 – Audio Coach-speiling må tilhøre original Watch-økt
 
 - Ved en ny HealthKit-mirroring kunne iPhone fortsatt ha `hasAcknowledgedVoiceLease` fra forrige Watch-økt, eller et `prepareIPhoneAudioCoach`-oppsett som ble gjort før den gamle øktens siste snapshot. Den nye `ATHLTHMirroredAudioCoachSessionPolicy` kobler den midlertidige telefonstemmen bare til et ferskt, økt-spesifikt oppsett. En ny HealthKit-sesjon nullstiller gammel generation, tilbud og bekreftelser **før** speilingen aktiveres.

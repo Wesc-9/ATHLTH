@@ -922,4 +922,38 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         ))
     }
 
+    func testIPadAccessSheetSurvivesTransientPresenceHeartbeatGap() {
+        XCTAssertTrue(ATHLTHiPadLiveAccessPresentationPolicy.retainsCard(
+            signedIn: true, hasApprovedLive: false, hasPresence: true,
+            sheetOpen: false, requestState: .idle
+        ))
+        XCTAssertTrue(ATHLTHiPadLiveAccessPresentationPolicy.retainsCard(
+            signedIn: true, hasApprovedLive: false, hasPresence: false,
+            sheetOpen: true, requestState: .pending
+        ), "Permission sheet must not disappear when presence is polled")
+        XCTAssertTrue(ATHLTHiPadLiveAccessPresentationPolicy.retainsCard(
+            signedIn: true, hasApprovedLive: false, hasPresence: false,
+            sheetOpen: false, requestState: .pending
+        ), "Keep the resend path available until the request is resolved")
+        XCTAssertTrue(ATHLTHiPadLiveAccessPresentationPolicy.retainsCard(
+            signedIn: true, hasApprovedLive: false, hasPresence: false,
+            sheetOpen: false, requestState: .sending
+        ))
+    }
+
+    func testIPadAccessDoesNotRemainVisibleAfterAccountChangeOrIdle() {
+        XCTAssertFalse(ATHLTHiPadLiveAccessPresentationPolicy.retainsCard(
+            signedIn: false, hasApprovedLive: true, hasPresence: true,
+            sheetOpen: true, requestState: .pending
+        ), "Signing out must dismiss private-session controls")
+        XCTAssertFalse(ATHLTHiPadLiveAccessPresentationPolicy.retainsCard(
+            signedIn: true, hasApprovedLive: false, hasPresence: false,
+            sheetOpen: false, requestState: .idle
+        ), "Healthy idle iPad should not show a spurious live workout")
+        XCTAssertFalse(ATHLTHiPadLiveAccessPresentationPolicy.retainsCard(
+            signedIn: true, hasApprovedLive: false, hasPresence: false,
+            sheetOpen: false, requestState: .approved
+        ), "An old approval is not a live telemetry session")
+    }
+
 }

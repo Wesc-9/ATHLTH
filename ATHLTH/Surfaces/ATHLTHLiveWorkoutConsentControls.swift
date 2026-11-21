@@ -39,6 +39,23 @@ struct ATHLTHLiveWorkoutPrestartToggle: View {
     }
 }
 
+/// A transient same-account presence heartbeat gap may remove a card from
+/// Home. Keep an already-open iPad permission sheet mounted while the
+/// request is pending; this never permits reading protected telemetry.
+enum ATHLTHiPadLiveAccessPresentationPolicy {
+    static func retainsCard(
+        signedIn: Bool,
+        hasApprovedLive: Bool,
+        hasPresence: Bool,
+        sheetOpen: Bool,
+        requestState: ATHLTHLiveViewRequestState
+    ) -> Bool {
+        guard signedIn else { return false }
+        return hasApprovedLive || hasPresence || sheetOpen ||
+            requestState == .pending || requestState == .sending
+    }
+}
+
 /// The iPad shows that a workout is underway without leaking its title,
 /// pulse, pace, GPS, exercises or other consent-protected details. The user
 /// opens this card to request access for only the current session.
@@ -53,12 +70,21 @@ struct ATHLTHiPadLiveWorkoutStatusCard: View {
 
     private var sourceName: String {
         let source = live.remote?.sourceDevice ?? live.remotePresence?.sourceDevice
-        return source == "watch" ? "Apple Watch" : "iPhone"
+        return source == "watch"
+            ? "Apple Watch"
+            : source == "iphone" ? "iPhone"
+            : tr("recording device", "opptaksenheten")
     }
 
     var body: some View {
         if ATHLTHDeviceRole.isIPad &&
-           (live.remote != nil || live.remotePresence != nil) {
+           ATHLTHiPadLiveAccessPresentationPolicy.retainsCard(
+               signedIn: account.signedIn,
+               hasApprovedLive: live.remote != nil,
+               hasPresence: live.remotePresence != nil,
+               sheetOpen: showingAccess,
+               requestState: live.outgoingRequestState
+           ) {
             Button {
                 if live.remote != nil {
                     live.setExpanded(true)
@@ -83,7 +109,9 @@ struct ATHLTHiPadLiveWorkoutStatusCard: View {
                                 .fill(Color(red: 0.18, green: 0.62, blue: 0.38))
                                 .frame(width: 7, height: 7)
                                 .accessibilityHidden(true)
-                            Text(tr("WORKOUT IN PROGRESS", "ØKT PÅGÅR"))
+                            Text(live.remote != nil || live.remotePresence != nil
+                                 ? tr("WORKOUT IN PROGRESS", "ØKT PÅGÅR")
+                                 : tr("WAITING FOR CONNECTION", "VENTER PÅ TILKOBLING"))
                                 .font(.caption2.weight(.semibold))
                                 .tracking(1.3)
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -200,6 +228,13 @@ struct ATHLTHiPadLiveWorkoutStatusCard: View {
             }
             .onChange(of: live.remote?.id) { _, newID in
                 if newID != nil { showingAccess = false }
+            }
+            .onChange(of: account.profile.userID) { _, _ in
+                // A permission sheet belongs only to the original account.
+                showingAccess = false
+            }
+            .onChange(of: account.signedIn) { _, signedIn in
+                if !signedIn { showingAccess = false }
             }
         } else if ATHLTHDeviceRole.isIPad && account.signedIn &&
                     live.presenceConnectionIssue {

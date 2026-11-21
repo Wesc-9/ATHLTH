@@ -146,6 +146,9 @@ struct ATHLTHiPadStudioRootView: View {
     @SceneStorage("athlth.studio.selectedHomeDayEpoch")
     private var savedHomeDayEpoch: Double = 0
     @State private var selection: ATHLTHStudioDestination = .overview
+    /// onAppear can fire after a full-screen presentation or scene return.
+    /// Restoring SceneStorage again would rewind in-progress navigation.
+    @State private var didRestoreStudioScene = false
     // A repeated Home tap scrolls to the top; it must NOT destroy the
     // dashboard and restart its HealthKit, community and live child tasks.
     @State private var homeScrollRequest = 0
@@ -354,30 +357,39 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .onAppear {
-            // Only restore the menu preference explicitly set in this window.
-            sidebarVisibility = sidebarUserVisible ? .all : .detailOnly
-            // Scene-local, not shared across windows: Stage Manager windows
-            // can keep different destinations without fighting each other.
-            let compatibilityLaunch = ProcessInfo.processInfo.arguments
-                .contains {
-                    $0.hasPrefix("--athlth-compatibility-tab=") ||
-                        $0.hasPrefix("--athlth-compatibility-library=") ||
-                        $0.hasPrefix("--athlth-compatibility-sidebar=")
-                }
-            if !compatibilityLaunch {
-                if let restored = ATHLTHStudioDestination(rawValue: savedDestination) {
-                    selection = restored
-                }
-                libraryPage = ATHLTHStudioLibraryPage(rawValue: savedLibraryPage)
-                sidebarPage = ATHLTHSideMenuDestination(rawValue: savedSidebarPage)
-                communityTab = ATHLTHCommunityMainTab(rawValue: savedCommunityTab)
-                    ?? .overview
-                // Restore a user-selected week, but discard nonsensical
-                // timestamps (e.g. a corrupted or legacy scene value).
-                let restoredDate = Date(timeIntervalSince1970: savedHomeDayEpoch)
-                if savedHomeDayEpoch > 0,
-                   abs(restoredDate.timeIntervalSinceNow) < 366 * 86_400 {
-                    selectedHomeWeekDate = restoredDate
+            if !didRestoreStudioScene {
+                didRestoreStudioScene = true
+                // Restore exactly once per scene/view identity, not again
+                // when closing an inspector or returning from background.
+                sidebarVisibility = sidebarUserVisible ? .all : .detailOnly
+                let compatibilityLaunch = ProcessInfo.processInfo.arguments
+                    .contains {
+                        $0.hasPrefix("--athlth-compatibility-tab=") ||
+                            $0.hasPrefix("--athlth-compatibility-library=") ||
+                            $0.hasPrefix("--athlth-compatibility-sidebar=")
+                    }
+                if !compatibilityLaunch {
+                    if let restored = ATHLTHStudioDestination(
+                        rawValue: savedDestination
+                    ) {
+                        selection = restored
+                    }
+                    libraryPage = ATHLTHStudioLibraryPage(
+                        rawValue: savedLibraryPage
+                    )
+                    sidebarPage = ATHLTHSideMenuDestination(
+                        rawValue: savedSidebarPage
+                    )
+                    communityTab = ATHLTHCommunityMainTab(
+                        rawValue: savedCommunityTab
+                    ) ?? .overview
+                    let restoredDate = Date(
+                        timeIntervalSince1970: savedHomeDayEpoch
+                    )
+                    if savedHomeDayEpoch > 0,
+                       abs(restoredDate.timeIntervalSinceNow) < 366 * 86_400 {
+                        selectedHomeWeekDate = restoredDate
+                    }
                 }
             }
             studioPlanSync.switchAccount(
@@ -392,7 +404,7 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .onChange(of: session.profile.userID) { _, _ in
-            showingInspector = false
+            clearAccountBoundStudioSelection()
             studioPlanSync.switchAccount(
                 session.signedIn ? session.profile.userID : nil
             )
@@ -405,7 +417,7 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .onChange(of: session.signedIn) { _, signedIn in
-            if !signedIn { showingInspector = false }
+            if !signedIn { clearAccountBoundStudioSelection() }
             studioPlanSync.switchAccount(signedIn ? session.profile.userID : nil)
             goalAccountSync.switchAccount(signedIn ? session.profile.userID : nil)
             if signedIn {
@@ -1122,6 +1134,34 @@ struct ATHLTHiPadStudioRootView: View {
         case .settings:
             ATHLTHSettingsView()
         }
+    }
+
+    /// iPad scene restoration is intentionally per-window. A signed-out or
+    /// newly authenticated athlete must not inherit the previous athlete's
+    /// workout inspector, plan sheet or pending live navigation request.
+    private func clearAccountBoundStudioSelection() {
+        showingInspector = false
+        showingWorkoutDetail = false
+        inspectedWeekDate = nil
+        selectedWorkout = nil
+        pendingWeekTrainLaunch = false
+        pendingWeekStandaloneWorkout = nil
+        selectedStandaloneWorkout = nil
+        showingTrain = false
+        trainRequest = nil
+        focusedPlanningDate = nil
+        showingPlanSync = false
+        showingPresentation = false
+        resetDetailNavigation(force: true)
+        libraryPage = nil
+        sidebarPage = nil
+        selection = .overview
+        savedDestination = ATHLTHStudioDestination.overview.rawValue
+        savedLibraryPage = ""
+        savedSidebarPage = ""
+        savedCommunityTab = ATHLTHCommunityMainTab.overview.rawValue
+        savedHomeDayEpoch = 0
+        selectedHomeWeekDate = .now
     }
 
     private func clearWeekInspectorIfNeeded() {
