@@ -313,10 +313,40 @@ simctl_bounded "terminate iPad preview" 35 terminate "$UDID" com.wesc9.athlth ||
 for TAB in 0 1 2 3 4; do
   echo "Rendering ATHLTH iPad tab $TAB"
 
-  TAB_OUTPUT=$(simctl_bounded "launch iPad tab $TAB" 65 launch "$UDID" com.wesc9.athlth \
+  # A hosted CoreSimulator can stall on a launch request even while the
+  # installed app and its launch services remain healthy. Preserve the first
+  # error and retry only a simulator timeout, never a real launch failure.
+  if TAB_OUTPUT=$(simctl_bounded "launch iPad tab $TAB" 65 launch "$UDID" com.wesc9.athlth \
     --athlth-compatibility-preview \
-    "--athlth-compatibility-tab=$TAB" 2>&1)
-  echo "$TAB_OUTPUT"
+    "--athlth-compatibility-tab=$TAB" 2>&1); then
+    echo "$TAB_OUTPUT"
+  else
+    launch_status=$?
+    echo "$TAB_OUTPUT" >&2
+    if [ "$launch_status" -ne 124 ]; then
+      echo "::error::iPad tab $TAB launch failed with status $launch_status"
+      exit "$launch_status"
+    fi
+    echo "::warning::CoreSimulator launch timed out on tab $TAB; checking services before one retry."
+    simctl_bounded "probe iPad services after tab timeout" 45 spawn "$UDID" launchctl list \
+      >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || {
+        echo "::error::iPad simulator services unavailable after tab $TAB timeout."
+        exit 124
+      }
+    # The first request may have launched the app despite its timed-out reply.
+    simctl_bounded "terminate timed-out tab preview" 35 terminate "$UDID" com.wesc9.athlth \
+      >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
+    if TAB_OUTPUT=$(simctl_bounded "retry launch iPad tab $TAB" 90 launch "$UDID" com.wesc9.athlth \
+      --athlth-compatibility-preview \
+      "--athlth-compatibility-tab=$TAB" 2>&1); then
+      echo "$TAB_OUTPUT"
+    else
+      launch_status=$?
+      echo "$TAB_OUTPUT" >&2
+      echo "::error::iPad tab $TAB still failed after bounded simulator recovery (status $launch_status)."
+      exit "$launch_status"
+    fi
+  fi
 
   TAB_PID=$(echo "$TAB_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
   sleep 5
