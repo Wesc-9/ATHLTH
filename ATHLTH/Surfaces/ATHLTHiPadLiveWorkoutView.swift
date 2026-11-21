@@ -50,6 +50,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
     let onMinimize: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("athlth_ipad_live_keep_awake") private var keepAwake = false
     @State private var keepAwakeWindowID = UUID()
     @EnvironmentObject private var session: AppSessionStore
@@ -203,12 +204,17 @@ struct ATHLTHiPadLiveWorkoutView: View {
         .accessibilityIdentifier("athlth-ipad-live-workout-fullscreen")
         .onAppear {
             ATHLTHiPadKeepAwakeCoordinator.setEnabled(
-                keepAwake, for: keepAwakeWindowID
+                keepAwake && scenePhase == .active, for: keepAwakeWindowID
             )
         }
         .onChange(of: keepAwake) { _, enabled in
             ATHLTHiPadKeepAwakeCoordinator.setEnabled(
-                enabled, for: keepAwakeWindowID
+                enabled && scenePhase == .active, for: keepAwakeWindowID
+            )
+        }
+        .onChange(of: scenePhase) { _, phase in
+            ATHLTHiPadKeepAwakeCoordinator.setEnabled(
+                keepAwake && phase == .active, for: keepAwakeWindowID
             )
         }
         .onDisappear {

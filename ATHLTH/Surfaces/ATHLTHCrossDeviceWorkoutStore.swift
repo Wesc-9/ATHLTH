@@ -446,6 +446,23 @@ enum ATHLTHCrossDeviceLiveReadPolicy {
     }
 }
 
+/// A pending iPad access request has its own local expiry independent of
+/// network callbacks. The offline spectator must never show "waiting" forever
+/// when its original source-session request has expired.
+enum ATHLTHiPadLiveRequestExpiryPolicy {
+    static func isExpired(
+        state: ATHLTHLiveViewRequestState,
+        expiry: Date?,
+        at now: Date = Date()
+    ) -> Bool {
+        guard state == .pending || state == .sending,
+              let expiry,
+              expiry.timeIntervalSince1970.isFinite,
+              now.timeIntervalSince1970.isFinite else { return false }
+        return now >= expiry
+    }
+}
+
 @MainActor
 final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     static let shared = ATHLTHCrossDeviceWorkoutStore()
@@ -471,6 +488,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private var approvedSourceSessionID: UUID?
     private var nextWorkoutSharingExpiresAt: Date?
     private var outgoingRequestID: UUID?
+    private var outgoingRequestExpiresAt: Date?
 
     /// Only this phone's live, locally confirmed session authorizes publishing.
     func isApprovedForSession(_ sessionID: UUID) -> Bool {
@@ -554,6 +572,18 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     func didForeground() {
         foregroundedSinceLastPoll = true
+        expireOutgoingRequestIfNeeded()
+    }
+
+    private func expireOutgoingRequestIfNeeded(at now: Date = Date()) {
+        guard ATHLTHiPadLiveRequestExpiryPolicy.isExpired(
+            state: outgoingRequestState,
+            expiry: outgoingRequestExpiresAt,
+            at: now
+        ) else { return }
+        outgoingRequestState = .expired
+        outgoingRequestID = nil
+        outgoingRequestExpiresAt = nil
     }
 
     func clearLocalState() {
@@ -575,6 +605,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         nextWorkoutSharingExpiresAt = nil
         incomingRequest = nil
         outgoingRequestID = nil
+        outgoingRequestExpiresAt = nil
         outgoingRequestState = .idle
         requestError = nil
         approvedSourceSessionID = nil
@@ -612,6 +643,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         hasLoadedRemote = false
         let isPad = ATHLTHDeviceRole.isIPad
         while !Task.isCancelled && trackingAccountID == accountID {
+            // Expiration is local: a network outage or auth refresh cannot
+            // keep a superseded iPad permission request pending indefinitely.
+            if isPad { expireOutgoingRequestIfNeeded() }
             // Do not trust local profile IDs as authorization: every request
             // also requires the active Supabase session to match that ID.
             if client.auth.currentUser?.id == accountID {
@@ -1336,6 +1370,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
               outgoingRequestState != .sending else { return }
 
         outgoingRequestState = .sending
+        // Invalidate callbacks from any earlier request before sending
+        // a replacement; a delayed error must not overwrite new UI state.
+        outgoingRequestID = nil
         requestError = nil
         let now = Date()
         let request = ATHLTHLiveViewRequest(
@@ -1347,6 +1384,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             respondedAt: nil,
             approvedSessionID: nil
         )
+        outgoingRequestExpiresAt = request.expiresAt
         do {
             try await client.from("private_live_view_requests")
                 .upsert(request, onConflict: "user_id")
@@ -1356,6 +1394,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                   !Task.isCancelled else { return }
             outgoingRequestID = request.id
             outgoingRequestState = .pending
+            expireOutgoingRequestIfNeeded()
             // Best effort APNs only. Sending the request is independent from
             // notification permissions and never grants spectator access.
             Task { await notifyIPhoneAboutRequest(id: request.id, accountID: accountID) }
@@ -1364,6 +1403,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                   client.auth.currentUser?.id == accountID,
                   !Task.isCancelled else { return }
             outgoingRequestState = .failed
+            outgoingRequestExpiresAt = nil
             requestError = ATHLTHLocalization.choose(
                 english: "Unable to send the viewing request. Try again.",
                 norwegian: "Kunne ikke sende forespørselen. Prøv igjen."
@@ -1476,6 +1516,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     }
 
     private func pollOutgoingRequest(accountID: UUID) async {
+        expireOutgoingRequestIfNeeded()
         guard ATHLTHDeviceRole.isIPad,
               let requestID = outgoingRequestID,
               client.auth.currentUser?.id == accountID else { return }
@@ -1494,18 +1535,23 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             guard let row = rows.first, row.id == requestID else {
                 outgoingRequestState = .expired
                 outgoingRequestID = nil
+                outgoingRequestExpiresAt = nil
                 return
             }
             if row.expiresAt <= .now {
                 outgoingRequestState = .expired
                 outgoingRequestID = nil
+                outgoingRequestExpiresAt = nil
             } else if row.status == "denied" {
                 outgoingRequestState = .denied
                 outgoingRequestID = nil
+                outgoingRequestExpiresAt = nil
             } else if row.status == "approved" {
                 outgoingRequestState = .approved
                 outgoingRequestID = nil
+                outgoingRequestExpiresAt = nil
             } else {
+                outgoingRequestExpiresAt = row.expiresAt
                 outgoingRequestState = .pending
             }
         } catch {

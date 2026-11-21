@@ -1016,4 +1016,51 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         ), true)
     }
 
+    func testIPadLiveAccessRequestExpiresOfflineWithoutGrantingPermission() {
+        let expires = Date(timeIntervalSince1970: 1_900_000_120)
+        XCTAssertFalse(ATHLTHiPadLiveRequestExpiryPolicy.isExpired(
+            state: .pending, expiry: expires,
+            at: expires.addingTimeInterval(-1)
+        ))
+        XCTAssertTrue(ATHLTHiPadLiveRequestExpiryPolicy.isExpired(
+            state: .pending, expiry: expires, at: expires
+        ))
+        XCTAssertTrue(ATHLTHiPadLiveRequestExpiryPolicy.isExpired(
+            state: .sending, expiry: expires,
+            at: expires.addingTimeInterval(20)
+        ), "Even an unresolved server request must expire on the iPad")
+        XCTAssertFalse(ATHLTHiPadLiveRequestExpiryPolicy.isExpired(
+            state: .approved, expiry: expires,
+            at: expires.addingTimeInterval(20)
+        ), "A grant cannot be inferred from the local timer")
+        XCTAssertFalse(ATHLTHiPadLiveRequestExpiryPolicy.isExpired(
+            state: .pending, expiry: nil,
+            at: expires.addingTimeInterval(20)
+        ))
+    }
+
+    func testIPadKeepAwakeLeaseCanReleaseForBackgroundAndReacquire() {
+        var leases = ATHLTHiPadKeepAwakeLeaseState()
+        let a = UUID(), b = UUID()
+        XCTAssertEqual(leases.setEnabled(
+            true, for: a, currentIdleTimerDisabled: false
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            true, for: b, currentIdleTimerDisabled: true
+        ), true)
+        // One scene becomes inactive without its view disappearing.
+        XCTAssertEqual(leases.setEnabled(
+            false, for: a, currentIdleTimerDisabled: true
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            false, for: b, currentIdleTimerDisabled: true
+        ), false)
+        XCTAssertEqual(leases.setEnabled(
+            true, for: a, currentIdleTimerDisabled: false
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            false, for: a, currentIdleTimerDisabled: true
+        ), false)
+    }
+
 }

@@ -1,3 +1,9 @@
+## 2.2.6 – iPad: utløp av tilgangsforespørsel og scene-livssyklus
+
+- Tidligere kunne en `outgoingRequestState == .pending` bli stående på iPad for alltid dersom Supabase-/auth-forespørsler feilet mens tillatelse var underveis: nettverksfeil ble korrekt avvist, men forespørselen fikk ingen **lokal utløpskontroll**. `ATHLTHiPadLiveRequestExpiryPolicy` og `outgoingRequestExpiresAt` avslutter nå 120-sekundersforespørselen også uten nett, ved foreground og i polling-sløyfen. Nytt forsøk nullstiller gamle request-ID-er for å unngå forsinkede callback-tilstander. Ingen lokal utløpskontroll kan godkjenne en økt; bare faktisk kildeenhet kan godkjenne.
+- En iPad Stage Manager-scene som går i bakgrunnen uten å kjøre `.onDisappear` kan ellers fortsatt eie en skjermvåken-lease. Livevisningen frigir nå sin lease når scenen ikke er aktiv, og gjenoppretter den når scenen blir aktiv igjen. Flere vinduers øvrige leier blir uendret.
+- Regresjonstester dekker timeout ved pending/sending uten datadeling, samt overgang mellom flere aktive vinduer, scene-bakgrunn og tilbake til forgrunn. Same-commit iPad/Watch/iPhone build og fysisk enhetskontroll gjenstår.
+
 ## 2.2.6 – iPad Stage Manager og 13-tommers testdekning
 
 - «Hold skjermen på» brukte tidligere `previousIdleTimerDisabled` per visning, mens `UIApplication.shared.isIdleTimerDisabled` er global for appen. Lukking av ett iPad-vindu kunne derfor slå av skjermlåssperren mens et annet vindu fortsatt viste samme aktive økt. `ATHLTHiPadKeepAwakeLeaseState` registrerer nå uavhengige vindusleier; bare når siste aktive vindu avsluttes gjenopprettes opprinnelig systemverdi. Inaktiv bryter og dobbelt `.onDisappear` påvirker ikke andre.
