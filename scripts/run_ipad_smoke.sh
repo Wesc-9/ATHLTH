@@ -221,7 +221,8 @@ install_ipad_app() {
   # A hung install may leave installd unresponsive. Restart the simulator
   # instead of assuming that simply repeating install will make progress.
   simctl_bounded "shutdown ${size}-inch iPad before retry" 60 shutdown "$UDID" || true
-  simctl_bounded "reboot ${size}-inch iPad before retry" 120 boot "$UDID"
+  simctl_bounded "reboot ${size}-inch iPad before retry" 120 boot "$UDID" || \
+    echo "::warning::Simulator reboot request failed; probing actual launch services."
   wait_for_ipad_services "$size"
   simctl_bounded "install ATHLTH on ${size}-inch iPad (final attempt)" 300 install "$UDID" "$APP"
 }
