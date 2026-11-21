@@ -215,6 +215,7 @@ jobs:
   testflight:
     needs: release-checks
     runs-on: xcode-27
+    timeout-minutes: 240
     env:
       APPLE_TEAM_ID: D3AX7B6RMW
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
