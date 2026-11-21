@@ -1099,16 +1099,16 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         current.capturedAt = now.addingTimeInterval(-5)
         var older = current
         older.capturedAt = now.addingTimeInterval(-7)
-        let decision = ATHLTHCrossDeviceSnapshotOrderPolicy.decision
-        XCTAssertEqual(decision(
+        // Call the policy directly: function values erase Swift argument labels.
+        XCTAssertEqual(ATHLTHCrossDeviceSnapshotOrderPolicy.decision(
             current: current, incoming: older,
             currentExpiry: now.addingTimeInterval(20), at: now
         ), .keepCurrent)
-        XCTAssertEqual(decision(
+        XCTAssertEqual(ATHLTHCrossDeviceSnapshotOrderPolicy.decision(
             current: current, incoming: older,
             currentExpiry: now.addingTimeInterval(-1), at: now
         ), .clearExpired)
-        XCTAssertEqual(decision(
+        XCTAssertEqual(ATHLTHCrossDeviceSnapshotOrderPolicy.decision(
             current: current, incoming: nil,
             currentExpiry: now.addingTimeInterval(20), at: now
         ), .acceptIncoming,
@@ -1120,7 +1120,7 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
             currentStep: older.currentStep, nextStep: older.nextStep,
             completedSets: older.completedSets, totalSets: older.totalSets
         )
-        XCTAssertEqual(decision(
+        XCTAssertEqual(ATHLTHCrossDeviceSnapshotOrderPolicy.decision(
             current: current, incoming: newSession,
             currentExpiry: now.addingTimeInterval(20), at: now
         ), .acceptIncoming, "A new source session can replace an old one")

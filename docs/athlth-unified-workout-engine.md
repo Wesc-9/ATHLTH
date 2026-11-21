@@ -1,3 +1,8 @@
+## 2.2.6 – CI: iPad snapshot XCTest-kompilering
+
+- Samme-commit Build ATHLTH på `f58bc1c` feilet i `Tests/ATHLTHiPadLiveWorkoutTests.swift` på fire `extraneous argument labels`-feil. En lagret Swift-funksjonsverdi mister parameteretikettene; testene kaller nå `ATHLTHCrossDeviceSnapshotOrderPolicy.decision` direkte med opprinnelige etiketter.
+- Endringen er kun i tester og dokumentasjon; produksjonskode, HealthKit-eierskap og eksisterende treningshistorikk er urørt. Ny samme-commit CI må bekrefte rettingen.
+
 ## 2.2.6 – CI: Basic planleggingskategori
 
 - Samme-commit CI på `a6d34787` feilet på iPhone, iPad, Build og Hybrid XCTest: `ATHLTHPlannedWorkoutType` har ikke `.yoga` eller `.meditation`.
