@@ -188,7 +188,9 @@ wait_for_ipad_services() {
       return 1
     fi
     simctl_bounded "shutdown ${size}-inch iPad after boot stall" 65 shutdown "$UDID" || true
-    simctl_bounded "restart ${size}-inch iPad after boot stall" 120 boot "$UDID"
+    # A failed boot request is recoverable: the next iteration verifies services.
+    simctl_bounded "restart ${size}-inch iPad after boot stall" 120 boot "$UDID" || \
+      echo "::warning::CoreSimulator rejected restart; checking actual device state next."
   done
 }
 if ! wait_for_ipad_services "$CURRENT_SIZE"; then
@@ -199,7 +201,8 @@ if ! wait_for_ipad_services "$CURRENT_SIZE"; then
   echo "::warning::Registered simulator unresponsive; trying a fresh isolated device."
   UDID=$(create_compatible_ipad "$CURRENT_SIZE" "ATHLTH-iPad-fallback")
   IPAD_SIMULATOR_OWNED=1
-  simctl_bounded "boot fresh fallback iPad" 100 boot "$UDID"
+  simctl_bounded "boot fresh fallback iPad" 100 boot "$UDID" || \
+    echo "::warning::Fallback boot returned an error; verifying launch services."
   wait_for_ipad_services "$CURRENT_SIZE"
 fi
 # CoreSimulator on fresh hosted Macs sometimes reports boot complete while its
@@ -423,8 +426,9 @@ if UDID_13=$(create_compatible_ipad 13 "ATHLTH-iPad-13"); then
   fi
   UDID="$UDID_13"
   IPAD_SIMULATOR_OWNED=1
-  simctl_bounded "boot 13-inch iPad" 100 boot "$UDID"
-  simctl_bounded "wait for 13-inch iPad boot" 160 bootstatus "$UDID" -b
+  simctl_bounded "boot 13-inch iPad" 100 boot "$UDID" || \
+    echo "::warning::13-inch boot request failed; checking simulator readiness."
+  wait_for_ipad_services 13
   install_ipad_app 13
   simctl_bounded "launch 13-inch iPad home" 65 launch "$UDID" com.wesc9.athlth \
     --athlth-compatibility-preview \
