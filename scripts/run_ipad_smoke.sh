@@ -244,12 +244,12 @@ validate_screen() {
     # never convert a crash, blank frame, or unavailable simulator to success.
     if ! simctl_bounded "screenshot iPad $label (attempt $attempt)" 50 io "$UDID" screenshot "$screenshot"; then
       echo "::warning::Screenshot capture failed for $label; verifying app and simulator before retry."
-      simctl_bounded "diagnose screenshot device services" 30 spawn "$UDID" launchctl list \\
-        >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || return 1
-      simctl_bounded "diagnose screenshot app process" 30 spawn "$UDID" launchctl procinfo \\
-        com.wesc9.athlth >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
-      simctl_bounded "capture screenshot failure logs" 45 spawn "$UDID" log show --last 2m --style compact \\
-        --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' \\
+      # Capture diagnostic evidence, but a transient launchctl probe failure
+      # must not abort the bounded screenshot retry loop.
+      simctl_bounded "diagnose screenshot device services" 30 spawn "$UDID" launchctl list \
+        >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
+      simctl_bounded "capture screenshot failure logs" 45 spawn "$UDID" log show --last 2m --style compact \
+        --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' \
         >> "$RUNNER_TEMP/athlth-ipad-diagnostics.txt" 2>&1 || true
       if [ "$attempt" -eq 4 ]; then
         echo "::error::iPad $label screenshot capture failed four times."
