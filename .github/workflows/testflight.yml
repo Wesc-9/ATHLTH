@@ -211,6 +211,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The branch can advance while waiting for a macOS runner. Do not
+      # sign or upload an obsolete commit after the release gate passed.
+      - name: Recheck release branch before signing
+        if: github.ref == 'refs/heads/release/v2.2.6' || github.ref == 'refs/heads/release/v2.2.5'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq '.object.sha')
+          if [ "$current" != "$GITHUB_SHA" ]; then
+            echo "::error::Release branch moved from $GITHUB_SHA to $current while waiting for TestFlight; refusing stale upload."
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
       - name: Validate required secrets
         shell: bash
         run: |
