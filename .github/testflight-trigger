@@ -270,3 +270,5 @@ ATHLTH 2.2.5 build 133 — TestFlight upload explicitly authorized by user on 20
 
 ATHLTH 2.2.6 build 134 — user-authorized TestFlight attempt 2026-11-21. Trigger on release/v2.2.6 only. Require full five-workflow same-commit release gate before signing and uploading; do not bypass CI, modify frozen branches, or claim Apple processing complete.
 ATHLTH 2.2.6 TestFlight retry 2026-11-21 — user-authorized after restoring single-build CI; require same-commit release checks and signed archive validation.
+
+ATHLTH 2.2.6 gated TestFlight request after full acceptance validation and CoreSimulator recovery, 2026-11-21. Do not upload unless all five gates succeed on this exact SHA.
