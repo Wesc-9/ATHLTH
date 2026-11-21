@@ -2,3 +2,5 @@ ATHLTH 2.2.5 full validation refresh 2026-11-19 07:26 Europe/Oslo
 Purpose: launch hybrid/Watch and iPhone smoke alongside iOS/iPad and backend on the same commit.
 This marker never initiates TestFlight upload.
 Validation refresh: reject empty iPad screenshot artifacts; rerun all acceptance workflows after release gate fix 50ae46c7.
+
+ATHLTH 2.2.6 full release validation after CoreSimulator startup recovery (52a5100). Validate hybrid XCTest, Watch, iPhone, iPad, backend and build on this exact commit. No TestFlight upload.
