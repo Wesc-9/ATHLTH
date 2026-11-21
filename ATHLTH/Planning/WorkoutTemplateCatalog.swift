@@ -6271,7 +6271,6 @@ struct WorkoutTemplateBuilderView: View {
     private var isBasicFreeRunningSelected: Bool {
         initialActivity == .running &&
             studioBasicRunMode == .free &&
-            selectedRouteID == nil &&
             (blocks.isEmpty || ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks))
     }
 

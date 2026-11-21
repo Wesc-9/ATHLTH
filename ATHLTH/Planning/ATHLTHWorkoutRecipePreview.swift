@@ -104,7 +104,8 @@ enum ATHLTHBasicFreeRunPolicy {
             block.resolvedPhase == .main &&
             block.groupID == nil &&
             block.groupKind == nil &&
-            block.routeID == nil &&
+            // A linked route is navigation, not an exercise or target.
+            // Free running must remain open-ended with or without it.
             block.exerciseID == nil &&
             block.exerciseSlug == nil &&
             block.notes == nil &&
@@ -123,9 +124,11 @@ enum ATHLTHBasicFreeRunPolicy {
         blocks: [WorkoutTemplateBlock],
         routeID: UUID?
     ) -> RunQuickStartMode {
+        // A genuine open Free Run remains Free when a navigation route is
+        // attached. Other route workouts retain the dedicated route mode.
+        if isFreeRunning(blocks) { return .free }
         if routeID != nil { return .route }
-        return blocks.isEmpty || isFreeRunning(blocks)
-            ? .free : .structured
+        return blocks.isEmpty ? .free : .structured
     }
 
     /// A weekly plan requires a duration for calendar layout only.

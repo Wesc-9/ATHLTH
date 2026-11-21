@@ -264,7 +264,8 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([named]))
         var routed = free
         routed.routeID = UUID()
-        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([routed]))
+        XCTAssertTrue(ATHLTHBasicFreeRunPolicy.isFreeRunning([routed]),
+                      "Navigation alone cannot make Free Run a target workout")
         var annotated = free
         annotated.notes = "Stay at easy effort and check form"
         XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([annotated]))
@@ -321,6 +322,29 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
                       "Free run should still be Free run after removing navigation")
         XCTAssertNil(cleared[0].durationSeconds)
         XCTAssertNil(cleared[0].distanceMeters)
+    }
+
+    func testBasicRoutedFreeRunSurvivesSaveAndReopenWithoutTarget() {
+        let id = UUID()
+        let free = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        let routed = ATHLTHBasicWorkoutRoutePolicy.attachingToOpenRun(
+            routeID: id, distanceMeters: 7_500, in: [free]
+        )!
+        XCTAssertTrue(ATHLTHBasicFreeRunPolicy.isFreeRunning(routed))
+        XCTAssertEqual(
+            ATHLTHBasicFreeRunPolicy.initialMode(blocks: routed, routeID: id),
+            .free
+        )
+        XCTAssertEqual(ATHLTHBasicFreeRunPolicy.scheduledMinutes(
+            blocks: routed, requestedMinutes: nil, basicFreeRunning: true
+        ), 30, "A calendar estimate is allowed only outside the open run step")
+        let steps = PlannedWorkoutWatchBuilder.runningStepsFromEditedBlocks(
+            routed
+        )
+        XCTAssertEqual(steps.count, 1)
+        XCTAssertEqual(steps.first?.measure, .open)
+        XCTAssertNil(steps.first?.distanceMeters)
+        XCTAssertNil(steps.first?.durationSeconds)
     }
 
 }

@@ -1,3 +1,9 @@
+## 2.2.6 – Fri løping med rute er fortsatt fri ved lagring/gjenåpning
+
+- Målløs «Fri løping» med et valgt rute-ID ble tidligere klassifisert som ikke-fri fordi kontrollen krevde `routeID == nil`. Dette gjorde at «Lagre og gå videre» kunne kreve en varighet, og gjenåpning kunne vise feil Basic-modus.
+- Den eksplisitte, åpne Free Run-blokken regnes nå som fri selv når en navigasjonsrute er koblet til. En faktisk distanse, tid, intensitetsmål eller annen egen treningsøvelse gjør fortsatt økten strukturert. «Fri løping»-valget viser riktig avhuking også med rute.
+- Ekstra XCTest dekker kalenderestimat uten runtime-stopptid, riktig .open-konvertering for Watch, og fri-modus etter gjenåpning med rute. Full CI og fysisk øktverifisering må fortsatt godkjennes.
+
 ## 2.2.6 – feilkontroll: rute og bibliotek i Enkel
 
 - SwiftUI `onChange(of: selectedRouteID)` hadde en eldre restregel som slettet alle løpesteg med tidligere rute-ID eller samme tittel – selv etter at den nye «Fjern rute»-knappen hadde fjernet rute-ID. Den destruktive regelen er nå erstattet med en ren fjerning av rutekobling. Eksisterende øvelser, drag og treningsmål overlever.
