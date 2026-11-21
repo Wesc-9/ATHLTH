@@ -131,6 +131,22 @@ enum ATHLTHBasicFreeRunPolicy {
         return blocks.isEmpty ? .free : .structured
     }
 
+    static func restoredMode(
+        blocks: [WorkoutTemplateBlock],
+        routeID: UUID?,
+        previouslySelected: RunQuickStartMode?
+    ) -> RunQuickStartMode {
+        // Preserve the athlete's deliberate empty structured draft: it may
+        // mean they just removed Free Running with the delete control.
+        // For non-empty recipes, real content outranks legacy saved labels.
+        if blocks.isEmpty {
+            return previouslySelected ?? initialMode(
+                blocks: blocks, routeID: routeID
+            )
+        }
+        return initialMode(blocks: blocks, routeID: routeID)
+    }
+
     /// A weekly plan requires a duration for calendar layout only.
     /// The underlying .open running step must never adopt this estimate as
     /// a time target or auto-finish after 30 minutes.
@@ -185,6 +201,42 @@ enum ATHLTHBasicWorkoutRoutePolicy {
     ) -> Bool {
         before.contains { $0.routeID == routeID } &&
             !after.contains { $0.routeID == routeID }
+    }
+}
+
+/// Basic never opens the strength-equipment catalogue when the athlete
+/// selected walking, cycling, yoga or meditation. These four already have
+/// canonical timeline step types, so adding one activity is a single tap.
+enum ATHLTHBasicWorkoutQuickStepPolicy {
+    static func makeStep(
+        for activity: ATHLTHPlannedWorkoutType?
+    ) -> WorkoutTemplateBlock? {
+        guard let activity else { return nil }
+        let isWalking = activity == .walking
+        let isCycling = activity == .cycling
+        let isYoga = activity == .yoga
+        let isMeditation = activity == .meditation
+        guard isWalking || isCycling || isYoga || isMeditation else {
+            return nil
+        }
+
+        let duration: TimeInterval =
+            isWalking || isCycling ? 30 * 60 :
+            isYoga ? 15 * 60 : 5 * 60
+        let kind: WorkoutTemplateBlockKind = isWalking ? .run : .note
+        var block = WorkoutTemplateBlock(
+            sequence: 0, kind: kind,
+            title: activity.title,
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: duration,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        if isWalking { block.cardioActivity = .walking }
+        if isCycling { block.activityTag = "cycling" }
+        if isYoga { block.wellnessKind = .yoga }
+        if isMeditation { block.wellnessKind = .meditation }
+        return block
     }
 }
 

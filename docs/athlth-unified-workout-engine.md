@@ -1,3 +1,10 @@
+## 2.2.6 – Enkel inngang for flere idretter, og bevar manuelle valg
+
+- Tidligere åpnet knappen «Legg til øvelse» **styrkebiblioteket** også for gåing, sykling, yoga og meditasjon. Disse modusene har foreløpig ikke egne øvelsesbiblioteker. De bruker nå «Legg til aktivitet» for å legge til en korrekt gå-, sykkel-, yoga- eller meditasjonsdel direkte med **ett trykk**, mens styrke og løping fortsatt åpner sine respektive øvelsesbiblioteker. Alle delene går inn i den samme eksisterende `WorkoutTemplateBlock`-tidslinjen uten en sekundær opptaker.
+- Enkel beholdt ikke alltid et manuelt innstilt kalenderestimat ved import/tillegging av øvelser. Nå blir eksplisitt valgt antall minutter i Enkel bevart gjennom redigering; bare automatiske estimater beregnes på nytt.
+- Ved gjenåpning av utkast overstyres en foreldet `basicRunMode` av faktisk treningsoppskrift når blokker finnes. En bevisst tømt løpeøkt beholder derimot brukerens valgte modus, slik at slettet fri løping ikke gjenopprettes.
+- XCTest dekker korrekt identitet/varighet for de fire nye én-trykksaktivitetene, ingen fabrikkert øvelses-ID, og gjenåpning av gamle utkast. Same-commit native CI og fysisk iPhone/iPad/Watch-testing er fortsatt nødvendig.
+
 ## 2.2.6 – Fri løping med rute er fortsatt fri ved lagring/gjenåpning
 
 - Målløs «Fri løping» med et valgt rute-ID ble tidligere klassifisert som ikke-fri fordi kontrollen krevde `routeID == nil`. Dette gjorde at «Lagre og gå videre» kunne kreve en varighet, og gjenåpning kunne vise feil Basic-modus.

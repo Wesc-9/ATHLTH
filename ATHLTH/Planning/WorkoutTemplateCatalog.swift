@@ -4759,10 +4759,12 @@ struct WorkoutTemplateBuilderView: View {
             studioBasicDate = restored
         }
         if initialActivity == .running {
-            studioBasicRunMode = stored.basicRunMode
-                .flatMap(RunQuickStartMode.init(rawValue:)) ??
-                (stored.routeID != nil ? .route :
-                    stored.blocks.isEmpty ? .free : .structured)
+            studioBasicRunMode = ATHLTHBasicFreeRunPolicy.restoredMode(
+                blocks: blocks, routeID: selectedRouteID,
+                previouslySelected: stored.basicRunMode.flatMap(
+                    RunQuickStartMode.init(rawValue:)
+                )
+            )
             studioBasicGoalSelected = stored.basicGoalSelected ?? false
             studioBasicGhostSelected = stored.basicGhostSelected ?? false
             studioBasicGoalKind = stored.basicGoalKind
@@ -5430,10 +5432,16 @@ struct WorkoutTemplateBuilderView: View {
                     // Workout Details, including when added in Advanced.
                     synchronizeRunningEnvironment()
                 }
-                // A changed recipe updates the estimate even if the
-                // user previously entered a time. Keep the field editable.
-                manualDurationMinutes = nil
-                durationInputText = knownDurationMinutes.map(String.init) ?? ""
+                // A manual calendar time is the athlete's explicit choice.
+                // Recalculate only derived estimates as recipe rows change;
+                // otherwise importing a workout/exercise erased their input.
+                if let manualDurationMinutes,
+                   isPlannedWorkout && !studioAdvanced {
+                    durationInputText = String(manualDurationMinutes)
+                } else {
+                    manualDurationMinutes = nil
+                    durationInputText = knownDurationMinutes.map(String.init) ?? ""
+                }
                 savedToMyWorkouts = false
                 scheduleWorkoutDraftCheckpoint()
             }
@@ -6160,18 +6168,43 @@ struct WorkoutTemplateBuilderView: View {
                     .accessibilityIdentifier("athlth-basic-free-running")
                 }
 
-                basicAddAction(
-                    title: tr("Add exercise", "Legg til øvelse"),
-                    detail: tr("Choose from the exercise library",
-                               "Velg fra øvelsesbiblioteket"),
-                    symbol: "plus.circle.fill",
-                    emphasized: true
-                ) {
-                    selectedPhase = .main
-                    studioVisiblePhases.insert(.main)
-                    openExercisePicker()
+                if let activity = initialActivity,
+                   ATHLTHBasicWorkoutQuickStepPolicy.makeStep(
+                       for: activity
+                   ) != nil {
+                    basicAddAction(
+                        title: tr("Add activity", "Legg til aktivitet"),
+                        detail: tr(
+                            "Add another \(activity.title.lowercased()) step in one tap",
+                            "Legg til \(activity.title.lowercased()) med ett trykk"
+                        ),
+                        symbol: activity.symbol,
+                        emphasized: true
+                    ) {
+                        guard let step =
+                            ATHLTHBasicWorkoutQuickStepPolicy.makeStep(
+                                for: activity
+                            ) else { return }
+                        selectedPhase = .main
+                        studioVisiblePhases.insert(.main)
+                        insertBlock(step, toGroup: nil)
+                        persistWorkoutDraft()
+                    }
+                    .accessibilityIdentifier("athlth-basic-add-activity")
+                } else {
+                    basicAddAction(
+                        title: tr("Add exercise", "Legg til øvelse"),
+                        detail: tr("Choose from the exercise library",
+                                   "Velg fra øvelsesbiblioteket"),
+                        symbol: "plus.circle.fill",
+                        emphasized: true
+                    ) {
+                        selectedPhase = .main
+                        studioVisiblePhases.insert(.main)
+                        openExercisePicker()
+                    }
+                    .accessibilityIdentifier("athlth-basic-add-exercise")
                 }
-                .accessibilityIdentifier("athlth-basic-add-exercise")
 
                 basicAddAction(
                     title: tr("Add workout", "Legg til treningsøkt"),

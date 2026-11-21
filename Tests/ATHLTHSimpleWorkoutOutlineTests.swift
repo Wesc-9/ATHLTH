@@ -347,4 +347,54 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         XCTAssertNil(steps.first?.durationSeconds)
     }
 
+    func testBasicOneTapActivitiesKeepTheirOriginalSport() {
+        let expected: [(ATHLTHPlannedWorkoutType, ATHLTHWorkoutSportMode, Int)] = [
+            (.walking, .walking, 30),
+            (.cycling, .cycling, 30),
+            (.yoga, .yoga, 15),
+            (.meditation, .meditation, 5)
+        ]
+        for (type, expectedSport, minutes) in expected {
+            let created = ATHLTHBasicWorkoutQuickStepPolicy.makeStep(
+                for: type
+            )
+            XCTAssertNotNil(created)
+            guard let created else { continue }
+            XCTAssertEqual(ATHLTHWorkoutSportMode.forBlock(created),
+                           expectedSport)
+            XCTAssertEqual(created.durationSeconds, Double(minutes * 60))
+            XCTAssertEqual(created.resolvedPhase, .main)
+            XCTAssertNil(created.exerciseID,
+                         "Quick activity cannot invent a library exercise ID")
+            XCTAssertNil(created.groupID)
+        }
+        XCTAssertNil(ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .running))
+        XCTAssertNil(ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .strength))
+    }
+
+    func testRestoredBasicModeUsesActualRecipeNotOldDraftLabel() {
+        let open = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        var timed = open
+        timed.durationSeconds = 600
+        XCTAssertEqual(
+            ATHLTHBasicFreeRunPolicy.restoredMode(
+                blocks: [timed], routeID: nil, previouslySelected: .free
+            ).rawValue,
+            RunQuickStartMode.structured.rawValue
+        )
+        XCTAssertEqual(
+            ATHLTHBasicFreeRunPolicy.restoredMode(
+                blocks: [open], routeID: UUID(),
+                previouslySelected: .route
+            ).rawValue,
+            RunQuickStartMode.free.rawValue
+        )
+        XCTAssertEqual(
+            ATHLTHBasicFreeRunPolicy.restoredMode(
+                blocks: [], routeID: nil, previouslySelected: .structured
+            ).rawValue,
+            RunQuickStartMode.structured.rawValue
+        )
+    }
+
 }
