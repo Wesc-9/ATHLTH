@@ -276,3 +276,5 @@ ATHLTH 2.2.6 gated TestFlight request after full acceptance validation and CoreS
 ATHLTH 2.2.6 explicitly authorized TestFlight retry 2026-11-21: validate all same-commit required CI gates; sign and upload only on success.
 
 ATHLTH 2.2.6 user-authorized gated TestFlight attempt after iPad screenshot recovery c8852f3; same-commit CI required, 2026-11-21.
+
+ATHLTH 2.2.6 user-authorized TestFlight retry after iPad recovery shell fix 9e0eccd, 2026-11-21. Require all five CI gates on this exact commit.
