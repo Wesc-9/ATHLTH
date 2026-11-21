@@ -719,7 +719,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         remoteReadGeneration &+= 1
         presenceReadGeneration &+= 1
         pollingLease.reset()
-        foregroundSceneIDs.removeAll()
+        // Foreground scene tokens represent active UI windows, not any
+        // account's data. Keep them through auth refresh so a session
+        // loaded just after sign-in can still be presented once. The
+        // account-bound recording and auto-open identity are reset below.
         autoPresentedSessionID = nil
         remote = nil
         remotePresence = nil

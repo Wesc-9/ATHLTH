@@ -1,3 +1,8 @@
+## 2.2.6 – oppfølging: auth-refresh og midlertidig nettverkstap
+
+- Scenens aktive vindus-ID-er må ikke slettes under `clearLocalState()` ved kontobytte/autentiseringsoppfriskning: det er UI-vinduer, ikke kontoautorisasjon. De bevares derfor mens kun konto-/samtykkedata og auto-åpne-ID nullstilles. Ny pålogging kan dermed åpne en faktisk ny, godkjent liveøkt uten at scenen først må lukkes og åpnes igjen.
+- `fullScreenCover` kan kalle setter med `false` når remote-snapshot blir `nil` ved nettverksavbrudd. Vi behandler dette ikke som en manuell minimering; en tidligere eksplisitt åpnet, fortsatt godkjent originaløkt kan åpnes igjen når samme ID kommer tilbake. Reell minimering i et aktivt livevindu lagres fortsatt per scene og blir ikke automatisk opphevet ved reconnect.
+
 ## 2.2.6 – iPad: visning per vindu, bakgrunn, minimert ved reconnect
 
 - Liveopptak og consent forblir i én `ATHLTHCrossDeviceWorkoutStore.shared` (ikke et nytt HealthKit-opptak), men `isExpanded` kan ikke være delt mellom Stage Manager-vinduer. Ny `ATHLTHiPadLiveScenePresentation` lever i hvert `AppRootView` og injiseres til iPad Studio. Hjem-kort, livefullskjerm og minimer-pillen styrer **kun dette vinduet**.

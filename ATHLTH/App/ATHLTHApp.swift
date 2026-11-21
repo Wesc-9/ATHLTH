@@ -1744,10 +1744,12 @@ struct AppRootView: View {
                     phoneWorkout.active == nil
                 },
                 set: { expanded in
-                    if !expanded {
-                        ipadLiveScene.minimize(
-                            sessionID: crossDeviceWorkout.remote?.sessionID
-                        )
+                    if !expanded, let sessionID =
+                        crossDeviceWorkout.remote?.sessionID {
+                        // Losing the authorized network snapshot temporarily
+                        // dismisses the cover too. Only a real user dismissal
+                        // while the session still exists counts as minimizing.
+                        ipadLiveScene.minimize(sessionID: sessionID)
                     }
                 }
             )
