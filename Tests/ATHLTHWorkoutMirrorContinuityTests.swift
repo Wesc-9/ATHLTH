@@ -585,4 +585,54 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testNewMirrorCannotInheritPreviousWorkoutsPreparedAudioCoach() {
+        let now = startedAt.addingTimeInterval(250)
+        let previousSample = startedAt.addingTimeInterval(200)
+        XCTAssertFalse(ATHLTHMirroredAudioCoachSessionPolicy
+            .mayAttachPreparedCoach(
+                preparedAt: previousSample.addingTimeInterval(-10),
+                previousCapturedAt: previousSample,
+                isSameHealthKitSession: false, now: now
+            ), "Old phone speech cannot attach to a new Watch workout")
+        XCTAssertTrue(ATHLTHMirroredAudioCoachSessionPolicy
+            .mayAttachPreparedCoach(
+                preparedAt: previousSample.addingTimeInterval(5),
+                previousCapturedAt: previousSample,
+                isSameHealthKitSession: false, now: now
+            ), "Freshly prepared phone speech may attach to its next workout")
+        XCTAssertTrue(ATHLTHMirroredAudioCoachSessionPolicy
+            .mayAttachPreparedCoach(
+                preparedAt: previousSample.addingTimeInterval(-10),
+                previousCapturedAt: previousSample,
+                isSameHealthKitSession: true, now: now
+            ), "Reattaching the identical original session can keep preparation")
+    }
+
+    func testMirroredAudioCoachRejectsExpiredOrFuturePreparation() {
+        let now = startedAt.addingTimeInterval(200)
+        XCTAssertFalse(ATHLTHMirroredAudioCoachSessionPolicy
+            .mayAttachPreparedCoach(
+                preparedAt: nil, previousCapturedAt: nil,
+                isSameHealthKitSession: false, now: now
+            ))
+        XCTAssertFalse(ATHLTHMirroredAudioCoachSessionPolicy
+            .mayAttachPreparedCoach(
+                preparedAt: now.addingTimeInterval(-91),
+                previousCapturedAt: nil,
+                isSameHealthKitSession: false, now: now
+            ))
+        XCTAssertFalse(ATHLTHMirroredAudioCoachSessionPolicy
+            .mayAttachPreparedCoach(
+                preparedAt: now.addingTimeInterval(10),
+                previousCapturedAt: nil,
+                isSameHealthKitSession: false, now: now
+            ))
+        XCTAssertTrue(ATHLTHMirroredAudioCoachSessionPolicy
+            .mayAttachPreparedCoach(
+                preparedAt: now.addingTimeInterval(-3),
+                previousCapturedAt: nil,
+                isSameHealthKitSession: false, now: now
+            ))
+    }
+
 }

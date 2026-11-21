@@ -179,6 +179,32 @@ enum ATHLTHWorkoutMirrorContinuity {
 }
 
  
+/// A phone audio configuration is a one-workout lease, never permission to
+/// speak for the next Watch recording after a reconnect or rapid restart.
+/// Only a newly prepared coach, after the previous mirror's latest sample,
+/// may attach to a different original HealthKit workout.
+enum ATHLTHMirroredAudioCoachSessionPolicy {
+    static func mayAttachPreparedCoach(
+        preparedAt: Date?,
+        previousCapturedAt: Date?,
+        isSameHealthKitSession: Bool,
+        now: Date
+    ) -> Bool {
+        guard let preparedAt,
+              preparedAt.timeIntervalSince1970.isFinite,
+              now.timeIntervalSince1970.isFinite else { return false }
+        let age = now.timeIntervalSince(preparedAt)
+        guard age >= 0, age <= 90 else { return false }
+        if !isSameHealthKitSession,
+           let previousCapturedAt,
+           previousCapturedAt.timeIntervalSince1970.isFinite,
+           preparedAt <= previousCapturedAt {
+            return false
+        }
+        return true
+    }
+}
+
 /// Prepared Today cards have transport identity separate from the original
 /// workout. A competing local/remote start must never falsely acknowledge
 /// or consume a card simply because Watch happens to be recording.

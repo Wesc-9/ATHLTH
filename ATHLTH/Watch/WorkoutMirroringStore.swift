@@ -142,7 +142,13 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         latestVoiceLeaseRequestID = requestID
         lastVoiceLeaseOfferAt = now
-        Task { @MainActor in
+        let originalGeneration = voiceLeaseGenerationID
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.mirroredSession === session,
+                  self.voiceLeaseGenerationID == originalGeneration,
+                  self.iPhoneAudioCoachAttached,
+                  !self.aiConversationActive else { return }
             try? await session.sendToRemoteWorkoutSession(
                 data: payload
             )
@@ -222,7 +228,14 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
               let data = try? JSONEncoder().encode(receipt)
         else { return }
 
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self,
+                  self.mirroredSession === session,
+                  self.iPhoneAudioCoachAttached,
+                  self.hasAcknowledgedVoiceLease,
+                  self.snapshot?.startedAt.map({
+                      abs($0.timeIntervalSince(currentStart)) < 2
+                  }) == true else { return }
             try? await session.sendToRemoteWorkoutSession(data: data)
         }
     }
@@ -571,13 +584,28 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         let incomingKind = workoutKind(
             for: session.workoutConfiguration.activityType
         )
+        let sameHealthKitSession = mirroredSession === session
+        let previousCapturedAt = snapshot?.capturedAt
+        let mayAttachPreparedCoach =
+            ATHLTHMirroredAudioCoachSessionPolicy.mayAttachPreparedCoach(
+                preparedAt: iPhoneAudioCoachPreparedAt,
+                previousCapturedAt: previousCapturedAt,
+                isSameHealthKitSession: sameHealthKitSession,
+                now: Date()
+            )
         let carry = ATHLTHWorkoutMirrorContinuity.mayCarryRecordedMetrics(
             previous: snapshot,
             newKind: incomingKind,
             newStartedAt: session.startDate,
-            sameHealthKitSession: mirroredSession === session
+            sameHealthKitSession: sameHealthKitSession
         )
         let previous = carry ? snapshot : nil
+        if !sameHealthKitSession {
+            // Revoke the previous original workout's temporary voice lease
+            // BEFORE attaching the replacement. A fast second run cannot
+            // inherit a 4.5-second lease or pending acknowledgement.
+            resetVoiceLease()
+        }
 
         session.delegate = self
         mirroredSession = session
@@ -598,18 +626,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             routePointCount: previous?.routePointCount ?? 0
         )
 
-        if let preparedAt =
-                iPhoneAudioCoachPreparedAt,
-           Date()
-                .timeIntervalSince(
-                    preparedAt
-                ) <= 90 {
-            iPhoneAudioCoachAttached =
-                true
-            offerVoiceLeaseIfNeeded(
-                for: initialSnapshot
-            )
+        if mayAttachPreparedCoach {
+            iPhoneAudioCoachAttached = true
+            offerVoiceLeaseIfNeeded(for: initialSnapshot)
         } else {
+            // No authenticated preparation for THIS Watch recording:
+            // Watch owns speech and old iPhone Coach settings are discarded.
             clearIPhoneAudioCoach()
         }
 

@@ -1,3 +1,10 @@
+## 2.2.6 – Audio Coach-speiling må tilhøre original Watch-økt
+
+- Ved en ny HealthKit-mirroring kunne iPhone fortsatt ha `hasAcknowledgedVoiceLease` fra forrige Watch-økt, eller et `prepareIPhoneAudioCoach`-oppsett som ble gjort før den gamle øktens siste snapshot. Den nye `ATHLTHMirroredAudioCoachSessionPolicy` kobler den midlertidige telefonstemmen bare til et ferskt, økt-spesifikt oppsett. En ny HealthKit-sesjon nullstiller gammel generation, tilbud og bekreftelser **før** speilingen aktiveres.
+- Asynkrone stemmetilbud og kvitteringer som allerede var planlagt, sendes nå bare dersom den opprinnelige `HKWorkoutSession` fortsatt er aktuell og lease/Coach fremdeles tilhører denne speilingen. Gamle kommandoer kan ikke gå til en ny økt etter rask avslutning, oppstart eller reconnect.
+- Audio Coach på Apple Watch beholder fullt eierskap når iPhone ikke kan bevise riktig stemmeforberedelse, uten å stoppe et aktivt HealthKit-opptak. Rene XCTest dekker ny økt vs. ekte reattach, gammel/fremtidig forberedelse og frisk oppstart.
+- Komplett same-commit native build og fysisk test av AirPods/Voice/Watch-reconnect gjenstår.
+
 ## 2.2.6 – Enkel inngang for flere idretter, og bevar manuelle valg
 
 - Tidligere åpnet knappen «Legg til øvelse» **styrkebiblioteket** også for gåing, sykling, yoga og meditasjon. Disse modusene har foreløpig ikke egne øvelsesbiblioteker. De bruker nå «Legg til aktivitet» for å legge til en korrekt gå-, sykkel-, yoga- eller meditasjonsdel direkte med **ett trykk**, mens styrke og løping fortsatt åpner sine respektive øvelsesbiblioteker. Alle delene går inn i den samme eksisterende `WorkoutTemplateBlock`-tidslinjen uten en sekundær opptaker.
