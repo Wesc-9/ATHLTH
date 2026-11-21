@@ -253,8 +253,34 @@ jobs:
           echo "Running hybrid XCTest on simulator $UDID"
           # Boot one registered simulator explicitly: xcodebuild's default
           # parallel-test clones intermittently hang before connecting.
-          xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
+          # CoreSimulator can abort with "Invalid parameter ... devicePair"
+          # during bootstatus. Retry ONLY infrastructure startup, never XCTest.
+          simulator_ready=0
+          for attempt in 1 2 3; do
+            echo "::group::Simulator startup attempt $attempt/3"
+            xcrun simctl shutdown "$UDID" 2>/dev/null || true
+            if [ "$attempt" -gt 1 ]; then
+              xcrun simctl shutdown all 2>/dev/null || true
+              xcrun simctl delete unavailable 2>/dev/null || true
+              killall -9 Simulator 2>/dev/null || true
+              killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+              sleep 8
+            fi
+            if perl -e 'alarm shift; exec @ARGV' 90 xcrun simctl boot "$UDID" &&
+               perl -e 'alarm shift; exec @ARGV' 150 xcrun simctl bootstatus "$UDID" -b &&
+               perl -e 'alarm shift; exec @ARGV' 30 xcrun simctl spawn "$UDID" launchctl list >/dev/null; then
+              simulator_ready=1
+              echo "::endgroup::"
+              break
+            fi
+            echo "::warning::CoreSimulator startup failed on attempt $attempt; collecting diagnostics and retrying."
+            xcrun simctl list devices 2>&1 | tail -60 || true
+            echo "::endgroup::"
+          done
+          if [ "$simulator_ready" -ne 1 ]; then
+            echo "::error::CoreSimulator failed three bounded startup attempts; XCTest was not executed."
+            exit 1
+          fi
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
