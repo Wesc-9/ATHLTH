@@ -129,12 +129,18 @@ jobs:
           pending = False
           
           for name in required:
-              matches = [run for run in runs if run["name"] == name and run["head_sha"] == sha]
+              matches = [
+                  run for run in runs
+                  if run["name"] == name and run["head_sha"] == sha
+                  and run.get("event") in ("push", "workflow_dispatch")
+                  and run.get("head_branch") == os.environ["GITHUB_REF_NAME"]
+              ]
               if not matches:
                   print(f"Waiting for {name}: workflow missing on this commit")
                   pending = True
                   continue
-              run = max(matches, key=lambda item: item["id"])
+              # A rerun keeps the same run ID; inspect its current attempt/status.
+              run = max(matches, key=lambda item: (item["id"], item.get("run_attempt", 1)))
               selected[name] = run
               if run["status"] != "completed":
                   print(f"Waiting for {name}: {run['status']} ({run['id']})")
