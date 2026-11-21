@@ -66,6 +66,60 @@ enum ATHLTHWorkoutStepCopy {
 /// Presentation-only grouping over the canonical WorkoutTemplateBlock timeline.
 /// Used by both Quick Train/library previews and the shared plan/quick editor.
 /// Never edits, expands, reorders or rewrites a user's saved training prescription.
+/// A Basic Free Run is a single, untargeted running phase. It remains a
+/// real canonical block, so scheduled plans and the Watch have one recorder,
+/// while elapsed time/distance remain entirely athlete-controlled.
+enum ATHLTHBasicFreeRunPolicy {
+    static let calendarEstimateMinutes = 30
+
+    static func makeOpenRunningBlock() -> WorkoutTemplateBlock {
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .run,
+            title: ATHLTHLocalization.choose(
+                english: "Free running", norwegian: "Fri løping"
+            ),
+            exerciseSlug: nil,
+            distanceMeters: nil,
+            repetitions: nil,
+            durationSeconds: nil,
+            targetWeightKilograms: nil,
+            loadNote: nil,
+            notes: nil,
+            phase: .main
+        )
+        block.cardioActivity = .running
+        return block
+    }
+
+    static func isFreeRunning(_ blocks: [WorkoutTemplateBlock]) -> Bool {
+        guard blocks.count == 1, let block = blocks.first else {
+            return false
+        }
+        return block.kind == .run &&
+            block.cardioActivity != .walking &&
+            block.groupID == nil &&
+            block.distanceMeters == nil &&
+            block.durationSeconds == nil &&
+            block.targetPaceSecondsPerKilometer == nil &&
+            block.targetHeartRateZone == nil &&
+            block.targetHeartRatePercentMin == nil &&
+            block.targetHeartRatePercentMax == nil
+    }
+
+    /// A weekly plan requires a duration for calendar layout only.
+    /// The underlying .open running step must never adopt this estimate as
+    /// a time target or auto-finish after 30 minutes.
+    static func scheduledMinutes(
+        blocks: [WorkoutTemplateBlock],
+        requestedMinutes: Int?,
+        basicFreeRunning: Bool
+    ) -> Int? {
+        basicFreeRunning && isFreeRunning(blocks)
+            ? (requestedMinutes ?? calendarEstimateMinutes)
+            : requestedMinutes
+    }
+}
+
 /// Deleting an item in Basic acts on the real source blocks, never on
 /// the compact preview. A grouped prescription is removed atomically.
 enum ATHLTHBasicWorkoutContentsPolicy {

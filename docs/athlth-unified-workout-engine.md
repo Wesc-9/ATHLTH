@@ -1,3 +1,11 @@
+## 2.2.6 – Enkel: ett trykk på «Fri løping», uten tids-/distansemål
+
+- For valgt idrett **Løping** vises nå «Fri løping» som første, tydelige valg i Enkel. Beskrivelsen er «Ingen fast tid eller distanse. Løp så lenge du vil.» Når det er aktivt, viser kortet avhuking; ved helt tom ny løpeøkt er fri løping allerede standard, slik at «Lagre og gå videre» fungerer uten ekstra spørsmål.
+- Valget oppretter kun **ett åpent, mål-løst `WorkoutTemplateBlock(.run, .main)`** i den eksisterende motoren. Ingen annen HealthKit-sesjon, oppvarming, intervall, målfart eller sekundær timer legges til. Både Watch og iPhone sin felles løpemotor får `.open`-steg, ikke en 30-minutters stoppkommando.
+- Eksisterende øvelser/intervaller blir aldri overskrevet på et feiltrykk: bytte til fri løping viser en forståelig bekreftelse før innholdet erstattes. Å velge en løpeøvelse senere erstatter kun den enslige friløpsplassholderen, ikke andre redigerte drag, og skifter tilbake til strukturert planlegging.
+- Ukesplanens eldre blåkopi krever et klokkeslettestimat i minutter. Derfor brukes 30 minutter **kun som kalenderestimat** når mål-løs fri løping lagres til en ukesplan; estimatet skrives ikke inn som mål/stopptid i det åpne løpesteget. Egen enkeltøkt beholder ingen påtvunget varighet.
+- Nye rene tester verifiserer ett åpent løpesteg, ingen skjult distanse/varighet/målfart, korrekt Watch-konvertering, gyldig ukesplan-lagring og at strukturerte løp aldri forveksles med fri løping. Innbygging og fysisk UI-verifisering gjenstår.
+
 ## 2.2.6 – Enkel øktbygger: legg til øvelse eller ferdig treningsøkt
 
 - Den tidligere «Hva vil du gjøre?»-kategorien i Basic er erstattet av **to store, direkte knapper** under Øktdetaljer: «Legg til øvelse» (rett til eksisterende øvelsesbibliotek/løpeøvelser, uten ekstra fase- eller gruppevelger) og «Legg til treningsøkt» (rett til eksisterende bibliotek, kategorifokus fra valgt treningsform). Øktnavn, miljø og dato styrer fortsatt det originale planlagte øktobjektet.

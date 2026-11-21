@@ -125,4 +125,54 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
     }
 
 
+    func testBasicFreeRunIsOneUntargetedOriginalBlock() {
+        let free = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        XCTAssertTrue(ATHLTHBasicFreeRunPolicy.isFreeRunning([free]))
+        XCTAssertEqual(free.kind, .run)
+        XCTAssertNil(free.durationSeconds)
+        XCTAssertNil(free.distanceMeters)
+        XCTAssertNil(free.targetPaceSecondsPerKilometer)
+        XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(for: [free]),
+                     "Do not fabricate a 30-minute training goal")
+        let steps = PlannedWorkoutWatchBuilder.runningStepsFromEditedBlocks([free])
+        XCTAssertEqual(steps.count, 1)
+        XCTAssertEqual(steps.first?.measure, .open,
+                       "Watch running must wait for the user's own finish")
+    }
+
+    func testBasicFreeRunCalendarEstimateDoesNotBecomeRunningTarget() {
+        let free = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        let minutes = ATHLTHBasicFreeRunPolicy.scheduledMinutes(
+            blocks: [free], requestedMinutes: nil, basicFreeRunning: true
+        )
+        XCTAssertEqual(minutes, 30)
+        XCTAssertNil(free.durationSeconds)
+        XCTAssertTrue(ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Free run", kind: .running,
+            durationMinutes: minutes ?? 30, routeID: nil, blocks: [free]
+        ).isValid, "Free running must also save inside a structured training plan")
+        XCTAssertEqual(ATHLTHBasicFreeRunPolicy.scheduledMinutes(
+            blocks: [free], requestedMinutes: nil, basicFreeRunning: false
+        ), nil)
+    }
+
+    func testBasicFreeRunMustNotMisidentifyTargetedOrMultiStepRuns() {
+        let free = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        var targeted = free
+        targeted.durationSeconds = 1_200
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([targeted]))
+        var distance = free
+        distance.distanceMeters = 5_000
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([distance]))
+        var paced = free
+        paced.targetPaceSecondsPerKilometer = 300
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([paced]))
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([free, free]))
+        XCTAssertFalse(ATHLTHBasicFreeRunPolicy.isFreeRunning([]))
+        XCTAssertNil(ATHLTHBasicFreeRunPolicy.scheduledMinutes(
+            blocks: [targeted], requestedMinutes: nil, basicFreeRunning: true
+        ))
+    }
+
+
 }

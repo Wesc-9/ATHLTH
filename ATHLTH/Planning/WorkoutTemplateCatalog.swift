@@ -5034,7 +5034,8 @@ struct WorkoutTemplateBuilderView: View {
         // A distance-based outdoor route is a complete planned workout,
         // even without an estimated finishing time.
         let basicFreeRun = isPlannedWorkout && !studioAdvanced &&
-            initialActivity == .running && studioBasicRunMode == .free
+            initialActivity == .running && studioBasicRunMode == .free &&
+            (blocks.isEmpty || ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks))
         return (hasRunning || hasStrength || hasCycling ||
                 hasTimedWellness || basicFreeRun) &&
             !hasIncompleteStrengthGroup &&
@@ -5785,8 +5786,12 @@ struct WorkoutTemplateBuilderView: View {
                 isPresented: $confirmingBasicActivityReplacement,
                 titleVisibility: .visible
             ) {
-                Button(tr("Replace activity", "Bytt aktivitet"),
-                       role: .destructive) {
+                Button(
+                    pendingBasicActivityReplacement == "freeRunning"
+                        ? tr("Use free running", "Velg fri løping")
+                        : tr("Replace activity", "Bytt aktivitet"),
+                    role: .destructive
+                ) {
                     if let choice = pendingBasicActivityReplacement {
                         applyBasicQuickActivity(choice)
                     }
@@ -5796,10 +5801,15 @@ struct WorkoutTemplateBuilderView: View {
                     pendingBasicActivityReplacement = nil
                 }
             } message: {
-                Text(tr(
-                    "The existing workout steps will be replaced. Choose Advanced if you want to keep them.",
-                    "Dagens øktdeler blir erstattet. Velg Avansert hvis du vil beholde dem."
-                ))
+                Text(pendingBasicActivityReplacement == "freeRunning"
+                    ? tr(
+                        "Replace the existing exercises or intervals with a free run? Your saved workouts are not changed.",
+                        "Erstatte øvelsene eller intervallene i denne økten med fri løping? Lagrede økter endres ikke."
+                      )
+                    : tr(
+                        "The existing workout steps will be replaced. Choose Advanced if you want to keep them.",
+                        "Dagens øktdeler blir erstattet. Velg Avansert hvis du vil beholde dem."
+                      ))
             }
             .sheet(isPresented: $showingBlockPicker, onDismiss: {
                 if pendingStandaloneExercise {
@@ -6129,6 +6139,28 @@ struct WorkoutTemplateBuilderView: View {
             studioPlanHeader
 
             VStack(spacing: 9) {
+                if initialActivity == .running {
+                    basicAddAction(
+                        title: tr("Free running", "Fri løping"),
+                        detail: tr(
+                            "No fixed time or distance. Run until you finish.",
+                            "Ingen fast tid eller distanse. Løp så lenge du vil."
+                        ),
+                        symbol: "figure.run",
+                        emphasized: true,
+                        selected: isBasicFreeRunningSelected
+                    ) {
+                        if isBasicFreeRunningSelected { return }
+                        if !blocks.isEmpty {
+                            pendingBasicActivityReplacement = "freeRunning"
+                            confirmingBasicActivityReplacement = true
+                        } else {
+                            applyBasicQuickActivity("freeRunning")
+                        }
+                    }
+                    .accessibilityIdentifier("athlth-basic-free-running")
+                }
+
                 basicAddAction(
                     title: tr("Add exercise", "Legg til øvelse"),
                     detail: tr("Choose from the exercise library",
@@ -6231,11 +6263,19 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
+    private var isBasicFreeRunningSelected: Bool {
+        initialActivity == .running &&
+            studioBasicRunMode == .free &&
+            selectedRouteID == nil &&
+            (blocks.isEmpty || ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks))
+    }
+
     private func basicAddAction(
         title: String,
         detail: String,
         symbol: String,
         emphasized: Bool,
+        selected: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -6258,8 +6298,9 @@ struct WorkoutTemplateBuilderView: View {
                         .lineLimit(2)
                 }
                 Spacer(minLength: 6)
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .semibold))
+                Image(systemName: selected
+                      ? "checkmark.circle.fill" : "plus")
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
             }
             .padding(.horizontal, 12)
@@ -6407,6 +6448,14 @@ struct WorkoutTemplateBuilderView: View {
         manualDurationMinutes = nil
         durationInputText = ""
         switch choice {
+        case "freeRunning":
+            title = tr("Free running", "Fri løping")
+            studioBasicRunMode = .free
+            studioBasicGoalSelected = false
+            studioBasicGhostSelected = false
+            studioBasicWorkoutTitle = nil
+            blocks = [ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()]
+            synchronizeRunningEnvironment()
         case "walking", "running":
             title = choice == "walking" ? tr("Walk", "Gå") : tr("Run", "Løping")
             addRunBlock(activity: choice == "walking" ? .walking : .running)
@@ -8369,6 +8418,16 @@ struct WorkoutTemplateBuilderView: View {
 
     private func appendRunningExerciseBlocks(_ selected: [WorkoutTemplateBlock]) {
         guard !selected.isEmpty else { return }
+        if isPlannedWorkout && !studioAdvanced &&
+           initialActivity == .running {
+            // Picking a structured run replaces ONLY the empty Free Run
+            // placeholder, never an athlete-authored interval prescription.
+            if ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks) {
+                blocks.removeAll()
+                studioBasicOwnedBlockIDs.removeAll()
+            }
+            studioBasicRunMode = .structured
+        }
         // A saved main set retains its own main section; individual presets
         // use the phase chosen by the athlete in the add menu.
         if selected.allSatisfy({ $0.resolvedPhase == .main }) {
@@ -8711,6 +8770,13 @@ struct WorkoutTemplateBuilderView: View {
             ? suggestedAdvancedTitle : suggestedBasicTitle
         let cleanTitle = requestedTitle.isEmpty ? fallbackTitle : requestedTitle
 
+        let snapshotBlocks: [WorkoutTemplateBlock] =
+            isPlannedWorkout && !studioAdvanced &&
+            initialActivity == .running && studioBasicRunMode == .free &&
+            blocks.isEmpty
+            ? [ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()]
+            : blocks
+
         var workout = PlannedSession(
             id: UUID(),
             title: cleanTitle,
@@ -8723,7 +8789,7 @@ struct WorkoutTemplateBuilderView: View {
             exercises: [],
             notes: nil
         )
-        workout.workoutBlocks = blocks
+        workout.workoutBlocks = snapshotBlocks
         if gearSelectionTouched {
             workout.gearIDs = Array(selectedWorkoutGearIDs)
         }
@@ -8759,6 +8825,15 @@ struct WorkoutTemplateBuilderView: View {
             return
         }
         let cleanTitle = workout.title
+        // Calendar scheduling expects a duration, but a Basic Free Run
+        // itself has NO time/distance target. The estimated calendar slot
+        // must not be injected into its open-ended running step.
+        let planningMinutes = ATHLTHBasicFreeRunPolicy.scheduledMinutes(
+            blocks: workout.workoutBlocks ?? blocks,
+            requestedMinutes: resolvedDurationMinutes,
+            basicFreeRunning: isPlannedWorkout && !studioAdvanced &&
+                initialActivity == .running && studioBasicRunMode == .free
+        )
         if sourceTemplateID != nil, onSaveToPlan == nil, onAddStandalone == nil {
             // Copying an ATHLTH/public recipe is an explicit new workout,
             // never a silent duplicate of the original.
@@ -8801,7 +8876,7 @@ struct WorkoutTemplateBuilderView: View {
             guard onSaveToPlan(
                 cleanTitle, workout.workoutBlocks ?? blocks,
                 hasOutdoorCardio ? activeRouteID : nil,
-                resolvedDurationMinutes, manualDurationMinutes != nil, extras
+                planningMinutes, manualDurationMinutes != nil, extras
             ) else {
                 actionNotice = tr("Cannot save this workout yet",
                                   "Kunne ikke lagre økten ennå")
@@ -8811,7 +8886,7 @@ struct WorkoutTemplateBuilderView: View {
                 guard onCopyToPlan(
                     cleanTitle, workout.workoutBlocks ?? blocks,
                 hasOutdoorCardio ? activeRouteID : nil,
-                    resolvedDurationMinutes, Array(pendingCopyDayIDs).sorted(), extras
+                    planningMinutes, Array(pendingCopyDayIDs).sorted(), extras
                 ) else {
                     actionNotice = tr("Workout saved; check copy destinations",
                                       "Økten er lagret. Kontroller kopieringsdagene.")
