@@ -1113,17 +1113,28 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
             currentExpiry: now.addingTimeInterval(20), at: now
         ), .acceptIncoming,
         "A revoked/expired database row must clear a previously live session")
-        older.sessionID = UUID()
+        let newSession = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: UUID(), kind: older.kind, title: older.title,
+            startedAt: older.startedAt, elapsedSeconds: older.elapsedSeconds,
+            distanceMeters: older.distanceMeters,
+            currentStep: older.currentStep, nextStep: older.nextStep,
+            completedSets: older.completedSets, totalSets: older.totalSets
+        )
         XCTAssertEqual(decision(
-            current: current, incoming: older,
+            current: current, incoming: newSession,
             currentExpiry: now.addingTimeInterval(20), at: now
         ), .acceptIncoming, "A new source session can replace an old one")
     }
 
     func testIPadRejectsImpossibleElapsedAndNeverConvertsBadNumbers() {
         let now = Date(timeIntervalSince1970: 2_100_000_000)
-        var remote = snapshot(elapsed: 600)
-        remote.startedAt = now.addingTimeInterval(-600)
+        var remote = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: UUID(), kind: "running", title: "Free run",
+            startedAt: now.addingTimeInterval(-600),
+            elapsedSeconds: 600, distanceMeters: 2000,
+            currentStep: nil, nextStep: nil,
+            completedSets: nil, totalSets: nil
+        )
         remote.capturedAt = now.addingTimeInterval(-2)
         XCTAssertTrue(ATHLTHCrossDeviceLiveReadPolicy.accepts(
             remote, updatedAt: now.addingTimeInterval(-1),
