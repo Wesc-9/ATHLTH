@@ -261,14 +261,37 @@ PY
 }
 
 if [ "$IPAD_SIZE" = "13" ]; then
-  # Only the first Studio frame is required on the 13-inch layout.
-  # It runs on a fresh runner, without the 11-inch session's CoreSimulator
-  # churn, and must independently install, launch and render successfully.
-  simctl_bounded "launch 13-inch iPad home" 65 launch "$UDID" com.wesc9.athlth \
-    --athlth-compatibility-preview \
-    "--athlth-compatibility-tab=0"
-  validate_screen "13-inch-home"
-  echo "ATHLTH 13-inch iPad simulator install, launch and rendering passed."
+  # A separate runner with the real 13-inch layout must exercise the
+  # Studio destinations most vulnerable to environment and split-view
+  # regressions, not just a single Home frame.
+  preview_13_inch() {
+    local label="$1"
+    local argument="$2"
+    local output
+    local pid
+
+    output=$(simctl_bounded "launch 13-inch $label" 65 launch "$UDID" com.wesc9.athlth \
+      --athlth-compatibility-preview "$argument" 2>&1)
+    echo "$output"
+    pid=$(echo "$output" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+    sleep 5
+    if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+      echo "::error::ATHLTH 13-inch $label exited before rendering."
+      return 1
+    fi
+    validate_screen "13-inch-$label"
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "::error::ATHLTH 13-inch $label crashed after rendering."
+      return 1
+    fi
+    simctl_bounded "terminate 13-inch preview" 35 terminate "$UDID" com.wesc9.athlth || true
+  }
+
+  preview_13_inch "home" "--athlth-compatibility-tab=0"
+  preview_13_inch "plan-studio" "--athlth-compatibility-tab=1"
+  preview_13_inch "library-exercises" "--athlth-compatibility-library=exercises"
+  preview_13_inch "profile" "--athlth-compatibility-sidebar=profile"
+  echo "ATHLTH 13-inch iPad Home, Plan Studio, library, and Profile passed."
   exit 0
 fi
 

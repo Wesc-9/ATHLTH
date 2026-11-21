@@ -1,3 +1,10 @@
+## 2.2.6 – iPad Stage Manager og 13-tommers testdekning
+
+- «Hold skjermen på» brukte tidligere `previousIdleTimerDisabled` per visning, mens `UIApplication.shared.isIdleTimerDisabled` er global for appen. Lukking av ett iPad-vindu kunne derfor slå av skjermlåssperren mens et annet vindu fortsatt viste samme aktive økt. `ATHLTHiPadKeepAwakeLeaseState` registrerer nå uavhengige vindusleier; bare når siste aktive vindu avsluttes gjenopprettes opprinnelig systemverdi. Inaktiv bryter og dobbelt `.onDisappear` påvirker ikke andre.
+- iPad XCTest dekker to parallelle vinduer, opprinnelig aktiv skjermlåssperre, duplisert release og gjenaktivering.
+- 13-tommers CoreSimulator-smoken dekker nå **Hjem, Plan Studio, Øvelsesbibliotek og Profil**. Hvert bilde krever faktisk simulator-oppstart, levende PID før og etter rendering og en skjermdump med målbar visuell informasjon. Dette er i tillegg til eksisterende 11-tommers test av onboarding, fem hovedområder, fem biblioteker og profil. Flere 13-tommers vinduer og ytelse kan ikke verifiseres uten interaktive enhetstester.
+- Ingen ny HealthKit-opptaker eller uautoriserte treningsdata på iPad. Native same-commit CI samt fysisk multiwindow-/rotasjons-/live-verifisering gjenstår.
+
 ## 2.2.6 – iPad-gjennomgang: tilgangsdialog, scenes og kontobytte
 
 - `ATHLTHiPadLiveWorkoutStatusCard` var en betinget SwiftUI-view: kortet og dets `.sheet` forsvant samtidig når både godkjent live-data og statusheartbeat ble kortvarig borte. Dette passer tidligere rapport om at «Be om tilgang» forsvant. Kortet holdes nå montert mens en forespørsel sendes, venter eller arket står åpent. Tap av heartbeat gir nøktern «Venter på tilkobling» uten å eksponere HR, GPS, øvelser eller tittelen på en ikke-godkjent økt. Konto-utlogging lukker arket.

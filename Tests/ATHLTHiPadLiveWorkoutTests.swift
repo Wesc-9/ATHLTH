@@ -956,4 +956,64 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         ), "An old approval is not a live telemetry session")
     }
 
+    func testTwoIPadLiveWindowsCannotDisableEachOthersKeepAwake() {
+        var leases = ATHLTHiPadKeepAwakeLeaseState()
+        let windowA = UUID(), windowB = UUID()
+        XCTAssertNil(leases.setEnabled(
+            false, for: windowA, currentIdleTimerDisabled: false
+        ))
+        XCTAssertEqual(leases.setEnabled(
+            true, for: windowA, currentIdleTimerDisabled: false
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            true, for: windowB, currentIdleTimerDisabled: true
+        ), true)
+        XCTAssertEqual(leases.activeWindowIDs.count, 2)
+        XCTAssertEqual(leases.setEnabled(
+            false, for: windowA, currentIdleTimerDisabled: true
+        ), true, "Closing one window must not lock the screen on the other")
+        XCTAssertEqual(leases.setEnabled(
+            false, for: windowB, currentIdleTimerDisabled: true
+        ), false, "Only the last window restores the original app state")
+        XCTAssertTrue(leases.activeWindowIDs.isEmpty)
+        XCTAssertNil(leases.originalIdleTimerDisabled)
+    }
+
+    func testIPadKeepAwakeLeaseRestoresExistingScreenAwakeOwnership() {
+        var leases = ATHLTHiPadKeepAwakeLeaseState()
+        let first = UUID(), second = UUID()
+        XCTAssertEqual(leases.setEnabled(
+            true, for: first, currentIdleTimerDisabled: true
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            true, for: second, currentIdleTimerDisabled: true
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            false, for: first, currentIdleTimerDisabled: true
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            false, for: second, currentIdleTimerDisabled: true
+        ), true, "Never clear an idle-timer disable set before iPad Live")
+        XCTAssertNil(leases.setEnabled(
+            false, for: first, currentIdleTimerDisabled: true
+        ), "Duplicate disappear must not overwrite another subsystem")
+    }
+
+    func testIPadKeepAwakeReacquisitionUsesNewBaseline() {
+        var leases = ATHLTHiPadKeepAwakeLeaseState()
+        let token = UUID()
+        XCTAssertEqual(leases.setEnabled(
+            true, for: token, currentIdleTimerDisabled: false
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            false, for: token, currentIdleTimerDisabled: true
+        ), false)
+        XCTAssertEqual(leases.setEnabled(
+            true, for: token, currentIdleTimerDisabled: true
+        ), true)
+        XCTAssertEqual(leases.setEnabled(
+            false, for: token, currentIdleTimerDisabled: true
+        ), true)
+    }
+
 }

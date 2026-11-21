@@ -1,6 +1,47 @@
 import SwiftUI
 import UIKit
 
+/// A foreground iPad can show one workout in several Stage Manager windows.
+/// UIKit's idle-timer flag belongs to the whole app, not to the view. Only
+/// the final active lease may restore its original state.
+struct ATHLTHiPadKeepAwakeLeaseState {
+    private(set) var activeWindowIDs: Set<UUID> = []
+    private(set) var originalIdleTimerDisabled: Bool?
+
+    mutating func setEnabled(
+        _ enabled: Bool,
+        for windowID: UUID,
+        currentIdleTimerDisabled: Bool
+    ) -> Bool? {
+        if enabled {
+            if activeWindowIDs.isEmpty {
+                originalIdleTimerDisabled = currentIdleTimerDisabled
+            }
+            activeWindowIDs.insert(windowID)
+            return true
+        }
+        guard activeWindowIDs.remove(windowID) != nil else { return nil }
+        guard activeWindowIDs.isEmpty else { return true }
+        let original = originalIdleTimerDisabled ?? false
+        originalIdleTimerDisabled = nil
+        return original
+    }
+}
+
+@MainActor
+enum ATHLTHiPadKeepAwakeCoordinator {
+    private static var leases = ATHLTHiPadKeepAwakeLeaseState()
+
+    static func setEnabled(_ enabled: Bool, for windowID: UUID) {
+        if let next = leases.setEnabled(
+            enabled, for: windowID,
+            currentIdleTimerDisabled: UIApplication.shared.isIdleTimerDisabled
+        ) {
+            UIApplication.shared.isIdleTimerDisabled = next
+        }
+    }
+}
+
 /// iPad's full-screen, read-only companion for an iPhone/Apple Watch workout.
 /// Uses exactly the same private snapshot as the small Home return pill.
 /// This view never starts/stops workouts, opens HealthKit, or controls Watch.
@@ -10,7 +51,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("athlth_ipad_live_keep_awake") private var keepAwake = false
-    @State private var previousIdleTimerDisabled = false
+    @State private var keepAwakeWindowID = UUID()
     @EnvironmentObject private var session: AppSessionStore
 
     private var liveMaximumBPM: Double? {
@@ -161,15 +202,19 @@ struct ATHLTHiPadLiveWorkoutView: View {
         }
         .accessibilityIdentifier("athlth-ipad-live-workout-fullscreen")
         .onAppear {
-            previousIdleTimerDisabled = UIApplication.shared.isIdleTimerDisabled
-            if keepAwake { UIApplication.shared.isIdleTimerDisabled = true }
+            ATHLTHiPadKeepAwakeCoordinator.setEnabled(
+                keepAwake, for: keepAwakeWindowID
+            )
         }
         .onChange(of: keepAwake) { _, enabled in
-            UIApplication.shared.isIdleTimerDisabled =
-                enabled || previousIdleTimerDisabled
+            ATHLTHiPadKeepAwakeCoordinator.setEnabled(
+                enabled, for: keepAwakeWindowID
+            )
         }
         .onDisappear {
-            UIApplication.shared.isIdleTimerDisabled = previousIdleTimerDisabled
+            ATHLTHiPadKeepAwakeCoordinator.setEnabled(
+                false, for: keepAwakeWindowID
+            )
         }
     }
 
