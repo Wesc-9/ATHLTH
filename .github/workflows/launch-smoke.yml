@@ -257,15 +257,39 @@ jobs:
 
             UDID="$DEVICE_UDID"
             trap 'cleanup_device "$UDID"' EXIT
-            # Reuse the runner's already-compatible device/runtime pairing.
-            # A previously booted device does not need a second boot.
-            simctl_bounded "boot registered $DEVICE_NAME" 95 boot "$UDID" || true
-            # A hanging bootstatus is not proof of failure or success.
-            # Require a responsive launchd before installation.
-            if ! simctl_bounded "wait for $DEVICE_NAME boot" 145 bootstatus "$UDID" -b; then
-              echo "::warning::Boot status incomplete; probing launch services."
+            # A runner-owned simulator may be registered but its CoreSimulator
+            # services can hang. Recover once, then require a responsive
+            # launchd before installing or launching ATHLTH.
+            boot_ready=0
+            for boot_attempt in 1 2; do
+              echo "::notice::Boot check $boot_attempt/2 for $DEVICE_NAME"
+              if simctl_bounded "boot registered $DEVICE_NAME" 95 boot "$UDID"; then
+                echo "::notice::Boot requested for $DEVICE_NAME"
+              else
+                echo "::warning::Boot request failed or simulator was already booted."
+              fi
+              if simctl_bounded "wait for $DEVICE_NAME boot" 145 bootstatus "$UDID" -b; then
+                if simctl_bounded "probe $DEVICE_NAME launch services" 50 spawn "$UDID" launchctl list > /dev/null; then
+                  boot_ready=1
+                  break
+                fi
+              fi
+              echo "::warning::$DEVICE_NAME boot/probe failed on attempt $boot_attempt."
+              {
+                echo "Device: $DEVICE_NAME ($UDID), boot attempt $boot_attempt"
+                date -u
+                xcrun simctl list devices available || true
+                xcrun simctl diagnose -h || true
+              } >> "$RUNNER_TEMP/athlth-iphone-boot-diagnostics.txt" 2>&1
+              if [ "$boot_attempt" -lt 2 ]; then
+                simctl_bounded "shutdown unresponsive $DEVICE_NAME" 35 shutdown "$UDID" || true
+                sleep 10
+              fi
+            done
+            if [ "$boot_ready" -ne 1 ]; then
+              echo "::error::$DEVICE_NAME remained unresponsive after recovery; no app launch was attempted."
+              exit 1
             fi
-            simctl_bounded "probe $DEVICE_NAME launch services" 50 spawn "$UDID" launchctl list
             simctl_bounded "install ATHLTH $DEVICE_NAME" 155 install "$UDID" "$APP"
 
             set +e
@@ -382,6 +406,15 @@ jobs:
             cleanup_device "$UDID"
             trap - EXIT
           done < "$DEVICE_MATRIX"
+
+      - name: Upload iPhone simulator boot diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-iphone-boot-diagnostics
+          path: ${{ runner.temp }}/athlth-iphone-boot-diagnostics.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload iPhone smoke screenshots
         if: always()
