@@ -1,3 +1,10 @@
+## 2.2.6 – iPad: visning per vindu, bakgrunn, minimert ved reconnect
+
+- Liveopptak og consent forblir i én `ATHLTHCrossDeviceWorkoutStore.shared` (ikke et nytt HealthKit-opptak), men `isExpanded` kan ikke være delt mellom Stage Manager-vinduer. Ny `ATHLTHiPadLiveScenePresentation` lever i hvert `AppRootView` og injiseres til iPad Studio. Hjem-kort, livefullskjerm og minimer-pillen styrer **kun dette vinduet**.
+- Shared store gir maksimalt én automatisk førstegangsvisning per autorisert HealthKit-økt og aktiv scene. Andre vinduer kan åpne økten manuelt, men får aldri en fullskjerm fordi noen åpnet en annen scene. `ATHLTHiPadSceneLivePresentationState` beholder brukerens beslutning når et snapshot midlertidig blir borte; samme sesjon kan ikke åpnes på nytt etter at den ble manuelt minimert. Konto-/utlogging nullstiller scene-visningen.
+- Bakgrunnshåndtering kalles nå med **scene-ID**. Inaktiv iPad-scene slipper sin polling-task, mens andre aktive vinduer overtar samme shared polling lease. iPhone-kildens publisering kjøres fortsatt uten en ny visningsmotor eller HealthKit-oppstart ved bakgrunn. En inaktiv scene kan ikke globalt kollapse en annen scenes fullskjerm.
+- Regresjonstester dekker to parallelle visningsvinduer, manuell minimering gjennom nettverkstap/gjenkobling og kontobytte. Native simulator- og enhetstester er fortsatt utsatt til testrunden.
+
 ## 2.2.6 – iPad: foreldede livesnapshots og ugyldige målinger
 
 - Et nettverkssvar fra en gammel Watch/iPhone-snapshot kunne tidligere få iPad til å beholde det siste bildet selv om dette var utløpt, eller i et omkoblingsvindu tilbakeføre et eldre tidspunkt. `ATHLTHCrossDeviceSnapshotOrderPolicy` skiller nå mellom å bruke et nyere gyldig svar, holde den ferske eksisterende rammen og rydde en utløpt lokal ramme. Ingen kilde-sesjon, autorisasjon eller opptaksdata endres.

@@ -1152,4 +1152,51 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertEqual(ATHLTHiPadLiveMetrics.duration(0), "00:00")
     }
 
+    func testIPadLiveSceneMinimizeSurvivesSnapshotLossAndReconnect() {
+        var scene = ATHLTHiPadSceneLivePresentationState()
+        let id = UUID()
+        scene.receive(sessionID: id, autoExpand: true)
+        XCTAssertTrue(scene.isExpanded)
+        scene.minimize(sessionID: id)
+        XCTAssertFalse(scene.isExpanded)
+        scene.receive(sessionID: nil, autoExpand: false)
+        scene.receive(sessionID: id, autoExpand: true)
+        XCTAssertFalse(scene.isExpanded,
+                       "Reconnecting the same session must respect manual minimize")
+        scene.expand(sessionID: id)
+        XCTAssertTrue(scene.isExpanded,
+                      "Athlete can explicitly reopen the existing session")
+    }
+
+    func testIPadLiveScenesCannotExpandOrMinimizeEachOther() {
+        var first = ATHLTHiPadSceneLivePresentationState()
+        var second = ATHLTHiPadSceneLivePresentationState()
+        let session = UUID()
+        first.receive(sessionID: session, autoExpand: true)
+        second.receive(sessionID: session, autoExpand: false)
+        XCTAssertTrue(first.isExpanded)
+        XCTAssertFalse(second.isExpanded)
+        second.expand(sessionID: session)
+        first.minimize(sessionID: session)
+        XCTAssertFalse(first.isExpanded)
+        XCTAssertTrue(second.isExpanded,
+                      "A second Stage Manager window must remain open")
+        second.receive(sessionID: UUID(), autoExpand: false)
+        XCTAssertFalse(second.isExpanded)
+    }
+
+    func testIPadLiveSceneResetOnAccountChange() {
+        var scene = ATHLTHiPadSceneLivePresentationState()
+        let oldID = UUID()
+        scene.receive(sessionID: oldID, autoExpand: true)
+        scene.minimize(sessionID: oldID)
+        scene.resetForAccountChange()
+        XCTAssertNil(scene.lastSeenSessionID)
+        XCTAssertNil(scene.minimizedSessionID)
+        XCTAssertFalse(scene.isExpanded)
+        let nextID = UUID()
+        scene.receive(sessionID: nextID, autoExpand: true)
+        XCTAssertTrue(scene.isExpanded)
+    }
+
 }

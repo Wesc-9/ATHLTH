@@ -803,6 +803,8 @@ struct AppRootView: View {
     @EnvironmentObject private var trainingBackups: TrainingBackupStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @StateObject private var crossDeviceWorkout = ATHLTHCrossDeviceWorkoutStore.shared
+    @StateObject private var ipadLiveScene = ATHLTHiPadLiveScenePresentation()
+    @State private var ipadLiveSceneID = UUID()
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
@@ -1451,12 +1453,24 @@ struct AppRootView: View {
             } else if ATHLTHDeviceRole.isIPad {
                 // Studio has its own adaptive landscape-first navigation.
                 // Keep the existing iPhone tab shell untouched.
-                AnyView(ATHLTHiPadStudioRootView())
+                AnyView(
+                    ATHLTHiPadStudioRootView()
+                        .environmentObject(ipadLiveScene)
+                )
             } else {
                 AnyView(ProductRootTabView())
             }
         }
         )
+    }
+
+    private func updateIPadLivePresentation() {
+        guard ATHLTHDeviceRole.isIPad, appSession.signedIn else { return }
+        let sessionID = crossDeviceWorkout.remote?.sessionID
+        let claim = crossDeviceWorkout.claimInitialPresentation(
+            sessionID: sessionID, sceneID: ipadLiveSceneID
+        )
+        ipadLiveScene.receive(sessionID: sessionID, autoExpand: claim)
     }
 
     private var lifecycleWorkoutContent: AnyView {
@@ -1597,34 +1611,74 @@ struct AppRootView: View {
                 )
             )
         }
-        .task(id: appSession.signedIn ? appSession.profile.userID : nil) {
-            if scenePhase == .active {
-                crossDeviceWorkout.didForeground()
+        .onAppear {
+            crossDeviceWorkout.setSceneActive(
+                scenePhase == .active, sceneID: ipadLiveSceneID
+            )
+            if ATHLTHDeviceRole.isIPad && appSession.signedIn {
+                updateIPadLivePresentation()
             }
-            if appSession.signedIn {
-                await crossDeviceWorkout.track(
-                    signedIn: true,
-                    accountID: appSession.profile.userID,
-                    phone: phoneWorkout,
-                    strength: strengthWorkout,
-                    mirroredWatch: workoutMirroring,
-                    spotify: spotifyPlayback
+        }
+        .onDisappear {
+            crossDeviceWorkout.setSceneActive(false, sceneID: ipadLiveSceneID)
+        }
+        .task(id: "\(appSession.signedIn ? appSession.profile.userID.uuidString : "none")-\(ATHLTHDeviceRole.isIPad ? scenePhase == .active : true)") {
+            guard appSession.signedIn else {
+                crossDeviceWorkout.clearLocalState()
+                return
+            }
+            // A backgrounded iPad scene yields the shared polling lease;
+            // another visible window may take over. Keep the iPhone's
+            // source publishing independent of foreground presentation.
+            guard !ATHLTHDeviceRole.isIPad ||
+                  scenePhase == .active else { return }
+            await crossDeviceWorkout.track(
+                signedIn: true,
+                accountID: appSession.profile.userID,
+                phone: phoneWorkout,
+                strength: strengthWorkout,
+                mirroredWatch: workoutMirroring,
+                spotify: spotifyPlayback
+            )
+        }
+        .onChange(of: crossDeviceWorkout.remote?.sessionID) { _, _ in
+            if ATHLTHDeviceRole.isIPad && appSession.signedIn {
+                updateIPadLivePresentation()
+            }
+        }
+        .onChange(of: appSession.profile.userID) { _, _ in
+            ipadLiveScene.resetForAccountChange()
+            crossDeviceWorkout.setSceneActive(
+                scenePhase == .active, sceneID: ipadLiveSceneID
+            )
+        }
+        .onChange(of: appSession.signedIn) { _, signedIn in
+            if !signedIn {
+                ipadLiveScene.resetForAccountChange()
+                crossDeviceWorkout.setSceneActive(
+                    false, sceneID: ipadLiveSceneID
                 )
             } else {
-                crossDeviceWorkout.clearLocalState()
+                crossDeviceWorkout.setSceneActive(
+                    scenePhase == .active, sceneID: ipadLiveSceneID
+                )
+                if ATHLTHDeviceRole.isIPad { updateIPadLivePresentation() }
             }
         }
         .onChange(of: scenePhase) { _, phase in
+            crossDeviceWorkout.setSceneActive(
+                phase == .active, sceneID: ipadLiveSceneID
+            )
             if phase == .active {
-                crossDeviceWorkout.didForeground()
+                if ATHLTHDeviceRole.isIPad && appSession.signedIn {
+                    updateIPadLivePresentation()
+                }
                 if appSession.signedIn {
                     _ = appSession.reconcileExpiredPlannedWorkouts(
                         healthWorkouts: health.workouts,
                         strengthHistory: strengthWorkout.workoutHistory
                     )
                 }
-            } else {
-                crossDeviceWorkout.didBackground()
             }
         }
         // While the app is running, deadlines are checked across every tab,
@@ -1657,7 +1711,7 @@ struct AppRootView: View {
                let remote = crossDeviceWorkout.remote,
                strengthWorkout.activeWorkout == nil,
                phoneWorkout.active == nil,
-               !crossDeviceWorkout.isExpanded {
+               !ipadLiveScene.isExpanded {
                 ATHLTHMinimizedWorkoutReturnPill(
                     title: remote.sourceDevice == "watch"
                         ? ATHLTHLocalization.choose(
@@ -1671,7 +1725,7 @@ struct AppRootView: View {
                     systemImage: remote.symbol,
                     detail: remote.title
                 ) {
-                    crossDeviceWorkout.setExpanded(true)
+                    ipadLiveScene.expand(sessionID: remote.sessionID)
                 }
                 .padding(.top, 12)
                 .padding(.horizontal, 18)
@@ -1684,19 +1738,23 @@ struct AppRootView: View {
                 get: {
                     ATHLTHDeviceRole.isIPad &&
                     appSession.signedIn &&
-                    crossDeviceWorkout.isExpanded &&
+                    ipadLiveScene.isExpanded &&
                     crossDeviceWorkout.remote != nil &&
                     strengthWorkout.activeWorkout == nil &&
                     phoneWorkout.active == nil
                 },
                 set: { expanded in
-                    crossDeviceWorkout.setExpanded(expanded)
+                    if !expanded {
+                        ipadLiveScene.minimize(
+                            sessionID: crossDeviceWorkout.remote?.sessionID
+                        )
+                    }
                 }
             )
         ) {
             if let remote = crossDeviceWorkout.remote {
                 ATHLTHiPadLiveWorkoutView(snapshot: remote) {
-                    crossDeviceWorkout.setExpanded(false)
+                    ipadLiveScene.minimize(sessionID: remote.sessionID)
                 }
                 .id(remote.id)
             }

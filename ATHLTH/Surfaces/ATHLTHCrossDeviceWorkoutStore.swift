@@ -519,6 +519,70 @@ struct ATHLTHCrossDevicePollingLease {
     }
 }
 
+/// Only display state belongs to a Stage Manager window. Permission and
+/// verified workout snapshots remain in ATHLTHCrossDeviceWorkoutStore.shared.
+struct ATHLTHiPadSceneLivePresentationState: Equatable {
+    private(set) var lastSeenSessionID: UUID?
+    private(set) var minimizedSessionID: UUID?
+    private(set) var isExpanded = false
+
+    mutating func receive(
+        sessionID: UUID?,
+        autoExpand: Bool
+    ) {
+        // An intermittent network gap must not reset a deliberate minimize.
+        guard let sessionID, lastSeenSessionID != sessionID else { return }
+        lastSeenSessionID = sessionID
+        isExpanded = autoExpand && minimizedSessionID != sessionID
+    }
+
+    mutating func expand(sessionID: UUID?) {
+        guard let sessionID else { return }
+        lastSeenSessionID = sessionID
+        minimizedSessionID = nil
+        isExpanded = true
+    }
+
+    mutating func minimize(sessionID: UUID?) {
+        isExpanded = false
+        if let sessionID {
+            lastSeenSessionID = sessionID
+            minimizedSessionID = sessionID
+        }
+    }
+
+    mutating func resetForAccountChange() {
+        lastSeenSessionID = nil
+        minimizedSessionID = nil
+        isExpanded = false
+    }
+}
+
+/// Each AppRootView owns an instance; opening and minimizing one window
+/// cannot present/dismiss another window's SwiftUI fullScreenCover.
+@MainActor
+final class ATHLTHiPadLiveScenePresentation: ObservableObject {
+    @Published private(set) var state = ATHLTHiPadSceneLivePresentationState()
+
+    var isExpanded: Bool { state.isExpanded }
+
+    func receive(sessionID: UUID?, autoExpand: Bool) {
+        state.receive(sessionID: sessionID, autoExpand: autoExpand)
+    }
+
+    func expand(sessionID: UUID?) {
+        state.expand(sessionID: sessionID)
+    }
+
+    func minimize(sessionID: UUID?) {
+        state.minimize(sessionID: sessionID)
+    }
+
+    func resetForAccountChange() {
+        state.resetForAccountChange()
+    }
+}
+
 @MainActor
 final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     static let shared = ATHLTHCrossDeviceWorkoutStore()
@@ -529,7 +593,6 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     // Avoid silently treating a failed request as "no workout".
     @Published private(set) var presenceConnectionIssue = false
     @Published private(set) var hasCheckedPresence = false
-    @Published private(set) var isExpanded = false
     /// Explicit opt-in only for the next workout, never a saved preference.
     @Published var shareNextWorkout = false
     @Published private(set) var incomingRequest: ATHLTHLiveViewRequest?
@@ -546,6 +609,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private var outgoingRequestID: UUID?
     private var outgoingRequestExpiresAt: Date?
     private var pollingLease = ATHLTHCrossDevicePollingLease()
+    private var foregroundSceneIDs: Set<UUID> = []
+    private var autoPresentedSessionID: UUID?
 
     /// Only this phone's live, locally confirmed session authorizes publishing.
     func isApprovedForSession(_ sessionID: UUID) -> Bool {
@@ -613,23 +678,30 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private var presenceReadGeneration: UInt64 = 0
     private var lastRemoteExpiry: Date?
     private var hasLoadedRemote = false
-    private var foregroundedSinceLastPoll = false
-    private var suppressAutoOpenOnNextPoll = false
-
-    func setExpanded(_ expanded: Bool) {
-        isExpanded = expanded
+    /// Scene lifecycle is per-window. A backgrounded Stage Manager scene
+    /// cannot mark another active scene as backgrounded.
+    func setSceneActive(_ active: Bool, sceneID: UUID) {
+        if active {
+            foregroundSceneIDs.insert(sceneID)
+            expireOutgoingRequestIfNeeded()
+        } else {
+            foregroundSceneIDs.remove(sceneID)
+        }
     }
 
-    func didBackground() {
-        foregroundedSinceLastPoll = false
-        // Keep a deliberately opened spectator visible when returning to
-        // iPad. Respect a manually minimized spectator across app switching.
-        suppressAutoOpenOnNextPoll = !isExpanded
-    }
-
-    func didForeground() {
-        foregroundedSinceLastPoll = true
-        expireOutgoingRequestIfNeeded()
+    /// At most ONE iPad window may automatically present a newly approved
+    /// recording. Other windows can still open it explicitly. A reconnect
+    /// to the same session cannot silently undo manual minimization.
+    func claimInitialPresentation(
+        sessionID: UUID?,
+        sceneID: UUID
+    ) -> Bool {
+        guard ATHLTHDeviceRole.isIPad,
+              let sessionID,
+              foregroundSceneIDs.contains(sceneID),
+              autoPresentedSessionID != sessionID else { return false }
+        autoPresentedSessionID = sessionID
+        return true
     }
 
     private func expireOutgoingRequestIfNeeded(at now: Date = Date()) {
@@ -647,6 +719,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         remoteReadGeneration &+= 1
         presenceReadGeneration &+= 1
         pollingLease.reset()
+        foregroundSceneIDs.removeAll()
+        autoPresentedSessionID = nil
         remote = nil
         remotePresence = nil
         presenceConnectionIssue = false
@@ -674,9 +748,6 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         mirroredSessionID = nil
         lastRemoteExpiry = nil
         hasLoadedRemote = false
-        foregroundedSinceLastPoll = false
-        suppressAutoOpenOnNextPoll = false
-        isExpanded = false
         ATHLTHSurfaceCoordinator.setRemoteWorkout(nil)
     }
 
@@ -1656,17 +1727,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             // If the existing verified frame expired, never resurrect it
             // from an older snapshot for the same session.
             let next = order == .clearExpired ? nil : candidate
-            let previous = remote?.id
-            if previous != next?.id {
-                if foregroundedSinceLastPoll &&
-                   !suppressAutoOpenOnNextPoll && next != nil {
-                    isExpanded = true
-                } else {
-                    isExpanded = false
-                }
-            }
+            // Do not touch window presentation from a shared network poll.
+            // Each AppRootView reacts to the verified session ID separately.
             remote = next
-            suppressAutoOpenOnNextPoll = false
             lastRemoteExpiry = next == nil ? nil : row?.expiresAt
             hasLoadedRemote = true
             ATHLTHSurfaceCoordinator.setRemoteWorkout(next.map {

@@ -61,6 +61,7 @@ enum ATHLTHiPadLiveAccessPresentationPolicy {
 /// opens this card to request access for only the current session.
 struct ATHLTHiPadLiveWorkoutStatusCard: View {
     @EnvironmentObject private var live: ATHLTHCrossDeviceWorkoutStore
+    @EnvironmentObject private var liveScene: ATHLTHiPadLiveScenePresentation
     @EnvironmentObject private var account: AppSessionStore
     @State private var showingAccess = false
 
@@ -86,8 +87,8 @@ struct ATHLTHiPadLiveWorkoutStatusCard: View {
                requestState: live.outgoingRequestState
            ) {
             Button {
-                if live.remote != nil {
-                    live.setExpanded(true)
+                if let sessionID = live.remote?.sessionID {
+                    liveScene.expand(sessionID: sessionID)
                 } else {
                     showingAccess = true
                 }
