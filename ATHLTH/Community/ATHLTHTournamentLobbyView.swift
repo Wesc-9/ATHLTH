@@ -655,7 +655,7 @@ struct ATHLTHTournamentLobbyView: View {
                         if message.authorID == userID { Spacer(minLength: 44) }
                         VStack(alignment: .leading,spacing: 5) {
                             HStack {
-                                Text(name(message.authorID))
+                                Text(message.authorID.map { name($0) } ?? "ATHLTH")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(ATHLTHArenaV3Style.gold)
                                 Spacer(minLength: 6)
@@ -663,6 +663,12 @@ struct ATHLTHTournamentLobbyView: View {
                                     date: .omitted,time: .shortened))
                                     .font(.caption2)
                                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            }
+                            if message.kind == "system" {
+                                Label("Konkurranseoppdatering",
+                                      systemImage: "trophy")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(ATHLTHArenaV3Style.gold)
                             }
                             if message.kind == "announcement" {
                                 Label("Beskjed fra arrangøren",
