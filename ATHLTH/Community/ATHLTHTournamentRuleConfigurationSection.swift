@@ -7,6 +7,9 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
     @Binding var authority: ATHLTHTournamentRulesAuthority
     @Binding var cadenceDays: Int
     @Binding var completionHours: Int
+    /// New competition scheduling is shown in the unified Start & Progress
+    /// section; avoid displaying a conflicting legacy "new exercise" timer.
+    var showsLegacyRoundTiming = true
 
     private let columns = [GridItem(.flexible(), spacing: 9),
                            GridItem(.flexible(), spacing: 9)]
@@ -100,6 +103,7 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                 .buttonStyle(.plain)
             }
 
+            if showsLegacyRoundTiming {
             VStack(spacing: 13) {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -152,6 +156,7 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                       systemImage: "calendar.badge.clock")
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
             }
             if authority == .group {
                 Text("Arrangørens valg er et første forslag. Deltakerne kan sende alternativer, og et flertall må godkjenne reglene før øvelsene velges og lobbyen kan bli klar.")
