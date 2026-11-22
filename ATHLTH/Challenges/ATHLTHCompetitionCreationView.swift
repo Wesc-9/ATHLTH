@@ -158,6 +158,7 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var format: ATHLTHCompetitionFormat = .duel
     @State private var leagueStyle: ATHLTHTournamentFormat = .league
     @State private var showingExistingTournamentRules = false
+    @State private var showingSprintRoutePicker = false
     @State private var competitionTitle = ""
     @State private var chosenIDs: Set<UUID> = []
     @State private var scoring: ATHLTHChallengeScoring = .fastestDistance
@@ -344,6 +345,15 @@ struct ATHLTHCompetitionCreationView: View {
                 .background(.regularMaterial)
             }
         }
+        .sheet(isPresented: $showingSprintRoutePicker) {
+            NavigationStack {
+                SavedRoutesView(selectionTitle: "Velg sprint-rute") { route in
+                    chosenRoute = route
+                    scoring = .fastestRoute
+                    showingSprintRoutePicker = false
+                }
+            }
+        }
         .sheet(isPresented: $showingExistingTournamentRules) {
             ATHLTHTournamentCreator(
                 preset: format == .cup ? .cup : leagueStyle,
@@ -503,10 +513,17 @@ struct ATHLTHCompetitionCreationView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(bronze)
                     } else {
-                        Label("Velg sprint fra en lagret rute i Ruter først",
-                              systemImage: "map")
+                        Text("En lagret rute er påkrevd for å sammenligne tider på samme løype.")
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(muted)
+                    }
+                    Button {
+                        showingSprintRoutePicker = true
+                    } label: {
+                        Label(chosenRoute == nil ? "Velg lagret rute" : "Endre rute",
+                              systemImage: "map")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(bronze)
                     }
                 }
             }
