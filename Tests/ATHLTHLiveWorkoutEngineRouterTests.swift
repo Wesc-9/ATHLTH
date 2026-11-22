@@ -24,6 +24,93 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
         )
     }
 
+    func testUniversalExecutionRecipeUsesSameBlocksAndOneIdentityAcrossEntrypoints() throws {
+        let sourceID = UUID()
+        var cycling = block(
+            "Cycle", kind: .note, sequence: 1, phase: .warmup
+        )
+        cycling.activityTag = "cycling"
+        let strength = block(
+            "Squat", kind: .exercise, sequence: 2, phase: .main
+        )
+        let pause = block(
+            "Rest", kind: .rest, sequence: 3, phase: .recovery
+        )
+        var running = block(
+            "Run", kind: .run, sequence: 4, phase: .cooldown
+        )
+        running.cardioActivity = .running
+        let authored = [cycling, strength, pause, running]
+
+        var source = PlannedSession(
+            id: sourceID, title: "Cycle + Strength + Run", kind: .custom,
+            scheduledStart: nil, durationMinutes: 20,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        ATHLTHUnifiedWorkout.apply(
+            blocks: authored, title: source.title, routeID: nil,
+            estimatedMinutes: 20, to: &source
+        )
+
+        // Quick Train, an independently planned workout, a calendar
+        // workout and a copied library workout use the same saved model.
+        // Their entry context must not create a second motor or stage graph.
+        for candidate in [source, source, source, source] {
+            let recipe = ATHLTHUniversalWorkoutExecutionRecipe(
+                workout: candidate
+            )
+            XCTAssertEqual(recipe.workoutID, sourceID)
+            XCTAssertEqual(recipe.activityCategory, "hybrid")
+            XCTAssertEqual(recipe.blocks, authored)
+            XCTAssertEqual(
+                try XCTUnwrap(recipe.activeRoute(at: 0)).engine, .cycling
+            )
+            XCTAssertEqual(
+                try XCTUnwrap(recipe.activeRoute(at: 1)).engine, .strength
+            )
+            XCTAssertEqual(
+                try XCTUnwrap(recipe.activeRoute(at: 2)).engine, .recovery
+            )
+            XCTAssertEqual(
+                try XCTUnwrap(recipe.activeRoute(at: 3)).engine, .endurance
+            )
+            for index in 0..<3 {
+                let transition = try XCTUnwrap(
+                    recipe.transition(after: index)
+                )
+                XCTAssertTrue(transition.preservesWorkoutIdentity)
+                XCTAssertEqual(transition.next.blockIndex, index + 1)
+                XCTAssertEqual(transition.next.workoutID, sourceID)
+            }
+            XCTAssertNil(recipe.transition(after: 3))
+        }
+    }
+
+    func testUniversalExecutionRecipeProjectsSimpleWalkingWithoutRunningControls() throws {
+        var walk = PlannedSession(
+            id: UUID(), title: "Walking", kind: .walking,
+            scheduledStart: nil, durationMinutes: 30,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        let simple = ATHLTHUniversalWorkoutExecutionRecipe(workout: walk)
+        XCTAssertEqual(simple.activityCategory, "walking")
+        XCTAssertEqual(simple.blocks.first?.cardioActivity, .walking)
+        XCTAssertEqual(simple.activeRoute(at: 0)?.workoutID, walk.id)
+        XCTAssertEqual(simple.activeRoute(at: 0)?.engine, .endurance)
+        XCTAssertNil(simple.activeRoute(at: 1))
+        XCTAssertNil(simple.transition(after: 0))
+
+        // Planning the same prescription changes only its schedule.
+        walk.scheduledStart = Date(timeIntervalSince1970: 1_900_000_000)
+        let scheduled = ATHLTHUniversalWorkoutExecutionRecipe(workout: walk)
+        XCTAssertEqual(scheduled.blocks, simple.blocks)
+        XCTAssertEqual(scheduled.workoutID, simple.workoutID)
+    }
+
     func testHybridWorkoutSwitchesInterfaceWithoutChangingIdentity() throws {
         let workoutID = UUID()
         let blocks = [
