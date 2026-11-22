@@ -4027,18 +4027,28 @@ struct MyTrainingPlansLibraryView: View {
         ) { $0.title }
     }
 
-    private var pageTemplates: [TrainingPlan] {
+    // One alphabetized window across reusable and scheduled plans keeps
+    // A–Å navigation consistent when both groups contain similar titles.
+    private var sortedPersonalPlans: [TrainingPlan] {
+        ATHLTHLibraryAlphabetSort.sorted(
+            displayedTemplates + displayedPlans
+        ) { $0.title }
+    }
+
+    private var visiblePersonalPlans: [TrainingPlan] {
         ATHLTHLibraryAlphabetWindow.visible(
-            displayedTemplates, start: visibleStartIndex, limit: visibleLimit
+            sortedPersonalPlans, start: visibleStartIndex, limit: visibleLimit
         )
     }
 
+    private var pageTemplates: [TrainingPlan] {
+        let templateIDs = Set(displayedTemplates.map(\.id))
+        return visiblePersonalPlans.filter { templateIDs.contains($0.id) }
+    }
+
     private var pagePlans: [TrainingPlan] {
-        ATHLTHLibraryAlphabetWindow.visible(
-            displayedPlans,
-            start: max(0, visibleStartIndex - displayedTemplates.count),
-            limit: max(0, visibleLimit - pageTemplates.count)
-        )
+        let planIDs = Set(displayedPlans.map(\.id))
+        return visiblePersonalPlans.filter { planIDs.contains($0.id) }
     }
 
     private var cardColumns: [GridItem] {
@@ -4051,7 +4061,7 @@ struct MyTrainingPlansLibraryView: View {
     }
 
     var body: some View {
-        let plans = displayedTemplates + displayedPlans
+        let plans = sortedPersonalPlans
         let alphabet = ATHLTHLibraryAlphabetLookup(
             items: plans, id: { $0.id }, title: { $0.title }
         )
