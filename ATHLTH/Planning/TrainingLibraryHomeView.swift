@@ -876,6 +876,7 @@ final class LibraryFavoritesStore: ObservableObject {
     private let client: SupabaseClient
     private var activeUserID: UUID?
     private var lastRefreshAt: Date?
+    private var localMutationRevision = 0
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -907,6 +908,7 @@ final class LibraryFavoritesStore: ObservableObject {
         }
 
         guard !isLoading else { return }
+        let requestedRevision = localMutationRevision
         isLoading = true
         defer { isLoading = false }
 
@@ -924,6 +926,9 @@ final class LibraryFavoritesStore: ObservableObject {
             // favorites after sign-out or a rapid account switch.
             guard activeUserID == user.id,
                   client.auth.currentUser?.id == user.id else { return }
+            // Do not replace a favorite the user toggled while the
+            // network request was still in flight.
+            guard requestedRevision == localMutationRevision else { return }
             favorites = rows
             lastRefreshAt = Date()
             persistLocal()
@@ -972,6 +977,8 @@ final class LibraryFavoritesStore: ObservableObject {
             errorMessage = nil
         }
 
+        localMutationRevision += 1
+        lastRefreshAt = nil
         if isFavorite(kind, itemID: itemID) {
             favorites.removeAll {
                 $0.itemType == kind &&
