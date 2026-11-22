@@ -3625,6 +3625,7 @@ final class SocialStore: ObservableObject {
                 deliverSystemAlert:
                     deliverSystemAlerts &&
                     event.pushNotifiedAt == nil &&
+                    event.kind != ATHLTHPlusGrantNotificationCopy.eventKind &&
                     event.createdAt >= activationDate
             )
         }
@@ -3647,6 +3648,10 @@ final class SocialStore: ObservableObject {
     ) -> ATHLTHNotificationKind {
         let kind = event.kind.lowercased()
         let entityType = event.entityType?.lowercased() ?? ""
+
+        if kind == ATHLTHPlusGrantNotificationCopy.eventKind {
+            return .system
+        }
 
         if kind.contains("challenge") ||
             entityType.contains("challenge") {
