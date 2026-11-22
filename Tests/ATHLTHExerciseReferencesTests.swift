@@ -123,10 +123,7 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         let library = ExerciseLibraryStore()
         let all = library.allExercises
         let visibleIDs = Set(library.selectableExercises.map(\.id))
-        let source = ATHLTHCuratedStrengthWorkouts.entries +
-            ATHLTHPremiumStrengthSessions.entries +
-            ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries +
-            WorkoutTemplateCatalogEntry.fallbackCatalog
+        let source = WorkoutTemplateCatalogEntry.bundledCatalog
         var seen = 0
         for workout in source {
             for step in workout.blocks where step.kind == .exercise {
