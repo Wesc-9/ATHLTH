@@ -494,7 +494,7 @@ struct TrainTogetherLiveDraftRoomView: View {
             Image(systemName: approved
                 ? "checkmark.circle.fill" : "circle.dotted")
             .foregroundStyle(approved
-                ? ATHLTHTrainTogetherDesign.accent : .secondary)
+                ? ATHLTHTrainTogetherDesign.accent : Color.secondary)
             Text(label)
             Spacer()
             Text(approved
