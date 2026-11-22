@@ -90,10 +90,15 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var agreement: ATHLTHCompetitionAgreement = .init()
 
     var isValid: Bool {
-        (startsAt == nil || startsAt! < Date().addingTimeInterval(366 * 86_400)) &&
-        (1...unit.maximumCount).contains(every) &&
-        (1...720).contains(completionHours) &&
-        agreement.isValid
+        let now = Date()
+        let validStart = startsAt.map {
+            $0 >= now.addingTimeInterval(-120) &&
+            $0 <= now.addingTimeInterval(366 * 86_400)
+        } ?? true
+        return validStart &&
+            (1...unit.maximumCount).contains(every) &&
+            ATHLTHTournamentCadence.completionHours.contains(completionHours) &&
+            agreement.isValid
     }
 
     var requiresExplicitConsent: Bool {
