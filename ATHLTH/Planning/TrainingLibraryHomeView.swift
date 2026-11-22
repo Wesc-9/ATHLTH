@@ -4292,14 +4292,14 @@ struct MyTrainingPlansLibraryView: View {
             libraryWidth = $0
         }
         .onChange(of: query) { _, _ in
+            // The text field must retain identity and keyboard focus while
+            // the My Plans result set changes on every typed character.
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .onChange(of: favoritesOnly) { _, _ in
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .onAppear {
             displayMode = .load(userID: session.profile.userID)
@@ -5712,19 +5712,18 @@ struct LibraryFavoritesView: View {
             }
         }
         .onChange(of: searchQuery) { _, _ in
+            // Search must not recreate the ScrollView that owns TextField.
+            // Reserve alphabetJumpRevision for explicit letter-index taps.
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .onChange(of: selectedKind) { _, _ in
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .onChange(of: ownExerciseFavoritesOnly) { _, _ in
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
             libraryWidth = $0
