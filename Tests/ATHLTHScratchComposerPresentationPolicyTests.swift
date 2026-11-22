@@ -153,6 +153,63 @@ final class ATHLTHScratchComposerPresentationPolicyTests: XCTestCase {
         ))
     }
 
+    func testFriendScratchHidesLegacyFormBehindNewBuilder() {
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+            isStandalone: true,
+            hasScratchSource: true,
+            preparesForSharing: false,
+            hasPartner: true,
+            builderIsPresented: true
+        ))
+        // After Save and continue the timeline is no longer showing. The
+        // partner confirmation has its own compact review, not the old Form.
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.showsPartnerInvitationReview(
+            isStandalone: true,
+            hasPartner: true,
+            hasScratchSource: true,
+            preparesForSharing: false,
+            builderIsPresented: false
+        ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.showsPartnerInvitationReview(
+            isStandalone: true,
+            hasPartner: true,
+            hasScratchSource: false,
+            preparesForSharing: false,
+            builderIsPresented: false
+        ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.showsPartnerInvitationReview(
+            isStandalone: true,
+            hasPartner: true,
+            hasScratchSource: true,
+            preparesForSharing: false,
+            builderIsPresented: true
+        ))
+    }
+
+    func testFriendInviteFixDoesNotBypassExistingSharingOrPlanEdits() {
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+            isStandalone: true,
+            hasScratchSource: true,
+            preparesForSharing: true,
+            hasPartner: true,
+            builderIsPresented: true
+        ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.showsPartnerInvitationReview(
+            isStandalone: true,
+            hasPartner: true,
+            hasScratchSource: true,
+            preparesForSharing: true,
+            builderIsPresented: false
+        ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.showsPartnerInvitationReview(
+            isStandalone: false,
+            hasPartner: true,
+            hasScratchSource: true,
+            preparesForSharing: false,
+            builderIsPresented: false
+        ))
+    }
+
     func testScratchBackAlwaysOffersDeleteEvenWithEmptyTimeline() {
         XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
             isScratchHost: true, hasEdits: false

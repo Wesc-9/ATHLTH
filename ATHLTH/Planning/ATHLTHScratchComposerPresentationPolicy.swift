@@ -16,16 +16,34 @@ enum ATHLTHScratchComposerPresentationPolicy {
             !hasPartner && !targetsActivePlan
     }
 
-    /// The legacy parent form must not reappear under the new solo
-    /// scratch builder, even when it is dismissing or presenting a child sheet.
-    /// Partner and plan-editing flows still use their established host UI.
+    /// The old Form must not render UNDER the common timeline composer.
+    /// This includes direct invitations from a friend's profile. After the
+    /// composer closes, partner drafts receive a compact invitation review,
+    /// while unrelated existing/plan editors keep their original flow.
     static func hidesLegacyStandaloneHost(
         isStandalone: Bool,
         hasScratchSource: Bool,
         preparesForSharing: Bool,
-        hasPartner: Bool
+        hasPartner: Bool,
+        builderIsPresented: Bool = false
     ) -> Bool {
-        isStandalone && hasScratchSource && !preparesForSharing && !hasPartner
+        guard isStandalone && hasScratchSource && !preparesForSharing else {
+            return false
+        }
+        return !hasPartner || builderIsPresented
+    }
+
+    /// A prepared partner workout requires scheduling and permission review,
+    /// but must never return to the old "Plan extra workout" Form.
+    static func showsPartnerInvitationReview(
+        isStandalone: Bool,
+        hasPartner: Bool,
+        hasScratchSource: Bool,
+        preparesForSharing: Bool,
+        builderIsPresented: Bool
+    ) -> Bool {
+        isStandalone && hasPartner && hasScratchSource &&
+            !preparesForSharing && !builderIsPresented
     }
 
     /// A scratch draft has a persistent checkpoint even before the athlete

@@ -5538,6 +5538,9 @@ struct SessionEditorView: View {
     @State private var scratchTimelineDraftID = UUID()
     @State private var scratchResumingSavedComposer = false
     @State private var showingUnifiedWorkoutComposer = false
+    // Only an actual builder-save is permitted to advance a friend's
+    // scratch workout to the invitation-review screen.
+    @State private var partnerScratchReadyForInvite = false
     // A saved library session opens in the SAME advanced Studio as a
     // newly planned strength workout, rather than the legacy Form timeline.
     @State private var showingImportedAdvancedWorkout = false
@@ -6557,6 +6560,7 @@ struct SessionEditorView: View {
     ) {
         discardStoredStandaloneDraft()
         selectedScratchWorkoutType = type
+        partnerScratchReadyForInvite = false
         scratchTimelineDraftID = UUID()
         scratchResumingSavedComposer = false
         if isStandalone, onPreparedWorkout == nil, selectedPartnerID == nil {
@@ -6606,6 +6610,10 @@ struct SessionEditorView: View {
     /// already saves and transfers to the Watch. It does not schedule the
     /// session itself: the athlete confirms date and time in this editor.
     private func applyScratchTimeline(_ updated: PlannedSession) {
+        if isStandalone && selectedPartnerID != nil &&
+            selectedScratchWorkoutType != nil && onPreparedWorkout == nil {
+            partnerScratchReadyForInvite = true
+        }
         workoutBlocks = updated.resolvedWorkoutBlocks
         workoutTemplateID = nil
         plannedExercises = []
@@ -6776,12 +6784,30 @@ struct SessionEditorView: View {
                 openScratchComposerAfterPickerDismiss ||
                 scratchResumingSavedComposer,
             preparesForSharing: onPreparedWorkout != nil,
-            hasPartner: selectedPartnerID != nil
+            hasPartner: selectedPartnerID != nil,
+            builderIsPresented: showingUnifiedWorkoutComposer ||
+                openScratchComposerAfterPickerDismiss ||
+                (selectedPartnerID != nil &&
+                 selectedScratchWorkoutType != nil &&
+                 !partnerScratchReadyForInvite)
         ) {
-            // Never show the old "Plan extra workout / 0 steps" editor
-            // while the shared scratch builder is opening or closing.
+            // Never render the old "Plan extra workout" Form behind the new
+            // full-screen timeline, including the direct friend route.
             ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
                 .toolbar(.hidden, for: .navigationBar)
+        } else if ATHLTHScratchComposerPresentationPolicy.showsPartnerInvitationReview(
+            isStandalone: isStandalone,
+            hasPartner: selectedPartnerID != nil,
+            hasScratchSource: selectedScratchWorkoutType != nil &&
+                partnerScratchReadyForInvite,
+            preparesForSharing: onPreparedWorkout != nil,
+            builderIsPresented: showingUnifiedWorkoutComposer ||
+                openScratchComposerAfterPickerDismiss
+        ) {
+            // After "Save and continue", go straight to invitation details,
+            // NOT the obsolete multi-row workout editor. The workout itself
+            // stays in the shared timeline builder (image #2).
+            partnerScratchInvitationReview
         } else {
         Form {
             if isStandalone && !hasSelectedWorkoutSource {
@@ -6987,6 +7013,152 @@ struct SessionEditorView: View {
         } // legacy form only for partner and existing workout flows
     }
 
+    /// Friend-profile scratch flow: the shared builder is the only workout
+    /// editor. This follow-up confirms the invitation, date and meeting place
+    /// without exposing or recreating the legacy "Planlegg ekstra økt" form.
+    private var partnerScratchInvitationReview: some View {
+        Form {
+            Section {
+                HStack(spacing: 13) {
+                    Image(systemName: kind.systemImage)
+                        .font(.title3)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 48, height: 48)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 15)
+                        )
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(resolvedWorkoutTitle)
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(workoutOverviewDuration)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 8)
+
+                Button {
+                    showingUnifiedWorkoutComposer = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Edit workout",
+                            norwegian: "Rediger treningsøkt"
+                        ),
+                        systemImage: "slider.horizontal.3"
+                    )
+                }
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .accessibilityIdentifier("athlth-friend-edit-shared-workout")
+            } header: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Prepared workout",
+                    norwegian: "Treningsøkt"
+                ))
+            }
+
+            partnerPlanningSection
+
+            Section {
+                DatePicker(
+                    ATHLTHLocalization.choose(
+                        english: "Date and time", norwegian: "Dato og klokkeslett"
+                    ),
+                    selection: $scheduledTime,
+                    in: Date()...,
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+                .datePickerStyle(.compact)
+                .accessibilityIdentifier("athlth-friend-workout-time")
+            } header: {
+                Text(ATHLTHLocalization.choose(
+                    english: "When", norwegian: "Når"
+                ))
+            }
+
+            plannedWorkoutLogisticsSection
+
+            Section {
+                Button {
+                    saveSession()
+                } label: {
+                    HStack(spacing: 9) {
+                        if isSaving {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "paperplane.fill")
+                        }
+                        Text(ATHLTHLocalization.choose(
+                            english: "Plan and send invitation",
+                            norwegian: "Planlegg og send invitasjon"
+                        ))
+                        .font(.headline)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .disabled(!canAdd || isSaving)
+                .accessibilityIdentifier("athlth-friend-plan-and-send")
+            } footer: {
+                Text(ATHLTHLocalization.choose(
+                    english: "The workout is saved in your calendar and the invitation is sent to the selected friend only when you confirm.",
+                    norwegian: "Økten legges i kalenderen og invitasjonen sendes til vennen din først når du bekrefter."
+                ))
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Invite to workout", norwegian: "Inviter til treningsøkt"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Cancel", norwegian: "Avbryt"
+                )) {
+                    finishDraft()
+                    onExit?()
+                    dismiss()
+                }
+            }
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Invitation not sent", norwegian: "Invitasjonen ble ikke sendt"
+            ),
+            isPresented: $showingInvitationError
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(invitationError)
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Select library exercises", norwegian: "Velg øvelser fra biblioteket"
+            ),
+            isPresented: $showingMissingLibraryExercises
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Continue editing", norwegian: "Fortsett å redigere"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "These exercises are not linked to your library: " +
+                    missingLibraryExercises.joined(separator: ", ") +
+                    ". Choose an existing exercise or create it in Exercises before saving.",
+                norwegian: "Disse øvelsene er ikke koblet til biblioteket: " +
+                    missingLibraryExercises.joined(separator: ", ") +
+                    ". Velg en eksisterende øvelse, eller opprett den i Øvelser før lagring."
+            ))
+        }
+        .accessibilityIdentifier("athlth-friend-invitation-review")
+    }
+
     private var editorPartnerSheets: some View {
         AnyView(editorBaseForm)
             .sheet(isPresented: $showingAllTrainingPartners) {
@@ -7050,6 +7222,20 @@ struct SessionEditorView: View {
                         Task { @MainActor in
                             await Task.yield()
                             dismiss()
+                        }
+                    } else if isStandalone &&
+                        selectedPartnerID != nil &&
+                        selectedScratchWorkoutType != nil &&
+                        onPreparedWorkout == nil {
+                        // A cancelled friend draft returns to the profile, not
+                        // the legacy sheet. A saved draft advances to the
+                        // compact partner review while keeping its exact IDs.
+                        if !partnerScratchReadyForInvite {
+                            scratchBuilderClosedIntentionally = false
+                            Task { @MainActor in
+                                await Task.yield()
+                                dismiss()
+                            }
                         }
                     } else if isStandalone &&
                         selectedScratchWorkoutType != nil &&
