@@ -194,10 +194,25 @@ function localizedAlert(
     const match = event.message.match(
       /^You have received ATHLTH\+ for (7|30|90|365) days\. Valid until (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) UTC\.$/,
     );
+    let expiry = match?.[2] ?? "";
+    if (match) {
+      const date = new Date(`${match[2].replace(" ", "T")}:00Z`);
+      if (!Number.isNaN(date.getTime())) {
+        expiry = new Intl.DateTimeFormat("nb-NO", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: "UTC",
+        }).format(date);
+      }
+    }
     return {
       title: "Du har fått ATHLTH+",
       body: match
-        ? `Du har fått ATHLTH+ i ${match[1]} dager. Tilgangen varer til ${match[2]} UTC.`
+        ? `Du har fått ATHLTH+ i ${match[1]} dager. Tilgangen varer til ${expiry} UTC.`
         : event.message,
     };
   }
