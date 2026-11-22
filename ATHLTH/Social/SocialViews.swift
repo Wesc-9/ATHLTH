@@ -1352,8 +1352,8 @@ private struct SocialActivityCard: View {
             in: RoundedRectangle(cornerRadius: 20)
         )
         .sheet(isPresented: $showingChallenge) {
-            ChallengeCreationView(
-                preselectedFriends: [item.actor]
+            ATHLTHCompetitionEntryView(
+                preselectedFriend: item.actor
             )
         }
     }
@@ -1701,8 +1701,8 @@ struct FriendProfileView: View {
         }
         .sheet(isPresented: $showingChallenge) {
             if let profile {
-                ChallengeCreationView(
-                    preselectedFriends: [profile.card]
+                ATHLTHCompetitionEntryView(
+                    preselectedFriend: profile.card
                 )
             }
         }
@@ -2278,7 +2278,7 @@ struct FriendProfileView: View {
                     if social.mutualFollows.contains(
                         where: { $0.userID == userID }
                     ) {
-                        showingArenaChoice = true
+                        showingChallenge = true
                     } else {
                         followActionError = ATHLTHLocalization.choose(
                             english: "Follow each other before sending a challenge.",
