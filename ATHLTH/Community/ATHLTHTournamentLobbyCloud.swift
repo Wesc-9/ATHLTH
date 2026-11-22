@@ -634,11 +634,13 @@ struct ATHLTHTournamentLobbyCloudService {
         ).execute()
     }
 
-    func completeExercise(slotID: UUID,evidence: String) async throws {
+    func completeExercise(
+        slotID: UUID, evidence: String, sourceWorkoutID: UUID? = nil
+    ) async throws {
         try await client.rpc("athlth_tournament_complete_exercise",
           params: ATHLTHTournamentExerciseAttemptParams(
             p_match_exercise: slotID,p_evidence_note: evidence,
-            p_source_workout: nil)
+            p_source_workout: sourceWorkoutID)
         ).execute()
     }
 }
