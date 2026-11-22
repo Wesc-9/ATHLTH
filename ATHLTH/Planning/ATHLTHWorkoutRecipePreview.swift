@@ -1179,12 +1179,22 @@ private struct IndexedWorkoutStep: Identifiable {
 private struct ATHLTHWorkoutStepEditor: View {
     @Environment(\.dismiss) private var dismiss
     let block: WorkoutTemplateBlock
+    let workoutTitle: String
+    let workoutCategory: String
     let onSave: (WorkoutTemplateBlock) -> Void
     @State private var draft: WorkoutTemplateBlock
     @State private var showAdditionalTargets = false
+    @State private var showingSpotifySongPicker = false
 
-    init(block: WorkoutTemplateBlock, onSave: @escaping (WorkoutTemplateBlock) -> Void) {
+    init(
+        block: WorkoutTemplateBlock,
+        workoutTitle: String,
+        workoutCategory: String,
+        onSave: @escaping (WorkoutTemplateBlock) -> Void
+    ) {
         self.block = block
+        self.workoutTitle = workoutTitle
+        self.workoutCategory = workoutCategory
         self.onSave = onSave
         _draft = State(initialValue:
             ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
@@ -1194,6 +1204,25 @@ private struct ATHLTHWorkoutStepEditor: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(workoutCategory)
+                            .font(.caption2.weight(.bold))
+                            .tracking(1)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Text(workoutTitle)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Edit this segment only",
+                            norwegian: "Endringer gjelder denne øktdelen"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .padding(.vertical, 7)
+                    .accessibilityIdentifier("athlth-edit-step-workout-header")
+                }
                 Section(ATHLTHLocalization.choose(english: "Step", norwegian: "Øktdel")) {
                     TextField(ATHLTHLocalization.choose(english: "Name", norwegian: "Navn"),
                               text: $draft.title)
@@ -1201,6 +1230,15 @@ private struct ATHLTHWorkoutStepEditor: View {
                         Text(ATHLTHLocalization.choose(english: "Duration (sec)", norwegian: "Varighet (sek)"))
                         Spacer()
                         TextField("—", value: $draft.durationSeconds, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Distance (metres)", norwegian: "Distanse (meter)"
+                        ))
+                        Spacer()
+                        TextField("—", value: $draft.distanceMeters, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
@@ -1448,6 +1486,49 @@ private struct ATHLTHWorkoutStepEditor: View {
                             .multilineTextAlignment(.trailing)
                     }
                 }
+                Section("Spotify") {
+                    Button {
+                        showingSpotifySongPicker = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "music.note")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(draft.spotifyTrack?.title ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Choose song for this segment",
+                                        norwegian: "Velg sang for denne øktdelen"
+                                    ))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                if let artist = draft.spotifyTrack?.artist,
+                                   !artist.isEmpty {
+                                    Text(artist)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    if draft.spotifyTrack != nil {
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Remove song", norwegian: "Fjern sang"
+                            ),
+                            role: .destructive
+                        ) {
+                            draft.spotifyTrack = nil
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Optional. Spotify is requested on iPhone when this part starts; the training timer never waits for music.",
+                        norwegian: "Valgfritt. Spotify forsøkes startet på iPhone når delen begynner. Treningstimeren venter aldri på musikken."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
                 Section(ATHLTHLocalization.choose(
                     english: "Workout instructions", norwegian: "Instruksjoner"
                 )) {
@@ -1477,6 +1558,7 @@ private struct ATHLTHWorkoutStepEditor: View {
                     }
                     .disabled(draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                               (draft.durationSeconds ?? 0) < 0 ||
+                              (draft.distanceMeters.map { !$0.isFinite || $0 < 0 } ?? false) ||
                               (draft.restBetweenSetsSeconds ?? 0) < 0 ||
                               (draft.targetPaceSecondsPerKilometer ?? 0) < 0 ||
                               (draft.treadmillInclinePercent.map {
@@ -1489,6 +1571,9 @@ private struct ATHLTHWorkoutStepEditor: View {
                               (draft.targetHeartRateZone != nil &&
                                !(1...5).contains(draft.targetHeartRateZone!)))
                 }
+            }
+            .sheet(isPresented: $showingSpotifySongPicker) {
+                ATHLTHSpotifyIntervalTrackPicker(selection: $draft.spotifyTrack)
             }
         }
     }
