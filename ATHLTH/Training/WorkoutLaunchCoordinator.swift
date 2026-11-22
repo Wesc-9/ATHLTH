@@ -1066,11 +1066,29 @@ enum WorkoutLaunchCoordinator {
                 effortSong,
                 workoutID: phoneWorkout.active?.id
             )
+            if let recording = phoneWorkout.active {
+                let originalSteps = (plannedRunningWorkout ?? configuration.workout)?
+                    .resolvedWorkoutBlocks ?? []
+                let liveSteps = recording.structuredRunningWorkout?.steps ?? []
+                // Only attach songs if every source part maps to one actual
+                // HealthKit interval/recovery step in the same order.
+                let aligned = !liveSteps.isEmpty &&
+                    originalSteps.count == liveSteps.count &&
+                    zip(originalSteps, liveSteps).allSatisfy { source, live in
+                        source.durationSeconds == live.durationSeconds
+                    }
+                spotify.configureRunningStepSongs(
+                    aligned ? originalSteps : [],
+                    actualRunningStepCount: liveSteps.count,
+                    workoutID: recording.id
+                )
+            }
             let initialEffortWorkout = phoneWorkout.active.flatMap { recording
                 -> PhoneWorkout? in
-                guard effortSong != nil,
-                      let first = recording.structuredRunningWorkout?.steps.first,
-                      ATHLTHSpotifyIntervalCuePolicy.isEffort(first.phase)
+                guard let first = recording.structuredRunningWorkout?.steps.first,
+                      spotify.configuredRunningStepSong(at: 0) != nil ||
+                      (effortSong != nil &&
+                       ATHLTHSpotifyIntervalCuePolicy.isEffort(first.phase))
                 else { return nil }
                 return recording
             }
@@ -1095,14 +1113,20 @@ enum WorkoutLaunchCoordinator {
                             respectGlobalAutoplay: false
                         )
                     }
-                    await spotify.playIntervalTrack(
-                        workoutID: recording.id, stepIndex: 0,
-                        effortIndex: 0,
-                        targetDurationSeconds: recording.structuredRunningWorkout?
-                            .steps.first?.durationSeconds,
-                        intensityText: recording.structuredRunningWorkout?
-                            .steps.first?.intensityText
-                    )
+                    if let selected = spotify.configuredRunningStepSong(at: 0) {
+                        await spotify.playWorkoutStepSong(
+                            selected, workoutID: recording.id, stepIndex: 0
+                        )
+                    } else {
+                        await spotify.playIntervalTrack(
+                            workoutID: recording.id, stepIndex: 0,
+                            effortIndex: 0,
+                            targetDurationSeconds: recording.structuredRunningWorkout?
+                                .steps.first?.durationSeconds,
+                            intensityText: recording.structuredRunningWorkout?
+                                .steps.first?.intensityText
+                        )
+                    }
                 }
             } else {
                 startQuickSpotifyIfNeeded(
