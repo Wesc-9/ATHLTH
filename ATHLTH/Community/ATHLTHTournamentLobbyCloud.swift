@@ -246,6 +246,10 @@ private struct ATHLTHTournamentExerciseAttemptParams: Encodable {
     }
 }
 
+private struct ATHLTHTournamentVisibleExerciseParams: Encodable {
+    let p_matches: [UUID]
+}
+
 private struct ATHLTHTournamentExerciseDeadlineParams: Encodable {
     let p_match_exercise: UUID
     let p_deadline: String
@@ -581,11 +585,10 @@ struct ATHLTHTournamentLobbyCloudService {
         for start in stride(from: 0,to: matchIDs.count,by: 150) {
             let end = min(start + 150,matchIDs.count)
             let batch: [ATHLTHTournamentMatchExerciseRemote] = try await client
-              .from("athlth_tournament_match_exercises")
-              .select("id,match_id,candidate_id,position,scheduled_at,deadline_at,state,winner_id")
-              .in("match_id",values: Array(matchIDs[start..<end]))
-              .order("position")
-              .limit(2500).execute().value
+              .rpc("athlth_tournament_visible_match_exercises",
+                   params: ATHLTHTournamentVisibleExerciseParams(
+                       p_matches: Array(matchIDs[start..<end])
+                   )).execute().value
             all.append(contentsOf: batch)
         }
         return all
