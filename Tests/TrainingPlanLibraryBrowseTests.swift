@@ -51,9 +51,18 @@ final class TrainingPlanLibraryBrowseTests: XCTestCase {
                                   count: bundled.sessionsPerWeek),
             tags: [], sortOrder: 5, catalogVersion: 100
         )
+        let replacementUUID = TrainingPlanCatalogEntry(
+            id: UUID(), slug: bundled.slug, title: "Same recipe, new UUID",
+            summary: "", category: bundled.category,
+            goal: bundled.goal, level: bundled.level,
+            durationWeeks: bundled.durationWeeks,
+            sessionsPerWeek: bundled.sessionsPerWeek,
+            workoutPattern: bundled.workoutPattern,
+            tags: [], sortOrder: 6, catalogVersion: 101
+        )
         let merged = TrainingPlanLibraryStore.mergeValidatedCatalog(
             remote: [olderDuplicate, invalid, tooLong, valid, stolenID,
-                     alteredPrescription]
+                     alteredPrescription, replacementUUID]
         )
         XCTAssertEqual(merged.first { $0.slug == bundled.slug }?.id, bundled.id)
         XCTAssertEqual(merged.filter { $0.slug == valid.slug }.count, 1)
