@@ -98,6 +98,17 @@ enum ATHLTHTournamentSeasonContinuation {
             loserConsequence: completed.loserConsequence
         )
         nextSettings.startsAt = nil
+        nextSettings.startMode =
+            completed.startMode == "scheduled" ? .manual :
+            ATHLTHCompetitionStartMode(rawValue: completed.startMode) ?? .manual
+        nextSettings.environment =
+            ATHLTHCompetitionEnvironment(rawValue: completed.requiredEnvironment)
+            ?? .any
+        nextSettings.meetingPlace = completed.meetingPlace ?? ""
+        nextSettings.meetingLat = completed.meetingLat
+        nextSettings.meetingLon = completed.meetingLon
+        // A new season always gets a new, independently approved exercise list.
+        nextSettings.coachExerciseIDs = []
 
         // Deliberately do not re-use the previous club season ID. The owner
         // chooses a new club season (if applicable) in the full editor.
