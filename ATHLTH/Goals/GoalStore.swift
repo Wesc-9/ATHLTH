@@ -42,6 +42,7 @@ final class GoalStore: ObservableObject {
 
     func add(_ goal: ATHLTHGoal) {
         var newGoal = goal
+        newGoal.lastSavedAt = .now
 
         if goals.isEmpty {
             newGoal.isPrimary = true
@@ -50,7 +51,10 @@ final class GoalStore: ObservableObject {
         if newGoal.isPrimary {
             goals = goals.map { existing in
                 var copy = existing
-                copy.isPrimary = false
+                if copy.isPrimary {
+                    copy.isPrimary = false
+                    copy.lastSavedAt = .now
+                }
                 return copy
             }
         }
@@ -65,11 +69,16 @@ final class GoalStore: ObservableObject {
 
         if goal.isPrimary {
             for otherIndex in goals.indices where goals[otherIndex].id != goal.id {
-                goals[otherIndex].isPrimary = false
+                if goals[otherIndex].isPrimary {
+                    goals[otherIndex].isPrimary = false
+                    goals[otherIndex].lastSavedAt = .now
+                }
             }
         }
 
-        goals[index] = goal
+        var savedGoal = goal
+        savedGoal.lastSavedAt = .now
+        goals[index] = savedGoal
         normalizePrimaryGoal()
         persist()
     }
@@ -105,10 +114,12 @@ final class GoalStore: ObservableObject {
             if goalIDs.contains(goals[index].id) {
                 if goals[index].linkedTrainingPlanID != planID {
                     goals[index].linkedTrainingPlanID = planID
+                    goals[index].lastSavedAt = .now
                     changed = true
                 }
             } else if goals[index].linkedTrainingPlanID == planID {
                 goals[index].linkedTrainingPlanID = nil
+                goals[index].lastSavedAt = .now
                 changed = true
             }
         }
@@ -121,11 +132,16 @@ final class GoalStore: ObservableObject {
     func setPrimary(_ goalID: UUID) {
         guard goals.contains(where: { $0.id == goalID && $0.status == .active }) else { return }
 
+        var changed = false
         for index in goals.indices {
-            goals[index].isPrimary = goals[index].id == goalID
+            let shouldBePrimary = goals[index].id == goalID
+            guard goals[index].isPrimary != shouldBePrimary else { continue }
+            goals[index].isPrimary = shouldBePrimary
+            goals[index].lastSavedAt = .now
+            changed = true
         }
 
-        persist()
+        if changed { persist() }
     }
 
     func setStatus(_ status: GoalStatus, for goalID: UUID) {
@@ -139,6 +155,7 @@ final class GoalStore: ObservableObject {
             goals[index].completedAt = nil
         }
 
+        goals[index].lastSavedAt = .now
         normalizePrimaryGoal()
         persist()
     }
@@ -173,6 +190,7 @@ final class GoalStore: ObservableObject {
             }
         }
 
+        goals[goalIndex].lastSavedAt = .now
         normalizePrimaryGoal()
         persist()
     }
@@ -185,12 +203,14 @@ final class GoalStore: ObservableObject {
         }
 
         goals[goalIndex].milestones[milestoneIndex].manualOverride = .none
+        goals[goalIndex].lastSavedAt = .now
         persist()
     }
 
     func replaceMilestones(_ milestones: [GoalMilestone], for goalID: UUID) {
         guard let index = goals.firstIndex(where: { $0.id == goalID }) else { return }
         goals[index].milestones = milestones
+        goals[index].lastSavedAt = .now
         persist()
     }
 
@@ -280,15 +300,22 @@ final class GoalStore: ObservableObject {
                     continue
                 }
 
+                let previousDescription =
+                    goals[goalIndex].milestones[milestoneIndex].lastEvidenceDescription
                 goals[goalIndex].milestones[milestoneIndex].lastEvidenceDescription =
                     evidence.description
 
                 guard Self.ruleIsSatisfied(rule, by: evidence.currentValue) else {
-                    changed = true
+                    // Repeated polling is not a new edit; only persist changed results.
+                    if previousDescription != evidence.description {
+                        goals[goalIndex].lastSavedAt = .now
+                        changed = true
+                    }
                     continue
                 }
 
                 goals[goalIndex].milestones[milestoneIndex].completedAt = evidence.evidenceDate
+                goals[goalIndex].lastSavedAt = .now
                 goals[goalIndex].milestones[milestoneIndex].completionMethod =
                     rule.dataSource == .appleHealth ? .automaticAppleHealth : .automaticATHLTH
                 changed = true

@@ -395,6 +395,8 @@ struct ATHLTHGoal: Identifiable, Codable, Hashable {
     var title: String
     var category: GoalCategory
     var createdAt: Date
+    /// Date of the last saved change to this goal, for automatic device synchronization.
+    var lastSavedAt: Date?
     var startDate: Date
     var deadline: Date?
     var imageFilename: String?
@@ -417,6 +419,7 @@ struct ATHLTHGoal: Identifiable, Codable, Hashable {
         title: String,
         category: GoalCategory,
         createdAt: Date = Date(),
+        lastSavedAt: Date? = nil,
         startDate: Date = Date(),
         deadline: Date? = nil,
         imageFilename: String? = nil,
@@ -437,6 +440,7 @@ struct ATHLTHGoal: Identifiable, Codable, Hashable {
         self.title = title
         self.category = category
         self.createdAt = createdAt
+        self.lastSavedAt = lastSavedAt
         self.startDate = startDate
         self.deadline = deadline
         self.imageFilename = imageFilename

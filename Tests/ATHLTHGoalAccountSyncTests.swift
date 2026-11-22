@@ -5,12 +5,12 @@ import XCTest
 final class ATHLTHGoalAccountSyncTests: XCTestCase {
     private func item(
         id: UUID = UUID(), title: String = "Run 10 km",
-        image: String? = nil
+        image: String? = nil, lastSavedAt: Date? = nil
     ) -> ATHLTHCloudGoal {
         ATHLTHCloudGoal(
             goal: ATHLTHGoal(
                 id: id, title: title, category: .endurance,
-                dataSource: .manual
+                lastSavedAt: lastSavedAt, dataSource: .manual
             ),
             coverBase64: image
         )
@@ -44,27 +44,76 @@ final class ATHLTHGoalAccountSyncTests: XCTestCase {
         XCTAssertTrue(outcome.conflictingIDs.isEmpty)
     }
 
-    func testConcurrentEditsToSameGoalDoNotOverwriteEachOther() {
+    func testMostRecentlySavedGoalWinsWithoutPrompt() {
         let id = UUID()
+        let older = Date(timeIntervalSince1970: 1_800_000_000)
+        let newer = older.addingTimeInterval(60)
         let existing = item(id: id, title: "Original")
-        let local = item(id: id, title: "iPhone edit")
-        let remote = item(id: id, title: "iPad edit")
+        let local = item(id: id, title: "iPhone edit", lastSavedAt: newer)
+        let remote = item(id: id, title: "iPad edit", lastSavedAt: older)
         let outcome = ATHLTHGoalMergePolicy.reconcile(
             base: [existing], local: [local], remote: [remote]
         )
-        XCTAssertEqual(outcome.conflictingIDs, [id])
-        XCTAssertTrue(outcome.merged.isEmpty)
+        XCTAssertEqual(outcome.merged, [local])
+        XCTAssertTrue(outcome.conflictingIDs.isEmpty)
     }
 
-    func testChangedCoverCountsAsAConflictingEdit() {
+    func testCloudNewerGoalWinsWithoutPrompt() {
         let id = UUID()
-        let existing = item(id: id, image: "one")
-        let local = item(id: id, image: "two")
-        let remote = item(id: id, image: "three")
+        let older = Date(timeIntervalSince1970: 1_800_000_000)
+        let newer = older.addingTimeInterval(60)
+        let existing = item(id: id, title: "Original")
+        let local = item(id: id, title: "iPhone edit", lastSavedAt: older)
+        let remote = item(id: id, title: "iPad edit", lastSavedAt: newer)
         let outcome = ATHLTHGoalMergePolicy.reconcile(
             base: [existing], local: [local], remote: [remote]
         )
-        XCTAssertEqual(outcome.conflictingIDs, [id])
+        XCTAssertEqual(outcome.merged, [remote])
+        XCTAssertTrue(outcome.conflictingIDs.isEmpty)
+    }
+
+    func testConcurrentDeleteIsNeverResurrected() {
+        let id = UUID()
+        let existing = item(id: id, title: "Original")
+        let remoteEdit = item(id: id, title: "Changed", lastSavedAt: .now)
+        let outcome = ATHLTHGoalMergePolicy.reconcile(
+            base: [existing], local: [], remote: [remoteEdit]
+        )
+        XCTAssertTrue(outcome.merged.isEmpty)
+        XCTAssertTrue(outcome.conflictingIDs.isEmpty)
+    }
+
+    func testChangedCoverUsesMostRecentSave() {
+        let id = UUID()
+        let older = Date(timeIntervalSince1970: 1_800_000_000)
+        let newer = older.addingTimeInterval(60)
+        let existing = item(id: id, image: "one")
+        let local = item(id: id, image: "two", lastSavedAt: older)
+        let remote = item(id: id, image: "three", lastSavedAt: newer)
+        let outcome = ATHLTHGoalMergePolicy.reconcile(
+            base: [existing], local: [local], remote: [remote]
+        )
+        XCTAssertEqual(outcome.merged, [remote])
+        XCTAssertTrue(outcome.conflictingIDs.isEmpty)
+    }
+
+    func testConcurrentMeasurementEditsResolveBySaveDate() {
+        let id = UUID()
+        let base = ATHLTHBodyMeasurement(
+            id: id, metric: .weight, value: 70,
+            date: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+        var local = base
+        local.value = 69
+        local.lastSavedAt = Date(timeIntervalSince1970: 1_800_000_100)
+        var remote = base
+        remote.value = 68
+        remote.lastSavedAt = Date(timeIntervalSince1970: 1_800_000_200)
+        let outcome = ATHLTHGoalMergePolicy.reconcileMeasurements(
+            base: [base], local: [local], remote: [remote]
+        )
+        XCTAssertEqual(outcome.merged, [remote])
+        XCTAssertTrue(outcome.conflictingIDs.isEmpty)
     }
 
     func testRemoteManualBodyMeasurementIsImportedToIPad() {

@@ -18,8 +18,8 @@ struct ATHLTHCloudGoalDocument: Codable, Equatable {
 }
 
 /// Three-way reconciliation: independent edits on different devices merge.
-/// Concurrent changes to the same goal are held as conflicts rather than
-/// silently overwriting either copy. Removal is treated as an actual edit.
+/// Concurrent changes resolve automatically in favor of the most recently
+/// saved edit. Deletion wins over an edit when both occurred offline.
 enum ATHLTHGoalMergePolicy {
     struct Result {
         let merged: [ATHLTHCloudGoal]
@@ -39,8 +39,6 @@ enum ATHLTHGoalMergePolicy {
                                      uniquingKeysWith: { old, _ in old })
         let ids = Set(baseline.keys).union(localItems.keys).union(remoteItems.keys)
         var merged: [ATHLTHCloudGoal] = []
-        var conflicts: [UUID] = []
-
         for id in ids.sorted(by: { $0.uuidString < $1.uuidString }) {
             let baseValue = baseline[id]
             let localValue = localItems[id]
@@ -53,14 +51,19 @@ enum ATHLTHGoalMergePolicy {
                 selected = remoteValue
             } else if remoteValue == baseValue {
                 selected = localValue
+            } else if let localValue, let remoteValue {
+                let localSavedAt = localValue.goal.lastSavedAt ?? localValue.goal.createdAt
+                let remoteSavedAt = remoteValue.goal.lastSavedAt ?? remoteValue.goal.createdAt
+                // Equal timestamps resolve to the server state consistently.
+                selected = localSavedAt > remoteSavedAt ? localValue : remoteValue
             } else {
-                conflicts.append(id)
-                continue
+                // Preserve deletions rather than resurrecting a removed goal.
+                selected = nil
             }
             if let selected { merged.append(selected) }
         }
 
-        return Result(merged: merged, conflictingIDs: conflicts)
+        return Result(merged: merged, conflictingIDs: [])
     }
 
     struct MeasurementResult {
@@ -77,17 +80,22 @@ enum ATHLTHGoalMergePolicy {
         let l = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { old, _ in old })
         let r = Dictionary(remote.map { ($0.id, $0) }, uniquingKeysWith: { old, _ in old })
         var merged: [ATHLTHBodyMeasurement] = []
-        var conflicts: [UUID] = []
         for id in Set(b.keys).union(l.keys).union(r.keys)
             .sorted(by: { $0.uuidString < $1.uuidString }) {
             let chosen: ATHLTHBodyMeasurement?
             if l[id] == r[id] { chosen = l[id] }
             else if l[id] == b[id] { chosen = r[id] }
             else if r[id] == b[id] { chosen = l[id] }
-            else { conflicts.append(id); continue }
+            else if let local = l[id], let remote = r[id] {
+                let localSavedAt = local.lastSavedAt ?? local.date
+                let remoteSavedAt = remote.lastSavedAt ?? remote.date
+                chosen = localSavedAt > remoteSavedAt ? local : remote
+            } else {
+                chosen = nil
+            }
             if let chosen { merged.append(chosen) }
         }
-        return MeasurementResult(merged: merged, conflictingIDs: conflicts)
+        return MeasurementResult(merged: merged, conflictingIDs: [])
     }
 
     static func ordered(_ values: [ATHLTHBodyMeasurement]) -> [ATHLTHBodyMeasurement] {
@@ -170,8 +178,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
 
     func sync(
         session: AppSessionStore,
-        goals: GoalStore,
-        preferLocalOnConflict: Bool? = nil
+        goals: GoalStore
     ) async {
         guard !isSyncing, session.signedIn,
               let userID = accountID, userID == session.profile.userID,
@@ -216,43 +223,9 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                 base: baseMeasurements, local: capturedMeasurements, remote: remoteMeasurements
             )
 
-            let hasConflicts = !result.conflictingIDs.isEmpty ||
-                !measurementResult.conflictingIDs.isEmpty
-            if hasConflicts && preferLocalOnConflict == nil {
-                conflictingGoalIDs = result.conflictingIDs
-                conflictingMeasurementIDs = measurementResult.conflictingIDs
-                status = ATHLTHLocalization.choose(
-                    english: "The same goal was changed on multiple devices. Choose which version to keep.",
-                    norwegian: "Det samme målet ble endret på flere enheter. Velg hvilken versjon du vil beholde."
-                )
-                return
-            }
-
-            // Conflict choice is scoped to the specific colliding identities.
-            // Independent additions/edits from both devices are still merged.
-            var resolvedGoals = result.merged
-            var resolvedMeasurements = measurementResult.merged
-            if let preferLocalOnConflict {
-                let chosenGoals = Dictionary(
-                    (preferLocalOnConflict ? localItems : remoteItems)
-                        .map { ($0.id, $0) },
-                    uniquingKeysWith: { old, _ in old }
-                )
-                for id in result.conflictingIDs {
-                    if let chosen = chosenGoals[id] { resolvedGoals.append(chosen) }
-                    // An absent selected value represents a deliberate deletion.
-                }
-                let chosenMeasurements = Dictionary(
-                    (preferLocalOnConflict ? capturedMeasurements : remoteMeasurements)
-                        .map { ($0.id, $0) },
-                    uniquingKeysWith: { old, _ in old }
-                )
-                for id in measurementResult.conflictingIDs {
-                    if let chosen = chosenMeasurements[id] {
-                        resolvedMeasurements.append(chosen)
-                    }
-                }
-            }
+            // Each saved value is reconciled automatically. No profile prompt.
+            let resolvedGoals = result.merged
+            let resolvedMeasurements = measurementResult.merged
 
             // Local goals could change while the remote request is pending.
             guard goals.goals == capturedLocalGoals,

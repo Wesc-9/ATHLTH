@@ -68,56 +68,7 @@ struct ATHLTHPrivateGoalsProfileCard: View {
                     .lineLimit(1)
             }
 
-            if !goalAccountSync.conflictingGoalIDs.isEmpty ||
-                !goalAccountSync.conflictingMeasurementIDs.isEmpty {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Goals changed on both devices. Check sync before editing further.",
-                        norwegian: "Mål er endret på begge enheter. Kontroller synkronisering før du redigerer videre."
-                    ),
-                    systemImage: "exclamationmark.triangle"
-                )
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                HStack(spacing: 8) {
-                    Button {
-                        Task {
-                            await goalAccountSync.sync(
-                                session: session,
-                                goals: goalStore,
-                                preferLocalOnConflict: true
-                            )
-                        }
-                    } label: {
-                        Text(tr("Keep this device", "Behold denne enheten"))
-                            .font(.caption.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 43)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 13))
-
-                    Button {
-                        Task {
-                            await goalAccountSync.sync(
-                                session: session,
-                                goals: goalStore,
-                                preferLocalOnConflict: false
-                            )
-                        }
-                    } label: {
-                        Text(tr("Keep cloud version", "Behold skyversjonen"))
-                            .font(.caption.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 43)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .background(ATHLTHPlanDesign.accent,
-                                in: RoundedRectangle(cornerRadius: 13))
-                }
-            } else if goalAccountSync.lastSyncError != nil {
+            if goalAccountSync.lastSyncError != nil {
                 Label(
                     ATHLTHLocalization.choose(
                         english: "Waiting for account sync. Your goals are saved on this device.",

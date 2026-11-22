@@ -57,8 +57,9 @@ struct ATHLTHTrainingProfile: Codable, Equatable {
         }) {
             measurements[index].value = value
             measurements[index].date = date
+            measurements[index].lastSavedAt = .now
         } else {
-            measurements.append(.init(metric: metric, value: value, date: date))
+            measurements.append(.init(metric: metric, value: value, date: date, lastSavedAt: .now))
         }
         updatedAt = .now
         return true
@@ -109,4 +110,5 @@ struct ATHLTHBodyMeasurement: Codable, Equatable, Identifiable {
     var metric: ATHLTHBodyMetric
     var value: Double
     var date: Date
+    var lastSavedAt: Date? = nil
 }
