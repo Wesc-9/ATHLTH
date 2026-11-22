@@ -93,7 +93,15 @@ enum ATHLTHCompoundExerciseProgress {
         source: String
     ) -> Result? {
         let expected = expectedProtocol(exercise)
-        guard exercise.isRunning, expected.count >= 2,
+        // GPS elevation/grade evidence is not present in recorded step
+        // summaries. Matching a hill session by time alone could produce
+        // a false hill PR from an unrelated flat interval workout.
+        guard exercise.category != .hills,
+              !expected.contains(where: {
+                  $0.targetGradientPercent != nil ||
+                  $0.targetElevationGainMeters != nil
+              }),
+              exercise.isRunning, expected.count >= 2,
               expected.contains(where: {
                   $0.kind == .run && !$0.isActiveRecovery
               }) else { return nil }
