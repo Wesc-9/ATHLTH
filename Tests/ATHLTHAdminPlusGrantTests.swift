@@ -11,7 +11,7 @@ final class ATHLTHAdminPlusGrantTests: XCTestCase {
         )
         XCTAssertEqual(
             ATHLTHPlusGrantNotificationCopy.message(canonical, norwegian: true),
-            "Du har fått ATHLTH+ i 30 dager. Tilgangen varer til 2026-12-22 14:15 UTC."
+            "Du har fått ATHLTH+ i 30 dager. Tilgangen varer til 22. desember 2026 kl. 14:15 UTC."
         )
         XCTAssertEqual(
             ATHLTHPlusGrantNotificationCopy.message(canonical, norwegian: false),
