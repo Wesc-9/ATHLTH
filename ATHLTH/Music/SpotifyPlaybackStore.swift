@@ -207,6 +207,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     // Independent of interval-wide song automation. These are explicit
     // selections attached to individual execution steps, including rests.
     private var stepSongWorkoutID: UUID?
+    private var stepSongsByIndex: [Int: ATHLTHSpotifyIntervalTrack] = [:]
     private var playedStepSongs = Set<Int>()
     private var stepSongGeneration = UUID()
     private var intervalCueObserver: NSObjectProtocol?
@@ -353,11 +354,32 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             let intensityText = notification.userInfo?["intensityText"] as? String
             let effortIndex = notification.userInfo?["effortOrdinal"] as? Int ?? stepIndex
             Task { @MainActor [weak self] in
-                await self?.playIntervalTrack(
-                    workoutID: workoutID, stepIndex: stepIndex,
-                    effortIndex: effortIndex,
-                    targetDurationSeconds: duration,
-                    intensityText: intensityText
+                guard let self else { return }
+                if let song = self.stepSongsByIndex[stepIndex] {
+                    await self.playWorkoutStepSong(
+                        song, workoutID: workoutID, stepIndex: stepIndex
+                    )
+                } else {
+                    await self.playIntervalTrack(
+                        workoutID: workoutID, stepIndex: stepIndex,
+                        effortIndex: effortIndex,
+                        targetDurationSeconds: duration,
+                        intensityText: intensityText
+                    )
+                }
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("athlth.spotifyWorkoutStepBegan"),
+            object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let workoutID = notification.userInfo?["workoutID"] as? UUID,
+                  let index = notification.userInfo?["stepIndex"] as? Int
+            else { return }
+            Task { @MainActor [weak self] in
+                guard let self, let song = self.stepSongsByIndex[index] else { return }
+                await self.playWorkoutStepSong(
+                    song, workoutID: workoutID, stepIndex: index
                 )
             }
         }
@@ -639,7 +661,27 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         guard stepSongWorkoutID != workoutID else { return }
         stepSongWorkoutID = workoutID
         playedStepSongs.removeAll()
+        stepSongsByIndex.removeAll()
         stepSongGeneration = UUID()
+    }
+
+    /// Only map when the saved recipe and running engine have the same
+    /// one-to-one step sequence. Never play a song against a wrong segment.
+    func configureRunningStepSongs(
+        _ blocks: [WorkoutTemplateBlock],
+        actualRunningStepCount: Int,
+        workoutID: UUID
+    ) {
+        prepareWorkoutStepSongs(workoutID: workoutID)
+        guard blocks.count == actualRunningStepCount else { return }
+        stepSongsByIndex = Dictionary(uniqueKeysWithValues: blocks.enumerated()
+            .compactMap { index, block in
+                block.spotifyTrack.map { (index, $0) }
+            })
+    }
+
+    func configuredRunningStepSong(at index: Int) -> ATHLTHSpotifyIntervalTrack? {
+        stepSongsByIndex[index]
     }
 
     /// Best effort: the recording/step engine never awaits Spotify. A song
