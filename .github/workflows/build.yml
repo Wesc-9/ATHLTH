@@ -296,8 +296,31 @@ jobs:
           ')
           echo "Booting XCTest host simulator $DEVICE_ID"
           printf '%s\n' "$DEVICE_ID" > "$RUNNER_TEMP/athlth-test-iphone-udid"
-          xcrun simctl boot "$DEVICE_ID" || true
-          xcrun simctl bootstatus "$DEVICE_ID" -b
+          # Hosted macOS runners may have a stale Watch/iPhone device pair.
+          # CoreSimulator then aborts simctl bootstatus (devicePair exception)
+          # before XCTest can execute. Recover ONLY the simulator service,
+          # and keep the actual xcodebuild test command mandatory.
+          SIMULATOR_READY=0
+          for ATTEMPT in 1 2 3; do
+            echo "XCTest simulator boot attempt $ATTEMPT of 3"
+            xcrun simctl boot "$DEVICE_ID" || true
+            if xcrun simctl bootstatus "$DEVICE_ID" -b; then
+              SIMULATOR_READY=1
+              break
+            fi
+            echo "::warning::CoreSimulator failed to boot XCTest host (attempt $ATTEMPT/3)"
+            xcrun simctl shutdown "$DEVICE_ID" || true
+            if [ "$ATTEMPT" -lt 3 ]; then
+              # Runner is private to this job; restart its simulator daemon
+              # to recover from transient corrupt device-pair notifications.
+              killall -9 com.apple.CoreSimulator.CoreSimulatorService || true
+              sleep 8
+            fi
+          done
+          if [ "$SIMULATOR_READY" -ne 1 ]; then
+            echo "::error::XCTest simulator did not boot after three attempts; tests were not run"
+            exit 1
+          fi
           xcodebuild -project ATHLTH.xcodeproj -scheme ATHLTH \
             -destination "platform=iOS Simulator,id=$DEVICE_ID" \
             -destination-timeout 120 \
