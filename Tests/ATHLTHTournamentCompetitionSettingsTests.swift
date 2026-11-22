@@ -119,6 +119,60 @@ final class ATHLTHTournamentCompetitionSettingsTests: XCTestCase {
         XCTAssertFalse(old.competitionSettings.requiresExplicitConsent)
     }
 
+    func testNewStartModesAndMeetingCoordinates() {
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.startMode = .scheduled
+        XCTAssertFalse(settings.isValid)
+        settings.startsAt = Date().addingTimeInterval(86_400)
+        XCTAssertTrue(settings.isValid)
+        settings.environment = .outdoor
+        settings.meetingPlace = "Stadionporten"
+        settings.meetingLat = 63.4297
+        settings.meetingLon = 10.3933
+        XCTAssertTrue(settings.isValid)
+        settings.meetingLon = 181
+        XCTAssertFalse(settings.isValid)
+        settings.meetingLon = 10.3933
+        settings.meetingPlace = String(repeating: "A", count: 241)
+        XCTAssertFalse(settings.isValid)
+    }
+
+    func testCoachExerciseProposalMustHaveUniqueCatalogIDs() {
+        var settings = ATHLTHTournamentCompetitionSettings()
+        let id = UUID()
+        settings.coachExerciseIDs = [id, id]
+        XCTAssertFalse(settings.isValid)
+        settings.coachExerciseIDs = [id, UUID()]
+        XCTAssertTrue(settings.isValid)
+        settings.coachExerciseIDs = (0..<13).map { _ in UUID() }
+        XCTAssertFalse(settings.isValid)
+    }
+
+    func testPreviousDraftSettingsDecodeWithSafeDefaults() throws {
+        let json = Data(#"""
+        {
+            "unlock":"interval",
+            "every":7,
+            "unit":"day",
+            "completionHours":48,
+            "invitationPermission":"admin",
+            "joinApproval":"admin",
+            "agreement": {
+                "allowed":"","prohibited":"","firstPrize":"",
+                "secondPrize":"","thirdPrize":"","loserConsequence":""
+            }
+        }
+        """#.utf8)
+        let old = try JSONDecoder().decode(
+            ATHLTHTournamentCompetitionSettings.self, from: json
+        )
+        XCTAssertEqual(old.startMode, .manual)
+        XCTAssertEqual(old.environment, .any)
+        XCTAssertTrue(old.coachExerciseIDs.isEmpty)
+        XCTAssertNil(old.meetingLat)
+        XCTAssertNil(old.startsAt)
+    }
+
     func testRulesCannotExceedBackendLengthBound() {
         var options = ATHLTHTournamentCompetitionSettings()
         options.agreement.firstPrize = String(repeating: "A", count: 501)
