@@ -923,8 +923,10 @@ final class ExerciseLibraryStore: ObservableObject {
             // unique, selectable RepDB equivalent exists.
             let completeLibrary = allExercises
             resolved = completeLibrary.filter { entry in
-                guard !Self.isRetiredNativeDuplicate(entry),
-                      entry.source != .athlthCatalog ||
+                guard !Self.isRetiredNativeDuplicate(entry) else {
+                    return false
+                }
+                guard entry.source != .athlthCatalog ||
                       !Self.isRetiredOriginalCoreSlug(entry.sourceIdentifier)
                 else {
                     return false
