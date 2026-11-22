@@ -6437,10 +6437,13 @@ struct ATHLTHTrainView: View {
                     restoreTrainSection(for: session.profile.userID)
                 }
                 restoreInterruptedPlanDestinationIfNeeded()
+                restoreDelayedPlanStartIfNeeded()
             }
             .onChange(of: session.profile.userID) { _, userID in
-                // Never reuse another athlete's selected Train subsection.
+                // Never reuse another athlete's selected Train subsection or timers.
+                delayedPlanStart = nil
                 restoreTrainSection(for: userID)
+                restoreDelayedPlanStartIfNeeded()
             }
             .onChange(of: selectedSection) { _, section in
                 persistedTrainSectionAccount = session.profile.userID.uuidString
@@ -6461,6 +6464,7 @@ struct ATHLTHTrainView: View {
                 // before expensive plan reconciliation and catalog refresh.
                 handleNavigationRequest()
                 restoreInterruptedPlanDestinationIfNeeded()
+                restoreDelayedPlanStartIfNeeded()
                 let userID = session.profile.userID
                 // Previously plan graph reconciliation started after 160 ms,
                 // right in the native floating tab-pill animation (~300 ms).
@@ -6525,6 +6529,7 @@ struct ATHLTHTrainView: View {
                     // existing sheet/navigation tree, including child editors.
                     // Only if iOS actually dismissed a sheet do we recover it.
                     restoreUnexpectedPlanDismissalIfNeeded()
+                    restoreDelayedPlanStartIfNeeded()
                     // The first Train activation owns the heavy daily refresh
                     // in the post-transition task above.
                     if preparedTrainUserID == session.profile.userID {
@@ -7894,10 +7899,15 @@ struct ATHLTHTrainView: View {
         else { return }
 
         cancelDelayedPlanStart()
+        let startsAt = Date().addingTimeInterval(seconds)
         delayedPlanStart = DelayedTrainPlanStart(
             planID: planID,
             workoutID: workout.id,
-            startsAt: Date().addingTimeInterval(seconds)
+            startsAt: startsAt
+        )
+        ATHLTHTrainDelayedStartStore.save(
+            .init(planID: planID, workoutID: workout.id, startsAt: startsAt),
+            for: session.profile.userID
         )
         PlannedWorkoutReminderScheduler.scheduleDelayedStart(
             workout, after: seconds
@@ -7911,6 +7921,21 @@ struct ATHLTHTrainView: View {
             )
         }
         delayedPlanStart = nil
+        ATHLTHTrainDelayedStartStore.remove(for: session.profile.userID)
+    }
+
+    /// A delayed start survives a terminated scene, but never starts HealthKit
+    /// or replays an uncertain recording when the application wakes up.
+    private func restoreDelayedPlanStartIfNeeded() {
+        guard delayedPlanStart == nil,
+              let checkpoint = ATHLTHTrainDelayedStartStore.load(
+                for: session.profile.userID
+              ) else { return }
+        delayedPlanStart = DelayedTrainPlanStart(
+            planID: checkpoint.planID,
+            workoutID: checkpoint.workoutID,
+            startsAt: checkpoint.startsAt
+        )
     }
 
     private func resolveDelayedPlanStartIfReady() {
