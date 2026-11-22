@@ -945,18 +945,25 @@ final class LibraryFavoritesStore: ObservableObject {
         for (key, change) in pendingChanges {
             guard activeUserID == userID,
                   client.auth.currentUser?.id == userID else { return }
-            // A queued write may still be running. Wait for it before retrying
-            // so a stale request cannot overwrite the desired final state.
-            await pendingFavoriteWrites[key]?.value
-            guard pendingChanges[key]?.revision == change.revision else { continue }
-            do {
-                try await sendChange(change, userID: userID)
-                acknowledgeChange(change, key: key, userID: userID)
-            } catch {
+            // Chain retries into the same per-item queue as user taps.
+            // A newer tap must wait for an older retry, not race it.
+            let previous = pendingFavoriteWrites[key]
+            let retry = Task {
+                await previous?.value
                 guard activeUserID == userID,
-                      client.auth.currentUser?.id == userID else { return }
-                errorMessage = error.localizedDescription
+                      client.auth.currentUser?.id == userID,
+                      pendingChanges[key]?.revision == change.revision else { return }
+                do {
+                    try await sendChange(change, userID: userID)
+                    acknowledgeChange(change, key: key, userID: userID)
+                } catch {
+                    guard activeUserID == userID,
+                          client.auth.currentUser?.id == userID else { return }
+                    errorMessage = error.localizedDescription
+                }
             }
+            pendingFavoriteWrites[key] = retry
+            await retry.value
         }
     }
 
