@@ -547,8 +547,16 @@ enum ATHLTHExerciseReferenceResolver {
                 copy.exerciseID = nil
                 copy.exerciseSlug = sourceID
             } else {
-                copy.exerciseID = found.id
+                // Unknown public catalog identities cannot be safely mapped
+                // to another account without a stable source identifier.
+                copy.exerciseID = nil
+                copy.exerciseSlug = nil
             }
+        } else {
+            // Never forward a stale or foreign account's private identifier.
+            // A recipient may still see the workout step's display title.
+            copy.exerciseID = nil
+            copy.exerciseSlug = nil
         }
         return copy
     }
@@ -569,6 +577,7 @@ enum ATHLTHExerciseReferenceResolver {
                 if let shared = shareableSnapshot(linked.exercise) {
                     safe.embeddedExercise = shared
                 } else {
+                    safe.exerciseID = nil
                     safe.embeddedExercise = ExerciseSnapshot(
                         name: linked.canonicalName,
                         instructions: [], primaryMuscles: [],
@@ -576,6 +585,9 @@ enum ATHLTHExerciseReferenceResolver {
                     )
                 }
             } else {
+                // Legacy planned exercises may contain private UUIDs from
+                // another account. Do not export these unverified identities.
+                safe.exerciseID = nil
                 // An exercise received from someone else may be previewed
                 // locally, but the original author has not consented to
                 // its further distribution by this user.
