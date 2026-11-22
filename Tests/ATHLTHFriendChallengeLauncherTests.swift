@@ -6,7 +6,6 @@ import XCTest
 /// crash when opening Home -> Friends -> Challenge on iOS 27.3 beta.
 /// Construct and lay out the exact lightweight entry and its profile/feed
 /// launchers independently of the large social profile's SwiftUI view tree.
-@MainActor
 final class ATHLTHFriendChallengeLauncherTests: XCTestCase {
     private func friend() -> SocialProfileCard {
         SocialProfileCard(
@@ -21,6 +20,7 @@ final class ATHLTHFriendChallengeLauncherTests: XCTestCase {
         )
     }
 
+    @MainActor
     private func render<Content: View>(_ content: Content) {
         let controller = UIHostingController(rootView: content)
         controller.loadViewIfNeeded()
@@ -29,6 +29,7 @@ final class ATHLTHFriendChallengeLauncherTests: XCTestCase {
         XCTAssertGreaterThan(controller.view.bounds.width, 0)
     }
 
+    @MainActor
     func testFriendsChallengeActionRendersWithoutMountingParentProfile() {
         render(ATHLTHFriendChallengeLauncher(
             friend: friend(),
@@ -37,6 +38,7 @@ final class ATHLTHFriendChallengeLauncherTests: XCTestCase {
         ))
     }
 
+    @MainActor
     func testFeedChallengeActionRendersWithoutMountingFeedCard() {
         render(ATHLTHFriendChallengeLauncher(
             friend: friend(),
@@ -45,10 +47,12 @@ final class ATHLTHFriendChallengeLauncherTests: XCTestCase {
         ))
     }
 
+    @MainActor
     func testChallengeSportPickerRendersFromFriendContext() {
         render(ATHLTHCompetitionEntryView(preselectedFriend: friend()))
     }
 
+    @MainActor
     func testUnfollowedFriendStillHasAnExplicitPermissionGate() {
         render(ATHLTHFriendChallengeLauncher(
             friend: friend(),
