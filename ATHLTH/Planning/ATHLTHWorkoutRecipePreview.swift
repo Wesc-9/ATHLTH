@@ -494,6 +494,9 @@ struct ATHLTHWorkoutRecipePreview: View {
     var compactDetailLayout = false
     var detailAdvancedMode: Binding<Bool>? = nil
     var onUpdateBlock: ((Int, WorkoutTemplateBlock) -> Void)? = nil
+    /// Library RunningWorkoutTemplate owns its independent interval editor.
+    /// A direct tap opens that existing editor, never a second engine.
+    var onEditStep: ((Int) -> Void)? = nil
 
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
@@ -914,7 +917,9 @@ struct ATHLTHWorkoutRecipePreview: View {
                             index: index,
                             block: ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
                         )
-                        if onUpdateBlock != nil {
+                        if let onEditStep {
+                            onEditStep(index)
+                        } else if onUpdateBlock != nil {
                             editingStep = item
                         } else {
                             inspectedCardioStep = item
