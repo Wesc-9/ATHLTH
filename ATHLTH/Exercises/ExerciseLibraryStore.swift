@@ -1204,8 +1204,7 @@ final class ExerciseLibraryStore: ObservableObject {
            let existing = customExercises.first(where: {
                $0.exercise.sharedSourceExerciseID == importedSourceID &&
                $0.exercise.ownerID == ownerID &&
-               (originalCreatorID == nil ||
-                $0.exercise.originalCreatorID == originalCreatorID)
+               $0.exercise.originalCreatorID == originalCreatorID
            }) {
             return existing
         }
