@@ -179,6 +179,29 @@ function localizedAlert(
   actorName?: string | null,
   actorUnreadCount = 1,
 ): { title: string; body: string } {
+  const isPlusGrant = event.kind === "athlth_plus_granted";
+  if (isPlusGrant) {
+    if (languageCode !== "nb") {
+      return { title: "ATHLTH+ granted", body: event.message };
+    }
+
+    if (event.message === "You have received ATHLTH+ with no end date.") {
+      return {
+        title: "Du har fått ATHLTH+",
+        body: "Du har fått ATHLTH+ uten sluttdato.",
+      };
+    }
+    const match = event.message.match(
+      /^You have received ATHLTH\+ for (7|30|90|365) days\. Valid until (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) UTC\.$/,
+    );
+    return {
+      title: "Du har fått ATHLTH+",
+      body: match
+        ? `Du har fått ATHLTH+ i ${match[1]} dager. Tilgangen varer til ${match[2]} UTC.`
+        : event.message,
+    };
+  }
+
   const isCommunityEventCancellation =
     event.entity_type === "community_event" &&
     event.title === "Event cancelled";
@@ -625,9 +648,13 @@ Deno.serve(async (req: Request) => {
   const mandatoryCommunityEventCancellation =
     event.entity_type === "community_event" &&
     event.title === "Event cancelled";
+  // A paid feature access change is an account notice, not social activity.
+  // Friend, message and challenge notification mutes must not suppress it.
+  const mandatoryPlusGrant = event.kind === "athlth_plus_granted";
 
   if (
     !mandatoryCommunityEventCancellation &&
+    !mandatoryPlusGrant &&
     !preferenceAllows(event.kind, preferences ?? null)
   ) {
     await admin
