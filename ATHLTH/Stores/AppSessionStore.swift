@@ -5263,6 +5263,45 @@ final class AppSessionStore: ObservableObject {
         persistPlanTemplates()
     }
 
+    /// Every executable catalog movement must come from the existing
+    /// exercise library, including when a caller omitted or passed an empty
+    /// library. Never silently save unbound strength steps in this situation.
+    /// This leaves non-strength (running/walking) plans independent of RepDB.
+    private func bindCatalogPlanExerciseReferences(
+        _ plan: inout TrainingPlan,
+        suppliedLibrary: [ExerciseLibraryEntry]
+    ) -> Bool {
+        let requiresExercises = plan.weeks.contains { week in
+            week.days.contains { day in
+                day.sessions.contains { workout in
+                    !workout.exercises.isEmpty ||
+                    workout.resolvedWorkoutBlocks.contains { $0.kind == .exercise }
+                }
+            }
+        }
+        guard requiresExercises else { return true }
+        let library = suppliedLibrary.isEmpty
+            ? ExerciseLibraryStore().allExercises
+            : suppliedLibrary
+        guard !library.isEmpty else { return false }
+        let report = ATHLTHWorkoutExerciseBinding.bind(&plan, library: library)
+        guard report.isReady else { return false }
+        // Verify the effective execution blocks after binding: an imported
+        // legacy plan may expose resolved blocks without workoutBlocks.
+        return plan.weeks.allSatisfy { week in
+            week.days.allSatisfy { day in
+                day.sessions.allSatisfy { workout in
+                    workout.resolvedWorkoutBlocks.allSatisfy { block in
+                        block.kind != .exercise ||
+                        ATHLTHExerciseReferenceResolver.resolve(
+                            block, in: library
+                        ) != nil
+                    }
+                }
+            }
+        }
+    }
+
     @discardableResult
     func saveCatalogPlanTemplate(
         _ entry: TrainingPlanCatalogEntry,
@@ -5289,12 +5328,9 @@ final class AppSessionStore: ObservableObject {
             startDate: nil,
             preferredDayIndexes: preferredDayIndexes
         )
-        if !exerciseLibrary.isEmpty {
-            let report = ATHLTHWorkoutExerciseBinding.bind(
-                &template, library: exerciseLibrary
-            )
-            guard report.isReady else { return nil }
-        }
+        guard bindCatalogPlanExerciseReferences(
+            &template, suppliedLibrary: exerciseLibrary
+        ) else { return nil }
 
         if preferredDayIndexes != nil {
             template.title = "\(entry.title) · Custom"
@@ -5368,12 +5404,9 @@ final class AppSessionStore: ObservableObject {
             startDate: start,
             preferredDayIndexes: preferredDayIndexes
         )
-        if !exerciseLibrary.isEmpty {
-            let report = ATHLTHWorkoutExerciseBinding.bind(
-                &plan, library: exerciseLibrary
-            )
-            guard report.isReady else { return nil }
-        }
+        guard bindCatalogPlanExerciseReferences(
+            &plan, suppliedLibrary: exerciseLibrary
+        ) else { return nil }
 
         guard addTrainingPlan(plan) else {
             return nil
