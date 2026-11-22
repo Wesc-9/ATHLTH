@@ -69,7 +69,7 @@ enum ATHLTHCompetitionCreationPolicy {
         switch format {
         case .duel: 1
         case .league: 2
-        case .cup: 3
+        case .cup: 2
         }
     }
 
@@ -149,6 +149,7 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var exerciseName = ""
     @State private var startsAt = Date().addingTimeInterval(86_400)
     @State private var endsAt = Date().addingTimeInterval(7 * 86_400)
+    @State private var simpleStartLater = false
     @State private var duelAgreement = ATHLTHCompetitionAgreement()
     @State private var multipleAttempts = true
     @State private var roundsPerWeek = 7
@@ -172,6 +173,15 @@ struct ATHLTHCompetitionCreationView: View {
         social.mutualFollows.filter { chosenIDs.contains($0.userID) }
     }
 
+    private var effectiveStart: Date {
+        advanced ? startsAt :
+            (simpleStartLater ? startsAt : Date())
+    }
+    private var effectiveEnd: Date {
+        advanced ? endsAt :
+            effectiveStart.addingTimeInterval(7 * 86_400)
+    }
+
     private var isValid: Bool {
         ATHLTHCompetitionCreationPolicy.canPublish(
             name: competitionTitle,
@@ -184,11 +194,11 @@ struct ATHLTHCompetitionCreationView: View {
             durationMinutes: durationMinutes,
             exerciseName: exerciseName,
             hasRoute: chosenRoute != nil,
-            endsAt: endsAt,
+            endsAt: effectiveEnd,
             now: Date()
         ) && selectedPeople.count == chosenIDs.count &&
-        startsAt >= Date().addingTimeInterval(-60) &&
-        startsAt < endsAt && duelAgreement.isValid
+        effectiveStart >= Date().addingTimeInterval(-60) &&
+        effectiveStart < effectiveEnd && duelAgreement.isValid
     }
 
     var body: some View {
@@ -230,7 +240,10 @@ struct ATHLTHCompetitionCreationView: View {
                         simpleIdentity
                     }
 
-                    if format == .duel {
+                    if !advanced {
+                        participantsCard
+                        simpleCompetitionRules
+                    } else if format == .duel {
                         participantsCard
                         competitionRules
                     } else {
@@ -270,7 +283,7 @@ struct ATHLTHCompetitionCreationView: View {
                 VStack(spacing: 0) {
                     Divider().opacity(0.32)
                     Button {
-                        if format == .duel {
+                        if format == .duel || !advanced {
                             Task { await publish() }
                         } else {
                             showingExistingTournamentRules = true
@@ -280,7 +293,7 @@ struct ATHLTHCompetitionCreationView: View {
                             if sending { ProgressView().tint(.white) }
                             Text(sending
                                 ? tr("Creating…", "Oppretter…")
-                                : format == .duel
+                                : format == .duel || !advanced
                                   ? tr("Create and invite", "Opprett og inviter")
                                   : tr("Continue to rules", "Fortsett til regler"))
                                 .font(.headline)
@@ -292,11 +305,11 @@ struct ATHLTHCompetitionCreationView: View {
                     }
                     .disabled(
                         sending || successful ||
-                        (format == .duel && !isValid)
+                        ((format == .duel || !advanced) && !isValid)
                     )
                     .opacity(
                         !sending && !successful &&
-                        (format != .duel || isValid) ? 1 : 0.48
+                        (advanced && format != .duel || isValid) ? 1 : 0.48
                     )
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
@@ -586,6 +599,62 @@ struct ATHLTHCompetitionCreationView: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
+    /// Basic does not open the Advanced tournament wizard. Three choices:
+    /// competition, friends and optional start. The real default exercise
+    /// is chosen from the existing server catalogue in one publish request.
+    private var simpleCompetitionRules: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            titleBlock(tr("The challenge", "Konkurransen"))
+            let preset: String = {
+                switch initialActivity {
+                case .running: return "Løp 5 km"
+                case .walking: return "Gå 5 km"
+                case .strength: return "Knebøy · flest repetisjoner"
+                }
+            }()
+            HStack(spacing: 10) {
+                Image(systemName: initialActivity.symbol)
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundStyle(bronze)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(preset).font(.subheadline.weight(.semibold))
+                    Text(tr("Ready to use · 7 days per round",
+                            "Ferdig oppsett · 7 dager per runde"))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                }
+                Spacer()
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(bronze)
+            }
+            .padding(13)
+            .background(ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 15))
+            Toggle(tr("Set start date", "Velg startdato"),
+                   isOn: $simpleStartLater)
+                .font(.subheadline)
+                .tint(bronze)
+            if simpleStartLater {
+                DatePicker(
+                    tr("Starts", "Starter"),
+                    selection: $startsAt,
+                    in: Date()...,
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+                .font(.subheadline)
+            }
+            Text(format == .duel
+                ? tr("Your friend accepts in your existing chat. The duel lasts seven days.",
+                     "Vennen godtar i samtalen dere allerede har. Duellen varer i syv dager.")
+                : tr("Each friend receives the group conversation in Inbox. The organizer starts once all invitations are answered.",
+                     "Hver venn får konkurransesamtalen i Innboks. Arrangøren starter når alle har svart."))
+                .font(.caption)
+                .foregroundStyle(muted)
+        }
+        .padding(15)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+    }
+
     private var competitionRules: some View {
         VStack(alignment: .leading, spacing: 13) {
             titleBlock(tr("Rules", "Regler"))
@@ -861,8 +930,8 @@ struct ATHLTHCompetitionCreationView: View {
                 ? nil : duelAgreement.firstPrize,
             loserConsequence: duelAgreement.loserConsequence.isEmpty
                 ? nil : duelAgreement.loserConsequence,
-            startsAt: startsAt,
-            endsAt: endsAt,
+            startsAt: effectiveStart,
+            endsAt: effectiveEnd,
             allowMultipleAttempts: multipleAttempts,
             lockRulesAtStart: true,
             meetup: nil
@@ -928,6 +997,21 @@ struct ATHLTHCompetitionCreationView: View {
 
     @MainActor
     private func publishTournament() async throws {
+        if !advanced {
+            guard isValid else {
+                throw ATHLTHCompetitionError.missingOpponents
+            }
+            _ = try await ATHLTHTournamentCloudService().createSimple(
+                title: competitionTitle,
+                format: format == .cup ? .cup : .league,
+                activity: ATHLTHCompetitionCreationPolicy.tournamentActivity(
+                    initialActivity
+                ),
+                invitees: selectedPeople.map(\.userID),
+                startsAt: simpleStartLater ? startsAt : nil
+            )
+            return
+        }
         let ownName = session.profile.username.isEmpty
             ? session.profile.displayName : session.profile.username
         let athletes = [
