@@ -158,6 +158,8 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var format: ATHLTHCompetitionFormat = .duel
     @State private var leagueStyle: ATHLTHTournamentFormat = .league
     @State private var showingExistingTournamentRules = false
+    @State private var showingSavedCompetitionTemplates = false
+    @State private var restoredCompetitionTemplate: ATHLTHTournamentDraft?
     @State private var showingSprintRoutePicker = false
     @State private var competitionTitle = ""
     @State private var chosenIDs: Set<UUID> = []
@@ -251,6 +253,30 @@ struct ATHLTHCompetitionCreationView: View {
                         )
                     }
 
+                    if initialFormat == nil || initialFormat != .duel {
+                        Button {
+                            showingSavedCompetitionTemplates = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "square.stack.3d.up")
+                                    .font(.title3)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Hent lagret konkurransemal")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("Velg en mal før du setter opp konkurransen")
+                                        .font(.caption)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .foregroundStyle(bronze)
+                            .padding(15)
+                            .background(.white,
+                                in: RoundedRectangle(cornerRadius: 17))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-competition-load-template")
+                    }
                     titleBlock(tr("Competition format", "Konkurranseform"))
                     VStack(spacing: 9) {
                         ForEach(ATHLTHCompetitionFormat.allCases) { option in
@@ -354,6 +380,33 @@ struct ATHLTHCompetitionCreationView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingSavedCompetitionTemplates,
+               onDismiss: {
+            if restoredCompetitionTemplate != nil {
+                showingExistingTournamentRules = true
+            }
+        }) {
+            ATHLTHTournamentTemplatePicker { selected in
+                let fixedSport = ATHLTHCompetitionCreationPolicy
+                    .tournamentActivity(initialActivity)
+                guard selected.allowedActivities.contains(fixedSport) else {
+                    errorMessage = "Denne malen gjelder en annen treningsform."
+                    restoredCompetitionTemplate = nil
+                    return
+                }
+                if let initialFormat,
+                   (initialFormat == .cup ? selected.format != .cup :
+                    initialFormat == .league ? selected.format == .cup : true) {
+                    errorMessage = "Malen har en annen konkurranseform."
+                    restoredCompetitionTemplate = nil
+                    return
+                }
+                restoredCompetitionTemplate = selected
+                competitionTitle = selected.title
+                format = selected.format == .cup ? .cup : .league
+                leagueStyle = selected.format
+            }
+        }
         .sheet(isPresented: $showingExistingTournamentRules) {
             ATHLTHTournamentCreator(
                 preset: format == .cup ? .cup : leagueStyle,
@@ -362,6 +415,7 @@ struct ATHLTHCompetitionCreationView: View {
                     initialActivity
                 ),
                 initialTitle: competitionTitle,
+                continuation: restoredCompetitionTemplate,
                 onPublished: { _ in
                     showingExistingTournamentRules = false
                     successful = true
