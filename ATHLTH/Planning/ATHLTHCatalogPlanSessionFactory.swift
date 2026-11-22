@@ -106,6 +106,13 @@ enum ATHLTHCatalogPlanSessionFactory {
             // week-specific copies, including source Z1–Z5 percentage ranges,
             // RIR, tempo, terrain and grouped set metadata.
             copy.routeID = step.routeID
+            // Preserve explicit workout measurement and music metadata when
+            // reindexing plan steps. Losing these makes a scheduled workout
+            // behave differently from its reviewed library prescription.
+            copy.assessmentMethod = step.assessmentMethod
+            copy.assessmentScope = step.assessmentScope
+            copy.measurementStepID = step.measurementStepID
+            copy.spotifyTrack = step.spotifyTrack
             copy.exerciseID = step.exerciseID
             copy.exerciseSnapshot = step.exerciseSnapshot
             copy.sourceIntensityZoneLabel = step.sourceIntensityZoneLabel
