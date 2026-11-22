@@ -88,6 +88,7 @@ struct MessageInboxView: View {
     var onNewMessage: () -> Void = {}
 
     @State private var arenaInboxVisibleCount = 0
+    @State private var tournamentInboxVisibleCount = 0
     @State private var searchText = ""
     @State private var showingSearch = false
     @State private var selectedFilter:
@@ -222,7 +223,7 @@ struct MessageInboxView: View {
 
                 ATHLTHTournamentInboxSection(
                     filterKey: selectedFilter.rawValue,
-                    onVisibleCountChanged: { _ in }
+                    onVisibleCountChanged: { tournamentInboxVisibleCount = $0 }
                 )
 
                 ATHLTHArenaInboxSection(
@@ -1450,6 +1451,7 @@ struct MessageInboxView: View {
             (selectedFilter != .all || social.workoutInvites.isEmpty) &&
             displayedPersonItems.isEmpty &&
             arenaInboxVisibleCount == 0 &&
+            tournamentInboxVisibleCount == 0 &&
             !hasClubInvites &&
             !hasVisibleClubChats &&
             unreadClubs.isEmpty &&
