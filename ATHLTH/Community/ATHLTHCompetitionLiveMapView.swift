@@ -65,14 +65,13 @@ struct ATHLTHCompetitionLiveMapView: View {
                             .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     }
 
-                    if tournament.raceRules.discipline == .laps,
-                       let capture = ATHLTHWorkoutRecordingArbiter.phone?
-                           .active?.competitionCapture,
-                       capture.tournamentID == tournament.id {
+                    if tournament.raceRules.discipline == .laps && attached {
                         TimelineView(.periodic(from: .now, by: 1)) { _ in
                             HStack(spacing: 10) {
                                 Image(systemName: "arrow.triangle.2.circlepath")
-                                Text(capture.lapSummary)
+                                Text(ATHLTHWorkoutRecordingArbiter.phone?.active?
+                                     .competitionCapture?.lapSummary ??
+                                     "0/\(tournament.raceRules.lapCount) runder")
                                     .font(.headline.monospacedDigit())
                             }
                             .foregroundStyle(ATHLTHArenaV3Style.gold)
