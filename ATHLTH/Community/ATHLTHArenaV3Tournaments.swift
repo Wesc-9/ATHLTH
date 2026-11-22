@@ -176,7 +176,9 @@ struct ATHLTHTournamentCreator: View {
         competitionSettings.isValid &&
         (fixedActivity.map { allowedActivities == Set([$0]) } ?? true) &&
         ATHLTHTournamentCadence.options.contains(cadenceDays) &&
-        ATHLTHTournamentCadence.completionHours.contains(completionHours) &&
+        ATHLTHTournamentCadence.completionHours.contains(
+            competitionSettings.completionHours
+        ) &&
         (inviteSource != .club || selectedClubID != nil) &&
         (exerciseMode != .vote || (
             proposalsCloseAt > Date().addingTimeInterval(120) &&
@@ -204,7 +206,7 @@ struct ATHLTHTournamentCreator: View {
                         ),
                         authority: $rulesAuthority,
                         cadenceDays: $cadenceDays,
-                        completionHours: $completionHours
+                        completionHours: $competitionSettings.completionHours
                     )
                     if let fixedActivity {
                         Label(
@@ -354,8 +356,11 @@ struct ATHLTHTournamentCreator: View {
             allowedActivities: (fixedActivity.map { [$0] } ??
                 allowedActivities.sorted { $0.rawValue < $1.rawValue }),
             rulesAuthority: rulesAuthority,
+            // Legacy cadence still controls tournament match rounds.
+            // The new per-exercise release is governed separately by
+            // competitionSettings, and both UIs share one deadline value.
             cadenceDays: cadenceDays,
-            completionHours: completionHours,
+            completionHours: competitionSettings.completionHours,
             rotationMode: rotationMode,
             restWeekdays: Array(restWeekdays).sorted(),
             proofMode: proofMode,
