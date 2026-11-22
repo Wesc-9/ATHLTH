@@ -5,8 +5,8 @@ import XCTest
 final class ATHLTHTournamentConversationTests: XCTestCase {
     func testDuelNeverCreatesAGroupConversation() {
         XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.duel), 1)
-        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.league), 2)
-        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.cup), 2)
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.league), 1)
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.cup), 3)
     }
 
     func testTournamentInvitationAndExerciseNotificationsOpenOneThread() {
