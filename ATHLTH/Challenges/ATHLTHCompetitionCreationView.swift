@@ -524,11 +524,13 @@ struct ATHLTHCompetitionCreationView: View {
         }
         switch sprintGoal {
         case .distance: scoring = .fastestDistance
-        case .time: scoring = .farthestInTime
+        case .time:
+            scoring = .farthestInTime
+            if durationMinutes > 10 { durationMinutes = 1 }
         case .route: scoring = .fastestRoute
         }
         if sprintGoal == .distance &&
-            !(0.1...5).contains(distanceKM) {
+           (distanceKM >= 5 || distanceKM < 0.1) {
             distanceKM = 0.1
         }
     }
@@ -751,6 +753,10 @@ struct ATHLTHCompetitionCreationView: View {
                 )
                 .font(.subheadline)
             }
+            Label("Svarfrist for invitasjoner: 3 dager",
+                  systemImage: "clock")
+                .font(.caption)
+                .foregroundStyle(muted)
             Text(format == .duel
                 ? tr("Your friend accepts in your existing chat. The duel lasts seven days.",
                      "Vennen godtar i samtalen dere allerede har. Duellen varer i syv dager.")
