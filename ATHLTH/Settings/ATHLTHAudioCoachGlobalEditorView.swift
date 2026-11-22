@@ -6,8 +6,57 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
     @State private var draft = AudioCoachDraft()
+    @State private var outputPreference: ATHLTHAudioCoachOutputPreference = .automatic
     @State private var loaded = false
     @State private var showingExitConfirmation = false
+
+    private var outputPreferenceCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Audio Coach output",
+                    norwegian: "Avspilling av Audio Coach"
+                ),
+                systemImage: "headphones"
+            )
+            .font(.headline)
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            Picker(
+                ATHLTHLocalization.choose(english: "Output", norwegian: "Lyd"),
+                selection: $outputPreference
+            ) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Automatic", norwegian: "Automatisk"
+                )).tag(ATHLTHAudioCoachOutputPreference.automatic)
+                Text("iPhone").tag(ATHLTHAudioCoachOutputPreference.iPhone)
+                Text("Apple Watch").tag(ATHLTHAudioCoachOutputPreference.appleWatch)
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("athlth-coach-audio-output")
+
+            Text(outputPreference == .automatic
+                ? ATHLTHLocalization.choose(
+                    english: "Use iPhone when it has headphones or another external output. Otherwise Apple Watch continues coaching.",
+                    norwegian: "Bruk iPhone når hodetelefoner eller en ekstern lydutgang er tilgjengelig. Ellers fortsetter Apple Watch."
+                )
+                : outputPreference == .iPhone
+                    ? ATHLTHLocalization.choose(
+                        english: "Prefer iPhone when connected, even with its built-in speaker. Watch takes over without a confirmed connection.",
+                        norwegian: "Foretrekk iPhone ved kontakt, også med innebygd høyttaler. Watch overtar uten bekreftet forbindelse."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Keep the Audio Coach on Apple Watch throughout the workout.",
+                        norwegian: "Behold Audio Coach på Apple Watch gjennom hele økten."
+                    ))
+            .font(.footnote)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+    }
 
     private var liveDraft: Binding<AudioCoachDraft> {
         Binding(get: { draft }, set: { draft = $0 })
@@ -18,7 +67,8 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
         var saved = AudioCoachDraft()
         saved.load(from: settings)
         saved.enabled = settings.audioCoachEnabledByDefault
-        return draft.configuration() != saved.configuration()
+        return draft.configuration() != saved.configuration() ||
+            outputPreference != settings.audioCoachOutputPreference
     }
 
     private func requestExit() {
@@ -32,12 +82,15 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
     var body: some View {
         ScrollView {
             if loaded {
-                ATHLTHAudioCoachActiveListView(
-                    draft: liveDraft,
-                    showRouteOptions: true,
-                    showStructuredOptions: true,
-                    globalScope: true
-                )
+                VStack(spacing: 12) {
+                    outputPreferenceCard
+                    ATHLTHAudioCoachActiveListView(
+                        draft: liveDraft,
+                        showRouteOptions: true,
+                        showStructuredOptions: true,
+                        globalScope: true
+                    )
+                }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 110)
@@ -69,6 +122,7 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
                 english: "Save", norwegian: "Lagre"
             )) {
                 settings.updateAudioCoachDefaults(from: draft)
+                settings.audioCoachOutputPreference = outputPreference
                 dismiss()
             }
             Button(ATHLTHLocalization.choose(
@@ -89,6 +143,7 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
             guard !loaded else { return }
             draft.load(from: settings)
             draft.enabled = settings.audioCoachEnabledByDefault
+            outputPreference = settings.audioCoachOutputPreference
             loaded = true
         }
     }
