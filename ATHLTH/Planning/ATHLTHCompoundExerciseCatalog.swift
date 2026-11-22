@@ -64,7 +64,9 @@ struct ATHLTHCompoundExercise: Identifiable {
         let generatedGroup = canGroupIntervals ? UUID() : nil
         return blocks.enumerated().map { index, original in
             var copy = original
-            copy.phase = phase
+            // Keep effort and recovery classifications distinct so Watch
+            // records pause seconds as recovery, never as work performance.
+            copy.phase = original.isRestOrActiveRecovery ? .recovery : phase
             copy.sequence = index + 1
             copy.editorDragID = UUID()
             copy.compoundExerciseID = id
