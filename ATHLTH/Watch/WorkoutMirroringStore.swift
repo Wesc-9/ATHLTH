@@ -42,7 +42,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     var mirroredIPhoneCoachAvailable: Bool {
         iPhoneAudioCoachAttached &&
         iPhoneAudioCoach.isEnabled &&
-        (snapshot?.kind == .running || snapshot?.kind == .walking)
+        (snapshot?.kind == .running || snapshot?.kind == .walking ||
+         snapshot?.kind == .strength)
     }
 
     var isIPhoneCoachVoiceOwner: Bool {
@@ -132,7 +133,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
               snapshot.watchOwnedAudioCoach != true,
               snapshot.supportsAudioCoachVoiceLease == true,
               snapshot.kind == .running ||
-                snapshot.kind == .walking,
+                snapshot.kind == .walking ||
+                snapshot.kind == .strength,
               snapshot.state == .running ||
                 snapshot.state == .paused ||
                 snapshot.state == .preparing,
@@ -680,6 +682,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     private func handle(_ incoming: [Data]) {
         var latestSnapshot: WatchWorkoutLiveSnapshot?
         var invitations: [ATHLTHAudioCoachMirrorInvitation] = []
+        var strengthCues: [ATHLTHStrengthMirroredCoachCue] = []
         var receipts: [ATHLTHCoachDeliveryReceipt] = []
         var acknowledgements: [ATHLTHAudioCoachLeaseAcknowledgement] = []
         var ghostDisableRequests: [ATHLTHGhostDisableDuringWorkout] = []
@@ -688,6 +691,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         // HealthKit can deliver these alongside the first snapshot for a
         // workout, while the cached snapshot still describes another state.
         for data in incoming {
+            if let cue = try? JSONDecoder().decode(
+                ATHLTHStrengthMirroredCoachCue.self, from: data
+            ) {
+                strengthCues.append(cue)
+                continue
+            }
             if let invitation = try? JSONDecoder().decode(
                 ATHLTHAudioCoachMirrorInvitation.self, from: data
             ) {
@@ -801,6 +810,25 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 acknowledgement,
                 latestSnapshot: latestSnapshot
             )
+        }
+
+        // Acknowledgement and Watch cues may arrive in the same batch.
+        // Never play a cue from an earlier workout or without a live lease.
+        if let current = latestSnapshot ?? snapshot,
+           current.kind == .strength,
+           current.watchOwnedAudioCoach == false,
+           current.supportsAudioCoachVoiceLease == true,
+           current.state == .running || current.state == .paused,
+           let startedAt = current.startedAt,
+           iPhoneAudioCoachAttached,
+           hasAcknowledgedVoiceLease,
+           mayUseIPhoneAudioOutput,
+           !aiConversationActive {
+            for cue in strengthCues where cue.isValid(for: startedAt) {
+                iPhoneAudioCoach.handleMirroredStrengthCue(
+                    cue, verifiedWorkoutStart: startedAt
+                )
+            }
         }
 
         guard let latestSnapshot else {
