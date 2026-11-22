@@ -495,10 +495,15 @@ struct TrainTogetherLiveDraftRoomView: View {
         }
         .onChange(of: live.draft?.revision) { _, _ in
             guard isOwner,
-                  let updated = live.draft?.workout,
-                  session.standalonePlannedSessions.contains(where: {
+                  var updated = live.draft?.workout,
+                  let local = session.standalonePlannedSessions.first(where: {
                       $0.id == updated.id
                   }) else { return }
+            // Never let a shared, privacy-sanitized snapshot erase the
+            // creator's personal music and equipment selections.
+            updated.gearIDs = local.gearIDs
+            updated.spotifyPlaylist = local.spotifyPlaylist
+            updated.spotifyAutoplayOnStart = local.spotifyAutoplayOnStart
             session.updateStandalonePlannedSession(updated)
         }
     }
