@@ -32,6 +32,7 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var showingMatchReport: ATHLTHTournamentRemoteMatch?
     @State private var editingExerciseDeadlines: ATHLTHTournamentRemoteMatch?
     @State private var busy = false
+    @State private var publishingFeed = false
     @State private var loading = true
     @State private var errorMessage: String?
     @State private var visibleMatchLimit = 80
@@ -57,6 +58,8 @@ struct ATHLTHTournamentLiveDetailView: View {
     private var minimumAthletes: Int { current.format == .cup ? 4 : 2 }
     private var readyToStart: Bool {
         confirmedEntries.count >= minimumAthletes &&
+        (current.unansweredPolicy != "replace" ||
+         current.replacementUntil == nil) &&
         pendingCount == 0 &&
         confirmedEntries.allSatisfy {
             $0.isReady && $0.agreedRuleVersion == current.ruleVersion
@@ -307,6 +310,32 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
+            if current.status == "completed" && isOwner &&
+               current.allowFeedPost {
+                if current.feedPublishedAt == nil {
+                    Button {
+                        Task { await publishToFeed() }
+                    } label: {
+                        HStack(spacing: 10) {
+                            if publishingFeed { ProgressView() }
+                            else { Image(systemName: "square.and.arrow.up") }
+                            Text("Publiser konkurransen i Feed")
+                            Spacer()
+                            Image(systemName: "arrow.right")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        .padding(14)
+                        .background(ATHLTHArenaV3Style.panel())
+                    }
+                    .disabled(publishingFeed)
+                } else {
+                    Label("Konkurransen er delt i vennefeeden",
+                          systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                }
+            }
             if current.status == "completed", let winner = champion {
                 HStack(spacing: 9) {
                     Image(systemName: "trophy.fill")
@@ -360,7 +389,19 @@ struct ATHLTHTournamentLiveDetailView: View {
                 }
                 Spacer()
             }
-            if myEntry?.response == "invited" {
+            if let me = myEntry, me.response == "invited",
+               let expires = me.expiresAt {
+                Label(expires > Date()
+                      ? "Svar innen " + expires.formatted(
+                            date: .abbreviated, time: .shortened)
+                      : "Svarfristen er utløpt",
+                      systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(expires > Date()
+                        ? ATHLTHArenaV3Style.secondary : .orange)
+            }
+            if myEntry?.response == "invited",
+               myEntry?.expiresAt.map({ $0 > Date() }) ?? false {
                 HStack(spacing: 9) {
                     Button("Godta") { Task { await respond(true) } }
                         .foregroundStyle(.white)
@@ -418,13 +459,37 @@ struct ATHLTHTournamentLiveDetailView: View {
                     .tint(ATHLTHArenaV3Style.gold)
                 }
             }
+            if let window = current.replacementUntil, isOwner {
+                VStack(alignment: .leading, spacing: 7) {
+                    Label("Erstatningsperiode frem til " + window.formatted(
+                        date: .abbreviated, time: .shortened),
+                        systemImage: "person.crop.circle.badge.plus")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Inviter en erstatter fra Lobby, eller fortsett med eksisterende deltakere når minst \(minimumAthletes) har godtatt.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    Button("Finn erstatter i Lobby") { selection = .lobby }
+                        .font(.subheadline.weight(.semibold))
+                        .tint(ATHLTHArenaV3Style.gold)
+                    if pendingCount == 0 &&
+                       confirmedEntries.count >= minimumAthletes {
+                        Button("Avslutt erstatningsperioden") {
+                            Task { await finishReplacement() }
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .tint(ATHLTHArenaV3Style.gold)
+                        .disabled(busy)
+                    }
+                }
+            }
             ForEach(entries) { entry in
                 HStack(spacing: 9) {
                     Text(name(entry.userID)).lineLimit(1)
                     Spacer(minLength: 6)
                     Text(entry.response == "accepted"
                          ? (entry.isReady ? "Klar" : "Ikke klar") :
-                         entry.response == "declined" ? "Avslått" : "Invitert")
+                         entry.response == "declined" ? "Avslått" :
+                         entry.response == "expired" ? "Utløpt" : "Invitert")
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     if isOwner && entry.userID != userID &&
                        entry.response != "accepted" {
@@ -984,6 +1049,26 @@ struct ATHLTHTournamentLiveDetailView: View {
         do {
             try await ATHLTHTournamentLobbyCloudService()
                 .ready(tournamentID: current.id, value: true)
+            await reload()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor private func finishReplacement() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await cloud.finishReplacement(tournamentID: current.id)
+            await reload()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor private func publishToFeed() async {
+        guard !publishingFeed else { return }
+        publishingFeed = true
+        defer { publishingFeed = false }
+        do {
+            try await cloud.publishCompletedToFeed(tournamentID: current.id)
             await reload()
         } catch { errorMessage = error.localizedDescription }
     }
