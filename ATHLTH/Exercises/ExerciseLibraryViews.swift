@@ -3535,7 +3535,8 @@ struct CustomExerciseEditorView: View {
             // leaving the remotely visible copy behind. Private-only edits
             // without any previous sharing need no network request.
             if let oldRecord,
-               previouslyShareable || scopedVisibility == .publicListing {
+               scopedVisibility != .publicListing,
+               previouslyShareable {
                 guard let published = await marketplace.publicationExists(oldRecord.id) else {
                     studioError = marketplace.errorMessage ??
                         ATHLTHLocalization.choose(
@@ -3623,12 +3624,19 @@ struct CustomExerciseEditorView: View {
                     username: session.profile.username
                 ) else {
                     pendingPublicExerciseID = saved.id
-                    // An upload failure never makes an exercise publicly
-                    // accessible: keep its local copy private for retry.
-                    var localCopy = saved.exercise
-                    localCopy.visibility = .privateOnly
-                    localCopy.isVisibleOutsideOwnerLibrary = false
-                    library.updateCustomExercise(localCopy)
+                    if let oldRecord,
+                       oldRecord.exercise.resolvedVisibility == .publicListing {
+                        // An existing public listing is still live when its
+                        // replacement upload fails. Restore its matching
+                        // local metadata instead of falsely marking it private.
+                        library.updateCustomExercise(oldRecord.exercise)
+                    } else {
+                        // New publication failed: keep the local draft private.
+                        var localCopy = saved.exercise
+                        localCopy.visibility = .privateOnly
+                        localCopy.isVisibleOutsideOwnerLibrary = false
+                        library.updateCustomExercise(localCopy)
+                    }
                     studioError = (marketplace.errorMessage ??
                         ATHLTHLocalization.choose(
                             english: "Could not publish the exercise.",
