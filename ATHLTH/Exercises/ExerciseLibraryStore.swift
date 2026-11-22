@@ -931,6 +931,16 @@ final class ExerciseLibraryStore: ObservableObject {
                     return true
                 }
                 guard let slug = entry.sourceIdentifier else { return false }
+                // A reviewed RepDB bench press replaces the older native
+                // search result even if equipment metadata differs by source.
+                // Keep the historical native record in allExercises for plans.
+                if slug == "athlth-native-bench-press" &&
+                    repDBExercises.contains(where: {
+                        $0.sourceIdentifier == "bench-press" ||
+                        ATHLTHExerciseReferenceResolver.key($0.canonicalName) == "bench press"
+                    }) {
+                    return false
+                }
                 if Self.featuredNativeExerciseSlugs.contains(slug) {
                     return true
                 }
