@@ -1693,61 +1693,36 @@ struct RunQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: isAdvancedSetup ? 16 : 12) {
-                    // Identical details card in Basic and Advanced.
-                    // Quick Train always starts now, so its time is read-only.
-                    advancedWorkoutDetailsCard
+                    if isAdvancedSetup {
+                        // Preserve the detailed editable card in Advanced.
+                        advancedWorkoutDetailsCard
+                    } else {
+                        ATHLTHQuickStartSimpleDetailsCard(
+                            activity: .running,
+                            summary: mode == .free
+                                ? ATHLTHLocalization.choose(
+                                    english: "Ready for a free run",
+                                    norwegian: "Klar for fri løping"
+                                )
+                                : mode == .route
+                                    ? selectedRoute?.title ?? ATHLTHLocalization.choose(
+                                        english: "Choose a route",
+                                        norwegian: "Velg en rute"
+                                    )
+                                    : advancedWorkout?.title ?? selectedWorkout?.title ??
+                                        ATHLTHLocalization.choose(
+                                            english: "Choose a workout",
+                                            norwegian: "Velg en treningsøkt"
+                                        )
+                        )
+                    }
                     if environment == .treadmill {
                         treadmillQuickSpeedCard
                     }
-                    if watchConnected {
+                    if watchConnected && isAdvancedSetup {
                         watchStartingScreenCard
                     }
-                    if isAdvancedSetup {
-                        modeCard
-                    } else {
-                        ATHLTHRunBasicSetupView(
-                            workoutName: $quickWorkoutName,
-                            mode: $mode,
-                            environment: $environment,
-                            date: $quickDisplayDate,
-                            selectedRouteTitle: selectedRoute?.title,
-                            selectedRoute: selectedRoute,
-                            structuredSteps: advancedWorkout?.resolvedWorkoutBlocks ??
-                                selectedWorkout?.plannedSession().resolvedWorkoutBlocks ?? [],
-                            selectedWorkoutTitle: selectedWorkout?.title,
-                            onChooseRoute: { showingRoutes = true },
-                            onChooseWorkout: { showingRunningLibrary = true },
-                            onChooseGoal: {
-                                basicGoalSelected = true
-                                basicGhostSelected = false
-                                mode = .structured
-                                advancedWorkout = nil
-                                selectedWorkout = nil
-                            },
-                            onChooseGhost: {
-                                basicGoalSelected = false
-                                basicGhostSelected = true
-                                environment = .outdoor
-                                mode = .route
-                                ghostDraft.enabled = true
-                                ghostDraft.setTargetTimeText(
-                                    GhostTargetTimeFormatter.string(
-                                        TimeInterval(basicGhostTargetMinutes * 60)
-                                    ),
-                                    distanceKilometers: guidanceRoute?.distanceKilometers
-                                )
-                                if selectedRoute == nil { showingRoutes = true }
-                            },
-                            onChooseStandardMode: {
-                                basicGoalSelected = false
-                                basicGhostSelected = false
-                            },
-                            isGoalSelected: basicGoalSelected,
-                            isGhostSelected: basicGhostSelected,
-                            audioCoachEnabled: session.canAccess(.audioCoach)
-                                ? $audioCoachDraft.enabled : nil
-                        )
-                    }
+                    quickStartTypePicker
 
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
@@ -1777,48 +1752,15 @@ struct RunQuickStartSheet: View {
                         ATHLTHRouteWarmupCard(configuration: $routeWarmup)
                     }
 
-                    if isAdvancedSetup {
-                        quickRunGuidanceCard
-                        ATHLTHPlanSurface(ghost: false, density: .compact) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                WorkoutFriendPicker(selectedFriendIDs: $selectedFriendIDs)
-                                if !selectedFriendIDs.isEmpty {
-                                    Divider()
-                                    WorkoutSocialModePicker(mode: $socialMode)
-                                }
-                            }
-                        }
-                    }
-
-                    ATHLTHQuickWorkoutPetPicker(selectedPetIDs: $selectedPetIDs)
-
-                    if isAdvancedSetup {
-                        VStack(spacing: 12) {
-                            WorkoutGearSelectionCard(
-                                selectedGearIDs: $selectedGearIDs,
-                                activity: .running
-                            )
-
-                            QuickStartSpotifyCard(
-                                captureDevice: captureDevice,
-                                playlist:
-                                    $selectedSpotifyPlaylist,
-                                autoplay:
-                                    $spotifyAutoplay
-                            ) {
-                                showingSpotifyPicker = true
-                            }
-
-                        }
-                        .transition(
-                            .opacity
-                                .combined(
-                                    with: .move(
-                                        edge: .top
-                                    )
-                                )
-                        )
-                    }
+                    ATHLTHQuickStartToolsRow(
+                        activity: .running,
+                        advanced: isAdvancedSetup,
+                        showOnIPad: $shareThisWorkoutOnIPad,
+                        // Installation detection must be verified before
+                        // offering a remote live-sharing control.
+                        iPadAvailable: false,
+                        detail: { tool in runStartToolDetail(tool) }
+                    )
 
                 }
                 .padding()
@@ -2277,38 +2219,85 @@ struct RunQuickStartSheet: View {
         )
     }
 
-    private var modeCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(ATHLTHLocalization.choose(
-                    english: "Run type", norwegian: "Løpetype"
-                ))
-                .font(.headline)
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                Spacer()
-                Text(ATHLTHLocalization.choose(
-                    english: "Choose one", norwegian: "Velg én"
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+    private var quickStartTypePicker: some View {
+        ATHLTHQuickStartTypeSelector(
+            activity: .running,
+            advanced: isAdvancedSetup,
+            selection: Binding(
+                get: {
+                    switch mode {
+                    case .free: return .free
+                    case .route: return .route
+                    case .structured: return .workout
+                    }
+                },
+                set: { _ in }
+            ),
+            routeAllowed: environment == .outdoor
+        ) { type in
+            basicGoalSelected = false
+            basicGhostSelected = false
+            switch type {
+            case .free:
+                mode = .free
+                selectedRoute = nil
+                selectedWorkout = nil
+                advancedWorkout = nil
+            case .route:
+                mode = .route
+                showingRoutes = true
+            case .workout:
+                mode = .structured
+                showingRunningLibrary = true
+            case .exercises:
+                break
             }
+        }
+    }
 
-            ForEach(RunQuickStartMode.allCases) { option in
-                let unavailable = environment != .outdoor && option == .route
-
-                ATHLTHPlanSelectionCard(
-                    title: option.title,
-                    subtitle: option.subtitle,
-                    symbol: option.icon,
-                    selected: mode == option,
-                    accent: ATHLTHPlanDesign.accentInk
-                ) {
-                    guard !unavailable else { return }
-                    mode = option
+    @ViewBuilder
+    private func runStartToolDetail(_ tool: ATHLTHQuickStartTool) -> some View {
+        switch tool {
+        case .spotify:
+            QuickStartSpotifyCard(
+                captureDevice: captureDevice,
+                playlist: $selectedSpotifyPlaylist,
+                autoplay: $spotifyAutoplay
+            ) { showingSpotifyPicker = true }
+        case .guidance:
+            if isAdvancedSetup {
+                quickRunGuidanceCard
+            } else {
+                Toggle(
+                    "Audio Coach",
+                    isOn: $audioCoachDraft.enabled
+                )
+                .tint(ATHLTHPlanDesign.accentInk)
+                .disabled(!session.canAccess(.audioCoach))
+                if mode == .route && selectedRoute != nil {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Route guidance",
+                            norwegian: "Ruteveiledning"
+                        ),
+                        isOn: $routeGuardianDraft.enabled
+                    )
+                    .tint(ATHLTHPlanDesign.accentInk)
                 }
-                .disabled(unavailable)
-                .opacity(unavailable ? 0.48 : 1)
             }
+        case .equipment:
+            WorkoutGearSelectionCard(
+                selectedGearIDs: $selectedGearIDs, activity: .running
+            )
+        case .companion:
+            ATHLTHQuickWorkoutPetPicker(selectedPetIDs: $selectedPetIDs)
+        case .partner:
+            WorkoutFriendPicker(selectedFriendIDs: $selectedFriendIDs)
+            if !selectedFriendIDs.isEmpty {
+                WorkoutSocialModePicker(mode: $socialMode)
+            }
+        case .iPad:
+            EmptyView()
         }
     }
 
