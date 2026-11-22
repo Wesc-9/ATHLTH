@@ -2871,7 +2871,11 @@ struct TrainingPlanCatalogDetailView: View {
                 }
             }
         }
-        return muscles.sorted()
+        // Use the same athlete-facing names as the exercise library,
+        // not raw English muscle labels from the source dataset.
+        return Array(Set(muscles.map {
+            exerciseLibrary.localizedBodyPartTitle($0)
+        })).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     var body: some View {
@@ -4318,8 +4322,8 @@ struct PersonalizeTrainingPlanView: View {
 
         guard let plan else {
             scheduleError = ATHLTHLocalization.choose(
-                english: "The plan could not be scheduled. Choose dates that do not overlap an existing plan.",
-                norwegian: "Planen kunne ikke opprettes. Velg datoer som ikke overlapper en eksisterende plan."
+                english: "The plan could not be saved. Check that its exercises exist in your library and try again. No new plan was created.",
+                norwegian: "Planen kunne ikke lagres. Kontroller at øvelsene finnes i biblioteket, og prøv igjen. Ingen ny plan ble opprettet."
             )
             return
         }
