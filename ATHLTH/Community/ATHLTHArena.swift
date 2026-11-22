@@ -847,7 +847,12 @@ private struct ATHLTHArenaRouteStarter: View {
         }
         .sheet(isPresented: $showingChallenge) {
             if let selectedRoute {
-                ChallengeCreationView(preselectedRouteID: selectedRoute.id)
+                ATHLTHCompetitionCreationView(
+                    initialActivity: .running,
+                    advanced: true,
+                    initialFormat: .duel,
+                    preselectedRoute: selectedRoute
+                )
             }
         }
     }
@@ -956,7 +961,12 @@ private struct ATHLTHArenaDistanceStarter: View {
         }
         .sheet(isPresented: $showingChallenge) {
             if let distanceKilometers {
-                ChallengeCreationView(preselectedDistanceKm: distanceKilometers)
+                ATHLTHCompetitionCreationView(
+                    initialActivity: .running,
+                    advanced: true,
+                    initialFormat: .duel,
+                    preselectedDistanceKM: distanceKilometers
+                )
             }
         }
     }
