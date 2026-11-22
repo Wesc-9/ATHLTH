@@ -18,7 +18,9 @@ enum ATHLTHCoachWorkoutPhase: String, Codable, CaseIterable, Identifiable {
     func matches(stepPhase: String?) -> Bool {
         switch self {
         case .warmup: return stepPhase == "warmup"
-        case .main: return stepPhase == "work" || stepPhase == "steady" || stepPhase == "main"
+        case .main:
+            return stepPhase == "work" || stepPhase == "steady" ||
+                stepPhase == "main" || stepPhase == "recovery"
         case .recovery: return stepPhase == "recovery"
         case .cooldown: return stepPhase == "cooldown"
         }
