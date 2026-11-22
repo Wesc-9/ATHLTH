@@ -234,6 +234,46 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         ))
     }
 
+    func testPublicCatalogShareUsesStableSlugAndResolvesForRecipient() {
+        let publicExercise = entry(
+            "Lat Pulldown", id: UUID(), source: .repDB,
+            sourceIdentifier: "lat-pulldown"
+        )
+        var linked = block("Lat Pulldown")
+        linked.exerciseID = publicExercise.id
+        let exported = ATHLTHExerciseReferenceResolver.portableBlock(
+            linked, from: [publicExercise]
+        )
+        XCTAssertNil(exported.exerciseID)
+        XCTAssertEqual(exported.exerciseSlug, "lat-pulldown")
+        XCTAssertNil(exported.exerciseSnapshot)
+
+        let recipient = entry(
+            "Lat Pulldown", id: UUID(), source: .repDB,
+            sourceIdentifier: "lat-pulldown"
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(
+                exported, in: [recipient]
+            )?.id, recipient.id
+        )
+    }
+
+    func testNativeCatalogShareUsesStableSlugWithoutEmbeddingCatalogData() {
+        let native = entry(
+            "Lat Pulldown", id: UUID(), source: .athlthCatalog,
+            sourceIdentifier: "athlth-native-lat-pulldown"
+        )
+        var linked = block("Lat Pulldown")
+        linked.exerciseID = native.id
+        let exported = ATHLTHExerciseReferenceResolver.portableBlock(
+            linked, from: [native]
+        )
+        XCTAssertNil(exported.exerciseID)
+        XCTAssertEqual(exported.exerciseSlug, "athlth-native-lat-pulldown")
+        XCTAssertNil(exported.exerciseSnapshot)
+    }
+
     func testSharedCustomExerciseIsPortableOnlyWithCreatorPermission() {
         let creator = UUID()
         var source = entry(
