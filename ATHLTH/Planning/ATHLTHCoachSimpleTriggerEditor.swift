@@ -141,8 +141,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                             in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(.plain)
-                    .disabled(!supportsStructured && [.section, .step, .pause].contains(item))
-                    .opacity(!supportsStructured && [.section, .step, .pause].contains(item)
+                    .disabled(!supportsStructured && [.step, .pause].contains(item))
+                    .opacity(!supportsStructured && [.step, .pause].contains(item)
                         ? 0.48 : 1)
                 }
             }
@@ -183,11 +183,13 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
             } else if family == .section {
-                ForEach([
-                    ATHLTHAudioCoachRule.Trigger.workoutStart,
-                    .warmupStart, .warmupEnd,
-                    .mainStart, .mainEnd, .cooldownStart, .cooldownEnd
-                ], id: \.self) { choice($0) }
+                choice(.workoutStart)
+                if supportsStructured {
+                    ForEach([
+                        ATHLTHAudioCoachRule.Trigger.warmupStart, .warmupEnd,
+                        .mainStart, .mainEnd, .cooldownStart, .cooldownEnd
+                    ], id: \.self) { choice($0) }
+                }
             } else if family == .step {
                 choice(.stepStart)
                 choice(.stepEnd)
@@ -212,8 +214,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 .pickerStyle(.segmented)
             }
 
-            if family == .distance || family == .time || family == .heartZone ||
-                family == .step || family == .pause {
+            if supportsStructured &&
+                (family == .distance || family == .time || family == .heartZone ||
+                 family == .step || family == .pause) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(tr("APPLIES TO", "GJELDER FOR"))
                         .font(.caption2.weight(.bold))
