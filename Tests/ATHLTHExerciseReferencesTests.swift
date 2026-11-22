@@ -63,6 +63,91 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testMarkloftUsesExistingDeadliftAndNeverRomanianDeadlift() throws {
+        let library = ExerciseLibraryStore()
+        let source = try XCTUnwrap(library.allExercises.first {
+            $0.sourceIdentifier == "athlth-native-deadlift"
+        })
+        let romanian = try XCTUnwrap(library.allExercises.first {
+            $0.sourceIdentifier == "athlth-native-romanian-deadlift"
+        })
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(for: "Markløft"),
+            source.sourceIdentifier
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(for: "Markloft"),
+            source.sourceIdentifier
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(for: "Rumensk markløft"),
+            romanian.sourceIdentifier
+        )
+        let direct = try XCTUnwrap(
+            ATHLTHExerciseReferenceResolver.resolve(
+                block("Markløft"), in: library.allExercises
+            )
+        )
+        let expected = ATHLTHExerciseReferenceResolver.visibleEquivalent(
+            of: source, in: library.allExercises
+        )
+        XCTAssertEqual(direct.id, expected.id)
+        XCTAssertNotEqual(direct.id, romanian.id)
+        XCTAssertTrue(library.selectableExercises.contains { $0.id == direct.id })
+
+        var legacySlug = block("Markløft")
+        legacySlug.exerciseSlug = "deadlift"
+        let shortSlug = ATHLTHExerciseReferenceResolver.resolve(
+            legacySlug, in: library.allExercises
+        )
+        XCTAssertNotNil(shortSlug)
+        // A known private/foreign ID can never be redirected by the name.
+        var foreign = legacySlug
+        foreign.exerciseID = UUID()
+        XCTAssertNil(ATHLTHExerciseReferenceResolver.resolve(
+            foreign, in: library.allExercises
+        ))
+        // The workout's 5/3/1 prescription is independent of library identity.
+        legacySlug.setCount = 3
+        legacySlug.repetitions = 1
+        legacySlug.targetEffortRPE = 9
+        legacySlug.restBetweenSetsSeconds = 240
+        XCTAssertEqual(legacySlug.setCount, 3)
+        XCTAssertEqual(legacySlug.targetEffortRPE, 9)
+        XCTAssertEqual(legacySlug.restBetweenSetsSeconds, 240)
+    }
+
+    @MainActor
+    func testAllBundledStrengthExercisesLinkToSelectableExistingRecords() throws {
+        let library = ExerciseLibraryStore()
+        let all = library.allExercises
+        let visibleIDs = Set(library.selectableExercises.map(\.id))
+        let source = ATHLTHCuratedStrengthWorkouts.entries +
+            ATHLTHPremiumStrengthSessions.entries +
+            ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries +
+            WorkoutTemplateCatalogEntry.fallbackCatalog
+        var seen = 0
+        for workout in source {
+            for step in workout.blocks where step.kind == .exercise {
+                let linked = ATHLTHExerciseReferenceResolver.resolve(step, in: all)
+                XCTAssertNotNil(
+                    linked,
+                    "\(workout.slug): \(step.title) has no matching existing exercise"
+                )
+                if let linked {
+                    XCTAssertTrue(
+                        visibleIDs.contains(linked.id),
+                        "\(workout.slug): \(step.title) links to a hidden exercise"
+                    )
+                    seen += 1
+                }
+            }
+        }
+        XCTAssertGreaterThan(seen, 100)
+        // This audit is source-based and does not scan or publish personal data.
+    }
+
     func testSeparatorVariantsResolveToSameEnglishExercise() {
         let sidePlank = entry(
             "Side Plank", id: UUID(), source: .athlthCatalog,
@@ -239,8 +324,22 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
                         match,
                         "Missing actual library exercise for \(original.name) in \(program.slug)"
                     )
-                    XCTAssertEqual(match?.source, .athlthCatalog)
-                    XCTAssertEqual(match?.sourceIdentifier, step.exerciseSlug)
+                    let canonical = try XCTUnwrap(bundled.first {
+                        $0.source == .athlthCatalog &&
+                            $0.sourceIdentifier == step.exerciseSlug
+                    })
+                    XCTAssertEqual(
+                        match?.id,
+                        ATHLTHExerciseReferenceResolver.visibleEquivalent(
+                            of: canonical, in: bundled
+                        ).id
+                    )
+                    XCTAssertTrue(
+                        library.selectableExercises.contains {
+                            $0.id == match?.id
+                        },
+                        "Existing exercise for \(original.name) must also be visible in the library"
+                    )
                     XCTAssertEqual(step.setCount, original.targetSets)
                     XCTAssertEqual(step.repetitions, original.targetRepsMin)
                     XCTAssertEqual(step.targetRepsInReserve, original.targetRIR)
@@ -273,7 +372,15 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
                 legacy, in: library.allExercises
             )
         )
-        XCTAssertEqual(matched.sourceIdentifier, "athlth-native-overhead-press")
+        let canonical = try XCTUnwrap(library.allExercises.first {
+            $0.sourceIdentifier == "athlth-native-overhead-press"
+        })
+        XCTAssertEqual(
+            matched.id,
+            ATHLTHExerciseReferenceResolver.visibleEquivalent(
+                of: canonical, in: library.allExercises
+            ).id
+        )
         // Linking must not rewrite any prescription from the plan.
         XCTAssertEqual(legacy.setCount, 5)
         XCTAssertEqual(legacy.repetitions, 3)
