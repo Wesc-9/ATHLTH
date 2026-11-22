@@ -201,8 +201,17 @@ struct AdvancedPlannerView: View {
             } else {
                 let recent = suspendedAt.map { Date().timeIntervalSince($0) < 300 } ?? false
                 if recent {
-                    showingStandaloneSessionEditor = showingStandaloneSessionEditor || suspendedStandaloneEditor
-                    showingSessionEditor = showingSessionEditor || suspendedDayEditor
+                    // An interrupted scene may remember two competing sheet
+                    // intents. Restore exactly ONE session-editor host.
+                    let standalone = showingStandaloneSessionEditor ||
+                        suspendedStandaloneEditor
+                    let day = showingSessionEditor || suspendedDayEditor
+                    let restored = ATHLTHScratchComposerPresentationPolicy
+                        .exclusiveEditorRestoration(
+                            standalone: standalone, day: day
+                        )
+                    showingStandaloneSessionEditor = restored.standalone
+                    showingSessionEditor = restored.day
                 }
                 suspendedAt = nil
                 suspendedStandaloneEditor = false
@@ -529,8 +538,8 @@ struct AdvancedPlannerView: View {
                     Spacer()
 
                     Button {
-                        showingStandaloneSessionEditor =
-                            true
+                        showingSessionEditor = false
+                        showingStandaloneSessionEditor = true
                     } label: {
                         Image(
                             systemName: "plus"
@@ -565,6 +574,7 @@ struct AdvancedPlannerView: View {
 
                 if hasStandaloneDraft {
                     Button {
+                        showingSessionEditor = false
                         showingStandaloneSessionEditor = true
                     } label: {
                         Label(ATHLTHLocalization.choose(
@@ -1622,6 +1632,7 @@ struct AdvancedPlannerView: View {
                     Spacer()
                     Button {
                         selectedDayID = day.id
+                        showingStandaloneSessionEditor = false
                         showingSessionEditor = true
                     } label: {
                         Label("Legg til", systemImage: "plus")
@@ -1638,6 +1649,7 @@ struct AdvancedPlannerView: View {
                 if ordered.isEmpty {
                     Button {
                         selectedDayID = day.id
+                        showingStandaloneSessionEditor = false
                         showingSessionEditor = true
                     } label: {
                         Label("Hviledag · Planlegg en økt", systemImage: "plus.circle")
@@ -5552,6 +5564,7 @@ struct SessionEditorView: View {
     // Solo scratch sessions are saved directly from the shared builder,
     // avoiding the legacy "Plan extra workout" intermediary.
     @State private var closeAfterScratchSave = false
+    @State private var closeAfterPreparedScratchSave = false
     @State private var scratchBuilderClosedIntentionally = false
     @State private var showingRecoveryRestPlanner = false
     @State private var selectedPartnerID: UUID?
@@ -7199,7 +7212,16 @@ struct SessionEditorView: View {
             .fullScreenCover(
                 isPresented: $showingUnifiedWorkoutComposer,
                 onDismiss: {
-                    if showingImportedAdvancedWorkout {
+                    if closeAfterPreparedScratchSave {
+                        closeAfterPreparedScratchSave = false
+                        onExit?()
+                        // The prepared recipe has already been handed off.
+                        // Dismiss the old host instead of returning to its Form.
+                        Task { @MainActor in
+                            await Task.yield()
+                            dismiss()
+                        }
+                    } else if showingImportedAdvancedWorkout {
                         showingImportedAdvancedWorkout = false
                         if closeAfterImportedAdvancedSave {
                             closeAfterImportedAdvancedSave = false
@@ -7344,9 +7366,34 @@ struct SessionEditorView: View {
                             guard persistSession(scheduled) else { return false }
                             finishDraft()
                             closeAfterScratchSave = true
+                        } else if ATHLTHScratchComposerPresentationPolicy
+                            .preparesSharedScratchDirectly(
+                                isStandalone: isStandalone,
+                                hasScratchSource: selectedScratchWorkoutType != nil,
+                                preparesForSharing: onPreparedWorkout != nil
+                            ) {
+                            // A new Train Together workout is already complete
+                            // in the universal editor. Do not show the obsolete
+                            // parent workout form just to press Save again.
+                            // Only prepare: the caller owns all invitation
+                            // settings and explicit publishing.
+                            var prepared = updated
+                            prepared.scheduledStart = scheduledTime
+                            if let source = initialSourceWorkout {
+                                prepared.trainTogetherMode = source.trainTogetherMode
+                                prepared.invitedPartnerID = source.invitedPartnerID
+                                prepared.allowInviteeExercises = source.allowInviteeExercises
+                            }
+                            guard let bound = libraryBoundWorkout(prepared) else {
+                                return false
+                            }
+                            onPreparedWorkout?(bound)
+                            finishDraft()
+                            closeAfterPreparedScratchSave = true
                         } else {
-                            // Existing plan, partner and proposal flows keep
-                            // their original confirmation/save behavior.
+                            // Existing plan and partner reviews keep their
+                            // confirmation/save behavior without a second
+                            // workout editor.
                             applyScratchTimeline(updated)
                         }
                         return true

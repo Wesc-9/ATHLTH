@@ -2690,6 +2690,8 @@ struct TrainTogetherPostCreateView:
     @State private var workoutToEdit: PlannedSession?
     @State private var showingSharedWorkoutEditor = false
     @State private var showingPlannedWorkoutPicker = false
+    // Avoid presenting two sheets in the same SwiftUI transaction.
+    @State private var queuedEditorAfterWorkoutPicker = false
     @State private var title = ""
     @State private var kind:
         WorkoutKind = .running
@@ -2911,12 +2913,22 @@ struct TrainTogetherPostCreateView:
                 }
             )
         }
-        .sheet(isPresented: $showingPlannedWorkoutPicker) {
+        .sheet(isPresented: $showingPlannedWorkoutPicker, onDismiss: {
+            // The underlying picker has fully released its presentation
+            // before we open the shared workout editor.
+            guard ATHLTHScratchComposerPresentationPolicy
+                .opensQueuedEditorAfterPickerDismiss(
+                    queued: queuedEditorAfterWorkoutPicker,
+                    pickerIsPresented: showingPlannedWorkoutPicker
+                ) else { return }
+            queuedEditorAfterWorkoutPicker = false
+            showingSharedWorkoutEditor = true
+        }) {
             ATHLTHPlannedWorkoutTypePickerView { workout, _ in
                 selectedSourceID = workout.id
                 workoutToEdit = workout
+                queuedEditorAfterWorkoutPicker = true
                 showingPlannedWorkoutPicker = false
-                showingSharedWorkoutEditor = true
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)

@@ -16,10 +16,10 @@ enum ATHLTHScratchComposerPresentationPolicy {
             !hasPartner && !targetsActivePlan
     }
 
-    /// The old Form must not render UNDER the common timeline composer.
-    /// This includes direct invitations from a friend's profile. After the
-    /// composer closes, partner drafts receive a compact invitation review,
-    /// while unrelated existing/plan editors keep their original flow.
+    /// When a shared editor is presented it is the ONLY visible editing
+    /// surface, regardless of whether its caller is Home, a friend, a planned
+    /// session or a Train Together proposal. Once it closes, the legacy
+    /// host returns only for flows that still need its original controls.
     static func hidesLegacyStandaloneHost(
         isStandalone: Bool,
         hasScratchSource: Bool,
@@ -27,10 +27,50 @@ enum ATHLTHScratchComposerPresentationPolicy {
         hasPartner: Bool,
         builderIsPresented: Bool = false
     ) -> Bool {
-        guard isStandalone && hasScratchSource && !preparesForSharing else {
-            return false
-        }
-        return !hasPartner || builderIsPresented
+        if builderIsPresented { return true }
+        return isStandalone && hasScratchSource &&
+            !preparesForSharing && !hasPartner
+    }
+
+    /// Sheets that choose a workout may only hand off to the next editor
+    /// after the first sheet's onDismiss callback has finished. Keep this
+    /// transition independent from whether the workout was newly created.
+    static func opensQueuedEditorAfterPickerDismiss(
+        queued: Bool,
+        pickerIsPresented: Bool
+    ) -> Bool {
+        queued && !pickerIsPresented
+    }
+
+    /// Plan Studio may restore one or both sheet flags after scene wake.
+    /// Never let a resumed day editor and standalone editor compete. The
+    /// explicit standalone intent wins; either may open again deliberately.
+    static func exclusiveEditorRestoration(
+        standalone: Bool,
+        day: Bool
+    ) -> (standalone: Bool, day: Bool) {
+        if standalone { return (true, false) }
+        return (false, day)
+    }
+
+    /// Quick Train's setup sheet remains mounted for the recorder and
+    /// settings, but its obsolete editable surface is hidden while the
+    /// shared running composer has focus.
+    static func showsQuickSetupBehindComposer(
+        composerIsPresented: Bool
+    ) -> Bool {
+        !composerIsPresented
+    }
+
+    /// A Train Together post built from scratch can advance directly to the
+    /// invitation composer without reopening the duplicate legacy workout
+    /// editor. This prepares the workout only; publication remains explicit.
+    static func preparesSharedScratchDirectly(
+        isStandalone: Bool,
+        hasScratchSource: Bool,
+        preparesForSharing: Bool
+    ) -> Bool {
+        isStandalone && hasScratchSource && preparesForSharing
     }
 
     /// A prepared partner workout requires scheduling and permission review,

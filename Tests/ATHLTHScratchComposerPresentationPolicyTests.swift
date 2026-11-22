@@ -210,6 +210,112 @@ final class ATHLTHScratchComposerPresentationPolicyTests: XCTestCase {
         ))
     }
 
+    func testSharedComposerIsOnlyVisibleWorkoutEditorAcrossAllSources() {
+        // A common builder takes the frontmost position in Home, existing
+        // plans, invited workouts and Train Together marketplace proposals.
+        for isStandalone in [false, true] {
+            for hasScratch in [false, true] {
+                for sharing in [false, true] {
+                    for hasPartner in [false, true] {
+                        XCTAssertTrue(
+                            ATHLTHScratchComposerPresentationPolicy
+                                .hidesLegacyStandaloneHost(
+                                    isStandalone: isStandalone,
+                                    hasScratchSource: hasScratch,
+                                    preparesForSharing: sharing,
+                                    hasPartner: hasPartner,
+                                    builderIsPresented: true
+                                )
+                        )
+                    }
+                }
+            }
+        }
+        // Closing the composer restores an ordinary existing-plan editor,
+        // not a persistent blank screen.
+        XCTAssertFalse(
+            ATHLTHScratchComposerPresentationPolicy
+                .hidesLegacyStandaloneHost(
+                    isStandalone: false,
+                    hasScratchSource: false,
+                    preparesForSharing: false,
+                    hasPartner: false,
+                    builderIsPresented: false
+                )
+        )
+    }
+
+    func testTrainTogetherMarketplaceScratchHandsOffWithoutLegacyForm() {
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy
+            .preparesSharedScratchDirectly(
+                isStandalone: true,
+                hasScratchSource: true,
+                preparesForSharing: true
+            ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy
+            .preparesSharedScratchDirectly(
+                isStandalone: true,
+                hasScratchSource: false,
+                preparesForSharing: true
+            ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy
+            .preparesSharedScratchDirectly(
+                isStandalone: true,
+                hasScratchSource: true,
+                preparesForSharing: false
+            ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy
+            .preparesSharedScratchDirectly(
+                isStandalone: false,
+                hasScratchSource: true,
+                preparesForSharing: true
+            ))
+    }
+
+    func testPickerToEditorHandoffRequiresDismissal() {
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy
+            .opensQueuedEditorAfterPickerDismiss(
+                queued: true, pickerIsPresented: true
+            ))
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy
+            .opensQueuedEditorAfterPickerDismiss(
+                queued: false, pickerIsPresented: false
+            ))
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy
+            .opensQueuedEditorAfterPickerDismiss(
+                queued: true, pickerIsPresented: false
+            ))
+    }
+
+    func testQuickRunHidesObsoleteSetupOnlyWhileSharedEditorIsOpen() {
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy
+            .showsQuickSetupBehindComposer(composerIsPresented: true))
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy
+            .showsQuickSetupBehindComposer(composerIsPresented: false))
+    }
+
+    func testPlanStudioSceneRestoreNeverPresentsBothSessionEditors() {
+        let both = ATHLTHScratchComposerPresentationPolicy
+            .exclusiveEditorRestoration(standalone: true, day: true)
+        XCTAssertTrue(both.standalone)
+        XCTAssertFalse(both.day)
+
+        let dayOnly = ATHLTHScratchComposerPresentationPolicy
+            .exclusiveEditorRestoration(standalone: false, day: true)
+        XCTAssertFalse(dayOnly.standalone)
+        XCTAssertTrue(dayOnly.day)
+
+        let alone = ATHLTHScratchComposerPresentationPolicy
+            .exclusiveEditorRestoration(standalone: true, day: false)
+        XCTAssertTrue(alone.standalone)
+        XCTAssertFalse(alone.day)
+
+        let none = ATHLTHScratchComposerPresentationPolicy
+            .exclusiveEditorRestoration(standalone: false, day: false)
+        XCTAssertFalse(none.standalone)
+        XCTAssertFalse(none.day)
+    }
+
     func testScratchBackAlwaysOffersDeleteEvenWithEmptyTimeline() {
         XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
             isScratchHost: true, hasEdits: false

@@ -1768,7 +1768,10 @@ struct RunQuickStartSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: isAdvancedSetup ? 16 : 12) {
+                if ATHLTHScratchComposerPresentationPolicy.showsQuickSetupBehindComposer(
+                    composerIsPresented: showingDetailedWorkoutBuilder
+                ) {
+                    VStack(spacing: isAdvancedSetup ? 16 : 12) {
                     if isAdvancedSetup {
                         // Preserve the detailed editable card in Advanced.
                         advancedWorkoutDetailsCard
@@ -1838,8 +1841,9 @@ struct RunQuickStartSheet: View {
                         detail: { tool in runStartToolDetail(tool) }
                     )
 
+                    }
+                    .padding()
                 }
-                .padding()
             }
             // Use the exact canvas from Training Plan, not the legacy
             // Quick Train gradient.
