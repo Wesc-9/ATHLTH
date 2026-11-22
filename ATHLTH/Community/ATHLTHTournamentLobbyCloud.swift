@@ -256,8 +256,60 @@ private struct ATHLTHTournamentReviewExerciseParams: Encodable {
     let p_approve: Bool
 }
 
+struct ATHLTHTournamentInviteRequestRemote: Decodable, Identifiable {
+    let id: UUID
+    let tournamentID: UUID
+    let nomineeID: UUID
+    let proposerID: UUID
+    let state: String
+    let createdAt: Date
+    enum CodingKeys: String, CodingKey {
+        case id,state
+        case tournamentID = "tournament_id"
+        case nomineeID = "nominee_id"
+        case proposerID = "proposer_id"
+        case createdAt = "created_at"
+    }
+}
+
+private struct ATHLTHTournamentProposeInviteParams: Encodable {
+    let p_tournament: UUID
+    let p_nominee: UUID
+}
+private struct ATHLTHTournamentReviewInviteParams: Encodable {
+    let p_request: UUID
+    let p_approved: Bool
+}
+
 struct ATHLTHTournamentLobbyCloudService {
     private let client = SupabaseEnvironment.client
+
+    func inviteRequests(tournamentID: UUID) async throws
+      -> [ATHLTHTournamentInviteRequestRemote] {
+        try await client.from("athlth_tournament_invite_requests")
+            .select("id,tournament_id,nominee_id,proposer_id,state,created_at")
+            .eq("tournament_id", value: tournamentID)
+            .order("created_at", ascending: false)
+            .limit(100).execute().value
+    }
+
+    func proposeInvite(tournamentID: UUID, nomineeID: UUID) async throws {
+        try await client.rpc(
+            "athlth_tournament_propose_invite",
+            params: ATHLTHTournamentProposeInviteParams(
+                p_tournament: tournamentID, p_nominee: nomineeID
+            )
+        ).execute()
+    }
+
+    func reviewInvite(requestID: UUID, approved: Bool) async throws {
+        try await client.rpc(
+            "athlth_tournament_review_invite",
+            params: ATHLTHTournamentReviewInviteParams(
+                p_request: requestID, p_approved: approved
+            )
+        ).execute()
+    }
 
     func candidates(tournamentID: UUID) async throws
       -> [ATHLTHTournamentExerciseCandidateRemote] {
