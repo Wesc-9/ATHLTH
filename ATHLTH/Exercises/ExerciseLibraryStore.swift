@@ -1526,7 +1526,9 @@ final class ExerciseLibraryStore: ObservableObject {
                   let data = try? Data(contentsOf: url),
                   let legacy = try? JSONDecoder().decode([Exercise].self, from: data) {
             // The legacy file contains owner IDs. Only migrate this account's records.
-            decoded = legacy.filter { $0.ownerID == accountID }
+            decoded = legacy.filter {
+                $0.ownerID == accountID && $0.origin == .custom
+            }
             AccountLocalStorage.write(decoded, name: "exerciseLibrary", userID: accountID)
         } else {
             decoded = []
