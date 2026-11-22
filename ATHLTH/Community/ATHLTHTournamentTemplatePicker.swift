@@ -88,7 +88,7 @@ struct ATHLTHTournamentTemplatePicker: View {
         loading = true
         defer { loading = false }
         do { templates = try await service.load(for: session.profile.userID) }
-        catch { error = "Kunne ikke hente malene." }
+        catch { self.error = "Kunne ikke hente malene." }
     }
 
     @MainActor private func remove(
