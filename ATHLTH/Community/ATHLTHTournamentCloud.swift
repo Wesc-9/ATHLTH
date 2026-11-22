@@ -551,6 +551,27 @@ struct ATHLTHTournamentCloudService {
         ).execute().value
     }
 
+    /// Inbox rooms belong only to current invited/accepted members.
+    /// Declined or removed athletes must not retain a ghost conversation.
+    func conversationTournamentIDs(userID: UUID) async throws -> Set<UUID> {
+        var ids = Set<UUID>()
+        var offset = 0
+        repeat {
+            let page: [ATHLTHTournamentInvitationID] = try await client
+                .from("athlth_tournament_entries")
+                .select("tournament_id")
+                .eq("user_id", value: userID)
+                .in("response", values: ["invited", "accepted"])
+                .is("removed_at", value: nil)
+                .range(from: offset, to: offset + 199)
+                .execute().value
+            ids.formUnion(page.map(\.tournamentID))
+            if page.count < 200 { break }
+            offset += page.count
+        } while offset < 5_000
+        return ids
+    }
+
     func myTournamentIDs(userID: UUID) async throws -> Set<UUID> {
         // The club may have competitions visible to members. Arena's "Mine"
         // tab lists only events where this athlete is actually an entrant,
