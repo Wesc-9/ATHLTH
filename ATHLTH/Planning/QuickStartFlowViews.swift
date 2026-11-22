@@ -1965,7 +1965,8 @@ struct RunQuickStartSheet: View {
                     audioCoachDraft.load(from: settings)
                     // Plan/individual workout choices supersede global defaults.
                     // Never write these session-scoped overrides back to Settings.
-                    if let savedCoach = plannedSession?.audioCoachConfiguration {
+                    if let savedCoach = selectedWorkout?.launchAudioCoachConfiguration ??
+                        plannedSession?.audioCoachConfiguration {
                         audioCoachDraft.load(configuration: savedCoach)
                     }
                     didLoadAudioCoachDefaults = true
@@ -1976,10 +1977,12 @@ struct RunQuickStartSheet: View {
                 // playlist chosen for the previous workout is never carried
                 // into a new one unless it is explicitly the global default.
                 selectedSpotifyPlaylist =
+                    selectedWorkout?.launchSpotifyPlaylist ??
                     settings.spotifyDefaultPlaylist
                 spotifyAutoplay =
-                    settings.spotifyAutoplayLinkedPlaylists &&
-                    selectedSpotifyPlaylist != nil
+                    selectedWorkout?.launchSpotifyAutoplayOnStart ??
+                    (settings.spotifyAutoplayLinkedPlaylists &&
+                     selectedSpotifyPlaylist != nil)
 
                 if spotify.isConnected &&
                     spotify.playlists.isEmpty {
@@ -3133,12 +3136,14 @@ struct RunQuickStartSheet: View {
                     runEnvironment == .outdoor &&
                     settings.autoPauseOutdoorWorkouts,
                 spotifyPlaylist:
-                    isAdvancedSetup &&
+                    (isAdvancedSetup ||
+                     selectedWorkout?.launchSpotifyAutoplayOnStart == true) &&
                     spotifyAutoplay
                         ? selectedSpotifyPlaylist
                         : nil,
                 spotifyAutoplay:
-                    isAdvancedSetup &&
+                    (isAdvancedSetup ||
+                     selectedWorkout?.launchSpotifyAutoplayOnStart == true) &&
                     spotifyAutoplay &&
                     selectedSpotifyPlaylist != nil,
                 friends: friends,
