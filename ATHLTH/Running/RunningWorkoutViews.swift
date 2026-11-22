@@ -378,6 +378,7 @@ struct RunningWorkoutDetailView: View {
     @State private var showingIntervalEditor = false
     @State private var focusedPrivateStepIndex: Int?
     @State private var showingOneTimeSettings = false
+    @State private var oneTimeStartRequested = false
     @State private var showingOneTimeComposer = false
     @State private var showingOneTimeCoach = false
     @State private var showingOneTimeSpotify = false
@@ -542,6 +543,7 @@ struct RunningWorkoutDetailView: View {
     }
 
     private func beginOneTimeAdjustment() {
+        oneTimeStartRequested = false
         oneTimeWorkout = previewWorkout
         oneTimeOptions = privateOptions
         oneTimeSpeedText = ""
@@ -768,7 +770,10 @@ struct RunningWorkoutDetailView: View {
                         .athlthPlanCard(radius: 18)
 
                         Button {
-                            launchLibraryWorkout(selected, with: oneTimeOptions)
+                            // Dismiss the editor first; the original Quick
+                            // Run flow is opened after the sheet is gone.
+                            oneTimeStartRequested = true
+                            showingOneTimeSettings = false
                         } label: {
                             Label("Start med disse innstillingene",
                                   systemImage: "play.fill")
@@ -1056,7 +1061,15 @@ struct RunningWorkoutDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingOneTimeSettings) {
+        .sheet(
+            isPresented: $showingOneTimeSettings,
+            onDismiss: {
+                guard oneTimeStartRequested, let selected = oneTimeWorkout
+                else { return }
+                oneTimeStartRequested = false
+                launchLibraryWorkout(selected, with: oneTimeOptions)
+            }
+        ) {
             oneTimeSettingsSheet
         }
         .onAppear {
