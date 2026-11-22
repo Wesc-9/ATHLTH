@@ -2044,7 +2044,7 @@ struct ATHLTHArenaSingleChallengesView: View {
         ))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingCreate) {
-            ChallengeCreationView()
+            ATHLTHCompetitionEntryView()
         }
     }
 
