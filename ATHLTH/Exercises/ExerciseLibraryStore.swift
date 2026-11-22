@@ -1288,7 +1288,13 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     func deleteCustomExercise(_ id: UUID) {
-        if let entry = customExercises.first(where: { $0.id == id }),
+        // Never mutate another account's private exercise through a stale
+        // library selection after switching users.
+        guard let owned = customExercises.first(where: {
+            $0.id == id && $0.source == .custom &&
+            $0.exercise.ownerID == accountID && accountID != nil
+        }) else { return }
+        if let entry = customExercises.first(where: { $0.id == owned.id }),
            let imageURL = entry.exercise.imageURL,
            imageURL.isFileURL {
             try? FileManager.default.removeItem(at: imageURL)
