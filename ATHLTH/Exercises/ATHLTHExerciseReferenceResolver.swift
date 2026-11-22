@@ -357,11 +357,20 @@ enum ATHLTHExerciseReferenceResolver {
                 ? visibleEquivalent(of: matches[0], in: library) : nil
         }
 
-        // User-created exercises are only matched by explicit IDs. Equal
-        // titles alone are not proof that two personal exercises are the same.
-        let clean = key(block.title)
+        // Single reviewed name-matching path for both modern workout blocks
+        // and legacy PlannedExercise rows. Never guess private exercises.
+        return resolvePublicName(block.title, in: library)
+    }
+
+    /// Only use this when the source has no explicit foreign/custom identity.
+    /// The result is one already existing public exercise; no duplicate import.
+    static func resolvePublicName(
+        _ name: String,
+        in library: [ExerciseLibraryEntry]
+    ) -> ExerciseLibraryEntry? {
+        let clean = key(name)
         guard !clean.isEmpty else { return nil }
-        if let reviewedID = exerciseSourceIdentifier(for: block.title) {
+        if let reviewedID = exerciseSourceIdentifier(for: name) {
             let source: ExerciseLibrarySource = reviewedID.hasPrefix("athlth-native-")
                 ? .athlthCatalog : .repDB
             let matches = library.filter {
@@ -372,23 +381,15 @@ enum ATHLTHExerciseReferenceResolver {
             }
         }
 
-        let repdbExact = library.filter {
-            $0.source == .repDB && key($0.canonicalName) == clean
-        }
-        if repdbExact.count == 1 { return repdbExact[0] }
-
-        // Match an English canonical name even when the workout title uses
-        // hyphens/underscores instead of spaces. Never infer a different exercise.
-        let canonicalMatches = library.filter {
+        // The canonical English name is a stronger proof than translated
+        // display strings, which may be shared by different equipment types.
+        let matches = library.filter {
             ($0.source == .repDB || $0.source == .athlthCatalog) &&
-            key($0.canonicalName) == clean
+                key($0.canonicalName) == clean
         }
-        if canonicalMatches.count == 1 { return canonicalMatches[0] }
-
-        let matchingNative = library.filter {
-            $0.source == .athlthCatalog && key($0.canonicalName) == clean
-        }
-        return matchingNative.count == 1 ? matchingNative[0] : nil
+        if matches.count == 1 { return matches[0] }
+        // Two public entries with the same title are ambiguous, so stop.
+        return nil
     }
 
     /// A native fallback is sometimes hidden from the default library grid
