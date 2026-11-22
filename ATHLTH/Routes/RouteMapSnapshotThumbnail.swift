@@ -280,29 +280,23 @@ enum RouteMapSnapshotCache {
         for coordinates:
             [CLLocationCoordinate2D]
     ) -> MKCoordinateRegion {
-        let latitudes =
-            coordinates.map(\.latitude)
-        let longitudes =
-            coordinates.map(\.longitude)
-
-        guard let minLatitude =
-                latitudes.min(),
-              let maxLatitude =
-                latitudes.max(),
-              let minLongitude =
-                longitudes.min(),
-              let maxLongitude =
-                longitudes.max()
-        else {
+        // Compute bounds in one pass without allocating latitude and
+        // longitude arrays or traversing a long GPS track four times.
+        guard let first = coordinates.first else {
             return MKCoordinateRegion(
-                center:
-                    coordinates[0],
-                span:
-                    MKCoordinateSpan(
-                        latitudeDelta: 0.02,
-                        longitudeDelta: 0.02
-                    )
+                center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
             )
+        }
+        var minLatitude = first.latitude
+        var maxLatitude = first.latitude
+        var minLongitude = first.longitude
+        var maxLongitude = first.longitude
+        for coordinate in coordinates.dropFirst() {
+            minLatitude = min(minLatitude, coordinate.latitude)
+            maxLatitude = max(maxLatitude, coordinate.latitude)
+            minLongitude = min(minLongitude, coordinate.longitude)
+            maxLongitude = max(maxLongitude, coordinate.longitude)
         }
 
         let center =
