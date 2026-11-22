@@ -34,13 +34,21 @@ final class TrainingPlanLibraryBrowseTests: XCTestCase {
             workoutPattern: ["easy_run"], tags: [],
             sortOrder: 3, catalogVersion: 1
         )
+        let stolenID = TrainingPlanCatalogEntry(
+            id: bundled.id, slug: "rogue-remote-plan", title: "Wrong identity",
+            summary: "", category: "running", goal: "Run",
+            level: "Beginner", durationWeeks: 8, sessionsPerWeek: 1,
+            workoutPattern: ["easy_run"], tags: [],
+            sortOrder: 4, catalogVersion: 100
+        )
         let merged = TrainingPlanLibraryStore.mergeValidatedCatalog(
-            remote: [olderDuplicate, invalid, tooLong, valid]
+            remote: [olderDuplicate, invalid, tooLong, valid, stolenID]
         )
         XCTAssertEqual(merged.first { $0.slug == bundled.slug }?.id, bundled.id)
         XCTAssertEqual(merged.filter { $0.slug == valid.slug }.count, 1)
         XCTAssertEqual(merged.first { $0.slug == valid.slug }?.id, valid.id)
         XCTAssertFalse(merged.contains { $0.slug == tooLong.slug })
+        XCTAssertFalse(merged.contains { $0.slug == stolenID.slug })
     }
 
     @MainActor
