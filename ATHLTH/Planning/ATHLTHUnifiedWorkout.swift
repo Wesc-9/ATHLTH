@@ -42,7 +42,7 @@ enum ATHLTHUnifiedWorkout {
            (workout.kind == .running || workout.kind == .walking),
            (workout.targetDistanceKilometers != nil ||
             workout.durationMinutes != nil) {
-            blocks.append(WorkoutTemplateBlock(
+            var effort = WorkoutTemplateBlock(
                 sequence: 1, kind: .run, title: workout.kind.title,
                 exerciseSlug: nil,
                 distanceMeters: workout.targetDistanceKilometers.map { $0 * 1_000 },
@@ -52,7 +52,20 @@ enum ATHLTHUnifiedWorkout {
                 targetWeightKilograms: nil, loadNote: nil,
                 notes: workout.notes, phase: .main,
                 targetPaceSecondsPerKilometer: workout.targetPaceSecondsPerKilometer
-            ))
+            )
+            effort.cardioActivity = workout.kind == .walking ? .walking : .running
+            blocks.append(effort)
+        }
+
+        // Old walking plans may store run-shaped interval targets without
+        // an explicit gait tag. Preserve their actual walking sport in the
+        // same universal timeline instead of presenting a running motor.
+        if workout.kind == .walking {
+            for index in blocks.indices where
+                blocks[index].kind == .run &&
+                blocks[index].cardioActivity == nil {
+                blocks[index].cardioActivity = .walking
+            }
         }
 
         // Earlier simple plan versions represented timed workouts with
