@@ -87,6 +87,51 @@ struct ATHLTHCompetitionRaceRules: Codable, Equatable {
     /// This does not substitute for device-source verification.
     var equipmentRules: String = ""
 
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case discipline, sprintMode, sprintTarget, routeID, routeName,
+             recordingDevice, targetDistanceMeters, targetDurationSeconds,
+             lapCount, lapVerification, lapCourseName, lapCourseLatitude,
+             lapCourseLongitude, countdownSeconds, allowOptInLiveLocation,
+             equipmentRules
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        discipline = try c.decodeIfPresent(ATHLTHCompetitionDiscipline.self,
+                         forKey: .discipline) ?? .workout
+        sprintMode = try c.decodeIfPresent(ATHLTHCompetitionSprintMode.self,
+                         forKey: .sprintMode) ?? .massStart
+        sprintTarget = try c.decodeIfPresent(ATHLTHCompetitionSprintTarget.self,
+                         forKey: .sprintTarget) ?? .distance
+        routeID = try c.decodeIfPresent(UUID.self, forKey: .routeID)
+        routeName = try c.decodeIfPresent(String.self, forKey: .routeName) ?? ""
+        recordingDevice = try c.decodeIfPresent(
+            ATHLTHCompetitionRecordingDevice.self,
+            forKey: .recordingDevice) ?? .any
+        targetDistanceMeters = try c.decodeIfPresent(Int.self,
+                                 forKey: .targetDistanceMeters) ?? 100
+        targetDurationSeconds = try c.decodeIfPresent(Int.self,
+                                 forKey: .targetDurationSeconds) ?? 60
+        lapCount = try c.decodeIfPresent(Int.self, forKey: .lapCount) ?? 3
+        lapVerification = try c.decodeIfPresent(
+            ATHLTHCompetitionLapVerification.self,
+            forKey: .lapVerification) ?? .supervised
+        lapCourseName = try c.decodeIfPresent(String.self,
+                         forKey: .lapCourseName) ?? ""
+        lapCourseLatitude = try c.decodeIfPresent(Double.self,
+                              forKey: .lapCourseLatitude)
+        lapCourseLongitude = try c.decodeIfPresent(Double.self,
+                              forKey: .lapCourseLongitude)
+        countdownSeconds = try c.decodeIfPresent(Int.self,
+                             forKey: .countdownSeconds) ?? 10
+        allowOptInLiveLocation = try c.decodeIfPresent(Bool.self,
+                                 forKey: .allowOptInLiveLocation) ?? false
+        equipmentRules = try c.decodeIfPresent(String.self,
+                         forKey: .equipmentRules) ?? ""
+    }
+
     var isValid: Bool {
         guard (100...100_000).contains(targetDistanceMeters),
               (10...86_400).contains(targetDurationSeconds),
