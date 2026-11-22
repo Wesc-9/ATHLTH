@@ -545,9 +545,8 @@ struct ATHLTHWorkoutRecipePreview: View {
             ) {
                 ATHLTHThreeMinuteAllOutProtocol()
             }
-            if !compactDetailLayout {
-                modeControl
-            }
+            // Compact mode is presented in the identity header or
+            // the owning library navigation toolbar.
             if isAdvanced && !embeddedInDetails && !compactDetailLayout {
                 statistics
             }
@@ -577,7 +576,11 @@ struct ATHLTHWorkoutRecipePreview: View {
             }
         }
         .sheet(item: $editingStep) { item in
-            ATHLTHWorkoutStepEditor(block: item.block) { updated in
+            ATHLTHWorkoutStepEditor(
+                block: item.block,
+                workoutTitle: title,
+                workoutCategory: categoryTitle
+            ) { updated in
                 onUpdateBlock?(item.index, updated)
             }
         }
@@ -601,6 +604,9 @@ struct ATHLTHWorkoutRecipePreview: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
 
+                        introduction
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
                         ATHLTHWorkoutStepDetails(
                             block: ATHLTHZonedLocalization
                                 .normalizeLegacyAllOutStep(item.block),
@@ -657,7 +663,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     private var introduction: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(recipeTint)
@@ -682,6 +688,9 @@ struct ATHLTHWorkoutRecipePreview: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
+            if !embeddedInDetails && !compactDetailLayout {
+                compactModePicker
+            }
         }
         .padding(19)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -735,38 +744,16 @@ struct ATHLTHWorkoutRecipePreview: View {
         .athlthPlanCard(radius: 19)
     }
 
-    /// Mode is immediately below the identity card in every shared preview.
-    /// Simple remains a readable recipe; Advanced retains all target details.
-    private var modeControl: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(tr("View workout", "Vis økten"))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                Spacer(minLength: 4)
-                Text(isAdvanced
-                    ? tr("All details", "Alle detaljer")
-                    : tr("At a glance", "Kort oversikt"))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
-
-            Picker(tr("Detail level", "Detaljnivå"), selection: detailAdvancedMode ?? $advanced) {
-                Text(tr("Simple", "Enkel")).tag(false)
-                Text(tr("Advanced", "Avansert")).tag(true)
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("workout-recipe-detail-mode")
-            .accessibilityHint(tr(
-                "Choose a quick overview or detailed targets and rests.",
-                "Velg kort oversikt eller detaljerte mål og pauser."
-            ))
+    /// Keep the detail switch at the top instead of a full-width row.
+    private var compactModePicker: some View {
+        Picker(tr("Detail level", "Detaljnivå"), selection: detailAdvancedMode ?? $advanced) {
+            Text(tr("Simple", "Enkel")).tag(false)
+            Text(tr("Advanced", "Avansert")).tag(true)
         }
-        .padding(13)
-        .background(
-            ATHLTHPlanDesign.selectedSurface.opacity(0.5),
-            in: RoundedRectangle(cornerRadius: 16)
-        )
+        .pickerStyle(.menu)
+        .tint(recipeTint)
+        .font(.caption.weight(.semibold))
+        .accessibilityIdentifier("workout-recipe-detail-mode")
     }
 
     /// A quick understanding of WHAT to do, not 26 individual settings.
@@ -909,6 +896,7 @@ struct ATHLTHWorkoutRecipePreview: View {
 
     private func recipeStepCard(_ block: WorkoutTemplateBlock, index: Int) -> some View {
         let expanded = expandedStepIndices.contains(index)
+        let isRecovery = block.kind == .rest || block.resolvedPhase == .recovery
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
                 Button {
@@ -922,16 +910,19 @@ struct ATHLTHWorkoutRecipePreview: View {
                             }
                         }
                     } else {
-                        // Like the training-plan timeline, tap the whole effort
-                        // or recovery row to inspect its canonical prescription.
-                        inspectedCardioStep = IndexedWorkoutStep(
+                        let item = IndexedWorkoutStep(
                             index: index,
                             block: ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
                         )
+                        if onUpdateBlock != nil {
+                            editingStep = item
+                        } else {
+                            inspectedCardioStep = item
+                        }
                     }
                 } label: {
                     HStack(alignment: .center, spacing: 11) {
-                        thumbnail(for: block)
+                        thumbnail(for: block, compact: isRecovery)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(localizedTitle(block, compact: true))
                                 .font(.subheadline.weight(.semibold))
@@ -974,7 +965,9 @@ struct ATHLTHWorkoutRecipePreview: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(recipeTint)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                    .frame(maxWidth: .infinity,
+                           minHeight: isRecovery ? 35 : 48,
+                           alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -999,7 +992,8 @@ struct ATHLTHWorkoutRecipePreview: View {
                         Image(systemName: expanded ? "chevron.up" : "chevron.down")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(recipeTint)
-                            .frame(width: 38, height: 48)
+                            .frame(width: isRecovery ? 32 : 38,
+                                   height: isRecovery ? 38 : 48)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -1086,10 +1080,10 @@ struct ATHLTHWorkoutRecipePreview: View {
                 }
             }
         }
-        .padding(14)
-        .athlthPlanCard(radius: 19, warm: block.resolvedPhase != .recovery)
+        .padding(isRecovery ? 9 : 14)
+        .athlthPlanCard(radius: isRecovery ? 16 : 19, warm: !isRecovery)
         .overlay(alignment: .leading) {
-            if block.resolvedPhase == .recovery {
+            if isRecovery {
                 RoundedRectangle(cornerRadius: 3)
                     .fill(recipeTint.opacity(0.65))
                     .frame(width: 4)
@@ -1098,16 +1092,19 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     @ViewBuilder
-    private func thumbnail(for block: WorkoutTemplateBlock) -> some View {
+    private func thumbnail(
+        for block: WorkoutTemplateBlock,
+        compact: Bool = false
+    ) -> some View {
         if let match = ATHLTHExerciseReferenceResolver.resolve(
             block, in: exerciseLibrary.allExercises
         ) {
-            ExerciseArtwork(entry: match, size: 39)
+            ExerciseArtwork(entry: match, size: compact ? 32 : 39)
         } else {
             Image(systemName: blockIcon(block))
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(recipeTint)
-                .frame(width: 39, height: 39)
+                .frame(width: compact ? 32 : 39, height: compact ? 32 : 39)
                 .background(ATHLTHPlanDesign.selectedSurface,
                             in: RoundedRectangle(cornerRadius: 12))
         }
