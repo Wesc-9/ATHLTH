@@ -26,6 +26,7 @@ struct ATHLTHTournamentCreator: View {
 
     let preset: ATHLTHTournamentFormat
     let fixedClubID: UUID?
+    let isSingleEvent: Bool
     /// Sports chosen from Quick Train cannot silently change to another mode.
     let fixedActivity: ATHLTHTournamentActivity?
     /// Entry flows choose a single competition format. The detailed rules
@@ -91,6 +92,7 @@ struct ATHLTHTournamentCreator: View {
         preset: ATHLTHTournamentFormat,
         fixedClubID: UUID?,
         fixedActivity: ATHLTHTournamentActivity? = nil,
+        singleEventMode: Bool = false,
         initialTitle: String? = nil,
         continuation: ATHLTHTournamentDraft? = nil,
         onPublished: ((UUID) -> Void)? = nil,
@@ -98,11 +100,14 @@ struct ATHLTHTournamentCreator: View {
     ) {
         self.preset = preset
         self.fixedClubID = fixedClubID
+        self.isSingleEvent = continuation?.singleEventMode ?? singleEventMode
         self.fixedActivity = fixedActivity
         self.restrictFormat = fixedActivity != nil || continuation != nil
         self.onSave = onSave
         self.onPublished = onPublished
-        _format = State(initialValue: continuation?.format ?? preset)
+        _format = State(initialValue:
+            (continuation?.singleEventMode ?? singleEventMode)
+                ? .league : (continuation?.format ?? preset))
         _title = State(initialValue: continuation?.title ?? initialTitle ?? "")
         _groupSize = State(initialValue: continuation?.groupSize ?? 4)
         _qualifiersPerGroup = State(initialValue:
@@ -186,7 +191,7 @@ struct ATHLTHTournamentCreator: View {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         // Two athletes belong in a private duel. Group competitions
         // require the organizer plus at least two invitees.
-        athletes.count >= (format == .cup ? 4 : 2) &&
+        athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2) &&
         !busy && !allowedActivities.isEmpty &&
         competitionSettings.isValid &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
@@ -417,6 +422,7 @@ struct ATHLTHTournamentCreator: View {
             title: String(title.trimmingCharacters(
                 in: .whitespacesAndNewlines).prefix(80)),
             format: format,
+            singleEventMode: isSingleEvent,
             groupSize: groupSize,
             qualifiersPerGroup: qualifiersPerGroup,
             participants: athletes,
@@ -475,7 +481,8 @@ struct ATHLTHTournamentCreator: View {
                 .font(.caption2.weight(.semibold))
                 .tracking(2)
                 .foregroundStyle(ATHLTHArenaV3Style.gold)
-            TextField("Navn på liga eller cup", text: $title)
+            TextField(isSingleEvent ? "Navn på enkeltkonkurranse" :
+                      "Navn på liga eller cup", text: $title)
                 .font(.title3.weight(.medium))
                 .padding(15)
                 .background(ATHLTHArenaV3Style.panel())
@@ -488,7 +495,14 @@ struct ATHLTHTournamentCreator: View {
     private var formatSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Konkurranseform")
-            ForEach(restrictFormat ? [format] : ATHLTHTournamentFormat.allCases) {
+            if isSingleEvent {
+                Label("Enkeltkonkurranse · én hendelse for minst tre",
+                      systemImage: "person.3.sequence.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+            }
+            ForEach(isSingleEvent ? [] :
+                    (restrictFormat ? [format] : ATHLTHTournamentFormat.allCases)) {
                 option in
                 Button {
                     format = option
@@ -556,7 +570,8 @@ struct ATHLTHTournamentCreator: View {
     }
 
     private func applyTemplate(_ saved: ATHLTHTournamentDraft) {
-        if restrictFormat && saved.format != format {
+        if restrictFormat && (saved.format != format ||
+                              saved.singleEventMode != isSingleEvent) {
             errorMessage = "Denne malen har en annen konkurranseform."
             return
         }
