@@ -151,6 +151,7 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var endsAt = Date().addingTimeInterval(7 * 86_400)
     @State private var simpleStartLater = false
     @State private var duelAgreement = ATHLTHCompetitionAgreement()
+    @State private var duelInvitationDays = 3
     @State private var multipleAttempts = true
     @State private var roundsPerWeek = 7
     @State private var reviewHours = 48
@@ -728,6 +729,12 @@ struct ATHLTHCompetitionCreationView: View {
             }
 
             if format == .duel {
+                Stepper("Svarfrist for invitasjonen: \(duelInvitationDays) dager",
+                        value: $duelInvitationDays, in: 1...30)
+                    .font(.subheadline)
+                Text("Invitasjonen utløper automatisk hvis den ikke besvares.")
+                    .font(.caption)
+                    .foregroundStyle(muted)
                 DatePicker(tr("Competition starts", "Konkurransen starter"),
                            selection: $startsAt, in: Date()...,
                            displayedComponents: [.date, .hourAndMinute])
@@ -973,6 +980,14 @@ struct ATHLTHCompetitionCreationView: View {
             )
         }
         challenges.mergeRemoteChallenges([challenge])
+        do {
+            try await ATHLTHDuelReplyDeadlineCloud().update(
+                challenge.id, days: advanced ? duelInvitationDays : 3
+            )
+        } catch {
+            // The database default of three days still protects the invite.
+            errorMessage = "Duellen er opprettet, men svarfristen kunne ikke tilpasses."
+        }
         // A duel is a private inbox conversation, not a new group chat.
         // The challenge invitation itself already exists independently
         // if the message cannot be delivered.
