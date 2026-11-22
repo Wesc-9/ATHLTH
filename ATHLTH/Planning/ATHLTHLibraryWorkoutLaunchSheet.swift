@@ -91,8 +91,8 @@ struct ATHLTHWorkoutWorkSpeedEditor: View {
                 }
 
                 Text(tr(
-                    "Updates \\(indices.count) work intervals only. Warm-up, rests and cool-down stay unchanged.",
-                    "Endrer bare \\(indices.count) drag. Oppvarming, pauser og nedjogging beholdes."
+                    "Updates \(indices.count) work intervals only. Warm-up, rests and cool-down stay unchanged.",
+                    "Endrer bare \(indices.count) drag. Oppvarming, pauser og nedjogging beholdes."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -134,7 +134,7 @@ struct ATHLTHLibraryWorkoutLaunchSheet: View {
     let originalBlocks: [WorkoutTemplateBlock]
     let savedBlocks: [WorkoutTemplateBlock]?
     let savedOptions: ATHLTHWorkoutPersonalOptions
-    let onStart: ([WorkoutTemplateBlock], ATHLTHWorkoutPersonalOptions, Bool) -> Void
+    let onStart: ([WorkoutTemplateBlock], ATHLTHWorkoutPersonalOptions, ATHLTHLibraryWorkoutStartChoice) -> Void
 
     @State private var adjustingOnce = false
     @State private var draftBlocks: [WorkoutTemplateBlock]
@@ -150,7 +150,7 @@ struct ATHLTHLibraryWorkoutLaunchSheet: View {
         originalBlocks: [WorkoutTemplateBlock],
         savedBlocks: [WorkoutTemplateBlock]?,
         savedOptions: ATHLTHWorkoutPersonalOptions,
-        onStart: @escaping ([WorkoutTemplateBlock], ATHLTHWorkoutPersonalOptions, Bool) -> Void
+        onStart: @escaping ([WorkoutTemplateBlock], ATHLTHWorkoutPersonalOptions, ATHLTHLibraryWorkoutStartChoice) -> Void
     ) {
         self.title = title
         self.summary = summary
@@ -200,7 +200,7 @@ struct ATHLTHLibraryWorkoutLaunchSheet: View {
                 if adjustingOnce {
                     ToolbarItem(placement: .confirmationAction) {
                         Button(tr("Start", "Start")) {
-                            onStart(draftBlocks, draftOptions, true)
+                            onStart(draftBlocks, draftOptions, .adjustOnce)
                         }
                     }
                 }
@@ -264,7 +264,7 @@ struct ATHLTHLibraryWorkoutLaunchSheet: View {
                 ),
                 enabled: true
             ) {
-                onStart(originalBlocks, .init(), false)
+                onStart(originalBlocks, .init(), .withoutPersonalSettings)
             }
             choiceRow(
                 icon: "person.crop.circle.badge.checkmark",
@@ -276,7 +276,7 @@ struct ATHLTHLibraryWorkoutLaunchSheet: View {
                          "Du har ikke lagret egne valg ennå."),
                 enabled: hasSavedChoices
             ) {
-                onStart(savedBlocks ?? originalBlocks, savedOptions, true)
+                onStart(savedBlocks ?? originalBlocks, savedOptions, .mySettings)
             }
             choiceRow(
                 icon: "slider.horizontal.3",
@@ -377,7 +377,7 @@ struct ATHLTHLibraryWorkoutLaunchSheet: View {
             .athlthPlanCard(radius: 19)
 
             Button(tr("Start with these settings", "Start med disse innstillingene")) {
-                onStart(draftBlocks, draftOptions, true)
+                onStart(draftBlocks, draftOptions, .adjustOnce)
             }
             .buttonStyle(.borderedProminent)
             .tint(ATHLTHPlanDesign.accentInk)
