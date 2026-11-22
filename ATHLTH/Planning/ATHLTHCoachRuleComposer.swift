@@ -171,7 +171,7 @@ struct ATHLTHCoachRuleComposer: View {
     private var availableMetrics: [ATHLTHAudioCoachRule.Metric] {
         let wanted: [ATHLTHAudioCoachRule.Metric] = [
             .distance, .elapsedTime, .pace, .averagePace,
-            .lastKilometerPace, .speed, .clockTime, .heartRate,
+            .lastKilometerPace, .speed, .clockTime, .date, .heartRate,
             .heartRateZone, .motivation, .hydrationReminder, .stepName,
             .stepRemainingTime, .workoutRemainingTime, .estimatedFinishTime,
             .remainingExercises, .nextExercise, .previousExerciseSummary,
@@ -477,6 +477,14 @@ struct ATHLTHCoachRuleComposer: View {
         if target.isGroup {
             if let groupID = target.groupID,
                let groupIndex = draft.coachGroups.firstIndex(where: { $0.id == groupID }) {
+                // Old grouped options must not continue to speak alongside
+                // the new single-rule bundle after this group is saved.
+                let previousOptions = draft.coachGroups[groupIndex].optionIDs
+                for rawValue in previousOptions {
+                    ATHLTHAudioCoachOption(rawValue: rawValue)?
+                        .setActive(false, in: &draft)
+                }
+                draft.coachGroups[groupIndex].optionIDs = []
                 draft.customRules.removeAll { oldRuleIDs.contains($0.id) }
                 draft.customRules.append(rule)
                 draft.coachGroups[groupIndex].name = name
