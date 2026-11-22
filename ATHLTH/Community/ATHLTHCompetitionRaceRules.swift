@@ -65,7 +65,7 @@ enum ATHLTHCompetitionLapVerification: String, Codable, CaseIterable, Identifiab
     }
 }
 
-struct ATHLTHCompetitionRaceRules: Codable, Equatable {
+struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     var discipline: ATHLTHCompetitionDiscipline = .workout
     var sprintMode: ATHLTHCompetitionSprintMode = .massStart
     var sprintTarget: ATHLTHCompetitionSprintTarget = .distance
@@ -77,7 +77,7 @@ struct ATHLTHCompetitionRaceRules: Codable, Equatable {
     var lapCount: Int = 3
     /// A lap can be used without knowing its length. All athletes must run
     /// the same course. It does not imply a measured distance.
-    var lapVerification: ATHLTHCompetitionLapVerification = .gps
+    var lapVerification: ATHLTHCompetitionLapVerification = .supervised
     var lapCourseName: String = ""
     var lapCourseLatitude: Double? = nil
     var lapCourseLongitude: Double? = nil
