@@ -103,6 +103,18 @@ enum ATHLTHCompetitionEnvironment: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum ATHLTHCompetitionUnansweredPolicy: String, Codable, CaseIterable, Identifiable {
+    case cancel, `continue`, replace
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .cancel: return "Avlys når svarfristen utløper"
+        case .continue: return "Start uten dem som ikke har godtatt"
+        case .replace: return "Gi mer tid til å finne en erstatter"
+        }
+    }
+}
+
 struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var startsAt: Date? = nil
     var startMode: ATHLTHCompetitionStartMode = .manual
@@ -111,6 +123,9 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var meetingLat: Double? = nil
     var meetingLon: Double? = nil
     var coachExerciseIDs: [UUID] = []
+    var invitationDays: Int = 3
+    var unansweredPolicy: ATHLTHCompetitionUnansweredPolicy = .cancel
+    var allowFeedPost: Bool = true
     var unlock: ATHLTHCompetitionUnlock = .interval
     var every: Int = 7
     var unit: ATHLTHCompetitionIntervalUnit = .day
@@ -130,6 +145,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
              (meetingLat.map { (-90...90).contains($0) } == true &&
               meetingLon.map { (-180...180).contains($0) } == true))
         return validStart && validVenue &&
+            (1...30).contains(invitationDays) &&
             coachExerciseIDs.count <= 12 &&
             Set(coachExerciseIDs).count == coachExerciseIDs.count &&
             (startMode != .scheduled || startsAt != nil) &&
@@ -151,7 +167,8 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     init() {}
     private enum CodingKeys: String, CodingKey {
         case startsAt, startMode, environment, meetingPlace, meetingLat,
-             meetingLon, coachExerciseIDs, unlock, every, unit, completionHours,
+             meetingLon, coachExerciseIDs, invitationDays, unansweredPolicy,
+             allowFeedPost, unlock, every, unit, completionHours,
              invitationPermission, joinApproval, agreement
     }
     init(from decoder: Decoder) throws {
@@ -167,6 +184,13 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
         meetingLon = try c.decodeIfPresent(Double.self, forKey: .meetingLon)
         coachExerciseIDs = try c.decodeIfPresent([UUID].self,
                                                   forKey: .coachExerciseIDs) ?? []
+        invitationDays = try c.decodeIfPresent(Int.self,
+                            forKey: .invitationDays) ?? 3
+        unansweredPolicy = try c.decodeIfPresent(
+            ATHLTHCompetitionUnansweredPolicy.self,
+            forKey: .unansweredPolicy) ?? .cancel
+        allowFeedPost = try c.decodeIfPresent(Bool.self,
+                        forKey: .allowFeedPost) ?? true
         unlock = try c.decodeIfPresent(ATHLTHCompetitionUnlock.self,
                                        forKey: .unlock) ?? .interval
         every = try c.decodeIfPresent(Int.self, forKey: .every) ?? 7
