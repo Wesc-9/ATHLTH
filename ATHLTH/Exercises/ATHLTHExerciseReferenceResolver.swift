@@ -526,7 +526,17 @@ enum ATHLTHExerciseReferenceResolver {
         // whose creator has explicitly enabled sharing.
         copy.exerciseSnapshot = nil
         if let found = resolve(block, in: library) {
-            copy.exerciseID = found.id
+            // Public catalog UUIDs are installation-independent only when
+            // the receiving catalog uses the same revision. Export the stable
+            // source slug instead, so another account can resolve it safely.
+            // Custom exercises retain their explicit creator identity.
+            if found.source == .custom {
+                copy.exerciseID = found.id
+            } else if found.sourceIdentifier != nil {
+                copy.exerciseID = nil
+            } else {
+                copy.exerciseID = found.id
+            }
             if let sourceID = found.sourceIdentifier {
                 copy.exerciseSlug = sourceID
             }
