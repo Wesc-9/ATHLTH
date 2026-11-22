@@ -111,7 +111,8 @@ enum ATHLTHPlannedWorkoutCaptureRoute: Equatable {
         // instructions. Current measured run/Watch transfers cannot
         // promise to execute them in sequence. Keep the whole recipe in
         // the existing block-based iPhone player, not a truncated export.
-        let hasInstructionSteps = workout.resolvedWorkoutBlocks.contains {
+        let recipe = ATHLTHUniversalWorkoutExecutionRecipe(workout: workout)
+        let hasInstructionSteps = recipe.blocks.contains {
             $0.kind == .note
         }
 
