@@ -64,6 +64,7 @@ struct WorkoutStartOptionsView: View {
     @State private var startType: ATHLTHQuickStartType = .free
     @State private var chosenStrengthTemplate: PlannedSession?
     @State private var showingStrengthWorkoutLibrary = false
+    @State private var showingCompetition = false
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var showOnIPad = false
     @StateObject private var registeredIPad = ATHLTHRegisteredIPadAvailability()
@@ -178,7 +179,7 @@ struct WorkoutStartOptionsView: View {
                         activity: .strength,
                         advanced: trackingMode == .advanced,
                         selection: Binding(
-                            get: { startType },
+                            get: { showingCompetition ? .competition : startType },
                             set: { _ in }
                         )
                     ) { type in
@@ -191,6 +192,8 @@ struct WorkoutStartOptionsView: View {
                         case .exercises:
                             startType = .exercises
                             chosenStrengthTemplate = nil
+                        case .competition:
+                            showingCompetition = true
                         case .route:
                             break
                         }
@@ -314,6 +317,12 @@ struct WorkoutStartOptionsView: View {
 
                 await registeredIPad.refresh(for: appSession.profile.userID)
                 await exerciseLibrary.refresh()
+            }
+            .sheet(isPresented: $showingCompetition) {
+                ATHLTHCompetitionCreationView(
+                    initialActivity: .strength,
+                    advanced: trackingMode == .advanced
+                )
             }
             .sheet(isPresented: $showingStrengthWorkoutLibrary) {
                 NavigationStack {
