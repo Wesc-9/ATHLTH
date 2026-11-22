@@ -720,19 +720,39 @@ extension RunQuickStartConfiguration {
             exercises: [],
             notes: nil
         )
-        // Preserve the same source recipe when Quick Run is relayed
-        // through iPad or shared with training partners.
+        // Train Together payloads go to other athletes. If the chosen
+        // built-in workout has an account-local, same-title private preset,
+        // send the immutable public recipe, not that person's 14 km/h pace,
+        // private notes, Audio Coach or per-step Spotify choices. The
+        // athlete's local launch configuration remains completely intact.
+        let isPrivateLibraryPreset: Bool = {
+            guard let workout, !workout.isBuiltIn,
+                  let sourceID = workout.sharedSourceWorkoutID,
+                  let source = RunningWorkoutLibraryStore.builtInTemplates
+                    .first(where: { $0.id == sourceID }) else { return false }
+            return ATHLTHWorkoutSearch.normalized(workout.title) ==
+                ATHLTHWorkoutSearch.normalized(source.title)
+        }()
+        let sharableRunningWorkout: RunningWorkoutTemplate? = {
+            guard let workout else { return nil }
+            guard isPrivateLibraryPreset,
+                  let sourceID = workout.sharedSourceWorkoutID,
+                  let source = RunningWorkoutLibraryStore.builtInTemplates
+                    .first(where: { $0.id == sourceID })
+            else { return workout }
+            return ATHLTHRunningLibraryDefaults.unpersonalized(source)
+        }()
         if let advancedWorkout {
             snapshot.workoutBlocks = advancedWorkout.resolvedWorkoutBlocks
             snapshot.workoutCategory = advancedWorkout.workoutCategory
             snapshot.durationMinutes = advancedWorkout.durationMinutes
             snapshot.routeID = advancedWorkout.routeID
         } else {
-            snapshot.runningWorkout = workout
-            snapshot.runningWorkouts = workout.map { [$0] }
+            snapshot.runningWorkout = sharableRunningWorkout
+            snapshot.runningWorkouts = sharableRunningWorkout.map { [$0] }
         }
         snapshot.audioCoachConfiguration =
-            audioCoach
+            isPrivateLibraryPreset ? nil : audioCoach
         snapshot.autoPauseEnabled =
             autoPauseEnabled
         snapshot.routeAlertConfiguration =
