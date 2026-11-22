@@ -919,11 +919,11 @@ final class ExerciseLibraryStore: ObservableObject {
                 !Self.isRetiredNativeDuplicate($0)
             }
         } else {
-            var repDBCounts: [String: Int] = [:]
-            for entry in repDBExercises {
-                repDBCounts[Self.exactPublicExerciseKey(entry), default: 0] += 1
-            }
-            resolved = allExercises.filter { entry in
+            // Use the same reviewed equivalence rule as workout resolution.
+            // A hidden native exercise must never resolve to itself when a
+            // unique, selectable RepDB equivalent exists.
+            let completeLibrary = allExercises
+            resolved = completeLibrary.filter { entry in
                 guard !Self.isRetiredNativeDuplicate(entry) else {
                     return false
                 }
@@ -931,22 +931,15 @@ final class ExerciseLibraryStore: ObservableObject {
                     return true
                 }
                 guard let slug = entry.sourceIdentifier else { return false }
-                // A reviewed RepDB bench press replaces the older native
-                // search result even if equipment metadata differs by source.
-                // Keep the historical native record in allExercises for plans.
-                if slug == "athlth-native-bench-press" &&
-                    repDBExercises.contains(where: {
-                        $0.sourceIdentifier == "bench-press" ||
-                        ATHLTHExerciseReferenceResolver.key($0.canonicalName) == "bench press"
-                    }) {
-                    return false
-                }
                 if Self.featuredNativeExerciseSlugs.contains(slug) {
                     return true
                 }
-                return (Self.referencedNativeExerciseSlugs.contains(slug) ||
-                    Self.referencedFallbackExerciseSlugs.contains(slug)) &&
-                    repDBCounts[Self.exactPublicExerciseKey(entry)] != 1
+                guard Self.referencedNativeExerciseSlugs.contains(slug) ||
+                      Self.referencedFallbackExerciseSlugs.contains(slug)
+                else { return false }
+                return ATHLTHExerciseReferenceResolver.visibleEquivalent(
+                    of: entry, in: completeLibrary
+                ).id == entry.id
             }
         }
         cachedSelectableExercises = resolved
