@@ -9,15 +9,81 @@ enum ATHLTHLibraryWorkoutStartChoice: String, CaseIterable {
     case adjustOnce
 }
 
+/// Pure conversion policy shared by the saved private settings editor and
+/// the one-time launch editor. Examples are placeholders, not recommended pace.
+enum ATHLTHPersonalWorkoutPaceUnit: String, CaseIterable {
+    case kilometersPerHour
+    case minutesPerKilometer
+}
+
 enum ATHLTHPersonalWorkoutSpeedPolicy {
-    /// Keep warm-up, active recovery and cool-down unchanged. This is based
-    /// on canonical phase/kind, not translated titles such as "4x4".
+    /// Only actual running efforts in the main workout are changed. Existing
+    /// warm-up, cool-down and active recovery targets remain intact.
     static func workIndices(in blocks: [WorkoutTemplateBlock]) -> [Int] {
         blocks.indices.filter {
             let block = blocks[$0]
             return block.kind == .run &&
                 block.resolvedPhase == .main &&
                 !block.isRestOrActiveRecovery
+        }
+    }
+
+    /// Athlete-entered 5:00 or 5.00 both mean five minutes per kilometre.
+    /// Decimal speed accepts both comma and period (e.g. 12,5 km/t).
+    static func kilometersPerHour(
+        input: String,
+        unit: ATHLTHPersonalWorkoutPaceUnit
+    ) -> Double? {
+        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        switch unit {
+        case .kilometersPerHour:
+            let normalized = value.replacingOccurrences(of: ",", with: ".")
+            guard let speed = Double(normalized), speed.isFinite,
+                  (2...30).contains(speed)
+            else { return nil }
+            return speed
+        case .minutesPerKilometer:
+            let normalized = value
+                .replacingOccurrences(of: ",", with: ":")
+                .replacingOccurrences(of: ".", with: ":")
+            let fields = normalized.split(
+                separator: ":", omittingEmptySubsequences: false
+            )
+            guard (1...2).contains(fields.count),
+                  let minutes = Int(fields[0]), minutes >= 0
+            else { return nil }
+            let seconds: Int
+            if fields.count == 2 {
+                // Require two digits so "5.3" cannot silently mean 5:03
+                // when an athlete intended a different pace.
+                guard fields[1].count == 2,
+                      let parsed = Int(fields[1]), (0...59).contains(parsed)
+                else { return nil }
+                seconds = parsed
+            } else {
+                seconds = 0
+            }
+            let total = Double(minutes * 60 + seconds)
+            guard (120...1800).contains(total) else { return nil }
+            return 3600 / total
+        }
+    }
+
+    static func display(
+        kilometersPerHour speed: Double,
+        unit: ATHLTHPersonalWorkoutPaceUnit
+    ) -> String {
+        guard speed.isFinite, speed > 0 else { return "" }
+        switch unit {
+        case .kilometersPerHour:
+            var result = String(format: "%.2f", speed)
+            while result.last == "0" { result.removeLast() }
+            if result.last == "." { result.removeLast() }
+            return result
+        case .minutesPerKilometer:
+            let seconds = Int((3600 / speed).rounded())
+            return String(format: "%d:%02d", seconds / 60, seconds % 60)
         }
     }
 
@@ -36,22 +102,23 @@ enum ATHLTHPersonalWorkoutSpeedPolicy {
     }
 }
 
-/// One deliberate edit, no keystroke-driven recalculation of the timeline.
+/// The same editor is used when saving private workout preferences and when
+/// changing an individual launch. Editing text affects only this small view;
+/// the larger timeline is updated once after tapping Apply.
 struct ATHLTHWorkoutWorkSpeedEditor: View {
     let blocks: [WorkoutTemplateBlock]
     let onApply: ([WorkoutTemplateBlock]) -> Void
-    @State private var speedText = ""
+    @State private var inputText = ""
+    @State private var unit: ATHLTHPersonalWorkoutPaceUnit = .kilometersPerHour
 
     private var indices: [Int] {
         ATHLTHPersonalWorkoutSpeedPolicy.workIndices(in: blocks)
     }
 
-    private var speed: Double? {
-        let normalized = speedText.replacingOccurrences(of: ",", with: ".")
-        guard let value = Double(normalized),
-              value.isFinite, (2...30).contains(value)
-        else { return nil }
-        return value
+    private var selectedSpeed: Double? {
+        ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+            input: inputText, unit: unit
+        )
     }
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -60,58 +127,101 @@ struct ATHLTHWorkoutWorkSpeedEditor: View {
 
     var body: some View {
         if !indices.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 11) {
                 Label(
-                    tr("Same speed for every work interval",
-                       "Samme fart på alle drag"),
+                    tr("Your target pace for work intervals",
+                       "Din målfart på arbeidsdragene"),
                     systemImage: "speedometer"
                 )
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
 
+                Picker(
+                    tr("Pace unit", "Fartenhet"), selection: $unit
+                ) {
+                    Text("km/t").tag(ATHLTHPersonalWorkoutPaceUnit.kilometersPerHour)
+                    Text("min/km").tag(ATHLTHPersonalWorkoutPaceUnit.minutesPerKilometer)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("athlth-personal-pace-unit")
+
                 HStack(spacing: 10) {
-                    TextField(tr("e.g. 14", "f.eks. 14"), text: $speedText)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 96)
-                        .textFieldStyle(.roundedBorder)
-                        .accessibilityIdentifier("athlth-personal-work-speed")
-                    Text("km/t")
+                    TextField(
+                        unit == .kilometersPerHour
+                            ? tr("Your speed", "Din fart")
+                            : tr("e.g. 5:00", "f.eks. 5:00"),
+                        text: $inputText
+                    )
+                    .keyboardType(unit == .kilometersPerHour ? .decimalPad : .numbersAndPunctuation)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 120)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("athlth-personal-work-speed")
+
+                    Text(unit == .kilometersPerHour ? "km/t" : "min/km")
+                        .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     Spacer(minLength: 0)
                     Button(tr("Apply to all", "Bruk på alle")) {
-                        guard let speed else { return }
+                        guard let speed = selectedSpeed else { return }
                         onApply(ATHLTHPersonalWorkoutSpeedPolicy.applying(
                             kilometersPerHour: speed, to: blocks
                         ))
                     }
-                    .disabled(speed == nil)
+                    .disabled(selectedSpeed == nil)
                     .buttonStyle(.bordered)
                     .tint(ATHLTHPlanDesign.accentInk)
                 }
 
+                if let speed = selectedSpeed {
+                    Text(
+                        ATHLTHPersonalWorkoutSpeedPolicy.display(
+                            kilometersPerHour: speed, unit: .kilometersPerHour
+                        ) + " km/t · " +
+                        ATHLTHPersonalWorkoutSpeedPolicy.display(
+                            kilometersPerHour: speed, unit: .minutesPerKilometer
+                        ) + " min/km"
+                    )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .accessibilityIdentifier("athlth-personal-pace-conversion")
+                }
+
                 Text(tr(
-                    "Updates \(indices.count) work intervals only. Warm-up, rests and cool-down stay unchanged.",
-                    "Endrer bare \(indices.count) drag. Oppvarming, pauser og nedjogging beholdes."
+                    "You choose the speed. Applies to \(indices.count) work intervals only; edit each interval individually above. Warm-up, rests and cool-down are unchanged.",
+                    "Du bestemmer farten. Gjelder bare \(indices.count) arbeidsdrag; du kan også justere hvert drag separat over. Oppvarming, pauser og nedjogging endres ikke."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
             .padding(15)
             .athlthPlanCard(radius: 19)
+            .onChange(of: unit) { previous, current in
+                // Preserve the athlete's typed value when switching units.
+                if let speed = ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+                    input: inputText, unit: previous
+                ) {
+                    inputText = ATHLTHPersonalWorkoutSpeedPolicy.display(
+                        kilometersPerHour: speed, unit: current
+                    )
+                } else {
+                    inputText = ""
+                }
+            }
             .onAppear {
-                guard speedText.isEmpty, let first = indices.first,
+                guard inputText.isEmpty, let first = indices.first,
                       let pace = blocks[first].targetPaceSecondsPerKilometer,
                       pace.isFinite, pace > 0
                 else { return }
-                let common = indices.allSatisfy {
-                    guard let candidate = blocks[$0].targetPaceSecondsPerKilometer
+                let samePaceForAll = indices.allSatisfy {
+                    guard let other = blocks[$0].targetPaceSecondsPerKilometer
                     else { return false }
-                    return abs(candidate - pace) < 0.02
+                    return abs(other - pace) < 0.02
                 }
-                if common {
-                    speedText = String(format: "%.1f", 3600 / pace)
-                        .replacingOccurrences(of: ".0", with: "")
+                if samePaceForAll {
+                    inputText = ATHLTHPersonalWorkoutSpeedPolicy.display(
+                        kilometersPerHour: 3600 / pace, unit: unit
+                    )
                 }
             }
         }
