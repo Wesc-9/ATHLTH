@@ -54,26 +54,12 @@ enum ATHLTHWorkoutExerciseBinding {
                         $0.exercise.sharedSourceExerciseID == id
                     })
             } else if exercise.embeddedExercise.instructions.isEmpty {
-                // An AI/legacy textual suggestion has no authored technique.
-                // Only exact, curated public catalog names can be resolved.
-                let name = exercise.embeddedExercise.name
-                let key = ATHLTHExerciseReferenceResolver.key(name)
-                let reviewedIdentifier =
-                    ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(for: name)
-                let reviewed = library.filter {
-                    guard let reviewedIdentifier else { return false }
-                    let source: ExerciseLibrarySource =
-                        reviewedIdentifier.hasPrefix("athlth-native-")
-                        ? .athlthCatalog : .repDB
-                    return $0.source == source &&
-                        $0.sourceIdentifier == reviewedIdentifier
-                }
-                let exact = library.filter {
-                    ($0.source == .athlthCatalog || $0.source == .repDB) &&
-                    ATHLTHExerciseReferenceResolver.key($0.canonicalName) == key
-                }
-                match = reviewed.count == 1 ? reviewed[0] :
-                    exact.count == 1 ? exact[0] : nil
+                // Older plans store a separate PlannedExercise instead of a
+                // canonical block. Resolve using the same exact/curated rules
+                // as the workout timeline, including reviewed Norwegian names.
+                match = ATHLTHExerciseReferenceResolver.resolvePublicName(
+                    exercise.embeddedExercise.name, in: library
+                )
             }
             guard let match else {
                 report.unresolved.append(exercise.embeddedExercise.name)
