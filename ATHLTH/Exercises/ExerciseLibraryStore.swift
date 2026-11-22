@@ -188,7 +188,8 @@ final class ExerciseLibraryStore: ObservableObject {
     @Published private(set) var athlthCatalogExercises:
         [ExerciseLibraryEntry] =
             ExerciseLibraryStore.nativeATHLTHExercises +
-            ExerciseLibraryStore.fallbackATHLTHExercises
+            ExerciseLibraryStore.fallbackATHLTHExercises +
+            ExerciseLibraryStore.historicalCoreExercises
     @Published private(set) var repDBExercises: [ExerciseLibraryEntry] = []
     @Published private(set) var repDBExpectedCount: Int?
     @Published private(set) var customExercises: [ExerciseLibraryEntry] = []
@@ -1882,6 +1883,32 @@ final class ExerciseLibraryStore: ObservableObject {
         Dictionary(uniqueKeysWithValues: nativeSeeds.map {
             ("athlth-native-" + $0.slug, [$0.norwegianInstruction])
         })
+
+    /// Restore legacy identities solely for old plans and workout history.
+    /// They remain excluded by isRetiredOriginalCoreSlug from every picker;
+    /// no extra visible duplicate exercise is introduced for new users.
+    private static var historicalCoreExercises: [ExerciseLibraryEntry] {
+        originalCoreSlugs.map { slug in
+            let name = slug.replacingOccurrences(of: "athlth-core-", with: "")
+                .split(separator: "-").map { $0.capitalized }.joined(separator: " ")
+            let id = stableUUID(for: "athlth-core:" +
+                slug.replacingOccurrences(of: "athlth-core-", with: ""))
+            let instructions = norwegianCoreInstructions[slug] ?? []
+            let exercise = Exercise(
+                id: id, origin: .publicCatalog, ownerID: nil,
+                name: name, instructions: instructions,
+                primaryMuscles: ["Core"], secondaryMuscles: [],
+                equipment: ["Bodyweight"], imageURL: nil,
+                isVisibleOutsideOwnerLibrary: false
+            )
+            return ExerciseLibraryEntry(
+                id: id, exercise: exercise, source: .athlthCatalog,
+                sourceIdentifier: slug, summary: instructions.joined(separator: " "),
+                tips: [], category: "core", difficulty: "All levels",
+                bodyPart: "Core", imageStartURL: nil, imagePeakURL: nil
+            )
+        }
+    }
 
     private static var nativeATHLTHExercises: [ExerciseLibraryEntry] {
         nativeSeeds.map { seed in

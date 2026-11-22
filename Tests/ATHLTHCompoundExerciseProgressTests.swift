@@ -43,6 +43,11 @@ final class ATHLTHCompoundExerciseProgressTests: XCTestCase {
 
     func testCompletedNestedFourByFourIsAttributedByActualProtocol() throws {
         let expected = try exercise()
+        XCTAssertEqual(expected.blocks.filter { $0.kind == .run }.count, 4,
+                       "Expected four real running efforts: \(expected.blocks)")
+        XCTAssertEqual(expected.blocks.filter { $0.isRestOrActiveRecovery }.count, 3,
+                       "Expected three real recoveries: \(expected.blocks)")
+        XCTAssertEqual(ATHLTHCompoundExerciseCatalog.fourByFourRecovery(expected.blocks), 120)
         var steps = recorded()
         let before = ATHLTHRecordedRunningStep(
             index: -1, title: "Other work", phase: "main",

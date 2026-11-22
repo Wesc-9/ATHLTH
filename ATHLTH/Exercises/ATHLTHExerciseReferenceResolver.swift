@@ -427,6 +427,17 @@ enum ATHLTHExerciseReferenceResolver {
             }
             if reviewed.count == 1 { return reviewed[0] }
         }
+        if source.sourceIdentifier == "athlth-native-hollow-body-hold" {
+            // The retired native duplicate remains addressable by its UUID
+            // in historical records. New plans should resolve its reviewed
+            // licensed RepDB counterpart rather than a hidden catalog tile.
+            let reviewed = library.filter { entry in
+                entry.source == .repDB &&
+                    (entry.sourceIdentifier == "hollow-body-hold" ||
+                     key(entry.canonicalName) == "hollow body hold")
+            }
+            if reviewed.count == 1 { return reviewed[0] }
+        }
         if source.sourceIdentifier == "athlth-native-bench-press" {
             // The licensed RepDB bench press can describe its equipment
             // differently from the historical native record. Match the

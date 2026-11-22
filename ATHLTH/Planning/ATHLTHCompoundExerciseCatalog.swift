@@ -239,9 +239,12 @@ enum ATHLTHCompoundExerciseCatalog {
         }
         // Presets omitted from complete sessions (e.g. the alternative
         // 3-minute recovery in 4×4) must also be selectable as exercises.
+        // B400 IDs are owned by ATHLTHZonedPlanLibrary's published workouts.
+        // Using them here gave two distinct compound exercises the same
+        // source workout ID and made published main phases look duplicated.
         for preset in ATHLTHRunningExercisePreset.allCases {
             let sourceID = UUID(uuidString: String(
-                format: "B4000000-0000-0000-0000-%012d",
+                format: "B4100000-0000-0000-0000-%012d",
                 (ATHLTHRunningExercisePreset.allCases.firstIndex(of: preset) ?? 0) + 1
             ))!
             let category: ATHLTHCompoundExercise.Category? =
