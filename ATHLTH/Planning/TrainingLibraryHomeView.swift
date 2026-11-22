@@ -4452,8 +4452,7 @@ struct MyTrainingPlansLibraryView: View {
                     visibleLimit += ATHLTHLibraryPagination.pageSize
                 }
 
-                if displayedTemplates.isEmpty &&
-                    displayedPlans.isEmpty {
+                if templates.isEmpty && scheduled.isEmpty {
                     ContentUnavailableView {
                         Label(
                             ATHLTHLocalization.choose(
