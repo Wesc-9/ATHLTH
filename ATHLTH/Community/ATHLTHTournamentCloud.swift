@@ -772,6 +772,13 @@ struct ATHLTHTournamentCloudService {
         ).execute()
     }
 
+    func finishReplacement(tournamentID: UUID) async throws {
+        try await client.rpc(
+            "athlth_tournament_finish_replacement",
+            params: ATHLTHTournamentIDParams(p_tournament: tournamentID)
+        ).execute()
+    }
+
     func publishCompletedToFeed(tournamentID: UUID) async throws {
         try await client.rpc(
             "athlth_tournament_publish_feed",
