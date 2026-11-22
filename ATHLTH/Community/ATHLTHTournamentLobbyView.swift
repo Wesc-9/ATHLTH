@@ -28,6 +28,7 @@ struct ATHLTHTournamentLobbyView: View {
     let entries: [ATHLTHTournamentRemoteEntry]
     let names: [UUID: String]
     let matches: [ATHLTHTournamentRemoteMatch]
+    var openChatInitially = false
     let onChange: @MainActor () async -> Void
 
     @State private var tab: ATHLTHTournamentLobbyTab = .rules
@@ -126,7 +127,10 @@ struct ATHLTHTournamentLobbyView: View {
                 }
             }
         }
-        .task(id: tournament.id) { await reload() }
+        .task(id: tournament.id) {
+            if openChatInitially { tab = .chat }
+            await reload()
+        }
         .task(id: exerciseQuery) {
             guard canSuggest && exerciseQuery.trimmingCharacters(
                 in: .whitespacesAndNewlines).count >= 2 else {
