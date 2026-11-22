@@ -4330,8 +4330,38 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    /// Route Watch controls through the same pure lifecycle policy as the
+    /// iPhone engines. HealthKit and the Watch remain the sole capture owner.
+    /// Restored legacy HealthKit sessions without an ATHLTH UUID keep their
+    /// pre-existing local controls rather than becoming impossible to end.
+    private func allowsSharedWorkoutTransition(
+        _ command: ATHLTHWorkoutLifecycleCommand,
+        stageIndex: Int? = nil,
+        stageCount: Int? = nil
+    ) -> Bool {
+        guard let originalID = universalWorkoutID else { return true }
+        let phase: ATHLTHWorkoutLifecyclePhase
+        switch state {
+        case .running: phase = .work
+        case .paused: phase = .paused
+        default: return false
+        }
+        return ATHLTHWorkoutLifecyclePolicy.nextPhase(
+            for: command,
+            workoutID: originalID,
+            expectedWorkoutID: originalID,
+            source: .watchRecorder,
+            recordingOwner: .appleWatch,
+            phase: phase,
+            requestingOwner: .appleWatch,
+            stageIndex: stageIndex,
+            stageCount: stageCount
+        ) != nil
+    }
+
     func pause() {
-        guard state == .running else { return }
+        guard state == .running,
+              allowsSharedWorkoutTransition(.pause) else { return }
         // A paused HealthKit recording must also freeze the current hybrid
         // treadmill interval. Journal the exact Watch event for offline replay.
         if strengthSession?.isEmbeddedRunningInterval == true,
@@ -4347,7 +4377,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func resume() {
-        guard state == .paused else { return }
+        guard state == .paused,
+              allowsSharedWorkoutTransition(.resume) else { return }
         // Resume the existing countdown, never start a new set or HKWorkout.
         if strengthSession?.isEmbeddedRunningInterval == true,
            let countdown = strengthSession?.timedSetCountdown,
@@ -4368,6 +4399,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // existing session delegate and live workout builder.
         guard isActive, state != .ending, !finishing,
               let session = workoutSession else { return }
+        // Preserve existing pre-start cancellation; running/paused sessions
+        // must pass the shared lifecycle rule before the original HK end.
+        if state == .running || state == .paused {
+            guard allowsSharedWorkoutTransition(.finish) else { return }
+        }
         publishState(.ending)
         session.end()
     }
@@ -5835,6 +5871,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func advanceStructuredRunningWorkout(manually: Bool = false) {
         guard let workout = structuredRunningWorkout else {
             return
+        }
+        // The final stage may complete without moving the cursor. A real
+        // next-stage transition uses the same bounds as the iPhone player.
+        if workout.steps.indices.contains(structuredStepIndex + 1) {
+            guard state == .running,
+                  allowsSharedWorkoutTransition(
+                      .advance, stageIndex: structuredStepIndex,
+                      stageCount: workout.steps.count
+                  ) else { return }
         }
 
         let finishedIndex = structuredStepIndex
@@ -9587,7 +9632,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               automaticPauseEnabled,
               !manualPauseActive,
               !automaticPauseActive,
-              state == .running
+              state == .running,
+              allowsSharedWorkoutTransition(.pause)
         else {
             return
         }
@@ -9608,6 +9654,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        // An auto-pause callback may precede the HealthKit state update.
+        // Check the shared rule when paused; retain the queued HK resume
+        // if the delegate has not yet published its .paused state.
+        if state == .paused {
+            guard allowsSharedWorkoutTransition(.resume) else { return }
+        }
         automaticPauseActive = false
         autoPauseDetector.reset(
             enabled: automaticPauseEnabled

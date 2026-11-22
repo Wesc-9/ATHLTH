@@ -34,17 +34,12 @@ struct ATHLTHUniversalActiveCaptureState: Equatable {
 /// One set of lifecycle commands across the existing workout recorders.
 /// A command authorizes a change to an ORIGINAL owner-owned workout; this
 /// reducer never starts HealthKit, creates a new ID, or saves a second journal.
-enum ATHLTHUniversalWorkoutCommand: String, Codable, Hashable {
-    case pause
-    case resume
-    case finish
-    case advance
-}
+// Keep call-site compatibility while both applications use one command type.
+typealias ATHLTHUniversalWorkoutCommand = ATHLTHWorkoutLifecycleCommand
 
 enum ATHLTHUniversalWorkoutLifecycle {
-    /// All recorder adapters must validate the same original identity and
-    /// original device owner before mutating their own persisted checkpoint.
-    /// A Watch mirror is read-only, even if an iPhone view is displaying it.
+    /// Translate the original iPhone capture projection into the one policy
+    /// that is also compiled into WatchWorkoutManager.
     static func nextPhase(
         for command: ATHLTHUniversalWorkoutCommand,
         workoutID: UUID,
@@ -56,29 +51,30 @@ enum ATHLTHUniversalWorkoutLifecycle {
         stageIndex: Int? = nil,
         stageCount: Int? = nil
     ) -> ATHLTHWorkoutSessionPhase? {
-        guard workoutID == expectedWorkoutID,
-              source != .watchMirror,
-              recordingOwner == requestingOwner,
-              phase != .completed else { return nil }
+        guard let sharedSource = ATHLTHWorkoutLifecycleSource(
+                  rawValue: source.rawValue
+              ),
+              let sharedOwner = ATHLTHWorkoutLifecycleOwner(
+                  rawValue: recordingOwner.rawValue
+              ),
+              let caller = ATHLTHWorkoutLifecycleOwner(
+                  rawValue: requestingOwner.rawValue
+              ),
+              let sharedPhase = ATHLTHWorkoutLifecyclePhase(
+                  rawValue: phase.rawValue
+              ) else { return nil }
 
-        switch command {
-        case .pause:
-            guard phase == .work || phase == .recovery else { return nil }
-            return .paused
-        case .resume:
-            guard phase == .paused else { return nil }
-            // The original recorder decides whether it resumes work or rest.
-            // Never manufacture a new interval index or a new HealthKit event.
-            return .work
-        case .finish:
-            return .completed
-        case .advance:
-            guard phase == .work || phase == .recovery,
-                  let stageIndex, let stageCount,
-                  stageCount > 0, stageIndex >= 0,
-                  stageIndex + 1 < stageCount else { return nil }
-            return phase
-        }
+        return ATHLTHWorkoutLifecyclePolicy.nextPhase(
+            for: command,
+            workoutID: workoutID,
+            expectedWorkoutID: expectedWorkoutID,
+            source: sharedSource,
+            recordingOwner: sharedOwner,
+            phase: sharedPhase,
+            requestingOwner: caller,
+            stageIndex: stageIndex,
+            stageCount: stageCount
+        ).flatMap { ATHLTHWorkoutSessionPhase(rawValue: $0.rawValue) }
     }
 
     static func permits(

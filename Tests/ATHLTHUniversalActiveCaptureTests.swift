@@ -1123,4 +1123,85 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         XCTAssertEqual(state.workoutID, id)
         XCTAssertNotNil(state.plannedSessionID)
     }
+
+    func testSharedLifecycleUsesOneDecisionAcrossPhoneAndWatch() {
+        let workoutID = UUID()
+        let phases: [ATHLTHWorkoutLifecyclePhase] = [
+            .work, .recovery, .paused, .completed
+        ]
+        let commands: [ATHLTHWorkoutLifecycleCommand] = [
+            .pause, .resume, .finish, .advance
+        ]
+        for command in commands {
+            for phase in phases {
+                let phone = ATHLTHWorkoutLifecyclePolicy.nextPhase(
+                    for: command, workoutID: workoutID,
+                    expectedWorkoutID: workoutID,
+                    source: .phoneRunWalk, recordingOwner: .iPhone,
+                    phase: phase, stageIndex: 0, stageCount: 3
+                )
+                let watch = ATHLTHWorkoutLifecyclePolicy.nextPhase(
+                    for: command, workoutID: workoutID,
+                    expectedWorkoutID: workoutID,
+                    source: .watchRecorder, recordingOwner: .appleWatch,
+                    phase: phase, requestingOwner: .appleWatch,
+                    stageIndex: 0, stageCount: 3
+                )
+                XCTAssertEqual(phone, watch,
+                    "Phone and Watch must share the \(command) / \(phase) decision")
+            }
+        }
+    }
+
+    func testSharedLifecycleRejectsWatchMirrorAndUnownedCommands() {
+        let workoutID = UUID()
+        for command in [
+            ATHLTHWorkoutLifecycleCommand.pause, .resume, .finish, .advance
+        ] {
+            XCTAssertNil(ATHLTHWorkoutLifecyclePolicy.nextPhase(
+                for: command, workoutID: workoutID,
+                expectedWorkoutID: workoutID,
+                source: .watchMirror, recordingOwner: .appleWatch,
+                phase: .work, requestingOwner: .appleWatch,
+                stageIndex: 0, stageCount: 2
+            ))
+            XCTAssertNil(ATHLTHWorkoutLifecyclePolicy.nextPhase(
+                for: command, workoutID: workoutID,
+                expectedWorkoutID: workoutID,
+                source: .watchRecorder, recordingOwner: .appleWatch,
+                phase: .work, requestingOwner: .iPhone,
+                stageIndex: 0, stageCount: 2
+            ))
+            XCTAssertNil(ATHLTHWorkoutLifecyclePolicy.nextPhase(
+                for: command, workoutID: workoutID,
+                expectedWorkoutID: UUID(),
+                source: .watchRecorder, recordingOwner: .appleWatch,
+                phase: .work, requestingOwner: .appleWatch,
+                stageIndex: 0, stageCount: 2
+            ))
+        }
+    }
+
+    func testAppAdapterAndSharedLifecycleMatchOriginalSemantics() {
+        let id = UUID()
+        for phase in [ATHLTHWorkoutLifecyclePhase.work, .recovery, .paused, .completed] {
+            for command in [
+                ATHLTHWorkoutLifecycleCommand.pause, .resume,
+                .finish, .advance
+            ] {
+                let shared = ATHLTHWorkoutLifecyclePolicy.nextPhase(
+                    for: command, workoutID: id, expectedWorkoutID: id,
+                    source: .structuredTimer, recordingOwner: .iPhone,
+                    phase: phase, stageIndex: 1, stageCount: 3
+                )
+                let adapted = ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                    for: command, workoutID: id, expectedWorkoutID: id,
+                    source: .structuredTimer, recordingOwner: .iPhone,
+                    phase: ATHLTHWorkoutSessionPhase(rawValue: phase.rawValue)!,
+                    stageIndex: 1, stageCount: 3
+                )
+                XCTAssertEqual(adapted?.rawValue, shared?.rawValue)
+            }
+        }
+    }
 }
