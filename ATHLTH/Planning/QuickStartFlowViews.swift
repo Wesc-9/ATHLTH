@@ -1525,6 +1525,7 @@ struct ATHLTHRouteQuickTrainSheet: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
 
     let route: TrainingRoute
 
@@ -1573,7 +1574,8 @@ struct ATHLTHRouteQuickTrainSheet: View {
                 phoneWorkout: phoneWorkout,
                 watchConnection: watchConnection,
                 spotify: spotify,
-                ghostRace: ghostRace
+                ghostRace: ghostRace,
+                workoutMirroring: workoutMirroring
             )
             if needsLobby { _ = await social.confirmCurrentJoinedWorkoutStarted() }
             return nil
@@ -1601,7 +1603,8 @@ struct ATHLTHWalkingRouteQuickTrainSheet: View {
         WalkQuickStartSheet(
             trainingDeviceProvider: watchConnection.isReady ? .appleWatch : .none,
             watchConnected: watchConnection.isReady,
-            initialRoute: route
+            initialRoute: route,
+            forceBasicSetup: true
         ) { configuration in
             let needsLobby = !configuration.friends.isEmpty
             if needsLobby {
@@ -3739,6 +3742,8 @@ struct WalkQuickStartSheet: View {
     var plannedSession: PlannedSession? = nil
     /// Explicit route from the Train route picker (may not be saved locally).
     var initialRoute: TrainingRoute? = nil
+    /// Route picker begins with Basic, without changing the saved preference.
+    var forceBasicSetup: Bool = false
     let onStart: (WalkQuickStartConfiguration) async -> String?
     @State private var shareThisWorkoutOnIPad = false
     @State private var launchInProgress = false
@@ -3930,7 +3935,7 @@ struct WalkQuickStartSheet: View {
                     selectedFriendIDs = invited
                 }
                 if !didLoadAudioCoachDefaults {
-                    isAdvancedSetup = settings.resolvedAdvancedSetup(for: .walking)
+                    isAdvancedSetup = forceBasicSetup ? false : settings.resolvedAdvancedSetup(for: .walking)
                 }
                 // Scheduled walking workouts retain their planned course
                 // when launched from the calendar or a training plan.

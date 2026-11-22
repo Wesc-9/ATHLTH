@@ -76,6 +76,7 @@ struct WorkoutStartOptionsView: View {
         watchConnected: Bool,
         defaultCapture: WorkoutCapturePreference,
         defaultTracking: StrengthTrackingPreference,
+        initialStartType: ATHLTHQuickStartType? = nil,
         onStart: @escaping (
             PlannedSession,
             WorkoutCaptureDevice,
@@ -102,10 +103,13 @@ struct WorkoutStartOptionsView: View {
             initialValue: session.exercises
         )
         _startType = State(initialValue:
-            session.workoutBlocks?.contains(where: {
-                $0.kind == .exercise
-            }) == true ? .workout :
-            !session.exercises.isEmpty ? .exercises : .free
+            ATHLTHStrengthQuickStartEntryPolicy.initialType(
+                requested: initialStartType,
+                hasStructuredBlocks: session.workoutBlocks?.contains(where: {
+                    $0.kind == .exercise
+                }) == true,
+                hasExercises: !session.exercises.isEmpty
+            )
         )
         _selectedGearIDs = State(initialValue: Set(session.gearIDs ?? []))
         _targetHeartRateZone = State(

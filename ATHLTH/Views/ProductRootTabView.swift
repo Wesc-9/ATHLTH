@@ -5797,6 +5797,7 @@ struct ATHLTHTrainView: View {
     @State private var showingRunQuickStart = false
     @State private var showingWalkQuickStart = false
     @State private var showingStrengthQuickStart = false
+    @State private var quickStrengthStartWithExercises = false
     @State private var showingCustomQuickStart = false
     @State private var customQuickInitialActivity: CustomQuickWorkoutActivity = .hiit
     @State private var isFreeTrainingQuickStart = false
@@ -6277,8 +6278,8 @@ struct ATHLTHTrainView: View {
                 }
             }
             .sheet(
-                isPresented:
-                    $showingStrengthQuickStart
+                isPresented: $showingStrengthQuickStart,
+                onDismiss: { quickStrengthStartWithExercises = false }
             ) {
                 WorkoutStartOptionsView(
                     session:
@@ -6293,7 +6294,8 @@ struct ATHLTHTrainView: View {
                         .automatic,
                     defaultTracking:
                         settings
-                            .defaultStrengthTracking
+                            .defaultStrengthTracking,
+                    initialStartType: quickStrengthStartWithExercises ? .exercises : .free
                 ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
                     // Return the launch failure to the sheet that owns the
                     // unsaved exercise/set configuration. Do not show a global
@@ -9928,12 +9930,14 @@ struct ATHLTHTrainView: View {
         case .freeWalk:
             handleQuickStart(.walking)
         case .freeStrength:
+            quickStrengthStartWithExercises = false
             handleQuickStart(.strength)
         case .strengthLibrary:
             personalLibrarySection = .workouts
         case .runningWorkouts:
             showingTrainRunningWorkoutLibrary = true
         case .strengthExercises:
+            quickStrengthStartWithExercises = true
             handleQuickStart(.strength)
         case .competition(let activity):
             selectedTrainCompetitionActivity = activity
