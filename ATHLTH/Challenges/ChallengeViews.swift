@@ -106,7 +106,7 @@ struct ProfileChallengesSection: View {
             }
         }
         .sheet(isPresented: $showingCreate) {
-            ChallengeCreationView()
+            ATHLTHCompetitionEntryView()
         }
     }
 }
@@ -410,7 +410,7 @@ struct ChallengeHubView: View {
             )
         }
         .sheet(isPresented: $showingCreate) {
-            ChallengeCreationView()
+            ATHLTHCompetitionEntryView()
         }
     }
 
