@@ -414,9 +414,9 @@ jobs:
             # native tabs. A cold-start screenshot of tab 1 cannot detect it.
             echo "Smoke testing Home -> Train tab switch on $DEVICE_NAME"
             set +e
-            HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth \\
-              --athlth-compatibility-preview \\
-              --athlth-compatibility-tab=0 \\
+            HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth \
+              --athlth-compatibility-preview \
+              --athlth-compatibility-tab=0 \
               --athlth-smoke-home-train-hop 2>&1)
             HOP_STATUS=$?
             set -e
