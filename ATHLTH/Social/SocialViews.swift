@@ -1203,7 +1203,6 @@ private struct SocialActivityCard: View {
     let item: SocialFeedItem
 
     @State private var commentText = ""
-    @State private var showingChallenge = false
 
     private var canChallenge: Bool {
         item.actor.userID != social.currentUserID &&
@@ -1327,21 +1326,10 @@ private struct SocialActivityCard: View {
                 .accessibilityLabel("Post comment")
 
                 if canChallenge {
-                    Button {
-                        showingChallenge = true
-                    } label: {
-                        Image(systemName: "trophy.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.orange)
-                            .frame(width: 34, height: 34)
-                            .background(
-                                Color.orange.opacity(0.10),
-                                in: Circle()
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        "Challenge \(item.actor.resolvedName)"
+                    ATHLTHFriendChallengeLauncher(
+                        friend: item.actor,
+                        isAllowed: canChallenge,
+                        style: .feedAction
                     )
                 }
             }
@@ -1351,11 +1339,7 @@ private struct SocialActivityCard: View {
             Color(.secondarySystemGroupedBackground),
             in: RoundedRectangle(cornerRadius: 20)
         )
-        .sheet(isPresented: $showingChallenge) {
-            ATHLTHCompetitionEntryView(
-                preselectedFriend: item.actor
-            )
-        }
+
     }
 
     private var reactionRow: some View {
@@ -1523,7 +1507,6 @@ struct FriendProfileView: View {
 
     @State private var profile: SocialFriendProfile?
     @State private var loading = true
-    @State private var showingChallenge = false
     @State private var showingTrainingEditor = false
     @State private var trainPhysically = true
     @State private var showingReport = false
@@ -1695,13 +1678,6 @@ struct FriendProfileView: View {
         }
         .refreshable {
             await load(force: true)
-        }
-        .sheet(isPresented: $showingChallenge) {
-            if let profile {
-                ATHLTHCompetitionEntryView(
-                    preselectedFriend: profile.card
-                )
-            }
         }
         .sheet(isPresented: $showingTrainingEditor) {
             SessionEditorView(
@@ -2216,29 +2192,17 @@ struct FriendProfileView: View {
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity)
 
-                Button {
-                    if social.mutualFollows.contains(
-                        where: { $0.userID == userID }
-                    ) {
-                        showingChallenge = true
-                    } else {
+                ATHLTHFriendChallengeLauncher(
+                    friend: profile.card,
+                    isAllowed: social.isMutualFollow(userID),
+                    style: .profileAction,
+                    onUnavailable: {
                         followActionError = ATHLTHLocalization.choose(
                             english: "Follow each other before sending a challenge.",
                             norwegian: "Dere må følge hverandre før du kan sende en utfordring."
                         )
                     }
-                } label: {
-                    profileActionLabel(
-                        title: ATHLTHLocalization.choose(
-                            english: "Challenge",
-                            norwegian: "Utfordre"
-                        ),
-                        icon: "trophy",
-                        tint: ATHLTHTheme.accentDeep,
-                        emphasized: false
-                    )
-                }
-                .buttonStyle(.plain)
+                )
                 .frame(maxWidth: .infinity)
 
                 Button {
