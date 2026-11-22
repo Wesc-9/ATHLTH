@@ -9,6 +9,7 @@ struct ATHLTHCoachEditorTarget: Identifiable {
     let ruleID: UUID?
     let isGroup: Bool
     var startAtTrigger: Bool = false
+    var legacyOption: ATHLTHAudioCoachOption? = nil
 
     static func newGroup() -> Self {
         .init(groupID: nil, ruleID: nil, isGroup: true)
@@ -22,6 +23,10 @@ struct ATHLTHCoachEditorTarget: Identifiable {
     }
     static func command(_ id: UUID) -> Self {
         .init(groupID: nil, ruleID: id, isGroup: false)
+    }
+    static func legacy(_ option: ATHLTHAudioCoachOption) -> Self {
+        .init(groupID: nil, ruleID: nil, isGroup: false,
+              startAtTrigger: true, legacyOption: option)
     }
 }
 
@@ -86,18 +91,77 @@ struct ATHLTHCoachRuleComposer: View {
                 (target.groupID != nil || target.ruleID != nil) ? .commands :
                 (target.isGroup ? .name : .trigger))
         _groupName = State(initialValue: group?.name ?? "")
-        _trigger = State(initialValue: group?.trigger ?? original?.trigger ?? .distance)
-        _interval = State(initialValue: group?.interval ?? original?.interval ?? 1_000)
+        _trigger = State(initialValue: group?.trigger ?? original?.trigger ??
+            Self.legacyTrigger(target.legacyOption))
+        _interval = State(initialValue: group?.interval ?? original?.interval ??
+            Self.legacyInterval(target.legacyOption, draft: value))
         _eventSelection = State(initialValue:
             group?.eventSelection ?? original?.eventSelection ?? .every)
         _allowedPhases = State(initialValue:
             group?.phases ?? original?.allowedPhases)
         _metrics = State(initialValue: target.isGroup ? uniqueMetrics :
-            Array(uniqueMetrics.prefix(1)))
+            Array((uniqueMetrics.isEmpty
+                ? target.legacyOption.map { [Self.legacyMetric($0)] } ?? []
+                : uniqueMetrics).prefix(1)))
         _motivationPhrase = State(initialValue: original?.customPhrase ?? "")
     }
 
-    private var isEditing: Bool { target.groupID != nil || target.ruleID != nil }
+    private var isEditing: Bool {
+        target.groupID != nil || target.ruleID != nil ||
+            target.legacyOption != nil
+    }
+
+    private static func legacyTrigger(
+        _ option: ATHLTHAudioCoachOption?
+    ) -> ATHLTHAudioCoachRule.Trigger {
+        switch option {
+        case .distanceUpdates, .distance, .averagePace,
+             .routeRemaining, .routeETA: return .distance
+        case .workoutStart: return .workoutStart
+        case .currentZone: return .zoneEnter
+        case .pauseResume: return .recoveryStart
+        case .workoutFinish: return .cooldownEnd
+        default: return .time
+        }
+    }
+
+    private static func legacyInterval(
+        _ option: ATHLTHAudioCoachOption?,
+        draft: AudioCoachDraft
+    ) -> Int {
+        switch option {
+        case .distanceUpdates, .distance, .averagePace,
+             .routeRemaining, .routeETA:
+            return max(100, draft.distanceIntervalMeters)
+        case .currentZone: return 3
+        case .time, .timedUpdates, .elapsedTime, .clockTime, .heartRate:
+            return max(15, draft.timeIntervalSeconds)
+        default: return 1
+        }
+    }
+
+    private static func legacyMetric(
+        _ option: ATHLTHAudioCoachOption
+    ) -> ATHLTHAudioCoachRule.Metric {
+        switch option {
+        case .distance, .distanceUpdates: return .distance
+        case .averagePace: return .averagePace
+        case .timedUpdates, .elapsedTime: return .elapsedTime
+        case .clockTime: return .clockTime
+        case .heartRate: return .heartRate
+        case .currentZone: return .heartRateZone
+        case .routeRemaining: return .routeRemainingDistance
+        case .routeETA: return .estimatedRouteTime
+        case .currentStep: return .stepName
+        case .remainingStepTime: return .stepRemainingTime
+        case .remainingStepDistance: return .stepRemainingTime
+        case .workoutFinish: return .workoutRemainingTime
+        case .workoutStart, .pauseResume, .motivation,
+             .randomEncouragement, .adaptiveMotivation, .contextual:
+            return .motivation
+        default: return .elapsedTime
+        }
+    }
     private var canSave: Bool {
         !metrics.isEmpty && (!target.isGroup ||
             !groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
@@ -402,6 +466,12 @@ struct ATHLTHCoachRuleComposer: View {
         if let previous { rule.id = previous.id }
         if metrics.contains(.motivation), !phrase.isEmpty {
             rule.customPhrase = phrase
+        }
+
+        // Old standard commands are replaced, not layered on top of the
+        // newly authored rule; this prevents duplicate speech.
+        if let legacyOption = target.legacyOption {
+            legacyOption.setActive(false, in: &draft)
         }
 
         if target.isGroup {
