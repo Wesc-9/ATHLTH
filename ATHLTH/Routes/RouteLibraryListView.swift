@@ -455,8 +455,15 @@ struct RouteLibraryListView: View {
             guard !Task.isCancelled else { return }
             committedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        // Favorites and recents are independent of server-side route filters.
+        // Do not refresh them for every search, sort or GPS-key change.
+        .task {
+            recents.refresh()
+            await favorites.refresh()
+        }
         .task(id: catalogKey) {
-            await refreshCatalogOnAppear()
+            if sort == .nearest { locationStore.start() }
+            await loadCatalog()
         }
         .onChange(of: sort) { _, value in
             if value == .nearest { locationStore.refresh() }
@@ -493,14 +500,6 @@ struct RouteLibraryListView: View {
         .fullScreenCover(item: $showingMapRoute) { route in
             SavedRouteFullscreenMap(route: route)
         }
-    }
-
-    private func refreshCatalogOnAppear() async {
-        recents.refresh()
-        if sort == .nearest { locationStore.start() }
-        async let favoriteRefresh: Void = favorites.refresh()
-        await loadCatalog()
-        _ = await favoriteRefresh
     }
 
     private var databaseHeader: some View {
