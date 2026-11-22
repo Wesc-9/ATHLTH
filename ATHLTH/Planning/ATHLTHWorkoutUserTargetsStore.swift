@@ -147,9 +147,35 @@ struct ATHLTHWorkoutPersonalOptions: Codable, Hashable {
     var spotifyPlaylist: SpotifyPlaylistReference? = nil
     var spotifyAutoplayOnStart: Bool? = nil
     var spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack? = nil
-    /// Optional song per exact expanded interval/recovery index. Kept only
-    /// in this account-scoped private options store.
+    /// An exact song for each execution step. Existing saved presets have no
+    /// such dictionary; they must keep their previously saved Coach/Spotify.
     var stepSongs: [Int: ATHLTHSpotifyIntervalTrack] = [:]
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case audioCoachConfiguration, spotifyPlaylist
+        case spotifyAutoplayOnStart, spotifyIntervalTrack, stepSongs
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        audioCoachConfiguration = try values.decodeIfPresent(
+            WatchAudioCoachConfiguration.self, forKey: .audioCoachConfiguration
+        )
+        spotifyPlaylist = try values.decodeIfPresent(
+            SpotifyPlaylistReference.self, forKey: .spotifyPlaylist
+        )
+        spotifyAutoplayOnStart = try values.decodeIfPresent(
+            Bool.self, forKey: .spotifyAutoplayOnStart
+        )
+        spotifyIntervalTrack = try values.decodeIfPresent(
+            ATHLTHSpotifyIntervalTrack.self, forKey: .spotifyIntervalTrack
+        )
+        stepSongs = try values.decodeIfPresent(
+            [Int: ATHLTHSpotifyIntervalTrack].self, forKey: .stepSongs
+        ) ?? [:]
+    }
 }
 
 enum ATHLTHWorkoutPersonalOptionsStore {
