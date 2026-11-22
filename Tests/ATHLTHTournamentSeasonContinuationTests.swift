@@ -29,7 +29,7 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
             ))
         }
         XCTAssertEqual(ATHLTHCompetitionFormat.allCases,
-                       [.duel, .league, .cup])
+                       [.duel, .single, .league, .cup])
         // Duel is a Challenge, not an ATHLTHTournamentFormat: no seasons.
         XCTAssertEqual(Set(ATHLTHTournamentFormat.allCases),
                        Set([.league, .groups, .cup]))
