@@ -195,8 +195,12 @@ enum ATHLTHCompoundExerciseCatalog {
         let protocolKey = protocolSignature(main)
         // A private section keeps its immutable source identity. Public
         // sources with the same complete prescription share one exercise.
+        // Personal target speeds, pulse zones and per-step edits are part
+        // of the athlete's OWN source, not grounds for public deduplication.
+        // Never collapse two different private workouts just because their
+        // interval timing protocol matches.
         let key = isPersonal
-            ? personalPrefix + digest(protocolKey)
+            ? personalPrefix + sourceID.uuidString
             : publicPrefix + digest(protocolKey)
         let family = fourByFourRecovery(main) != nil
             ? "athlth:running:interval:4x4"
@@ -252,8 +256,9 @@ enum ATHLTHCompoundExerciseCatalog {
             }
         }
         for section in saved {
-            if let item = make(sourceID: section.id, title: section.title,
-                               source: section.blocks, isPersonal: true) {
+            if let item = make(sourceID: section.sourceWorkoutID,
+                               title: section.title, source: section.blocks,
+                               isPersonal: true) {
                 found.append(ATHLTHCompoundExercise(
                     id: item.id, title: item.title, category: item.category,
                     blocks: item.blocks,
