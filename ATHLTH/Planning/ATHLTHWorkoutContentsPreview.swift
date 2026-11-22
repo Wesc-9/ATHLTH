@@ -297,7 +297,8 @@ struct ATHLTHWorkoutSelectionPreviewSheet: View {
         ATHLTHUnifiedWorkout.editorBlocks(from: workout)
     }
 
-    private var summary: ATHLTHWorkoutSelectionOverview.Metrics {
+    private func summary(for blocks: [WorkoutTemplateBlock])
+        -> ATHLTHWorkoutSelectionOverview.Metrics {
         ATHLTHWorkoutSelectionOverview.metrics(
             for: blocks,
             defaultActivity: workout.kind == .walking ? .walking : .running
@@ -310,7 +311,9 @@ struct ATHLTHWorkoutSelectionPreviewSheet: View {
         } ?? "–"
     }
 
-    private var headlineDuration: String {
+    private func headlineDuration(
+        for summary: ATHLTHWorkoutSelectionOverview.Metrics
+    ) -> String {
         if let estimated = summary.totalSeconds {
             return durationLabel(estimated)
         }
@@ -321,12 +324,14 @@ struct ATHLTHWorkoutSelectionPreviewSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        let source = blocks
+        let stats = summary(for: source)
+        return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
-                    workoutOverview
+                    workoutOverview(stats)
                     ATHLTHWorkoutContentsPreview(
-                        blocks: blocks,
+                        blocks: source,
                         maximumVisibleBlocks: nil
                     )
                     .padding(17)
@@ -383,7 +388,9 @@ struct ATHLTHWorkoutSelectionPreviewSheet: View {
         }
     }
 
-    private var workoutOverview: some View {
+    private func workoutOverview(
+        _ summary: ATHLTHWorkoutSelectionOverview.Metrics
+    ) -> some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .top, spacing: 13) {
                 Image(systemName: workout.kind.systemImage)
@@ -429,7 +436,7 @@ struct ATHLTHWorkoutSelectionPreviewSheet: View {
                     ATHLTHLocalization.choose(
                         english: "Duration", norwegian: "Varighet"
                     ),
-                    headlineDuration, icon: "clock"
+                    headlineDuration(for: summary), icon: "clock"
                 )
                 metricTile(
                     summary.exerciseCount > 0
