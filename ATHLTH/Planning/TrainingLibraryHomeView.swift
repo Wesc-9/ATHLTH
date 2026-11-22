@@ -4209,19 +4209,33 @@ struct MyTrainingPlansLibraryView: View {
 
     // Filter each source once; sort only the combined collection below.
     // Sorting each source and then sorting their union did redundant work.
+    private func matchesPlan(
+        _ plan: TrainingPlan, favoriteIDs: Set<String>
+    ) -> Bool {
+        (normalizedQuery.isEmpty ||
+         plan.title.localizedStandardContains(normalizedQuery)) &&
+        (!favoritesOnly || favoriteIDs.contains(plan.id.uuidString))
+    }
+
     private var displayedTemplates: [TrainingPlan] {
-        session.planTemplates.filter {
-            (normalizedQuery.isEmpty ||
-             $0.title.localizedStandardContains(normalizedQuery)) &&
-            (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
+        let favoriteIDs = favoritesOnly
+            ? Set(favorites.favorites.lazy
+                .filter { $0.itemType == .plan }
+                .map(\.itemID))
+            : []
+        return session.planTemplates.filter {
+            matchesPlan($0, favoriteIDs: favoriteIDs)
         }
     }
 
     private var displayedPlans: [TrainingPlan] {
-        session.trainingPlans.filter {
-            (normalizedQuery.isEmpty ||
-             $0.title.localizedStandardContains(normalizedQuery)) &&
-            (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
+        let favoriteIDs = favoritesOnly
+            ? Set(favorites.favorites.lazy
+                .filter { $0.itemType == .plan }
+                .map(\.itemID))
+            : []
+        return session.trainingPlans.filter {
+            matchesPlan($0, favoriteIDs: favoriteIDs)
         }
     }
 
