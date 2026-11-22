@@ -5662,17 +5662,25 @@ struct LibraryFavoritesView: View {
             LazyVStack(alignment: .leading, spacing: 16) {
                 if initialKind == nil {
                 LibraryPremiumIntro(
-                    eyebrow: "FAVORITES",
-                    title: "Your fastest way back",
-                    subtitle:
-                        "Keep the plans, workouts, exercises and routes you return to most in one place.",
+                    eyebrow: ATHLTHLocalization.choose(
+                        english: "FAVORITES", norwegian: "FAVORITTER"
+                    ),
+                    title: ATHLTHLocalization.choose(
+                        english: "Your fastest way back", norwegian: "Alt du har lagret"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Keep the plans, workouts, exercises and routes you return to most in one place.",
+                        norwegian: "Planene, øktene, øvelsene og rutene du bruker mest, samlet på ett sted."
+                    ),
                     icon: "star.fill",
                     accent: ATHLTHTheme.premiumGold
                 ) {
                     HStack(spacing: 8) {
                         LibraryStatPill(
                             value: "\(favorites.favorites.count)",
-                            label: "saved",
+                            label: ATHLTHLocalization.choose(
+                                english: "saved", norwegian: "lagret"
+                            ),
                             icon: "star.fill",
                             tint: ATHLTHTheme.premiumGold
                         )
@@ -5687,7 +5695,9 @@ struct LibraryFavoritesView: View {
                         } else {
                             LibraryStatPill(
                                 value: "\(favoriteKindsInUse)",
-                                label: "types",
+                                label: ATHLTHLocalization.choose(
+                                    english: "types", norwegian: "typer"
+                                ),
                                 icon: "square.grid.2x2.fill",
                                 tint: ATHLTHTheme.accent
                             )
@@ -5700,7 +5710,9 @@ struct LibraryFavoritesView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         favoriteFilter(
-                            "All",
+                            ATHLTHLocalization.choose(
+                                english: "All", norwegian: "Alle"
+                            ),
                             icon: "sparkles",
                             selected: selectedKind == nil && !ownExerciseFavoritesOnly
                         ) {
