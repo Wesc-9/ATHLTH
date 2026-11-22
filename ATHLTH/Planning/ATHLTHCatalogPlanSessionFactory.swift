@@ -21,11 +21,9 @@ enum ATHLTHCatalogPlanSessionFactory {
 
         let original = strengthRecipe(for: blueprint)
         var blocks: [WorkoutTemplateBlock]
-        var category: String
 
         if let original {
             blocks = original.blocks
-            category = "strength"
             for index in blocks.indices where blocks[index].kind == .exercise {
                 let secondaryFocus = entry.slug == "focus-chest-triceps" && blueprint == .push ||
                     entry.slug == "focus-back-biceps" && blueprint == .pull
@@ -62,13 +60,11 @@ enum ATHLTHCatalogPlanSessionFactory {
         } else if blueprint == .hyroxSkills || blueprint == .hyroxCircuit {
             blocks = hybridBlocks(blueprint, recovery: recoveryWeek,
                                   taper: competitionTaper)
-            category = "hybrid"
         } else {
             blocks = enduranceBlocks(
                 blueprint, entry: entry, week: weekNumber,
                 recovery: recoveryWeek, taper: competitionTaper
             )
-            category = blueprint.kind == .walking ? "walking" : "running"
         }
 
         // All blocks are portable and ordered. Do not generate additional
@@ -126,6 +122,14 @@ enum ATHLTHCatalogPlanSessionFactory {
             return copy
         }
 
+        // Use the same sport classifier as Quick Train, Plan Studio and
+        // the live router. Source metadata must never label mobility as
+        // running, or a mixed plan as a pure strength workout.
+        let activity = ATHLTHUnifiedActivityProfile(
+            blocks: blocks, fallbackKind: blueprint.kind
+        )
+        let category = activity.category
+
         let baselineMinutes = original?.estimatedDurationMinutes ??
             blueprint.durationMinutes(week: weekNumber, totalWeeks: entry.durationWeeks)
         let factor = competitionTaper ? 0.60 : recoveryWeek ? 0.80 : 1.0
@@ -173,7 +177,7 @@ enum ATHLTHCatalogPlanSessionFactory {
         var workout = PlannedSession(
             id: UUID(),
             title: original?.title ?? blueprint.title,
-            kind: category == "hybrid" ? .custom : blueprint.kind,
+            kind: activity.workoutKind,
             scheduledStart: nil,
             durationMinutes: minutes,
             targetDistanceKilometers: nil,
