@@ -68,11 +68,20 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
                 Divider()
-                Stepper(
-                    "Gjennomføringsfrist: \(settings.completionHours) timer",
-                    value: $settings.completionHours, in: 1...720
-                )
-                .font(.subheadline)
+                HStack(spacing: 12) {
+                    Text("Gjennomføringsfrist")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Picker("Frist", selection: $settings.completionHours) {
+                        ForEach(ATHLTHTournamentCadence.completionHours,
+                                id: \.self) { hours in
+                            Text(ATHLTHTournamentCadence.window(hours))
+                                .tag(hours)
+                        }
+                    }
+                    .labelsHidden()
+                    .tint(ATHLTHArenaV3Style.gold)
+                }
                 Label(
                     "Ikke gjennomført innen fristen: 0 poeng. Uavgjort ved to uteblivelser avgjøres ikke ved loddtrekning.",
                     systemImage: "clock.badge.exclamationmark"
@@ -148,6 +157,9 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             .tint(ATHLTHArenaV3Style.gold)
             .padding(15)
             .background(ATHLTHArenaV3Style.panel())
+        }
+        .onChange(of: settings.unit) { _, unit in
+            settings.every = min(settings.every, unit.maximumCount)
         }
     }
 
