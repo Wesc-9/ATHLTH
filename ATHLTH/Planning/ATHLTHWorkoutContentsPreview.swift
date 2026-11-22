@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// One preview for every ATHLTH workout source: personal, planned, running,
-/// strength, imported, mobility, cycling and hybrid. Never maintain separate
-/// per-activity arrays of "exercises" in the selection UI. The unified
-/// PlannedSession recipe is the single source of truth.
+/// One shared preview for every ATHLTH workout source. The selection screen
+/// reads the real, executable timeline without mutating sets, targets or rest.
 struct ATHLTHWorkoutContentsPreview: View {
     let workout: PlannedSession?
     let catalogBlocks: [WorkoutTemplateBlock]?
@@ -15,8 +13,6 @@ struct ATHLTHWorkoutContentsPreview: View {
         self.maximumVisibleBlocks = maximumVisibleBlocks
     }
 
-    /// Bundled/published catalog content is already a canonical recipe.
-    /// Do not project it through PlannedSession on every row recomputation.
     init(blocks: [WorkoutTemplateBlock], maximumVisibleBlocks: Int? = 3) {
         self.workout = nil
         self.catalogBlocks = blocks
@@ -25,143 +21,333 @@ struct ATHLTHWorkoutContentsPreview: View {
 
     private var blocks: [WorkoutTemplateBlock] {
         if let catalogBlocks { return catalogBlocks }
-        // Historic user workouts can store steps in legacy containers;
-        // preserve the shared editor's read-only projection for these.
         if let workout { return ATHLTHUnifiedWorkout.editorBlocks(from: workout) }
         return []
     }
 
     var body: some View {
-        // Resolve legacy workout storage exactly once per render. Previously
-        // block count, visible rows and overflow each repeated the projection.
         let resolved = blocks
-        let visible = Array(resolved.prefix(maximumVisibleBlocks ?? resolved.count))
-        return VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 6) {
-                Text(ATHLTHLocalization.choose(
-                    english: "EXERCISES & STEPS", norwegian: "ØVELSER OG ØKTDELER"
-                ))
-                .font(.system(size: 10, weight: .bold))
-                .tracking(1.2)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-
-                Spacer(minLength: 0)
-
-                if !resolved.isEmpty {
-                    Text("\(resolved.count)")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                }
+        Group {
+            if maximumVisibleBlocks == nil {
+                completeOutline(resolved)
+            } else {
+                compactOutline(
+                    resolved,
+                    maximumVisible: maximumVisibleBlocks ?? 3
+                )
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
+    /// Keep the compact list used across Library and Plan lightweight. Only
+    /// the full inspection sheet expands/group-compacts the executable sets.
+    private func compactOutline(
+        _ blocks: [WorkoutTemplateBlock],
+        maximumVisible: Int
+    ) -> some View {
+        let visible = Array(blocks.prefix(max(0, maximumVisible)))
+        return VStack(alignment: .leading, spacing: 9) {
+            sectionHeading(remaining: blocks.count)
             if visible.isEmpty {
-                Text(ATHLTHLocalization.choose(
-                    english: "No detailed steps are saved for this workout. You can add them in the workout builder.",
-                    norwegian: "Denne økten har ingen lagrede deløkter. Du kan legge dem til i øktbyggeren."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                emptyState
             } else {
                 ForEach(visible.indices, id: \.self) { index in
                     let block = visible[index]
                     HStack(alignment: .top, spacing: 9) {
-                        Image(systemName: block.kind.systemImage)
+                        Image(systemName: block.isRestOrActiveRecovery
+                              ? "pause.fill" : block.kind.systemImage)
                             .font(.system(size: 13, weight: .semibold))
                             .frame(width: 22, height: 22)
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
                             .background(ATHLTHTheme.accentSoft, in: Circle())
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(block.title)
+                            Text(block.kind == .rest
+                                ? ATHLTHLocalization.choose(
+                                    english: "Pause", norwegian: "Pause"
+                                  )
+                                : block.title)
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .fixedSize(horizontal: false, vertical: true)
-                            HStack(spacing: 5) {
-                                Text(block.resolvedPhase.title)
-                                if let details = block.targetText, !details.isEmpty {
-                                    Text("·")
-                                    Text(details)
-                                }
-                            }
-                            .font(.caption2)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .fixedSize(horizontal: false, vertical: true)
+
+                            Text(compactSubtitle(block))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-
-                if resolved.count > visible.count {
+                if blocks.count > visible.count {
                     Text(ATHLTHLocalization.choose(
-                        english: "+ \(resolved.count - visible.count) more steps",
-                        norwegian: "+ \(resolved.count - visible.count) øktdeler"
+                        english: "+ \(blocks.count - visible.count) more steps",
+                        norwegian: "+ \(blocks.count - visible.count) øktdeler"
                     ))
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func compactSubtitle(_ block: WorkoutTemplateBlock) -> String {
+        if block.kind == .rest {
+            // Keep pause as the main heading, followed by its purpose/time.
+            return ATHLTHWorkoutSelectionOverview.Row(
+                id: 0, steps: [block]
+            ).subtitle
+        }
+        return [block.resolvedPhase.title, block.targetText]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private func completeOutline(_ blocks: [WorkoutTemplateBlock]) -> some View {
+        let rows = ATHLTHWorkoutSelectionOverview.rows(for: blocks)
+        let stats = ATHLTHWorkoutSelectionOverview.metrics(for: blocks)
+        return VStack(alignment: .leading, spacing: 12) {
+            sectionHeading(remaining: nil)
+            if rows.isEmpty {
+                emptyState
+            } else {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(stats.exerciseCount) exercises · \(stats.setCount) sets · \(stats.pauseCount) pauses",
+                        norwegian: "\(stats.exerciseCount) øvelser · \(stats.setCount) sett · \(stats.pauseCount) pauser"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    Spacer(minLength: 0)
+                }
+
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(rows) { row in
+                        expandedRow(row)
+                        if row.id != rows.last?.id {
+                            Divider()
+                                .overlay(ATHLTHPlanDesign.outline.opacity(0.35))
+                                .padding(.vertical, 10)
+                        }
+                    }
+                }
+
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Only saved rests are shown. A between-set rest is not added after the final set.",
+                        norwegian: "Bare lagrede pauser vises. Det legges ikke til settpause etter siste sett."
+                    ),
+                    systemImage: "info.circle"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func expandedRow(_ row: ATHLTHWorkoutSelectionOverview.Row) -> some View {
+        if row.isExercise && row.sets > 1 {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(row.steps.indices, id: \.self) { index in
+                        let step = row.steps[index]
+                        HStack(alignment: .firstTextBaseline, spacing: 9) {
+                            Image(systemName: step.kind == .rest
+                                  ? "pause.fill" : "circle.fill")
+                                .font(.system(size: 8))
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                .frame(width: 14)
+                            Text(step.kind == .rest
+                                ? ATHLTHLocalization.choose(
+                                    english: "Pause", norwegian: "Pause"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "Set", norwegian: "Sett"
+                                  ) + " \(row.steps[0...index].filter { $0.kind == .exercise }.count)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer(minLength: 5)
+                            Text(rowStepDetail(step))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                }
+                .padding(.leading, 30)
+                .padding(.top, 11)
+            } label: {
+                rowHeader(row)
+            }
+            .tint(ATHLTHTrainDesign.bronze)
+            .accessibilityIdentifier("athlth-workout-preview-exercise-group")
+        } else {
+            rowHeader(row)
+        }
+    }
+
+    private func rowStepDetail(_ step: WorkoutTemplateBlock) -> String {
+        if step.kind == .rest {
+            return ATHLTHWorkoutSelectionOverview.Row(
+                id: 0, steps: [step]
+            ).subtitle
+        }
+        return step.targetText ?? "–"
+    }
+
+    private func rowHeader(_ row: ATHLTHWorkoutSelectionOverview.Row) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: row.isPause
+                  ? "pause.fill" : row.first.kind.systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 30, height: 30)
+                .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(row.title)
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+                Text(row.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+                if row.betweenSetPauses > 0 {
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(row.betweenSetPauses) between-set pauses",
+                        norwegian: "\(row.betweenSetPauses) pauser mellom sett"
+                    ) + (row.betweenSetRestSeconds.map {
+                        " · " + ATHLTHWorkoutDurationEstimator.conciseDuration($0)
+                    } ?? ""))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if row.isExercise {
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(row.sets) sets",
+                        norwegian: "\(row.sets) sett"
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    if let duration = row.estimatedSeconds {
+                        Text("~" + ATHLTHWorkoutDurationEstimator
+                            .conciseDuration(duration))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    }
+                }
+                .fixedSize(horizontal: true, vertical: false)
+            } else if !row.isPause, let duration = row.estimatedSeconds {
+                Text("~" + ATHLTHWorkoutDurationEstimator.conciseDuration(duration))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+            }
+        }
+    }
+
+    private func sectionHeading(remaining: Int?) -> some View {
+        HStack(spacing: 6) {
+            Text(ATHLTHLocalization.choose(
+                english: "EXERCISES & STEPS", norwegian: "ØVELSER OG ØKTDELER"
+            ))
+            .font(.system(size: 10, weight: .bold))
+            .tracking(1.2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            Spacer(minLength: 0)
+            if let remaining, remaining > 0 {
+                Text(ATHLTHLocalization.choose(
+                    english: "\(remaining) steps",
+                    norwegian: "\(remaining) øktdeler"
+                ))
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        Text(ATHLTHLocalization.choose(
+            english: "No detailed steps are saved for this workout. You can add them in the workout builder.",
+            norwegian: "Denne økten har ingen lagrede deløkter. Du kan legge dem til i øktbyggeren."
+        ))
+        .font(.caption)
+        .foregroundStyle(ATHLTHTheme.mutedText)
     }
 }
 
-/// Before copying an existing workout into the user's schedule, inspect the
-/// real shared recipe. Confirming returns the original PlannedSession to the
-/// existing editor, where the athlete can freely change sets, rests and pace.
+/// Inspect an existing workout BEFORE copying it into the user's calendar.
+/// The original workout is never altered when the athlete taps Use.
 struct ATHLTHWorkoutSelectionPreviewSheet: View {
     let workout: PlannedSession
     let onUse: () -> Void
 
     @Environment(\.dismiss) private var dismiss
 
+    private var blocks: [WorkoutTemplateBlock] {
+        ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+    }
+
+    private var summary: ATHLTHWorkoutSelectionOverview.Metrics {
+        ATHLTHWorkoutSelectionOverview.metrics(
+            for: blocks,
+            defaultActivity: workout.kind == .walking ? .walking : .running
+        )
+    }
+
+    private func durationLabel(_ seconds: TimeInterval?) -> String {
+        seconds.map {
+            "~" + ATHLTHWorkoutDurationEstimator.conciseDuration($0)
+        } ?? "–"
+    }
+
+    private var headlineDuration: String {
+        if let estimated = summary.totalSeconds {
+            return durationLabel(estimated)
+        }
+        if let planned = workout.durationMinutes, planned > 0 {
+            return "\(planned) min"
+        }
+        return "–"
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 19) {
-                    HStack(spacing: 14) {
-                        Image(systemName: workout.kind.systemImage)
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            .frame(width: 57, height: 57)
-                            .background(
-                                ATHLTHTheme.accentSoft,
-                                in: RoundedRectangle(cornerRadius: 17)
-                            )
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(workout.title)
-                                .font(.title2.bold())
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                            if let duration = workout.durationMinutes {
-                                Label("\(duration) min", systemImage: "clock")
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-                        }
-                    }
-                    if let notes = workout.notes, !notes.isEmpty {
-                        Text(notes)
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-
+                VStack(alignment: .leading, spacing: 15) {
+                    workoutOverview
                     ATHLTHWorkoutContentsPreview(
-                        workout: workout,
+                        blocks: blocks,
                         maximumVisibleBlocks: nil
                     )
                     .padding(17)
                     .background(
-                        .white, in: RoundedRectangle(cornerRadius: 20)
+                        ATHLTHPlanDesign.surface,
+                        in: RoundedRectangle(cornerRadius: 22)
                     )
-
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 22)
+                            .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.7)
+                    }
                     Text(ATHLTHLocalization.choose(
-                        english: "You can edit every exercise, interval, target and rest in the existing workout builder. This never overwrites the source workout.",
-                        norwegian: "Du kan endre alle øvelser, intervaller, mål og pauser i den eksisterende øktbyggeren. Originaløkten endres ikke."
+                        english: "You can edit exercises, intervals, pace targets and rests in the workout builder. Using this workout does not overwrite the original.",
+                        norwegian: "Øvelser, intervaller, målfart og pauser kan tilpasses i øktbyggeren. Originaløkten endres ikke."
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
+                    .padding(.horizontal, 3)
                 }
-                .padding(20)
-                .frame(maxWidth: 700)
+                .padding(16)
+                .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
@@ -194,6 +380,186 @@ struct ATHLTHWorkoutSelectionPreviewSheet: View {
                     }
                 }
             }
+        }
+    }
+
+    private var workoutOverview: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(alignment: .top, spacing: 13) {
+                Image(systemName: workout.kind.systemImage)
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 54, height: 54)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 16))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "WORKOUT DETAILS", norwegian: "ØKTDETALJER"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    Text(workout.title)
+                        .font(.system(size: 25, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(workout.kind.title)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+            }
+
+            if let notes = workout.notes?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ), !notes.isEmpty {
+                Text(notes)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider().overlay(ATHLTHPlanDesign.outline.opacity(0.35))
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
+                spacing: 8
+            ) {
+                metricTile(
+                    ATHLTHLocalization.choose(
+                        english: "Duration", norwegian: "Varighet"
+                    ),
+                    headlineDuration, icon: "clock"
+                )
+                metricTile(
+                    summary.exerciseCount > 0
+                        ? ATHLTHLocalization.choose(
+                            english: "Exercises", norwegian: "Øvelser"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Active steps", norwegian: "Øktdeler"
+                        ),
+                    "\(summary.exerciseCount > 0
+                         ? summary.exerciseCount
+                         : summary.executedStepCount - summary.pauseCount)",
+                    icon: "figure.strengthtraining.traditional"
+                )
+                metricTile(
+                    summary.setCount > 0
+                        ? ATHLTHLocalization.choose(
+                            english: "Sets", norwegian: "Sett"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Work steps", norwegian: "Arbeidsdeler"
+                        ),
+                    "\(summary.setCount > 0
+                         ? summary.setCount
+                         : summary.executedStepCount - summary.pauseCount)",
+                    icon: "square.stack"
+                )
+                metricTile(
+                    ATHLTHLocalization.choose(
+                        english: "Pauses", norwegian: "Pauser"
+                    ),
+                    "\(summary.pauseCount)", icon: "pause.circle"
+                )
+                metricTile(
+                    ATHLTHLocalization.choose(
+                        english: "Rest time", norwegian: "Hviletid"
+                    ),
+                    durationLabel(summary.restSeconds),
+                    icon: "hourglass"
+                )
+                metricTile(
+                    ATHLTHLocalization.choose(
+                        english: "Active time", norwegian: "Aktiv tid"
+                    ),
+                    durationLabel(summary.activeSeconds),
+                    icon: "bolt"
+                )
+            }
+
+            if !summary.primaryMuscles.isEmpty {
+                overviewDetail(
+                    ATHLTHLocalization.choose(
+                        english: "Muscle focus", norwegian: "Muskelfokus"
+                    ),
+                    items: summary.primaryMuscles.map {
+                        ExerciseMuscleGroup(rawValue: $0)?.title ?? $0
+                    },
+                    icon: "figure.strengthtraining.traditional"
+                )
+            }
+            if !summary.equipment.isEmpty {
+                overviewDetail(
+                    ATHLTHLocalization.choose(
+                        english: "Equipment", norwegian: "Utstyr"
+                    ),
+                    items: summary.equipment,
+                    icon: "dumbbell"
+                )
+            }
+
+            Text(summary.totalSeconds != nil
+                ? ATHLTHLocalization.choose(
+                    english: "Duration is a planning estimate based on the saved sets, targets and pauses.",
+                    norwegian: "Tiden er et planestimat basert på lagrede sett, mål og pauser."
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Some steps have no time target. Shown duration, if any, comes from the workout plan.",
+                    norwegian: "Noen øktdeler mangler tidsmål. Eventuell varighet er hentet fra øktplanen."
+                ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(17)
+        .background(
+            ATHLTHPlanDesign.surface,
+            in: RoundedRectangle(cornerRadius: 22)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.7)
+        }
+        .accessibilityIdentifier("athlth-workout-selection-overview")
+    }
+
+    private func metricTile(_ label: String, _ value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(label, systemImage: icon)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(value)
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, minHeight: 67, alignment: .leading)
+        .padding(10)
+        .background(
+            ATHLTHPlanDesign.selectedSurface.opacity(0.52),
+            in: RoundedRectangle(cornerRadius: 13)
+        )
+    }
+
+    private func overviewDetail(
+        _ label: String,
+        items: [String],
+        icon: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label(label, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+            Text(items.joined(separator: " · "))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
