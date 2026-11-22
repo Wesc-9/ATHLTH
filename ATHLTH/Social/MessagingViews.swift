@@ -7590,42 +7590,40 @@ struct MessageSharePicker: View {
                     .hidden
                 )
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(
-                .inline
-            )
-            .toolbarBackground(
-                .hidden,
-                for: .navigationBar
-            )
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    VStack(alignment: .leading, spacing: 0) {
+            // Navigation toolbar items can collapse the leading title into
+            // a tiny circle on narrow iPhones. Keep the heading in a real
+            // full-width layout for every share kind instead.
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(shareEyebrow.uppercased())
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .tracking(1.4)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .tracking(1.2)
                             .foregroundStyle(ATHLTHTheme.premiumGold)
                         Text(shareTitle)
-                            .font(.system(size: 24, weight: .semibold, design: .serif))
+                            .font(.system(size: 23, weight: .semibold, design: .serif))
                             .foregroundStyle(ATHLTHTheme.primaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .combine)
-                }
-                ToolbarItem(
-                    placement:
-                        .topBarTrailing
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Done",
-                            norwegian: "Ferdig"
-                        )
-                    ) {
+
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) {
                         dismiss()
                     }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 44)
+                    .background(.white.opacity(0.88), in: Capsule())
+                    .fixedSize(horizontal: true, vertical: false)
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(ATHLTHPlanDesign.canvas)
             }
             .task(id: session.profile.userID) {
                 await favorites.refresh()
