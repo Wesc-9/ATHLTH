@@ -2735,6 +2735,7 @@ private struct ATHLTHPlanGhostCard<Content: View>: View {
 }
 
 struct TrainingPlanCatalogDetailView: View {
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
@@ -2750,6 +2751,35 @@ struct TrainingPlanCatalogDetailView: View {
     @State private var expandedWeeks: Set<Int> = []
     @State private var expandedSessionKeys: Set<String> = []
     @State private var inspectedPlanStep: WorkoutTemplateBlock?
+
+    // Only exact exercise-library identities count toward muscle focus.
+    // Missing matches are omitted rather than guessing from a workout title.
+    private var verifiedMuscleFocus: [String] {
+        let exercises = exerciseLibrary.allExercises
+        let byID = Dictionary(exercises.map { ($0.id, $0) },
+                              uniquingKeysWith: { first, _ in first })
+        let bySource = Dictionary(
+            exercises.compactMap { item -> (String, ExerciseLibraryEntry)? in
+                guard let source = item.sourceIdentifier else { return nil }
+                return (source, item)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var muscles = Set<String>()
+        for blueprint in entry.sessionBlueprints.prefix(entry.sessionsPerWeek) {
+            let workout = ATHLTHCatalogPlanSessionFactory.session(
+                entry: entry, blueprint: blueprint, week: 1
+            )
+            for block in workout.resolvedWorkoutBlocks where block.kind == .exercise {
+                let match = block.exerciseID.flatMap { byID[$0] }
+                    ?? block.exerciseSlug.flatMap { bySource[$0] }
+                if let match {
+                    muscles.formUnion(match.exercise.primaryMuscles)
+                }
+            }
+        }
+        return muscles.sorted()
+    }
 
     var body: some View {
         ScrollView {
@@ -2858,6 +2888,18 @@ struct TrainingPlanCatalogDetailView: View {
                         Text(entry.goal)
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
+                        let muscleFocus = verifiedMuscleFocus
+                        if !muscleFocus.isEmpty {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Muscle groups", norwegian: "Muskelgrupper"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Text(muscleFocus.joined(separator: " · "))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         HStack(spacing: 8) {
                             ForEach(Array(entry.workoutKinds.enumerated()), id: \.offset) { _, kind in
                                 Image(systemName: kind.systemImage)
