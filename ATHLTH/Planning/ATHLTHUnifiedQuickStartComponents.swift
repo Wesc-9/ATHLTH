@@ -29,6 +29,14 @@ enum ATHLTHQuickStartActivity: Equatable {
         case .strength: return [.free, .workout, .exercises]
         }
     }
+
+    func availableTools(registeredIPad: Bool) -> [ATHLTHQuickStartTool] {
+        ATHLTHQuickStartTool.allCases.filter {
+            if $0 == .companion && self == .strength { return false }
+            if $0 == .iPad { return registeredIPad }
+            return true
+        }
+    }
 }
 
 enum ATHLTHQuickStartType: String, Identifiable {
@@ -248,11 +256,7 @@ struct ATHLTHQuickStartToolsRow<Detail: View>: View {
     @State private var confirmSpotifyConnect = false
 
     private var available: [ATHLTHQuickStartTool] {
-        ATHLTHQuickStartTool.allCases.filter {
-            if $0 == .companion && activity == .strength { return false }
-            if $0 == .iPad { return iPadAvailable }
-            return true
-        }
+        activity.availableTools(registeredIPad: iPadAvailable)
     }
 
     var body: some View {
