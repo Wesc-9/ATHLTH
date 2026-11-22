@@ -76,6 +76,42 @@ final class ATHLTHFourByFourRecordsTests: XCTestCase {
         XCTAssertNil(result(phases))
     }
 
+    func testThreeMinuteRecoveryIsTrackedAsSeparateFourByFourProtocol() throws {
+        var steps = standard()
+        for index in [2, 4, 6] { steps[index].activeSeconds = 180 }
+        let result = try XCTUnwrap(result(steps))
+        XCTAssertEqual(result.recoverySeconds, 180)
+        XCTAssertEqual(result.exerciseCount, 4)
+        XCTAssertEqual(result.protocolID, "athlth:running:interval:4x4:r180")
+        let baseline = try XCTUnwrap(self.result(standard()))
+        XCTAssertNotEqual(result.protocolID, baseline.protocolID)
+    }
+
+    func testFourByFourWithinLongerWorkoutStillRecordsOnlyFourEfforts() throws {
+        var steps = standard()
+        let extra = step(9, phase: "main", seconds: 600, distance: 1700)
+        steps.append(extra)
+        let result = try XCTUnwrap(result(steps))
+        XCTAssertEqual(result.mainSeconds, 960)
+        XCTAssertEqual(result.mainDistanceMeters, 4130, accuracy: 0.01)
+    }
+
+    func testTwoComparableFourByFourSectionsDoNotInventSingleBest() {
+        let first = standard().filter {
+            !["warmup", "cooldown"].contains($0.phase ?? "")
+        }
+        var second = first
+        for index in second.indices { second[index].index += 7 }
+        XCTAssertNil(result(first + second))
+    }
+
+    func testPartialThreeMinuteRecoveryCannotQualify() {
+        var steps = standard()
+        steps[2].activeSeconds = 180
+        steps[4].activeSeconds = 180
+        XCTAssertNil(result(steps))
+    }
+
     func testManualTreadmillPaceRemainsExplicitlyReported() throws {
         var phases = standard()
         phases[1].isUserReported = true
