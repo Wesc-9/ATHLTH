@@ -304,3 +304,5 @@ ATHLTH 2.2.7 build 135 — verify canonical public name visibility correction aa
 ATHLTH 2.2.7 build 135 — validate unified exercise visibility and regression tests 612934a0. All five CI checks must pass before TestFlight upload.
 
 ATHLTH 2.2.7: validate ownership checks and account isolation regression tests 5d54bd4. TestFlight requires all gates.
+
+ATHLTH 2.2.7: batched library portability, creator-aware import deduplication, regression suite at 6e147b5. Require passing gates before TestFlight.
