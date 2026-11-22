@@ -316,6 +316,21 @@ final class ATHLTHScratchComposerPresentationPolicyTests: XCTestCase {
         XCTAssertFalse(none.day)
     }
 
+    func testStrengthLiveWaitsUntilSetupSheetHasDismissed() {
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy
+            .startsLiveAfterSetupDismiss(
+                queued: true, setupIsPresented: true
+            ), "The active recorder must not stack over the setup sheet")
+        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy
+            .startsLiveAfterSetupDismiss(
+                queued: false, setupIsPresented: false
+            ), "Cancelling or a failed start must not open live recording")
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy
+            .startsLiveAfterSetupDismiss(
+                queued: true, setupIsPresented: false
+            ))
+    }
+
     func testScratchBackAlwaysOffersDeleteEvenWithEmptyTimeline() {
         XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
             isScratchHost: true, hasEdits: false

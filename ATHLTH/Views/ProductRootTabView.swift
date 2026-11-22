@@ -1145,6 +1145,7 @@ struct ATHLTHHomeView: View {
     @State private var selectedHomeStructuredWorkout: PlannedSession?
     @State private var pendingHomeQuickStartKind: WorkoutKind?
     @State private var showingHomeStrengthWorkout = false
+    @State private var pendingHomeStrengthLiveAfterDismiss = false
     @State private var homeDirectStartInProgress = false
     @State private var homeWatchTransferMessage: String?
     @State private var homeWatchTransferError: String?
@@ -1349,7 +1350,15 @@ struct ATHLTHHomeView: View {
                         hasCompletedProfileSetup
                 )
             }
-            .sheet(item: $selectedHomeStrengthSession) { workout in
+            .sheet(item: $selectedHomeStrengthSession, onDismiss: {
+                guard ATHLTHScratchComposerPresentationPolicy
+                    .startsLiveAfterSetupDismiss(
+                        queued: pendingHomeStrengthLiveAfterDismiss,
+                        setupIsPresented: selectedHomeStrengthSession != nil
+                    ) else { return }
+                pendingHomeStrengthLiveAfterDismiss = false
+                showingHomeStrengthWorkout = true
+            }) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
                     trainingDeviceProvider:
@@ -1378,7 +1387,10 @@ struct ATHLTHHomeView: View {
                             spotify: spotifyPlayback
                         )
                         if didStart {
-                            showingHomeStrengthWorkout = true
+                            // Only after the setup sheet has finished closing
+                            // may the active strength recorder take the stage.
+                            pendingHomeStrengthLiveAfterDismiss = true
+                            selectedHomeStrengthSession = nil
                             return nil
                         }
                         // The iPad sends an envelope to the paired iPhone;
@@ -1394,7 +1406,15 @@ struct ATHLTHHomeView: View {
                 }
             }
             .athlthStablePresentationBoundary()
-            .sheet(item: $pendingHomeQuickStartKind) { kind in
+            .sheet(item: $pendingHomeQuickStartKind, onDismiss: {
+                guard ATHLTHScratchComposerPresentationPolicy
+                    .startsLiveAfterSetupDismiss(
+                        queued: pendingHomeStrengthLiveAfterDismiss,
+                        setupIsPresented: pendingHomeQuickStartKind != nil
+                    ) else { return }
+                pendingHomeStrengthLiveAfterDismiss = false
+                showingHomeStrengthWorkout = true
+            }) { kind in
                 // Stable type regardless of running, walking or other kind.
                 AnyView(
                     Group {
@@ -1481,8 +1501,8 @@ struct ATHLTHHomeView: View {
                             spotify: spotifyPlayback
                         )
                         if didStart {
+                            pendingHomeStrengthLiveAfterDismiss = true
                             pendingHomeQuickStartKind = nil
-                                                        showingHomeStrengthWorkout = true
                             return nil
                         }
                         // The iPad sends an envelope to the paired iPhone;
@@ -5817,6 +5837,7 @@ struct ATHLTHTrainView: View {
     @State private var pendingCustomIPhoneQuick: CustomIPhoneQuickLaunch?
     @State private var activeCustomIPhoneQuick: CustomIPhoneQuickLaunch?
     @State private var showingStrengthWorkout = false
+    @State private var pendingTrainStrengthLiveAfterDismiss = false
     @State private var selectedStructuredWorkout:
         PlannedSession?
     @State private var showingGhostHub = false
@@ -6116,7 +6137,15 @@ struct ATHLTHTrainView: View {
                 )
                 .environmentObject(session)
             }
-            .sheet(item: $selectedStrengthSession) { workout in
+            .sheet(item: $selectedStrengthSession, onDismiss: {
+                guard ATHLTHScratchComposerPresentationPolicy
+                    .startsLiveAfterSetupDismiss(
+                        queued: pendingTrainStrengthLiveAfterDismiss,
+                        setupIsPresented: selectedStrengthSession != nil
+                    ) else { return }
+                pendingTrainStrengthLiveAfterDismiss = false
+                showingStrengthWorkout = true
+            }) { workout in
                 WorkoutStartOptionsView(
                     session: workout,
                     trainingDeviceProvider:
@@ -6145,7 +6174,8 @@ struct ATHLTHTrainView: View {
                             spotify: spotifyPlayback
                         )
                         if didStart {
-                            showingStrengthWorkout = true
+                            pendingTrainStrengthLiveAfterDismiss = true
+                            selectedStrengthSession = nil
                             return nil
                         }
                         // The iPad sends an envelope to the paired iPhone;
@@ -6292,7 +6322,16 @@ struct ATHLTHTrainView: View {
             }
             .sheet(
                 isPresented: $showingStrengthQuickStart,
-                onDismiss: { quickStrengthStartWithExercises = false }
+                onDismiss: {
+                    quickStrengthStartWithExercises = false
+                    guard ATHLTHScratchComposerPresentationPolicy
+                        .startsLiveAfterSetupDismiss(
+                            queued: pendingTrainStrengthLiveAfterDismiss,
+                            setupIsPresented: showingStrengthQuickStart
+                        ) else { return }
+                    pendingTrainStrengthLiveAfterDismiss = false
+                    showingStrengthWorkout = true
+                }
             ) {
                 WorkoutStartOptionsView(
                     session:
@@ -6330,8 +6369,8 @@ struct ATHLTHTrainView: View {
                             spotify: spotifyPlayback
                         )
                         if didStart {
+                            pendingTrainStrengthLiveAfterDismiss = true
                             showingStrengthQuickStart = false
-                                                        showingStrengthWorkout = true
                             return nil
                         }
                         // The iPad sends an envelope to the paired iPhone;

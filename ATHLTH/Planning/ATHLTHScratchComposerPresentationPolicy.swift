@@ -53,6 +53,17 @@ enum ATHLTHScratchComposerPresentationPolicy {
         return (false, day)
     }
 
+    /// Starting a strength recorder and presenting its live UI are
+    /// separate operations. SwiftUI must finish dismissing the options sheet
+    /// before the live full-screen cover takes ownership of presentation.
+    /// Failed launches never queue the transition.
+    static func startsLiveAfterSetupDismiss(
+        queued: Bool,
+        setupIsPresented: Bool
+    ) -> Bool {
+        queued && !setupIsPresented
+    }
+
     /// Quick Train's setup sheet remains mounted for the recorder and
     /// settings, but its obsolete editable surface is hidden while the
     /// shared running composer has focus.
