@@ -2302,6 +2302,14 @@ struct AroundYouExploreView: View {
         let loop = ATHLTHExploreRoutePolicy.isLoop(
             route.coordinates.map(\.coordinate)
         )
+        // Compute once for the selected route card. Keep published trail
+        // elevation/difficulty separate from the map's visual basemap.
+        let publishedElevation = publicTrailDiscovery.trails.first {
+            $0.id == route.id || $0.id == route.sharedSourceRouteID
+        }
+        let elevation = ATHLTHRouteMiniElevationPolicy.summary(
+            for: route, published: publishedElevation
+        )
 
         return VStack(
             alignment: .leading,
@@ -2437,16 +2445,6 @@ struct AroundYouExploreView: View {
                     icon: "figure.run"
                 )
 
-                if let elevation =
-                    route.elevationGainMeters {
-                    previewMetric(
-                        value:
-                            "\(Int(elevation.rounded())) m ↑",
-                        icon:
-                            "mountain.2.fill"
-                    )
-                }
-
                 if let distance =
                     distanceToRouteStart(routeForWorkout(route)) {
                     previewMetric(
@@ -2503,6 +2501,12 @@ struct AroundYouExploreView: View {
                 .lineLimit(2)
             }
             .foregroundStyle(ATHLTHTheme.mutedText)
+
+            // Compact read-only profile, elevation gain/loss and sourced
+            // difficulty. Never render fake elevation or guessed grades.
+            if elevation.hasContent {
+                ATHLTHRouteMiniElevationView(summary: elevation)
+            }
 
             if isPublicTrailRoute(route) {
                 Text(
