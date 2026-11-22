@@ -265,7 +265,7 @@ struct RunGuidanceSetupView: View {
                         norwegian: "DIN LØPEØKT · AVANSERT"
                     ),
                     title: ATHLTHLocalization.choose(
-                        english: "Run tools", norwegian: "Løpsverktøy"
+                        english: "Coach & guidance", norwegian: "Coach og veiledning"
                     ),
                     subtitle: ATHLTHLocalization.choose(
                         english: "Fine-tune this workout before you start.",
@@ -389,7 +389,7 @@ struct RunGuidanceSetupView: View {
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .tint(ATHLTHPlanDesign.accentInk)
         .navigationTitle(ATHLTHLocalization.choose(
-            english: "Run tools", norwegian: "Løpsverktøy"
+            english: "Coach & guidance", norwegian: "Coach og veiledning"
         ))
         .navigationBarTitleDisplayMode(.inline)
     }
