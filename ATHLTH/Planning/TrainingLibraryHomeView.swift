@@ -6232,6 +6232,20 @@ struct LibraryFavoritesView: View {
                     selectionTitle: nil,
                     onSelect: nil
                 )
+            } else if item.itemID.hasPrefix("athlth-main:") ||
+                      item.itemID.hasPrefix("athlth-personal-main:") {
+                let available = ATHLTHCompoundExerciseCatalog.build(
+                    running: runningLibrary.allTemplates,
+                    workoutCatalog: workoutLibrary.entries,
+                    saved: ATHLTHWorkoutMainSectionLibrary.load(
+                        userID: session.profile.userID
+                    )
+                )
+                if let match = available.first(where: { $0.id == item.itemID }) {
+                    ATHLTHCompoundExerciseDetailView(exercise: match)
+                } else {
+                    ATHLTHCompoundExerciseLibraryView()
+                }
             } else {
                 ExerciseLibraryView(source: .library)
             }
