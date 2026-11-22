@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import Supabase
 
 /// Use an existing, authenticated device registration as a conservative
