@@ -862,8 +862,41 @@ final class ExerciseLibraryStore: ObservableObject {
         } == true
     }
 
-    /// Keep historical native exercise IDs available for old workout logs,
-    /// but offer RepDB (and personal exercises) as the primary choices.
+    /// Source identifiers already used by the bundled strength programs.
+    /// Unlike English/Norwegian titles, these IDs survive language changes.
+    /// Computed once; never build a workout lookup during scrolling.
+    static let referencedNativeExerciseSlugs: Set<String> = {
+        let workouts = ATHLTHCuratedStrengthWorkouts.entries +
+            ATHLTHPremiumStrengthSessions.entries +
+            ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries
+        return Set(workouts.flatMap { workout in
+            workout.blocks.compactMap { block in
+                guard block.kind == .exercise,
+                      let slug = block.exerciseSlug,
+                      slug.hasPrefix("athlth-native-")
+                else { return nil }
+                return slug
+            }
+        })
+    }()
+
+    /// A verified public duplicate must have precisely the same canonical
+    /// English name AND equipment. Similar names and alternative movements
+    /// never suppress a library entry or silently change its identity.
+    private static func exactPublicExerciseKey(
+        _ entry: ExerciseLibraryEntry
+    ) -> String {
+        let name = ATHLTHExerciseReferenceResolver.key(entry.canonicalName)
+        let equipment = Set(entry.exercise.equipment.map {
+            ATHLTHExerciseReferenceResolver.key($0)
+        }).sorted().joined(separator: "|")
+        return name + "#" + equipment
+    }
+
+    /// A native movement used by an existing workout must be findable in
+    /// Exercises. Prefer the real visible RepDB record only when it is an
+    /// unambiguous exact equivalent; otherwise expose the original native
+    /// record rather than creating a duplicate exercise.
     var selectableExercises: [ExerciseLibraryEntry] {
         if let cachedSelectableExercises { return cachedSelectableExercises }
         let resolved: [ExerciseLibraryEntry]
@@ -872,13 +905,23 @@ final class ExerciseLibraryStore: ObservableObject {
                 !Self.isRetiredNativeDuplicate($0)
             }
         } else {
-            resolved = allExercises.filter {
-                !Self.isRetiredNativeDuplicate($0) &&
-                    ($0.source == .repDB || $0.source == .custom ||
-                     ($0.source == .athlthCatalog &&
-                      $0.sourceIdentifier.map {
-                          Self.featuredNativeExerciseSlugs.contains($0)
-                      } == true))
+            var repDBCounts: [String: Int] = [:]
+            for entry in repDBExercises {
+                repDBCounts[Self.exactPublicExerciseKey(entry), default: 0] += 1
+            }
+            resolved = allExercises.filter { entry in
+                guard !Self.isRetiredNativeDuplicate(entry) else {
+                    return false
+                }
+                guard entry.source == .athlthCatalog else {
+                    return true
+                }
+                guard let slug = entry.sourceIdentifier else { return false }
+                if Self.featuredNativeExerciseSlugs.contains(slug) {
+                    return true
+                }
+                return Self.referencedNativeExerciseSlugs.contains(slug) &&
+                    repDBCounts[Self.exactPublicExerciseKey(entry)] != 1
             }
         }
         cachedSelectableExercises = resolved
