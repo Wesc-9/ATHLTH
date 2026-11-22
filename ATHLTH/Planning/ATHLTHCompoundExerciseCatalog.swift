@@ -51,16 +51,34 @@ struct ATHLTHCompoundExercise: Identifiable {
     /// doubles its warm-up. All internal group IDs are new for this insertion.
     func blocksForReuse(in phase: WorkoutPhaseKind = .main) -> [WorkoutTemplateBlock] {
         var groupIDs: [UUID: UUID] = [:]
+        // Legacy 4×4 recipes are expanded work/recovery rows without group
+        // metadata. Group only genuinely alternating running intervals;
+        // never recast mixed sport/strength blocks as running intervals.
+        let canGroupIntervals = category == .intervals &&
+            blocks.count >= 3 &&
+            blocks.enumerated().allSatisfy { index, step in
+                index.isMultiple(of: 2)
+                    ? step.kind == .run && !step.isActiveRecovery
+                    : step.isRestOrActiveRecovery
+            }
+        let generatedGroup = canGroupIntervals ? UUID() : nil
         return blocks.enumerated().map { index, original in
             var copy = original
             copy.phase = phase
             copy.sequence = index + 1
             copy.editorDragID = UUID()
+            copy.compoundExerciseID = id
+            copy.compoundExerciseFamilyID = familyID
+            copy.compoundExerciseProtocolID = protocolID
             if let originalGroup = original.groupID {
                 if groupIDs[originalGroup] == nil {
                     groupIDs[originalGroup] = UUID()
                 }
                 copy.groupID = groupIDs[originalGroup]
+            } else if let generatedGroup {
+                copy.groupID = generatedGroup
+                copy.groupKind = .intervals
+                copy.groupRounds = 1
             }
             return copy
         }
@@ -87,7 +105,15 @@ enum ATHLTHCompoundExerciseCatalog {
                 String(Int((block.distanceMeters ?? 0).rounded())),
                 String(block.repetitions ?? 0),
                 String(block.setCount ?? 0),
-                block.exerciseSlug ?? ATHLTHWorkoutLibraryExerciseIndex.normalize(block.title)
+                block.kind == .exercise
+                    ? (block.exerciseSlug ?? ATHLTHWorkoutLibraryExerciseIndex.normalize(block.title))
+                    : "",
+                block.groupKind?.rawValue ?? "",
+                block.activityTag ?? "",
+                block.isIndoor == true ? "indoor" : "outdoor",
+                String(Int((block.treadmillInclinePercent ?? 0).rounded())),
+                String(Int((block.targetGradientPercent ?? 0).rounded())),
+                block.targetTerrainType ?? ""
             ].joined(separator: ":")
         }.joined(separator: "|")
     }
