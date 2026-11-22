@@ -227,6 +227,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     /// Athlete-selected perceived intensity (RPE 1...10). Never a measured
     /// physiological reading; optional so historic templates still decode.
     var targetEffortRPE: Int? = nil
+    /// Optional Spotify song for this exact effort, recovery or timed set.
+    /// Never required for training and absent in all older saved workouts.
+    var spotifyTrack: ATHLTHSpotifyIntervalTrack? = nil
     /// Planned treadmill gradient in percent: never treated as measured data.
     var treadmillInclinePercent: Double? = nil
     // Optional fields preserve compatibility with all existing saved workouts.
@@ -298,6 +301,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.sourceSupersetGroupIndex == rhs.sourceSupersetGroupIndex &&
         lhs.sourceLoadAlternativesKilograms == rhs.sourceLoadAlternativesKilograms &&
         lhs.targetEffortRPE == rhs.targetEffortRPE &&
+        lhs.spotifyTrack == rhs.spotifyTrack &&
         lhs.treadmillInclinePercent == rhs.treadmillInclinePercent &&
         lhs.setCount == rhs.setCount &&
         lhs.restBetweenSetsSeconds == rhs.restBetweenSetsSeconds &&
@@ -352,6 +356,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(sourceSupersetGroupIndex)
         hasher.combine(sourceLoadAlternativesKilograms)
         hasher.combine(targetEffortRPE)
+        hasher.combine(spotifyTrack)
         hasher.combine(treadmillInclinePercent)
         hasher.combine(setCount)
         hasher.combine(restBetweenSetsSeconds)
@@ -414,6 +419,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case sourceSupersetGroupIndex = "source_superset_group_index"
         case sourceLoadAlternativesKilograms = "source_load_alternatives_kg"
         case targetEffortRPE = "target_effort_rpe"
+        case spotifyTrack = "spotify_step_track"
         case treadmillInclinePercent = "treadmill_incline_percent"
         case setCount = "set_count"
         case restBetweenSetsSeconds = "rest_between_sets_seconds"
@@ -607,6 +613,7 @@ extension Array where Element == WorkoutTemplateBlock {
             item.activityTag = source.activityTag
             item.treadmillInclinePercent = source.treadmillInclinePercent
             item.targetEffortRPE = source.targetEffortRPE
+            item.spotifyTrack = source.spotifyTrack
             item.sourceIntensityZoneLabel = source.sourceIntensityZoneLabel
             item.targetHeartRatePercentMin = source.targetHeartRatePercentMin
             item.targetHeartRatePercentMax = source.targetHeartRatePercentMax
