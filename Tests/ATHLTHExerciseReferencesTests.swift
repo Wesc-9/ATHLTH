@@ -266,6 +266,56 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         if let first { library.deleteCustomExercise(first.id) }
     }
 
+    @MainActor
+    func testMarketplaceImportsFromDifferentCreatorsStayDistinct() {
+        let owner = UUID()
+        let sourceID = UUID()
+        let firstCreator = UUID()
+        let secondCreator = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(owner)
+        defer { library.switchAccount(nil) }
+        let snapshot = ExerciseSnapshot(
+            name: "Shared row", instructions: ["Pull with control"],
+            primaryMuscles: ["Back"], secondaryMuscles: [],
+            equipment: ["Cable"], imageURL: nil
+        )
+        let first = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: sourceID,
+            originalCreatorID: firstCreator
+        )
+        let second = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: sourceID,
+            originalCreatorID: secondCreator
+        )
+        XCTAssertNotNil(first)
+        XCTAssertNotNil(second)
+        XCTAssertNotEqual(first?.id, second?.id)
+        if let first { library.deleteCustomExercise(first.id) }
+        if let second { library.deleteCustomExercise(second.id) }
+    }
+
+    @MainActor
+    func testMarketplaceImportRejectsOtherAccount() {
+        let activeAccount = UUID()
+        let otherAccount = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(activeAccount)
+        defer { library.switchAccount(nil) }
+        let snapshot = ExerciseSnapshot(
+            name: "Foreign shared exercise",
+            instructions: [], primaryMuscles: ["Back"],
+            secondaryMuscles: [], equipment: [], imageURL: nil
+        )
+        let result = library.importSharedExercise(
+            snapshot, ownerID: otherAccount, sourceExerciseID: UUID()
+        )
+        XCTAssertNil(result)
+        XCTAssertFalse(library.customExercises.contains {
+            $0.exercise.name == "Foreign shared exercise"
+        })
+    }
+
     func testUnknownPrivateExerciseReferenceIsRemovedFromPublicExport() {
         var unknown = block("Personal strength movement")
         unknown.exerciseID = UUID()
