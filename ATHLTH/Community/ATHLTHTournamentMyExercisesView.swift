@@ -90,13 +90,18 @@ struct ATHLTHTournamentMyExercisesView: View {
         .task(id: matches.map(\.id)) { await reload() }
         .sheet(item: $reportSlot) { slot in
             ATHLTHTournamentExerciseEvidenceSheet(
+                requiresVerifiedWorkout: tournament.raceRules.discipline == .sprint,
+                userID: userID,
+                earliestStart: slot.scheduledAt.addingTimeInterval(
+                    TimeInterval(tournament.raceRules.countdownSeconds)),
                 exerciseName: candidates.first(where: {
                     $0.id == slot.candidateID
                 }).flatMap { exerciseNames[$0.lookupID] } ?? "Øvelse",
                 deadline: slot.deadlineAt
-            ) { note in
+            ) { note, sourceWorkoutID in
                 try await cloud.completeExercise(
-                    slotID: slot.id,evidence: note
+                    slotID: slot.id,evidence: note,
+                    sourceWorkoutID: sourceWorkoutID
                 )
                 await reload()
             }
@@ -134,6 +139,19 @@ struct ATHLTHTournamentMyExercisesView: View {
                     } ?? "Øvelse \(slot.position)")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    if tournament.raceRules.discipline == .sprint {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            let start = slot.scheduledAt.addingTimeInterval(
+                                TimeInterval(tournament.raceRules.countdownSeconds))
+                            let seconds = max(0, Int(ceil(start.timeIntervalSince(
+                                context.date))))
+                            Label(seconds == 0 ? "Startsignal gitt" :
+                                  "Startsperre · \(seconds) sek",
+                                  systemImage: "timer")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        }
+                    }
                     if slot.scheduledAt > Date() {
                         Text("Åpner " + slot.scheduledAt.formatted(
                             date: .abbreviated,time: .shortened))
@@ -182,7 +200,10 @@ struct ATHLTHTournamentMyExercisesView: View {
                 } else if match.status != "confirmed" &&
                           slot.state == "pending" &&
                           slot.deadlineAt > Date() &&
-                          slot.scheduledAt <= Date() {
+                          slot.scheduledAt.addingTimeInterval(
+                             tournament.raceRules.discipline == .sprint
+                             ? TimeInterval(tournament.raceRules.countdownSeconds)
+                             : 0) <= Date() {
                     Button("Registrer") { reportSlot = slot }
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
@@ -262,11 +283,16 @@ struct ATHLTHTournamentMyExercisesView: View {
 
 private struct ATHLTHTournamentExerciseEvidenceSheet: View {
     @Environment(\.dismiss) private var dismiss
+    let requiresVerifiedWorkout: Bool
+    let userID: UUID
+    let earliestStart: Date
     let exerciseName: String
     let deadline: Date
-    let onSubmit: @MainActor (String) async throws -> Void
+    let onSubmit: @MainActor (String, UUID?) async throws -> Void
 
     @State private var evidence = ""
+    @State private var verifiedWorkouts: [ATHLTHTournamentEligibleWorkout] = []
+    @State private var selectedWorkoutID: UUID?
     @State private var submitting = false
     @State private var errorMessage: String?
 
@@ -288,6 +314,26 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
                     .lineLimit(3...6)
                     .padding(15)
                     .background(ATHLTHArenaV3Style.panel())
+                if requiresVerifiedWorkout {
+                    if verifiedWorkouts.isEmpty {
+                        Label("Ingen verifiserte ATHLTH-økter funnet etter startsignalet. Start og fullfør en økt før du registrerer sprintresultatet.",
+                              systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Picker("Verifisert sprintøkt", selection: $selectedWorkoutID) {
+                            Text("Velg økt").tag(UUID?.none)
+                            ForEach(verifiedWorkouts) { workout in
+                                Text(workout.startedAt.map {
+                                    $0.formatted(date: .abbreviated,
+                                                 time: .shortened)
+                                } ?? "Verifisert økt")
+                                    .tag(workout.sourceWorkoutID)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                }
                 if let errorMessage {
                     Text(errorMessage).font(.caption).foregroundStyle(.red)
                 }
@@ -297,7 +343,8 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
                         defer { submitting=false }
                         do {
                             try await onSubmit(evidence.trimmingCharacters(
-                                in: .whitespacesAndNewlines))
+                                in: .whitespacesAndNewlines),
+                                selectedWorkoutID)
                             dismiss()
                         } catch { errorMessage=error.localizedDescription }
                     }
@@ -313,13 +360,19 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
                 }
                 .disabled(submitting || evidence.trimmingCharacters(
                     in: .whitespacesAndNewlines).count<3 || evidence.count>500 ||
-                    deadline<=Date())
+                    deadline<=Date() ||
+                    (requiresVerifiedWorkout && selectedWorkoutID == nil))
                 Spacer()
             }
             .padding(18)
             .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
             .navigationTitle("Gjennomføring")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                guard requiresVerifiedWorkout else { return }
+                verifiedWorkouts = (try? await ATHLTHTournamentSingleEventCloud()
+                    .eligibleWorkouts(userID: userID, after: earliestStart)) ?? []
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Lukk") { dismiss() }
