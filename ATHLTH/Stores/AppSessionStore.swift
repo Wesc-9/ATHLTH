@@ -5575,6 +5575,8 @@ final class AppSessionStore: ObservableObject {
         }
 
         switch sessionsPerWeek {
+        case 1:
+            return [3]
         case 2:
             return [2, 5]
         case 3:
@@ -5583,8 +5585,13 @@ final class AppSessionStore: ObservableObject {
             return [1, 3, 5, 7]
         case 5:
             return [1, 2, 4, 5, 7]
-        default:
+        case 6:
             return [1, 2, 3, 4, 5, 6]
+        case 7:
+            return [1, 2, 3, 4, 5, 6, 7]
+        default:
+            // Invalid remote plans are rejected by hasCompleteWorkoutPattern.
+            return []
         }
     }
 
