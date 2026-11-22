@@ -6,9 +6,9 @@ final class ATHLTHUnifiedQuickStartPresentationTests: XCTestCase {
         XCTAssertEqual(ATHLTHQuickStartActivity.running.types,
                        [.free, .route, .workout, .competition])
         XCTAssertEqual(ATHLTHQuickStartActivity.walking.types,
-                       [.free, .route])
+                       [.free, .route, .competition])
         XCTAssertEqual(ATHLTHQuickStartActivity.strength.types,
-                       [.free, .workout, .exercises])
+                       [.free, .workout, .exercises, .competition])
     }
 
     func testStrengthNeverOffersWalkingCompanion() {
