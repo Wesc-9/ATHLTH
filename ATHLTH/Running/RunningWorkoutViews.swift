@@ -385,7 +385,6 @@ struct RunningWorkoutDetailView: View {
     @State private var oneTimeWorkout: RunningWorkoutTemplate?
     @State private var oneTimeOptions = ATHLTHWorkoutPersonalOptions()
     @State private var oneTimeCoachDraft = AudioCoachDraft()
-    @State private var oneTimeSpeedText = ""
     @State private var oneTimeSongStep: PrivateSongStep?
     @State private var editingPrivatePreset = false
     @State private var showingPrivateStartChoices = false
@@ -395,7 +394,6 @@ struct RunningWorkoutDetailView: View {
     @State private var privateSavedWorkout: RunningWorkoutTemplate?
     @State private var privateOptions = ATHLTHWorkoutPersonalOptions()
     @State private var privateCoachDraft = AudioCoachDraft()
-    @State private var privateSpeedText = ""
     @State private var selectedPrivateSongStep: PrivateSongStep?
     private struct PrivateSongStep: Identifiable {
         let index: Int
@@ -478,10 +476,7 @@ struct RunningWorkoutDetailView: View {
         dismiss()
     }
 
-    private func applyPrivateSpeed() {
-        let normalized = privateSpeedText.replacingOccurrences(of: ",", with: ".")
-        guard let speed = Double(normalized), speed.isFinite,
-              (2...30).contains(speed) else { return }
+    private func applyPrivateSpeed(_ speed: Double) {
         let candidate = ATHLTHRunningPrivateSpeedPolicy.applying(
             kilometersPerHour: speed,
             to: privateSavedWorkout ?? ATHLTHRunningLibraryDefaults.unpersonalized(workout)
@@ -546,7 +541,6 @@ struct RunningWorkoutDetailView: View {
         oneTimeStartRequested = false
         oneTimeWorkout = previewWorkout
         oneTimeOptions = privateOptions
-        oneTimeSpeedText = ""
         showingOneTimeSettings = true
     }
 
@@ -584,33 +578,9 @@ struct RunningWorkoutDetailView: View {
                 in: previewWorkout
             )
             if count > 0 {
-                HStack(spacing: 9) {
-                    TextField("14", text: $privateSpeedText)
-                        .keyboardType(.decimalPad)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 76)
-                        .accessibilityIdentifier("athlth-running-private-speed")
-                    Text("km/t")
-                        .font(.subheadline)
-                    Spacer(minLength: 0)
-                    Button(ATHLTHLocalization.choose(
-                        english: "All work intervals",
-                        norwegian: "Alle \(count) drag"
-                    )) {
-                        applyPrivateSpeed()
-                    }
-                    .disabled(Double(privateSpeedText.replacingOccurrences(
-                        of: ",", with: "."
-                    )).map { !(2...30).contains($0) } ?? true)
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHPlanDesign.accentInk)
+                ATHLTHRunningPrivateSpeedEditor(effortCount: count) {
+                    applyPrivateSpeed($0)
                 }
-                Text(ATHLTHLocalization.choose(
-                    english: "Apply one speed to all efforts, without changing recoveries.",
-                    norwegian: "Sett samme fart på dragene uten å endre pausene."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
             Button {
@@ -704,26 +674,14 @@ struct RunningWorkoutDetailView: View {
                         .athlthPlanCard(radius: 18)
 
                         if ATHLTHRunningPrivateSpeedPolicy.workCount(in: selected) > 0 {
-                            HStack(spacing: 10) {
-                                Text("Fart på alle drag")
-                                Spacer(minLength: 6)
-                                TextField("14", text: $oneTimeSpeedText)
-                                    .keyboardType(.decimalPad)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 70)
-                                Text("km/t")
-                                Button("Bruk") {
-                                    guard let speed = Double(oneTimeSpeedText
-                                        .replacingOccurrences(of: ",", with: ".")),
-                                          speed.isFinite, (2...30).contains(speed)
-                                    else { return }
-                                    oneTimeWorkout = ATHLTHRunningPrivateSpeedPolicy.applying(
-                                        kilometersPerHour: speed, to: selected
-                                    )
-                                }
-                                .buttonStyle(.bordered)
+                            ATHLTHRunningPrivateSpeedEditor(
+                                effortCount: ATHLTHRunningPrivateSpeedPolicy
+                                    .workCount(in: selected)
+                            ) { speed in
+                                oneTimeWorkout = ATHLTHRunningPrivateSpeedPolicy.applying(
+                                    kilometersPerHour: speed, to: selected
+                                )
                             }
-                            .font(.subheadline)
                             .padding(13)
                             .athlthPlanCard(radius: 18)
                         }
