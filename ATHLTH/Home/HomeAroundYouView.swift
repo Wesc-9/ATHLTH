@@ -150,7 +150,6 @@ private struct AroundYouRouteItem: Identifiable {
     let centerCoordinate: CLLocationCoordinate2D?
     let renderCoordinates: [CLLocationCoordinate2D]
     let renderBounds: (south: Double, north: Double, west: Double, east: Double)?
-    let hitTestLocations: [CLLocation]
 
     init(
         id: UUID,
@@ -179,7 +178,6 @@ private struct AroundYouRouteItem: Identifiable {
             centerCoordinate = nil
             renderCoordinates = []
             renderBounds = nil
-            hitTestLocations = []
             return
         }
 
@@ -190,24 +188,10 @@ private struct AroundYouRouteItem: Identifiable {
             coordinates.reduce(0) { $0 + $1.longitude } /
             Double(coordinates.count)
 
-        centerCoordinate = CLLocationCoordinate2D(
+        let visualCenter = CLLocationCoordinate2D(
             latitude: latitude,
             longitude: longitude
         )
-
-        func sampled(maximumCount: Int) -> [RouteCoordinate] {
-            guard coordinates.count > maximumCount else {
-                return coordinates
-            }
-            let stride = max(1, (coordinates.count + maximumCount - 1) / maximumCount)
-            var values = coordinates.enumerated().compactMap {
-                $0.offset % stride == 0 ? $0.element : nil
-            }
-            if let last = coordinates.last, values.last != last {
-                values.append(last)
-            }
-            return values
-        }
 
         // Map cards do not need the full GPS density. Keeping a compact
         // display/hit-test sample cuts transient allocations while panning
@@ -216,6 +200,17 @@ private struct AroundYouRouteItem: Identifiable {
             coordinates.map(\.coordinate),
             maximum: 160
         )
+        // The centroid of a loop may fall in the water or beside another
+        // trail. Its exact-ID route pin must sit on the route actually drawn.
+        centerCoordinate = renderCoordinates.min(by: { lhs, rhs in
+            let latitudeWeight = max(0.05,
+                abs(cos(visualCenter.latitude * .pi / 180)))
+            let left = pow(lhs.latitude - visualCenter.latitude, 2) +
+                pow((lhs.longitude - visualCenter.longitude) * latitudeWeight, 2)
+            let right = pow(rhs.latitude - visualCenter.latitude, 2) +
+                pow((rhs.longitude - visualCenter.longitude) * latitudeWeight, 2)
+            return left < right
+        }) ?? visualCenter
 
         // Precompute geometry bounds once per route item instead of walking
         // every polyline again whenever the user pans or zooms the map.
@@ -235,13 +230,6 @@ private struct AroundYouRouteItem: Identifiable {
             renderBounds = nil
         }
 
-        hitTestLocations = sampled(maximumCount: 64)
-            .map {
-                CLLocation(
-                    latitude: $0.latitude,
-                    longitude: $0.longitude
-                )
-            }
     }
 }
 
@@ -1138,89 +1126,102 @@ struct AroundYouExploreView: View {
                                         )
                             )
 
-                            // Keep start, finish and direction visible only
-                            // for the focused route to avoid map clutter.
+                            // Show only the selected track's compact
+                            // start/finish and actual route-geometry turns.
+                            // Pure annotations: no map-tap interception.
                             if isSelected,
-                               let start = (reverseSelectedRoute
-                                   ? route.coordinates.last : route.coordinates.first)?.coordinate,
-                               let finish = (reverseSelectedRoute
-                                   ? route.coordinates.first : route.coordinates.last)?.coordinate,
-                               CLLocationCoordinate2DIsValid(start),
-                               CLLocationCoordinate2DIsValid(finish) {
-                                let loop = CLLocation(latitude: start.latitude,
-                                                      longitude: start.longitude)
-                                    .distance(from: CLLocation(
-                                        latitude: finish.latitude,
-                                        longitude: finish.longitude
-                                    )) < 35
+                               let start = selectedDisplayCoordinates.first,
+                               let finish = selectedDisplayCoordinates.last {
+                                let loop = CLLocation(
+                                    latitude: start.latitude,
+                                    longitude: start.longitude
+                                ).distance(from: CLLocation(
+                                    latitude: finish.latitude,
+                                    longitude: finish.longitude
+                                )) < 35
 
-                                Annotation(loop ? "Start / mål" : "Start",
-                                           coordinate: start) {
-                                    Label(loop ? "Start / mål" : "Start",
-                                          systemImage: loop
-                                              ? "flag.checkered" : "figure.run")
-                                        .font(.caption2.weight(.bold))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
-                                        .padding(.horizontal, 9)
-                                        .padding(.vertical, 7)
-                                        .background(.regularMaterial, in: Capsule())
-                                        .overlay {
-                                            Capsule().stroke(
-                                                ATHLTHTheme.premiumGold,
-                                                lineWidth: 2
-                                            )
-                                        }
+                                Annotation(loop ? "Start og mål" : "Start",
+                                           coordinate: start, anchor: .center) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: loop
+                                              ? "flag.checkered" : "circle.fill")
+                                            .font(.system(size: 9, weight: .bold))
+                                        Text(loop ? "S/M" : "S")
+                                            .font(.system(size: 10, weight: .bold))
+                                    }
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 24)
+                                    .background(ATHLTHTheme.accentDeep,
+                                                in: Capsule())
+                                    .overlay {
+                                        Capsule().stroke(.white, lineWidth: 1.5)
+                                    }
+                                    .shadow(color: .black.opacity(0.16), radius: 3, y: 1)
+                                    .accessibilityLabel(loop
+                                        ? "Rundløype: start og mål"
+                                        : "Rutens start")
+                                    .allowsHitTesting(false)
                                 }
                                 .annotationTitles(.hidden)
 
                                 if !loop {
-                                    Annotation("Mål", coordinate: finish) {
-                                        Label("Mål", systemImage: "flag.checkered")
-                                            .font(.caption2.weight(.bold))
-                                            .foregroundStyle(ATHLTHTheme.primaryText)
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 7)
-                                            .background(.regularMaterial, in: Capsule())
+                                    Annotation("Mål", coordinate: finish,
+                                               anchor: .center) {
+                                        Image(systemName: "flag.checkered")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 26, height: 26)
+                                            .background(
+                                                ATHLTHTheme.premiumGold,
+                                                in: Circle()
+                                            )
                                             .overlay {
-                                                Capsule().stroke(
-                                                    ATHLTHTheme.vitality,
-                                                    lineWidth: 2
-                                                )
+                                                Circle().stroke(.white, lineWidth: 1.5)
                                             }
+                                            .shadow(color: .black.opacity(0.14),
+                                                    radius: 3, y: 1)
+                                            .accessibilityLabel("Rutens mål")
+                                            .allowsHitTesting(false)
                                     }
                                     .annotationTitles(.hidden)
                                 }
 
-                                if route.coordinates.count >= 3 {
-                                    let directedPoints = reverseSelectedRoute
-                                        ? Array(route.coordinates.reversed()) : route.coordinates
-                                    let midIndex = max(1, directedPoints.count / 3)
-                                    let previous = directedPoints[midIndex - 1]
-                                    let next = directedPoints[
-                                        min(directedPoints.count - 1, midIndex + 1)
-                                    ]
-                                    let mid = directedPoints[midIndex]
-                                    let bearing = atan2(
-                                        (next.longitude - previous.longitude) *
-                                            cos(mid.latitude * .pi / 180),
-                                        next.latitude - previous.latitude
-                                    ) * 180 / .pi
-                                    Annotation("Retning", coordinate: mid.coordinate) {
+                                ForEach(ATHLTHExploreRouteMapPolicy.directionCues(
+                                    for: selectedDisplayCoordinates
+                                )) { cue in
+                                    Annotation("Retning", coordinate: cue.coordinate,
+                                               anchor: .center) {
                                         Image(systemName: "arrow.up")
-                                            .font(.caption.weight(.heavy))
-                                            .foregroundStyle(ATHLTHTheme.primaryText)
-                                            .frame(width: 29, height: 29)
-                                            .background(.regularMaterial, in: Circle())
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                                            .frame(width: 22, height: 22)
+                                            .background(
+                                                Color.white.opacity(0.93),
+                                                in: Circle()
+                                            )
+                                            .overlay {
+                                                Circle().stroke(
+                                                    ATHLTHTheme.premiumGold.opacity(0.55),
+                                                    lineWidth: 0.8
+                                                )
+                                            }
                                             .rotationEffect(.degrees(
-                                                bearing - (lastObservedMapCamera?.heading ?? 0)
+                                                cue.bearingDegrees -
+                                                    (lastObservedMapCamera?.heading ?? 0)
                                             ))
-                                            .accessibilityLabel("Rutens retning")
+                                            .shadow(color: .black.opacity(0.10),
+                                                    radius: 2, y: 1)
+                                            .accessibilityLabel(
+                                                "Retning langs valgt rute"
+                                            )
+                                            .allowsHitTesting(false)
                                     }
                                     .annotationTitles(.hidden)
                                 }
                             }
 
-                            if let center = route.centerCoordinate {
+                            if !isSelected, let center = route.centerCoordinate {
                                 Annotation(
                                     route.title,
                                     coordinate: center
@@ -1339,8 +1340,44 @@ struct AroundYouExploreView: View {
                         return
                     }
 
+                    // Convert 16 screen points to actual map meters at
+                    // this zoom level. Never use the old fixed 240 m radius.
+                    let shifted = proxy.convert(
+                        CGPoint(x: point.x + 16, y: point.y),
+                        from: .local
+                    )
+                    let tolerance = shifted.map {
+                        CLLocation(latitude: coordinate.latitude,
+                                   longitude: coordinate.longitude)
+                            .distance(from: CLLocation(
+                                latitude: $0.latitude, longitude: $0.longitude
+                            ))
+                    } ?? 18
+
+                    // Explicit map pins keep their exact route identities
+                    // even if MapKit also dispatches the parent tap gesture.
+                    let pinned = mapVisibleRoutes.compactMap { route
+                        -> (AroundYouRouteItem, Double)? in
+                        guard let center = route.centerCoordinate else {
+                            return nil
+                        }
+                        let meters = CLLocation(
+                            latitude: center.latitude,
+                            longitude: center.longitude
+                        ).distance(from: CLLocation(
+                            latitude: coordinate.latitude,
+                            longitude: coordinate.longitude
+                        ))
+                        return meters <= max(10, tolerance * 1.4)
+                            ? (route, meters) : nil
+                    }.min { $0.1 < $1.1 }
+                    if let pinned {
+                        selectRoute(pinned.0.trainingRoute)
+                        return
+                    }
                     selectRoute(
-                        nearestTo: coordinate
+                        nearestTo: coordinate,
+                        toleranceMeters: tolerance
                     )
                 }
                 .overlay(alignment: .bottomTrailing) {
@@ -2200,57 +2237,55 @@ struct AroundYouExploreView: View {
     }
 
     private func selectRoute(
-        nearestTo coordinate: CLLocationCoordinate2D
+        nearestTo coordinate: CLLocationCoordinate2D,
+        toleranceMeters: Double
     ) {
-        guard filter == .all || filter == .routes else {
-            withAnimation(.easeInOut(duration: 0.16)) {
-                selectedRoute = nil
-            }
+        guard filter == .all || filter == .routes else { return }
+        let candidates = mapVisibleRoutes.map {
+            ATHLTHExploreRouteMapPolicy.Candidate(
+                id: $0.id, points: $0.renderCoordinates
+            )
+        }
+        guard let id = ATHLTHExploreRouteMapPolicy.nearestRouteID(
+            to: coordinate, candidates: candidates,
+            toleranceMeters: toleranceMeters,
+            preferredID: selectedRoute?.id
+        ), let matched = mapVisibleRoutes.first(where: { $0.id == id })
+        else {
+            // An unrelated tap must not unexpectedly replace or dismiss
+            // the selected route card.
             return
         }
+        selectRoute(matched.trainingRoute)
+    }
 
-        let tapLocation = CLLocation(
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude
+    private func routePreviewEstimates(
+        for route: TrainingRoute
+    ) -> (walk: TimeInterval, run: TimeInterval)? {
+        let published = publicTrailDiscovery.trails.first { $0.id == route.id }
+        return ATHLTHExploreRouteMapPolicy.estimatedTimes(
+            distanceKilometers: route.distanceKilometers,
+            publicWalkSeconds: published?.estimatedWalkSeconds,
+            publicRunSeconds: published?.estimatedRunSeconds
         )
+    }
 
-        let candidate = mapVisibleRoutes
-            .prefix(60)
-            .compactMap {
-                route ->
-                    (TrainingRoute, CLLocationDistance)?
-                in
-                guard !route.coordinates.isEmpty
-                else {
-                    return nil
-                }
-
-                guard let nearest =
-                    route.hitTestLocations
-                    .lazy
-                    .map({
-                        tapLocation.distance(from: $0)
-                    })
-                    .min(),
-                    nearest <= 240
-                else {
-                    return nil
-                }
-
-                return (
-                    route.trainingRoute,
-                    nearest
-                )
-            }
-            .min { $0.1 < $1.1 }
-
-        if let route = candidate?.0 {
-            selectRoute(route)
-        } else {
-            withAnimation(.easeInOut(duration: 0.16)) {
-                selectedRoute = nil
-            }
+    private func routeEstimatedMinutes(_ seconds: TimeInterval) -> String {
+        let minutes = max(1, Int((seconds / 60).rounded()))
+        if minutes >= 60 {
+            let hours = minutes / 60
+            let remainder = minutes % 60
+            return remainder == 0 ? "\(hours) t" : "\(hours) t \(remainder) min"
         }
+        return "\(minutes) min"
+    }
+
+    private func routePreviewSurface(for route: TrainingRoute) -> String {
+        let published = publicTrailDiscovery.trails.first { $0.id == route.id }
+        return ATHLTHExploreRouteMapPolicy.surfaceLabel(
+            percentages: route.surfacePercentages,
+            publishedSummary: published?.surfaceSummary
+        )
     }
 
     private func routePreviewCard(
@@ -2430,49 +2465,43 @@ struct AroundYouExploreView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: loop ? "Loop route" : "Point-to-point route",
-                            norwegian: loop ? "Rundløype" : "Fra A til B"
-                        ),
-                        systemImage: loop
-                            ? "arrow.triangle.2.circlepath" : "arrow.right"
-                    )
-                    Spacer(minLength: 4)
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            reverseSelectedRoute.toggle()
-                        }
-                    } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: loop ? "Loop route" : "Point-to-point route",
+                        norwegian: loop ? "Rundløype" : "Fra A til B"
+                    ),
+                    systemImage: loop
+                        ? "arrow.triangle.2.circlepath" : "arrow.right"
+                )
+                .font(.caption2.weight(.semibold))
+
+                // Distinct walking/running times, never the one ambiguous
+                // expectedTravelTimeSeconds from the old map card.
+                if let estimates = routePreviewEstimates(for: route) {
+                    HStack(spacing: 8) {
                         Label(
-                            ATHLTHLocalization.choose(
-                                english: reverseSelectedRoute
-                                    ? "Original direction" : "Reverse",
-                                norwegian: reverseSelectedRoute
-                                    ? "Normal retning" : "Snu retning"
-                            ),
-                            systemImage: "arrow.left.arrow.right"
+                            "Gå · ~" + routeEstimatedMinutes(estimates.walk),
+                            systemImage: "figure.walk"
                         )
-                        .lineLimit(1)
+                        Spacer(minLength: 6)
+                        Label(
+                            "Løp · ~" + routeEstimatedMinutes(estimates.run),
+                            systemImage: "figure.run"
+                        )
+                        Spacer(minLength: 6)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .accessibilityHint("Endrer start, mål og rutens retning")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText.opacity(0.88))
                 }
-                if let seconds = route.expectedTravelTimeSeconds,
-                   seconds > 0 {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Estimated \(Int((seconds / 60).rounded())) min",
-                            norwegian: "Estimert \(Int((seconds / 60).rounded())) min"
-                        ),
-                        systemImage: "clock"
-                    )
-                }
+
+                Label(
+                    routePreviewSurface(for: route),
+                    systemImage: "circle.hexagongrid"
+                )
+                .font(.caption2)
+                .lineLimit(2)
             }
-            .font(.caption2.weight(.semibold))
             .foregroundStyle(ATHLTHTheme.mutedText)
 
             if isPublicTrailRoute(route) {
