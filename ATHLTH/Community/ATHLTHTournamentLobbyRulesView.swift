@@ -100,6 +100,24 @@ struct ATHLTHTournamentLobbyRulesView: View {
                 Divider().opacity(0.5)
                 VStack(alignment: .leading, spacing: 8) {
                     Label(
+                        tournament.startMode == "when_ready"
+                            ? "Starter automatisk når alle har godkjent og trykket Klar"
+                            : tournament.startMode == "scheduled"
+                            ? "Starter ved avtalt tidspunkt når alle er klare"
+                            : "Arrangøren starter manuelt når alle er klare",
+                        systemImage: "checkmark.circle"
+                    )
+                    if tournament.requiredEnvironment != "any" {
+                        Label(tournament.requiredEnvironment == "gym"
+                              ? "Tillatt treningsmiljø: treningssenter"
+                              : "Tillatt treningsmiljø: utendørs",
+                              systemImage: "checkmark.shield")
+                    }
+                    if let place = tournament.meetingPlace, !place.isEmpty {
+                        Label("Møtepunkt: " + place,
+                              systemImage: "mappin.and.ellipse")
+                    }
+                    Label(
                         tournament.plannedStartsAt.map {
                             "Tidligste start: " + $0.formatted(
                                 date: .abbreviated, time: .shortened
