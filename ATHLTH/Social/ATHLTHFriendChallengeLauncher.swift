@@ -39,9 +39,11 @@ struct ATHLTHFriendChallengeLauncher: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("athlth-friend-challenge-launch")
         .sheet(isPresented: $showingCompetition) {
-            ATHLTHCompetitionEntryView(
+            // This is a cold navigation boundary: avoid nesting the generic
+            // competition editor type in the friend-profile view graph.
+            AnyView(ATHLTHCompetitionEntryView(
                 preselectedFriend: friend
-            )
+            ))
         }
     }
 
