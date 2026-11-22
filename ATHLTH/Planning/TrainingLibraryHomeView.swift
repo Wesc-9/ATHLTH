@@ -3158,11 +3158,24 @@ struct TrainingPlanCatalogDetailView: View {
                         ))
                         .font(.headline.weight(.bold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
-                        Text(ATHLTHLocalization.format(
-                            english: "%d planned sessions",
-                            norwegian: "%d planlagte økter",
-                            entry.sessionsPerWeek
-                        ))
+                        HStack(spacing: 6) {
+                            Text(ATHLTHLocalization.format(
+                                english: "%d planned sessions",
+                                norwegian: "%d planlagte økter",
+                                entry.sessionsPerWeek
+                            ))
+                            if let km = zonedWeek?.targetKm {
+                                Text("·")
+                                Text("\(km.formatted()) km")
+                            }
+                            if let load = zonedWeek?.weeklyLoadScore {
+                                Text("·")
+                                Text(ATHLTHLocalization.format(
+                                    english: "Load %d", norwegian: "Belastning %d",
+                                    load
+                                ))
+                            }
+                        }
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
