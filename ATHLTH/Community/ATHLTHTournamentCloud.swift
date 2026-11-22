@@ -401,6 +401,18 @@ private struct ATHLTHTournamentReplacementOfferID: Decodable {
     }
 }
 
+private struct ATHLTHTournamentConversationPreview: Decodable {
+    let tournamentID: UUID
+    let content: String
+    let kind: String
+    let createdAt: Date
+    enum CodingKeys: String, CodingKey {
+        case content, kind
+        case tournamentID = "tournament_id"
+        case createdAt = "created_at"
+    }
+}
+
 struct ATHLTHTournamentCloudService {
     private let client = SupabaseEnvironment.client
 
@@ -454,6 +466,28 @@ struct ATHLTHTournamentCloudService {
                 )
             )
         ).execute().value
+    }
+
+    /// Fetch only the latest message preview per visible conversation;
+    /// one batched query instead of one network request per row.
+    func tournamentMessagePreviews(ids: [UUID]) async throws -> [UUID: String] {
+        guard !ids.isEmpty else { return [:] }
+        var recent: [UUID: String] = [:]
+        for start in stride(from: 0, to: ids.count, by: 100) {
+            let batch = Array(ids[start..<min(start + 100, ids.count)])
+            let records: [ATHLTHTournamentConversationPreview] = try await client
+                .from("athlth_tournament_lobby_messages")
+                .select("tournament_id,content,kind,created_at")
+                .in("tournament_id", values: batch)
+                .order("created_at", ascending: false)
+                .limit(300)
+                .execute().value
+            for record in records where recent[record.tournamentID] == nil {
+                recent[record.tournamentID] =
+                    String(record.content.prefix(110))
+            }
+        }
+        return recent
     }
 
     func visibleTournaments() async throws -> [ATHLTHTournamentRemote] {
