@@ -179,6 +179,9 @@ enum ATHLTHTournamentEngine {
             groupSize: draft.groupSize,
             qualifiersPerGroup: draft.qualifiersPerGroup
         )
+        // A single event scores everyone once. It must not generate any
+        // league fixtures, byes or imaginary one-on-one matches.
+        if draft.singleEventMode { return [] }
         let practices = warmups(draft.participants, rounds: draft.warmupRounds)
         switch draft.format {
         case .league:
