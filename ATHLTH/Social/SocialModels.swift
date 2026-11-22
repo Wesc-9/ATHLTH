@@ -1254,7 +1254,9 @@ struct SocialWorkoutInvitePayload: Codable, Hashable {
     var startIndependently: Bool? = nil
 
     var resolvedStartIndependently: Bool {
-        startIndependently == true || resolvedParticipationMode == .remote
+        // Explicit false means a synchronized remote lobby. Legacy remote
+        // invites with a missing field retain their independent-start mode.
+        startIndependently ?? (resolvedParticipationMode == .remote)
     }
 
     var resolvedParticipationMode:
