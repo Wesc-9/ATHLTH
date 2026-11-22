@@ -10,6 +10,7 @@ struct ATHLTHTournamentInboxSection: View {
 
     @State private var tournaments: [ATHLTHTournamentRemote] = []
     @State private var pendingIDs: Set<UUID> = []
+    @State private var recentText: [UUID: String] = [:]
     @State private var loading = false
     @State private var error: String?
 
@@ -38,8 +39,8 @@ struct ATHLTHTournamentInboxSection: View {
 
             ForEach(visible) { tournament in
                 NavigationLink {
-                    ATHLTHTournamentLiveDetailView(
-                        tournament: tournament, openChatInitially: true
+                    ATHLTHTournamentGroupConversationView(
+                        tournament: tournament
                     )
                 } label: {
                     HStack(spacing: 12) {
@@ -53,8 +54,9 @@ struct ATHLTHTournamentInboxSection: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                             Text(pendingIDs.contains(tournament.id)
-                                 ? "Invitasjon – godta eller avslå"
-                                 : "Konkurransechat · \(tournament.format.title)")
+                                 ? "Invitasjon · Godta eller avslå"
+                                 : recentText[tournament.id] ??
+                                   "Konkurransechat · \(tournament.format.title)")
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
@@ -74,7 +76,13 @@ struct ATHLTHTournamentInboxSection: View {
                 Text(error).font(.caption).foregroundStyle(.secondary)
             }
         }
-        .task(id: session.profile.userID) { await reload() }
+        .task(id: session.profile.userID) {
+            await reload()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                if !Task.isCancelled { await reload() }
+            }
+        }
         .task(id: filterKey) {
             onVisibleCountChanged(visible.count)
             if filterKey == "all" || filterKey == "groups" {
@@ -104,9 +112,14 @@ struct ATHLTHTournamentInboxSection: View {
             )
             tournaments = items.filter {
                 mine.contains($0.id) &&
-                [.league, .groups, .cup].contains($0.format)
+                [.league, .groups, .cup].contains($0.format) &&
+                $0.status != "cancelled"
             }
             pendingIDs = pending
+            let preview = try await cloud.tournamentMessagePreviews(
+                ids: tournaments.map(\.id)
+            )
+            recentText = preview
             error = nil
         } catch {
             self.error = error.localizedDescription
