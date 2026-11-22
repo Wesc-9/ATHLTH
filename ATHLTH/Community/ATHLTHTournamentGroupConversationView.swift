@@ -14,6 +14,7 @@ struct ATHLTHTournamentGroupConversationView: View {
     @State private var entries: [ATHLTHTournamentRemoteEntry] = []
     @State private var messages: [ATHLTHTournamentLobbyMessageRemote] = []
     @State private var draft = ""
+    @State private var announcing = false
     @State private var isLoading = true
     @State private var working = false
     @State private var errorMessage: String?
@@ -237,6 +238,12 @@ struct ATHLTHTournamentGroupConversationView: View {
                         .font(.caption2)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     }
+                    if message.kind == "announcement" {
+                        Label("Viktig beskjed fra arrangør",
+                              systemImage: "megaphone")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    }
                     Text(message.content)
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
@@ -251,7 +258,13 @@ struct ATHLTHTournamentGroupConversationView: View {
     }
 
     private var composer: some View {
-        HStack(spacing: 9) {
+        VStack(spacing: 7) {
+            if displayed.ownerID == session.profile.userID {
+                Toggle("Send som viktig beskjed til alle", isOn: $announcing)
+                    .font(.caption.weight(.medium))
+                    .tint(ATHLTHArenaV3Style.gold)
+            }
+            HStack(spacing: 9) {
             TextField("Skriv til konkurransen…", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .padding(12)
@@ -269,6 +282,7 @@ struct ATHLTHTournamentGroupConversationView: View {
             .disabled(!canWrite)
             .accessibilityLabel("Send melding")
         }
+            }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.regularMaterial)
@@ -294,9 +308,11 @@ struct ATHLTHTournamentGroupConversationView: View {
         do {
             try await lobby.sendMessage(
                 tournamentID: displayed.id, text: message,
-                announcement: false
+                announcement: announcing &&
+                    displayed.ownerID == session.profile.userID
             )
             draft = ""
+            announcing = false
             await reload(showLoading: false)
         } catch { errorMessage = error.localizedDescription }
     }
