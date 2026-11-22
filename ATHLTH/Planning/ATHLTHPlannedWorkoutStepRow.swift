@@ -34,6 +34,8 @@ struct ATHLTHPlannedWorkoutStepRow: View {
         return abs(horizontal) >= threshold
     }
     private var isPause: Bool { block.isRestOrActiveRecovery }
+    // Recovery is visually secondary, but keeps a 44-point hit target.
+    private var rowHeight: CGFloat { isPause ? 44 : 58 }
     private var isActivePause: Bool { block.isActiveRecovery }
     private var displayedStepTitle: String {
         if isActivePause {
@@ -161,7 +163,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.31))
-                .frame(width: 21, height: 49)
+                .frame(width: 21, height: rowHeight)
                 .contentShape(Rectangle())
                 .gesture(reorderGesture)
                 .accessibilityLabel(ATHLTHLocalization.choose(
@@ -193,13 +195,15 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                   : block.kind == .run &&
                                     block.treadmillInclinePercent != nil
                                         ? "figure.run.treadmill" : block.kind.systemImage)
-                                .font(.system(size: 15))
+                                .font(.system(size: isPause ? 13 : 17))
                                 .foregroundStyle(
                                     isPause ? .secondary : ATHLTHTrainDesign.ink
                                 )
                                 .frame(width: 23)
                             Text(displayedStepTitle)
-                                .font(.subheadline.weight(.medium))
+                                .font(isPause
+                                      ? .caption.weight(.medium)
+                                      : .subheadline.weight(.semibold))
                                 .foregroundStyle(ATHLTHTrainDesign.ink)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.85)
@@ -237,7 +241,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                         }
                         .padding(.leading, 9)
                         .padding(.trailing, 4)
-                        .frame(maxWidth: .infinity, minHeight: 49)
+                        .frame(maxWidth: .infinity, minHeight: rowHeight)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -279,7 +283,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                         .labelStyle(.iconOnly)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
-                        .frame(width: 44, height: 49)
+                        .frame(width: 44, height: rowHeight)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -287,18 +291,21 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                 .background(
                     isPause ? ATHLTHPlanDesign.warmSurface.opacity(0.56)
                         : ATHLTHPlanDesign.canvas,
-                    in: RoundedRectangle(cornerRadius: 12)
+                    in: RoundedRectangle(cornerRadius: isPause ? 11 : 15)
                 )
                 .offset(x: swipeOffset)
                 .contentShape(Rectangle())
                 .simultaneousGesture(swipeGesture)
             }
-            .frame(maxWidth: .infinity, minHeight: 49)
+            .frame(maxWidth: .infinity, minHeight: rowHeight)
             .clipped()
             .onGeometryChange(for: CGFloat.self) { geometry in
                 geometry.size.width
             } action: { _, width in
-                if width > 0 { measuredRowWidth = width }
+                // Ignore subpixel geometry noise during interactive scroll.
+                if width > 0 && abs(width - measuredRowWidth) > 1 {
+                    measuredRowWidth = width
+                }
             }
         }
     }
