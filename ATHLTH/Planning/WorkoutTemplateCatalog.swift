@@ -2592,9 +2592,11 @@ struct WorkoutTemplateLibraryView: View {
             }
         }
         .onChange(of: pageFilterKey) { _, _ in
+            // Filtering updates the rows but must NOT recreate their parent
+            // ScrollView: its search TextField would resign first responder
+            // after the first letter and dismiss the iOS keyboard.
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .sheet(item: $previewedWorkoutSource, onDismiss: {
             if let source = workoutSourceAfterPreviewDismiss {
