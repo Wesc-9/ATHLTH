@@ -25,6 +25,22 @@ enum ATHLTHCoachWorkoutPhase: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Additional choice for structured step/rest triggers. Optional on persisted
+/// rules to preserve decoding of existing plans and Watch transfers.
+enum ATHLTHCoachEventSelection: String, Codable, CaseIterable, Identifiable {
+    case every, first, last, mainOnly, withoutRest
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .every: return ATHLTHLocalization.choose(english: "Every", norwegian: "Alle")
+        case .first: return ATHLTHLocalization.choose(english: "First", norwegian: "Første")
+        case .last: return ATHLTHLocalization.choose(english: "Last", norwegian: "Siste")
+        case .mainOnly: return ATHLTHLocalization.choose(english: "All in main section", norwegian: "Alle i hoveddelen")
+        case .withoutRest: return ATHLTHLocalization.choose(english: "All except rests", norwegian: "Alle uten pause")
+        }
+    }
+}
+
 enum ATHLTHCoachMetricCategory: String, CaseIterable, Identifiable {
     case workout, heartRate, exercises, motivation, navigation
     var id: String { rawValue }
@@ -57,7 +73,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case activeRecoveryStart, activeRecoveryEnd
         case warmupStart, warmupEnd, mainStart, mainEnd
         case cooldownStart, cooldownEnd
-        case stepStart, beforeNextStep, beforeMain, beforeCooldown
+        case stepStart, stepEnd, beforeNextStep, beforeMain, beforeCooldown
 
         var id: String { rawValue }
         var isPeriodic: Bool { self == .time || self == .distance }
@@ -139,6 +155,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .cooldownStart: return tr("Cool-down starts", "Nedjogging starter")
             case .cooldownEnd: return tr("Cool-down ends", "Nedjogging avsluttes")
             case .stepStart: return tr("Each workout step starts", "Hver deløkt starter")
+            case .stepEnd: return tr("Each workout step ends", "Hver deløkt avsluttes")
             case .beforeNextStep: return tr("Before next step", "Før neste deløkt")
             case .beforeMain: return tr("Before main part", "Før hoveddelen")
             case .beforeCooldown: return tr("Before cool-down", "Før nedjogging")
@@ -253,12 +270,41 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     var allowedPhases: [ATHLTHCoachWorkoutPhase]? = nil
     var encouragementStyle: ATHLTHCoachEncouragementStyle? = nil
     var scope: Scope? = nil
+    /// Optional first/last/main/non-rest matching for structured step cues.
+    var eventSelection: ATHLTHCoachEventSelection? = nil
     /// An optional single-shot cue before a planned finish. Nothing is
     /// announced if the workout has no reliable remaining-duration estimate.
     var beforeEndSeconds: Int? = nil
     var customPhrase: String? = nil
 
     var isEnabled: Bool { enabled ?? true }
+
+    func matchesEventSelection(_ context: ATHLTHCoachReadoutContext) -> Bool {
+        let selection = eventSelection ?? .every
+        guard selection != .every else { return true }
+        guard let index = context.stepIndex, index >= 0 else { return false }
+        switch trigger {
+        case .stepStart, .stepEnd, .beforeNextStep:
+            switch selection {
+            case .every: return true
+            case .first: return index == 0
+            case .last: return index == (context.stepCount ?? 0) - 1
+            case .mainOnly:
+                return ["work", "steady", "main", "recovery"].contains(
+                    context.stepPhase ?? ""
+                )
+            case .withoutRest: return context.stepPhase != "recovery"
+            }
+        case .recoveryStart, .recoveryEnd:
+            switch selection {
+            case .every, .mainOnly: return true
+            case .first: return context.firstRecoveryStepIndex == index
+            case .last: return context.lastRecoveryStepIndex == index
+            case .withoutRest: return false
+            }
+        default: return true
+        }
+    }
 
     func matchesPhase(_ context: ATHLTHCoachReadoutContext) -> Bool {
         guard let allowedPhases, !allowedPhases.isEmpty else { return true }
@@ -727,7 +773,9 @@ enum ATHLTHAudioCoachRuleDelivery {
             if !alreadyConsumed {
                 lastSlots[rule.id] = current
             }
-            guard rule.isEnabled, rule.matchesPhase(context) else { continue }
+            guard rule.isEnabled,
+                  rule.matchesPhase(context),
+                  rule.matchesEventSelection(context) else { continue }
             // Simultaneous rules are composed into one speech event. A
             // metric already included by another rule is not repeated.
             let available = rule.selectedMetrics.filter { metric in
@@ -880,6 +928,9 @@ enum ATHLTHAudioCoachRuleDelivery {
         switch rule.trigger {
         case .stepStart:
             return nearStart ? index + 1 : nil
+        case .stepEnd:
+            if nearEnd { return index + 1 }
+            return index > 0 && nearStart ? index : nil
         case .effortStart:
             return phase == "work" && nearStart ? index + 1 : nil
         case .effortEnd:
@@ -962,6 +1013,7 @@ struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
     var enabled: Bool? = nil
     /// Nil means all workout phases (legacy behavior). Empty also means all.
     var phases: [ATHLTHCoachWorkoutPhase]? = nil
+    var eventSelection: ATHLTHCoachEventSelection? = nil
 
     var isEnabled: Bool { enabled ?? true }
 }
@@ -1027,6 +1079,7 @@ extension WatchAudioCoachConfiguration {
             var effective = authored
             if let group = groups.first(where: { $0.ruleIDs.contains(authored.id) }) {
                 effective.allowedPhases = group.phases
+                effective.eventSelection = group.eventSelection
             }
             return effective
         }
@@ -1165,6 +1218,8 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var previousWasActiveRecovery: Bool? = nil
     var nextIsActiveRecovery: Bool? = nil
     var stepCount: Int? = nil
+    var firstRecoveryStepIndex: Int? = nil
+    var lastRecoveryStepIndex: Int? = nil
     // Optional fields keep old Watch/phone snapshots backwards compatible.
     var remainingExerciseCount: Int? = nil
     var nextExerciseName: String? = nil
@@ -1261,6 +1316,8 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         context.stepName = step.title
         context.stepIndex = index
         context.stepCount = steps.count
+        context.firstRecoveryStepIndex = steps.firstIndex { $0.phase == "recovery" }
+        context.lastRecoveryStepIndex = steps.lastIndex { $0.phase == "recovery" }
         // Recovery steps are pauses, not exercises. Count only actual
         // upcoming activities (work, warm-up, cool-down, etc.).
         let isExercise: (WatchRunningWorkoutStep) -> Bool = {
