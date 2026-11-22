@@ -425,7 +425,7 @@ jobs:
               echo "::error::ATHLTH failed to launch for Home -> Train regression."
               exit 1
             fi
-            HOP_PID=$(echo "$HOP_OUTPUT" | awk -F': ' '/com\\.wesc9\\.athlth:/ {print $2}')
+            HOP_PID=$(echo "$HOP_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
             # The app changes selectedTab after 950ms, then gets time to
             # process layout and AttributeGraph updates before verification.
             sleep 8
