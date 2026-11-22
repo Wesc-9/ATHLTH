@@ -5,6 +5,29 @@ import XCTest
 /// Regression checks for real multi-week prescriptions, not merely list cards.
 final class ATHLTHCuratedTrainingPlanTests: XCTestCase {
     @MainActor
+    func testResequencingPreservesEntireWorkoutStepAndAllFutureFields() throws {
+        var source = try XCTUnwrap(
+            ATHLTHCuratedStrengthWorkouts.entries.first?.blocks.first
+        )
+        source.sequence = 99
+        source.measurementStepID = UUID()
+        source.targetHeartRatePercentMin = 62
+        source.targetHeartRatePercentMax = 86
+        source.sourceLoadAlternativesKilograms = [8, 12]
+        source.targetRepsInReserve = 2
+
+        var expected = source
+        expected.sequence = 1
+        let actual = ATHLTHCatalogPlanSessionFactory.resequencedBlocks([source])
+        XCTAssertEqual(actual, [expected])
+        XCTAssertEqual(actual.first?.measurementStepID, source.measurementStepID)
+        XCTAssertEqual(actual.first?.targetHeartRatePercentMin, 62)
+        XCTAssertEqual(actual.first?.targetHeartRatePercentMax, 86)
+        XCTAssertEqual(actual.first?.sourceLoadAlternativesKilograms, [8, 12])
+        XCTAssertEqual(actual.first?.targetRepsInReserve, 2)
+    }
+
+    @MainActor
     func testEveryBundledPlanHasStableIdentityAndRunnableBlueprints() {
         let entries = TrainingPlanCatalogEntry.bundledCatalog
         XCTAssertEqual(ATHLTHCuratedTrainingPlans.entries.count, 24)
