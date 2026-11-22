@@ -47,7 +47,18 @@ enum WorkoutInviteExercisePolicy {
         proposed: PlannedSession
     ) -> Bool {
         let existingIDs = Set(original.exercises.map(\.id))
-        return proposed.exercises.contains { !existingIDs.contains($0.id) }
+        if proposed.exercises.contains(where: {
+            !existingIDs.contains($0.id)
+        }) { return true }
+
+        // The universal editor stores strength exercises as timeline
+        // blocks. Checking just legacy PlannedExercise missed additions
+        // made in Basic/Advanced and would bypass the invitee permission.
+        let existingBlockIDs = Set((original.workoutBlocks ?? [])
+            .filter { $0.kind == .exercise }.map(\.id))
+        return (proposed.workoutBlocks ?? [])
+            .filter { $0.kind == .exercise }
+            .contains { !existingBlockIDs.contains($0.id) }
     }
 
     static func canPropose(

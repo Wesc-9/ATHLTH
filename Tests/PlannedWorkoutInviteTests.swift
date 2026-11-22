@@ -85,6 +85,86 @@ final class PlannedWorkoutInviteTests: XCTestCase {
         )
     }
 
+    func testSharedDraftIsInviteableBeforeAnyExercisesAreAdded() throws {
+        var draft = makeWorkout()
+        let partnerID = UUID()
+        draft.scheduledStart = nil // start time is agreed after joint planning
+        draft.workoutBlocks = []
+        draft.invitedPartnerID = partnerID
+        draft.allowInviteeExercises = true
+        draft.trainTogetherMode = .physical
+
+        let remote = try JSONDecoder().decode(
+            PlannedSession.self, from: JSONEncoder().encode(draft)
+        )
+        XCTAssertEqual(remote.id, draft.id, "Both athletes use one source ID")
+        XCTAssertEqual(remote.invitedPartnerID, partnerID)
+        XCTAssertTrue(remote.allowInviteeExercises == true)
+        XCTAssertTrue(remote.resolvedWorkoutBlocks.isEmpty)
+        XCTAssertTrue(PlannedWorkoutInvitationPresentationState.resolve(
+            start: remote.scheduledStart,
+            decision: nil,
+            organizerCancelled: false
+        ).canRespond, "An unscheduled draft must not be marked cancelled")
+    }
+
+    func testInviteeCanSuggestAnExerciseInUniversalTimelineOnlyWithPermission() {
+        var original = makeWorkout()
+        original.workoutBlocks = []
+        original.exercises = []
+
+        var proposed = original
+        proposed.workoutBlocks = [WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "90/90 Hold",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: 10,
+            durationSeconds: nil, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )]
+
+        XCTAssertTrue(WorkoutInviteExercisePolicy.hasAddedExercises(
+            original: original, proposed: proposed
+        ))
+        XCTAssertFalse(WorkoutInviteExercisePolicy.canPropose(
+            original: original, proposed: proposed
+        ), "A recipient cannot bypass invite permissions via workoutBlocks")
+
+        original.allowInviteeExercises = true
+        proposed.allowInviteeExercises = true
+        XCTAssertTrue(WorkoutInviteExercisePolicy.canPropose(
+            original: original, proposed: proposed
+        ))
+        let proposal = WorkoutChangeProposal(
+            id: UUID(), proposedBy: UUID(), ownerID: UUID(),
+            original: original, proposed: proposed,
+            submittedAt: Date()
+        )
+        XCTAssertTrue(proposal.hasChanges)
+        XCTAssertTrue(WorkoutChangeComparison.rows(proposal).contains {
+            $0.key == "workoutBlocks"
+        })
+        XCTAssertEqual(proposal.workoutID, original.id)
+    }
+
+    func testAllowedGuestAdditionNeverChangesOwnerIdentity() throws {
+        var original = makeWorkout()
+        let partnerID = UUID()
+        original.invitedPartnerID = partnerID
+        original.allowInviteeExercises = true
+        var proposed = original
+        proposed.workoutBlocks = [WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Squat",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: 8,
+            durationSeconds: nil, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )]
+        let restored = try JSONDecoder().decode(
+            PlannedSession.self, from: JSONEncoder().encode(proposed)
+        )
+        XCTAssertEqual(restored.id, original.id)
+        XCTAssertEqual(restored.invitedPartnerID, partnerID)
+        XCTAssertEqual(restored.allowInviteeExercises, true)
+    }
+
     func testOldWorkoutDefaultsToNoExerciseAdditionPermission() throws {
         let source = makeWorkout()
         let restored = try JSONDecoder().decode(

@@ -13,6 +13,12 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     /// Only supplied for running workouts. Other activities never expose
     /// the running environment selector.
     let runningEnvironment: Binding<RunEnvironment>?
+    /// Present only for a direct, mutually followed training partner.
+    /// The editor remains the single source of truth for the workout.
+    let trainingPartnerName: String?
+    let collaborationInviteSent: Bool
+    let collaborationInviteSending: Bool
+    let onInviteToBuild: (() -> Void)?
 
     init(
         workoutName: Binding<String>,
@@ -21,7 +27,11 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         durationMinutes: Int?,
         route: TrainingRoute?,
         scheduledAt: Binding<Date>?,
-        runningEnvironment: Binding<RunEnvironment>? = nil
+        runningEnvironment: Binding<RunEnvironment>? = nil,
+        trainingPartnerName: String? = nil,
+        collaborationInviteSent: Bool = false,
+        collaborationInviteSending: Bool = false,
+        onInviteToBuild: (() -> Void)? = nil
     ) {
         _workoutName = workoutName
         self.activity = activity
@@ -30,6 +40,10 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         self.route = route
         self.scheduledAt = scheduledAt
         self.runningEnvironment = runningEnvironment
+        self.trainingPartnerName = trainingPartnerName
+        self.collaborationInviteSent = collaborationInviteSent
+        self.collaborationInviteSending = collaborationInviteSending
+        self.onInviteToBuild = onInviteToBuild
     }
 
     private let ink = ATHLTHTrainDesign.ink
@@ -168,6 +182,86 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
             showsTimingLabel: scheduledAt != nil
         ) {
             VStack(alignment: .leading, spacing: 12) {
+                if let trainingPartnerName {
+                    HStack(alignment: .center, spacing: 10) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(bronze)
+                            .frame(width: 38, height: 38)
+                            .background(
+                                ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "TRAINING WITH",
+                                norwegian: "TRENER SAMMEN MED"
+                            ))
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(1.0)
+                            .foregroundStyle(.secondary)
+                            Text(trainingPartnerName)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 4)
+                        if collaborationInviteSent {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Invited",
+                                norwegian: "Invitert"
+                            ), systemImage: "checkmark.circle.fill")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(bronze)
+                        }
+                    }
+                    .accessibilityIdentifier("athlth-workout-partner-in-details")
+
+                    if let onInviteToBuild {
+                        Button(action: onInviteToBuild) {
+                            HStack(spacing: 8) {
+                                if collaborationInviteSending {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: collaborationInviteSent
+                                          ? "checkmark.circle.fill" : "paperplane")
+                                }
+                                Text(collaborationInviteSent
+                                     ? ATHLTHLocalization.choose(
+                                        english: "Invitation sent · build together",
+                                        norwegian: "Invitasjon sendt · bygg sammen")
+                                     : ATHLTHLocalization.choose(
+                                        english: "Invite to build workout together",
+                                        norwegian: "Inviter til å bygge økt sammen"))
+                                    .lineLimit(2)
+                                Spacer(minLength: 0)
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(collaborationInviteSent
+                                             ? bronze : .white)
+                            .padding(.horizontal, 13)
+                            .frame(maxWidth: .infinity, minHeight: 45)
+                            .background(
+                                collaborationInviteSent
+                                    ? ATHLTHPlanDesign.selectedSurface
+                                    : bronze,
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(collaborationInviteSent || collaborationInviteSending)
+                        .accessibilityIdentifier("athlth-invite-to-build-workout")
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your friend can add exercises and suggest changes before the workout starts. You approve changes in Messages.",
+                            norwegian: "Vennen kan legge til øvelser og foreslå endringer før økten starter. Du godkjenner forslag i Meldinger."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                    Divider().overlay(ATHLTHPlanDesign.outline.opacity(0.5))
+                }
                 if let runningLocationText {
                     HStack(spacing: 6) {
                         Image(systemName: runningLocationSymbol)

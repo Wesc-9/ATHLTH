@@ -5553,6 +5553,10 @@ struct SessionEditorView: View {
     // Only an actual builder-save is permitted to advance a friend's
     // scratch workout to the invitation-review screen.
     @State private var partnerScratchReadyForInvite = false
+    /// Set only after the private draft invitation is delivered. A friend
+    /// may propose new exercises while this same workout remains editable.
+    @State private var collaborationInvitationSent = false
+    @State private var collaborationInviteBaseline: PlannedSession?
     // A saved library session opens in the SAME advanced Studio as a
     // newly planned strength workout, rather than the legacy Form timeline.
     @State private var showingImportedAdvancedWorkout = false
@@ -6574,6 +6578,13 @@ struct SessionEditorView: View {
         discardStoredStandaloneDraft()
         selectedScratchWorkoutType = type
         partnerScratchReadyForInvite = false
+        collaborationInvitationSent = false
+        collaborationInviteBaseline = nil
+        if selectedPartnerID != nil {
+            // A direct friend invite starts with exercise suggestions enabled.
+            // Proposals still require creator approval in Messages.
+            allowInviteeExercises = true
+        }
         scratchTimelineDraftID = UUID()
         scratchResumingSavedComposer = false
         if isStandalone, onPreparedWorkout == nil, selectedPartnerID == nil {
@@ -6617,6 +6628,149 @@ struct SessionEditorView: View {
         extras.ghostTargetDurationSeconds = source.ghostTargetDurationSeconds
         extras.ghostUpdates = source.ghostUpdates
         return extras
+    }
+
+    /// Send the current *draft* over the existing private workout-invite
+    /// protocol, not a completed-session or active-recording invitation.
+    /// The recipient can add exercise blocks through a v4 proposal; only
+    /// this owner can approve the revision. The original editor stays open.
+    @MainActor
+    private func invitePartnerToBuild(
+        _ draft: PlannedSession
+    ) async -> String? {
+        guard isStandalone, onPreparedWorkout == nil,
+              selectedScratchWorkoutType != nil,
+              !collaborationInvitationSent,
+              let partnerID = selectedPartnerID,
+              social.trainingPartners.contains(where: {
+                  $0.userID == partnerID
+              }) else {
+            return ATHLTHLocalization.choose(
+                english: "Select a mutual training partner to collaborate.",
+                norwegian: "Velg en gjensidig treningspartner for å bygge økt."
+            )
+        }
+
+        var workout = draft
+        // A collaboration request may be sent before a start time is
+        // agreed. A date in the past would make the message instantly look
+        // cancelled to the recipient.
+        workout.scheduledStart = scheduledTime > Date() ? scheduledTime : nil
+        workout.trainTogetherMode = .physical
+        workout.invitedPartnerID = partnerID
+        workout.allowInviteeExercises = true
+        workout.meetingPoint = meetingPoint
+        guard let bound = libraryBoundWorkout(workout) else {
+            return ATHLTHLocalization.choose(
+                english: "Resolve the exercises in your library first.",
+                norwegian: "Knytt øvelsene til biblioteket før invitasjonen sendes."
+            )
+        }
+
+        // Proposal approval looks up the author's planned session by this
+        // stable ID. Persist exactly once, even when a failed send is retried.
+        let alreadyExists = session.standalonePlannedSessions.contains {
+            $0.id == bound.id
+        }
+        if alreadyExists {
+            session.updateStandalonePlannedSession(bound)
+        } else {
+            session.addStandalonePlannedSession(bound)
+        }
+
+        do {
+            let conversationID = try await messaging.openConversation(
+                with: partnerID
+            )
+            var privateCopy = bound
+            privateCopy.gearIDs = []
+            privateCopy.spotifyPlaylist = nil
+            privateCopy.spotifyAutoplayOnStart = false
+
+            let attachment = try MessageShareDraft(
+                kind: .workout,
+                title: bound.title,
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Build this workout together",
+                    norwegian: "Bygg denne økten sammen"
+                ),
+                snapshot: privateCopy,
+                sourceObjectID: bound.id,
+                sourceOwnerID: session.profile.userID,
+                shareVersion: 2
+            )
+            let sent = await messaging.send(
+                to: partnerID,
+                conversationID: conversationID,
+                body: ATHLTHLocalization.choose(
+                    english: "Let's build our workout together. Add exercises or suggest changes before we start.",
+                    norwegian: "La oss bygge treningsøkten sammen! Legg til øvelser eller foreslå endringer før vi starter."
+                ),
+                attachment: attachment
+            )
+            guard sent else {
+                return messaging.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not send the invitation. Your draft is saved.",
+                        norwegian: "Kunne ikke sende invitasjonen. Utkastet er lagret."
+                    )
+            }
+            collaborationInviteBaseline = bound
+            collaborationInvitationSent = true
+            allowInviteeExercises = true
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// Send a new complete snapshot through the existing organizer-only
+    /// version-6 lifecycle message; never create a duplicate invitation.
+    private func publishCollaborativeDraftUpdate(_ workout: PlannedSession) {
+        guard collaborationInvitationSent,
+              let partnerID = selectedPartnerID else { return }
+        Task { @MainActor in
+            do {
+                let conversation = try await messaging.openConversation(
+                    with: partnerID
+                )
+                var copy = workout
+                copy.gearIDs = []
+                copy.spotifyPlaylist = nil
+                copy.spotifyAutoplayOnStart = false
+                let change = WorkoutInviteLifecycleUpdate(
+                    sourceWorkoutID: workout.id,
+                    organizerID: session.profile.userID,
+                    kind: .updated,
+                    updatedWorkout: copy,
+                    occurredAt: Date()
+                )
+                let attachment = try MessageShareDraft(
+                    kind: .workout,
+                    title: workout.title,
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Shared draft updated",
+                        norwegian: "Felles utkast oppdatert"
+                    ),
+                    snapshot: change,
+                    sourceObjectID: workout.id,
+                    sourceOwnerID: session.profile.userID,
+                    shareVersion: 6
+                )
+                _ = await messaging.send(
+                    to: partnerID,
+                    conversationID: conversation,
+                    body: ATHLTHLocalization.choose(
+                        english: "I updated our workout draft.",
+                        norwegian: "Jeg har oppdatert treningsutkastet vårt."
+                    ),
+                    attachment: attachment
+                )
+            } catch {
+                invitationError = error.localizedDescription
+                showingInvitationError = true
+            }
+        }
     }
 
     /// The timeline builder returns the same PlannedSession recipe the editor
@@ -7327,8 +7481,76 @@ struct SessionEditorView: View {
                         : selectedScratchWorkoutType,
                     initialStudioAdvanced: showingImportedAdvancedWorkout ? true : nil,
                     onScheduledTimeChanged: { scheduledTime = $0 },
+                    collaborationPartnerName: isStandalone &&
+                        onPreparedWorkout == nil &&
+                        selectedScratchWorkoutType != nil &&
+                        selectedPartnerID != nil
+                        ? (social.trainingPartners.first {
+                            $0.userID == selectedPartnerID
+                        }?.resolvedName ?? ATHLTHLocalization.choose(
+                            english: "Selected training partner",
+                            norwegian: "Valgt treningspartner"
+                        )) : nil,
+                    collaborationWorkoutID: isStandalone &&
+                        onPreparedWorkout == nil &&
+                        selectedPartnerID != nil
+                        ? scratchTimelineDraftID : nil,
+                    collaborationInviteSent: collaborationInvitationSent,
+                    onInviteToBuild: isStandalone && selectedPartnerID != nil &&
+                        onPreparedWorkout == nil &&
+                        selectedScratchWorkoutType != nil
+                        ? { draft in await invitePartnerToBuild(draft) } : nil,
                     onAddStandalone: { updated in
-                        if showingImportedAdvancedWorkout {
+                        if collaborationInvitationSent &&
+                            selectedScratchWorkoutType != nil &&
+                            selectedPartnerID != nil &&
+                            isStandalone && onPreparedWorkout == nil {
+                            // The invitation was sent from THIS editor before
+                            // the workout was finished. Save the same ID and
+                            // update the agreed draft rather than creating a
+                            // second calendar entry or another invite.
+                            var latest = updated
+                            latest.scheduledStart = scheduledTime > Date()
+                                ? scheduledTime : nil
+                            latest.invitedPartnerID = selectedPartnerID
+                            latest.allowInviteeExercises = true
+                            latest.trainTogetherMode = .physical
+                            latest.meetingPoint = meetingPoint
+                            guard let bound = libraryBoundWorkout(latest)
+                            else { return false }
+                            if let baseline = collaborationInviteBaseline,
+                               let current = session.standalonePlannedSessions.first(
+                                    where: { $0.id == bound.id }
+                               ) {
+                                // The invited friend may have proposed steps
+                                // and the organizer may already have accepted
+                                // them in Messages. Never overwrite that new
+                                // agreed workout with a stale editor snapshot.
+                                let changed = WorkoutChangeComparison.rows(
+                                    WorkoutChangeProposal(
+                                        id: UUID(),
+                                        proposedBy: session.profile.userID,
+                                        ownerID: session.profile.userID,
+                                        original: baseline,
+                                        proposed: current,
+                                        submittedAt: Date()
+                                    )
+                                )
+                                guard changed.isEmpty else {
+                                    invitationError = ATHLTHLocalization.choose(
+                                        english: "This shared workout has new approved changes. Open the updated workout before saving.",
+                                        norwegian: "Fellesøkten har fått nye godkjente endringer. Åpne den oppdaterte økten før du lagrer."
+                                    )
+                                    showingInvitationError = true
+                                    return false
+                                }
+                            }
+                            session.updateStandalonePlannedSession(bound)
+                            collaborationInviteBaseline = bound
+                            publishCollaborativeDraftUpdate(bound)
+                            finishDraft()
+                            closeAfterScratchSave = true
+                        } else if showingImportedAdvancedWorkout {
                             // Schedule from the exact edited Studio recipe,
                             // preserving unrelated session-level settings
                             // that the block editor does not expose.

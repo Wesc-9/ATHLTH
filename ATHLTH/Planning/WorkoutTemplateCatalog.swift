@@ -4813,6 +4813,13 @@ struct WorkoutTemplateBuilderView: View {
     @State private var savedToMyWorkouts = false
     @State private var savedTemplateID: UUID?
     @State private var actionNotice: String?
+    @State private var collaborationInviteSending = false
+    private let collaborationPartnerName: String?
+    private let collaborationWorkoutID: UUID?
+    private let collaborationInviteSent: Bool
+    /// A true invite can be sent before any exercise is added. It sends a
+    /// private, editable proposal invitation rather than starting recording.
+    private let onInviteToBuild: ((PlannedSession) async -> String?)?
     private let draftContext: String
     private let isNewStandaloneScratch: Bool
     private let resumeSavedScratchDraft: Bool
@@ -4874,6 +4881,10 @@ struct WorkoutTemplateBuilderView: View {
         initialCopyWeekIndex: Int = 0,
         onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int], ATHLTHWorkoutPlannerExtras) -> Bool)? = nil,
         onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool, ATHLTHWorkoutPlannerExtras) -> Bool)? = nil,
+        collaborationPartnerName: String? = nil,
+        collaborationWorkoutID: UUID? = nil,
+        collaborationInviteSent: Bool = false,
+        onInviteToBuild: ((PlannedSession) async -> String?)? = nil,
         onAddStandalone: ((PlannedSession) -> Bool)? = nil,
         onSwitchToBasic: ((PlannedSession) -> Void)? = nil,
         onValidateSave: ((PlannedSession) -> String?)? = nil,
@@ -4991,6 +5002,10 @@ struct WorkoutTemplateBuilderView: View {
         self.onCloseInline = onCloseInline
         self.onCloseRequested = onCloseRequested
         self.onDraftDiscarded = onDraftDiscarded
+        self.collaborationPartnerName = collaborationPartnerName
+        self.collaborationWorkoutID = collaborationWorkoutID
+        self.collaborationInviteSent = collaborationInviteSent
+        self.onInviteToBuild = onInviteToBuild
     }
 
     private struct StoredWorkoutDraft: Codable {
@@ -6055,10 +6070,44 @@ struct WorkoutTemplateBuilderView: View {
                 route: activeRoute,
                 scheduledAt: plannedDate != nil ? $studioBasicDate : nil,
                 runningEnvironment: initialActivity == .running
-                    ? $studioBasicRunEnvironment : nil
+                    ? $studioBasicRunEnvironment : nil,
+                trainingPartnerName: collaborationPartnerName,
+                collaborationInviteSent: collaborationInviteSent,
+                collaborationInviteSending: collaborationInviteSending,
+                onInviteToBuild: onInviteToBuild == nil
+                    ? nil : { sendCollaborationInvite() }
             )
             // Audio Coach, Spotify and advanced options are grouped
             // underneath the workout instead of above its hero card.
+        }
+    }
+
+    /// Sending a draft invitation does not finish the workout or close the
+    /// editor. The owner can continue adding exercises and save later.
+    private func sendCollaborationInvite() {
+        guard let onInviteToBuild,
+              !collaborationInviteSent,
+              !collaborationInviteSending else { return }
+        guard !hasIncompleteStrengthGroup && !hasInvalidDropSetWeights else {
+            actionNotice = tr(
+                "Finish the incomplete exercise group before inviting.",
+                "Fullfør den uferdige øvelsesgruppen før du inviterer."
+            )
+            return
+        }
+        collaborationInviteSending = true
+        let snapshot = workoutSnapshot()
+        Task { @MainActor in
+            let error = await onInviteToBuild(snapshot)
+            collaborationInviteSending = false
+            if let error {
+                actionNotice = error
+            } else {
+                actionNotice = tr(
+                    "Invitation sent. You can keep building this workout.",
+                    "Invitasjon sendt. Du kan fortsette å bygge økten."
+                )
+            }
         }
     }
 
@@ -9332,7 +9381,7 @@ struct WorkoutTemplateBuilderView: View {
             : blocks
 
         var workout = PlannedSession(
-            id: UUID(),
+            id: collaborationWorkoutID ?? UUID(),
             title: cleanTitle,
             kind: basicFreeRunningKind,
             scheduledStart: nil,

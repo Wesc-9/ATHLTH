@@ -27,6 +27,15 @@ struct ThreadWorkoutInvitationCard: View {
     private var statusLabel: String {
         switch state {
         case .pending:
+            if workout.allowInviteeExercises == true {
+                return isMine
+                    ? ATHLTHLocalization.choose(
+                        english: "Shared draft · awaiting friend",
+                        norwegian: "Felles utkast · venter på venn")
+                    : ATHLTHLocalization.choose(
+                        english: "Build this workout together",
+                        norwegian: "Bygg denne økten sammen")
+            }
             return isMine
                 ? ATHLTHLocalization.choose(english: "Awaiting reply", norwegian: "Venter på svar")
                 : ATHLTHLocalization.choose(english: "Invitation received", norwegian: "Venter på ditt svar")
@@ -48,7 +57,13 @@ struct ThreadWorkoutInvitationCard: View {
     }
 
     private var subtitle: String {
-        workout.kind.title + " · " + (
+        if workout.allowInviteeExercises == true {
+            return workout.kind.title + " · " +
+                ATHLTHLocalization.choose(
+                    english: "Shared workout draft",
+                    norwegian: "Felles treningsutkast")
+        }
+        return workout.kind.title + " · " + (
             workout.trainTogetherMode == .sameWorkout
             ? ATHLTHLocalization.choose(english: "Same workout", norwegian: "Samme økt")
             : ATHLTHLocalization.choose(english: "Train in person", norwegian: "Trene fysisk sammen")
@@ -404,8 +419,12 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                         Button(action: onProposeChanges) {
                             Label(
                                 ATHLTHLocalization.choose(
-                                    english: "Suggest workout changes",
-                                    norwegian: "Foreslå endringer i økten"
+                                    english: workout.allowInviteeExercises == true
+                                        ? "Add exercises or suggest changes"
+                                        : "Suggest workout changes",
+                                    norwegian: workout.allowInviteeExercises == true
+                                        ? "Legg til øvelser eller foreslå endringer"
+                                        : "Foreslå endringer i økten"
                                 ),
                                 systemImage: "square.and.pencil"
                             )

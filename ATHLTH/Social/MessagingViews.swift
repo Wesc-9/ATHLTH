@@ -3414,20 +3414,43 @@ struct DirectMessageThreadView: View {
         }
         .sheet(item: $workoutInvitationForProposal) { invitation in
             if let original = invitation.decodeSnapshot(PlannedSession.self) {
-                SessionEditorView(
-                    standaloneDate: original.scheduledStart ?? Date(),
-                    initialSourceWorkout: latestAgreedWorkout(
-                        for: invitation,
-                        in: conversationID.map {
-                            messaging.messages(in: $0)
-                        } ?? []
-                    ) ?? original,
-                    preserveSourceID: true,
-                    onPreparedWorkout: { proposed in
+                let revision = latestSharedWorkout(
+                    for: invitation,
+                    in: conversationID.map {
+                        messaging.messages(in: $0)
+                    } ?? []
+                ) ?? original
+
+                // Guest uses the exact same premium timeline editor as the
+                // organizer. Saving sends a PROPOSAL only; it cannot silently
+                // overwrite the owner's or guest's recorded workout.
+                WorkoutTemplateBuilderView(
+                    initialTitle: revision.title,
+                    initialBlocks: revision.resolvedWorkoutBlocks,
+                    initialRouteID: revision.routeID,
+                    initialDurationOverrideMinutes: revision.durationMinutes,
+                    draftContext: "workout-proposal-\(invitation.id.uuidString)",
+                    plannedDate: revision.scheduledStart,
+                    initialActivity: ATHLTHPlannedWorkoutType.from(revision),
+                    initialStudioAdvanced: true,
+                    collaborationWorkoutID: revision.id,
+                    onAddStandalone: { changed in
+                        var proposed = revision
+                        proposed.title = changed.title
+                        proposed.kind = changed.kind
+                        proposed.durationMinutes = changed.durationMinutes
+                        proposed.routeID = changed.routeID
+                        proposed.workoutBlocks = changed.workoutBlocks
                         sendWorkoutChangeProposal(
-                            invitation: invitation, proposed: proposed
+                            invitation: invitation, proposed: proposed,
+                            basedOn: revision
                         )
-                    }
+                        return true
+                    },
+                    saveButtonTitle: ATHLTHLocalization.choose(
+                        english: "Send workout suggestion",
+                        norwegian: "Send forslag til fellesøkten"
+                    )
                 )
             }
         }
@@ -3766,7 +3789,7 @@ struct DirectMessageThreadView: View {
                                 onRespondToInvite: { accept in
                                     respondToPlannedInvite(message, accept: accept)
                                 },
-                                agreedWorkout: latestAgreedWorkout(
+                                agreedWorkout: latestSharedWorkout(
                                     for: message, in: messages
                                 ),
                                 lifecycleUpdate: latestWorkoutLifecycle(
@@ -5445,9 +5468,48 @@ struct DirectMessageThreadView: View {
             .approvedWorkout
     }
 
+    /// Organizer lifecycle revisions supersede the original invitation
+    /// snapshot. This allows both people to keep proposing on the same
+    /// source ID without proposals accidentally reverting newer exercises.
+    private func latestSharedWorkout(
+        for invitation: DirectMessageRecord,
+        in messages: [DirectMessageRecord]
+    ) -> PlannedSession? {
+        let lifecycle = latestWorkoutLifecycle(
+            for: invitation, in: messages
+        )
+        if lifecycle?.kind == .cancelled { return nil }
+        // Approved proposals can arrive after an organizer's update. Choose
+        // the chronologically latest authorized revision, not always the
+        // version-6 message even when it is already superseded.
+        let ownerMessages = messages.filter {
+            $0.attachmentKind == .workout &&
+            $0.sourceObjectID == invitation.sourceObjectID &&
+            $0.senderID == invitation.senderID
+        }
+        let latestOwnerUpdate = ownerMessages
+            .filter { $0.shareVersion == 6 }
+            .max { $0.createdAt < $1.createdAt }
+        let latestApproval = ownerMessages
+            .filter {
+                $0.shareVersion == 5 &&
+                $0.decodeSnapshot(WorkoutChangeDecision.self)?.approved == true
+            }
+            .max { $0.createdAt < $1.createdAt }
+        if let latestApproval,
+           latestApproval.createdAt > (latestOwnerUpdate?.createdAt ?? .distantPast),
+           let approved = latestApproval
+                .decodeSnapshot(WorkoutChangeDecision.self)?.approvedWorkout {
+            return approved
+        }
+        return lifecycle?.updatedWorkout ??
+            latestAgreedWorkout(for: invitation, in: messages)
+    }
+
     private func sendWorkoutChangeProposal(
         invitation: DirectMessageRecord,
-        proposed: PlannedSession
+        proposed: PlannedSession,
+        basedOn: PlannedSession? = nil
     ) {
         guard invitation.attachmentKind == .workout,
               invitation.shareVersion == 2,
@@ -5458,10 +5520,38 @@ struct DirectMessageThreadView: View {
               original.scheduledStart.map({ $0 > Date() }) ?? true
         else { return }
 
-        let agreed = latestAgreedWorkout(
-            for: invitation,
-            in: messaging.messages(in: conversationID)
+        let messages = messaging.messages(in: conversationID)
+        guard latestWorkoutLifecycle(
+            for: invitation, in: messages
+        )?.kind != .cancelled else {
+            plannedInviteError = ATHLTHLocalization.choose(
+                english: "This shared workout was cancelled.",
+                norwegian: "Denne fellesøkten er avlyst."
+            )
+            return
+        }
+        let agreed = latestSharedWorkout(
+            for: invitation, in: messages
         ) ?? original
+        if let basedOn {
+            let changedSinceOpening = WorkoutChangeComparison.rows(
+                WorkoutChangeProposal(
+                    id: UUID(),
+                    proposedBy: session.profile.userID,
+                    ownerID: invitation.senderID,
+                    original: basedOn,
+                    proposed: agreed,
+                    submittedAt: Date()
+                )
+            )
+            guard changedSinceOpening.isEmpty else {
+                plannedInviteError = ATHLTHLocalization.choose(
+                    english: "The shared workout changed while you were editing. Reopen it before sending your exercises.",
+                    norwegian: "Fellesøkten ble oppdatert mens du redigerte. Åpne den på nytt før du sender øvelsene."
+                )
+                return
+            }
+        }
         let proposal = WorkoutChangeProposal(
             id: UUID(),
             proposedBy: session.profile.userID,
@@ -5696,7 +5786,7 @@ struct DirectMessageThreadView: View {
             )
             return
         }
-        let workout = lifecycle?.updatedWorkout ?? latestAgreedWorkout(
+        let workout = latestSharedWorkout(
             for: invitation, in: messaging.messages(in: conversationID)
         ) ?? originalWorkout
         let currentMessages = messaging.messages(in: conversationID)
@@ -7066,7 +7156,7 @@ private struct MessageBubble: View {
                 } else if isPlannedInvitation,
                           let workout = message.decodeSnapshot(PlannedSession.self) {
                     ThreadWorkoutInvitationCard(
-                        workout: lifecycleUpdate?.updatedWorkout ?? agreedWorkout ?? workout,
+                        workout: agreedWorkout ?? lifecycleUpdate?.updatedWorkout ?? workout,
                         response: inviteResponse,
                         lifecycleUpdate: lifecycleUpdate,
                         isMine: isMine,
