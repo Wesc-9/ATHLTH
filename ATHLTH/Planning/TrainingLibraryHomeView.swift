@@ -110,7 +110,11 @@ struct ATHLTHUnifiedWorkoutsLibraryView: View {
             case .athlth:
                 WorkoutTemplateLibraryView(onStartRunning: onStartRunning)
             case .mine:
-                MyWorkoutTemplatesView()
+                if let onStartRunning {
+                    LibrarySavedWorkoutsHubView(onStartRunning: onStartRunning)
+                } else {
+                    MyWorkoutTemplatesView()
+                }
             case .favorites:
                 LibraryFavoritesView(onStartRunning: onStartRunning, initialKind: .workout)
             }
@@ -599,7 +603,7 @@ struct LibrarySavedWorkoutsHubView: View {
                         title: tr("Strength and mixed workouts", "Styrke og kombinasjonsøkter"),
                         detail: tr("Detailed sessions and templates", "Detaljerte økter og maler"),
                         symbol: "dumbbell",
-                        tint: Color(red: 0.46, green: 0.41, blue: 0.66),
+                        tint: ATHLTHTheme.accentDeep,
                         count: session.savedWorkoutTemplates.count
                     )
                 }
@@ -614,7 +618,7 @@ struct LibrarySavedWorkoutsHubView: View {
                         title: tr("Running workouts", "Løpeøkter"),
                         detail: tr("Intervals, tempo and distance", "Intervaller, tempo og distanse"),
                         symbol: "figure.run",
-                        tint: Color(red: 0.32, green: 0.47, blue: 0.40),
+                        tint: ATHLTHPlanDesign.accentInk,
                         count: runningLibrary.customTemplates.count
                     )
                 }
