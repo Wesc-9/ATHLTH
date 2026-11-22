@@ -194,6 +194,7 @@ struct ATHLTHTournamentCreator: View {
         athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2) &&
         !busy && !allowedActivities.isEmpty &&
         competitionSettings.isValid &&
+        competitionSettings.race.isOperational &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
           (exerciseMode == .owner &&
            competitionSettings.coachExerciseIDs.count == exerciseCount)) &&
@@ -239,6 +240,14 @@ struct ATHLTHTournamentCreator: View {
                         )
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    }
+                    if !competitionSettings.race.isOperational {
+                        Label("Dette oppsettet kan lagres som mal, men publisering krever videre støtte i den universelle treningsmotoren for valgt utstyr, rute, lagstart eller GPS-runder.",
+                              systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .padding(13)
+                            .background(ATHLTHArenaV3Style.panel())
                     }
                     coachEntry
                     templateEntry
