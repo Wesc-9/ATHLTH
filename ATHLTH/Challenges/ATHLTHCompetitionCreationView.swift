@@ -68,8 +68,8 @@ enum ATHLTHCompetitionCreationPolicy {
     static func minOpponents(_ format: ATHLTHCompetitionFormat) -> Int {
         switch format {
         case .duel: 1
-        case .league: 2
-        case .cup: 2
+        case .league: 1
+        case .cup: 3
         }
     }
 
