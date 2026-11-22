@@ -90,6 +90,45 @@ enum ATHLTHQuickStartType: String, Identifiable {
     }
 }
 
+/// Every mode uses the same top-right toggle; Basic is cream and
+/// Advanced is premium bronze, rather than sport-specific green/blue pills.
+struct ATHLTHQuickStartSetupModeButton: View {
+    let advanced: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(advanced
+                    ? ATHLTHLocalization.choose(
+                        english: "Advanced", norwegian: "Avansert")
+                    : ATHLTHLocalization.choose(
+                        english: "Basic", norwegian: "Enkel"))
+                    .font(.caption.weight(.bold))
+            }
+            .foregroundStyle(
+                advanced ? Color.white : ATHLTHPlanDesign.ink
+            )
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
+            .background(
+                advanced ? ATHLTHPlanDesign.accentInk :
+                    ATHLTHPlanDesign.selectedSurface,
+                in: Capsule()
+            )
+            .overlay {
+                Capsule().strokeBorder(
+                    ATHLTHPlanDesign.outline, lineWidth: 0.7
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-quick-setup-mode")
+    }
+}
+
 /// A consistent type selector, with a compact Basic layout and a more
 /// descriptive Advanced layout. Source pickers stay owned by each activity.
 struct ATHLTHQuickStartTypeSelector: View {
