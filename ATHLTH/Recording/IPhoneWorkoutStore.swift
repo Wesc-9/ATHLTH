@@ -173,6 +173,9 @@ struct PhoneWorkout: Codable, Identifiable {
         return weightedDistance / measuredSeconds
     }
     var points: [PhoneRoutePoint] = []
+    /// Competition evidence belongs to this original workout, not a
+    /// separate GPS or HealthKit recording. Nil for older workouts.
+    var competitionCapture: ATHLTHCompetitionCaptureContext? = nil
     var healthID: UUID?
     // Explicit plan origin, optional to preserve previous history.
     var plannedPlanID: UUID? = nil
@@ -6530,6 +6533,35 @@ final class IPhoneWorkoutStore:
         return true
     }
 
+    /// Attach an already started universal phone workout to an accepted
+    /// group competition. Older recordings or pre-signal starts cannot win.
+    /// The same recorded UUID is the sole workout evidence identity.
+    @discardableResult
+    func attachCompetition(
+        tournamentID: UUID,
+        startSignalAt: Date,
+        raceRules: ATHLTHCompetitionRaceRules
+    ) -> Bool {
+        guard var workout = active,
+              workout.runEnvironment == .outdoor,
+              workout.start >= startSignalAt,
+              raceRules.isValid, raceRules.isOperational,
+              !saving,
+              workout.competitionCapture == nil ||
+              workout.competitionCapture?.tournamentID == tournamentID
+        else { return false }
+        if workout.competitionCapture == nil {
+            workout.competitionCapture = ATHLTHCompetitionCaptureContext(
+                tournamentID: tournamentID,
+                startSignalAt: startSignalAt,
+                raceRules: raceRules
+            )
+        }
+        active = workout
+        persistActiveCheckpoint(force: true)
+        return true
+    }
+
     private func accept(
         _ locations: [CLLocation]
     ) {
@@ -6627,6 +6659,28 @@ final class IPhoneWorkoutStore:
             workout.points.append(
                 PhoneRoutePoint(location)
             )
+            if var competition = workout.competitionCapture,
+               competition.raceRules.discipline == .laps,
+               competition.raceRules.lapVerification == .gps,
+               let startLat = competition.raceRules.lapCourseLatitude,
+               let startLon = competition.raceRules.lapCourseLongitude {
+                competition.lapState = ATHLTHCompetitionGPSLapCounter.update(
+                    competition.lapState,
+                    fix: ATHLTHCompetitionGPSFix(
+                        latitude: location.coordinate.latitude,
+                        longitude: location.coordinate.longitude,
+                        accuracyMeters: location.horizontalAccuracy,
+                        timestamp: location.timestamp,
+                        courseDegrees: location.course >= 0
+                            ? location.course : nil
+                    ),
+                    startLatitude: startLat,
+                    startLongitude: startLon,
+                    startSignalAt: competition.startSignalAt,
+                    limit: competition.raceRules.lapCount
+                )
+                workout.competitionCapture = competition
+            }
             workout.lastCheckpoint = Date()
             updatePace(
                 workout: &workout,
