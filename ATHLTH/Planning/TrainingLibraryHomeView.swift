@@ -1038,6 +1038,8 @@ final class LibraryFavoritesStore: ObservableObject {
         }
     }
 
+    var pendingSyncCount: Int { pendingChanges.count }
+
     func isFavorite(
         _ kind: LibraryFavoriteKind,
         itemID: String
@@ -5735,6 +5737,30 @@ struct LibraryFavoritesView: View {
                     }
                     .padding(.vertical, 2)
                 }
+                }
+
+                if favorites.pendingSyncCount > 0 {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(favorites.pendingSyncCount) favorite changes awaiting sync",
+                            norwegian: "\(favorites.pendingSyncCount) favorittendringer venter på synkronisering"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Spacer(minLength: 4)
+                        Button(ATHLTHLocalization.choose(
+                            english: "Retry", norwegian: "Prøv igjen"
+                        )) {
+                            Task { await favorites.refresh(force: true) }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .disabled(favorites.isLoading)
+                    }
+                    .padding(12)
+                    .background(ATHLTHPlanDesign.surface,
+                                in: RoundedRectangle(cornerRadius: 14))
                 }
 
                 TextField(
