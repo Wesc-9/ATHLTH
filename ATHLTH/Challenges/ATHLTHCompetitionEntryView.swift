@@ -82,12 +82,15 @@ struct ATHLTHCompetitionEntryView: View {
                 }
             }
             .sheet(isPresented: $showingCreator) {
-                ATHLTHCompetitionCreationView(
+                // Only instantiate the heavy editor AFTER the athlete
+                // chooses a sport. Erasure prevents generic type metadata
+                // expansion across the nested competition sheet boundary.
+                AnyView(ATHLTHCompetitionCreationView(
                     initialActivity: selectedActivity,
                     advanced: true,
                     initialFormat: initialFormat,
                     preselectedFriend: preselectedFriend
-                )
+                ))
             }
         }
         .presentationDetents([.large])
