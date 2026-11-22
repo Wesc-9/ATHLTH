@@ -879,6 +879,71 @@ final class LibraryFavoritesStore: ObservableObject {
     private var localMutationRevision = 0
     private var refreshRequestID: UUID?
 
+    private struct PendingFavoriteChange: Codable {
+        let revision: UUID
+        let kind: LibraryFavoriteKind
+        let itemID: String
+        let record: LibraryFavoriteRecord?
+    }
+
+    private var pendingChanges: [String: PendingFavoriteChange] = [:]
+
+    private func loadPendingChanges(for userID: UUID) {
+        pendingChanges = AccountLocalStorage.read(
+            [String: PendingFavoriteChange].self,
+            name: "libraryFavoritePendingChanges",
+            userID: userID
+        ) ?? [:]
+    }
+
+    private func persistPendingChanges(for userID: UUID) {
+        AccountLocalStorage.write(
+            pendingChanges,
+            name: "libraryFavoritePendingChanges",
+            userID: userID
+        )
+    }
+
+    private func sendChange(_ change: PendingFavoriteChange, userID: UUID) async throws {
+        if let record = change.record {
+            try await client.from("library_favorites")
+                .upsert(record).execute()
+        } else {
+            try await client.from("library_favorites")
+                .delete()
+                .eq("user_id", value: userID)
+                .eq("item_type", value: change.kind.rawValue)
+                .eq("item_id", value: change.itemID)
+                .execute()
+        }
+    }
+
+    private func acknowledgeChange(
+        _ change: PendingFavoriteChange, key: String, userID: UUID
+    ) {
+        guard activeUserID == userID,
+              pendingChanges[key]?.revision == change.revision else { return }
+        pendingChanges.removeValue(forKey: key)
+        persistPendingChanges(for: userID)
+    }
+
+    private func retryPendingChanges(for userID: UUID) async {
+        for (key, change) in pendingChanges {
+            guard activeUserID == userID,
+                  client.auth.currentUser?.id == userID else { return }
+            // A queued write may still be running. Wait for it before retrying
+            // so a stale request cannot overwrite the desired final state.
+            await pendingFavoriteWrites[key]?.value
+            guard pendingChanges[key]?.revision == change.revision else { continue }
+            do {
+                try await sendChange(change, userID: userID)
+                acknowledgeChange(change, key: key, userID: userID)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
     }
@@ -906,6 +971,7 @@ final class LibraryFavoritesStore: ObservableObject {
             refreshRequestID = nil
             isLoading = false
             errorMessage = nil
+            loadPendingChanges(for: user.id)
         }
 
         if !force,
@@ -927,6 +993,7 @@ final class LibraryFavoritesStore: ObservableObject {
         }
 
         do {
+            await retryPendingChanges(for: user.id)
             let rows: [LibraryFavoriteRecord] =
                 try await client
                     .from("library_favorites")
@@ -944,7 +1011,14 @@ final class LibraryFavoritesStore: ObservableObject {
             // Do not replace a favorite the user toggled while the
             // network request was still in flight.
             guard requestedRevision == localMutationRevision else { return }
-            favorites = rows
+            // Preserve locally requested changes if the server is still
+            // unavailable; retry them at the next refresh.
+            let pending = pendingChanges.values
+            let pendingIDs = Set(pending.map { "\($0.kind.rawValue)|\($0.itemID)" })
+            let resolvedRows = rows.filter {
+                !pendingIDs.contains("\($0.itemType.rawValue)|\($0.itemID)")
+            } + pending.compactMap(\.record)
+            favorites = resolvedRows
             lastRefreshAt = Date()
             persistLocal()
             errorMessage = nil
@@ -997,6 +1071,7 @@ final class LibraryFavoritesStore: ObservableObject {
             refreshRequestID = nil
             isLoading = false
             errorMessage = nil
+            loadPendingChanges(for: user.id)
         }
 
         localMutationRevision += 1
@@ -1023,32 +1098,26 @@ final class LibraryFavoritesStore: ObservableObject {
             record = added
         }
         persistLocal()
+        let change = PendingFavoriteChange(
+            revision: UUID(), kind: kind, itemID: itemID, record: record
+        )
+        pendingChanges[key] = change
+        persistPendingChanges(for: user.id)
 
         pendingFavoriteWrites[key] = Task {
             // Wait for the preceding write to complete before applying the
             // next requested state of this exact favorite.
             await previous?.value
             do {
-                if let record {
-                    try await client
-                        .from("library_favorites")
-                        .upsert(record)
-                        .execute()
-                } else {
-                    try await client
-                        .from("library_favorites")
-                        .delete()
-                        .eq("user_id", value: user.id)
-                        .eq("item_type", value: kind.rawValue)
-                        .eq("item_id", value: itemID)
-                        .execute()
-                }
+                try await sendChange(change, userID: user.id)
+                acknowledgeChange(change, key: key, userID: user.id)
                 guard activeUserID == user.id,
                       client.auth.currentUser?.id == user.id else { return }
                 errorMessage = nil
             } catch {
                 guard activeUserID == user.id,
                       client.auth.currentUser?.id == user.id else { return }
+                // Keep the desired change on disk for the next refresh.
                 errorMessage = error.localizedDescription
             }
         }
