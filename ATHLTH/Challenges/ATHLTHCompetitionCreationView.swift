@@ -606,6 +606,13 @@ struct ATHLTHCompetitionCreationView: View {
         VStack(alignment: .leading, spacing: 12) {
             titleBlock(tr("The challenge", "Konkurransen"))
             let preset: String = {
+                if format == .duel {
+                    switch initialActivity {
+                    case .running: return "Løp 5 km"
+                    case .walking: return "Gå lengst"
+                    case .strength: return "Størst treningsvolum"
+                    }
+                }
                 switch initialActivity {
                 case .running: return "Løp 5 km"
                 case .walking: return "Gå 5 km"
