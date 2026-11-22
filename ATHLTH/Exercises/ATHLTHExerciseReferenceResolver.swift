@@ -410,8 +410,7 @@ enum ATHLTHExerciseReferenceResolver {
         if source.sourceIdentifier == "athlth-native-incline-dumbbell-bench-press" {
             let reviewed = library.filter {
                 $0.source == .repDB &&
-                $0.sourceIdentifier == "incline-dumbbell-bench-press" &&
-                key($0.canonicalName) == key("Incline Dumbbell Bench Press")
+                $0.sourceIdentifier == "incline-dumbbell-bench-press"
             }
             if reviewed.count == 1 { return reviewed[0] }
         }
