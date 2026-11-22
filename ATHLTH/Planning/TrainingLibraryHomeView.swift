@@ -1031,12 +1031,19 @@ final class LibraryFavoritesStore: ObservableObject {
         remote: [TrainingPlanCatalogEntry]
     ) -> [TrainingPlanCatalogEntry] {
         let bundled = TrainingPlanCatalogEntry.bundledCatalog
+        let bundledIDs = Dictionary(
+            bundled.map { ($0.id, $0.slug) },
+            uniquingKeysWith: { existing, _ in existing }
+        )
         var seenIDs = Set<UUID>()
         var seenSlugs = Set<String>()
         let validRemote = remote.filter {
             $0.hasCompleteWorkoutPattern &&
             (1...52).contains($0.durationWeeks) &&
-            !$0.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            !$0.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            // Never allow a different remote slug to steal an ID owned by
+            // one of the built-in plans. Existing saved plans use this UUID.
+            (bundledIDs[$0.id] == nil || bundledIDs[$0.id] == $0.slug)
         }.sorted {
             if $0.catalogVersion != $1.catalogVersion {
                 return $0.catalogVersion > $1.catalogVersion
