@@ -44,7 +44,9 @@ struct ATHLTHTournamentMyExercisesView: View {
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                 }
             }
-            Text("Hver øvelse må gjennomføres innen fristen. Dokumentasjonen kontrolleres før eventuell walkover, og uavklarte registreringer må behandles.")
+            Text(tournament.releaseMode == "everyone_finished"
+                ? "Neste øvelse åpnes når alle har godkjent forrige resultat, eller når den forrige fristen er behandlet. Uteblitt øvelse gir 0 poeng."
+                : "Hver øvelse har en egen gjennomføringsfrist. Uteblitt øvelse gir 0 poeng; oppgjøret avgjøres først når alle øvelser er vurdert.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 .fixedSize(horizontal: false,vertical: true)
@@ -142,8 +144,25 @@ struct ATHLTHTournamentMyExercisesView: View {
                         date: .abbreviated,time: .shortened))
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    if tournament.releaseMode == "everyone_finished" &&
+                        slot.scheduledAt >= Date(timeIntervalSince1970: 4_070_908_800) {
+                        Text("Venter på at alle fullfører forrige øvelse")
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    if tournament.releaseMode != "" &&
+                        slot.deadlineAt <= Date() &&
+                        ownCompletion?.reviewStatus != "approved" &&
+                        ownCompletion?.reviewStatus != "submitted" {
+                        Text("0 poeng · fristen er utløpt")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
                     if slot.state == "walkover" {
-                        Text("Walkover registrert")
+                        Text(tournament.releaseMode == "everyone_finished" ||
+                             tournament.releaseEvery > 0
+                             ? "Øvelsen er avgjort"
+                             : "Walkover registrert")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.orange)
                     } else if slot.state == "disputed" {
