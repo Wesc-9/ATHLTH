@@ -180,6 +180,7 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var endsAt = Date().addingTimeInterval(7 * 86_400)
     @State private var simpleStartLater = false
     @State private var duelAgreement = ATHLTHCompetitionAgreement()
+    @State private var duelRaceSettings = ATHLTHTournamentCompetitionSettings()
     @State private var duelInvitationDays = 3
     @State private var multipleAttempts = true
     @State private var roundsPerWeek = 7
@@ -212,25 +213,75 @@ struct ATHLTHCompetitionCreationView: View {
             effectiveStart.addingTimeInterval(7 * 86_400)
     }
 
+    private var chosenDuelRoute: TrainingRoute? {
+        guard advanced && format == .duel &&
+              duelRaceSettings.race.routeID != nil else {
+            return chosenRoute
+        }
+        return session.savedRoutes.first {
+            $0.id == duelRaceSettings.race.routeID
+        }
+    }
+
+    private var effectiveDuelMetric: ATHLTHChallengeScoring {
+        guard advanced, format == .duel else { return scoring }
+        switch duelRaceSettings.race.discipline {
+        case .sprint:
+            switch duelRaceSettings.race.sprintTarget {
+            case .distance: return .fastestDistance
+            case .duration: return .farthestInTime
+            case .route: return .fastestRoute
+            }
+        case .distance: return .fastestDistance
+        case .duration: return .farthestInTime
+        case .workout, .laps: return scoring
+        }
+    }
+
+    private var effectiveDuelDistance: Double {
+        advanced && format == .duel &&
+        (duelRaceSettings.race.discipline == .sprint ||
+         duelRaceSettings.race.discipline == .distance)
+        ? Double(duelRaceSettings.race.targetDistanceMeters) / 1_000 : distanceKM
+    }
+
+    private var effectiveDuelMinutes: Double {
+        advanced && format == .duel &&
+        (duelRaceSettings.race.discipline == .sprint ||
+         duelRaceSettings.race.discipline == .duration)
+        ? Double(duelRaceSettings.race.targetDurationSeconds) / 60 :
+          durationMinutes
+    }
+
+    private var duelEngineSupportsRule: Bool {
+        guard advanced, format == .duel else { return true }
+        let race = duelRaceSettings.race
+        return race.isValid &&
+            race.discipline != .laps &&
+            (race.discipline != .sprint || race.sprintMode == .massStart) &&
+            race.recordingDevice != .appleWatch
+    }
+
     private var isValid: Bool {
         ATHLTHCompetitionCreationPolicy.canPublish(
             name: competitionTitle,
             ownerID: session.profile.userID,
             opponents: chosenIDs,
             format: format,
-            metric: scoring,
+            metric: effectiveDuelMetric,
             activity: initialActivity,
-            distanceKM: distanceKM,
-            durationMinutes: durationMinutes,
+            distanceKM: effectiveDuelDistance,
+            durationMinutes: effectiveDuelMinutes,
             exerciseName: exerciseName,
-            hasRoute: chosenRoute != nil,
+            hasRoute: chosenDuelRoute != nil,
             endsAt: effectiveEnd,
             now: Date()
         ) && (runningBranch != .sprint || format != .duel ||
                 (sprintGoal != .route || chosenRoute != nil)) &&
         selectedPeople.count == chosenIDs.count &&
         effectiveStart >= Date().addingTimeInterval(-60) &&
-        effectiveStart < effectiveEnd && duelAgreement.isValid
+        effectiveStart < effectiveEnd && duelAgreement.isValid &&
+        duelEngineSupportsRule
     }
 
     var body: some View {
@@ -290,7 +341,8 @@ struct ATHLTHCompetitionCreationView: View {
                         }
                     }
 
-                    if initialActivity == .running && format == .duel {
+                    if initialActivity == .running && format == .duel &&
+                       !advanced {
                         sprintSection
                     }
                     if advanced {
@@ -463,6 +515,11 @@ struct ATHLTHCompetitionCreationView: View {
             }
             if let preselectedFriend, preselectedFriend.userID != session.profile.userID {
                 chosenIDs.insert(preselectedFriend.userID)
+            }
+            if advanced && initialActivity != .strength {
+                duelRaceSettings.race.discipline = .distance
+                duelRaceSettings.race.targetDistanceMeters =
+                    Int(max(100, distanceKM * 1_000))
             }
             if competitionTitle.isEmpty {
                 competitionTitle = "\(format.title) · \(initialActivity.title)"
@@ -854,11 +911,28 @@ struct ATHLTHCompetitionCreationView: View {
     private var competitionRules: some View {
         VStack(alignment: .leading, spacing: 13) {
             titleBlock(tr("Rules", "Regler"))
+            if format == .duel && advanced {
+                ATHLTHCompetitionRaceRulesSection(
+                    settings: $duelRaceSettings,
+                    activities: Set([
+                        ATHLTHCompetitionCreationPolicy.tournamentActivity(
+                            initialActivity
+                        )
+                    ])
+                )
+                if !duelEngineSupportsRule {
+                    Label("Runder, lagsprint og verifisert Apple Watch-kilde krever videre integrasjon med treningsmotoren før duellen kan publiseres.",
+                          systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
             if format == .duel {
                 Text(tr("What determines the winner?", "Hva avgjør vinneren?"))
                     .font(.caption)
                     .foregroundStyle(muted)
-                if runningBranch != .sprint {
+                if runningBranch != .sprint &&
+                   (!advanced || duelRaceSettings.race.discipline == .workout) {
                     Picker(tr("Result", "Resultat"), selection: $scoring) {
                         ForEach(duelMetrics, id: \.self) { metric in
                             Text(metric.title).tag(metric)
@@ -1103,22 +1177,23 @@ struct ATHLTHCompetitionCreationView: View {
         }) {
             throw ATHLTHCompetitionError.duplicate
         }
-        let routeSnapshot: ChallengeRouteSnapshot? = scoring == .fastestRoute
-            ? chosenRoute.map {
+        let duelMetric = effectiveDuelMetric
+        let routeSnapshot: ChallengeRouteSnapshot? = duelMetric == .fastestRoute
+            ? chosenDuelRoute.map {
                 ChallengeRouteSnapshot(
                     routeID: $0.id, title: $0.title,
                     distanceKilometers: $0.distanceKilometers,
                     coordinates: $0.coordinates
                 )
             } : nil
-        let rules = ATHLTHChallengeRules(
-            scoring: scoring,
+        var rules = ATHLTHChallengeRules(
+            scoring: duelMetric,
             verificationPolicy: initialActivity == .strength
                 ? .manualAllowed : .verifiedRequired,
-            targetDistanceMeters: scoring == .fastestDistance
-                ? distanceKM * 1_000 : nil,
-            targetDurationSeconds: scoring == .farthestInTime
-                ? durationMinutes * 60 : nil,
+            targetDistanceMeters: duelMetric == .fastestDistance
+                ? effectiveDuelDistance * 1_000 : nil,
+            targetDurationSeconds: duelMetric == .farthestInTime
+                ? effectiveDuelMinutes * 60 : nil,
             timeBasis: .elapsed,
             route: routeSnapshot,
             gpsRequired: initialActivity != .strength,
@@ -1140,6 +1215,20 @@ struct ATHLTHCompetitionCreationView: View {
             lockRulesAtStart: true,
             meetup: nil
         )
+        if advanced {
+            rules.competitionRace = duelRaceSettings.race
+        } else if initialActivity == .running && runningBranch == .sprint {
+            var quickSprint = ATHLTHCompetitionRaceRules()
+            quickSprint.discipline = .sprint
+            quickSprint.sprintTarget =
+                sprintGoal == .time ? .duration :
+                sprintGoal == .route ? .route : .distance
+            quickSprint.targetDistanceMeters = Int(distanceKM * 1_000)
+            quickSprint.targetDurationSeconds = Int(durationMinutes * 60)
+            quickSprint.routeID = chosenRoute?.id
+            quickSprint.routeName = chosenRoute?.title ?? ""
+            rules.competitionRace = quickSprint
+        }
         let creator = ChallengeParticipant(
             userID: session.profile.userID,
             username: session.profile.username,
