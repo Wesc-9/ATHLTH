@@ -165,6 +165,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
     var seasonID: UUID?
     var title: String
     var format: ATHLTHTournamentFormat
+    var singleEventMode: Bool
     var groupSize: Int
     var qualifiersPerGroup: Int
     var participants: [ATHLTHTournamentParticipant]
@@ -195,6 +196,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         seasonID: UUID? = nil,
         title: String,
         format: ATHLTHTournamentFormat,
+        singleEventMode: Bool = false,
         groupSize: Int,
         qualifiersPerGroup: Int,
         participants: [ATHLTHTournamentParticipant],
@@ -224,6 +226,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         self.seasonID = clubID == nil ? nil : seasonID
         self.title = title
         self.format = format
+        self.singleEventMode = singleEventMode
         self.groupSize = groupSize
         self.qualifiersPerGroup = qualifiersPerGroup
         self.participants = participants
@@ -253,7 +256,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, ownerID, clubID, seasonID, title, format, groupSize
+        case id, ownerID, clubID, seasonID, title, format, singleEventMode, groupSize
         case qualifiersPerGroup, participants, warmupRounds, createdAt
         case exerciseMode, exerciseCount, proposalsCloseAt, votesCloseAt,
              approvePlayerChanges, allowedActivities, rulesAuthority,
@@ -271,6 +274,8 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
             try values.decodeIfPresent(UUID.self, forKey: .seasonID)
         title = try values.decode(String.self, forKey: .title)
         format = try values.decode(ATHLTHTournamentFormat.self, forKey: .format)
+        singleEventMode = try values.decodeIfPresent(Bool.self,
+                                 forKey: .singleEventMode) ?? false
         groupSize = try values.decode(Int.self, forKey: .groupSize)
         qualifiersPerGroup = try values.decode(Int.self, forKey: .qualifiersPerGroup)
         participants = try values.decode([ATHLTHTournamentParticipant].self,
@@ -330,6 +335,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         try values.encodeIfPresent(seasonID, forKey: .seasonID)
         try values.encode(title, forKey: .title)
         try values.encode(format, forKey: .format)
+        try values.encode(singleEventMode, forKey: .singleEventMode)
         try values.encode(groupSize, forKey: .groupSize)
         try values.encode(qualifiersPerGroup, forKey: .qualifiersPerGroup)
         try values.encode(participants, forKey: .participants)
