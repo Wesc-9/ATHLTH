@@ -36,6 +36,7 @@ struct ATHLTHTournamentLobbyView: View {
     @State private var votes: [ATHLTHTournamentExerciseVoteRemote] = []
     @State private var exerciseNames: [UUID: String] = [:]
     @State private var messages: [ATHLTHTournamentLobbyMessageRemote] = []
+    @State private var inviteRequests: [ATHLTHTournamentInviteRequestRemote] = []
     @State private var replacements: [ATHLTHTournamentPlayerChangeRemote] = []
     @State private var replacementVotes: [ATHLTHTournamentPlayerChangeVoteRemote] = []
     @State private var exerciseQuery = ""
@@ -395,6 +396,7 @@ struct ATHLTHTournamentLobbyView: View {
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
 
+            additionalInviteContent
             replacementRequestsContent
 
             if isOwner {
@@ -804,6 +806,126 @@ struct ATHLTHTournamentLobbyView: View {
         }
     }
 
+    private var mayInviteMore: Bool {
+        tournament.status == "inviting" &&
+        (isOwner || (tournament.invitationPermission == "participants" && isAccepted))
+    }
+
+    private var mayApproveInvite: Bool {
+        tournament.status == "inviting" &&
+        (isOwner && tournament.joinApproval == "admin" ||
+         isAccepted && tournament.joinApproval == "participants")
+    }
+
+    @ViewBuilder
+    private var additionalInviteContent: some View {
+        if mayInviteMore {
+            VStack(alignment: .leading, spacing: 11) {
+                Text("Inviter flere")
+                    .font(.headline)
+                Text(tournament.invitationPermission == "admin"
+                    ? "Arrangøren inviterer nye deltakere."
+                    : "Alle godkjente deltakere kan foreslå nye deltakere.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                let choices = social.mutualFollows.filter { person in
+                    !entries.contains(where: { $0.userID == person.userID }) &&
+                    !inviteRequests.contains(where: {
+                        $0.nomineeID == person.userID && $0.state == "pending"
+                    })
+                }
+                if choices.isEmpty {
+                    Text("Ingen nye gjensidige venner å invitere.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                ForEach(choices.prefix(20), id: \.userID) { person in
+                    Button {
+                        Task {
+                            await perform {
+                                try await cloud.proposeInvite(
+                                    tournamentID: tournament.id,
+                                    nomineeID: person.userID
+                                )
+                                await onChange()
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.crop.circle.badge.plus")
+                            Text(person.resolvedName)
+                            Spacer()
+                            Image(systemName: "plus.circle")
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        .padding(10)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy)
+                }
+            }
+            .padding(15)
+            .background(ATHLTHArenaV3Style.panel())
+        }
+        let pending = inviteRequests.filter { $0.state == "pending" }
+        if !pending.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Venter på godkjenning")
+                    .font(.headline)
+                Text(tournament.joinApproval == "participants"
+                    ? "Alle godkjente deltakere må si ja."
+                    : "Arrangøren godkjenner nye invitasjoner.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                ForEach(pending) { item in
+                    VStack(alignment: .leading, spacing: 8) {
+                        let friend = social.mutualFollows.first {
+                            $0.userID == item.nomineeID
+                        }
+                        Text(friend?.resolvedName ?? "Ny deltaker")
+                            .font(.subheadline.weight(.semibold))
+                        if mayApproveInvite {
+                            HStack {
+                                Button("Godkjenn") {
+                                    Task {
+                                        await perform {
+                                            try await cloud.reviewInvite(
+                                                requestID: item.id, approved: true
+                                            )
+                                            await onChange()
+                                        }
+                                    }
+                                }
+                                Button("Avslå") {
+                                    Task {
+                                        await perform {
+                                            try await cloud.reviewInvite(
+                                                requestID: item.id, approved: false
+                                            )
+                                            await onChange()
+                                        }
+                                    }
+                                }
+                            }
+                            .font(.caption.weight(.semibold))
+                            .tint(ATHLTHArenaV3Style.gold)
+                            .disabled(busy)
+                        } else {
+                            Text("Avventer beslutning")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding(15)
+            .background(ATHLTHArenaV3Style.panel())
+        }
+    }
+
     private func name(_ id: UUID) -> String {
         if id == userID { return session.profile.username }
         return names[id] ?? "Utøver"
@@ -851,10 +973,13 @@ struct ATHLTHTournamentLobbyView: View {
             async let allVotes = cloud.exerciseVotes(tournamentID: tournament.id)
             async let allMessages = cloud.messages(tournamentID: tournament.id)
             async let allChanges = cloud.playerChanges(tournamentID: tournament.id)
+            async let allInvites = cloud.inviteRequests(tournamentID: tournament.id)
             let candidateRows = try await allCandidates
             let voteRows = try await allVotes
             let messageRows = try await allMessages
             let changes = try await allChanges
+            let extraInvites = try await allInvites
+            inviteRequests = extraInvites
             candidates = candidateRows
             votes = voteRows
             messages = messageRows
