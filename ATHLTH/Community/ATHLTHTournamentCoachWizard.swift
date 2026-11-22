@@ -148,9 +148,8 @@ struct ATHLTHTournamentCoachWizard: View {
                             Divider()
                             Text("Øvelser fra biblioteket")
                                 .font(.subheadline.weight(.semibold))
-                            ForEach(Array(proposal.exerciseNames.enumerated()),
-                                    id: \.offset) { index, exercise in
-                                Label("\(index + 1). \(exercise)",
+                            ForEach(proposal.exerciseNames.indices, id: \.self) { index in
+                                Label("\(index + 1). \(proposal.exerciseNames[index])",
                                       systemImage: "checkmark.circle")
                                     .font(.subheadline)
                             }
