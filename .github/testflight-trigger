@@ -296,3 +296,5 @@ ATHLTH 2.2.7 build 135 retry after XCTest competition expectations and reviewed 
 ATHLTH 2.2.7 build 135 retry after quick-start expectations and reviewed incline dumbbell ID resolution 2026-11-22
 
 ATHLTH 2.2.7 build 135 — user-authorized gated TestFlight retry after RepDB incline dumbbell alias and legacy bench press visibility fixes (2026-11-22). Require five successful same-commit CI workflows before signing/archive/upload; never bypass checks.
+
+ATHLTH 2.2.7 build 135 — gated revalidation after bench press reference resolver fix 3b8a64f (2026-11-22). Require all five CI gates; upload only on green.
