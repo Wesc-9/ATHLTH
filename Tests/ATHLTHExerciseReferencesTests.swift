@@ -37,6 +37,60 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         )
     }
 
+    func testLegacyBenchPressUsesReviewedRepDBEvenWhenEquipmentMetadataDiffers() {
+        let legacy = entry(
+            "Bench Press", id: UUID(), source: .athlthCatalog,
+            sourceIdentifier: "athlth-native-bench-press"
+        )
+        let reviewed = entry(
+            "Bench Press", id: UUID(), source: .repDB,
+            sourceIdentifier: "bench-press"
+        )
+        let catalog = [legacy, reviewed]
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.visibleEquivalent(
+                of: legacy, in: catalog
+            ).id, reviewed.id
+        )
+        var saved = block("Bench Press")
+        saved.exerciseSlug = "athlth-native-bench-press"
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(saved, in: catalog)?.id,
+            reviewed.id
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(
+                block("Bench Press"), in: catalog
+            )?.id, reviewed.id
+        )
+        // A stored UUID is historical identity, not a fuzzy title search.
+        saved.exerciseID = legacy.id
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(saved, in: catalog)?.id,
+            legacy.id
+        )
+    }
+
+    func testAmbiguousRepDBBenchPressNeverSilentlyReplacesNativeIdentity() {
+        let legacy = entry(
+            "Bench Press", id: UUID(), source: .athlthCatalog,
+            sourceIdentifier: "athlth-native-bench-press"
+        )
+        let first = entry(
+            "Bench Press", id: UUID(), source: .repDB,
+            sourceIdentifier: "bench-press"
+        )
+        let second = entry(
+            "Bench Press", id: UUID(), source: .repDB,
+            sourceIdentifier: "bench-press"
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.visibleEquivalent(
+                of: legacy, in: [legacy, first, second]
+            ).id, legacy.id
+        )
+    }
+
     func testExistingLatPulldownAndSeatedCableRowResolveByReviewedLibraryID() {
         let first = entry(
             "Lat Pulldown", id: UUID(), source: .athlthCatalog,
