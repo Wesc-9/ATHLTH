@@ -333,7 +333,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .font(.subheadline.weight(.semibold))
                 .disabled(busy)
             } else if isOwner {
-                if pendingCount == 0 && confirmedEntries.count >= 2 {
+                if pendingCount == 0 && confirmedEntries.count >= 3 {
                     Button {
                         Task { await start() }
                     } label: {
