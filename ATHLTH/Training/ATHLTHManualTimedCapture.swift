@@ -216,7 +216,16 @@ enum ATHLTHManualTimedCapture {
         id: UUID, userID: UUID,
         defaults: UserDefaults = .standard
     ) -> Bool {
-        guard current(for: userID)?.id == id else { return false }
+        guard let checkpoint = current(for: userID),
+              checkpoint.id == id,
+              ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                  for: .finish, workoutID: checkpoint.id,
+                  expectedWorkoutID: id, source: .manualTimer,
+                  recordingOwner: .iPhone,
+                  phase: checkpoint.resumedAt == nil ? .paused : .work
+              ) != nil else { return false }
+        // The saved CustomQuickWorkoutJournal is still the one original
+        // finished record. This clears only its already-saved live timer.
         return remove(id: id, userID: userID, defaults: defaults)
     }
 

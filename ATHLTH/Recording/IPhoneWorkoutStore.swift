@@ -1796,9 +1796,15 @@ final class IPhoneWorkoutStore:
         workout: inout PhoneWorkout,
         at date: Date
     ) {
-        guard workout.resumedAt != nil else {
-            return
-        }
+        guard workout.resumedAt != nil,
+              ATHLTHUniversalWorkoutLifecycle.permits(
+                  .pause,
+                  state: ATHLTHUniversalActiveCapture.recorded(
+                      ATHLTHWorkoutSessionFoundation.running(workout, at: date),
+                      source: .phoneRunWalk
+                  ),
+                  expectedWorkoutID: workout.id
+              ) else { return }
 
         workout.accumulatedSeconds =
             workout.elapsed(at: date)
@@ -1830,9 +1836,15 @@ final class IPhoneWorkoutStore:
         workout: inout PhoneWorkout,
         at date: Date
     ) {
-        guard automaticPauseActive else {
-            return
-        }
+        guard automaticPauseActive, workout.resumedAt == nil,
+              ATHLTHUniversalWorkoutLifecycle.permits(
+                  .resume,
+                  state: ATHLTHUniversalActiveCapture.recorded(
+                      ATHLTHWorkoutSessionFoundation.running(workout, at: date),
+                      source: .phoneRunWalk
+                  ),
+                  expectedWorkoutID: workout.id
+              ) else { return }
 
         if var pauses = workout.pauses,
            let lastIndex = pauses.indices.last,

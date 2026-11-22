@@ -169,4 +169,45 @@ final class ATHLTHManualTimedCaptureTests: XCTestCase {
         ))
     }
 
+
+    func testManualPauseResumeAndFinishedCleanupRetainOneOriginalIdentity() throws {
+        let (defaults, suite) = try suite()
+        defer {
+            ATHLTHManualTimedCapture.switchAccount(nil, defaults: defaults)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let owner = UUID()
+        ATHLTHManualTimedCapture.switchAccount(owner, defaults: defaults)
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let session = try ATHLTHManualTimedCapture.beginOrResume(
+            configuration: bike(), userID: owner, at: now, defaults: defaults
+        )
+
+        XCTAssertFalse(ATHLTHManualTimedCapture.closeAfterSavedRecord(
+            id: UUID(), userID: owner, defaults: defaults
+        ))
+        XCTAssertEqual(ATHLTHManualTimedCapture.current(for: owner)?.id, session.id)
+
+        XCTAssertTrue(ATHLTHManualTimedCapture.update(
+            id: session.id, userID: owner, accumulatedSeconds: 75,
+            resumedAt: nil, approvedTimeLimit: 18_000, defaults: defaults
+        ))
+        XCTAssertTrue(ATHLTHManualTimedCapture.update(
+            id: session.id, userID: owner, accumulatedSeconds: 75,
+            resumedAt: now.addingTimeInterval(150),
+            approvedTimeLimit: 18_000, defaults: defaults
+        ))
+        XCTAssertEqual(ATHLTHManualTimedCapture.current(for: owner)?.id, session.id)
+
+        // The completion record is saved by the owning caller. This method
+        // must release only the original active timer, never make a new ID.
+        XCTAssertTrue(ATHLTHManualTimedCapture.closeAfterSavedRecord(
+            id: session.id, userID: owner, defaults: defaults
+        ))
+        XCTAssertNil(ATHLTHManualTimedCapture.current(for: owner))
+        XCTAssertFalse(ATHLTHManualTimedCapture.hasActiveCapture)
+        XCTAssertFalse(ATHLTHManualTimedCapture.closeAfterSavedRecord(
+            id: session.id, userID: owner, defaults: defaults
+        ))
+    }
 }
