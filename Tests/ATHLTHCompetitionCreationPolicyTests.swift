@@ -89,13 +89,30 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
             activity: .walking, format: .league,
             opponents: players, metric: .mostDistance
         ))
-        XCTAssertTrue(valid(
+        XCTAssertFalse(valid(
             activity: .walking, format: .cup,
             opponents: players, metric: .mostDistance
         ))
         XCTAssertTrue(valid(
             activity: .walking, format: .cup,
             opponents: players.union([UUID()]), metric: .mostDistance
+        ))
+    }
+
+    func testLeagueAllowsOneOpponentAndCupNeedsThreeOpponents() {
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.league), 1)
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.cup), 3)
+        XCTAssertTrue(valid(
+            activity: .running, format: .league,
+            opponents: [rival], metric: .fastestDistance
+        ))
+        XCTAssertFalse(valid(
+            activity: .running, format: .cup,
+            opponents: [rival, UUID()], metric: .fastestDistance
+        ))
+        XCTAssertTrue(valid(
+            activity: .running, format: .cup,
+            opponents: [rival, UUID(), UUID()], metric: .fastestDistance
         ))
     }
 
