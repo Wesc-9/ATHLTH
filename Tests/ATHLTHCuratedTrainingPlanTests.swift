@@ -30,6 +30,46 @@ final class ATHLTHCuratedTrainingPlanTests: XCTestCase {
         }
     }
 
+    /// Prevent training plans from linking to hidden, absent or ambiguous
+    /// exercises. Catalog recipes must use existing library identities, not
+    /// create private duplicates or silently substitute equipment variants.
+    @MainActor
+    func testEveryCatalogPlanExerciseResolvesToSelectableLibraryRecord() {
+        let library = ExerciseLibraryStore()
+        let entries = library.allExercises
+        let selectableIDs = Set(library.selectableExercises.map(\.id))
+        let catalog = TrainingPlanCatalogEntry.bundledCatalog
+        var checkedReferences = Set<String>()
+
+        for plan in catalog {
+            for blueprint in plan.sessionBlueprints {
+                let session = ATHLTHCatalogPlanSessionFactory.session(
+                    entry: plan, blueprint: blueprint, week: 1
+                )
+                for block in session.resolvedWorkoutBlocks where block.kind == .exercise {
+                    let key = "\(block.exerciseID?.uuidString ?? "-")|\(block.exerciseSlug ?? "-")|\(block.title)"
+                    guard checkedReferences.insert(key).inserted else { continue }
+                    let context = "\(plan.slug) / \(blueprint.rawValue) / \(block.title)"
+                    XCTAssertTrue(
+                        block.exerciseID != nil || (block.exerciseSlug?.isEmpty == false),
+                        "Missing explicit library identity: \(context)"
+                    )
+                    let resolved = ATHLTHExerciseReferenceResolver.resolve(
+                        block, in: entries
+                    )
+                    XCTAssertNotNil(resolved, "Missing library exercise: \(context)")
+                    if let resolved {
+                        XCTAssertTrue(
+                            selectableIDs.contains(resolved.id),
+                            "Plan links to a hidden exercise: \(context)"
+                        )
+                    }
+                }
+            }
+        }
+        XCTAssertGreaterThan(checkedReferences.count, 20)
+    }
+
     @MainActor
     func testMuscleFocusedProgramsIncludeRealExerciseSetsRestAndWarmup() throws {
         let selected = ATHLTHCuratedTrainingPlans.entries.filter { $0.category == "muscle_focus" }
