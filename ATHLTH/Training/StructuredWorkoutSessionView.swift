@@ -1267,7 +1267,13 @@ struct StructuredWorkoutSessionView: View {
         }
         let prospectiveBlocks = candidateRound ?? blocks
         if currentIndex < prospectiveBlocks.count - 1 {
-            guard ATHLTHLiveWorkoutEngineRouter.advance(
+            guard ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                for: .advance, workoutID: workout.id,
+                expectedWorkoutID: workout.id, source: .structuredTimer,
+                recordingOwner: .iPhone, phase: .work,
+                stageIndex: currentIndex, stageCount: prospectiveBlocks.count
+            ) != nil,
+            ATHLTHLiveWorkoutEngineRouter.advance(
                 workoutID: workout.id,
                 blocks: prospectiveBlocks,
                 from: currentIndex
@@ -1329,7 +1335,15 @@ struct StructuredWorkoutSessionView: View {
     /// Stop all timed groups and the stage clock without changing the
     /// original workout ID, actual start, HealthKit owner, or history.
     private func toggleStructuredPause() {
-        guard hasStarted, !savedCompletion else { return }
+        guard hasStarted, !savedCompletion,
+              ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                  for: pausedAt == nil ? .pause : .resume,
+                  workoutID: workout.id,
+                  expectedWorkoutID: workout.id,
+                  source: .structuredTimer,
+                  recordingOwner: .iPhone,
+                  phase: pausedAt == nil ? .work : .paused
+              ) != nil else { return }
         let now = Date(), oldPause = pausedAt
         let oldTotal = completedPauseSeconds
         let oldStep = stepEnteredAt, oldGroups = modeStarts
@@ -1511,11 +1525,15 @@ struct StructuredWorkoutSessionView: View {
     }
 
     private func finishWorkout() {
-        // Ignore repeated confirmation taps and empty sessions. A saved
-        // structured completion is evidence for the linked training plan.
-        guard !savedCompletion,
-              !completedBlockIDs.isEmpty || !amrapTimedOutGroups.isEmpty
-        else { return }
+        // All completed workouts use the original identity and one lifecycle.
+        guard hasStarted, !savedCompletion,
+              !completedBlockIDs.isEmpty || !amrapTimedOutGroups.isEmpty,
+              ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                  for: .finish, workoutID: workout.id,
+                  expectedWorkoutID: workout.id, source: .structuredTimer,
+                  recordingOwner: .iPhone,
+                  phase: pausedAt == nil ? .work : .paused
+              ) != nil else { return }
         var completion =
             StructuredWorkoutCompletion(
                 id: completionID,

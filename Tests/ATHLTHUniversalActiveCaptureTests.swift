@@ -1001,4 +1001,126 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
         XCTAssertNil(restored.plannedSessionID)
     }
 
+
+    func testUniversalLifecycleHandlesSameTransitionsForAllPhoneRecorders() {
+        let id = UUID()
+        for source in [
+            ATHLTHUniversalCaptureSource.phoneRunWalk,
+            .strength, .manualTimer, .structuredTimer
+        ] {
+            XCTAssertEqual(
+                ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                    for: .pause, workoutID: id,
+                    expectedWorkoutID: id, source: source,
+                    recordingOwner: .iPhone, phase: .work
+                ),
+                .paused, "\(source)"
+            )
+            XCTAssertEqual(
+                ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                    for: .resume, workoutID: id,
+                    expectedWorkoutID: id, source: source,
+                    recordingOwner: .iPhone, phase: .paused
+                ),
+                .work, "\(source)"
+            )
+            XCTAssertEqual(
+                ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                    for: .finish, workoutID: id,
+                    expectedWorkoutID: id, source: source,
+                    recordingOwner: .iPhone, phase: .paused
+                ),
+                .completed, "\(source)"
+            )
+        }
+    }
+
+    func testLifecycleRejectsRepeatedPauseResumeAndFinalizedSessions() {
+        let id = UUID()
+        func next(
+            _ command: ATHLTHUniversalWorkoutCommand,
+            _ phase: ATHLTHWorkoutSessionPhase
+        ) -> ATHLTHWorkoutSessionPhase? {
+            ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                for: command, workoutID: id, expectedWorkoutID: id,
+                source: .manualTimer, recordingOwner: .iPhone, phase: phase
+            )
+        }
+        XCTAssertNil(next(.pause, .paused))
+        XCTAssertNil(next(.resume, .work))
+        XCTAssertNil(next(.resume, .recovery))
+        XCTAssertNil(next(.finish, .completed))
+        XCTAssertNil(next(.advance, .completed))
+        XCTAssertEqual(next(.pause, .recovery), .paused)
+        XCTAssertEqual(next(.finish, .recovery), .completed)
+    }
+
+    func testLifecycleNeverReassignsWatchOwnerOrAcceptsWrongWorkoutID() {
+        let id = UUID()
+        let another = UUID()
+        let commands: [ATHLTHUniversalWorkoutCommand] = [
+            .pause, .resume, .finish, .advance
+        ]
+        for command in commands {
+            XCTAssertNil(ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                for: command, workoutID: id, expectedWorkoutID: another,
+                source: .phoneRunWalk, recordingOwner: .iPhone,
+                phase: .work, stageIndex: 0, stageCount: 2
+            ))
+            XCTAssertNil(ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                for: command, workoutID: id, expectedWorkoutID: id,
+                source: .watchMirror, recordingOwner: .appleWatch,
+                phase: .work, requestingOwner: .appleWatch,
+                stageIndex: 0, stageCount: 2
+            ))
+            XCTAssertNil(ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                for: command, workoutID: id, expectedWorkoutID: id,
+                source: .strength, recordingOwner: .appleWatch,
+                phase: .work, requestingOwner: .iPhone,
+                stageIndex: 0, stageCount: 2
+            ))
+        }
+    }
+
+    func testLifecycleCanAdvanceOnlyWithinOriginalStructuredStages() {
+        let id = UUID()
+        func advance(index: Int?, count: Int?) -> ATHLTHWorkoutSessionPhase? {
+            ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                for: .advance, workoutID: id, expectedWorkoutID: id,
+                source: .structuredTimer, recordingOwner: .iPhone,
+                phase: .recovery, stageIndex: index, stageCount: count
+            )
+        }
+        XCTAssertEqual(advance(index: 0, count: 3), .recovery)
+        XCTAssertEqual(advance(index: 1, count: 3), .recovery)
+        XCTAssertNil(advance(index: 2, count: 3))
+        XCTAssertNil(advance(index: -1, count: 3))
+        XCTAssertNil(advance(index: nil, count: 3))
+        XCTAssertNil(advance(index: 0, count: 0))
+    }
+
+    func testLifecycleValidatesUniversalProjectionWithoutCreatingAnID() {
+        let id = UUID()
+        let state = ATHLTHUniversalActiveCaptureState(
+            workoutID: id, plannedSessionID: UUID(),
+            recordingOwner: .iPhone, source: .phoneRunWalk,
+            activityCategory: "running", engine: .endurance,
+            phase: .work, startedAt: started,
+            elapsedSeconds: 210, stageIndex: 1, stageCount: 3
+        )
+        XCTAssertTrue(ATHLTHUniversalWorkoutLifecycle.permits(
+            .pause, state: state, expectedWorkoutID: id
+        ))
+        XCTAssertTrue(ATHLTHUniversalWorkoutLifecycle.permits(
+            .advance, state: state, expectedWorkoutID: id
+        ))
+        XCTAssertFalse(ATHLTHUniversalWorkoutLifecycle.permits(
+            .resume, state: state, expectedWorkoutID: id
+        ))
+        XCTAssertFalse(ATHLTHUniversalWorkoutLifecycle.permits(
+            .finish, state: state, expectedWorkoutID: UUID()
+        ))
+        XCTAssertEqual(state.workoutID, id)
+        XCTAssertNotNil(state.plannedSessionID)
+    }
 }

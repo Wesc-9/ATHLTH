@@ -1637,9 +1637,15 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        guard workout.resumedAt != nil else {
-            return
-        }
+        guard workout.resumedAt != nil,
+              let state = activeSessionState,
+              ATHLTHUniversalWorkoutLifecycle.permits(
+                  .pause,
+                  state: ATHLTHUniversalActiveCapture.recorded(
+                      state, source: .phoneRunWalk
+                  ),
+                  expectedWorkoutID: workout.id
+              ) else { return }
 
         workout.advanceTreadmillDistance(at: now)
         workout.accumulatedSeconds =
@@ -1695,10 +1701,16 @@ final class IPhoneWorkoutStore:
     func resume() {
         guard var workout = active,
               workout.resumedAt == nil,
-              !saving
-        else {
-            return
-        }
+              !saving,
+              let state = activeSessionState,
+              ATHLTHUniversalWorkoutLifecycle.permits(
+                  .resume,
+                  state: ATHLTHUniversalActiveCapture.recorded(
+                      state, source: .phoneRunWalk
+                  ),
+                  expectedWorkoutID: workout.id
+              )
+        else { return }
         coachCueQueue.discardPreviousPauseCues()
 
         let environment =
@@ -1838,7 +1850,15 @@ final class IPhoneWorkoutStore:
     }
 
     func finish() async {
-        guard !saving else { return }
+        guard !saving, let current = active,
+              let state = activeSessionState,
+              ATHLTHUniversalWorkoutLifecycle.permits(
+                  .finish,
+                  state: ATHLTHUniversalActiveCapture.recorded(
+                      state, source: .phoneRunWalk
+                  ),
+                  expectedWorkoutID: current.id
+              ) else { return }
         pause()
 
         guard var workout = active,

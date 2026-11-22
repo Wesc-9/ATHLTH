@@ -185,6 +185,22 @@ enum ATHLTHManualTimedCapture {
     ) -> Bool {
         guard let previous = current(for: userID),
               previous.id == id else { return false }
+
+        // Pause/resume is authorized by the SAME lifecycle policy as the
+        // measured iPhone and structured recorders. Changing the time cap
+        // without switching running state is only a checkpoint update.
+        if (previous.resumedAt == nil) != (resumedAt == nil) {
+            let command: ATHLTHUniversalWorkoutCommand =
+                resumedAt == nil ? .pause : .resume
+            let phase: ATHLTHWorkoutSessionPhase =
+                previous.resumedAt == nil ? .paused : .work
+            guard ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                for: command, workoutID: previous.id,
+                expectedWorkoutID: id, source: .manualTimer,
+                recordingOwner: .iPhone, phase: phase
+            ) != nil else { return false }
+        }
+
         var updated = previous
         updated.accumulatedSeconds = accumulatedSeconds
         updated.resumedAt = resumedAt

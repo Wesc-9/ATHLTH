@@ -31,6 +31,76 @@ struct ATHLTHUniversalActiveCaptureState: Equatable {
     let stageCount: Int?
 }
 
+/// One set of lifecycle commands across the existing workout recorders.
+/// A command authorizes a change to an ORIGINAL owner-owned workout; this
+/// reducer never starts HealthKit, creates a new ID, or saves a second journal.
+enum ATHLTHUniversalWorkoutCommand: String, Codable, Hashable {
+    case pause
+    case resume
+    case finish
+    case advance
+}
+
+enum ATHLTHUniversalWorkoutLifecycle {
+    /// All recorder adapters must validate the same original identity and
+    /// original device owner before mutating their own persisted checkpoint.
+    /// A Watch mirror is read-only, even if an iPhone view is displaying it.
+    static func nextPhase(
+        for command: ATHLTHUniversalWorkoutCommand,
+        workoutID: UUID,
+        expectedWorkoutID: UUID,
+        source: ATHLTHUniversalCaptureSource,
+        recordingOwner: ATHLTHWorkoutRecordingOwner,
+        phase: ATHLTHWorkoutSessionPhase,
+        requestingOwner: ATHLTHWorkoutRecordingOwner = .iPhone,
+        stageIndex: Int? = nil,
+        stageCount: Int? = nil
+    ) -> ATHLTHWorkoutSessionPhase? {
+        guard workoutID == expectedWorkoutID,
+              source != .watchMirror,
+              recordingOwner == requestingOwner,
+              phase != .completed else { return nil }
+
+        switch command {
+        case .pause:
+            guard phase == .work || phase == .recovery else { return nil }
+            return .paused
+        case .resume:
+            guard phase == .paused else { return nil }
+            // The original recorder decides whether it resumes work or rest.
+            // Never manufacture a new interval index or a new HealthKit event.
+            return .work
+        case .finish:
+            return .completed
+        case .advance:
+            guard phase == .work || phase == .recovery,
+                  let stageIndex, let stageCount,
+                  stageCount > 0, stageIndex >= 0,
+                  stageIndex + 1 < stageCount else { return nil }
+            return phase
+        }
+    }
+
+    static func permits(
+        _ command: ATHLTHUniversalWorkoutCommand,
+        state: ATHLTHUniversalActiveCaptureState,
+        expectedWorkoutID: UUID,
+        requestingOwner: ATHLTHWorkoutRecordingOwner = .iPhone
+    ) -> Bool {
+        nextPhase(
+            for: command,
+            workoutID: state.workoutID,
+            expectedWorkoutID: expectedWorkoutID,
+            source: state.source,
+            recordingOwner: state.recordingOwner,
+            phase: state.phase,
+            requestingOwner: requestingOwner,
+            stageIndex: state.stageIndex,
+            stageCount: state.stageCount
+        ) != nil
+    }
+}
+
 /// An active Watch HealthKit session may exist before the first iPhone
 /// mirror packet. Its recording slot is occupied even without a renderable
 /// live projection. Only an already-owned original Watch strength journal

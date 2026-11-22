@@ -5479,7 +5479,20 @@ final class StrengthWorkoutStore: ObservableObject {
         maxHeartRate: Double? = nil,
         completedAt: Date? = nil
     ) -> Bool {
-        guard activeWorkout != nil else { return false }
+        guard let currentWorkout = activeWorkout else { return false }
+        // Only a phone-owned strength journal is mutable through this
+        // phone lifecycle gate. Watch-owned strength still finishes through
+        // its existing Watch-authoritative result reconciliation.
+        if currentWorkout.captureDevice == .iPhone {
+            guard let state = activeSessionState,
+                  ATHLTHUniversalWorkoutLifecycle.permits(
+                      .finish,
+                      state: ATHLTHUniversalActiveCapture.recorded(
+                          state, source: .strength
+                      ),
+                      expectedWorkoutID: currentWorkout.id
+                  ) else { return false }
+        }
         // When the Watch owns HealthKit, its recorded end is authoritative.
         // Local Finish still defaults to the actual tap time.
         let finishDate = completedAt ?? Date()
