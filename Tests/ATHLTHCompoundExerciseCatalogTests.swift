@@ -65,6 +65,45 @@ final class ATHLTHCompoundExerciseCatalogTests: XCTestCase {
         XCTAssertNotEqual(twoMinute.protocolID, threeMinute.protocolID)
     }
 
+    func testInsertedFourByFourKeepsCanonicalIdentityAndEditableGroupAcrossPersistence() throws {
+        let entries = ATHLTHCompoundExerciseCatalog.build(
+            running: RunningWorkoutLibraryStore.builtInTemplates,
+            workoutCatalog: [], saved: []
+        )
+        let original = try XCTUnwrap(
+            RunningWorkoutLibraryStore.builtInTemplates.first {
+                $0.title == "4 × 4 intervaller"
+            }
+        )
+        let compound = try XCTUnwrap(entries.first {
+            $0.sourceIDs.contains(original.id)
+        })
+        let first = compound.blocksForReuse()
+        let second = compound.blocksForReuse()
+        XCTAssertTrue(first.allSatisfy { $0.compoundExerciseID == compound.id })
+        XCTAssertTrue(first.allSatisfy {
+            $0.compoundExerciseProtocolID == compound.protocolID &&
+            $0.compoundExerciseFamilyID == compound.familyID
+        })
+        XCTAssertNotEqual(first.first?.editorDragID, second.first?.editorDragID)
+        let group = try XCTUnwrap(first.first?.groupID)
+        let summary = try XCTUnwrap(
+            ATHLTHIntervalRecipeEditing.summary(for: group, in: first)
+        )
+        XCTAssertEqual(summary.rounds, 4)
+        XCTAssertEqual(summary.recoveryCount, 3)
+        XCTAssertFalse(summary.hasFinalRecovery)
+        let decoded = try JSONDecoder().decode(
+            [WorkoutTemplateBlock].self,
+            from: JSONEncoder().encode(first)
+        )
+        XCTAssertEqual(decoded, first)
+        XCTAssertEqual(decoded.first?.compoundExerciseID, compound.id)
+        XCTAssertTrue(first.contains {
+            $0.kind == .rest && $0.resolvedPhase == .recovery
+        })
+    }
+
     func testPrivateSavedMainIsNotPublishedAndReuseDoesNotMutateOriginal() throws {
         let source = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first)
         let base = ATHLTHCompoundExerciseCatalog.mainBlocks(
