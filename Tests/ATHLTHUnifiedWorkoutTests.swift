@@ -120,6 +120,8 @@ final class ATHLTHUnifiedWorkoutTests: XCTestCase {
         let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
         XCTAssertEqual(blocks.count, 1)
         XCTAssertEqual(blocks.first?.kind, .run)
+        XCTAssertEqual(blocks.first?.cardioActivity, .walking)
+        XCTAssertEqual(ATHLTHWorkoutSportMode.forBlock(blocks[0]), .walking)
 
         ATHLTHUnifiedWorkout.apply(
             blocks: blocks, title: "", routeID: nil,
