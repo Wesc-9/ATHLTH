@@ -409,6 +409,46 @@ struct ExerciseLibraryView: View {
             .padding(.top, 7)
 
             filters
+            if selectedSection == .library && onSelect == nil {
+                NavigationLink {
+                    // Compound interval exercises belong in the same
+                    // Exercises destination, not in a second workout engine.
+                    ATHLTHCompoundExerciseLibraryView()
+                } label: {
+                    HStack(spacing: 11) {
+                        Image(systemName: "figure.run")
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 44, height: 44)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Running · Intervals",
+                                norwegian: "Løping · Intervaller"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(ATHLTHLocalization.choose(
+                                english: "4×4 and reusable main sections from workout plans",
+                                norwegian: "4×4 og gjenbrukbare hoveddeler fra treningsøkter"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .padding(12)
+                    .athlthPlanCard(radius: 17)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+                .accessibilityIdentifier("exercise-library-running-intervals")
+            }
             translationAvailabilityBanner
 
             if selectedSection == .library,
