@@ -446,9 +446,9 @@ struct ATHLTHWorkoutSelectionPreviewSheet: View {
                         : ATHLTHLocalization.choose(
                             english: "Active steps", norwegian: "Øktdeler"
                         ),
-                    "\(summary.exerciseCount > 0
-                         ? summary.exerciseCount
-                         : summary.executedStepCount - summary.pauseCount)",
+                    String(summary.exerciseCount > 0
+                        ? summary.exerciseCount
+                        : max(0, summary.executedStepCount - summary.pauseCount)),
                     icon: "figure.strengthtraining.traditional"
                 )
                 metricTile(
@@ -459,9 +459,9 @@ struct ATHLTHWorkoutSelectionPreviewSheet: View {
                         : ATHLTHLocalization.choose(
                             english: "Work steps", norwegian: "Arbeidsdeler"
                         ),
-                    "\(summary.setCount > 0
-                         ? summary.setCount
-                         : summary.executedStepCount - summary.pauseCount)",
+                    String(summary.setCount > 0
+                        ? summary.setCount
+                        : max(0, summary.executedStepCount - summary.pauseCount)),
                     icon: "square.stack"
                 )
                 metricTile(
