@@ -5164,7 +5164,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     english: "Time target reached. Confirm your set when ready.",
                     norwegian: "Tidsmålet er nådd. Registrer settet når du er klar."
                 )
-            speak(detail, priority: .structuredStep, forceLocal: true)
+            speak(detail, priority: .structuredStep)
             return
         }
         guard let number = ATHLTHCoachSecondCountdown.dueNumber(
@@ -5221,7 +5221,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     english: "Group time is up. Continue when ready.",
                     norwegian: "Gruppens tid er ute. Fortsett når du er klar."
                 )
-            speak(detail, priority: .structuredStep, forceLocal: true)
+            speak(detail, priority: .structuredStep)
             return
         }
         guard let number = ATHLTHCoachSecondCountdown.dueNumber(
@@ -8299,13 +8299,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     Task { @MainActor [weak self] in
                         guard let self,
                               self.workoutSession === session,
-                              self.iPhoneVoiceLease.isActive()
-                        else { return }
+                              self.isActive else { return }
+                        guard self.iPhoneVoiceLease.isActive() else {
+                            self.speak(
+                                text, priority: priority, event: event,
+                                forceLocal: true,
+                                rememberForReplay: rememberForReplay,
+                                deadline: deadline
+                            )
+                            return
+                        }
                         do {
                             try await session.sendToRemoteWorkoutSession(data: payload)
                         } catch {
-                            // A transport failure must not silence the next
-                            // set cue. Only the original live workout may retry.
+                            // The original Watch retains fail-safe voice on a
+                            // failed mirrored send, never a second workout.
                             guard self.workoutSession === session,
                                   self.isActive else { return }
                             self.speak(
@@ -8316,6 +8324,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                             )
                         }
                     }
+                } else {
+                    // Unexpectedly long/invalid cue: do not discard coaching.
+                    speak(
+                        text, priority: priority, event: event,
+                        forceLocal: true,
+                        rememberForReplay: rememberForReplay,
+                        deadline: deadline
+                    )
                 }
             }
             return
