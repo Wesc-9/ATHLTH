@@ -4,7 +4,7 @@ import XCTest
 final class ATHLTHUnifiedQuickStartPresentationTests: XCTestCase {
     func testActivityTypeChoicesAreSharedAcrossBasicAndAdvanced() {
         XCTAssertEqual(ATHLTHQuickStartActivity.running.types,
-                       [.free, .route, .workout])
+                       [.free, .route, .workout, .competition])
         XCTAssertEqual(ATHLTHQuickStartActivity.walking.types,
                        [.free, .route])
         XCTAssertEqual(ATHLTHQuickStartActivity.strength.types,
