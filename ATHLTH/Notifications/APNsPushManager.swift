@@ -72,6 +72,12 @@ extension Notification.Name {
         Notification.Name("athlth.remoteNotificationTapped")
 }
 
+/// A Plus-grant push opens the recipient's ATHLTH notification center.
+struct ATHLTHPlusGrantNotificationRoute: Identifiable, Equatable {
+    let accountID: UUID
+    var id: UUID { accountID }
+}
+
 @MainActor
 final class APNsPushManager: ObservableObject {
     static let shared = APNsPushManager()
@@ -90,6 +96,8 @@ final class APNsPushManager: ObservableObject {
     @Published private(set) var pendingDailyCheckInAccountID: UUID?
     @Published private(set) var pendingBodyGoalCheckIn:
         ATHLTHBodyGoalNotificationRoute?
+    @Published private(set) var pendingPlusGrantNotification:
+        ATHLTHPlusGrantNotificationRoute?
 
     private let client: SupabaseClient
     private var deviceTokenHex: String?
@@ -141,6 +149,15 @@ final class APNsPushManager: ObservableObject {
             pendingDailyCheckInAccountID = accountID
             return
         }
+        if (userInfo["athlth_kind"] as? String) ==
+            ATHLTHPlusGrantNotificationCopy.eventKind,
+           let rawRecipient = userInfo["athlth_recipient_id"] as? String,
+           let recipientID = UUID(uuidString: rawRecipient) {
+            pendingPlusGrantNotification =
+                ATHLTHPlusGrantNotificationRoute(accountID: recipientID)
+            return
+        }
+
         if let invite = ATHLTHWorkoutInviteNotificationRoute.resolve(
             userInfo: userInfo
         ) {
@@ -215,6 +232,10 @@ final class APNsPushManager: ObservableObject {
 
     func clearPendingBodyGoalCheckIn() {
         pendingBodyGoalCheckIn = nil
+    }
+
+    func clearPendingPlusGrantNotification() {
+        pendingPlusGrantNotification = nil
     }
 
     func receive(deviceToken: Data) {
