@@ -275,6 +275,14 @@ struct StructuredWorkoutSessionView: View {
         return blocks[currentIndex]
     }
 
+    /// All workout modes share the same work/recovery lifecycle. A rest
+    /// stage is recovery even inside a strength or run/walk prescription.
+    private var currentStagePhase: ATHLTHWorkoutSessionPhase {
+        guard let currentBlock else { return .work }
+        return (currentBlock.kind == .rest || currentBlock.isActiveRecovery)
+            ? .recovery : .work
+    }
+
     /// The active screen follows the current block. Changing it does not
     /// end, restart or create another workout recording.
     private var currentLiveRoute: ATHLTHLiveWorkoutRoute? {
@@ -459,6 +467,13 @@ struct StructuredWorkoutSessionView: View {
             }
             .onAppear {
                 guard !hasStarted else { return }
+                guard executionRecipe.hasStructuredSteps else {
+                    persistenceErrorMessage = ATHLTHLocalization.choose(
+                        english: "This workout has no executable steps. Add a workout stage before starting.",
+                        norwegian: "Økten har ingen treningssteg. Legg til en deløkt før du starter."
+                    )
+                    return
+                }
                 let hadOriginalAdmission =
                     ATHLTHStructuredCaptureAdmission.activeWorkoutID ==
                         workout.id
@@ -1294,7 +1309,7 @@ struct StructuredWorkoutSessionView: View {
             guard ATHLTHUniversalWorkoutLifecycle.nextPhase(
                 for: .advance, workoutID: workout.id,
                 expectedWorkoutID: workout.id, source: .structuredTimer,
-                recordingOwner: .iPhone, phase: .work,
+                recordingOwner: .iPhone, phase: currentStagePhase,
                 stageIndex: currentIndex, stageCount: prospectiveBlocks.count
             ) != nil,
             ATHLTHLiveWorkoutEngineRouter.advance(
@@ -1377,7 +1392,7 @@ struct StructuredWorkoutSessionView: View {
                   expectedWorkoutID: workout.id,
                   source: .structuredTimer,
                   recordingOwner: .iPhone,
-                  phase: pausedAt == nil ? .work : .paused
+                  phase: pausedAt == nil ? currentStagePhase : .paused
               ) != nil else { return }
         let now = Date(), oldPause = pausedAt
         let oldTotal = completedPauseSeconds
