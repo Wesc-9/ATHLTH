@@ -37,6 +37,36 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         )
     }
 
+    func testExplicitCardioLibraryReferencesResolveAndExportSafely() {
+        let id = UUID()
+        let libraryEntry = entry(
+            "Running", id: id, source: .athlthCatalog,
+            sourceIdentifier: "athlth-native-running"
+        )
+        var cardio = block("Running")
+        cardio.kind = .run
+        cardio.exerciseID = id
+        cardio.exerciseSlug = "athlth-native-running"
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(
+                cardio, in: [libraryEntry]
+            )?.id, id
+        )
+        let exported = ATHLTHExerciseReferenceResolver.portableBlock(
+            cardio, from: [libraryEntry]
+        )
+        XCTAssertNil(exported.exerciseID)
+        XCTAssertEqual(exported.exerciseSlug, "athlth-native-running")
+        XCTAssertEqual(exported.kind, .run)
+
+        var unreferenced = cardio
+        unreferenced.exerciseID = nil
+        unreferenced.exerciseSlug = nil
+        XCTAssertNil(ATHLTHExerciseReferenceResolver.resolve(
+            unreferenced, in: [libraryEntry]
+        ))
+    }
+
     func testLegacyBenchPressUsesReviewedRepDBEvenWhenEquipmentMetadataDiffers() {
         let legacy = entry(
             "Bench Press", id: UUID(), source: .athlthCatalog,

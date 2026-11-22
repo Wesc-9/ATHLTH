@@ -1429,17 +1429,6 @@ struct ATHLTHTrainTodayPremiumView: View {
         "athlth.train.today.quickTaps." + String(describing: session.profile.userID)
     }
 
-    private var sortedQuickActivities: [QuickActivity] {
-        let defaults = QuickActivity.allCases
-        return defaults.sorted { first, second in
-            let firstCount = quickActivityTapCounts[first.rawValue, default: 0]
-            let secondCount = quickActivityTapCounts[second.rawValue, default: 0]
-            if firstCount != secondCount { return firstCount > secondCount }
-            return (defaults.firstIndex(of: first) ?? 0) <
-                (defaults.firstIndex(of: second) ?? 0)
-        }
-    }
-
     private func recordQuickActivityTap(_ activity: QuickActivity) {
         var counts = quickActivityTapCounts
         counts[activity.rawValue] = min(

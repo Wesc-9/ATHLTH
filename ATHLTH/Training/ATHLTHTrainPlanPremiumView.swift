@@ -186,7 +186,8 @@ struct ATHLTHTrainPlanPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             refreshUnfinishedPlanDraft()
-            session.refreshActivePlanForToday()
+            // Train root already owns day refresh; avoid a second plan-graph
+            // reconciliation each time the user switches to Plan.
             resumeInterruptedDraftIfNeeded()
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced

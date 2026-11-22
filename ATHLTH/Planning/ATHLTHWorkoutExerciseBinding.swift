@@ -51,7 +51,10 @@ enum ATHLTHWorkoutExerciseBinding {
         var report = Report()
 
         if var blocks = workout.workoutBlocks {
-            for i in blocks.indices where blocks[i].kind == .exercise {
+            // Adapted running/cardio exercises retain their library ID or slug.
+            // Unreferenced timing/route/interval blocks are never guessed by name.
+            for i in blocks.indices where blocks[i].kind == .exercise ||
+                blocks[i].exerciseID != nil || blocks[i].exerciseSlug != nil {
                 let reference = LookupKey(blocks[i])
                 let match: ExerciseLibraryEntry?
                 if let cached = cache[reference] {

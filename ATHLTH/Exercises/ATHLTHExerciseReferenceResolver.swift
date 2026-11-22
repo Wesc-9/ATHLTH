@@ -286,7 +286,8 @@ enum ATHLTHExerciseReferenceResolver {
         _ block: WorkoutTemplateBlock,
         in library: [ExerciseLibraryEntry]
     ) -> ExerciseLibraryEntry? {
-        guard block.kind == .exercise else { return nil }
+        guard block.kind == .exercise || block.exerciseID != nil ||
+              block.exerciseSlug != nil else { return nil }
         if let id = block.exerciseID {
             if let exact = library.first(where: { $0.id == id }) {
                 return exact
@@ -519,7 +520,8 @@ enum ATHLTHExerciseReferenceResolver {
         _ block: WorkoutTemplateBlock,
         from library: [ExerciseLibraryEntry]
     ) -> WorkoutTemplateBlock {
-        guard block.kind == .exercise else { return block }
+        guard block.kind == .exercise || block.exerciseID != nil ||
+              block.exerciseSlug != nil else { return block }
         var copy = block
         // A received custom exercise is not automatically licensed for
         // forwarding. Send instructions only for a locally owned exercise

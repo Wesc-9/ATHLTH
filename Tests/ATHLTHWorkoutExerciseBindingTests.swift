@@ -228,6 +228,33 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         XCTAssertEqual(session.exercises.first?.notes, "Last set AMRAP")
     }
 
+    func testCardioTypedLibraryExerciseKeepsCanonicalIDAcrossPlanBinding() throws {
+        let library = ExerciseLibraryStore().allExercises
+        var source = strengthBlock()
+        source.kind = .run
+        source.durationSeconds = 240
+        var session = workout("Mixed", blocks: [source])
+        let result = ATHLTHWorkoutExerciseBinding.bind(&session, library: library)
+        XCTAssertTrue(result.isReady)
+        XCTAssertEqual(result.linked, 1)
+        let bound = try XCTUnwrap(session.workoutBlocks?.first)
+        XCTAssertEqual(bound.kind, .run)
+        XCTAssertEqual(bound.durationSeconds, 240)
+        XCTAssertNotNil(bound.exerciseID)
+    }
+
+    func testUnreferencedCardioBlockIsNotFalselyLinked() {
+        var run = strengthBlock(title: "Running", slug: nil)
+        run.kind = .run
+        run.exerciseID = nil
+        var session = workout("Mixed", blocks: [run])
+        let result = ATHLTHWorkoutExerciseBinding.bind(
+            &session, library: ExerciseLibraryStore().allExercises
+        )
+        XCTAssertTrue(result.isReady)
+        XCTAssertNil(session.workoutBlocks?.first?.exerciseID)
+    }
+
     func testCardioAndNotesDoNotRequireStrengthExerciseIdentity() {
         var session = workout(blocks: [
             WorkoutTemplateBlock(
