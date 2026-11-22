@@ -92,6 +92,40 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
         XCTAssertEqual(transfer?.steps[2].measure, .time)
     }
 
+    func testRunWalkIsSameRecipeInQuickRunAndTrainingPlan() throws {
+        var walk = block("Walk warm-up", phase: .warmup, seconds: 300)
+        walk.cardioActivity = .walking
+        var run = block("Run interval", phase: .main, seconds: 240)
+        run.cardioActivity = .running
+        var walkingRecovery = block(
+            "Walking recovery", phase: .recovery, seconds: 90
+        )
+        walkingRecovery.cardioActivity = .walking
+        let planned = workout([walk, run, walkingRecovery])
+        XCTAssertEqual(ATHLTHUnifiedActivityProfile.category(for: planned), "running")
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(planned, device: .iPhone),
+            .phoneEndurance
+        )
+        XCTAssertNil(ATHLTHQuickRunTimelineAdapter.validationError(for: planned))
+
+        let transferred = try XCTUnwrap(ATHLTHQuickRunTimelineAdapter.transfer(
+            from: planned, title: planned.title,
+            routeAlerts: .standard, autoPauseEnabled: false
+        ))
+        XCTAssertEqual(transferred.sourceWorkoutID, planned.id)
+        XCTAssertEqual(transferred.steps.map(\.phase), [
+            "warmup", "work", "recovery"
+        ])
+        XCTAssertEqual(transferred.steps.map(\.durationSeconds), [300, 240, 90])
+
+        let walkingOnly = workout([walk, walkingRecovery])
+        XCTAssertNotNil(
+            ATHLTHQuickRunTimelineAdapter.validationError(for: walkingOnly),
+            "Pure walking must use the walking capture mode, not running"
+        )
+    }
+
     func testOpenEndedRecoveryTransfersAsManualNextWithoutInventedTime() throws {
         for id in ["HIL-005", "HIL-006", "VMA-019", "RP-016"] {
             let source = try XCTUnwrap(
