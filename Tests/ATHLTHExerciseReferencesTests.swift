@@ -342,6 +342,12 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
             ).exerciseSnapshot,
             "Friends-only exercise details must never enter a public plan"
         )
+        XCTAssertNil(
+            ATHLTHExerciseReferenceResolver.portableBlock(
+                linked, from: [friendOnly]
+            ).exerciseID,
+            "Friends-only exercise identifiers must not enter public plans"
+        )
 
         let notShared = entry(
             source.name, id: source.id, source: .custom,
@@ -351,6 +357,11 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
             ATHLTHExerciseReferenceResolver.portableBlock(
                 linked, from: [notShared]
             ).exerciseSnapshot
+        )
+        XCTAssertNil(
+            ATHLTHExerciseReferenceResolver.portableBlock(
+                linked, from: [notShared]
+            ).exerciseID
         )
     }
 
