@@ -2156,70 +2156,10 @@ struct RunQuickStartSheet: View {
     }
 
     private var runSetupModeButton: some View {
-        Button {
-            let nextMode =
-                !isAdvancedSetup
-            isAdvancedSetup =
-                nextMode
-            settings.recordAdvancedSetup(
-                nextMode,
-                for: .running
-            )
-        } label: {
-            HStack(spacing: 6) {
-                Image(
-                    systemName:
-                        isAdvancedSetup
-                            ? "slider.horizontal.3"
-                            : "bolt.fill"
-                )
-                .font(
-                    .system(
-                        size: 11,
-                        weight: .semibold
-                    )
-                )
-
-                Text(
-                    isAdvancedSetup
-                        ? ATHLTHLocalization.choose(
-                            english: "Advanced",
-                            norwegian: "Avansert"
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Basic", norwegian: "Enkel"
-                        )
-                )
-                .font(
-                    .caption
-                        .weight(.bold)
-                )
-            }
-            .foregroundStyle(
-                isAdvancedSetup ? Color.white : ATHLTHPlanDesign.ink
-            )
-            .padding(.horizontal, 11)
-            .frame(minHeight: 36)
-            .background(
-                isAdvancedSetup
-                    ? ATHLTHTheme.accentDeep
-                    : ATHLTHPlanDesign.selectedSurface,
-                in: Capsule()
-            )
-            .overlay {
-                Capsule()
-                    .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.8)
-            }
+        ATHLTHQuickStartSetupModeButton(advanced: isAdvancedSetup) {
+            isAdvancedSetup.toggle()
+            settings.recordAdvancedSetup(isAdvancedSetup, for: .running)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            ATHLTHLocalization.choose(
-                english:
-                    "Switch run setup mode",
-                norwegian:
-                    "Bytt oppsettsmodus for løpeøkt"
-            )
-        )
     }
 
     private var quickStartTypePicker: some View {
@@ -3859,23 +3799,12 @@ struct WalkQuickStartSheet: View {
                     )) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button {
+                    ATHLTHQuickStartSetupModeButton(advanced: isAdvancedSetup) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             isAdvancedSetup.toggle()
                         }
                         settings.recordAdvancedSetup(isAdvancedSetup, for: .walking)
-                    } label: {
-                        Label(
-                            isAdvancedSetup
-                                ? ATHLTHLocalization.choose(
-                                    english: "Advanced", norwegian: "Avansert")
-                                : ATHLTHLocalization.choose(
-                                    english: "Basic", norwegian: "Enkel"),
-                            systemImage: "slider.horizontal.3"
-                        )
-                        .font(.caption.weight(.semibold))
                     }
-                    .accessibilityIdentifier("athlth-walk-setup-mode")
                 }
             }
             .sheet(isPresented: $showingWalkingRoutes) {
