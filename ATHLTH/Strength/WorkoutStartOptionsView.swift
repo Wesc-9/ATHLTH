@@ -8,6 +8,7 @@ struct WorkoutStartOptionsView: View {
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
     @EnvironmentObject private var gear: ProfileGearStore
 
     let session: PlannedSession
@@ -66,6 +67,7 @@ struct WorkoutStartOptionsView: View {
     @State private var showingStrengthWorkoutLibrary = false
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var showOnIPad = false
+    @StateObject private var registeredIPad = ATHLTHRegisteredIPadAvailability()
 
 
     init(
@@ -227,7 +229,7 @@ struct WorkoutStartOptionsView: View {
                         activity: .strength,
                         advanced: trackingMode == .advanced,
                         showOnIPad: $showOnIPad,
-                        iPadAvailable: false,
+                        iPadAvailable: registeredIPad.hasRegisteredIPad,
                         detail: { tool in strengthStartToolDetail(tool) }
                     )
 
@@ -311,6 +313,7 @@ struct WorkoutStartOptionsView: View {
                     await social.refresh()
                 }
 
+                await registeredIPad.refresh(for: appSession.profile.userID)
                 await exerciseLibrary.refresh()
             }
             .sheet(isPresented: $showingStrengthWorkoutLibrary) {
@@ -634,6 +637,9 @@ struct WorkoutStartOptionsView: View {
     // weights, settings and this entire sheet instead of navigating home.
     launchInProgress = true
     Task { @MainActor in
+        if showOnIPad && registeredIPad.hasRegisteredIPad {
+            liveSharing.prepareOneWorkoutSharing(true)
+        }
         let failure = await onStart(
             configuredSession,
             device,
