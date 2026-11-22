@@ -13,18 +13,63 @@ enum ATHLTHWorkoutExerciseBinding {
         var isReady: Bool { unresolved.isEmpty }
     }
 
+    /// Repeated week prescriptions share the same movement identity even
+    /// when weights, repetitions and rest differ. Key by authoritative source
+    /// fields, never by the transient step sequence or a fuzzy exercise name.
+    private struct LookupKey: Hashable {
+        let id: UUID?
+        let slug: String?
+        let title: String
+        let snapshot: ExerciseSnapshot?
+
+        init(_ block: WorkoutTemplateBlock) {
+            id = block.exerciseID
+            slug = block.exerciseSlug
+            title = block.title
+            snapshot = block.exerciseSnapshot
+        }
+    }
+
     @discardableResult
     static func bind(
         _ workout: inout PlannedSession,
         library: [ExerciseLibraryEntry]
     ) -> Report {
+        var cache: [LookupKey: ExerciseLibraryEntry] = [:]
+        var misses = Set<LookupKey>()
+        return bind(
+            &workout, library: library, cache: &cache, misses: &misses
+        )
+    }
+
+    private static func bind(
+        _ workout: inout PlannedSession,
+        library: [ExerciseLibraryEntry],
+        cache: inout [LookupKey: ExerciseLibraryEntry],
+        misses: inout Set<LookupKey>
+    ) -> Report {
         var report = Report()
 
         if var blocks = workout.workoutBlocks {
             for i in blocks.indices where blocks[i].kind == .exercise {
-                guard let match = ATHLTHExerciseReferenceResolver.resolve(
-                    blocks[i], in: library
-                ) else {
+                let reference = LookupKey(blocks[i])
+                let match: ExerciseLibraryEntry?
+                if let cached = cache[reference] {
+                    match = cached
+                } else if misses.contains(reference) {
+                    match = nil
+                } else {
+                    let resolved = ATHLTHExerciseReferenceResolver.resolve(
+                        blocks[i], in: library
+                    )
+                    if let resolved {
+                        cache[reference] = resolved
+                    } else {
+                        misses.insert(reference)
+                    }
+                    match = resolved
+                }
+                guard let match else {
                     report.unresolved.append(blocks[i].title)
                     continue
                 }
@@ -83,12 +128,16 @@ enum ATHLTHWorkoutExerciseBinding {
         library: [ExerciseLibraryEntry]
     ) -> Report {
         var report = Report()
+        // One lookup per distinct movement across the entire plan, rather
+        // than repeating full-library scans for every week's prescription.
+        var cache: [LookupKey: ExerciseLibraryEntry] = [:]
+        var misses = Set<LookupKey>()
         for weekIndex in plan.weeks.indices {
             for dayIndex in plan.weeks[weekIndex].days.indices {
                 for sessionIndex in plan.weeks[weekIndex].days[dayIndex].sessions.indices {
                     let current = bind(
                         &plan.weeks[weekIndex].days[dayIndex].sessions[sessionIndex],
-                        library: library
+                        library: library, cache: &cache, misses: &misses
                     )
                     report.linked += current.linked
                     report.unresolved.append(contentsOf: current.unresolved)
