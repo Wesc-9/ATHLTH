@@ -290,3 +290,5 @@ ATHLTH 2.2.7 build 135 — explicit user-authorized TestFlight upload 2026-11-22
 ATHLTH 2.2.7 build 135 — user-authorized gated TestFlight retry 2026-11-22 after fixing Swift compilation issues on release/v2.2.7: walking setup state, Quick Start actor isolation, competition switch and strength scoped countdown editor. Require all five CI workflows on THIS trigger commit before any signing or upload. No CI bypass, no frozen release changes.
 
 ATHLTH 2.2.7 build 135 — authorized gated retry 2026-11-22 after catalog category compile fix and release workflow gate enablement. Require all five exact-commit checks before signing and upload; do not modify frozen versions.
+
+ATHLTH 2.2.7 build 135 — authorized gated retry 2026-11-22 after fixing tournament template catch error shadowing and competition creator Swift argument ordering. Require all five CI gates on this exact commit; never bypass checks or upload stale source.
