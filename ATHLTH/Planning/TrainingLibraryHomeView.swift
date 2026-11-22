@@ -4117,8 +4117,13 @@ struct MyTrainingPlansLibraryView: View {
 
                 if !pageTemplates.isEmpty {
                     planSectionHeader(
-                        "Saved Plans",
-                        detail: "Reusable plans that are not on your calendar yet."
+                        ATHLTHLocalization.choose(
+                            english: "Saved Plans", norwegian: "Lagrede planer"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Reusable plans that are not on your calendar yet.",
+                            norwegian: "Planer du har lagret, men ikke lagt i kalenderen."
+                        )
                     )
 
                     LazyVGrid(columns: cardColumns, spacing: 10) {
@@ -4134,8 +4139,13 @@ struct MyTrainingPlansLibraryView: View {
 
                 if !pagePlans.isEmpty {
                     planSectionHeader(
-                        "Scheduled Plans",
-                        detail: "Active, upcoming and completed plans."
+                        ATHLTHLocalization.choose(
+                            english: "Scheduled Plans", norwegian: "Planlagte planer"
+                        ),
+                        detail: ATHLTHLocalization.choose(
+                            english: "Active, upcoming and completed plans.",
+                            norwegian: "Aktive, kommende og fullførte planer."
+                        )
                     )
 
                     LazyVGrid(columns: cardColumns, spacing: 12) {
@@ -4263,15 +4273,22 @@ struct MyTrainingPlansLibraryView: View {
                     displayedPlans.isEmpty {
                     ContentUnavailableView {
                         Label(
-                            "No plans yet",
+                            ATHLTHLocalization.choose(
+                                english: "No plans yet", norwegian: "Ingen planer ennå"
+                            ),
                             systemImage: "calendar.badge.plus"
                         )
                     } description: {
                         Text(
-                            "Save a plan from Plan Library or create one from scratch."
+                            ATHLTHLocalization.choose(
+                                english: "Save a plan from Plan Library or create one from scratch.",
+                                norwegian: "Lagre en plan fra biblioteket, eller opprett en ny."
+                            )
                         )
                     } actions: {
-                        Button("Create Plan") {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Create Plan", norwegian: "Opprett plan"
+                        )) {
                             if let onCreatePlan { onCreatePlan() }
                             else { showingCreatePlan = true }
                         }
