@@ -3259,9 +3259,9 @@ struct RunQuickStartSheet: View {
                             Text(
                                 ATHLTHLocalization.choose(
                                     english:
-                                        "Run tools",
+                                        "Coach & guidance",
                                     norwegian:
-                                        "Løpsverktøy"
+                                        "Coach og veiledning"
                                 )
                             )
                             .font(.headline)
