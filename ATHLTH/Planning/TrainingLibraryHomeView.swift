@@ -1517,6 +1517,21 @@ struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
         case catalogVersion = "catalog_version"
     }
 
+    /// One shared weekday preset for the plan picker and actual scheduler.
+    /// Never display a different number of days than the engine can save.
+    static func defaultDayIndexes(for sessionsPerWeek: Int) -> [Int] {
+        switch sessionsPerWeek {
+        case 1: return [3]
+        case 2: return [2, 5]
+        case 3: return [2, 4, 6]
+        case 4: return [1, 3, 5, 7]
+        case 5: return [1, 2, 4, 5, 7]
+        case 6: return [1, 2, 3, 4, 5, 6]
+        case 7: return [1, 2, 3, 4, 5, 6, 7]
+        default: return []
+        }
+    }
+
     var sessionBlueprints: [TrainingPlanCatalogSessionBlueprint] {
         workoutPattern.compactMap(
             TrainingPlanCatalogSessionBlueprint.init(rawValue:)
@@ -4258,13 +4273,7 @@ struct PersonalizeTrainingPlanView: View {
     private func defaultDays(
         for count: Int
     ) -> [Int] {
-        switch count {
-        case 2: return [2, 5]
-        case 3: return [2, 4, 6]
-        case 4: return [1, 3, 5, 7]
-        case 5: return [1, 2, 4, 5, 7]
-        default: return [1, 2, 3, 4, 5, 6]
-        }
+        TrainingPlanCatalogEntry.defaultDayIndexes(for: count)
     }
 
     private func createScheduledPlan() {
