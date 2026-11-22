@@ -569,6 +569,10 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var firstPrize: String? = nil
     var loserConsequence: String? = nil
 
+    // Competition-specific rules remain optional so historic Duels decode.
+    // A race setting alone never verifies Apple Watch hardware or GPS laps.
+    var competitionRace: ATHLTHCompetitionRaceRules? = nil
+
     var startsAt: Date
     var endsAt: Date?
     var allowMultipleAttempts: Bool
