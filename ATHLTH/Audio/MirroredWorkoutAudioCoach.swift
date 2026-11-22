@@ -61,6 +61,7 @@ final class MirroredWorkoutAudioCoach:
     private var eventLedger = ATHLTHCoachEventLedger()
     private var cueQueue = ATHLTHCoachCueQueue()
     private var recentCueText = ATHLTHCoachCueRepeatPolicy()
+    private var receivedStrengthCueIDs = Set<UUID>()
     private var localSpeechWatchdog: Task<Void, Never>?
     private var coachReplayMemory = ATHLTHCoachReplayMemory()
     var onLastSpokenCoachMessage: ((String?) -> Void)?
@@ -138,6 +139,7 @@ final class MirroredWorkoutAudioCoach:
         eventLedger.reset()
         cueQueue.reset()
         recentCueText.reset()
+        receivedStrengthCueIDs.removeAll()
         coachReplayMemory.reset()
         onLastSpokenCoachMessage?(nil)
         lastState = nil
@@ -207,14 +209,16 @@ final class MirroredWorkoutAudioCoach:
             return
         }
 
-        // Strength's detailed set, exercise and rest cues are generated
-        // by Watch. The mirrored iPhone coach only has a generic start,
-        // pause and completion vocabulary for strength, so speaking here
-        // would duplicate the Watch-owned strength coaching.
+        // Strength cues are authored on Watch. Never synthesize a second
+        // set/rest plan from snapshots on iPhone.
         if snapshot.kind == .strength {
+            workoutStartedAt = snapshot.startedAt
+            lastState = snapshot.state
             if snapshot.state == .completed ||
-                snapshot.state == .failed {
+                snapshot.state == .failed ||
+                snapshot.state == .ending {
                 finished = true
+                cueQueue.reset()
             }
             return
         }
@@ -342,6 +346,31 @@ final class MirroredWorkoutAudioCoach:
         }
     }
 
+    /// Play a bounded, Watch-authored strength cue without starting another
+    /// timer, exercise controller or HealthKit workout on iPhone.
+    func handleMirroredStrengthCue(
+        _ cue: ATHLTHStrengthMirroredCoachCue,
+        verifiedWorkoutStart: Date
+    ) {
+        guard configuration.enabled, !finished,
+              cue.isValid(for: verifiedWorkoutStart),
+              !receivedStrengthCueIDs.contains(cue.id)
+        else { return }
+        if receivedStrengthCueIDs.count >= 256 {
+            receivedStrengthCueIDs.removeAll()
+        }
+        receivedStrengthCueIDs.insert(cue.id)
+        workoutStartedAt = verifiedWorkoutStart
+        let event = ATHLTHCoachEvent(
+            kind: .strengthSet,
+            key: cue.id.uuidString,
+            priority: cue.priority,
+            createdAt: cue.sentAt,
+            validFor: 7
+        )
+        speak(cue.text, priority: cue.priority, event: event)
+    }
+
     /// A new acknowledged lease must not replay an old start, step or
     /// milestone when iPhone takes over speech mid-workout.
     func synchronizeOnHandoff(
@@ -429,6 +458,7 @@ final class MirroredWorkoutAudioCoach:
         eventLedger.reset()
         cueQueue.reset()
         recentCueText.reset()
+        receivedStrengthCueIDs.removeAll()
         coachReplayMemory.reset()
         onLastSpokenCoachMessage?(nil)
         configuration = .disabled
