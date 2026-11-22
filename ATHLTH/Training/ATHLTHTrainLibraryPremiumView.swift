@@ -50,6 +50,18 @@ struct ATHLTHTrainLibraryPremiumView: View {
         }
     }
 
+    private var sectionIndex: Binding<Int> {
+        Binding(
+            get: { LibrarySection.allCases.firstIndex(of: section) ?? 0 },
+            set: { index in
+                guard LibrarySection.allCases.indices.contains(index) else { return }
+                section = LibrarySection.allCases[index]
+                query = ""
+                queryInput = ""
+            }
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .firstTextBaseline) {
@@ -71,31 +83,12 @@ struct ATHLTHTrainLibraryPremiumView: View {
             .foregroundStyle(secondary)
             .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 4) {
-                ForEach(LibrarySection.allCases) { item in
-                    Button {
-                        section = item
-                        query = ""
-                        queryInput = ""
-                    } label: {
-                        Text(item.label)
-                            .font(.caption.weight(section == item ? .semibold : .medium))
-                            .foregroundStyle(section == item ? .white : secondary)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 38)
-                            .background(
-                                section == item ? ink : Color.clear,
-                                in: RoundedRectangle(cornerRadius: 10)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(section == item ? .isSelected : [])
+            ATHLTHLibraryGlossyTabRow(
+                titles: LibrarySection.allCases.map(\.label),
+                selection: sectionIndex,
+                identifiers: LibrarySection.allCases.map {
+                    "train-library-category-\($0.rawValue)"
                 }
-            }
-            .padding(4)
-            .background(
-                Color(red: 0.93, green: 0.92, blue: 0.90),
-                in: RoundedRectangle(cornerRadius: 14)
             )
 
             HStack(spacing: 10) {

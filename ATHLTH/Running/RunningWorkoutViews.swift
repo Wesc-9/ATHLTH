@@ -84,15 +84,32 @@ struct RunningWorkoutLibraryView: View {
         }
     }
 
+    private var sectionIndex: Binding<Int> {
+        Binding(
+            get: {
+                RunningWorkoutLibrarySection.allCases.firstIndex(
+                    of: selectedSection
+                ) ?? 0
+            },
+            set: { index in
+                guard RunningWorkoutLibrarySection.allCases.indices.contains(index) else {
+                    return
+                }
+                selectedSection = RunningWorkoutLibrarySection.allCases[index]
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if source == nil {
-                Picker("Workout source", selection: $selectedSection) {
-                    ForEach(RunningWorkoutLibrarySection.allCases) { section in
-                        Text(section.title).tag(section)
+                ATHLTHLibraryGlossyTabRow(
+                    titles: RunningWorkoutLibrarySection.allCases.map(\.title),
+                    selection: sectionIndex,
+                    identifiers: RunningWorkoutLibrarySection.allCases.map {
+                        "running-workout-library-source-\($0.rawValue)"
                     }
-                }
-                .pickerStyle(.segmented)
+                )
                 .padding(.horizontal)
                 .padding(.top, 10)
                 .padding(.bottom, 4)

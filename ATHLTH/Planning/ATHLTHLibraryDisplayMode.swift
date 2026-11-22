@@ -333,37 +333,162 @@ struct ATHLTHLibraryLoadMoreButton: View {
     }
 }
 
-/// Identical ATHLTH / Mine selector across exercises, workouts, plans and routes.
-struct ATHLTHLibrarySourcePicker: View {
-    @Binding var selection: ATHLTHUnifiedLibraryScope
-    /// Route library uses “Public”; other libraries keep ATHLTH branding.
-    var athlthTitle: String? = nil
+/// One premium, light-weight source tab row throughout ATHLTH libraries.
+/// Drawn with SwiftUI gradients (no backdrop blur) to keep scrolling responsive.
+struct ATHLTHLibraryGlossyTabRow: View {
+    let titles: [String]
+    @Binding var selection: Int
+    var identifiers: [String] = []
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(ATHLTHUnifiedLibraryScope.allCases) { source in
+            ForEach(Array(titles.enumerated()), id: \.offset) { index, title in
+                let active = selection == index
+
                 Button {
-                    selection = source
+                    guard selection != index else { return }
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        selection = index
+                    }
                 } label: {
-                    Text(source == .athlth ? (athlthTitle ?? source.title) : source.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(selection == source ? Color.white : ATHLTHPlanDesign.ink)
-                        .frame(maxWidth: .infinity, minHeight: 42)
-                        .background(
-                            selection == source ? ATHLTHPlanDesign.ink : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    Text(title)
+                        .font(.system(
+                            size: dynamicTypeSize.isAccessibilitySize ? 16 : 15,
+                            weight: active ? .semibold : .medium
+                        ))
+                        .foregroundStyle(
+                            active ? ATHLTHPlanDesign.ink : ATHLTHPlanDesign.secondaryInk
                         )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.80)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 54 : 48)
+                        .background {
+                            if active {
+                                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                                    .fill(LinearGradient(
+                                        colors: [
+                                            Color.white,
+                                            ATHLTHTheme.cardWarm.opacity(0.92)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                                    .overlay {
+                                        RoundedRectangle(
+                                            cornerRadius: 17, style: .continuous
+                                        )
+                                        .strokeBorder(LinearGradient(
+                                            colors: [
+                                                Color.white.opacity(0.98),
+                                                ATHLTHPlanDesign.accent.opacity(0.28),
+                                                ATHLTHPlanDesign.warmDivider.opacity(0.35)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ), lineWidth: 0.9)
+                                    }
+                                    .overlay(alignment: .top) {
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.90))
+                                            .frame(height: 1)
+                                            .padding(.horizontal, 18)
+                                            .padding(.top, 5)
+                                    }
+                                    .shadow(
+                                        color: ATHLTHPlanDesign.ink.opacity(0.09),
+                                        radius: 9, x: 0, y: 3
+                                    )
+                            }
+                        }
+                        .overlay(alignment: .bottom) {
+                            if active {
+                                Capsule()
+                                    .fill(ATHLTHPlanDesign.accent.opacity(0.75))
+                                    .frame(width: 24, height: 2)
+                                    .padding(.bottom, 3)
+                            }
+                        }
+                        .contentShape(RoundedRectangle(
+                            cornerRadius: 17, style: .continuous
+                        ))
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(selection == source ? [.isSelected] : [])
-                .accessibilityIdentifier("athlth-library-source-\(source.rawValue)")
+                .accessibilityAddTraits(active ? [.isSelected] : [])
+                .accessibilityIdentifier(
+                    identifiers.indices.contains(index)
+                        ? identifiers[index]
+                        : "athlth-library-tab-\(index)"
+                )
             }
         }
         .padding(4)
-        .background(
-            ATHLTHPlanDesign.selectedSurface,
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
+        .background {
+            RoundedRectangle(cornerRadius: 21, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        ATHLTHTheme.cardWarm.opacity(0.87),
+                        ATHLTHPlanDesign.warmSurface.opacity(0.78)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ))
+                .overlay(alignment: .top) {
+                    RoundedRectangle(cornerRadius: 21, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [Color.white.opacity(0.53), Color.clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ))
+                        .frame(height: 25)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 21, style: .continuous)
+                        .strokeBorder(
+                            Color.white.opacity(0.86),
+                            lineWidth: 0.9
+                        )
+                }
+                .shadow(
+                    color: ATHLTHPlanDesign.ink.opacity(0.05),
+                    radius: 12, x: 0, y: 4
+                )
+        }
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// Shared Library / Mine / Favorites selection for exercises, workouts,
+/// training plans and routes, styled identically to the add-exercise picker.
+struct ATHLTHLibrarySourcePicker: View {
+    @Binding var selection: ATHLTHUnifiedLibraryScope
+    var athlthTitle: String? = nil
+
+    private var indexedSelection: Binding<Int> {
+        Binding(
+            get: {
+                ATHLTHUnifiedLibraryScope.allCases.firstIndex(of: selection) ?? 0
+            },
+            set: { index in
+                guard ATHLTHUnifiedLibraryScope.allCases.indices.contains(index) else {
+                    return
+                }
+                selection = ATHLTHUnifiedLibraryScope.allCases[index]
+            }
+        )
+    }
+
+    var body: some View {
+        ATHLTHLibraryGlossyTabRow(
+            titles: ATHLTHUnifiedLibraryScope.allCases.map { source in
+                source == .athlth ? (athlthTitle ?? source.title) : source.title
+            },
+            selection: indexedSelection,
+            identifiers: ATHLTHUnifiedLibraryScope.allCases.map {
+                "athlth-library-source-\($0.rawValue)"
+            }
+        )
     }
 }

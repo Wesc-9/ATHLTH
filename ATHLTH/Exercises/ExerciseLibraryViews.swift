@@ -360,9 +360,12 @@ struct ExerciseLibraryView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             } else if source == nil {
-                ATHLTHPremiumSegmentedControl(
+                ATHLTHLibraryGlossyTabRow(
                     titles: ExerciseLibrarySection.allCases.map(\.title),
-                    selection: selectedSectionIndex
+                    selection: selectedSectionIndex,
+                    identifiers: ExerciseLibrarySection.allCases.map {
+                        "exercise-library-source-\($0.rawValue)"
+                    }
                 )
                 .padding(.horizontal)
                 .padding(.top, 10)
@@ -535,7 +538,7 @@ struct ExerciseLibraryView: View {
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         .multilineTextAlignment(.center)
                         if selectedBodyPart != "All" || selectedEquipment != "All" ||
-                       !query.isEmpty || selectedSection == .mine || favoritesOnly {
+                       !query.isEmpty || favoritesOnly {
                             Button(ATHLTHLocalization.choose(
                                 english: "Clear filters", norwegian: "Nullstill filtrene"
                             )) {
@@ -543,7 +546,6 @@ struct ExerciseLibraryView: View {
                                 selectedEquipment = "All"
                                 query = ""
                                 queryInput = ""
-                                selectedSection = .library
                                 favoritesOnly = false
                             }
                             .font(.subheadline.weight(.semibold))
@@ -1282,35 +1284,6 @@ struct ExerciseLibraryView: View {
                     .buttonStyle(.plain)
                     }
 
-                    // Keep this shortcut only in the training exercise picker;
-                    // standalone browsing uses the common source selector.
-                    if onSelect != nil {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            selectedSection = selectedSection == .mine ? .library : .mine
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "person.crop.square")
-                            Text(ATHLTHLocalization.choose(
-                                english: "My exercises", norwegian: "Egne øvelser"
-                            ))
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(selectedSection == .mine ? .white : .primary)
-                        .padding(.horizontal, 11)
-                        .frame(minHeight: 44)
-                        .background(
-                            selectedSection == .mine
-                                ? ATHLTHTheme.accentDeep
-                                : ATHLTHTheme.cardWarm.opacity(0.72),
-                            in: Capsule()
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("exercise-library-mine-filter")
-                    }
-
                     Menu {
                         Button(
                             ATHLTHLocalization.choose(
@@ -1344,7 +1317,7 @@ struct ExerciseLibraryView: View {
                     }
 
                     if selectedBodyPart != "All" || selectedEquipment != "All" ||
-                       selectedSection == .mine || favoritesOnly {
+                       favoritesOnly {
                         Button(
                             ATHLTHLocalization.choose(
                                 english: "Clear",
@@ -1353,7 +1326,6 @@ struct ExerciseLibraryView: View {
                         ) {
                             selectedBodyPart = "All"
                             selectedEquipment = "All"
-                            selectedSection = .library
                             favoritesOnly = false
                         }
                         .font(.caption.weight(.semibold))

@@ -11,6 +11,15 @@ final class ATHLTHUnifiedLibraryNavigationTests: XCTestCase {
         )
     }
 
+    func testExerciseSourceTabsAreDistinctAndKeepMineInSecondPosition() {
+        let tabs = ExerciseLibrarySection.allCases
+        XCTAssertEqual(tabs.map(\.title).count, 3)
+        XCTAssertEqual(tabs.map(\.segmentedIndex), [0, 1, 2])
+        XCTAssertEqual(ExerciseLibrarySection.section(forSegmentedIndex: 0), .library)
+        XCTAssertEqual(ExerciseLibrarySection.section(forSegmentedIndex: 1), .mine)
+        XCTAssertEqual(ExerciseLibrarySection.section(forSegmentedIndex: 2), .marketplace)
+    }
+
     func testNorwegianMuscleFiltersAreAlphabeticalWithoutChangingRawKeys() {
         let source = ["Shoulders", "Back", "Core", "Chest", "Biceps"]
         let localized = [

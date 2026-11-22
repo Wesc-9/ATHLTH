@@ -1592,6 +1592,13 @@ struct TrainingPlanLibrarySheet: View {
     var onOpenSavedPlan: ((UUID) -> Void)? = nil
     @State private var selectedSection: Section = .library
 
+    private var sectionIndex: Binding<Int> {
+        Binding(
+            get: { selectedSection == .library ? 0 : 1 },
+            set: { selectedSection = $0 == 1 ? .mine : .library }
+        )
+    }
+
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
@@ -1600,11 +1607,17 @@ struct TrainingPlanLibrarySheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 if !favoritePlansOnly {
-                    Picker(tr("Plans", "Planer"), selection: $selectedSection) {
-                        Text(tr("Library plans", "Bibliotekets planer")).tag(Section.library)
-                        Text(tr("My plans", "Mine planer")).tag(Section.mine)
-                    }
-                    .pickerStyle(.segmented)
+                    ATHLTHLibraryGlossyTabRow(
+                        titles: [
+                            tr("Library plans", "Bibliotekets planer"),
+                            tr("My plans", "Mine planer")
+                        ],
+                        selection: sectionIndex,
+                        identifiers: [
+                            "training-plan-sheet-library",
+                            "training-plan-sheet-mine"
+                        ]
+                    )
                     .padding(.horizontal, 18)
                     .padding(.top, 12)
                     .padding(.bottom, 4)
