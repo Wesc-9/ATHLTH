@@ -172,7 +172,9 @@ struct ATHLTHTournamentCreator: View {
 
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
-        athletes.count >= 2 && !busy && !allowedActivities.isEmpty &&
+        // Two athletes belong in a private duel. Group competitions
+        // require the organizer plus at least two invitees.
+        athletes.count >= 3 && !busy && !allowedActivities.isEmpty &&
         competitionSettings.isValid &&
         (fixedActivity.map { allowedActivities == Set([$0]) } ?? true) &&
         ATHLTHTournamentCadence.options.contains(cadenceDays) &&
