@@ -185,6 +185,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
     var allowExtensions: Bool
     var winPoints: Int
     var drawPoints: Int
+    var competitionSettings: ATHLTHTournamentCompetitionSettings
     var createdAt: Date
 
     init(
@@ -214,6 +215,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         allowExtensions: Bool = true,
         winPoints: Int = 3,
         drawPoints: Int = 1,
+        competitionSettings: ATHLTHTournamentCompetitionSettings = .init(),
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -246,6 +248,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         self.allowExtensions = allowExtensions
         self.winPoints = winPoints
         self.drawPoints = drawPoints
+        self.competitionSettings = competitionSettings
         self.createdAt = createdAt
     }
 
@@ -256,7 +259,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
              approvePlayerChanges, allowedActivities, rulesAuthority,
              cadenceDays, completionHours, rotationMode,
              restWeekdays, proofMode, publicResults, allowExtensions,
-             winPoints, drawPoints
+             winPoints, drawPoints, competitionSettings
     }
 
     init(from decoder: Decoder) throws {
@@ -312,6 +315,10 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
             forKey: .winPoints) ?? 3
         drawPoints = try values.decodeIfPresent(Int.self,
             forKey: .drawPoints) ?? 1
+        competitionSettings = try values.decodeIfPresent(
+            ATHLTHTournamentCompetitionSettings.self,
+            forKey: .competitionSettings
+        ) ?? .init()
         createdAt = try values.decode(Date.self, forKey: .createdAt)
     }
 
@@ -343,6 +350,7 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         try values.encode(allowExtensions, forKey: .allowExtensions)
         try values.encode(winPoints, forKey: .winPoints)
         try values.encode(drawPoints, forKey: .drawPoints)
+        try values.encode(competitionSettings, forKey: .competitionSettings)
         try values.encode(createdAt, forKey: .createdAt)
     }
 }
