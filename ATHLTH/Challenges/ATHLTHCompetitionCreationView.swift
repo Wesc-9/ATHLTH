@@ -474,8 +474,8 @@ struct ATHLTHCompetitionCreationView: View {
                 fixedActivity: ATHLTHCompetitionCreationPolicy.tournamentActivity(
                     initialActivity
                 ),
-                initialTitle: competitionTitle,
                 singleEventMode: format == .single,
+                initialTitle: competitionTitle,
                 continuation: restoredCompetitionTemplate,
                 onPublished: { _ in
                     showingExistingTournamentRules = false
