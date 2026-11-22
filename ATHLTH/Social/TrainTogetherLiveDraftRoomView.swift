@@ -233,6 +233,15 @@ struct TrainTogetherLiveDraftRoomView: View {
         return isOwner || draft.isCollaborative
     }
 
+    private var editableSourceWorkout: PlannedSession {
+        var source = live.draft?.workout ?? fallbackWorkout
+        // SessionEditorView's existing proposal guard reads this flag.
+        // The owner may always add exercises, including in view-only invites;
+        // the server-side edit_mode still prevents guest edits.
+        if isOwner { source.allowInviteeExercises = true }
+        return source
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -459,11 +468,16 @@ struct TrainTogetherLiveDraftRoomView: View {
             SessionEditorView(
                 standaloneDate: live.draft?.workout?.scheduledStart
                     ?? fallbackWorkout.scheduledStart ?? Date(),
-                initialSourceWorkout: live.draft?.workout ?? fallbackWorkout,
+                initialSourceWorkout: editableSourceWorkout,
                 preserveSourceID: true,
                 onPreparedWorkout: { proposed in
+                    var revision = proposed
+                    // Never change the invitation permission merely because
+                    // the owner opened the universal exercise editor.
+                    revision.allowInviteeExercises =
+                        live.draft?.workout?.allowInviteeExercises
                     Task {
-                        await live.save(proposed, basedOn: editingRevision)
+                        await live.save(revision, basedOn: editingRevision)
                     }
                 }
             )
