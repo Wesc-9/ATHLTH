@@ -256,10 +256,8 @@ struct ATHLTHCompetitionCreationView: View {
     private var duelEngineSupportsRule: Bool {
         guard advanced, format == .duel else { return true }
         let race = duelRaceSettings.race
-        return race.isValid &&
-            race.discipline != .laps &&
-            (race.discipline != .sprint || race.sprintMode == .massStart) &&
-            race.recordingDevice != .appleWatch
+        return race.isValid && race.isOperational &&
+            race.discipline != .laps
     }
 
     private var isValid: Bool {
