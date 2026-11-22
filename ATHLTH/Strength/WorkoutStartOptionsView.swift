@@ -1405,85 +1405,14 @@ struct WorkoutStartOptionsView: View {
     }
 
     private var trackingModeButton: some View {
-        Button {
-            let nextMode:
-                StrengthTrackingMode =
-                    trackingMode == .advanced
-                        ? .simple
-                        : .advanced
-            withAnimation(
-                .easeInOut(
-                    duration: 0.22
-                )
-            ) {
-                trackingMode = nextMode
+        ATHLTHQuickStartSetupModeButton(advanced: trackingMode == .advanced) {
+            let next: StrengthTrackingMode =
+                trackingMode == .advanced ? .simple : .advanced
+            withAnimation(.easeInOut(duration: 0.2)) {
+                trackingMode = next
             }
-            settings.recordAdvancedSetup(
-                nextMode == .advanced,
-                for: .strength
-            )
-        } label: {
-            HStack(spacing: 6) {
-                Image(
-                    systemName:
-                        trackingMode == .advanced
-                            ? "slider.horizontal.3"
-                            : "bolt.fill"
-                )
-                .font(
-                    .system(
-                        size: 11,
-                        weight: .semibold
-                    )
-                )
-
-                Text(
-                    trackingMode == .advanced
-                        ? ATHLTHLocalization.choose(
-                            english: "Advanced",
-                            norwegian: "Avansert"
-                        )
-                        : "Basic"
-                )
-                .font(
-                    .caption
-                        .weight(.bold)
-                )
-            }
-            .foregroundStyle(
-                trackingMode == .advanced
-                    ? Color.white
-                    : ATHLTHTheme.primaryText
-            )
-            .padding(.horizontal, 11)
-            .frame(height: 34)
-            .background(
-                trackingMode == .advanced
-                    ? ATHLTHTheme.vitality
-                    : Color.primary.opacity(
-                        0.055
-                    ),
-                in: Capsule()
-            )
-            .overlay {
-                Capsule()
-                    .stroke(
-                        Color.black.opacity(
-                            0.045
-                        ),
-                        lineWidth: 0.7
-                    )
-            }
+            settings.recordAdvancedSetup(next == .advanced, for: .strength)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            ATHLTHLocalization.choose(
-                english:
-                    "Switch strength setup mode",
-                norwegian:
-                    "Bytt oppsettsmodus for styrke"
-            )
-        )
     }
 
     @ViewBuilder
