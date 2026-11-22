@@ -887,6 +887,20 @@ final class SupabaseSocialService: Sendable {
             .value
     }
 
+    /// Bulk-acknowledge only the signed-in athlete's competition notices.
+    /// Direct-message events and other tournaments are not touched.
+    func markTournamentInboxEventsRead(_ tournamentID: UUID) async throws {
+        guard let userID = currentUserID else { return }
+        try await client
+            .from("social_inbox_events")
+            .update(["read_at": ISO8601DateFormatter().string(from: Date())])
+            .eq("recipient_id", value: userID)
+            .eq("entity_type", value: "athlth_tournament")
+            .eq("entity_id", value: tournamentID)
+            .is("read_at", value: nil)
+            .execute()
+    }
+
     func markInboxEventRead(_ eventID: UUID) async throws {
         try await client
             .from("social_inbox_events")
