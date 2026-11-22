@@ -523,7 +523,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         effective.outputPreference = configuration.outputPreference
         if workoutInitiatedLocallyOnWatch,
            effective.outputPreference == nil,
-           (kind == .running || kind == .walking) {
+           (kind == .running || kind == .walking || kind == .strength) {
             effective.outputPreference = .automatic
         }
         publish {
@@ -588,7 +588,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         effective.outputPreference = configuration.outputPreference
         if workoutInitiatedLocallyOnWatch,
            effective.outputPreference == nil,
-           (kind == .running || kind == .walking) {
+           (kind == .running || kind == .walking || kind == .strength) {
             effective.outputPreference = .automatic
         }
         publish {
@@ -4591,7 +4591,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // Locally started Watch runs can invite a phone to own only the
         // voice output; the Watch retains the sole HealthKit recording.
         if workoutInitiatedLocallyOnWatch,
-           (kind == .running || kind == .walking),
+           (kind == .running || kind == .walking || kind == .strength),
            audioCoachConfiguration.enabled,
            audioCoachConfiguration.outputPreference == nil {
             audioCoachConfiguration.outputPreference = .automatic
@@ -8282,9 +8282,42 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         guard forceLocal || shouldSpeakLocally(priority: priority) else {
-            // iPhone handles routine and structured running commentary.
-            // Critical route/target alerts, Ghost and strength cues remain
-            // local because the mirrored iPhone coach does not reproduce them.
+            // Running/walking cues are reconstructed from mirror snapshots.
+            // The Watch creates strength set/rest/exercise phrases itself;
+            // forward them over the same HealthKit mirror used for voice leases.
+            if kind == .strength,
+               mirroringActive,
+               let startedAt,
+               let session = workoutSession,
+               (priority == .routineCoach || priority == .structuredStep) {
+                let cue = ATHLTHStrengthMirroredCoachCue(
+                    id: UUID(), workoutStartedAt: startedAt,
+                    sentAt: Date(), text: text, priority: priority
+                )
+                if cue.isValid(for: startedAt),
+                   let payload = try? JSONEncoder().encode(cue) {
+                    Task { @MainActor [weak self] in
+                        guard let self,
+                              self.workoutSession === session,
+                              self.iPhoneVoiceLease.isActive()
+                        else { return }
+                        do {
+                            try await session.sendToRemoteWorkoutSession(data: payload)
+                        } catch {
+                            // A transport failure must not silence the next
+                            // set cue. Only the original live workout may retry.
+                            guard self.workoutSession === session,
+                                  self.isActive else { return }
+                            self.speak(
+                                text, priority: priority, event: event,
+                                forceLocal: true,
+                                rememberForReplay: rememberForReplay,
+                                deadline: deadline
+                            )
+                        }
+                    }
+                }
+            }
             return
         }
 
@@ -9395,8 +9428,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             usesOutdoorGPS && smartCoachState.isReliablyNotClimbing
         snapshot.watchOwnedAudioCoach =
             ghostRaceConfiguration != nil ||
-            kind == .strength ||
             !audioCoachConfiguration.enabled ||
+            (kind == .strength && audioCoachConfiguration.outputPreference == nil) ||
             !audioCoachConfiguration.shouldPreferIPhoneAudioWhenReachable
         snapshot.treadmillTargetPaceSecondsPerKilometer =
             treadmillTargetPaceSecondsPerKilometer
@@ -9450,7 +9483,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // The phone may become available after Watch start or reconnection.
             // Re-advertise without interrupting the original workout session.
             if workoutSession === self.workoutSession,
-               (kind == .running || kind == .walking),
+               (kind == .running || kind == .walking || kind == .strength),
                audioCoachConfiguration.enabled,
                audioCoachConfiguration.shouldPreferIPhoneAudioWhenReachable,
                audioCoachConfiguration.shouldUseAcknowledgedVoiceLease,
@@ -10175,7 +10208,9 @@ extension WatchWorkoutManager:
                         self.audioCoachConfiguration
                             .shouldUseAcknowledgedVoiceLease &&
                         (self.kind == .running ||
-                         self.kind == .walking) &&
+                         self.kind == .walking ||
+                         (self.kind == .strength &&
+                          self.audioCoachConfiguration.outputPreference != nil)) &&
                         self.isActive
 
                     if let acknowledgement =
