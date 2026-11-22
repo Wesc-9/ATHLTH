@@ -76,6 +76,11 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
             activity: .running, format: .duel, opponents: [rival],
             metric: .fastestDistance
         ))
+        XCTAssertFalse(valid(
+            activity: .running, format: .duel,
+            opponents: [rival, UUID()],
+            metric: .fastestDistance
+        ))
     }
 
     func testCupAndLeagueRequireDifferentRosterSizes() {
