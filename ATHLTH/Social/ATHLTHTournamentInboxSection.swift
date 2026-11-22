@@ -101,7 +101,7 @@ struct ATHLTHTournamentInboxSection: View {
         defer { loading = false }
         do {
             async let tournamentRecords = cloud.visibleTournaments()
-            async let memberIDs = cloud.myTournamentIDs(
+            async let memberIDs = cloud.conversationTournamentIDs(
                 userID: session.profile.userID
             )
             async let invitationIDs = cloud.pendingInvitationIDs(
