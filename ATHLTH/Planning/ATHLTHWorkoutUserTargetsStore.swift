@@ -137,3 +137,41 @@ enum ATHLTHWorkoutUserTargetsStore {
         defaults.removeObject(forKey: key(userID: userID, workoutID: workoutID))
     }
 }
+
+
+/// Optional, athlete-owned options for an immutable catalogue workout.
+/// These are separate from the published source and from personal step
+/// prescriptions, and are never sent when sharing the original workout.
+struct ATHLTHWorkoutPersonalOptions: Codable, Hashable {
+    var audioCoachConfiguration: WatchAudioCoachConfiguration? = nil
+    var spotifyPlaylist: SpotifyPlaylistReference? = nil
+    var spotifyAutoplayOnStart: Bool? = nil
+    var spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack? = nil
+}
+
+enum ATHLTHWorkoutPersonalOptionsStore {
+    private static func key(userID: String, workoutID: UUID) -> String {
+        "athlth.workout.personalOptions.v1.\(userID).\(workoutID.uuidString)"
+    }
+
+    static func load(
+        userID: String, workoutID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> ATHLTHWorkoutPersonalOptions {
+        guard let data = defaults.data(forKey: key(userID: userID, workoutID: workoutID)),
+              let value = try? JSONDecoder().decode(
+                  ATHLTHWorkoutPersonalOptions.self, from: data
+              ) else { return .init() }
+        return value
+    }
+
+    static func save(
+        _ value: ATHLTHWorkoutPersonalOptions,
+        userID: String, workoutID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        guard !userID.isEmpty,
+              let data = try? JSONEncoder().encode(value) else { return }
+        defaults.set(data, forKey: key(userID: userID, workoutID: workoutID))
+    }
+}
