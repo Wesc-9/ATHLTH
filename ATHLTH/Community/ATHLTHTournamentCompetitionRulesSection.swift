@@ -5,6 +5,8 @@ import SwiftUI
 /// awards points or grants permission by itself.
 struct ATHLTHTournamentCompetitionRulesSection: View {
     @Binding var settings: ATHLTHTournamentCompetitionSettings
+    var activities: Set<ATHLTHTournamentActivity> = []
+    @State private var showingMeetingPoint = false
     @State private var expandedAccess = false
     @State private var expandedAgreement = false
 
@@ -15,29 +17,29 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
 
             VStack(alignment: .leading, spacing: 14) {
-                Toggle("Bestem startdato", isOn: Binding(
-                    get: { settings.startsAt != nil },
-                    set: { enabled in
-                        settings.startsAt = enabled
-                            ? Date().addingTimeInterval(86_400) : nil
+                Text("Hvordan starter konkurransen?")
+                    .font(.subheadline.weight(.semibold))
+                Picker("Startmåte", selection: $settings.startMode) {
+                    ForEach(ATHLTHCompetitionStartMode.allCases) { choice in
+                        Text(choice.title).tag(choice)
                     }
-                ))
-                .tint(ATHLTHArenaV3Style.gold)
-                if settings.startsAt != nil {
+                }
+                .pickerStyle(.menu)
+                if settings.startMode == .scheduled {
                     DatePicker(
-                        "Konkurransen kan starte",
+                        "Dato og klokkeslett",
                         selection: Binding(
-                            get: { settings.startsAt ?? Date() },
+                            get: { settings.startsAt ??
+                                Date().addingTimeInterval(86_400) },
                             set: { settings.startsAt = $0 }
-                        ),
-                        in: Date()...,
+                        ), in: Date()...,
                         displayedComponents: [.date, .hourAndMinute]
                     )
                     .font(.subheadline)
-                    Text("Invitasjoner og regelgodkjenning kan gjøres før start.")
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
+                Text("Alle deltakere må godta invitasjonen og trykke Klar. Ved valgt tidspunkt starter konkurransen så snart alle er klare og tidspunktet er nådd.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 Divider()
                 Text("Når åpner neste øvelse?")
                     .font(.subheadline.weight(.semibold))
@@ -91,6 +93,56 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             }
             .padding(15)
             .background(ATHLTHArenaV3Style.panel())
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Treningsmiljø og sted")
+                    .font(.system(size: 21, design: .serif))
+                Picker("Hvor er trening tillatt?",
+                       selection: $settings.environment) {
+                    Text("Ingen begrensning")
+                        .tag(ATHLTHCompetitionEnvironment.any)
+                    if activities.contains(.running) ||
+                       activities.contains(.walking) ||
+                       activities.contains(.hiking) {
+                        Text("Kun utendørs")
+                            .tag(ATHLTHCompetitionEnvironment.outdoor)
+                    }
+                    if activities.contains(.strength) {
+                        Text("Kun treningssenter")
+                            .tag(ATHLTHCompetitionEnvironment.gym)
+                    }
+                }
+                .pickerStyle(.menu)
+                Text("Treningsmiljø er en konkurranseregel. Dokumentasjonen må kontrolleres; ATHLTH antar ikke at GPS eller Apple Health alene kan bevise treningssted.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                Button {
+                    showingMeetingPoint = true
+                } label: {
+                    HStack {
+                        Image(systemName: "mappin.and.ellipse")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(settings.meetingPlace.isEmpty
+                                 ? "Legg til møtepunkt (valgfritt)"
+                                 : settings.meetingPlace)
+                                .font(.subheadline.weight(.semibold))
+                            Text("Søk i kart eller skriv adresse")
+                                .font(.caption)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    .padding(13)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(15)
+            .background(ATHLTHArenaV3Style.panel())
+            .sheet(isPresented: $showingMeetingPoint) {
+                ATHLTHCompetitionMeetingPointPicker(settings: $settings)
+            }
 
             DisclosureGroup(
                 "Invitasjoner og godkjenning",
@@ -157,6 +209,12 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             .tint(ATHLTHArenaV3Style.gold)
             .padding(15)
             .background(ATHLTHArenaV3Style.panel())
+        }
+        .onChange(of: settings.startMode) { _, value in
+            if value == .scheduled && settings.startsAt == nil {
+                settings.startsAt = Date().addingTimeInterval(86_400)
+            }
+            if value != .scheduled { settings.startsAt = nil }
         }
         .onChange(of: settings.unit) { _, unit in
             settings.every = min(settings.every, unit.maximumCount)
