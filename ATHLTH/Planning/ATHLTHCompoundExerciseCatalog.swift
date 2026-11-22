@@ -89,6 +89,7 @@ struct ATHLTHCompoundExercise: Identifiable {
 /// built-in running workout, every published/offline workout catalog entry,
 /// the existing run exercise presets and athlete-owned saved main sections.
 /// Does not create duplicate strength movements in the ExerciseLibraryStore.
+@MainActor
 enum ATHLTHCompoundExerciseCatalog {
     private static let personalPrefix = "athlth-personal-main:"
     private static let publicPrefix = "athlth-main:"
