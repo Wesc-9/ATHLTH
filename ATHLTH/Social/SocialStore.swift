@@ -3163,6 +3163,20 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func markTournamentInboxRead(_ tournamentID: UUID) async {
+        guard inboxEvents.contains(where: {
+            $0.entityType == "athlth_tournament" &&
+            $0.entityID == tournamentID && $0.readAt == nil
+        }) else { return }
+        do {
+            try await service.markTournamentInboxEventsRead(tournamentID)
+            inboxEvents = try await service.loadInboxEvents()
+            syncApplicationIconBadge()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func markBackendInboxRead(_ eventID: UUID) async {
         do {
             try await service.markInboxEventRead(eventID)
