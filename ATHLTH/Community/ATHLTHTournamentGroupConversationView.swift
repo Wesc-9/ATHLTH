@@ -105,7 +105,7 @@ struct ATHLTHTournamentGroupConversationView: View {
     private var pinnedCompetitionCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 11) {
-                Image(systemName: displayed.format.symbol)
+                Image(systemName: displayed.displayFormatSymbol)
                     .font(.system(size: 21, weight: .light))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
                     .frame(width: 43, height: 43)
