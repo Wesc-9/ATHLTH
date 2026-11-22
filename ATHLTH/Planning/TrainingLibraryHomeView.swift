@@ -1025,68 +1025,6 @@ final class LibraryFavoritesStore: ObservableObject {
         self.client = client
     }
 
-    /// Malformed or duplicated remote plans must not hide a working bundled
-    /// plan with the same slug, nor appear as runnable catalog entries.
-    /// Changes to this rule require full build, iPhone, iPad, hybrid and
-    /// backend regression coverage on the exact release commit.
-    static func mergeValidatedCatalog(
-        remote: [TrainingPlanCatalogEntry]
-    ) -> [TrainingPlanCatalogEntry] {
-        let bundled = TrainingPlanCatalogEntry.bundledCatalog
-        let bundledIDs = Dictionary(
-            bundled.map { ($0.id, $0.slug) },
-            uniquingKeysWith: { existing, _ in existing }
-        )
-        let bundledBySlug = Dictionary(
-            bundled.map { ($0.slug, $0) },
-            uniquingKeysWith: { existing, _ in existing }
-        )
-        var seenIDs = Set<UUID>()
-        var seenSlugs = Set<String>()
-        let validRemote = remote.filter { candidate in
-            candidate.hasCompleteWorkoutPattern &&
-            (1...52).contains(candidate.durationWeeks) &&
-            !candidate.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            // Never allow a different remote slug to steal an ID owned by
-            // one of the built-in plans. Existing saved plans use this UUID.
-            (bundledIDs[candidate.id] == nil || bundledIDs[candidate.id] == candidate.slug) &&
-            // Built-in identity includes its workout recipe and time frame.
-            // If those change, the remote edition needs a new slug rather
-            // than misleading existing schedules that carry this identity.
-            (bundledBySlug[candidate.slug].map { local in
-                // Favorites, saved copies and histories refer to this UUID,
-                // so even a cosmetically identical remote replacement must
-                // keep the exact source identity.
-                local.id == candidate.id &&
-                local.durationWeeks == candidate.durationWeeks &&
-                local.sessionsPerWeek == candidate.sessionsPerWeek &&
-                local.workoutPattern == candidate.workoutPattern
-            } ?? true)
-        }.sorted {
-            if $0.catalogVersion != $1.catalogVersion {
-                return $0.catalogVersion > $1.catalogVersion
-            }
-            return $0.sortOrder < $1.sortOrder
-        }.filter { plan in
-            guard !seenIDs.contains(plan.id),
-                  !seenSlugs.contains(plan.slug) else { return false }
-            seenIDs.insert(plan.id)
-            seenSlugs.insert(plan.slug)
-            return true
-        }
-        let local = bundled.filter { plan in
-            guard !seenIDs.contains(plan.id),
-                  !seenSlugs.contains(plan.slug) else { return false }
-            seenIDs.insert(plan.id)
-            seenSlugs.insert(plan.slug)
-            return true
-        }
-        return (validRemote + local).sorted {
-            $0.sortOrder == $1.sortOrder
-                ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
-        }
-    }
-
     func refresh(force: Bool = false) async {
         guard let user = client.auth.currentUser else {
             activeUserID = nil
@@ -1701,6 +1639,68 @@ final class TrainingPlanLibraryStore: ObservableObject {
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
+    }
+
+    /// Malformed or duplicated remote plans must not hide a working bundled
+    /// plan with the same slug, nor appear as runnable catalog entries.
+    /// Changes to this rule require full build, iPhone, iPad, hybrid and
+    /// backend regression coverage on the exact release commit.
+    static func mergeValidatedCatalog(
+        remote: [TrainingPlanCatalogEntry]
+    ) -> [TrainingPlanCatalogEntry] {
+        let bundled = TrainingPlanCatalogEntry.bundledCatalog
+        let bundledIDs = Dictionary(
+            bundled.map { ($0.id, $0.slug) },
+            uniquingKeysWith: { existing, _ in existing }
+        )
+        let bundledBySlug = Dictionary(
+            bundled.map { ($0.slug, $0) },
+            uniquingKeysWith: { existing, _ in existing }
+        )
+        var seenIDs = Set<UUID>()
+        var seenSlugs = Set<String>()
+        let validRemote = remote.filter { candidate in
+            candidate.hasCompleteWorkoutPattern &&
+            (1...52).contains(candidate.durationWeeks) &&
+            !candidate.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            // Never allow a different remote slug to steal an ID owned by
+            // one of the built-in plans. Existing saved plans use this UUID.
+            (bundledIDs[candidate.id] == nil || bundledIDs[candidate.id] == candidate.slug) &&
+            // Built-in identity includes its workout recipe and time frame.
+            // If those change, the remote edition needs a new slug rather
+            // than misleading existing schedules that carry this identity.
+            (bundledBySlug[candidate.slug].map { local in
+                // Favorites, saved copies and histories refer to this UUID,
+                // so even a cosmetically identical remote replacement must
+                // keep the exact source identity.
+                local.id == candidate.id &&
+                local.durationWeeks == candidate.durationWeeks &&
+                local.sessionsPerWeek == candidate.sessionsPerWeek &&
+                local.workoutPattern == candidate.workoutPattern
+            } ?? true)
+        }.sorted {
+            if $0.catalogVersion != $1.catalogVersion {
+                return $0.catalogVersion > $1.catalogVersion
+            }
+            return $0.sortOrder < $1.sortOrder
+        }.filter { plan in
+            guard !seenIDs.contains(plan.id),
+                  !seenSlugs.contains(plan.slug) else { return false }
+            seenIDs.insert(plan.id)
+            seenSlugs.insert(plan.slug)
+            return true
+        }
+        let local = bundled.filter { plan in
+            guard !seenIDs.contains(plan.id),
+                  !seenSlugs.contains(plan.slug) else { return false }
+            seenIDs.insert(plan.id)
+            seenSlugs.insert(plan.slug)
+            return true
+        }
+        return (validRemote + local).sorted {
+            $0.sortOrder == $1.sortOrder
+                ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
+        }
     }
 
     func refresh(force: Bool = false) async {
