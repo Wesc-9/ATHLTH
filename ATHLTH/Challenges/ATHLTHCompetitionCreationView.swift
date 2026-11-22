@@ -36,6 +36,24 @@ enum ATHLTHCompetitionFormat: String, CaseIterable, Identifiable {
     }
 }
 
+enum ATHLTHRunningCompetitionBranch: String, CaseIterable, Identifiable {
+    case running, sprint
+    var id: String { rawValue }
+    var title: String { self == .sprint ? "Sprint" : "Vanlig løping" }
+}
+
+enum ATHLTHSprintGoal: String, CaseIterable, Identifiable {
+    case distance, time, route
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .distance: "Distanse"
+        case .time: "Tid"
+        case .route: "Rute"
+        }
+    }
+}
+
 /// Pure entry policy. A tournament or duel cannot be published with
 /// nonexistent rivals, duplicated participants or invalid measures.
 enum ATHLTHCompetitionCreationPolicy {
@@ -143,6 +161,8 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var competitionTitle = ""
     @State private var chosenIDs: Set<UUID> = []
     @State private var scoring: ATHLTHChallengeScoring = .fastestDistance
+    @State private var runningBranch: ATHLTHRunningCompetitionBranch = .running
+    @State private var sprintGoal: ATHLTHSprintGoal = .distance
     @State private var distanceKM = 5.0
     @State private var chosenRoute: TrainingRoute?
     @State private var durationMinutes = 30.0
@@ -197,7 +217,9 @@ struct ATHLTHCompetitionCreationView: View {
             hasRoute: chosenRoute != nil,
             endsAt: effectiveEnd,
             now: Date()
-        ) && selectedPeople.count == chosenIDs.count &&
+        ) && (runningBranch != .sprint || format != .duel ||
+                (sprintGoal != .route || chosenRoute != nil)) &&
+        selectedPeople.count == chosenIDs.count &&
         effectiveStart >= Date().addingTimeInterval(-60) &&
         effectiveStart < effectiveEnd && duelAgreement.isValid
     }
@@ -235,6 +257,9 @@ struct ATHLTHCompetitionCreationView: View {
                         }
                     }
 
+                    if initialActivity == .running && format == .duel {
+                        sprintSection
+                    }
                     if advanced {
                         advancedIdentity
                     } else {
@@ -359,6 +384,7 @@ struct ATHLTHCompetitionCreationView: View {
             if let preselectedRoute {
                 chosenRoute = preselectedRoute
                 scoring = .fastestRoute
+                sprintGoal = .route
             }
             if let preselectedFriend, preselectedFriend.userID != session.profile.userID {
                 chosenIDs.insert(preselectedFriend.userID)
@@ -431,6 +457,80 @@ struct ATHLTHCompetitionCreationView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("athlth-competition-format-\(option.rawValue)")
+    }
+
+    private var sprintSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            titleBlock("Løpegren")
+            Picker("Løpegren", selection: $runningBranch) {
+                ForEach(ATHLTHRunningCompetitionBranch.allCases) { item in
+                    Text(item.title).tag(item)
+                }
+            }
+            .pickerStyle(.segmented)
+            if runningBranch == .sprint {
+                Text("Sprint · samme treningsmotor, med tid, distanse eller lagret rute som mål.")
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                Picker("Sprintmål", selection: $sprintGoal) {
+                    ForEach(ATHLTHSprintGoal.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+                switch sprintGoal {
+                case .distance:
+                    HStack {
+                        Text("Fast sprintdistanse")
+                        Spacer()
+                        TextField("100", value: Binding(
+                            get: { Int(distanceKM * 1_000) },
+                            set: { distanceKM = Double(max(100, min($0, 5_000))) / 1_000 }
+                        ), format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 70)
+                        Text("m")
+                    }
+                    .font(.subheadline)
+                case .time:
+                    Stepper("Sprint i \(Int(durationMinutes)) min",
+                            value: $durationMinutes, in: 1...10, step: 1)
+                        .font(.subheadline)
+                case .route:
+                    if let chosenRoute {
+                        Label(chosenRoute.title, systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(bronze)
+                    } else {
+                        Label("Velg sprint fra en lagret rute i Ruter først",
+                              systemImage: "map")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+        }
+        .padding(15)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .onChange(of: runningBranch) { _, _ in updateSprintScoring() }
+        .onChange(of: sprintGoal) { _, _ in updateSprintScoring() }
+    }
+
+    private func updateSprintScoring() {
+        guard runningBranch == .sprint else {
+            scoring = .fastestDistance
+            return
+        }
+        switch sprintGoal {
+        case .distance: scoring = .fastestDistance
+        case .time: scoring = .farthestInTime
+        case .route: scoring = .fastestRoute
+        }
+        if sprintGoal == .distance &&
+            !(0.1...5).contains(distanceKM) {
+            distanceKM = 0.1
+        }
     }
 
     private var simpleIdentity: some View {
@@ -670,12 +770,14 @@ struct ATHLTHCompetitionCreationView: View {
                 Text(tr("What determines the winner?", "Hva avgjør vinneren?"))
                     .font(.caption)
                     .foregroundStyle(muted)
-                Picker(tr("Result", "Resultat"), selection: $scoring) {
-                    ForEach(duelMetrics, id: \.self) { metric in
-                        Text(metric.title).tag(metric)
+                if runningBranch != .sprint {
+                    Picker(tr("Result", "Resultat"), selection: $scoring) {
+                        ForEach(duelMetrics, id: \.self) { metric in
+                            Text(metric.title).tag(metric)
+                        }
                     }
+                    .pickerStyle(.menu)
                 }
-                .pickerStyle(.menu)
                 if scoring == .fastestRoute {
                     Text(chosenRoute?.title ?? tr(
                         "Choose a route", "Velg en rute"
