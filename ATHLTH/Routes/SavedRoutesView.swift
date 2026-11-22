@@ -336,14 +336,16 @@ struct SavedRoutesView: View {
             }
         }
         .onChange(of: pageFilterKey) { _, _ in
+            // Filtering must not replace the ScrollView that contains the
+            // search TextField; otherwise typing can dismiss the keyboard.
+            // Only explicit alphabet index taps change the scroll identity.
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .onChange(of: session.savedRoutes.count) { _, _ in
+            // New or removed routes reset paging without stealing focus.
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .onScrollPhaseChange { _, phase in
             routeCardsScrolling = phase.isScrolling
