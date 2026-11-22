@@ -919,7 +919,9 @@ struct ATHLTHTournamentLiveDetailView: View {
             let newEntries = try await participants
             let newMatches = try await competitionMatches
             let updatedRankings = try await officialRankings
-            let statuses = try await progress
+            // Nonparticipants may view public results but not private athlete
+            // presence. That must never prevent the public detail from loading.
+            let statuses = (try? await progress) ?? []
             latest = all.first { $0.id == current.id } ?? latest
             entries = newEntries
             matches = newMatches
