@@ -5391,10 +5391,9 @@ final class AppSessionStore: ObservableObject {
             max(entry.durationWeeks, 1),
             52
         )
-        let sessionsPerWeek = min(
-            max(entry.sessionsPerWeek, 2),
-            6
-        )
+        // A complete catalog may prescribe one through seven distinct
+        // training days. Never silently add or drop sessions when saving.
+        let sessionsPerWeek = entry.sessionsPerWeek
         // Public entry points validate the complete source pattern. No
         // invented fallback workouts when an external plan is malformed.
         let blueprints = entry.sessionBlueprints
