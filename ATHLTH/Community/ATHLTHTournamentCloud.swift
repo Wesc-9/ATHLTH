@@ -63,6 +63,13 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let prizeThird: String
     let loserConsequence: String
 
+    var displayFormatTitle: String {
+        singleEventMode ? "Enkeltkonkurranse" : format.title
+    }
+    var displayFormatSymbol: String {
+        singleEventMode ? "flag.checkered" : format.symbol
+    }
+
     enum CodingKeys: String, CodingKey {
         case id, title, format, status
         case singleEventMode = "single_event_mode"
