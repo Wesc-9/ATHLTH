@@ -3744,112 +3744,34 @@ struct WalkQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    ATHLTHWorkoutDetailsCard(
-                        activityTitle: ATHLTHLocalization.choose(
-                            english: "Walking", norwegian: "Gåing"
-                        ),
-                        symbol: "figure.walk"
-                    ) {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Walk outdoors", norwegian: "Gåtur utendørs"
-                        ), systemImage: "location")
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                    }
-
-                    HStack {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Walking", norwegian: "Gåing"
-                        ))
-                        .font(.system(size: 26, weight: .medium, design: .serif))
-                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                        Spacer()
-                        Button {
-                            isAdvancedSetup.toggle()
-                            if isAdvancedSetup { showingWalkDetails = true }
-                        } label: {
-                            Text(isAdvancedSetup
-                                ? ATHLTHLocalization.choose(
-                                    english: "Advanced", norwegian: "Avansert"
-                                  )
-                                : "Basic")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHTrainDesign.bronze)
-                                .padding(.horizontal, 12)
-                                .frame(minHeight: 40)
-                                .background(.white, in: Capsule())
+                    if isAdvancedSetup {
+                        ATHLTHWorkoutDetailsCard(
+                            activityTitle: ATHLTHLocalization.choose(
+                                english: "Walking", norwegian: "Gåing"
+                            ),
+                            symbol: "figure.walk"
+                        ) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Walk outdoors",
+                                    norwegian: "Gåtur utendørs"
+                                ),
+                                systemImage: "location"
+                            )
+                            .font(.subheadline)
                         }
-                        .buttonStyle(.plain)
-                    }
-
-                    ATHLTHBasicActivityHero(
-                        title: selectedWalkingRoute?.title ?? ATHLTHLocalization.choose(
-                            english: "Free walking", norwegian: "Fri gåtur"
-                        ),
-                        subtitle: selectedWalkingRoute.map {
-                            String(format: "%.1f km", $0.distanceKilometers)
-                        } ?? ATHLTHLocalization.choose(
-                            english: "Start a walk without planning. Add coaching or company if you want.",
-                            norwegian: "Start en gåtur uten plan. Legg til veiledning eller selskap hvis du ønsker."
-                        ),
-                        symbol: "figure.walk",
-                        isSelected: true,
-                        actionTitle: selectedWalkingRoute == nil
-                            ? ATHLTHLocalization.choose(english: "Start free walk", norwegian: "Start fri gåtur")
-                            : ATHLTHLocalization.choose(english: "Start route walk", norwegian: "Start gåtur med rute")
-                    ) {
-                        startWalk(using:
-                            trainingDeviceProvider == .appleWatch &&
-                            watchConnected && !ATHLTHDeviceRole.isIPad
-                                ? .appleWatch : .iPhone
+                    } else {
+                        ATHLTHQuickStartSimpleDetailsCard(
+                            activity: .walking,
+                            summary: selectedWalkingRoute?.title ??
+                                ATHLTHLocalization.choose(
+                                    english: "Ready for a free walk",
+                                    norwegian: "Klar for fri gåing"
+                                )
                         )
                     }
 
-                    Text(ATHLTHLocalization.choose(
-                        english: "Make your walk yours",
-                        norwegian: "Tilpass gåturen"
-                    ))
-                    .font(.system(size: 17, weight: .semibold, design: .serif))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())],
-                              spacing: 10) {
-                        ATHLTHBasicActivityModeTile(
-                            title: ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
-                            subtitle: selectedWalkingRoute?.title ??
-                                ATHLTHLocalization.choose(english: "Choose a walking route", norwegian: "Velg en gårute"),
-                            symbol: "map",
-                            selected: selectedWalkingRoute != nil
-                        ) {
-                            showingWalkingRoutes = true
-                        }
-                        if session.canAccess(.audioCoach) {
-                            ATHLTHBasicActivityModeTile(
-                            title: "Audio Coach",
-                            subtitle: ATHLTHLocalization.choose(
-                                english: "Spoken guidance", norwegian: "Lydveiledning"
-                            ),
-                            symbol: "waveform",
-                            selected: audioCoachDraft.enabled
-                        ) {
-                            guard session.canAccess(.audioCoach) else { return }
-                            audioCoachDraft.enabled.toggle()
-                            }
-                        }
-                        ATHLTHBasicActivityModeTile(
-                            title: ATHLTHLocalization.choose(
-                                english: "Workout details", norwegian: "Øktdetaljer"
-                            ),
-                            subtitle: ATHLTHLocalization.choose(
-                                english: "Gear, pets and friends",
-                                norwegian: "Utstyr, kjæledyr og venner"
-                            ),
-                            symbol: "slider.horizontal.3",
-                            selected: showingWalkDetails
-                        ) {
-                            showingWalkDetails.toggle()
-                        }
-                    }
+                    walkTypeSelector
 
                     if let route = selectedWalkingRoute {
                         ATHLTHPlanSurface(density: .compact) {
@@ -3882,119 +3804,14 @@ struct WalkQuickStartSheet: View {
                         PlannedQuickStartContextCard(workout: plannedSession)
                     }
 
-                    if showingWalkDetails || isAdvancedSetup {
-                        WorkoutGearSelectionCard(
-                        selectedGearIDs: $selectedGearIDs,
-                        activity: .walking
+                    ATHLTHQuickStartToolsRow(
+                        activity: .walking,
+                        advanced: isAdvancedSetup,
+                        showOnIPad: $shareThisWorkoutOnIPad,
+                        iPadAvailable: false,
+                        detail: { tool in walkStartToolDetail(tool) }
                     )
-                    ATHLTHQuickWorkoutPetPicker(selectedPetIDs: $selectedPetIDs)
 
-                    ATHLTHPlanSurface(density: .compact) {
-                        VStack(
-                            alignment: .leading,
-                            spacing: 14
-                        ) {
-                            WorkoutFriendPicker(
-                                selectedFriendIDs:
-                                    $selectedFriendIDs
-                            )
-
-                            if !selectedFriendIDs
-                                .isEmpty {
-                                Divider()
-
-                                WorkoutSocialModePicker(
-                                    mode:
-                                        $socialMode
-                                )
-                            }
-                        }
-                    }
-
-                    }
-
-                    if isAdvancedSetup {
-                        QuickStartSpotifyCard(
-                            playlist:
-                                $selectedSpotifyPlaylist,
-                            autoplay:
-                                $spotifyAutoplay
-                        ) {
-                            showingSpotifyPicker = true
-                        }
-
-                        NavigationLink {
-                            PerWorkoutAudioCoachView(
-                                draft:
-                                    $audioCoachDraft,
-                                showRouteOptions: selectedWalkingRoute != nil,
-                                showStructuredOptions: false
-                            )
-                        } label: {
-                            ATHLTHPlanSurface(density: .compact) {
-                                HStack(spacing: 12) {
-                                    Image(
-                                        systemName:
-                                            "waveform.and.mic"
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .premiumGold
-                                    )
-                                    .frame(
-                                        width: 40,
-                                        height: 40
-                                    )
-                                    .background(
-                                        ATHLTHTheme
-                                            .premiumGoldSoft,
-                                        in:
-                                            RoundedRectangle(
-                                                cornerRadius:
-                                                    12
-                                            )
-                                    )
-
-                                    VStack(
-                                        alignment: .leading,
-                                        spacing: 3
-                                    ) {
-                                        Text(
-                                            "Guidance & Alerts"
-                                        )
-                                        .font(
-                                            .subheadline
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-
-                                        Text(
-                                            audioCoachDraft
-                                                .enabled
-                                                ? "Audio Coach · tap to adjust"
-                                                : "Tap to configure this walk"
-                                        )
-                                        .font(.caption)
-                                        .foregroundStyle(
-                                            .secondary
-                                        )
-                                    }
-
-                                    Spacer()
-
-                                    Image(
-                                        systemName:
-                                            "chevron.right"
-                                    )
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
 
                 }
                 .padding()
@@ -4015,8 +3832,6 @@ struct WalkQuickStartSheet: View {
                         .font(.caption)
                         .padding(.horizontal, 18)
                     }
-                    ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
-                        .padding(.horizontal, 14)
                     ATHLTHQuickStartDeviceLaunchBar(
                     watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
                     onIPhone: { startWalk(using: .iPhone) },
@@ -4037,9 +3852,28 @@ struct WalkQuickStartSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isAdvancedSetup.toggle()
+                        }
+                        settings.recordAdvancedSetup(isAdvancedSetup, for: .walking)
+                    } label: {
+                        Label(
+                            isAdvancedSetup
+                                ? ATHLTHLocalization.choose(
+                                    english: "Advanced", norwegian: "Avansert")
+                                : ATHLTHLocalization.choose(
+                                    english: "Basic", norwegian: "Enkel"),
+                            systemImage: "slider.horizontal.3"
+                        )
+                        .font(.caption.weight(.semibold))
                     }
+                    .accessibilityIdentifier("athlth-walk-setup-mode")
                 }
             }
             .sheet(isPresented: $showingWalkingRoutes) {
@@ -4113,6 +3947,76 @@ struct WalkQuickStartSheet: View {
                     await gear.refresh()
                 }
             }
+        }
+    }
+
+    private var walkTypeSelector: some View {
+        ATHLTHQuickStartTypeSelector(
+            activity: .walking,
+            advanced: isAdvancedSetup,
+            selection: Binding(
+                get: { selectedWalkingRoute == nil ? .free : .route },
+                set: { _ in }
+            )
+        ) { chosen in
+            switch chosen {
+            case .free:
+                selectedWalkingRoute = nil
+                walkingRouteChoiceTouched = true
+            case .route:
+                showingWalkingRoutes = true
+            case .workout, .exercises:
+                break
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func walkStartToolDetail(_ tool: ATHLTHQuickStartTool) -> some View {
+        switch tool {
+        case .spotify:
+            QuickStartSpotifyCard(
+                playlist: $selectedSpotifyPlaylist,
+                autoplay: $spotifyAutoplay
+            ) { showingSpotifyPicker = true }
+        case .guidance:
+            if isAdvancedSetup {
+                NavigationLink {
+                    PerWorkoutAudioCoachView(
+                        draft: $audioCoachDraft,
+                        showRouteOptions: selectedWalkingRoute != nil,
+                        showStructuredOptions: false
+                    )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Audio Coach settings",
+                            norwegian: "Innstillinger for Audio Coach"
+                        ),
+                        systemImage: "waveform"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 46,
+                           alignment: .leading)
+                }
+            } else {
+                Toggle("Audio Coach", isOn: $audioCoachDraft.enabled)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    .disabled(!session.canAccess(.audioCoach))
+            }
+        case .equipment:
+            WorkoutGearSelectionCard(
+                selectedGearIDs: $selectedGearIDs, activity: .walking
+            )
+        case .companion:
+            ATHLTHQuickWorkoutPetPicker(selectedPetIDs: $selectedPetIDs)
+        case .partner:
+            WorkoutFriendPicker(selectedFriendIDs: $selectedFriendIDs)
+            if !selectedFriendIDs.isEmpty {
+                WorkoutSocialModePicker(mode: $socialMode)
+            }
+        case .iPad:
+            EmptyView()
         }
     }
 
