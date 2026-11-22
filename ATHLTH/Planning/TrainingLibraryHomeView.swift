@@ -2823,6 +2823,22 @@ struct TrainingPlanCatalogDetailView: View {
     @State private var expandedWeeks: Set<Int> = []
     @State private var expandedSessionKeys: Set<String> = []
     @State private var inspectedPlanStep: WorkoutTemplateBlock?
+    @State private var displayedMuscleFocus: [String] = []
+
+    // A 16-week GymCoach/Zoned plan can generate hundreds of source steps.
+    // Recalculate focus only for a new plan/library/language revision, not
+    // every time a user expands a week, opens a sheet or toggles a favorite.
+    private var muscleFocusRevision: String {
+        [
+            entry.id.uuidString,
+            String(entry.catalogVersion),
+            String(entry.durationWeeks),
+            String(exerciseLibrary.allExercises.count),
+            String(exerciseLibrary.customExercises.count),
+            String(exerciseLibrary.lastUpdated?.timeIntervalSince1970 ?? 0),
+            String(ATHLTHLocalization.isNorwegian)
+        ].joined(separator: "|")
+    }
 
     // Use the exact source that scheduling uses, not a generic blueprint:
     // GymCoach rotates its actual strength workouts and Zoned uses its own
@@ -2985,7 +3001,7 @@ struct TrainingPlanCatalogDetailView: View {
                         Text(entry.goal)
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
-                        let muscleFocus = verifiedMuscleFocus
+                        let muscleFocus = displayedMuscleFocus
                         if !muscleFocus.isEmpty {
                             Text(ATHLTHLocalization.choose(
                                 english: "Muscle groups", norwegian: "Muskelgrupper"
@@ -3111,6 +3127,9 @@ struct TrainingPlanCatalogDetailView: View {
         }
         .navigationTitle(entry.title)
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: muscleFocusRevision) {
+            displayedMuscleFocus = verifiedMuscleFocus
+        }
         .onAppear {
             recents.markUsed(
                 .plan,
