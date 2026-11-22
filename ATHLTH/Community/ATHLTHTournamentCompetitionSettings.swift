@@ -123,6 +123,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var meetingLat: Double? = nil
     var meetingLon: Double? = nil
     var coachExerciseIDs: [UUID] = []
+    var race: ATHLTHCompetitionRaceRules = .init()
     var invitationDays: Int = 3
     var unansweredPolicy: ATHLTHCompetitionUnansweredPolicy = .cancel
     var allowFeedPost: Bool = true
@@ -144,7 +145,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
             ((meetingLat == nil && meetingLon == nil) ||
              (meetingLat.map { (-90...90).contains($0) } == true &&
               meetingLon.map { (-180...180).contains($0) } == true))
-        return validStart && validVenue &&
+        return validStart && validVenue && race.isValid &&
             (1...30).contains(invitationDays) &&
             coachExerciseIDs.count <= 12 &&
             Set(coachExerciseIDs).count == coachExerciseIDs.count &&
@@ -167,7 +168,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     init() {}
     private enum CodingKeys: String, CodingKey {
         case startsAt, startMode, environment, meetingPlace, meetingLat,
-             meetingLon, coachExerciseIDs, invitationDays, unansweredPolicy,
+             meetingLon, coachExerciseIDs, race, invitationDays, unansweredPolicy,
              allowFeedPost, unlock, every, unit, completionHours,
              invitationPermission, joinApproval, agreement
     }
@@ -184,6 +185,8 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
         meetingLon = try c.decodeIfPresent(Double.self, forKey: .meetingLon)
         coachExerciseIDs = try c.decodeIfPresent([UUID].self,
                                                   forKey: .coachExerciseIDs) ?? []
+        race = try c.decodeIfPresent(ATHLTHCompetitionRaceRules.self,
+                                     forKey: .race) ?? .init()
         invitationDays = try c.decodeIfPresent(Int.self,
                             forKey: .invitationDays) ?? 3
         unansweredPolicy = try c.decodeIfPresent(
