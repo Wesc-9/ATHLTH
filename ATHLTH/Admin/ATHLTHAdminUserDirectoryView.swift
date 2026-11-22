@@ -239,7 +239,7 @@ struct ATHLTHAdminUserDirectoryView: View {
                         ContentUnavailableView.search(text: submittedSearch)
                     }
                 } else {
-                    LazyVStack(spacing: 10) {
+                    LazyVStack(spacing: 8) {
                         ForEach(users) { user in
                             accountCard(user)
                         }
@@ -328,34 +328,35 @@ struct ATHLTHAdminUserDirectoryView: View {
         )
         let plan = ATHLTHAdminDirectoryPresentation.plan(for: user.subscriptionTier)
 
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 13) {
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .center, spacing: 10) {
                 userAvatar(user)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(name)
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
                         .lineLimit(2)
 
                     if let username = user.username, !username.isEmpty {
                         Text("@\(username)")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 4)
 
                 Text(ATHLTHAdminDirectoryPresentation.roleTitle(
                     user.accountRole, norwegian: norwegian
                 ))
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(user.accountRole.lowercased() == "user" ? ink : gold)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .fixedSize(horizontal: true, vertical: false)
                 .background(
                     canvas,
                     in: Capsule()
@@ -419,35 +420,71 @@ struct ATHLTHAdminUserDirectoryView: View {
                 }
             }
 
-            Rectangle()
-                .fill(outline.opacity(0.35))
-                .frame(height: 1)
-
+            // Keep the essential account facts visible in two compact rows.
+            // Wide text and Dynamic Type may wrap without losing information.
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 32) {
+                HStack(spacing: 10) {
                     subscriptionDetail(user, plan: plan)
-                    registeredDetail(user)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 2)
                     accountStatusDetail(user)
-                    Spacer(minLength: 0)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
-
-                VStack(alignment: .leading, spacing: 13) {
+                VStack(alignment: .leading, spacing: 6) {
                     subscriptionDetail(user, plan: plan)
-                    registeredDetail(user)
                     accountStatusDetail(user)
                 }
             }
 
-            if canManagePlus(for: user) &&
-                (user.adminPlusGrantActive || user.subscriptionStatus != "active") {
+            let showPlusControls = canManagePlus(for: user) &&
+                (user.adminPlusGrantActive || user.subscriptionStatus != "active")
+
+            if showPlusControls && !user.adminPlusGrantActive {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        registeredDetail(user)
+                            .fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 2)
+                        Button {
+                            prepare(.grantPlus, user: user)
+                        } label: {
+                            Label(tr("Grant ATHLTH+", "Tildel ATHLTH+"),
+                                  systemImage: "sparkles")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(gold)
+                        .accessibilityIdentifier("admin-grant-plus")
+                        .fixedSize(horizontal: true, vertical: false)
+                    }
+                    VStack(alignment: .leading, spacing: 7) {
+                        registeredDetail(user)
+                        Button {
+                            prepare(.grantPlus, user: user)
+                        } label: {
+                            Label(tr("Grant ATHLTH+", "Tildel ATHLTH+"),
+                                  systemImage: "sparkles")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(gold)
+                        .accessibilityIdentifier("admin-grant-plus")
+                    }
+                }
+            } else {
+                registeredDetail(user)
+            }
+
+            if showPlusControls && user.adminPlusGrantActive {
                 plusGrantControls(for: user)
             }
         }
-        .padding(18)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+        .background(.white, in: RoundedRectangle(cornerRadius: 17))
         .overlay {
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: 17)
                 .strokeBorder(outline.opacity(0.48), lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
@@ -563,7 +600,7 @@ struct ATHLTHAdminUserDirectoryView: View {
                 .background(canvas)
             }
         }
-        .frame(width: 46, height: 46)
+        .frame(width: 40, height: 40)
         .clipShape(Circle())
         .overlay(Circle().strokeBorder(outline.opacity(0.4), lineWidth: 1))
     }
