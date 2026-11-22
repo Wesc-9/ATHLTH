@@ -413,8 +413,39 @@ private struct ATHLTHTournamentConversationPreview: Decodable {
     }
 }
 
+private struct ATHLTHTournamentSimpleCreateParams: Encodable {
+    let p_title: String
+    let p_format: String
+    let p_activity: String
+    let p_invitees: [UUID]
+    let p_starts_at: String?
+}
+
 struct ATHLTHTournamentCloudService {
     private let client = SupabaseEnvironment.client
+
+    /// Single-step Basic creation. The server chooses a real activity
+    /// template, confirms the owner's preset and keeps invite consent simple.
+    func createSimple(
+        title: String,
+        format: ATHLTHTournamentFormat,
+        activity: ATHLTHTournamentActivity,
+        invitees: [UUID],
+        startsAt: Date?
+    ) async throws -> UUID {
+        try await client.rpc(
+            "athlth_tournament_create_simple",
+            params: ATHLTHTournamentSimpleCreateParams(
+                p_title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+                p_format: format.rawValue,
+                p_activity: activity.rawValue,
+                p_invitees: invitees,
+                p_starts_at: startsAt.map {
+                    ISO8601DateFormatter().string(from: $0)
+                }
+            )
+        ).execute().value
+    }
 
     func create(from draft: ATHLTHTournamentDraft) async throws -> UUID {
         guard draft.participants.count >= 2 else {
