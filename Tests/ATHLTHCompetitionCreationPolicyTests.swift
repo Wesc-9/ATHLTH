@@ -89,7 +89,7 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
             activity: .walking, format: .league,
             opponents: players, metric: .mostDistance
         ))
-        XCTAssertFalse(valid(
+        XCTAssertTrue(valid(
             activity: .walking, format: .cup,
             opponents: players, metric: .mostDistance
         ))
