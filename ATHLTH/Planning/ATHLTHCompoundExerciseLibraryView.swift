@@ -6,6 +6,7 @@ struct ATHLTHCompoundExerciseLibraryView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @ObservedObject private var catalog = WorkoutTemplateCatalogStore.shared
 
     var runningOnly = false
@@ -47,7 +48,7 @@ struct ATHLTHCompoundExerciseLibraryView: View {
         // Build once on source revisions rather than hashing every exercise
         // on each search keystroke and SwiftUI view publication.
         records = ATHLTHCompoundExerciseCatalog.build(
-            running: RunningWorkoutLibraryStore.builtInTemplates,
+            running: runningLibrary.allTemplates,
             workoutCatalog: catalog.entries,
             saved: mySections
         )
@@ -163,6 +164,7 @@ struct ATHLTHCompoundExerciseLibraryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: refresh)
         .onChange(of: catalog.entries) { _, _ in refresh() }
+        .onReceive(runningLibrary.$customTemplates) { _ in refresh() }
         .onChange(of: session.profile.userID) { _, _ in refresh() }
         .task { await catalog.refresh() }
     }
