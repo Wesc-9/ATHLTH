@@ -403,6 +403,7 @@ enum WorkoutSetupPreference: String, CaseIterable, Identifiable {
 
 enum WorkoutSetupActivity {
     case running
+    case walking
     case strength
 }
 
@@ -484,6 +485,8 @@ final class AppSettingsStore: ObservableObject {
         }
     }
     @Published private(set) var lastRunAdvancedSetup:
+        Bool { didSet { persist() } }
+    @Published private(set) var lastWalkAdvancedSetup:
         Bool { didSet { persist() } }
     @Published private(set) var lastStrengthAdvancedSetup:
         Bool { didSet { persist() } }
@@ -847,6 +850,9 @@ final class AppSettingsStore: ObservableObject {
                     "settings.lastRunAdvancedSetup"
             ) as? Bool ?? false
 
+        let resolvedLastWalkAdvancedSetup =
+            defaults.object(forKey: "settings.lastWalkAdvancedSetup") as? Bool ?? false
+
         let resolvedLastStrengthAdvancedSetup =
             defaults.object(
                 forKey:
@@ -858,6 +864,8 @@ final class AppSettingsStore: ObservableObject {
             resolvedWorkoutSetupPreference
         lastRunAdvancedSetup =
             resolvedLastRunAdvancedSetup
+        lastWalkAdvancedSetup =
+            resolvedLastWalkAdvancedSetup
         lastStrengthAdvancedSetup =
             resolvedLastStrengthAdvancedSetup
 
@@ -1266,6 +1274,10 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.lastRunAdvancedSetup"
         )
         defaults.set(
+            lastWalkAdvancedSetup,
+            forKey: "settings.lastWalkAdvancedSetup"
+        )
+        defaults.set(
             lastStrengthAdvancedSetup,
             forKey: "settings.lastStrengthAdvancedSetup"
         )
@@ -1598,6 +1610,8 @@ final class AppSettingsStore: ObservableObject {
             switch activity {
             case .running:
                 return lastRunAdvancedSetup
+            case .walking:
+                return lastWalkAdvancedSetup
             case .strength:
                 return lastStrengthAdvancedSetup
             }
@@ -1616,6 +1630,8 @@ final class AppSettingsStore: ObservableObject {
         switch activity {
         case .running:
             lastRunAdvancedSetup = advanced
+        case .walking:
+            lastWalkAdvancedSetup = advanced
         case .strength:
             lastStrengthAdvancedSetup = advanced
             defaultStrengthTracking =
