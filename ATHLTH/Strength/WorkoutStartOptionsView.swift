@@ -955,7 +955,8 @@ struct WorkoutStartOptionsView: View {
                 configured.runningWorkout = nil
                 configured.runningWorkouts = nil
             }
-        case .route:
+        case .route, .competition:
+            // Competition configuration is handled by its dedicated sheet.
             break
         }
         configured.gearIDs = Array(selectedGearIDs)
@@ -2066,3 +2067,121 @@ private struct StrengthDisplayControlSettingsView: View {
     }
 }
 
+
+// Session-local voice countdowns. Rules are snapshots for this workout;
+ // editing them must never mutate the athlete's global Audio Coach defaults.
+private struct ATHLTHScopedCountdownRulesEditor: View {
+    @Binding var rules: [ATHLTHCoachBoundaryCountdownRule]?
+    let strengthOnly: Bool
+
+    private func field<Value>(
+        _ rule: ATHLTHCoachBoundaryCountdownRule,
+        _ path: WritableKeyPath<ATHLTHCoachBoundaryCountdownRule, Value>
+    ) -> Binding<Value> {
+        Binding(
+            get: {
+                (rules ?? []).first(where: { $0.id == rule.id })?[keyPath: path]
+                    ?? rule[keyPath: path]
+            },
+            set: { newValue in
+                var updated = rules ?? []
+                guard let index = updated.firstIndex(where: { $0.id == rule.id }) else {
+                    return
+                }
+                updated[index][keyPath: path] = newValue
+                rules = updated
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(rules ?? []) { rule in
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Toggle(
+                            ATHLTHLocalization.choose(english: "Enabled", norwegian: "Aktiv"),
+                            isOn: field(rule, \.enabled)
+                        )
+                        Spacer(minLength: 8)
+                        Button(role: .destructive) {
+                            let remaining = (rules ?? []).filter { $0.id != rule.id }
+                            rules = remaining.isEmpty ? nil : remaining
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Remove countdown",
+                                norwegian: "Fjern nedtelling"
+                            )
+                        )
+                    }
+
+                    Picker(
+                        ATHLTHLocalization.choose(english: "Scope", norwegian: "Gjelder"),
+                        selection: field(rule, \.scope)
+                    ) {
+                        ForEach(ATHLTHCoachBoundaryCountdownRule.Scope.allCases) { scope in
+                            Text(scope.title).tag(scope)
+                        }
+                    }
+
+                    Picker(
+                        ATHLTHLocalization.choose(english: "When", norwegian: "Når"),
+                        selection: field(rule, \.boundary)
+                    ) {
+                        ForEach(ATHLTHCoachBoundaryCountdownRule.Boundary.allCases) { boundary in
+                            Text(boundary.title).tag(boundary)
+                        }
+                    }
+
+                    Picker(
+                        ATHLTHLocalization.choose(english: "Count from", norwegian: "Tell ned fra"),
+                        selection: field(rule, \.seconds)
+                    ) {
+                        ForEach(ATHLTHCoachSecondCountdown.offeredLengths, id: \.self) { seconds in
+                            Text("\(seconds) s").tag(seconds)
+                        }
+                    }
+
+                    Picker(
+                        ATHLTHLocalization.choose(english: "After countdown", norwegian: "Etter nedtelling"),
+                        selection: field(rule, \.after)
+                    ) {
+                        ForEach(ATHLTHCoachCountdownAfter.allCases) { action in
+                            Text(action.title).tag(action)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+
+            Button {
+                var updated = rules ?? []
+                guard updated.count < 20 else { return }
+                updated.append(ATHLTHCoachBoundaryCountdownRule())
+                rules = updated
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Add countdown",
+                        norwegian: "Legg til nedtelling"
+                    ),
+                    systemImage: "plus.circle"
+                )
+            }
+            .disabled((rules ?? []).count >= 20)
+
+            if strengthOnly {
+                Text(ATHLTHLocalization.choose(
+                    english: "Spoken countdowns require an actual timed set, rest or group.",
+                    norwegian: "Talt nedtelling krever et tidsbestemt sett, en pause eller en gruppe."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
