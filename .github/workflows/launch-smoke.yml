@@ -259,11 +259,11 @@ jobs:
             UDID="$DEVICE_UDID"
             trap 'cleanup_device "$UDID"' EXIT
             # A runner-owned simulator may be registered but its CoreSimulator
-            # services can hang. Recover once, then require a responsive
-            # launchd before installing or launching ATHLTH.
+            # services can hang. Recover with an explicit service reset;
+            # the actual app launch and screenshot assertions stay mandatory.
             boot_ready=0
-            for boot_attempt in 1 2; do
-              echo "::notice::Boot check $boot_attempt/2 for $DEVICE_NAME"
+            for boot_attempt in 1 2 3; do
+              echo "::notice::Boot check $boot_attempt/3 for $DEVICE_NAME"
               if simctl_bounded "boot registered $DEVICE_NAME" 95 boot "$UDID"; then
                 echo "::notice::Boot requested for $DEVICE_NAME"
               else
@@ -281,8 +281,14 @@ jobs:
                 date -u
                 simctl_bounded "list devices after failed boot" 30 list devices available || true
               } >> "$RUNNER_TEMP/athlth-iphone-boot-diagnostics.txt" 2>&1
-              if [ "$boot_attempt" -lt 2 ]; then
+              if [ "$boot_attempt" -lt 3 ]; then
                 simctl_bounded "shutdown unresponsive $DEVICE_NAME" 35 shutdown "$UDID" || true
+                if [ "$boot_attempt" -eq 2 ]; then
+                  # Restart only the macOS simulator infrastructure. Do not
+                  # retry a failed ATHLTH launch or hide a real screenshot error.
+                  killall -9 Simulator 2>/dev/null || true
+                  killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+                fi
                 sleep 10
               fi
             done

@@ -249,15 +249,15 @@ jobs:
           xcrun simctl list devices available -j \
             | python3 scripts/select_iphone_simulators.py > "$DEVICE_MATRIX"
           test -s "$DEVICE_MATRIX"
-          UDID=$(head -n 1 "$DEVICE_MATRIX" | cut -d'|' -f2)
-          test -n "$UDID"
-          echo "Running hybrid XCTest on simulator $UDID"
-          # Boot one registered simulator explicitly: xcodebuild's default
-          # parallel-test clones intermittently hang before connecting.
-          # CoreSimulator can abort with "Invalid parameter ... devicePair"
-          # during bootstatus. Retry ONLY infrastructure startup, never XCTest.
+          # Prefer the first matching registered iPhone, but do not tie the
+          # entire required XCTest suite to one broken runner-owned device.
+          # Every candidate must pass a real boot and launchd probe. Only
+          # simulator startup may retry; no failed XCTest is ever skipped.
           simulator_ready=0
-          for attempt in 1 2 3; do
+          while IFS= read -r UDID; do
+            test -n "$UDID" || continue
+            echo "Checking hybrid XCTest simulator $UDID"
+            for attempt in 1 2 3; do
             echo "::group::Simulator startup attempt $attempt/3"
             xcrun simctl shutdown "$UDID" 2>/dev/null || true
             if [ "$attempt" -gt 1 ]; then
@@ -274,12 +274,14 @@ jobs:
               echo "::endgroup::"
               break
             fi
-            echo "::warning::CoreSimulator startup failed on attempt $attempt; collecting diagnostics and retrying."
-            xcrun simctl list devices 2>&1 | tail -60 || true
-            echo "::endgroup::"
-          done
+              echo "::warning::CoreSimulator startup failed on attempt $attempt; collecting diagnostics and retrying."
+              xcrun simctl list devices 2>&1 | tail -60 || true
+              echo "::endgroup::"
+            done
+            if [ "$simulator_ready" -eq 1 ]; then break; fi
+          done < <(cut -d'|' -f2 "$DEVICE_MATRIX" | awk '!seen[$0]++')
           if [ "$simulator_ready" -ne 1 ]; then
-            echo "::error::CoreSimulator failed three bounded startup attempts; XCTest was not executed."
+            echo "::error::No registered iPhone simulator survived bounded startup recovery; XCTest was not executed."
             exit 1
           fi
           xcodebuild \
