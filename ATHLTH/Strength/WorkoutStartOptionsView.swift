@@ -818,17 +818,26 @@ struct WorkoutStartOptionsView: View {
             .tint(ATHLTHPlanDesign.accentInk)
             .disabled(selectedSpotifyPlaylist == nil)
         case .guidance:
-            advancedOptionButton(
-                title: "Audio Coach",
-                subtitle: strengthAudioCoach.enabled
-                    ? ATHLTHLocalization.choose(
-                        english: "On · adjust", norwegian: "På · juster")
-                    : ATHLTHLocalization.choose(
-                        english: "Off · tap to enable", norwegian: "Av · trykk for å aktivere"),
-                icon: "waveform",
-                tint: ATHLTHPlanDesign.accentInk
-            ) { showingAudioCoachSettings = true }
-            if trackingMode == .advanced {
+            if trackingMode == .simple {
+                Toggle(
+                    "Audio Coach",
+                    isOn: $strengthAudioCoach.enabled
+                )
+                .font(.subheadline.weight(.semibold))
+                .tint(ATHLTHPlanDesign.accentInk)
+                .accessibilityIdentifier("athlth-strength-basic-audio-coach")
+            } else {
+                advancedOptionButton(
+                    title: "Audio Coach",
+                    subtitle: strengthAudioCoach.enabled
+                        ? ATHLTHLocalization.choose(
+                            english: "On · adjust", norwegian: "På · juster")
+                        : ATHLTHLocalization.choose(
+                            english: "Off · tap to enable",
+                            norwegian: "Av · trykk for å aktivere"),
+                    icon: "waveform",
+                    tint: ATHLTHPlanDesign.accentInk
+                ) { showingAudioCoachSettings = true }
                 advancedOptionButton(
                     title: ATHLTHLocalization.choose(
                         english: "Rest and reminders", norwegian: "Hvile og varsler"
