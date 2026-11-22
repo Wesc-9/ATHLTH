@@ -353,14 +353,21 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .lineLimit(3)
 
-                HStack(spacing: 9) {
-                    if let durationMinutes, durationMinutes > 0 {
-                        Label("~\(durationMinutes) min", systemImage: "clock")
-                    }
-                    if let zone = ATHLTHWorkoutCompactOutline.headlineZone(
-                        for: workoutSteps
-                    ) {
-                        Label(zone, systemImage: "heart")
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 9) {
+                        if let durationMinutes, durationMinutes > 0 {
+                            Label("~\(durationMinutes) min", systemImage: "clock")
+                        }
+                        if selectedKind == .heartRateZone {
+                            Label(
+                                tr("My target Z\(heartRateZone)", "Mitt mål Z\(heartRateZone)"),
+                                systemImage: "heart.fill"
+                            )
+                        } else if let zone = ATHLTHWorkoutCompactOutline.headlineZone(
+                            for: workoutSteps
+                        ) {
+                            Label(zone, systemImage: "heart")
+                        }
                     }
                     if let percent = ATHLTHWorkoutCompactOutline.headlineHeartRatePercent(
                         for: workoutSteps
