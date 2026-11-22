@@ -1120,17 +1120,25 @@ struct PlannedWorkoutLobbyView: View {
         openingReadyLobby = true
         launchError = nil
 
+        // Launch exactly the mutually approved revision. Gear and music
+        // remain private to the creator and never go to the partner.
+        var approvedWorkout = sharedDraft.draft?.workout ?? persistedWorkout
+        approvedWorkout.gearIDs = persistedWorkout.gearIDs
+        approvedWorkout.spotifyPlaylist = persistedWorkout.spotifyPlaylist
+        approvedWorkout.spotifyAutoplayOnStart =
+            persistedWorkout.spotifyAutoplayOnStart
+
         // Invitation scheduling must not start a recorder. Starting the
         // ready lobby creates a distinct real-time participation session.
         let approved = await social.beginWorkoutWithFriends(
-            title: persistedWorkout.title,
-            kind: persistedWorkout.kind,
+            title: approvedWorkout.title,
+            kind: approvedWorkout.kind,
             friends: [friend],
             creatorName: session.profile.displayName,
             creatorUsername: session.profile.username,
             invitePayload: SocialWorkoutInvitePayload(
-                workout: persistedWorkout,
-                participationMode: persistedWorkout.trainTogetherMode == .sameWorkout
+                workout: approvedWorkout,
+                participationMode: approvedWorkout.trainTogetherMode == .sameWorkout
                     ? .remote : .physical,
                 maxParticipants: 2,
                 startIndependently: false
@@ -1145,7 +1153,7 @@ struct PlannedWorkoutLobbyView: View {
             }
             return
         }
-        guard let current = session.standalonePlannedSessions.first(where: {
+        guard session.standalonePlannedSessions.contains(where: {
             $0.id == persistedWorkout.id
         }) else {
             await social.markCurrentJoinedWorkoutLaunchFailed()
@@ -1162,7 +1170,7 @@ struct PlannedWorkoutLobbyView: View {
         } else {
             recordingDevice = .iPhone
         }
-        onStartWorkout?(current, recordingDevice)
+        onStartWorkout?(approvedWorkout, recordingDevice)
     }
 
     private var headerCard: some View {
