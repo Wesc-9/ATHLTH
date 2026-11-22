@@ -686,6 +686,7 @@ struct WalkQuickStartConfiguration {
 }
 
 extension RunQuickStartConfiguration {
+    @MainActor
     func trainTogetherInvitePayload(
         savedRoutes: [TrainingRoute]
     ) -> SocialWorkoutInvitePayload {
@@ -3855,6 +3856,9 @@ struct WalkQuickStartSheet: View {
             .task {
                 if let invited = social.takePreparedQuickTrainFriends() {
                     selectedFriendIDs = invited
+                }
+                if !didLoadAudioCoachDefaults {
+                    isAdvancedSetup = settings.resolvedAdvancedSetup(for: .walking)
                 }
                 // Scheduled walking workouts retain their planned course
                 // when launched from the calendar or a training plan.
