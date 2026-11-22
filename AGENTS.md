@@ -1,3 +1,10 @@
+# ACTIVE ATHLTH DEVELOPMENT (2026-11-22 — 2.2.8)
+
+- **CURRENT ACTIVE DEVELOPMENT: `release/v2.2.8` (build 136).** All new code, tests, fixes and workflows belong directly on this branch, not the frozen 2.2.7 branch or a parallel feature branch. This section supersedes historical active-version instructions below.
+- **VERSION 2.2.7 (build 135) SOURCE FROZEN:** Exact source snapshot `88555b016d6cfe6beee1a129141ea5feab0cbd06`. Preserved in `locked/v2.2.7` and `backup/v2.2.7-locked-before-v2.2.8-20261122`. Do not modify or move these preservation refs or `release/v2.2.7`. Branch protection is not administrator-enforced; freezing is by preserved refs and policy.
+- **RELEASE SAFETY:** This branch cut does not authorize a 2.2.8 TestFlight upload. Verify the same-commit iPhone/iPad/watchOS builds, hybrid/Train tests, backend regression checks and iPad compatibility before release; verify physical-device behavior separately. Do not assume pending 2.2.7 TestFlight runs are complete.
+- **UNIFIED WORKOUT ENGINE:** Preserve the single recording owner and established PhoneWorkout/StrengthWorkoutLog persistence; do not duplicate HealthKit recordings or lose workouts. Read `docs/athlth-unified-workout-engine.md` before changing training flows.
+
 # ACTIVE ATHLTH DEVELOPMENT (2026-11-20 — 2.2.6)
 
 - **CURRENT ACTIVE DEVELOPMENT: `release/v2.2.6` (build 134)**. Supersedes older active-branch instructions below. All new code, tests and workflows belong directly on this release branch, never on a parallel feature branch or frozen release.
