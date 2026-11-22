@@ -1960,9 +1960,10 @@ struct TrainingPlanLibraryView: View {
         }
         .background(canvas.ignoresSafeArea())
         .onChange(of: pageFilterKey) { _, _ in
+            // Keep the search field mounted while filtering on each word.
+            // Scroll identity changes only for an explicit A–Å letter jump.
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .navigationTitle(favoritePlansOnly
             ? tr("Favorite plans", "Favorittplaner")
