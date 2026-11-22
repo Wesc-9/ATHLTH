@@ -8,6 +8,11 @@ enum ATHLTHExerciseReferenceResolver {
         value.folding(options: [.caseInsensitive, .diacriticInsensitive],
                       locale: Locale(identifier: "nb_NO"))
             .lowercased()
+            // Foundation diacritic folding does not reliably transliterate
+            // Norwegian ø/æ/å. Do this before stripping non-ASCII characters.
+            .replacingOccurrences(of: "ø", with: "o")
+            .replacingOccurrences(of: "æ", with: "ae")
+            .replacingOccurrences(of: "å", with: "a")
             .replacingOccurrences(of: "[^a-z0-9]+", with: " ",
                                   options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -84,11 +89,150 @@ enum ATHLTHExerciseReferenceResolver {
         Dictionary(uniqueKeysWithValues: nativeAliases.map { (key($0.key), $0.value) })
     }()
 
+    /// Exact English/Norwegian names from the 68 distinct bundled movement
+    /// records, not fuzzy translations. This list intentionally excludes
+    /// the internal test and generic free-training placeholders. All values
+    /// point back to the existing native exercise, never a new duplicate.
+    private static let verifiedBundledNames: [String: String] = [
+        "90 degree tabletop sit up": "tabletop-sit-up",
+        "ab wheel rollout": "ab-wheel-rollout",
+        "armheving": "push-up",
+        "back extension": "back-extension",
+        "barbell back squat": "back-squat",
+        "barbell bent over row": "barbell-row",
+        "barbell curl": "barbell-curl",
+        "barbell hip thrust": "hip-thrust",
+        "barbell overhead press": "overhead-press",
+        "beinpress": "leg-press",
+        "beinstrekk": "leg-extension",
+        "bench press": "bench-press",
+        "benkpress": "bench-press",
+        "benkpress med manualer": "dumbbell-bench-press",
+        "bicepscurl i kabel": "cable-curl",
+        "bicepscurl med manualer": "dumbbell-curl",
+        "bicepscurl med stang": "barbell-curl",
+        "box step up": "step-up",
+        "brystpress i apparat": "chest-press-machine",
+        "bryststottet roing": "chest-supported-row",
+        "bulgarian split squat": "bulgarian-split-squat",
+        "bulgarsk utfall": "bulgarian-split-squat",
+        "burpee": "burpee",
+        "cable crunch": "cable-crunch",
+        "cable curl": "cable-curl",
+        "cable fly": "cable-fly",
+        "chest press machine": "chest-press-machine",
+        "chest supported row": "chest-supported-row",
+        "chin up": "chin-up",
+        "chin ups med underha ndsgrep": "chin-up",
+        "conventional deadlift": "deadlift",
+        "dead bug": "dead-bug",
+        "dumbbell bench press": "dumbbell-bench-press",
+        "dumbbell biceps curl": "dumbbell-curl",
+        "dumbbell fly": "dumbbell-fly",
+        "dumbbell lateral raise": "lateral-raise",
+        "dumbbell row": "dumbbell-row",
+        "dumbbell shoulder press": "dumbbell-shoulder-press",
+        "enarms roing med manual": "one-arm-dumbbell-row",
+        "ettbeins rumensk markloft": "single-leg-romanian-deadlift",
+        "face pull": "face-pull",
+        "flat dumbbell chest fly": "flat-dumbbell-chest-fly",
+        "flyes med manualer": "dumbbell-fly",
+        "flyes pa flat benk med manualer": "flat-dumbbell-chest-fly",
+        "foroverboyd stangroing": "barbell-row",
+        "front squat": "front-squat",
+        "frontboy": "front-squat",
+        "ga ende utfall": "walking-lunge",
+        "glute bridge": "glute-bridge",
+        "goblet squat": "goblet-squat",
+        "hammer curl": "hammer-curl",
+        "hammercurl": "hammer-curl",
+        "hanging knee raise": "hanging-knee-raise",
+        "hanging leg raise": "hanging-leg-raise",
+        "hengende beinhev": "hanging-leg-raise",
+        "hengende kneloft": "hanging-knee-raise",
+        "hip thrust med stang": "hip-thrust",
+        "hollow body hold": "hollow-body-hold",
+        "hollow hold": "hollow-body-hold",
+        "incline bench press": "incline-bench-press",
+        "incline dumbbell bench press": "incline-dumbbell-bench-press",
+        "kabel flyes": "cable-fly",
+        "kettlebell sving": "kettlebell-swing",
+        "kettlebell swing": "kettlebell-swing",
+        "kneboy med stang": "back-squat",
+        "la rcurl": "leg-curl",
+        "lat pulldown": "lat-pulldown",
+        "lateral raise": "lateral-raise-unspecified",
+        "leg curl": "leg-curl",
+        "leg extension": "leg-extension",
+        "leg press": "leg-press",
+        "liggende la rcurl": "lying-leg-curl",
+        "liggende tricepspress": "skullcrusher",
+        "lying leg curl": "lying-leg-curl",
+        "magecrunch i kabel": "cable-crunch",
+        "magehjul": "ab-wheel-rollout",
+        "markloft": "deadlift",
+        "mountain climber": "mountain-climber",
+        "nedtrekk": "lat-pulldown",
+        "omvendt crunch": "reverse-crunch",
+        "omvendt flyes": "rear-delt-fly",
+        "one arm dumbbell row": "one-arm-dumbbell-row",
+        "overhead triceps extension": "overhead-triceps-extension",
+        "pallof press": "pallof-press",
+        "plank": "plank",
+        "planke": "plank",
+        "power clean": "power-clean",
+        "pull up": "pull-up",
+        "pull ups": "pull-up",
+        "push up": "push-up",
+        "rear delt fly": "rear-delt-fly",
+        "reverse crunch": "reverse-crunch",
+        "roing med manual": "dumbbell-row",
+        "romanian deadlift": "romanian-deadlift",
+        "rumensk markloft": "romanian-deadlift",
+        "russian twist": "russian-twist",
+        "russisk rotasjon": "russian-twist",
+        "russisk rotasjon med vekt": "weighted-russian-twist",
+        "rygghev": "back-extension",
+        "seated cable row": "seated-cable-row",
+        "seated calf raise": "seated-calf-raise",
+        "seated dumbbell press": "seated-dumbbell-press",
+        "seated leg curl": "seated-leg-curl",
+        "seteloft": "glute-bridge",
+        "side plank": "side-plank",
+        "sidehev": "lateral-raise-unspecified",
+        "sidehev med manualer": "lateral-raise",
+        "sideplanke": "side-plank",
+        "single leg romanian deadlift": "single-leg-romanian-deadlift",
+        "sittende kabelroing": "seated-cable-row",
+        "sittende la rcurl": "seated-leg-curl",
+        "sittende skulderpress": "seated-dumbbell-press",
+        "sittende ta hev": "seated-calf-raise",
+        "situps med beina i 90 grader": "tabletop-sit-up",
+        "six inch hold": "six-inch-hold",
+        "six inch hold beinhold": "six-inch-hold",
+        "skra benk med manualer": "incline-dumbbell-bench-press",
+        "skra benk med stang": "incline-bench-press",
+        "skulderpress med manualer": "dumbbell-shoulder-press",
+        "skulderpress med stang": "overhead-press",
+        "skullcrusher": "skullcrusher",
+        "sta ende ta hev": "standing-calf-raise",
+        "standing calf raise": "standing-calf-raise",
+        "step up pa kasse": "step-up",
+        "styrkevending": "power-clean",
+        "triceps nedpress": "triceps-pushdown",
+        "triceps over hodet": "overhead-triceps-extension",
+        "triceps pushdown": "triceps-pushdown",
+        "walking lunge": "walking-lunge",
+        "weighted russian twist": "weighted-russian-twist"
+    ]
+
     static func nativeSourceIdentifier(for name: String) -> String? {
         let normalized = key(name)
-        // Treat spaces, hyphens and underscores as equivalent for reviewed English names.
-        // Do not guess across different equipment or movement variations.
-        guard let slug = normalizedNativeAliases[normalized] else { return nil }
+        // Reviewed GymCoach aliases take precedence where English source
+        // vocabulary is less specific than a bundled movement title.
+        guard let slug = normalizedNativeAliases[normalized] ??
+            verifiedBundledNames[normalized]
+        else { return nil }
         return "athlth-native-" + slug
     }
 
@@ -163,7 +307,21 @@ enum ATHLTHExerciseReferenceResolver {
                 guard let identifier = entry.sourceIdentifier else { return false }
                 return identifier == slug || key(identifier) == normalizedSlug
             }
-            if byIdentifier.count == 1 { return byIdentifier[0] }
+            if byIdentifier.count == 1 {
+                return visibleEquivalent(of: byIdentifier[0], in: library)
+            }
+            // Older imported recipes used the public native source slug
+            // without the "athlth-native-" prefix. Match only a reviewed,
+            // real bundled exercise and never a similarly named private one.
+            if let canonicalID = nativeSourceIdentifier(for: slug) {
+                let native = library.filter {
+                    $0.source == .athlthCatalog &&
+                    $0.sourceIdentifier == canonicalID
+                }
+                if native.count == 1 {
+                    return visibleEquivalent(of: native[0], in: library)
+                }
+            }
             if let canonicalID = publishedHYROXSourceAliases[slug] {
                 let matches = library.filter {
                     $0.source == .athlthCatalog &&
@@ -195,7 +353,8 @@ enum ATHLTHExerciseReferenceResolver {
                 $0.sourceIdentifier == identifier &&
                 $0.source == .athlthCatalog
             }
-            return matches.count == 1 ? matches[0] : nil
+            return matches.count == 1
+                ? visibleEquivalent(of: matches[0], in: library) : nil
         }
 
         // User-created exercises are only matched by explicit IDs. Equal
@@ -208,7 +367,9 @@ enum ATHLTHExerciseReferenceResolver {
             let matches = library.filter {
                 $0.source == source && $0.sourceIdentifier == reviewedID
             }
-            if matches.count == 1 { return matches[0] }
+            if matches.count == 1 {
+                return visibleEquivalent(of: matches[0], in: library)
+            }
         }
 
         let repdbExact = library.filter {
@@ -228,6 +389,29 @@ enum ATHLTHExerciseReferenceResolver {
             $0.source == .athlthCatalog && key($0.canonicalName) == clean
         }
         return matchingNative.count == 1 ? matchingNative[0] : nil
+    }
+
+    /// A native fallback is sometimes hidden from the default library grid
+    /// when RepDB is installed. An *identical* public exercise from RepDB
+    /// should be the visible shared source. Match complete English name AND
+    /// equipment, never mere Norwegian translation or a similar movement.
+    /// Explicit exercise UUIDs are handled before this function and cannot
+    /// be silently reassigned across user accounts.
+    static func visibleEquivalent(
+        of source: ExerciseLibraryEntry,
+        in library: [ExerciseLibraryEntry]
+    ) -> ExerciseLibraryEntry {
+        guard source.source == .athlthCatalog,
+              source.sourceIdentifier?.hasPrefix("athlth-native-") == true
+        else { return source }
+        let exactName = key(source.canonicalName)
+        let equipment = Set(source.exercise.equipment.map(key))
+        let identical = library.filter { entry in
+            entry.source == .repDB &&
+                key(entry.canonicalName) == exactName &&
+                Set(entry.exercise.equipment.map(key)) == equipment
+        }
+        return identical.count == 1 ? identical[0] : source
     }
 
     /// Portable, deliberately bounded content. Do not share local files,
