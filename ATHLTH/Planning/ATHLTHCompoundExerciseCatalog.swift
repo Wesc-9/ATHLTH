@@ -194,7 +194,7 @@ enum ATHLTHCompoundExerciseCatalog {
         // A private section keeps its immutable source identity. Public
         // sources with the same complete prescription share one exercise.
         let key = isPersonal
-            ? personalPrefix + sourceID.uuidString
+            ? personalPrefix + digest(protocolKey)
             : publicPrefix + digest(protocolKey)
         let family = fourByFourRecovery(main) != nil
             ? "athlth:running:interval:4x4"
@@ -221,7 +221,7 @@ enum ATHLTHCompoundExerciseCatalog {
         for run in running {
             let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: run.plannedSession())
             if let item = make(sourceID: run.id, title: run.title, source: blocks,
-                               isPersonal: false) {
+                               isPersonal: !run.isBuiltIn) {
                 found.append(item)
             }
         }
@@ -252,7 +252,13 @@ enum ATHLTHCompoundExerciseCatalog {
         for section in saved {
             if let item = make(sourceID: section.id, title: section.title,
                                source: section.blocks, isPersonal: true) {
-                found.append(item)
+                found.append(ATHLTHCompoundExercise(
+                    id: item.id, title: item.title, category: item.category,
+                    blocks: item.blocks,
+                    sourceIDs: [section.id, section.sourceWorkoutID],
+                    isPersonal: true, familyID: item.familyID,
+                    protocolID: item.protocolID
+                ))
             }
         }
 
