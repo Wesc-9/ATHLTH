@@ -141,14 +141,15 @@ struct ATHLTHTrainLibraryPremiumView: View {
             value.save(userID: session.profile.userID)
         }
         .onChange(of: query) { _, _ in
+            // Filter existing rows without remounting their scroll view.
+            // An explicit alphabet-index selection is the only reason to
+            // reset its identity.
             exerciseStartIndex = 0
             exerciseVisibleLimit = ATHLTHLibraryPagination.pageSize
-            exercisePageRevision += 1
         }
         .onChange(of: exerciseGroup) { _, _ in
             exerciseStartIndex = 0
             exerciseVisibleLimit = ATHLTHLibraryPagination.pageSize
-            exercisePageRevision += 1
         }
         .task { await catalog.refresh() }
         .task { await exerciseLibrary.refresh() }
