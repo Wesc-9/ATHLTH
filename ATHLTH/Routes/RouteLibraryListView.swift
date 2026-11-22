@@ -130,6 +130,8 @@ struct RouteLibraryListView: View {
     @EnvironmentObject private var recents: LibraryRecentsStore
     @StateObject private var locationStore = HomeLocationStore()
     let source: RouteLibrarySource
+    /// Preserve the originating sport when choosing a route from Train.
+    var quickStartActivity: WorkoutKind = .running
 
     @State private var selectedCollection: ATHLTHUnifiedLibraryScope = .athlth
     @State private var didSaveRouteInBuilder = false
@@ -495,7 +497,11 @@ struct RouteLibraryListView: View {
         }
         .sheet(isPresented: $showingCustomLength) { publicCustomLengthSheet }
         .sheet(item: $routeToQuickTrain) { route in
-            ATHLTHRouteQuickTrainSheet(route: route)
+            if quickStartActivity == .walking {
+                ATHLTHWalkingRouteQuickTrainSheet(route: route)
+            } else {
+                ATHLTHRouteQuickTrainSheet(route: route)
+            }
         }
         .fullScreenCover(item: $showingMapRoute) { route in
             SavedRouteFullscreenMap(route: route)

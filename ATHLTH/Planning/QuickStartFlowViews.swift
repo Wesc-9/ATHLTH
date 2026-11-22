@@ -1543,13 +1543,26 @@ struct ATHLTHRouteQuickTrainSheet: View {
     private func startExistingQuickRun(
         _ configuration: RunQuickStartConfiguration
     ) async -> String? {
-        await social.beginWorkoutWithFriends(
-            title: configuration.title,
-            kind: .running,
-            friends: configuration.friends,
-            creatorName: session.profile.displayName,
-            creatorUsername: session.profile.username
-        )
+        // Solo route launches must not depend on the social backend.
+        let needsLobby = !configuration.friends.isEmpty
+        if needsLobby {
+            guard await social.beginWorkoutWithFriends(
+                title: configuration.title,
+                kind: .running,
+                friends: configuration.friends,
+                creatorName: session.profile.displayName,
+                creatorUsername: session.profile.username,
+                invitePayload: configuration.trainTogetherInvitePayload(
+                    savedRoutes: session.savedRoutes
+                ),
+                creatorCaptureDevice: configuration.captureDevice
+            ) else {
+                return social.errorMessage ?? ATHLTHLocalization.choose(
+                    english: "Could not invite friends.",
+                    norwegian: "Kunne ikke invitere venner."
+                )
+            }
+        }
 
         do {
             try await WorkoutLaunchCoordinator.startRunQuick(
@@ -1562,10 +1575,67 @@ struct ATHLTHRouteQuickTrainSheet: View {
                 spotify: spotify,
                 ghostRace: ghostRace
             )
+            if needsLobby { _ = await social.confirmCurrentJoinedWorkoutStarted() }
             return nil
         } catch {
-            await social.cancelActiveWorkout()
+            if needsLobby { await social.markCurrentJoinedWorkoutLaunchFailed() }
             return error.localizedDescription
+        }
+    }
+}
+
+/// Routes selected under Walking must always use walking capture and HealthKit kind.
+struct ATHLTHWalkingRouteQuickTrainSheet: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
+
+    let route: TrainingRoute
+
+    var body: some View {
+        WalkQuickStartSheet(
+            trainingDeviceProvider: watchConnection.isReady ? .appleWatch : .none,
+            watchConnected: watchConnection.isReady,
+            initialRoute: route
+        ) { configuration in
+            let needsLobby = !configuration.friends.isEmpty
+            if needsLobby {
+                guard await social.beginWorkoutWithFriends(
+                    title: route.title,
+                    kind: .walking,
+                    friends: configuration.friends,
+                    creatorName: session.profile.displayName,
+                    creatorUsername: session.profile.username,
+                    invitePayload: configuration.trainTogetherInvitePayload,
+                    creatorCaptureDevice: configuration.captureDevice
+                ) else {
+                    return social.errorMessage ?? ATHLTHLocalization.choose(
+                        english: "Could not invite friends.",
+                        norwegian: "Kunne ikke invitere venner."
+                    )
+                }
+            }
+            do {
+                try await WorkoutLaunchCoordinator.startWalkQuick(
+                    configuration: configuration,
+                    settings: settings,
+                    gear: gear,
+                    phoneWorkout: phoneWorkout,
+                    watchConnection: watchConnection,
+                    spotify: spotify,
+                    workoutMirroring: workoutMirroring
+                )
+                if needsLobby { _ = await social.confirmCurrentJoinedWorkoutStarted() }
+                return nil
+            } catch {
+                if needsLobby { await social.markCurrentJoinedWorkoutLaunchFailed() }
+                return error.localizedDescription
+            }
         }
     }
 }
@@ -3667,6 +3737,8 @@ struct WalkQuickStartSheet: View {
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     var plannedSession: PlannedSession? = nil
+    /// Explicit route from the Train route picker (may not be saved locally).
+    var initialRoute: TrainingRoute? = nil
     let onStart: (WalkQuickStartConfiguration) async -> String?
     @State private var shareThisWorkoutOnIPad = false
     @State private var launchInProgress = false
@@ -3862,9 +3934,10 @@ struct WalkQuickStartSheet: View {
                 }
                 // Scheduled walking workouts retain their planned course
                 // when launched from the calendar or a training plan.
-                if !walkingRouteChoiceTouched, selectedWalkingRoute == nil,
-                   let routeID = plannedSession?.routeID {
-                    selectedWalkingRoute = session.savedRoutes.first { $0.id == routeID }
+                if !walkingRouteChoiceTouched, selectedWalkingRoute == nil {
+                    selectedWalkingRoute = initialRoute ?? plannedSession?.routeID.flatMap { routeID in
+                        session.savedRoutes.first { $0.id == routeID }
+                    }
                 }
 
                 if !didLoadAudioCoachDefaults {

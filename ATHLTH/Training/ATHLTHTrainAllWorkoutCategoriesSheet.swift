@@ -284,7 +284,7 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
         switch category {
         case .running:
             NavigationLink {
-                routePicker
+                routePicker(for: category)
             } label: {
                 optionRow(icon: "map", title: tr("Route", "Rute"),
                           detail: tr("Choose a route before running", "Velg rute før løping"))
@@ -301,7 +301,7 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
                       detail: tr("Walk without a route", "Gå uten valgt rute"),
                       action: .freeWalk)
             NavigationLink {
-                routePicker
+                routePicker(for: category)
             } label: {
                 optionRow(icon: "map", title: tr("Route", "Rute"),
                           detail: tr("Browse walking routes", "Velg en turrute"))
@@ -321,8 +321,11 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
         }
     }
 
-    private var routePicker: some View {
-        RouteLibraryListView(source: .database)
+    private func routePicker(for category: Category) -> some View {
+        RouteLibraryListView(
+            source: .database,
+            quickStartActivity: category == .walking ? .walking : .running
+        )
             .navigationTitle(tr("Routes", "Ruter"))
             .navigationBarTitleDisplayMode(.inline)
     }
