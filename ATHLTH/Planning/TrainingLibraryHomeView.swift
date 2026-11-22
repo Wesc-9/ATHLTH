@@ -93,8 +93,9 @@ struct TrainingLibraryHomeView: View {
     private let muted = ATHLTHPlanDesign.secondaryInk
     private let gold = ATHLTHPlanDesign.accentInk
     private let slate = ATHLTHTheme.accentDeep
-    private let green = ATHLTHTheme.vitality
-    private let lavender = ATHLTHTheme.recoveryBlue
+    // Keep library categories within the cream / gold / slate palette.
+    private let routeTint = ATHLTHPlanDesign.accentInk
+    private let workoutTint = ATHLTHTheme.accentDeep
 
     // More categories share a row as the iPad window grows, without
     // changing the familiar two-column iPhone landing page.
@@ -211,7 +212,7 @@ struct TrainingLibraryHomeView: View {
                                    "Styrke, løping og mer"),
                         symbol: "dumbbell.fill",
                         artwork: "StrengthQuickHero",
-                        tint: lavender,
+                        tint: workoutTint,
                     )
                 }
 
@@ -237,7 +238,7 @@ struct TrainingLibraryHomeView: View {
                                    "Finn en ny tur eller løperute"),
                         symbol: "map.fill",
                         artwork: "GoalAdventure",
-                        tint: green,
+                        tint: routeTint,
                     )
                 }
             }
