@@ -140,6 +140,18 @@ struct ATHLTHTournamentLobbyRulesView: View {
                         "ikke gjennomført: 0 poeng",
                         systemImage: "clock.badge.exclamationmark"
                     )
+                    Label("Invitasjoner: svar innen \(tournament.invitationDays) dager",
+                          systemImage: "clock")
+                    Label(tournament.unansweredPolicy == "continue"
+                          ? "Ubesvarte: start uten dem som ikke godtar"
+                          : tournament.unansweredPolicy == "replace"
+                          ? "Ubesvarte: tid til å finne erstatter"
+                          : "Ubesvarte: konkurransen avlyses",
+                          systemImage: "person.crop.circle.badge.questionmark")
+                    Label(tournament.allowFeedPost
+                          ? "Etter avslutning: arrangøren kan dele resultatet i vennefeeden"
+                          : "Etter avslutning: deling i feed er ikke tillatt",
+                          systemImage: "square.and.arrow.up")
                     Label(
                         tournament.invitationPermission == "admin"
                             ? "Invitasjoner: kun arrangør"
