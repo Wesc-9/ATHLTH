@@ -4217,28 +4217,6 @@ struct MyTrainingPlansLibraryView: View {
         (!favoritesOnly || favoriteIDs.contains(plan.id.uuidString))
     }
 
-    private var displayedTemplates: [TrainingPlan] {
-        let favoriteIDs = favoritesOnly
-            ? Set(favorites.favorites.lazy
-                .filter { $0.itemType == .plan }
-                .map(\.itemID))
-            : []
-        return session.planTemplates.filter {
-            matchesPlan($0, favoriteIDs: favoriteIDs)
-        }
-    }
-
-    private var displayedPlans: [TrainingPlan] {
-        let favoriteIDs = favoritesOnly
-            ? Set(favorites.favorites.lazy
-                .filter { $0.itemType == .plan }
-                .map(\.itemID))
-            : []
-        return session.trainingPlans.filter {
-            matchesPlan($0, favoriteIDs: favoriteIDs)
-        }
-    }
-
     private var cardColumns: [GridItem] {
         ATHLTHLibraryResponsiveLayout.columns(
             mode: displayMode,
@@ -4249,8 +4227,17 @@ struct MyTrainingPlansLibraryView: View {
     }
 
     var body: some View {
-        let templates = displayedTemplates
-        let scheduled = displayedPlans
+        let favoriteIDs: Set<String> = favoritesOnly
+            ? Set(favorites.favorites.lazy
+                .filter { $0.itemType == .plan }
+                .map(\.itemID))
+            : []
+        let templates = session.planTemplates.filter {
+            matchesPlan($0, favoriteIDs: favoriteIDs)
+        }
+        let scheduled = session.trainingPlans.filter {
+            matchesPlan($0, favoriteIDs: favoriteIDs)
+        }
         let plans = ATHLTHLibraryAlphabetSort.sorted(
             templates + scheduled
         ) { $0.title }
