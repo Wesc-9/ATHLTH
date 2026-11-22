@@ -530,6 +530,11 @@ struct ATHLTHTournamentLiveDetailView: View {
         VStack(alignment: .leading, spacing: 17) {
             eventInformation
             athleteProgressSection
+            ATHLTHCompetitionLiveMapView(
+                tournament: current,
+                userID: userID,
+                names: names
+            )
             if current.singleEventMode {
                 singleEventSection
             }
