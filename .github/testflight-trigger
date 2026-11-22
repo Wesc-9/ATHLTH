@@ -314,3 +314,5 @@ ATHLTH 2.2.7 build 135 retry TestFlight after fixing missing startedOnWatch iPho
 ATHLTH 2.2.7 build 135 gated TestFlight retry after TrainToday layout test initializer fix; 2026-11-22
 
 ATHLTH 2.2.7 build 135 gated TestFlight retry after compound identity, retired exercises, 4x4 progress fixture and simulator boot recovery fixes; source=cccaea9f18fa4b6af3cce3ed7cc751ae63a2b84f
+
+ATHLTH 2.2.7 build 135 authorized gated TestFlight rerun after correcting broad bench-press catalog expectation (2026-11-22)

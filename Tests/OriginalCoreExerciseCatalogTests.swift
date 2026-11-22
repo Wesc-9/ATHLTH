@@ -55,7 +55,12 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         let benchPress = library.search(query: "benkpress")
         XCTAssertFalse(benchPress.isEmpty)
         XCTAssertTrue(benchPress.contains { $0.source == .repDB })
-        XCTAssertFalse(benchPress.contains { $0.source == .athlthCatalog })
+        // The public barbell Bench Press should resolve to its licensed RepDB
+        // entry, but other distinct native bench-press variants can legitimately
+        // appear in a broad Norwegian search such as "benkpress".
+        XCTAssertFalse(benchPress.contains {
+            $0.sourceIdentifier == "athlth-native-bench-press"
+        })
         XCTAssertTrue(library.search(query: "knebøy").contains {
             $0.source == .repDB
         })
