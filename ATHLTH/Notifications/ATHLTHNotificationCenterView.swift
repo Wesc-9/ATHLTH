@@ -2341,7 +2341,32 @@ struct ATHLTHNotificationCenterView: View {
     private func notificationDestination(
         _ item: ATHLTHNotificationItem
     ) -> some View {
-        if item.kind == .dailyCheckIn {
+        if item.socialEventKind == ATHLTHPlusGrantNotificationCopy.eventKind {
+            VStack(alignment: .leading, spacing: 18) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "ATHLTH+ granted",
+                        norwegian: "Du har fått ATHLTH+"
+                    ),
+                    systemImage: "sparkles"
+                )
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                Text(item.message)
+                    .font(.body)
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "This records the grant when it was made. Your profile shows your current subscription status.",
+                    norwegian: "Dette viser tildelingen da den ble gjort. Gjeldende abonnementsstatus finner du i profilen."
+                ))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+            .padding(22)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if item.kind == .dailyCheckIn {
             RecoverySorenessLogView(store: RecoverySorenessStore())
         } else if item.socialEventKind == "body_goal_checkin",
                   let goalID = item.goalID,
