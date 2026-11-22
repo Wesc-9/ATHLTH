@@ -831,9 +831,10 @@ struct ExerciseLibraryView: View {
             ))
         }
         .onChange(of: pageFilterKey) { _, _ in
+            // Do not remount the results scroll view for each search letter.
+            // The alphabet index alone triggers an intentional scroll reset.
             visibleStartIndex = 0
             visibleLimit = ATHLTHLibraryPagination.pageSize
-            alphabetJumpRevision += 1
         }
         .onChange(of: selectedSection) { _, section in
             if section == .mine, scannerResultsActive {
