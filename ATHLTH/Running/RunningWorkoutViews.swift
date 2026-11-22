@@ -376,8 +376,16 @@ struct RunningWorkoutDetailView: View {
     @State private var showingDelete = false
     @State private var copySaveError: String?
     @State private var showingIntervalEditor = false
-    @State private var editingBeforeStart = false
     @State private var focusedPrivateStepIndex: Int?
+    @State private var showingOneTimeSettings = false
+    @State private var showingOneTimeComposer = false
+    @State private var showingOneTimeCoach = false
+    @State private var showingOneTimeSpotify = false
+    @State private var oneTimeWorkout: RunningWorkoutTemplate?
+    @State private var oneTimeOptions = ATHLTHWorkoutPersonalOptions()
+    @State private var oneTimeCoachDraft = AudioCoachDraft()
+    @State private var oneTimeSpeedText = ""
+    @State private var oneTimeSongStep: PrivateSongStep?
     @State private var editingPrivatePreset = false
     @State private var showingPrivateStartChoices = false
     @State private var showingPrivateCoach = false
@@ -522,17 +530,32 @@ struct RunningWorkoutDetailView: View {
     }
 
     private func editPersonalizedCopy() {
-        editingBeforeStart = false
         editingPrivatePreset = false
         focusedPrivateStepIndex = nil
         showingIntervalEditor = true
     }
 
     private func editPrivatePreset(focusing index: Int? = nil) {
-        editingBeforeStart = false
         editingPrivatePreset = true
         focusedPrivateStepIndex = index
         showingIntervalEditor = true
+    }
+
+    private func beginOneTimeAdjustment() {
+        oneTimeWorkout = previewWorkout
+        oneTimeOptions = privateOptions
+        oneTimeSpeedText = ""
+        showingOneTimeSettings = true
+    }
+
+    private func openOneTimeCoach() {
+        var draft = AudioCoachDraft()
+        draft.load(configuration: oneTimeOptions.audioCoachConfiguration ??
+            settings.audioCoachConfiguration(
+                enabled: settings.audioCoachEnabledByDefault
+            ))
+        oneTimeCoachDraft = draft
+        showingOneTimeCoach = true
     }
 
     /// Deliberately isolated from the long workout timeline: no recompute
@@ -653,6 +676,175 @@ struct RunningWorkoutDetailView: View {
         .accessibilityIdentifier("athlth-running-private-options")
     }
 
+    private var oneTimeSettingsSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 13) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Changes here apply only to this run.",
+                        norwegian: "Endringene gjelder bare denne økten og lagres ikke i Mine innstillinger."
+                    ))
+                    .font(.footnote)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                    if let selected = oneTimeWorkout {
+                        Button { showingOneTimeComposer = true } label: {
+                            HStack {
+                                Label("Rediger alle drag og pauser",
+                                      systemImage: "slider.horizontal.3")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(15)
+                        .athlthPlanCard(radius: 18)
+
+                        if ATHLTHRunningPrivateSpeedPolicy.workCount(in: selected) > 0 {
+                            HStack(spacing: 10) {
+                                Text("Fart på alle drag")
+                                Spacer(minLength: 6)
+                                TextField("14", text: $oneTimeSpeedText)
+                                    .keyboardType(.decimalPad)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 70)
+                                Text("km/t")
+                                Button("Bruk") {
+                                    guard let speed = Double(oneTimeSpeedText
+                                        .replacingOccurrences(of: ",", with: ".")),
+                                          speed.isFinite, (2...30).contains(speed)
+                                    else { return }
+                                    oneTimeWorkout = ATHLTHRunningPrivateSpeedPolicy.applying(
+                                        kilometersPerHour: speed, to: selected
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            .font(.subheadline)
+                            .padding(13)
+                            .athlthPlanCard(radius: 18)
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Audio og musikk").font(.headline)
+                            Button(action: openOneTimeCoach) {
+                                Label("Audio Coach", systemImage: "waveform")
+                                    .frame(maxWidth: .infinity, minHeight: 44,
+                                           alignment: .leading)
+                            }
+                            Button { showingOneTimeSpotify = true } label: {
+                                Label("Spotify", systemImage: "music.note")
+                                    .frame(maxWidth: .infinity, minHeight: 44,
+                                           alignment: .leading)
+                            }
+                            DisclosureGroup("Sang per drag og pause") {
+                                let steps = selected.recipePreviewBlocks
+                                LazyVStack(alignment: .leading, spacing: 5) {
+                                    ForEach(steps.indices, id: \.self) { index in
+                                        Button {
+                                            oneTimeSongStep = PrivateSongStep(index: index)
+                                        } label: {
+                                            HStack {
+                                                Text(steps[index].title)
+                                                    .lineLimit(1)
+                                                Spacer(minLength: 8)
+                                                Text(oneTimeOptions.stepSongs[index]?.title ??
+                                                     "Velg sang")
+                                                    .font(.caption)
+                                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                                    .lineLimit(1)
+                                                Image(systemName: "chevron.right")
+                                            }
+                                            .frame(minHeight: 40)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .padding(15)
+                        .athlthPlanCard(radius: 18)
+
+                        Button {
+                            launchLibraryWorkout(selected, with: oneTimeOptions)
+                        } label: {
+                            Label("Start med disse innstillingene",
+                                  systemImage: "play.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHPlanDesign.accentInk)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: 680)
+                .frame(maxWidth: .infinity)
+            }
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle("Juster denne gangen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Avbryt") { showingOneTimeSettings = false }
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .sheet(isPresented: $showingOneTimeComposer) {
+            ATHLTHTrainIntervalComposerView(initial: oneTimeWorkout) { edited in
+                oneTimeWorkout = edited
+            }
+        }
+        .sheet(isPresented: $showingOneTimeCoach) {
+            NavigationStack {
+                ScrollView {
+                    PerWorkoutAudioCoachView(
+                        draft: $oneTimeCoachDraft,
+                        showRouteOptions: oneTimeWorkout?.routeID != nil,
+                        showStructuredOptions: true
+                    )
+                    .padding(16)
+                }
+                .navigationTitle("Audio Coach")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Avbryt") { showingOneTimeCoach = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Bruk") {
+                            oneTimeOptions.audioCoachConfiguration =
+                                oneTimeCoachDraft.configuration()
+                            showingOneTimeCoach = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingOneTimeSpotify) {
+            ATHLTHWorkoutSpotifyOptionsSheet(
+                playlist: $oneTimeOptions.spotifyPlaylist,
+                autoplay: $oneTimeOptions.spotifyAutoplayOnStart,
+                intervalTrack: $oneTimeOptions.spotifyIntervalTrack,
+                supportsIntervals: true
+            )
+        }
+        .sheet(item: $oneTimeSongStep) { selection in
+            ATHLTHSpotifyIntervalTrackPicker(selection: Binding(
+                get: { oneTimeOptions.stepSongs[selection.index] },
+                set: { track in
+                    if let track {
+                        oneTimeOptions.stepSongs[selection.index] = track
+                    } else {
+                        oneTimeOptions.stepSongs.removeValue(forKey: selection.index)
+                    }
+                }
+            ))
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -682,22 +874,6 @@ struct RunningWorkoutDetailView: View {
                 ATHLTHLastWorkoutHistoryCard(summary: lastHistory)
 
                 if let onStart {
-                    Button {
-                        editingBeforeStart = true
-                        showingIntervalEditor = true
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Adjust workout before starting",
-                                norwegian: "Tilpass økten før start"
-                            ),
-                            systemImage: "slider.horizontal.3"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHPlanDesign.accentInk)
-
                     Button {
                         showingPrivateStartChoices = true
                     } label: {
@@ -803,9 +979,7 @@ struct RunningWorkoutDetailView: View {
             Button(ATHLTHLocalization.choose(
                 english: "Adjust now", norwegian: "Juster nå"
             )) {
-                editingBeforeStart = true
-                editingPrivatePreset = false
-                showingIntervalEditor = true
+                beginOneTimeAdjustment()
             }
             Button(ATHLTHLocalization.choose(
                 english: "Cancel", norwegian: "Avbryt"
@@ -861,8 +1035,6 @@ struct RunningWorkoutDetailView: View {
                 // renamed; rejected saves keep the original intact.
                 if editingPrivatePreset {
                     savePrivateWorkout(personalized)
-                } else if editingBeforeStart, onStart != nil {
-                    launchLibraryWorkout(personalized, with: privateOptions)
                 } else if library.save(personalized) {
                     if pendingAddToPlan {
                         onSelect?(personalized)
@@ -883,6 +1055,9 @@ struct RunningWorkoutDetailView: View {
                         )
                 }
             }
+        }
+        .sheet(isPresented: $showingOneTimeSettings) {
+            oneTimeSettingsSheet
         }
         .onAppear {
             reloadPrivateSettings()
