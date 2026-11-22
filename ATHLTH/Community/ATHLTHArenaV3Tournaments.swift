@@ -51,6 +51,10 @@ struct ATHLTHTournamentCreator: View {
     @State private var competitionSettings = ATHLTHTournamentCompetitionSettings()
     @State private var showingCompetitionCoach = false
     @State private var coachNames: [String] = []
+    @State private var showingTemplatePicker = false
+    @State private var showingSaveTemplate = false
+    @State private var templateName = ""
+    @State private var templateSaving = false
     @State private var allowExtensions = true
     @State private var publicResults = false
     @State private var proofMode: ATHLTHTournamentProofMode = .opponent
@@ -172,6 +176,12 @@ struct ATHLTHTournamentCreator: View {
             }
     }
 
+    private var canSaveTemplate: Bool {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
+        !allowedActivities.isEmpty && competitionSettings.isValid &&
+        !templateSaving && !publishing
+    }
+
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         // Two athletes belong in a private duel. Group competitions
@@ -226,6 +236,7 @@ struct ATHLTHTournamentCreator: View {
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                     }
                     coachEntry
+                    templateEntry
                     exerciseRulesSection
                     ATHLTHTournamentAdvancedRulesSection(
                         rotation: $rotationMode,
@@ -293,6 +304,16 @@ struct ATHLTHTournamentCreator: View {
                             .frame(maxWidth: .infinity, minHeight: 35)
                     }
                     .disabled(!canSave || publishing)
+                    Button {
+                        templateName = title
+                        showingSaveTemplate = true
+                    } label: {
+                        Label("Lagre som mal", systemImage: "square.stack.3d.up")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                            .frame(maxWidth: .infinity, minHeight: 29)
+                    }
+                    .disabled(!canSaveTemplate)
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 10)
@@ -315,6 +336,20 @@ struct ATHLTHTournamentCreator: View {
                 selectedSeasonID = nil
                 clubSeasons = []
             }
+        }
+        .sheet(isPresented: $showingTemplatePicker) {
+            ATHLTHTournamentTemplatePicker { saved in
+                applyTemplate(saved)
+            }
+        }
+        .alert("Lagre konkurransemal", isPresented: $showingSaveTemplate) {
+            TextField("Navn på mal", text: $templateName)
+            Button("Avbryt", role: .cancel) {}
+            Button("Lagre") {
+                Task { await storeTemplate() }
+            }
+        } message: {
+            Text("Malen lagrer regler og øvelser, men ingen venner, invitasjoner eller gamle startdatoer.")
         }
         .sheet(isPresented: $showingCompetitionCoach) {
             ATHLTHTournamentCoachWizard(
@@ -477,6 +512,83 @@ struct ATHLTHTournamentCreator: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var templateEntry: some View {
+        Button {
+            showingTemplatePicker = true
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: "square.stack.3d.up")
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Hent konkurransemal")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Bruk et oppsett du har lagret tidligere")
+                        .font(.caption)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+            }
+            .foregroundStyle(ATHLTHArenaV3Style.gold)
+            .padding(15)
+            .background(ATHLTHArenaV3Style.panel())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @MainActor private func storeTemplate() async {
+        guard canSaveTemplate else { return }
+        templateSaving = true
+        defer { templateSaving = false }
+        do {
+            try await ATHLTHTournamentTemplateCloudService().save(
+                makeDraft(), name: templateName, userID: session.profile.userID
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = "Kunne ikke lagre malen: " + error.localizedDescription
+        }
+    }
+
+    private func applyTemplate(_ saved: ATHLTHTournamentDraft) {
+        if restrictFormat && saved.format != format {
+            errorMessage = "Denne malen har en annen konkurranseform."
+            return
+        }
+        if let fixedActivity,
+           !saved.allowedActivities.contains(fixedActivity) {
+            errorMessage = "Denne malen er ikke laget for \(fixedActivity.title)."
+            return
+        }
+        format = saved.format
+        title = saved.title
+        groupSize = saved.groupSize
+        qualifiersPerGroup = saved.qualifiersPerGroup
+        allowedActivities = fixedActivity.map { Set([$0]) } ??
+            Set(saved.allowedActivities)
+        rulesAuthority = saved.rulesAuthority
+        cadenceDays = saved.cadenceDays
+        rotationMode = saved.rotationMode
+        restWeekdays = Set(saved.restWeekdays)
+        winPoints = saved.winPoints
+        drawPoints = saved.drawPoints
+        competitionSettings = saved.competitionSettings
+        allowExtensions = saved.allowExtensions
+        publicResults = saved.publicResults
+        proofMode = saved.proofMode
+        exerciseMode = saved.exerciseMode
+        exerciseCount = saved.exerciseCount
+        proposalsCloseAt = saved.proposalsCloseAt ??
+            Date().addingTimeInterval(2 * 86_400)
+        votesCloseAt = saved.votesCloseAt ??
+            Date().addingTimeInterval(3 * 86_400)
+        approvePlayerChanges = saved.approvePlayerChanges
+        warmupRounds = saved.warmupRounds
+        chosenIDs = []
+        chosenNames = [:]
+        selectedSeasonID = nil
+        errorMessage = nil
     }
 
     private var coachEntry: some View {
