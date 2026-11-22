@@ -2752,20 +2752,48 @@ struct TrainingPlanCatalogDetailView: View {
     @State private var expandedSessionKeys: Set<String> = []
     @State private var inspectedPlanStep: WorkoutTemplateBlock?
 
-    // Only exact exercise-library identities count toward muscle focus.
-    // Missing matches are omitted rather than guessing from a workout title.
+    // Use the exact source that scheduling uses, not a generic blueprint:
+    // GymCoach rotates its actual strength workouts and Zoned uses its own
+    // source weeks. Resolve each distinct exercise only once for the hero.
     private var verifiedMuscleFocus: [String] {
-        let exercises = exerciseLibrary.allExercises
+        let library = exerciseLibrary.allExercises
+        var sessions: [PlannedSession] = []
+        if let coach = ATHLTHGymCoachStrengthLibrary.program(for: entry.slug) {
+            for week in 1...max(entry.durationWeeks, 1) {
+                sessions += ATHLTHGymCoachStrengthLibrary.sourceWorkouts(
+                    for: coach, week: week
+                ).map {
+                    ATHLTHGymCoachStrengthLibrary.plannedSession(
+                        $0, program: coach, week: week
+                    )
+                }
+            }
+        } else if let zoned = ATHLTHZonedPlanLibrary.plan(for: entry.slug) {
+            for sourceWeek in zoned.weeks {
+                sessions += ATHLTHZonedPlanLibrary.orderedRequiredSessions(
+                    in: sourceWeek
+                ).compactMap {
+                    ATHLTHZonedPlanLibrary.plannedSession(
+                        $0, week: sourceWeek, sourcePlan: zoned
+                    )
+                }
+            }
+        } else {
+            sessions = entry.sessionBlueprints.prefix(entry.sessionsPerWeek).map {
+                ATHLTHCatalogPlanSessionFactory.session(
+                    entry: entry, blueprint: $0, week: 1
+                )
+            }
+        }
+        var seen = Set<String>()
         var muscles = Set<String>()
-        for blueprint in entry.sessionBlueprints.prefix(entry.sessionsPerWeek) {
-            let workout = ATHLTHCatalogPlanSessionFactory.session(
-                entry: entry, blueprint: blueprint, week: 1
-            )
-            for block in workout.resolvedWorkoutBlocks where block.kind == .exercise {
-                // Use the same authoritative resolver as the workout
-                // library (including reviewed RepDB and HYROX aliases).
+        for session in sessions {
+            for block in session.resolvedWorkoutBlocks where block.kind == .exercise {
+                let identity = block.exerciseID?.uuidString ??
+                    block.exerciseSlug ?? block.title
+                guard seen.insert(identity).inserted else { continue }
                 if let match = ATHLTHExerciseReferenceResolver.resolve(
-                    block, in: exercises
+                    block, in: library
                 ) {
                     muscles.formUnion(match.exercise.primaryMuscles)
                 }
