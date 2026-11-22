@@ -15,6 +15,8 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let winPoints: Int
     let drawPoints: Int
     let status: String
+    let singleEventMode: Bool
+    let raceSignalAt: Date?
     let exerciseMode: ATHLTHTournamentExerciseMode
     let exerciseCount: Int
     let proposalsCloseAt: Date?
@@ -63,6 +65,8 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, format, status
+        case singleEventMode = "single_event_mode"
+        case raceSignalAt = "race_signal_at"
         case exerciseMode = "exercise_mode"
         case exerciseCount = "exercise_count"
         case proposalsCloseAt = "proposals_close_at"
@@ -300,6 +304,7 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
     let meetingLon: Double?
     let coachExerciseIDs: [UUID]?
     let raceRules: ATHLTHCompetitionRaceRules
+    let singleEventMode: Bool
     let invitationDays: Int
     let unansweredPolicy: String
     let allowFeedPost: Bool
@@ -315,7 +320,9 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
     let thirdPrize: String
     let loserConsequence: String
 
-    init(_ settings: ATHLTHTournamentCompetitionSettings) {
+    init(_ settings: ATHLTHTournamentCompetitionSettings,
+         singleEventMode: Bool = false) {
+        self.singleEventMode = singleEventMode
         startsAt = settings.startsAt.map {
             ISO8601DateFormatter().string(from: $0)
         }
@@ -524,8 +531,29 @@ struct ATHLTHTournamentCloudService {
         ).execute().value
     }
 
+    func createSimpleSingleEvent(
+        title: String, activity: ATHLTHTournamentActivity,
+        invitees: [UUID], startsAt: Date?
+    ) async throws -> UUID {
+        guard invitees.count >= 2 else {
+            throw ATHLTHTournamentEngineError.tooFewParticipants
+        }
+        return try await client.rpc(
+            "athlth_tournament_create_simple_event",
+            params: ATHLTHTournamentSimpleCreateParams(
+                p_title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+                p_format: ATHLTHTournamentFormat.league.rawValue,
+                p_activity: activity.rawValue,
+                p_invitees: invitees,
+                p_starts_at: startsAt.map {
+                    ISO8601DateFormatter().string(from: $0)
+                }
+            )
+        ).execute().value
+    }
+
     func create(from draft: ATHLTHTournamentDraft) async throws -> UUID {
-        guard draft.participants.count >= 2 else {
+        guard draft.participants.count >= (draft.singleEventMode ? 3 : 2) else {
             throw ATHLTHTournamentEngineError.tooFewParticipants
         }
         guard draft.competitionSettings.isValid else {
@@ -570,7 +598,8 @@ struct ATHLTHTournamentCloudService {
                 p_win_points: draft.winPoints,
                 p_draw_points: draft.drawPoints,
                 p_setup: ATHLTHTournamentCompetitionPayload(
-                    draft.competitionSettings
+                    draft.competitionSettings,
+                    singleEventMode: draft.singleEventMode
                 )
             )
         ).execute().value
