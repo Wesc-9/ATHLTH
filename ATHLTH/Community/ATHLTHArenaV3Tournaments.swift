@@ -174,7 +174,8 @@ struct ATHLTHTournamentCreator: View {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         // Two athletes belong in a private duel. Group competitions
         // require the organizer plus at least two invitees.
-        athletes.count >= 3 && !busy && !allowedActivities.isEmpty &&
+        athletes.count >= (format == .cup ? 4 : 2) &&
+        !busy && !allowedActivities.isEmpty &&
         competitionSettings.isValid &&
         (fixedActivity.map { allowedActivities == Set([$0]) } ?? true) &&
         ATHLTHTournamentCadence.options.contains(cadenceDays) &&
@@ -230,14 +231,15 @@ struct ATHLTHTournamentCreator: View {
                         proof: $proofMode
                     )
                     ATHLTHTournamentCompetitionRulesSection(
-                        settings: $competitionSettings
+                        settings: $competitionSettings,
+                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities
                     )
                     warmupSection
                     if format == .groups { groupsSection }
                     inviteSection
                     if activeClubID != nil { seasonSection }
                     preview
-                    Text("Du kan lagre et privat utkast eller publisere invitasjoner. Ingen konkurranse starter før alle har svart og arrangøren starter den.")
+                    Text("Invitasjoner og regler godkjennes før start. Konkurransen starter manuelt, automatisk når alle er klare eller på valgt tidspunkt, slik du har valgt.")
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                         .fixedSize(horizontal: false, vertical: true)
