@@ -6687,11 +6687,17 @@ struct ATHLTHTrainView: View {
                         }
                     )
                 } else {
+                    // Keep the enormous Today dashboard's SwiftUI type tree
+                    // out of the parent ScrollView's AttributeGraph metadata.
+                    // iOS 27.3 build 135 crashed while evaluating this tree
+                    // during Home -> Train (stack-guard SIGSEGV).
                     premiumTodayScreen
+                        .athlthStablePresentationBoundary()
                         .padding(.top, -40)
                         .zIndex(1)
                 }
             }
+            .athlthStablePresentationBoundary()
             .padding(.horizontal, 17)
             // Today owns the full-bleed status-bar image; the compact
             // Plan and Progress mastheads start at the same screen y.
@@ -7675,6 +7681,11 @@ struct ATHLTHTrainView: View {
         // Reset date-specific check-in and proposed workout state exactly
         // once when the calendar day changes; never reset the live recorder.
         .id(displayedTrainDay)
+        // The large Today view owns many closures and dynamic sections.
+        // Erase their composite view type *inside* the enclosing VStack:
+        // otherwise the type's metadata instantiation overflows the main
+        // thread's stack on some devices when switching Home -> Train.
+        .athlthStablePresentationBoundary()
         }
     }
 
