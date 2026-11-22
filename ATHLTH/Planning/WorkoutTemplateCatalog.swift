@@ -3244,6 +3244,8 @@ struct WorkoutTemplateDetailView: View {
 
     @AppStorage("athlth.workoutPreview.advanced.v1") private var advancedMode = false
     @State private var showingWorkout = false
+    @State private var showingLaunchSelection = false
+    @State private var pendingLaunchWorkout: PlannedSession?
     @State private var showingEditor = false
     @State private var askingForPersonalTargets = false
     @State private var detailQuickGoalDecision: ATHLTHWorkoutGoalSheetDecision?
@@ -3282,18 +3284,42 @@ struct WorkoutTemplateDetailView: View {
         activePersonalBlocks ?? libraryDisplayBlocks
     }
 
-    private var workoutForStarting: PlannedSession {
-        // Preserve the original catalogue identity and recording path.
-        var original = entry.plannedSession(useOriginalID: true)
-        original.workoutBlocks = displayedBlocks
-        original.audioCoachConfiguration = personalOptions.audioCoachConfiguration
-        original.spotifyPlaylist = personalOptions.spotifyPlaylist
-        original.spotifyAutoplayOnStart = personalOptions.spotifyAutoplayOnStart
-        original.spotifyIntervalTrack = personalOptions.spotifyIntervalTrack
-        _ = ATHLTHWorkoutExerciseBinding.bind(
-            &original, library: exerciseLibrary.allExercises
+    /// One immutable launch snapshot; toggling saved personal settings while
+    /// a workout is open can never alter the active recording prescription.
+    private func prepareLibraryLaunch(
+        blocks: [WorkoutTemplateBlock],
+        options: ATHLTHWorkoutPersonalOptions,
+        usePersonalSettings: Bool
+    ) {
+        guard !hasActiveWorkout else { return }
+        var planned = entry.plannedSession(useOriginalID: true)
+        planned.workoutBlocks = blocks
+        if usePersonalSettings {
+            if let coach = options.audioCoachConfiguration {
+                planned.audioCoachConfiguration = coach
+            }
+            if let playlist = options.spotifyPlaylist {
+                planned.spotifyPlaylist = playlist
+            }
+            if let autoplay = options.spotifyAutoplayOnStart {
+                planned.spotifyAutoplayOnStart = autoplay
+            }
+            if let track = options.spotifyIntervalTrack {
+                planned.spotifyIntervalTrack = track
+            }
+        }
+        let report = ATHLTHWorkoutExerciseBinding.bind(
+            &planned, library: exerciseLibrary.allExercises
         )
-        return original
+        guard report.isReady else {
+            shareError = tr(
+                "Resolve library exercises before starting: ",
+                "Koble øvelsene til biblioteket før start: "
+            ) + report.unresolved.prefix(4).joined(separator: ", ")
+            return
+        }
+        pendingLaunchWorkout = planned
+        showingLaunchSelection = false
     }
 
     private var heroImageName: String {
@@ -3523,6 +3549,10 @@ struct WorkoutTemplateDetailView: View {
                     }
                 )
 
+                ATHLTHWorkoutWorkSpeedEditor(blocks: displayedBlocks) { edited in
+                    saveTargets(edited)
+                }
+
                 workoutOptionsCard
 
                 if let original = ATHLTHZonedPlanLibrary
@@ -3613,18 +3643,8 @@ struct WorkoutTemplateDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button {
                 guard !hasActiveWorkout else { return }
-                var workout = workoutForStarting
-                let report = ATHLTHWorkoutExerciseBinding.bind(
-                    &workout, library: exerciseLibrary.allExercises
-                )
-                guard report.isReady else {
-                    shareError = tr(
-                        "Resolve library exercises before starting: ",
-                        "Koble øvelsene til biblioteket før start: "
-                    ) + report.unresolved.prefix(4).joined(separator: ", ")
-                    return
-                }
-                showingWorkout = true
+                pendingLaunchWorkout = nil
+                showingLaunchSelection = true
             } label: {
                 Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
                     .font(.headline)
@@ -3636,6 +3656,33 @@ struct WorkoutTemplateDetailView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 11)
             .background(ATHLTHPlanDesign.canvas)
+        }
+        .sheet(
+            isPresented: $showingLaunchSelection,
+            onDismiss: {
+                // Never stack a full-screen workout over a closing sheet.
+                // Begin only after the deliberate launch choice is dismissed.
+                if pendingLaunchWorkout != nil {
+                    showingWorkout = true
+                }
+            }
+        ) {
+            ATHLTHLibraryWorkoutLaunchSheet(
+                title: entry.title,
+                summary: entry.summary,
+                category: entry.category,
+                symbol: entry.systemImage,
+                difficulty: entry.difficulty,
+                durationMinutes: entry.estimatedDurationMinutes,
+                originalBlocks: libraryDisplayBlocks,
+                savedBlocks: activePersonalBlocks,
+                savedOptions: personalOptions
+            ) { blocks, options, useSettings in
+                prepareLibraryLaunch(
+                    blocks: blocks, options: options,
+                    usePersonalSettings: useSettings
+                )
+            }
         }
         .sheet(isPresented: $showingPersonalAudioCoach) {
             NavigationStack {
@@ -3757,8 +3804,10 @@ struct WorkoutTemplateDetailView: View {
             Text(shareError ?? "")
         }
         .fullScreenCover(isPresented: $showingWorkout) {
-            StructuredWorkoutSessionView(workout: workoutForStarting)
-                .environmentObject(session)
+            if let selectedWorkout = pendingLaunchWorkout {
+                StructuredWorkoutSessionView(workout: selectedWorkout)
+                    .environmentObject(session)
+            }
         }
         .onAppear {
             reloadPersonalTargets()
