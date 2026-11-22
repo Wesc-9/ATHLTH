@@ -147,6 +147,9 @@ struct ATHLTHWorkoutPersonalOptions: Codable, Hashable {
     var spotifyPlaylist: SpotifyPlaylistReference? = nil
     var spotifyAutoplayOnStart: Bool? = nil
     var spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack? = nil
+    /// Optional song per exact expanded interval/recovery index. Kept only
+    /// in this account-scoped private options store.
+    var stepSongs: [Int: ATHLTHSpotifyIntervalTrack] = [:]
 }
 
 enum ATHLTHWorkoutPersonalOptionsStore {
