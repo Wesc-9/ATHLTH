@@ -234,6 +234,38 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         ))
     }
 
+    @MainActor
+    func testSharedExerciseImportIsIdempotentForSameCreatorAndSource() {
+        let owner = UUID()
+        let creator = UUID()
+        let sourceID = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(owner)
+        defer { library.switchAccount(nil) }
+        let snapshot = ExerciseSnapshot(
+            name: "Imported Cable Pull",
+            instructions: ["Control the movement"],
+            primaryMuscles: ["Back"],
+            secondaryMuscles: [], equipment: ["Cable"], imageURL: nil
+        )
+        let first = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: sourceID,
+            originalCreatorID: creator, originalExerciseID: sourceID
+        )
+        let second = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: sourceID,
+            originalCreatorID: creator, originalExerciseID: sourceID
+        )
+        XCTAssertNotNil(first)
+        XCTAssertEqual(first?.id, second?.id)
+        XCTAssertEqual(
+            library.customExercises.filter {
+                $0.exercise.sharedSourceExerciseID == sourceID
+            }.count, 1
+        )
+        if let first { library.deleteCustomExercise(first.id) }
+    }
+
     func testPublicCatalogShareUsesStableSlugAndResolvesForRecipient() {
         let publicExercise = entry(
             "Lat Pulldown", id: UUID(), source: .repDB,
