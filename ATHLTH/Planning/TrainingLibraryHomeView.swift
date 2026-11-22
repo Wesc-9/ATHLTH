@@ -2846,80 +2846,41 @@ struct TrainingPlanCatalogDetailView: View {
                         icon: "repeat"
                     )
                     detailMetric(
-                        entry.level,
-                        label: ATHLTHLocalization.choose(english: "level", norwegian: "nivå"),
-                        icon: "speedometer"
+                        "\(entry.durationWeeks * entry.sessionsPerWeek)",
+                        label: ATHLTHLocalization.choose(english: "total sessions", norwegian: "økter totalt"),
+                        icon: "figure.run"
                     )
                 }
 
                 ATHLTHPlanGhostCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Weekly rhythm",
-                            norwegian: "Ukerytme"
-                        ))
-                            .font(.headline)
-
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Training focus", norwegian: "Treningsfokus"
+                            ),
+                            systemImage: "scope"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(entry.goal)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
                         HStack(spacing: 8) {
-                            ForEach(
-                                Array(
-                                    entry.workoutKinds.enumerated()
-                                ),
-                                id: \.offset
-                            ) { index, kind in
-                                VStack(spacing: 6) {
-                                    Image(
-                                        systemName:
-                                            kind.systemImage
-                                    )
-                                    .font(
-                                        .system(
-                                            size: 16,
-                                            weight: .semibold
-                                        )
-                                    )
-
-                                    Text("\(index + 1)")
-                                        .font(.caption2.weight(.bold))
-                                }
-                                .foregroundStyle(
-                                    ATHLTHTheme.accent
-                                )
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 11)
-                                .background(
-                                    ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(
-                                        cornerRadius: 12
-                                    )
-                                )
+                            ForEach(Array(entry.workoutKinds.enumerated()), id: \.offset) { _, kind in
+                                Image(systemName: kind.systemImage)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    .frame(width: 34, height: 34)
+                                    .background(ATHLTHPlanDesign.selectedSurface,
+                                                in: RoundedRectangle(cornerRadius: 10))
                             }
                         }
-
                         Text(ATHLTHLocalization.choose(
-                            english: "Each session below includes its actual exercises and targets. Tap a session to expand it. You can edit all workouts after selecting a start date.",
-                            norwegian: "Hver økt nedenfor viser faktiske øvelser og mål. Trykk på en økt for detaljer. Alt kan redigeres etter at du velger startdato."
+                            english: "Explore each week and expand a session to see its exercises, targets and rest.",
+                            norwegian: "Åpne en uke og deretter en økt for å se øvelser, mål og pauser."
                         ))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                ATHLTHPlanGhostCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Goal",
-                            norwegian: "Mål"
-                        ))
-                            .font(.headline)
-                        Text(entry.goal)
-                            .font(.title3.weight(.semibold))
-                        Text(ATHLTHLocalization.choose(
-                            english: "Adapt sets, reps and volume to your training history.",
-                            norwegian: "Tilpass sett, repetisjoner og mengde til treningshistorikken din."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                 }
 
