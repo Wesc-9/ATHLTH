@@ -110,6 +110,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var meetingPlace: String = ""
     var meetingLat: Double? = nil
     var meetingLon: Double? = nil
+    var coachExerciseIDs: [UUID] = []
     var unlock: ATHLTHCompetitionUnlock = .interval
     var every: Int = 7
     var unit: ATHLTHCompetitionIntervalUnit = .day
@@ -129,6 +130,8 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
              (meetingLat.map { (-90...90).contains($0) } == true &&
               meetingLon.map { (-180...180).contains($0) } == true))
         return validStart && validVenue &&
+            coachExerciseIDs.count <= 12 &&
+            Set(coachExerciseIDs).count == coachExerciseIDs.count &&
             (startMode != .scheduled || startsAt != nil) &&
             (1...unit.maximumCount).contains(every) &&
             ATHLTHTournamentCadence.completionHours.contains(completionHours) &&
@@ -148,7 +151,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     init() {}
     private enum CodingKeys: String, CodingKey {
         case startsAt, startMode, environment, meetingPlace, meetingLat,
-             meetingLon, unlock, every, unit, completionHours,
+             meetingLon, coachExerciseIDs, unlock, every, unit, completionHours,
              invitationPermission, joinApproval, agreement
     }
     init(from decoder: Decoder) throws {
@@ -162,6 +165,8 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
                                              forKey: .meetingPlace) ?? ""
         meetingLat = try c.decodeIfPresent(Double.self, forKey: .meetingLat)
         meetingLon = try c.decodeIfPresent(Double.self, forKey: .meetingLon)
+        coachExerciseIDs = try c.decodeIfPresent([UUID].self,
+                                                  forKey: .coachExerciseIDs) ?? []
         unlock = try c.decodeIfPresent(ATHLTHCompetitionUnlock.self,
                                        forKey: .unlock) ?? .interval
         every = try c.decodeIfPresent(Int.self, forKey: .every) ?? 7
