@@ -228,7 +228,7 @@ struct WorkoutStartOptionsView: View {
                         activity: .strength,
                         advanced: trackingMode == .advanced,
                         showOnIPad: $showOnIPad,
-                        iPadAvailable: registeredIPad.hasRegisteredIPad,
+                        iPadAvailable: ATHLTHDeviceRole.isIPhone && registeredIPad.hasRegisteredIPad,
                         detail: { tool in strengthStartToolDetail(tool) }
                     )
 
