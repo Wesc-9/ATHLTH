@@ -882,7 +882,17 @@ struct HomeActiveFriendsStrip: View {
         }
     }
             .sheet(item: $challengeFriend) { friend in
-                ChallengeCreationView(preselectedFriends: [friend])
+                // This Home quick action previously mounted the legacy
+                // 11k-line ChallengeCreationView directly beneath the
+                // large Friends strip. On iOS 27.3 (2.2.7 / 135) the
+                // resulting generic metadata evaluation overflowed the
+                // main-thread stack. Route through the same small modern
+                // sport/format chooser used by the friend profile instead.
+                // Type erasure keeps the heavy competition editor out of
+                // Home's generic view type.
+                AnyView(ATHLTHCompetitionEntryView(
+                    preselectedFriend: friend
+                ))
             }
             .sheet(item: $trainTogetherFriend) { friend in
                 // Reuse Plan's real invitation editor. Its send action
