@@ -80,11 +80,24 @@ final class ATHLTHCompetitionGPSLapCounterTests: XCTestCase {
         XCTAssertEqual(state.laps, 1)
     }
 
-    func testOldWorkoutWithoutCompetitionContextRemainsDecodable() throws {
-        let json = Data(#"{\"walking\":false,\"start\":0,\"end\":null,\"lastCheckpoint\":0}"#.utf8)
-        // The original decoding rules are unchanged: competitionCapture is
-        // an optional additional field, never a required new recording.
-        let original = try? JSONDecoder().decode(PhoneWorkout.self,from: json)
-        XCTAssertNil(original?.competitionCapture)
+    func testRaceOverlayRoundTripPreservesOriginalWorkoutIdentity() throws {
+        let raceID = UUID()
+        var race = ATHLTHCompetitionRaceRules()
+        race.discipline = .laps
+        race.lapCount = 5
+        race.lapCourseName = "Rundt bygningen"
+        race.lapVerification = .gps
+        var record = ATHLTHCompetitionCaptureContext(
+            tournamentID: raceID,
+            startSignalAt: start,
+            raceRules: race
+        )
+        record.lapState.laps = 2
+        let recovered = try JSONDecoder().decode(
+            ATHLTHCompetitionCaptureContext.self,
+            from: JSONEncoder().encode(record)
+        )
+        XCTAssertEqual(recovered.tournamentID,raceID)
+        XCTAssertEqual(recovered.lapSummary,"2/5 runder")
     }
 }
