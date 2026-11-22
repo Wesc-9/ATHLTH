@@ -282,6 +282,52 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testMyExercisesCannotBeUpdatedOrDeletedFromAnotherAccount() {
+        let owner = UUID()
+        let other = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(owner)
+        defer { library.switchAccount(nil) }
+        let created = library.createCustomExercise(
+            ownerID: owner, name: "Private owner exercise",
+            instructions: ["Keep form"], primaryMuscles: ["Back"],
+            secondaryMuscles: [], equipment: ["Cable"],
+            isVisibleOutsideOwnerLibrary: false
+        )
+        XCTAssertTrue(library.customExercises.contains { $0.id == created.id })
+        library.switchAccount(other)
+        XCTAssertFalse(library.customExercises.contains { $0.id == created.id })
+        var attemptedUpdate = created.exercise
+        attemptedUpdate.name = "Cross-account edit"
+        library.updateCustomExercise(attemptedUpdate)
+        library.deleteCustomExercise(created.id)
+        XCTAssertFalse(library.customExercises.contains { $0.id == created.id })
+        library.switchAccount(owner)
+        XCTAssertTrue(library.customExercises.contains {
+            $0.id == created.id && $0.exercise.name == "Private owner exercise"
+        })
+        library.deleteCustomExercise(created.id)
+        XCTAssertFalse(library.customExercises.contains { $0.id == created.id })
+    }
+
+    @MainActor
+    func testUnknownCustomExerciseCannotBeInsertedThroughUpdate() {
+        let owner = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(owner)
+        defer { library.switchAccount(nil) }
+        let unknown = Exercise(
+            id: UUID(), origin: .custom, ownerID: owner,
+            name: "Unverified private exercise",
+            instructions: [], primaryMuscles: ["Back"],
+            secondaryMuscles: [], equipment: [], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        library.updateCustomExercise(unknown)
+        XCTAssertFalse(library.customExercises.contains { $0.id == unknown.id })
+    }
+
     func testExistingPlansRemainDecodableWithNoExerciseSnapshot() throws {
         let legacy = """
         {
