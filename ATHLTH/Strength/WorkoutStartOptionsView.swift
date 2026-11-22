@@ -9,7 +9,6 @@ struct WorkoutStartOptionsView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
-    @EnvironmentObject private var gear: ProfileGearStore
 
     let session: PlannedSession
     let trainingDeviceProvider: TrainingDeviceProvider
