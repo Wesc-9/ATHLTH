@@ -1139,7 +1139,9 @@ final class LibraryFavoritesStore: ObservableObject {
                 acknowledgeChange(change, key: key, userID: user.id)
                 guard activeUserID == user.id,
                       client.auth.currentUser?.id == user.id else { return }
-                errorMessage = nil
+                // One successful item must not hide a different item's
+                // outstanding sync failure.
+                if pendingChanges.isEmpty { errorMessage = nil }
             } catch {
                 guard activeUserID == user.id,
                       client.auth.currentUser?.id == user.id else { return }
