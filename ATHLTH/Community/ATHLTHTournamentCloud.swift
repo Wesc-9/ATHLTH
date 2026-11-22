@@ -36,6 +36,18 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let createdAt: Date
     let startedAt: Date?
     let completedAt: Date?
+    let plannedStartsAt: Date?
+    let releaseMode: String
+    let releaseEvery: Int
+    let releaseUnit: String
+    let invitationPermission: String
+    let joinApproval: String
+    let allowedActions: String
+    let prohibitedActions: String
+    let prizeFirst: String
+    let prizeSecond: String
+    let prizeThird: String
+    let loserConsequence: String
 
     enum CodingKeys: String, CodingKey {
         case id, title, format, status
@@ -67,6 +79,18 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
         case createdAt = "created_at"
         case startedAt = "started_at"
         case completedAt = "completed_at"
+        case plannedStartsAt = "planned_starts_at"
+        case releaseMode = "release_mode"
+        case releaseEvery = "release_every"
+        case releaseUnit = "release_unit"
+        case invitationPermission = "invitation_permission"
+        case joinApproval = "join_approval"
+        case allowedActions = "allowed_actions"
+        case prohibitedActions = "prohibited_actions"
+        case prizeFirst = "prize_first"
+        case prizeSecond = "prize_second"
+        case prizeThird = "prize_third"
+        case loserConsequence = "loser_consequence"
     }
 }
 
@@ -211,6 +235,38 @@ private struct ATHLTHTournamentCreateParams: Encodable {
     }
 }
 
+private struct ATHLTHTournamentCompetitionPayload: Encodable {
+    let startsAt: String?
+    let unlock: String
+    let every: Int
+    let unit: String
+    let invitationPermission: String
+    let joinApproval: String
+    let allowed: String
+    let prohibited: String
+    let firstPrize: String
+    let secondPrize: String
+    let thirdPrize: String
+    let loserConsequence: String
+
+    init(_ settings: ATHLTHTournamentCompetitionSettings) {
+        startsAt = settings.startsAt.map {
+            ISO8601DateFormatter().string(from: $0)
+        }
+        unlock = settings.unlock.rawValue
+        every = settings.every
+        unit = settings.unit.rawValue
+        invitationPermission = settings.invitationPermission.rawValue
+        joinApproval = settings.joinApproval.rawValue
+        allowed = settings.agreement.allowed
+        prohibited = settings.agreement.prohibited
+        firstPrize = settings.agreement.firstPrize
+        secondPrize = settings.agreement.secondPrize
+        thirdPrize = settings.agreement.thirdPrize
+        loserConsequence = settings.agreement.loserConsequence
+    }
+}
+
 private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
     let p_title: String
     let p_format: String
@@ -236,6 +292,7 @@ private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
     let p_allow_extensions: Bool
     let p_win_points: Int
     let p_draw_points: Int
+    let p_setup: ATHLTHTournamentCompetitionPayload
 
     enum CodingKeys: String, CodingKey {
         case p_title,p_format,p_club,p_season,p_group_size,p_qualifiers,
@@ -244,7 +301,7 @@ private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
              p_allowed_activities,p_rules_authority,p_cadence_days,
              p_completion_hours,p_rotation_mode,p_rest_weekdays,
              p_proof_mode,p_public_results,p_allow_extensions,
-             p_win_points,p_draw_points
+             p_win_points,p_draw_points,p_setup
     }
 
     func encode(to encoder: Encoder) throws {
@@ -273,6 +330,7 @@ private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
         try keyed.encode(p_allow_extensions,forKey: .p_allow_extensions)
         try keyed.encode(p_win_points,forKey: .p_win_points)
         try keyed.encode(p_draw_points,forKey: .p_draw_points)
+        try keyed.encode(p_setup,forKey: .p_setup)
     }
 }
 
@@ -350,6 +408,9 @@ struct ATHLTHTournamentCloudService {
         guard draft.participants.count >= 2 else {
             throw ATHLTHTournamentEngineError.tooFewParticipants
         }
+        guard draft.competitionSettings.isValid else {
+            throw ATHLTHTournamentEngineError.invalidGroupSize
+        }
         try ATHLTHTournamentEngine.validate(
             draft.participants,
             groupSize: draft.groupSize,
@@ -358,7 +419,7 @@ struct ATHLTHTournamentCloudService {
         let targets = draft.participants.filter { $0.id != draft.ownerID }
         let timestamp = ISO8601DateFormatter()
         return try await client.rpc(
-            "athlth_tournament_create_accepted_rules",
+            "athlth_tournament_create_competition",
             params: ATHLTHTournamentConfiguredCreateParams(
                 p_title: draft.title,
                 p_format: draft.format.rawValue,
@@ -380,14 +441,17 @@ struct ATHLTHTournamentCloudService {
                 p_allowed_activities: draft.allowedActivities.map(\.rawValue),
                 p_rules_authority: draft.rulesAuthority.rawValue,
                 p_cadence_days: draft.cadenceDays,
-                p_completion_hours: draft.completionHours,
+                p_completion_hours: draft.competitionSettings.completionHours,
                 p_rotation_mode: draft.rotationMode.rawValue,
                 p_rest_weekdays: draft.restWeekdays,
                 p_proof_mode: draft.proofMode.rawValue,
                 p_public_results: draft.publicResults,
                 p_allow_extensions: draft.allowExtensions,
                 p_win_points: draft.winPoints,
-                p_draw_points: draft.drawPoints
+                p_draw_points: draft.drawPoints,
+                p_setup: ATHLTHTournamentCompetitionPayload(
+                    draft.competitionSettings
+                )
             )
         ).execute().value
     }
