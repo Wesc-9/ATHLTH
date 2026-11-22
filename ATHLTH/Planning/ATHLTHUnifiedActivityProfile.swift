@@ -301,7 +301,12 @@ struct ATHLTHUnifiedActivityProfile: Equatable {
         let otherSports = tagged.subtracting([
             .cycling, .yoga, .mobility
         ])
-        let activities = [running, walking, strength, cycling, mobility]
+        // Running and walking are one endurance recording family. A
+        // run/walk interval plan must not become an unsupported hybrid only
+        // because its warm-up, recoveries or work segments alternate gait.
+        // Their individual block cardioActivity tags remain unchanged.
+        let endurance = running || walking
+        let activities = [endurance, strength, cycling, mobility]
             .filter { $0 }.count + otherSports.count
 
         if activities > 1 {
