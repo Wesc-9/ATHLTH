@@ -219,9 +219,14 @@ struct ATHLTHiPadStudioRootView: View {
                 $0.dropFirst("--athlth-compatibility-sidebar=".count)
             ))
         }
-        _selection = State(initialValue: initial)
-        _libraryPage = State(initialValue: libraryPreview)
-        _sidebarPage = State(initialValue: sidebarPreview)
+        let plannerPreview = ProcessInfo.processInfo.arguments.contains(
+            "--athlth-compatibility-workout-planner"
+        )
+        _selection = State(initialValue: plannerPreview ? .overview : initial)
+        _libraryPage = State(initialValue: plannerPreview ? nil : libraryPreview)
+        _sidebarPage = State(initialValue: plannerPreview ? nil : sidebarPreview)
+        _focusedPlanningDate = State(initialValue: plannerPreview
+            ? Calendar.current.startOfDay(for: .now) : nil)
         // Plan Studio and every other destination start with the same menu.
         _sidebarVisibility = State(initialValue: .all)
     }
@@ -364,7 +369,8 @@ struct ATHLTHiPadStudioRootView: View {
                     .contains {
                         $0.hasPrefix("--athlth-compatibility-tab=") ||
                             $0.hasPrefix("--athlth-compatibility-library=") ||
-                            $0.hasPrefix("--athlth-compatibility-sidebar=")
+                            $0.hasPrefix("--athlth-compatibility-sidebar=") ||
+                            $0 == "--athlth-compatibility-workout-planner"
                     }
                 if !compatibilityLaunch {
                     if let restored = ATHLTHStudioDestination(

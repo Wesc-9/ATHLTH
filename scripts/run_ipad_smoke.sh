@@ -310,6 +310,7 @@ if [ "$IPAD_SIZE" = "13" ]; then
 
   preview_13_inch "home" "--athlth-compatibility-tab=0"
   preview_13_inch "plan-studio" "--athlth-compatibility-tab=1"
+  preview_13_inch "workout-planner" "--athlth-compatibility-workout-planner"
   preview_13_inch "library-exercises" "--athlth-compatibility-library=exercises"
   preview_13_inch "profile" "--athlth-compatibility-sidebar=profile"
   echo "ATHLTH 13-inch iPad Home, Plan Studio, library, and Profile passed."
@@ -426,8 +427,29 @@ if ! kill -0 "$PROFILE_PID" 2>/dev/null; then
 fi
 simctl_bounded "terminate iPad preview" 35 terminate "$UDID" com.wesc9.athlth || true
 
-# The 11-inch matrix job is complete after these 12 validated screens.
-# A separate 13-inch job tests the larger layout on a fresh runner.
+# A real focused-day workout planner was previously skipped by every
+# iPad simulator check. Launch the exact editorial-dashboard planning flow,
+# not merely the Plan Studio landing page; keep a screenshot artifact and
+# fail if its SwiftUI view tree crashes while the new grid is rendered.
+PLANNER_OUTPUT=$(simctl_bounded "launch iPad premium workout planner" 65 launch "$UDID" com.wesc9.athlth \
+  --athlth-compatibility-preview \
+  --athlth-compatibility-workout-planner 2>&1)
+echo "$PLANNER_OUTPUT"
+PLANNER_PID=$(echo "$PLANNER_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+sleep 5
+if [ -z "$PLANNER_PID" ] || ! kill -0 "$PLANNER_PID" 2>/dev/null; then
+  echo "::error::ATHLTH iPad workout planner exited before rendering."
+  exit 1
+fi
+validate_screen "premium-workout-planner"
+if ! kill -0 "$PLANNER_PID" 2>/dev/null; then
+  echo "::error::ATHLTH iPad workout planner crashed after rendering."
+  exit 1
+fi
+simctl_bounded "terminate iPad planner preview" 35 terminate "$UDID" com.wesc9.athlth || true
+
+# The 11-inch matrix includes the focused planner; 13-inch tests its
+# larger editor layout independently on a fresh runner.
 if [ "$IPAD_SIZE" = "11" ]; then
   echo "ATHLTH 11-inch iPad onboarding, tabs, libraries and profile passed."
   exit 0
