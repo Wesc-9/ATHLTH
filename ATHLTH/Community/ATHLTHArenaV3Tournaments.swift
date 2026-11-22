@@ -1008,7 +1008,9 @@ struct ATHLTHTournamentCreator: View {
     private var preview: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle("Forhåndsvisning")
-            Text(format == .cup
+            Text(isSingleEvent
+                ? "Én felles hendelse · \(athletes.count) deltakere"
+                : format == .cup
                 ? "\(ATHLTHTournamentStructure.bracketSize(athletes.count))-plassers cupoppsett"
                 : format == .league
                 ? "\(ATHLTHTournamentStructure.leagueMatchCount(athletes.count)) oppgjør i én liga"
@@ -1026,7 +1028,9 @@ struct ATHLTHTournamentCreator: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
             }
-            Text("Oppsettet er et utkast. Trekningen gjøres ved start, og bare godkjente resultater teller.")
+            Text(isSingleEvent
+                ? "Én konkurranse for alle inviterte. Alle må godta og trykke Klar. Resultater vises når alle er ferdige."
+                : "Oppsettet er et utkast. Trekningen gjøres ved start, og bare godkjente resultater teller.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
@@ -1101,7 +1105,9 @@ struct ATHLTHTournamentDraftDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text(draft.format.title.uppercased() + " · UTKAST")
+                    Text((draft.singleEventMode
+                          ? "ENKELTKONKURRANSE" : draft.format.title.uppercased()) +
+                          " · UTKAST")
                         .font(.caption2.weight(.semibold))
                         .tracking(2.2)
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
@@ -1150,14 +1156,30 @@ struct ATHLTHTournamentDraftDetailView: View {
                 if !draft.warmupRounds.isEmpty {
                     warmupSection
                 }
-                if draft.format == .cup {
+                if draft.singleEventMode {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Label("Én konkurranse for alle deltakerne",
+                              systemImage: "flag.checkered")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        Text("Øvelse: " + draft.competitionSettings.race.discipline.title)
+                            .font(.subheadline)
+                        Text("Ingen ligakamper eller cupoppsett opprettes. Alle må godta og trykke Klar.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    .padding(15)
+                    .background(ATHLTHArenaV3Style.panel())
+                } else if draft.format == .cup {
                     cupView
                 } else if draft.format == .groups {
                     groupsView
                 } else {
                     tableView(draft.participants, title: "Ligatabell")
                 }
-                Text("Forhåndsvisningen viser bare kampstrukturen. Ved publisering sendes invitasjoner, men ingen oppgjør eller resultater teller før alle har svart og arrangøren starter.")
+                Text(draft.singleEventMode
+                     ? "Etter publisering opprettes én gruppesamtale med invitasjoner. Startsignalet og resultatgodkjenningen håndteres av konkurransen."
+                     : "Forhåndsvisningen viser bare kampstrukturen. Ved publisering sendes invitasjoner, men ingen oppgjør eller resultater teller før alle har svart og arrangøren starter.")
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
