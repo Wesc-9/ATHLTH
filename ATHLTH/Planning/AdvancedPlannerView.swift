@@ -5725,8 +5725,8 @@ struct SessionEditorView: View {
         _selectedPartnerID = State(initialValue: partnerID)
         _partnerPlanningExpanded = State(initialValue: true)
         _directPartnerID = State(initialValue: partnerID)
-        // Scheduling with a friend always means an in-person meetup.
-        _physicalMeetup = State(initialValue: true)
+        // The calling surface's chosen presence mode must be preserved.
+        _physicalMeetup = State(initialValue: physicalMeetup)
         if let initialWorkoutStart {
             _scheduledTime = State(initialValue: initialWorkoutStart)
         }
@@ -5783,7 +5783,7 @@ struct SessionEditorView: View {
             }) ? .indoor : .outdoor
         _runEnvironment = State(initialValue: storedRunEnvironment)
         _meetingPoint = State(initialValue: workout.meetingPoint)
-        _physicalMeetup = State(initialValue: true)
+        _physicalMeetup = State(initialValue: workout.trainTogetherMode != .sameWorkout)
         _allowInviteeExercises = State(initialValue: workout.allowInviteeExercises == true)
         _reminderMinutesBefore = State(initialValue: workout.reminderMinutesBefore ?? 0)
         _plannedExercises = State(initialValue: workout.exercises)
@@ -6656,9 +6656,9 @@ struct SessionEditorView: View {
         // agreed. A date in the past would make the message instantly look
         // cancelled to the recipient.
         workout.scheduledStart = scheduledTime > Date() ? scheduledTime : nil
-        workout.trainTogetherMode = .physical
+        workout.trainTogetherMode = physicalMeetup ? .physical : .sameWorkout
         workout.invitedPartnerID = partnerID
-        workout.allowInviteeExercises = true
+        workout.allowInviteeExercises = allowInviteeExercises
         workout.meetingPoint = meetingPoint
         guard let bound = libraryBoundWorkout(workout) else {
             return ATHLTHLocalization.choose(
@@ -6679,6 +6679,13 @@ struct SessionEditorView: View {
         }
 
         do {
+            let liveDraft = TrainTogetherLiveDraftStore()
+            try await liveDraft.create(
+                workout: bound,
+                partnerID: partnerID,
+                isCollaborative: allowInviteeExercises,
+                isPhysical: physicalMeetup
+            )
             let conversationID = try await messaging.openConversation(
                 with: partnerID
             )
@@ -6720,7 +6727,6 @@ struct SessionEditorView: View {
                     $0.id == bound.id
                 } ?? bound
             collaborationInvitationSent = true
-            allowInviteeExercises = true
             return nil
         } catch {
             return error.localizedDescription
@@ -6734,6 +6740,16 @@ struct SessionEditorView: View {
               let partnerID = selectedPartnerID else { return }
         Task { @MainActor in
             do {
+                let live = TrainTogetherLiveDraftStore()
+                await live.refresh(workout.id)
+                if let draft = live.draft {
+                    await live.save(workout, basedOn: draft.revision)
+                    if let issue = live.errorMessage {
+                        invitationError = issue
+                        showingInvitationError = true
+                        return
+                    }
+                }
                 let conversation = try await messaging.openConversation(
                     with: partnerID
                 )
@@ -7524,9 +7540,9 @@ struct SessionEditorView: View {
                             latest.scheduledStart = scheduledTime > Date()
                                 ? scheduledTime : nil
                             latest.invitedPartnerID = selectedPartnerID
-                            latest.allowInviteeExercises = true
-                            latest.trainTogetherMode = .physical
-                            latest.meetingPoint = meetingPoint
+                            latest.allowInviteeExercises = allowInviteeExercises
+                            latest.trainTogetherMode = physicalMeetup ? .physical : .sameWorkout
+                            latest.meetingPoint = physicalMeetup ? meetingPoint : nil
                             guard let bound = libraryBoundWorkout(latest)
                             else { return false }
                             if let baseline = collaborationInviteBaseline,
@@ -9153,20 +9169,64 @@ struct SessionEditorView: View {
         }
     }
 
+    /// One invitation permission and one location choice for every workout mode.
+    /// These are independent: a remote workout can still be built together.
+    private var partnerCollaborationOptions: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Invitation type", norwegian: "Type tren sammen"
+                ),
+                selection: $allowInviteeExercises
+            ) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Build together", norwegian: "Bygg økt sammen"
+                )).tag(true)
+                Text(ATHLTHLocalization.choose(
+                    english: "Send locked workout", norwegian: "Send låst økt"
+                )).tag(false)
+            }
+            .pickerStyle(.segmented)
+            .disabled(collaborationInvitationSent)
+
+            Text(allowInviteeExercises
+                ? ATHLTHLocalization.choose(
+                    english: "Both can edit the shared workout live; both approve before Ready.",
+                    norwegian: "Begge kan redigere økten fortløpende. Begge godkjenner før Klar."
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Only you can edit; your partner can view, approve and join.",
+                    norwegian: "Bare du kan redigere. Vennen kan se, godkjenne og delta."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Where to train", norwegian: "Hvordan skal dere trene?"
+                ),
+                selection: $physicalMeetup
+            ) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Together in person", norwegian: "Fysisk sammen"
+                )).tag(true)
+                Text(ATHLTHLocalization.choose(
+                    english: "Separately", norwegian: "Hver for dere"
+                )).tag(false)
+            }
+            .pickerStyle(.segmented)
+            .disabled(collaborationInvitationSent)
+        }
+        .tint(ATHLTHPlanDesign.accent)
+    }
+
     private var partnerPlanningSection: some View {
         Section {
             if directPartnerID != nil {
                 lockedTrainingPartnerCard
 
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Allow guest to add exercises",
-                        norwegian: "La invitert legge til øvelser"
-                    ),
-                    isOn: $allowInviteeExercises
-                )
-                .tint(ATHLTHPlanDesign.accent)
-                .padding(.horizontal, 2)
+                partnerCollaborationOptions
+                    .padding(.horizontal, 2)
             } else {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
@@ -9221,14 +9281,7 @@ struct SessionEditorView: View {
                     trainingPartnerQuickPicker
 
                     if selectedPartnerID != nil {
-                        Toggle(
-                            ATHLTHLocalization.choose(
-                                english: "Allow guest to add exercises",
-                                norwegian: "La invitert legge til øvelser"
-                            ),
-                            isOn: $allowInviteeExercises
-                        )
-                        .tint(ATHLTHPlanDesign.accent)
+                        partnerCollaborationOptions
                     }
                 }
             }
@@ -11014,7 +11067,8 @@ struct SessionEditorView: View {
                 ? reminderMinutesBefore : nil,
             trainTogetherMode: onPreparedWorkout != nil
                 ? initialSourceWorkout?.trainTogetherMode
-                : selectedPartnerID == nil ? nil : .physical,
+                : selectedPartnerID == nil ? nil :
+                    (physicalMeetup ? .physical : .sameWorkout),
             invitedPartnerID: onPreparedWorkout != nil
                 ? initialSourceWorkout?.invitedPartnerID : selectedPartnerID,
             allowInviteeExercises: onPreparedWorkout != nil
@@ -11072,6 +11126,13 @@ struct SessionEditorView: View {
         isSaving = true
         Task {
             do {
+                let liveDraft = TrainTogetherLiveDraftStore()
+                try await liveDraft.create(
+                    workout: workout,
+                    partnerID: partnerID,
+                    isCollaborative: workout.allowInviteeExercises == true,
+                    isPhysical: workout.trainTogetherMode != .sameWorkout
+                )
                 let conversationID = try await messaging.openConversation(
                     with: partnerID
                 )
