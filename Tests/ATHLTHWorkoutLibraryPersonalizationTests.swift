@@ -118,6 +118,95 @@ final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
         XCTAssertNil(result.blocks[0].work.intensity.paceMaxSecondsPerKilometer)
     }
 
+    func testFourByFourPrivatePaceIsFourteenKilometersPerHourWithoutChangingRecovery() throws {
+        let source = try XCTUnwrap(
+            RunningWorkoutLibraryStore.builtInTemplates.first {
+                ATHLTHWorkoutSearch.normalized($0.title) == "4x4 intervaller"
+            }
+        )
+        let original = ATHLTHRunningLibraryDefaults.unpersonalized(source)
+        XCTAssertEqual(ATHLTHRunningPrivateSpeedPolicy.workCount(in: original), 4)
+        let edited = ATHLTHRunningPrivateSpeedPolicy.applying(
+            kilometersPerHour: 14, to: original
+        )
+        for block in edited.blocks where block.kind == .work {
+            XCTAssertEqual(block.work.intensity.paceMinSecondsPerKilometer ?? 0,
+                           3600 / 14, accuracy: 0.001)
+            XCTAssertEqual(block.work.intensity.paceMaxSecondsPerKilometer ?? 0,
+                           3600 / 14, accuracy: 0.001)
+            XCTAssertNil(block.recovery?.intensity.paceMinSecondsPerKilometer)
+        }
+        XCTAssertEqual(original, ATHLTHRunningLibraryDefaults.unpersonalized(source))
+        XCTAssertTrue(original.blocks.allSatisfy {
+            $0.kind != .work ||
+            $0.work.intensity.paceMinSecondsPerKilometer == nil
+        })
+    }
+
+    func testPrivateRunningWorkoutSavedByAccountAndNeverChangesLibrarySource() throws {
+        let suite = "athlth.private-running-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let source = try XCTUnwrap(
+            RunningWorkoutLibraryStore.builtInTemplates.first {
+                ATHLTHWorkoutSearch.normalized($0.title) == "4x4 intervaller"
+            }
+        )
+        let user = UUID()
+        let edited = ATHLTHRunningPrivateSpeedPolicy.applying(
+            kilometersPerHour: 14, to: ATHLTHRunningLibraryDefaults.unpersonalized(source)
+        )
+        XCTAssertTrue(ATHLTHRunningPrivateWorkoutStore.save(
+            userID: user, source: source, customized: edited, defaults: defaults
+        ))
+        let restored = try XCTUnwrap(ATHLTHRunningPrivateWorkoutStore.load(
+            userID: user, source: source, defaults: defaults
+        ))
+        XCTAssertEqual(restored.sharedSourceWorkoutID, source.id)
+        XCTAssertEqual(restored.title, source.title)
+        XCTAssertFalse(restored.isBuiltIn)
+        XCTAssertEqual(ATHLTHRunningPrivateSpeedPolicy.workCount(in: restored), 4)
+        XCTAssertNil(ATHLTHRunningPrivateWorkoutStore.load(
+            userID: UUID(), source: source, defaults: defaults
+        ))
+        ATHLTHRunningPrivateWorkoutStore.reset(
+            userID: user, sourceID: source.id, defaults: defaults
+        )
+        XCTAssertNil(ATHLTHRunningPrivateWorkoutStore.load(
+            userID: user, source: source, defaults: defaults
+        ))
+        XCTAssertTrue(source.isBuiltIn)
+    }
+
+    func testPrivateRunningLaunchSettingsNeverEnterEncodedSharedWorkout() throws {
+        let source = try XCTUnwrap(
+            RunningWorkoutLibraryStore.builtInTemplates.first {
+                ATHLTHWorkoutSearch.normalized($0.title) == "4x4 intervaller"
+            }
+        )
+        var payload = ATHLTHRunningLibraryDefaults.unpersonalized(source)
+        var coach = WatchAudioCoachConfiguration.disabled
+        coach.enabled = true
+        payload.launchAudioCoachConfiguration = coach
+        payload.launchSpotifyAutoplayOnStart = true
+        payload.launchStepSongs = [
+            1: ATHLTHSpotifyIntervalTrack(
+                id: String(repeating: "a", count: 22),
+                title: "My song", artist: "Private",
+                durationMilliseconds: 180_000
+            )
+        ]
+        let encoded = try JSONEncoder().encode(payload)
+        let json = try XCTUnwrap(String(data: encoded, encoding: .utf8))
+        XCTAssertFalse(json.contains("launchAudioCoachConfiguration"))
+        XCTAssertFalse(json.contains("launchStepSongs"))
+        XCTAssertFalse(json.contains("My song"))
+        let decoded = try JSONDecoder().decode(RunningWorkoutTemplate.self, from: encoded)
+        XCTAssertNil(decoded.launchAudioCoachConfiguration)
+        XCTAssertNil(decoded.launchStepSongs)
+        XCTAssertTrue(source.isBuiltIn)
+    }
+
     func testSavedPersonalRunningCopyUsesOriginalLibraryIdentity() throws {
         let source = try XCTUnwrap(
             RunningWorkoutLibraryStore.builtInTemplates.first {
