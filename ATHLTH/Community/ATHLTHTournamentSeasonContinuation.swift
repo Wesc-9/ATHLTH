@@ -109,6 +109,11 @@ enum ATHLTHTournamentSeasonContinuation {
         nextSettings.meetingLon = completed.meetingLon
         // A new season always gets a new, independently approved exercise list.
         nextSettings.coachExerciseIDs = []
+        nextSettings.invitationDays = completed.invitationDays
+        nextSettings.unansweredPolicy =
+            ATHLTHCompetitionUnansweredPolicy(rawValue:
+                completed.unansweredPolicy) ?? .cancel
+        nextSettings.allowFeedPost = completed.allowFeedPost
 
         // Deliberately do not re-use the previous club season ID. The owner
         // chooses a new club season (if applicable) in the full editor.
