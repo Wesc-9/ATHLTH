@@ -8,7 +8,9 @@ struct ATHLTHTrainIntervalComposerView: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     let initial: RunningWorkoutTemplate?
+    let focusedTimelineStepIndex: Int?
     let onSave: (RunningWorkoutTemplate) -> Void
+    @State private var didApplyInitialFocus = false
 
     @State private var name: String
     @State private var blocks: [RunningWorkoutBlock]
@@ -76,8 +78,10 @@ struct ATHLTHTrainIntervalComposerView: View {
     private let paper = ATHLTHTrainDesign.canvas
 
     init(initial: RunningWorkoutTemplate? = nil,
+         focusedTimelineStepIndex: Int? = nil,
          onSave: @escaping (RunningWorkoutTemplate) -> Void) {
         self.initial = initial
+        self.focusedTimelineStepIndex = focusedTimelineStepIndex
         self.onSave = onSave
         _name = State(initialValue: initial?.title ?? "")
         let initialBlocks = initial?.blocks ?? []
@@ -233,6 +237,7 @@ struct ATHLTHTrainIntervalComposerView: View {
             }
         }
         .preferredColorScheme(.light)
+        .onAppear { focusRequestedStepOnce() }
         .onChange(of: speedInputEnabled) { _, speed in
             if speed {
                 speedKilometersPerHour = 3_600 / Double(max(paceSeconds, 1))
@@ -814,6 +819,31 @@ struct ATHLTHTrainIntervalComposerView: View {
         }
         .padding(16)
         .background(.white, in: RoundedRectangle(cornerRadius: 15))
+    }
+
+    /// Focus the selected canonical effort/recovery without eagerly creating
+    /// extra views for every interval. The same composer edits and saves it.
+    private func focusRequestedStepOnce() {
+        guard !didApplyInitialFocus, let focus = focusedTimelineStepIndex,
+              focus >= 0 else { return }
+        didApplyInitialFocus = true
+        var index = 0
+        for block in blocks {
+            for repetition in 1...max(block.repetitions, 1) {
+                if index == focus {
+                    edit(block)
+                    return
+                }
+                index += 1
+                if block.resolvedRecovery(after: repetition) != nil {
+                    if index == focus {
+                        edit(block)
+                        return
+                    }
+                    index += 1
+                }
+            }
+        }
     }
 
     private func loadFourByFour() {
