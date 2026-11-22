@@ -24,6 +24,86 @@ final class ATHLTHWorkoutUserTargetsStoreTests: XCTestCase {
         return [work, recovery]
     }
 
+    func testOwnSpeedOrPaceCanBeEnteredWithoutFixedDefault() {
+        XCTAssertEqual(
+            ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+                input: "14", unit: .kilometersPerHour
+            ), 14
+        )
+        XCTAssertEqual(
+            ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+                input: "9,5", unit: .kilometersPerHour
+            ), 9.5
+        )
+        XCTAssertEqual(
+            ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+                input: "5:00", unit: .minutesPerKilometer
+            ), 12
+        )
+        XCTAssertEqual(
+            ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+                input: "5.00", unit: .minutesPerKilometer
+            ), 12
+        )
+        XCTAssertEqual(
+            ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+                input: "5,30", unit: .minutesPerKilometer
+            ) ?? 0, 3600.0 / 330.0, accuracy: 0.0001
+        )
+        XCTAssertNil(ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+            input: "", unit: .kilometersPerHour
+        ))
+        XCTAssertNil(ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+            input: "5:99", unit: .minutesPerKilometer
+        ))
+        XCTAssertNil(ATHLTHPersonalWorkoutSpeedPolicy.kilometersPerHour(
+            input: "5.3", unit: .minutesPerKilometer
+        ))
+        XCTAssertEqual(
+            ATHLTHPersonalWorkoutSpeedPolicy.display(
+                kilometersPerHour: 12, unit: .minutesPerKilometer
+            ), "5:00"
+        )
+    }
+
+    func testApplyingCustomSpeedOnlyChangesFourEfforts() {
+        let recoveryIndices: Set<Int> = [2, 4, 6]
+        let steps: [WorkoutTemplateBlock] = (0..<9).map { index in
+            WorkoutTemplateBlock(
+                sequence: index + 1,
+                kind: .run,
+                title: "Part \(index + 1)",
+                exerciseSlug: nil,
+                distanceMeters: nil,
+                repetitions: nil,
+                durationSeconds: index == 0 || index == 8 ? 600 : 240,
+                targetWeightKilograms: nil,
+                loadNote: nil,
+                notes: nil,
+                phase: index == 0 ? .warmup :
+                    (index == 8 ? .cooldown :
+                        (recoveryIndices.contains(index) ? .recovery : .main))
+            )
+        }
+        XCTAssertEqual(
+            ATHLTHPersonalWorkoutSpeedPolicy.workIndices(in: steps),
+            [1, 3, 5, 7]
+        )
+        let updated = ATHLTHPersonalWorkoutSpeedPolicy.applying(
+            kilometersPerHour: 9.5, to: steps
+        )
+        for index in [1, 3, 5, 7] {
+            XCTAssertEqual(
+                updated[index].targetPaceSecondsPerKilometer ?? 0,
+                3600 / 9.5, accuracy: 0.0001
+            )
+        }
+        for index in [0, 2, 4, 6, 8] {
+            XCTAssertNil(updated[index].targetPaceSecondsPerKilometer)
+        }
+        XCTAssertEqual(steps, (0..<9).map { steps[$0] })
+    }
+
     func testOnlyAccountOwnsSavedTargetsAndOriginalNeverChanges() {
         let suite = "athlth.user-targets-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
