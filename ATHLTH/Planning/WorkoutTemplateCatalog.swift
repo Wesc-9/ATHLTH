@@ -4663,6 +4663,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingStudioRoutePicker = false
     @State private var showingStudioRouteBuilder = false
     @State private var studioStepEditorSelection: ATHLTHWorkoutStudioStepEditorSelection?
+    @State private var showingStudioStepSongPicker = false
     @State private var selectedWorkoutExtra: ATHLTHWorkoutExtraDestination?
     @State private var audioCoachDraft: AudioCoachDraft
     @State private var routeGuardianDraft: RouteGuardianDraft
@@ -5514,6 +5515,93 @@ struct WorkoutTemplateBuilderView: View {
         )
     }
 
+    /// Lightweight settings below the workout timeline. Keep each editor
+    /// lazy in its own sheet instead of rendering a Spotify catalogue or
+    /// Audio Coach form in every scrolling workout row.
+    private var workoutSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Label(tr("Workout settings", "Innstillinger for økten"),
+                  systemImage: "slider.horizontal.3")
+                .font(.headline)
+                .foregroundStyle(studioInk)
+
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 9),
+                GridItem(.flexible(), spacing: 9)
+            ], spacing: 9) {
+                workoutSettingButton(
+                    "Audio Coach",
+                    icon: "waveform",
+                    detail: coachIsCustomized
+                        ? tr("Customized", "Tilpasset")
+                        : tr("Default", "Standard")
+                ) { openAudioCoach() }
+
+                workoutSettingButton(
+                    "Spotify",
+                    icon: "music.note",
+                    detail: selectedSpotifyPlaylist?.name ??
+                        spotifyIntervalTrack?.title ??
+                        tr("Playlist and songs", "Musikk og sanger")
+                ) { selectedWorkoutExtra = .spotify }
+
+                workoutSettingButton(
+                    tr("Goals", "Mål og tempo"),
+                    icon: "scope",
+                    detail: tr("Heart rate, pace", "Puls og fart")
+                ) { selectedWorkoutExtra = .heartRateAndPace }
+
+                workoutSettingButton(
+                    tr("Navigation", "Navigasjon"),
+                    icon: "map",
+                    detail: tr("Route guidance", "Ruteveiledning")
+                ) {
+                    loadGuidanceDefaultsIfNeeded()
+                    routeIsCustomized = true
+                    selectedWorkoutExtra = .navigation
+                }
+            }
+            Text(tr(
+                "Choose a specific Spotify song inside each effort, rest or exercise. The training engine never waits for music.",
+                "Velg en egen Spotify-sang inne på hvert drag, hver pause eller øvelse. Treningsmotoren venter aldri på musikk."
+            ))
+            .font(.caption)
+            .foregroundStyle(studioInk.opacity(0.7))
+        }
+        .padding(15)
+        .athlthPlanCard(radius: 20)
+        .accessibilityIdentifier("athlth-workout-extra-settings")
+    }
+
+    private func workoutSettingButton(
+        _ name: String, icon: String, detail: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(studioAccent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(studioInk)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(studioInk.opacity(0.68))
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 47, alignment: .topLeading)
+            .padding(12)
+            .background(ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 14))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var durationSettings: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -5864,12 +5952,8 @@ struct WorkoutTemplateBuilderView: View {
                 runningEnvironment: initialActivity == .running
                     ? $studioBasicRunEnvironment : nil
             )
-            // Do not overlay integration controls on the shared card's
-            // planned timestamp; they remain available in both modes.
-            HStack {
-                Spacer(minLength: 0)
-                workoutExtrasMenu
-            }
+            // Audio Coach, Spotify and advanced options are grouped
+            // underneath the workout instead of above its hero card.
         }
     }
 
@@ -5947,15 +6031,11 @@ struct WorkoutTemplateBuilderView: View {
                                 systemImage: "calendar"
                             )
                         }
-                        HStack {
-                            Spacer()
-                            workoutExtrasMenu
-                        }
                         workoutOverview
                         durationSettings
                         timeline
                     }
-                    audioCoachEntry
+                    workoutSettingsSection
                     if draftNotice {
                         Label(tr("Recovered saved draft", "Gjenopprettet lagret utkast"),
                               systemImage: "checkmark.circle.fill")
@@ -6337,6 +6417,34 @@ struct WorkoutTemplateBuilderView: View {
                                         .foregroundStyle(studioInk)
                                 }
                                 blockDetails(index)
+                                Button {
+                                    showingStudioStepSongPicker = true
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "music.note")
+                                            .foregroundStyle(studioAccent)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(tr("Song for this segment",
+                                                    "Sang for denne øktdelen"))
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(blocks[index].spotifyTrack?.title ??
+                                                tr("Choose a song", "Velg en sang"))
+                                                .font(.caption)
+                                                .foregroundStyle(studioInk.opacity(0.65))
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                    }
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                if blocks[index].spotifyTrack != nil {
+                                    Button(tr("Remove song", "Fjern sang"),
+                                           role: .destructive) {
+                                        blocks[index].spotifyTrack = nil
+                                    }
+                                }
                             }
                             .padding(18)
                             .onAppear {
@@ -6381,7 +6489,13 @@ struct WorkoutTemplateBuilderView: View {
                         }
                     }
                 }
-
+                .sheet(isPresented: $showingStudioStepSongPicker) {
+                    if let index = selection.index(in: blocks) {
+                        ATHLTHSpotifyIntervalTrackPicker(
+                            selection: $blocks[index].spotifyTrack
+                        )
+                    }
+                }
                 .presentationDetents([.large])
         )
     }
