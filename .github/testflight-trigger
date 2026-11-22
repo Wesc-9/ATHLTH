@@ -293,3 +293,4 @@ ATHLTH 2.2.7 build 135 — authorized gated retry 2026-11-22 after catalog categ
 
 ATHLTH 2.2.7 build 135 — authorized gated retry 2026-11-22 after fixing tournament template catch error shadowing and competition creator Swift argument ordering. Require all five CI gates on this exact commit; never bypass checks or upload stale source.
 ATHLTH 2.2.7 build 135 retry after XCTest competition expectations and reviewed exercise alias corrections
+ATHLTH 2.2.7 build 135 retry after quick-start expectations and reviewed incline dumbbell ID resolution 2026-11-22
