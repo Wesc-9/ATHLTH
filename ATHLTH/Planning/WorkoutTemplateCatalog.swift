@@ -3289,12 +3289,12 @@ struct WorkoutTemplateDetailView: View {
     private func prepareLibraryLaunch(
         blocks: [WorkoutTemplateBlock],
         options: ATHLTHWorkoutPersonalOptions,
-        usePersonalSettings: Bool
+        choice: ATHLTHLibraryWorkoutStartChoice
     ) {
         guard !hasActiveWorkout else { return }
         var planned = entry.plannedSession(useOriginalID: true)
         planned.workoutBlocks = blocks
-        if usePersonalSettings {
+        if choice != .withoutPersonalSettings {
             if let coach = options.audioCoachConfiguration {
                 planned.audioCoachConfiguration = coach
             }
@@ -3454,8 +3454,12 @@ struct WorkoutTemplateDetailView: View {
         ATHLTHWorkoutUserTargetsStore.reset(
             userID: accountKey, workoutID: entry.id
         )
+        ATHLTHWorkoutPersonalOptionsStore.reset(
+            userID: accountKey, workoutID: entry.id
+        )
         activePersonalBlocks = nil
         personalBlocks = nil
+        personalOptions = .init()
     }
 
     private func shareOriginalWorkout() {
@@ -3510,8 +3514,8 @@ struct WorkoutTemplateDetailView: View {
                     } label: {
                         Label(
                             activePersonalBlocks == nil
-                                ? tr("Set my targets", "Sett mine mål")
-                                : tr("Adjust my targets", "Juster mine mål"),
+                                ? tr("Save my settings", "Lagre mine innstillinger")
+                                : tr("Edit my settings", "Juster mine innstillinger"),
                             systemImage: "scope"
                         )
                         .font(.subheadline.weight(.semibold))
@@ -3522,8 +3526,9 @@ struct WorkoutTemplateDetailView: View {
 
                     Spacer(minLength: 8)
 
-                    if activePersonalBlocks != nil {
-                        Label(tr("Saved for you", "Lagret for deg"),
+                    if activePersonalBlocks != nil ||
+                       personalOptions != ATHLTHWorkoutPersonalOptions() {
+                        Label(tr("Private to you", "Kun synlig for deg"),
                               systemImage: "checkmark.circle.fill")
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -3631,7 +3636,8 @@ struct WorkoutTemplateDetailView: View {
                         Label(tr("Reset personal targets", "Nullstill"),
                               systemImage: "arrow.counterclockwise")
                     }
-                    .disabled(activePersonalBlocks == nil)
+                    .disabled(activePersonalBlocks == nil &&
+                              personalOptions == ATHLTHWorkoutPersonalOptions())
                 } label: {
                     Image(systemName: "ellipsis")
                         .frame(width: 44, height: 44)
@@ -3677,10 +3683,10 @@ struct WorkoutTemplateDetailView: View {
                 originalBlocks: libraryDisplayBlocks,
                 savedBlocks: activePersonalBlocks,
                 savedOptions: personalOptions
-            ) { blocks, options, useSettings in
+            ) { blocks, options, choice in
                 prepareLibraryLaunch(
                     blocks: blocks, options: options,
-                    usePersonalSettings: useSettings
+                    choice: choice
                 )
             }
         }
@@ -3790,8 +3796,8 @@ struct WorkoutTemplateDetailView: View {
             }
         } message: {
             Text(tr(
-                "Your pace, load and other personal targets will be removed. The original workout stays unchanged.",
-                "Målfart, belastning og andre personlige mål fjernes. Originaløkten endres ikke."
+                "Your saved pace, song choices, Spotify and Audio Coach options will be removed. The library workout stays unchanged.",
+                "Lagret fart, sangvalg, Spotify og Audio Coach fjernes. Bibliotekøkten forblir uendret."
             ))
         }
         .alert(tr("Could not complete action", "Kunne ikke fullføre"),
