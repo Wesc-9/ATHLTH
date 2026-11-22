@@ -5292,16 +5292,16 @@ final class AppSessionStore: ObservableObject {
         guard !library.isEmpty else { return false }
         let report = ATHLTHWorkoutExerciseBinding.bind(&plan, library: library)
         guard report.isReady else { return false }
-        // Verify the effective execution blocks after binding: an imported
-        // legacy plan may expose resolved blocks without workoutBlocks.
+        // Validate the final execution IDs in O(n) with one set of known
+        // library identities. Do not run a second linear catalog search
+        // for every exercise in every week of a long program.
+        let availableIDs = Set(library.map(\.id))
         return plan.weeks.allSatisfy { week in
             week.days.allSatisfy { day in
                 day.sessions.allSatisfy { workout in
                     workout.resolvedWorkoutBlocks.allSatisfy { block in
                         block.kind != .exercise ||
-                        ATHLTHExerciseReferenceResolver.resolve(
-                            block, in: library
-                        ) != nil
+                        block.exerciseID.map(availableIDs.contains) == true
                     }
                 }
             }
