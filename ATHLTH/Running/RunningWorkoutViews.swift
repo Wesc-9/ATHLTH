@@ -603,20 +603,20 @@ struct RunningWorkoutDetailView: View {
             }
 
             DisclosureGroup("Sang per drag eller pause") {
+                let steps = previewWorkout.recipePreviewBlocks
                 LazyVStack(alignment: .leading, spacing: 5) {
-                    ForEach(Array(previewWorkout.recipePreviewBlocks.enumerated()),
-                            id: \.offset) { step in
+                    ForEach(steps.indices, id: \.self) { index in
                         Button {
                             selectedPrivateSongStep = PrivateSongStep(
-                                index: step.offset
+                                index: index
                             )
                         } label: {
                             HStack {
-                                Text(step.element.title)
+                                Text(steps[index].title)
                                     .font(.subheadline)
                                     .lineLimit(1)
                                 Spacer(minLength: 8)
-                                Text(privateOptions.stepSongs[step.offset]?.title ??
+                                Text(privateOptions.stepSongs[index]?.title ??
                                      "Velg sang")
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
