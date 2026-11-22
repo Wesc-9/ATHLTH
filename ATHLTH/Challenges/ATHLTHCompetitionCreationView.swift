@@ -4,12 +4,13 @@ import SwiftUI
 /// existing Challenge backend; League/Cup use the server-authoritative
 /// tournament service. Nothing starts a HealthKit recording here.
 enum ATHLTHCompetitionFormat: String, CaseIterable, Identifiable {
-    case duel, league, cup
+    case duel, single, league, cup
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .duel: "Duell"
+        case .single: "Enkeltkonkurranse"
         case .league: "Liga"
         case .cup: "Cup"
         }
@@ -19,6 +20,9 @@ enum ATHLTHCompetitionFormat: String, CaseIterable, Identifiable {
         case .duel: return ATHLTHLocalization.choose(
             english: "One opponent. One challenge.",
             norwegian: "Én motstander. Én utfordring.")
+        case .single: return ATHLTHLocalization.choose(
+            english: "One event for three or more athletes.",
+            norwegian: "Én konkurranse med minst tre deltakere.")
         case .league: return ATHLTHLocalization.choose(
             english: "Everyone competes; a league table determines the winner.",
             norwegian: "Alle møter alle. En tabell avgjør.")
@@ -30,6 +34,7 @@ enum ATHLTHCompetitionFormat: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .duel: "person.2.fill"
+        case .single: "person.3.sequence.fill"
         case .league: "list.number"
         case .cup: "trophy.fill"
         }
@@ -86,6 +91,7 @@ enum ATHLTHCompetitionCreationPolicy {
     static func minOpponents(_ format: ATHLTHCompetitionFormat) -> Int {
         switch format {
         case .duel: 1
+        case .single: 2
         case .league: 1
         case .cup: 3
         }
@@ -396,14 +402,18 @@ struct ATHLTHCompetitionCreationView: View {
                 }
                 if let initialFormat,
                    (initialFormat == .cup ? selected.format != .cup :
-                    initialFormat == .league ? selected.format == .cup : true) {
+                    initialFormat == .single ? !selected.singleEventMode :
+                    initialFormat == .league
+                      ? (selected.format == .cup || selected.singleEventMode)
+                      : true) {
                     errorMessage = "Malen har en annen konkurranseform."
                     restoredCompetitionTemplate = nil
                     return
                 }
                 restoredCompetitionTemplate = selected
                 competitionTitle = selected.title
-                format = selected.format == .cup ? .cup : .league
+                format = selected.singleEventMode ? .single :
+                    (selected.format == .cup ? .cup : .league)
                 leagueStyle = selected.format
             }
         }
@@ -415,6 +425,7 @@ struct ATHLTHCompetitionCreationView: View {
                     initialActivity
                 ),
                 initialTitle: competitionTitle,
+                singleEventMode: format == .single,
                 continuation: restoredCompetitionTemplate,
                 onPublished: { _ in
                     showingExistingTournamentRules = false
@@ -831,8 +842,8 @@ struct ATHLTHCompetitionCreationView: View {
             Text(format == .duel
                 ? tr("Your friend accepts in your existing chat. The duel lasts seven days.",
                      "Vennen godtar i samtalen dere allerede har. Duellen varer i syv dager.")
-                : tr("Each friend receives the group conversation in Inbox. The organizer starts once all invitations are answered.",
-                     "Hver venn får konkurransesamtalen i Innboks. Arrangøren starter når alle har svart."))
+                : tr("Each friend receives the competition group chat. Everyone must accept and press Ready.",
+                     "Alle får samme konkurransechat i Innboks. Alle må godta og trykke Klar."))
                 .font(.caption)
                 .foregroundStyle(muted)
         }
@@ -1064,7 +1075,7 @@ struct ATHLTHCompetitionCreationView: View {
             switch format {
             case .duel:
                 try await publishDuel()
-            case .league, .cup:
+            case .single, .league, .cup:
                 try await publishTournament()
             }
             successful = true
@@ -1201,6 +1212,17 @@ struct ATHLTHCompetitionCreationView: View {
         if !advanced {
             guard isValid else {
                 throw ATHLTHCompetitionError.missingOpponents
+            }
+            if format == .single {
+                _ = try await ATHLTHTournamentCloudService().createSimpleSingleEvent(
+                    title: competitionTitle,
+                    activity: ATHLTHCompetitionCreationPolicy.tournamentActivity(
+                        initialActivity
+                    ),
+                    invitees: selectedPeople.map(\.userID),
+                    startsAt: simpleStartLater ? startsAt : nil
+                )
+                return
             }
             _ = try await ATHLTHTournamentCloudService().createSimple(
                 title: competitionTitle,
