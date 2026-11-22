@@ -424,6 +424,17 @@ enum ATHLTHExerciseReferenceResolver {
             }
             if reviewed.count == 1 { return reviewed[0] }
         }
+        if source.sourceIdentifier == "athlth-native-bench-press" {
+            // The licensed RepDB bench press can describe its equipment
+            // differently from the historical native record. Match the
+            // reviewed movement identity, never an incline/dumbbell variant.
+            let reviewed = library.filter { entry in
+                entry.source == .repDB &&
+                    (entry.sourceIdentifier == "bench-press" ||
+                     key(entry.canonicalName) == "bench press")
+            }
+            if reviewed.count == 1 { return reviewed[0] }
+        }
         let exactName = key(source.canonicalName)
         let equipment = Set(source.exercise.equipment.map(key))
         let identical = library.filter { entry in
