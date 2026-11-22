@@ -968,6 +968,8 @@ final class LibraryFavoritesStore: ObservableObject {
                     name: "libraryFavorites",
                     userID: user.id
                 ) ?? []
+            lastRefreshAt = nil
+            errorMessage = nil
         }
 
         if isFavorite(kind, itemID: itemID) {
@@ -986,8 +988,12 @@ final class LibraryFavoritesStore: ObservableObject {
                         .eq("item_type", value: kind.rawValue)
                         .eq("item_id", value: itemID)
                         .execute()
+                    guard activeUserID == user.id,
+                          client.auth.currentUser?.id == user.id else { return }
                     errorMessage = nil
                 } catch {
+                    guard activeUserID == user.id,
+                          client.auth.currentUser?.id == user.id else { return }
                     errorMessage = error.localizedDescription
                 }
             }
@@ -1010,8 +1016,12 @@ final class LibraryFavoritesStore: ObservableObject {
                         .from("library_favorites")
                         .upsert(record)
                         .execute()
+                    guard activeUserID == user.id,
+                          client.auth.currentUser?.id == user.id else { return }
                     errorMessage = nil
                 } catch {
+                    guard activeUserID == user.id,
+                          client.auth.currentUser?.id == user.id else { return }
                     errorMessage = error.localizedDescription
                 }
             }
