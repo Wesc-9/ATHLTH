@@ -154,6 +154,18 @@ enum RouteMapSnapshotCache {
         return points
     }
 
+    // Small previews do not benefit from full 3x device pixel density.
+    // A 2x cap cuts decoded pixel memory and rendering work on 3x screens.
+    private static var thumbnailScale: CGFloat {
+        min(UIScreen.main.scale, 2)
+    }
+
+    private static func cacheImage(_ image: UIImage, key: NSString) {
+        let cost = image.cgImage.map { $0.bytesPerRow * $0.height }
+            ?? Int(image.size.width * image.size.height * image.scale * image.scale * 4)
+        images.setObject(image, forKey: key, cost: cost)
+    }
+
     private static var generation: UInt64 = 0
 
     static func clearCache() {
@@ -211,7 +223,7 @@ enum RouteMapSnapshotCache {
         let options = MKMapSnapshotter.Options()
         options.region = region(for: coordinates)
         options.size = size
-        options.scale = UIScreen.main.scale
+        options.scale = thumbnailScale
         options.mapType = .standard
         options.showsBuildings = false
         options.pointOfInterestFilter = .excludingAll
@@ -221,13 +233,7 @@ enum RouteMapSnapshotCache {
             guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
             let rendered = drawRoute(coordinates, on: snapshot, size: size)
             if requestedGeneration == generation {
-                images.setObject(
-                    rendered,
-                    forKey: requestID as NSString,
-                    cost: rendered.cgImage.map {
-                        $0.bytesPerRow * $0.height
-                    } ?? 0
-                )
+                cacheImage(rendered, key: requestID as NSString)
             }
             return rendered
         } catch {
@@ -242,21 +248,29 @@ enum RouteMapSnapshotCache {
     ) async -> UIImage? {
         let key = requestID as NSString
         if let cached = images.object(forKey: key) { return cached }
-        guard coordinates.count >= 2 else { return nil }
+        guard coordinates.count >= 2, scrollingOwners.isEmpty else { return nil }
+        // Coordinate-only thumbnails share the same two-render budget.
+        while activeRenders >= 2 {
+            if Task.isCancelled || !scrollingOwners.isEmpty { return nil }
+            try? await Task.sleep(nanoseconds: 70_000_000)
+        }
+        guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
+        activeRenders += 1
+        defer { activeRenders -= 1 }
         let currentGeneration = generation
         let options = MKMapSnapshotter.Options()
         options.region = region(for: coordinates)
         options.size = size
-        options.scale = UIScreen.main.scale
+        options.scale = thumbnailScale
         options.mapType = .standard
         options.showsBuildings = false
         options.pointOfInterestFilter = .excludingAll
         do {
             let snapshot = try await MKMapSnapshotter(options: options).start()
-            guard !Task.isCancelled else { return nil }
+            guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
             let rendered = drawRoute(coordinates, on: snapshot, size: size)
             if currentGeneration == generation {
-                images.setObject(rendered, forKey: key)
+                cacheImage(rendered, key: key)
             }
             return rendered
         } catch { return nil }
@@ -339,7 +353,7 @@ enum RouteMapSnapshotCache {
         let format =
             UIGraphicsImageRendererFormat()
         format.scale =
-            UIScreen.main.scale
+            thumbnailScale
         format.opaque = true
 
         return UIGraphicsImageRenderer(
