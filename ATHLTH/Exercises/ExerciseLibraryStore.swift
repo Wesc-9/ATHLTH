@@ -631,12 +631,9 @@ final class ExerciseLibraryStore: ObservableObject {
                 athlthCatalogExercises +
                 repDBExercises
             )
-            .filter { entry in
-                // Retire the old original-core batch. Keep legacy cached
-                // entries for references from previously recorded workouts.
-                entry.source != .athlthCatalog ||
-                    !Self.isRetiredOriginalCoreSlug(entry.sourceIdentifier)
-            }
+            // Retired catalog records remain in the identity index to keep
+            // historic workouts with explicit UUIDs resolvable. They are
+            // removed only from new selections below.
             .reduce(
                 into:
                     [UUID:
@@ -916,7 +913,9 @@ final class ExerciseLibraryStore: ObservableObject {
         let resolved: [ExerciseLibraryEntry]
         if repDBExercises.isEmpty {
             resolved = allExercises.filter {
-                !Self.isRetiredNativeDuplicate($0)
+                !Self.isRetiredNativeDuplicate($0) &&
+                ($0.source != .athlthCatalog ||
+                 !Self.isRetiredOriginalCoreSlug($0.sourceIdentifier))
             }
         } else {
             // Use the same reviewed equivalence rule as workout resolution.
@@ -924,7 +923,10 @@ final class ExerciseLibraryStore: ObservableObject {
             // unique, selectable RepDB equivalent exists.
             let completeLibrary = allExercises
             resolved = completeLibrary.filter { entry in
-                guard !Self.isRetiredNativeDuplicate(entry) else {
+                guard !Self.isRetiredNativeDuplicate(entry),
+                      entry.source != .athlthCatalog ||
+                      !Self.isRetiredOriginalCoreSlug(entry.sourceIdentifier)
+                else {
                     return false
                 }
                 guard entry.source == .athlthCatalog else {
