@@ -138,9 +138,12 @@ final class ATHLTHLiveActivityDisplayPolicyTests: XCTestCase {
         XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactRepetitions(-1), "—")
     }
 
-    func testCompactIslandDistanceFitsAlongsideMusic() {
+    func testCompactIslandDistanceKeepsKmUnitAlongsideMusic() {
+        // The iOS 27 narrow Dynamic Island must not replace "km" with "k".
         XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(500), "500m")
-        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(2400), "2.4k")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(1_800), "1.8 km")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(2_400), "2.4 km")
+        XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(12_300), "12.3 km")
         XCTAssertEqual(ATHLTHLiveActivityDisplayPolicy.compactDistance(.nan), "—")
     }
 
