@@ -2756,24 +2756,17 @@ struct TrainingPlanCatalogDetailView: View {
     // Missing matches are omitted rather than guessing from a workout title.
     private var verifiedMuscleFocus: [String] {
         let exercises = exerciseLibrary.allExercises
-        let byID = Dictionary(exercises.map { ($0.id, $0) },
-                              uniquingKeysWith: { first, _ in first })
-        let bySource = Dictionary(
-            exercises.compactMap { item -> (String, ExerciseLibraryEntry)? in
-                guard let source = item.sourceIdentifier else { return nil }
-                return (source, item)
-            },
-            uniquingKeysWith: { first, _ in first }
-        )
         var muscles = Set<String>()
         for blueprint in entry.sessionBlueprints.prefix(entry.sessionsPerWeek) {
             let workout = ATHLTHCatalogPlanSessionFactory.session(
                 entry: entry, blueprint: blueprint, week: 1
             )
             for block in workout.resolvedWorkoutBlocks where block.kind == .exercise {
-                let match = block.exerciseID.flatMap { byID[$0] }
-                    ?? block.exerciseSlug.flatMap { bySource[$0] }
-                if let match {
+                // Use the same authoritative resolver as the workout
+                // library (including reviewed RepDB and HYROX aliases).
+                if let match = ATHLTHExerciseReferenceResolver.resolve(
+                    block, in: exercises
+                ) {
                     muscles.formUnion(match.exercise.primaryMuscles)
                 }
             }
