@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 private enum ATHLTHTournamentDetailTab: String, CaseIterable, Identifiable {
     case lobby, overview, matches, standings
@@ -514,10 +515,21 @@ struct ATHLTHTournamentLiveDetailView: View {
                 Label(place, systemImage: "mappin.and.ellipse")
                     .font(.subheadline)
             }
-            if current.meetingLat != nil && current.meetingLon != nil {
-                Text("Møtepunkt er markert på kartet.")
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            if let lat = current.meetingLat, let lon = current.meetingLon {
+                Button {
+                    let pin = MKMapItem(placemark: MKPlacemark(
+                        coordinate: CLLocationCoordinate2D(
+                            latitude: lat, longitude: lon
+                        )
+                    ))
+                    pin.name = current.meetingPlace ?? "Møtepunkt"
+                    pin.openInMaps()
+                } label: {
+                    Label("Åpne møtepunkt i Kart",
+                          systemImage: "map")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                }
             }
             Text(current.releaseMode == "everyone_finished"
                 ? "Neste øvelse åpnes når alle er ferdige."
