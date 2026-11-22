@@ -49,6 +49,8 @@ struct ATHLTHTournamentCreator: View {
     @State private var winPoints = 3
     @State private var drawPoints = 1
     @State private var competitionSettings = ATHLTHTournamentCompetitionSettings()
+    @State private var showingCompetitionCoach = false
+    @State private var coachNames: [String] = []
     @State private var allowExtensions = true
     @State private var publicResults = false
     @State private var proofMode: ATHLTHTournamentProofMode = .opponent
@@ -220,6 +222,7 @@ struct ATHLTHTournamentCreator: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                     }
+                    coachEntry
                     exerciseRulesSection
                     ATHLTHTournamentAdvancedRulesSection(
                         rotation: $rotationMode,
@@ -308,6 +311,39 @@ struct ATHLTHTournamentCreator: View {
             } else {
                 selectedSeasonID = nil
                 clubSeasons = []
+            }
+        }
+        .sheet(isPresented: $showingCompetitionCoach) {
+            ATHLTHTournamentCoachWizard(
+                format: format,
+                activities: fixedActivity.map { [$0] } ??
+                    allowedActivities.sorted { $0.rawValue < $1.rawValue }
+            ) { proposal in
+                let suggested = proposal.exerciseIDs
+                guard !suggested.isEmpty else { return }
+                title = String(proposal.title.prefix(80))
+                exerciseMode = .owner
+                rulesAuthority = .owner
+                exerciseCount = suggested.count
+                competitionSettings.coachExerciseIDs = suggested
+                competitionSettings.startMode =
+                    ATHLTHCompetitionStartMode(rawValue: proposal.startMode)
+                    ?? .manual
+                competitionSettings.startsAt = nil
+                competitionSettings.environment =
+                    ATHLTHCompetitionEnvironment(rawValue: proposal.environment)
+                    ?? .any
+                competitionSettings.unit = .day
+                competitionSettings.every = min(28, max(1, proposal.releaseEvery))
+                if ATHLTHTournamentCadence.completionHours
+                    .contains(proposal.completionHours) {
+                    competitionSettings.completionHours = proposal.completionHours
+                }
+                competitionSettings.agreement.allowed =
+                    proposal.allowedRules
+                competitionSettings.agreement.prohibited =
+                    proposal.prohibitedRules
+                coachNames = proposal.exerciseNames
             }
         }
         .sheet(isPresented: $showingSeasonCreation) {
@@ -436,6 +472,48 @@ struct ATHLTHTournamentCreator: View {
                     .background(ATHLTHArenaV3Style.panel())
                 }
                 .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var coachEntry: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                showingCompetitionCoach = true
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "sparkles")
+                        .font(.title3)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("La Coach sette opp konkurransen")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Foreslå øvelser, regler og progresjon")
+                            .font(.caption)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                .padding(15)
+                .background(ATHLTHArenaV3Style.panel())
+            }
+            .buttonStyle(.plain)
+            .disabled(allowedActivities.isEmpty)
+            if !competitionSettings.coachExerciseIDs.isEmpty {
+                Text("Coach har valgt \(competitionSettings.coachExerciseIDs.count) eksisterende øvelser. Forslaget kan gjennomgås nedenfor før publisering.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                ForEach(coachNames, id: \.self) { name in
+                    Label(name, systemImage: "checkmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                }
+                Button("Fjern Coach-forslaget") {
+                    competitionSettings.coachExerciseIDs = []
+                    coachNames = []
+                }
+                .font(.caption)
+                .tint(ATHLTHArenaV3Style.gold)
             }
         }
     }
