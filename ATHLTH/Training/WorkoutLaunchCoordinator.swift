@@ -1062,13 +1062,23 @@ enum WorkoutLaunchCoordinator {
             // workouts. Apple Watch retains independent Spotify playback.
             let effortSong = configuration.advancedWorkout?.spotifyIntervalTrack
                 ?? plannedRunningWorkout?.spotifyIntervalTrack
+                ?? configuration.workout?.launchSpotifyIntervalTrack
             spotify.prepareIntervalTrack(
                 effortSong,
                 workoutID: phoneWorkout.active?.id
             )
             if let recording = phoneWorkout.active {
-                let originalSteps = (plannedRunningWorkout ?? configuration.workout)?
-                    .resolvedWorkoutBlocks ?? []
+                // Exact per-drag and recovery songs for a private Running
+                // Library preset. No song choice mutates the source recipe.
+                var originalSteps: [WorkoutTemplateBlock] =
+                    plannedRunningWorkout?.resolvedWorkoutBlocks ??
+                    configuration.workout?.recipePreviewBlocks ?? []
+                if let songs = configuration.workout?.launchStepSongs {
+                    for (index, song) in songs
+                        where originalSteps.indices.contains(index) {
+                        originalSteps[index].spotifyTrack = song
+                    }
+                }
                 let liveSteps = recording.structuredRunningWorkout?.steps ?? []
                 // Only attach songs if every source part maps to one actual
                 // HealthKit interval/recovery step in the same order.
