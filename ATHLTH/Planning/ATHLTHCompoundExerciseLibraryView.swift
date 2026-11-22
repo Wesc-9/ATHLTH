@@ -194,6 +194,16 @@ struct ATHLTHCompoundExerciseDetailView: View {
     var insertionPhase: WorkoutPhaseKind = .main
     var onSelect: (([WorkoutTemplateBlock]) -> Void)? = nil
 
+    private var measuredIntervalResults: [ATHLTHCompoundExerciseProgress.Result] {
+        guard exercise.isRunning else { return [] }
+        return ATHLTHCompoundExerciseProgress.results(
+            for: exercise,
+            completed: ATHLTHRunningPerformanceHistory.load(
+                userID: session.profile.userID
+            )
+        )
+    }
+
     private var fourByFourResults: [ATHLTHFourByFourRecords.Result] {
         guard exercise.familyID == "athlth:running:interval:4x4",
               let recovery = ATHLTHCompoundExerciseCatalog.fourByFourRecovery(
@@ -269,6 +279,47 @@ struct ATHLTHCompoundExerciseDetailView: View {
                             .font(.subheadline)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
+                    }
+                    .padding(16)
+                    .athlthPlanCard(radius: 19)
+                }
+                if exercise.isRunning &&
+                   exercise.familyID != "athlth:running:interval:4x4" {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "My interval exercise history",
+                            norwegian: "Min intervallhistorikk"
+                        ))
+                        .font(.headline)
+                        if let best = ATHLTHCompoundExerciseProgress.bestMeasured(
+                            measuredIntervalResults
+                        ) {
+                            Text(String(format: "%.1f km/t", best.averageWorkSpeedKmh))
+                                .font(.title2.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Best recorded effort speed",
+                                norwegian: "Beste målte dragfart"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        if let reported = ATHLTHCompoundExerciseProgress.bestReported(
+                            measuredIntervalResults
+                        ) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Reported treadmill result",
+                                norwegian: "Oppgitt mølleresultat"
+                            ) + " · " + String(
+                                format: "%.1f km/t", reported.averageWorkSpeedKmh
+                            ))
+                            .font(.caption)
+                        }
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(measuredIntervalResults.count) comparable completed attempts",
+                            norwegian: "\(measuredIntervalResults.count) sammenlignbare fullførte forsøk"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                     .padding(16)
                     .athlthPlanCard(radius: 19)
