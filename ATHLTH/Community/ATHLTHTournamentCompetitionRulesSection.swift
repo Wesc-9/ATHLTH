@@ -144,6 +144,44 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 ATHLTHCompetitionMeetingPointPicker(settings: $settings)
             }
 
+            VStack(alignment: .leading, spacing: 13) {
+                Text("Svarfrist for invitasjoner")
+                    .font(.system(size: 21, design: .serif))
+                Stepper("Svarfrist: \(settings.invitationDays) dager",
+                        value: $settings.invitationDays, in: 1...30)
+                    .font(.subheadline.weight(.semibold))
+                Text("Standard er 3 dager. Invitasjoner som ikke besvares innen fristen, utløper automatisk.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                Divider()
+                Text("Hvis noen ikke godtar eller svarer")
+                    .font(.subheadline.weight(.semibold))
+                Picker("Ubesvarte invitasjoner",
+                       selection: $settings.unansweredPolicy) {
+                    ForEach(ATHLTHCompetitionUnansweredPolicy.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
+                .pickerStyle(.menu)
+                Text(settings.unansweredPolicy == .replace
+                    ? "Arrangøren får en ekstra periode på \(settings.invitationDays) dager til å finne en erstatter. Hvis dette ikke lykkes, avlyses konkurransen."
+                    : settings.unansweredPolicy == .continue
+                    ? "Konkurransen kan starte med dem som er klare, men liga krever minst 2 og cup minst 4 deltakere."
+                    : "Konkurransen avlyses hvis en invitasjon utløper uten svar.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                Divider()
+                Toggle("Kan publiseres i Feed etter avslutning",
+                       isOn: $settings.allowFeedPost)
+                    .tint(ATHLTHArenaV3Style.gold)
+                    .font(.subheadline.weight(.medium))
+                Text("På som standard. Arrangøren kan publisere først etter at konkurransen er fullført. Kun godkjente deltakere som har samtykket til reglene, nevnes i vennefeeden.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            .padding(15)
+            .background(ATHLTHArenaV3Style.panel())
+
             DisclosureGroup(
                 "Invitasjoner og godkjenning",
                 isExpanded: $expandedAccess
