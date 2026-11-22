@@ -1670,6 +1670,7 @@ struct RunQuickStartSheet: View {
 
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
+    @State private var showingCompetition = false
     @State private var openEditorAfterLibrary = false
     @State private var showingDetailedWorkoutBuilder = false
 
@@ -1896,6 +1897,12 @@ struct RunQuickStartSheet: View {
                     onHistorySave: { treadmillInitialSpeed = $0 }
                 )
                 .presentationDetents([.large])
+            }
+            .sheet(isPresented: $showingCompetition) {
+                ATHLTHCompetitionCreationView(
+                    initialActivity: .running,
+                    advanced: isAdvancedSetup
+                )
             }
             .sheet(isPresented: $showingSpotifyPicker) {
                 SpotifyPlaylistPickerView(
@@ -2168,6 +2175,7 @@ struct RunQuickStartSheet: View {
             advanced: isAdvancedSetup,
             selection: Binding(
                 get: {
+                    if showingCompetition { return .competition }
                     switch mode {
                     case .free: return .free
                     case .route: return .route
@@ -2192,6 +2200,8 @@ struct RunQuickStartSheet: View {
             case .workout:
                 mode = .structured
                 showingRunningLibrary = true
+            case .competition:
+                showingCompetition = true
             case .exercises:
                 break
             }
@@ -3672,6 +3682,7 @@ struct WalkQuickStartSheet: View {
     @State private var isAdvancedSetup = false
     @State private var showingWalkDetails = false
     @State private var showingWalkingRoutes = false
+    @State private var showingCompetition = false
     @State private var selectedWalkingRoute: TrainingRoute?
     @State private var walkingRouteChoiceTouched = false
     @State private var autoPausePreference:
@@ -3807,6 +3818,12 @@ struct WalkQuickStartSheet: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingCompetition) {
+                ATHLTHCompetitionCreationView(
+                    initialActivity: .walking,
+                    advanced: isAdvancedSetup
+                )
+            }
             .sheet(isPresented: $showingWalkingRoutes) {
                 NavigationStack {
                     SavedRoutesView(
@@ -3888,7 +3905,10 @@ struct WalkQuickStartSheet: View {
             activity: .walking,
             advanced: isAdvancedSetup,
             selection: Binding(
-                get: { selectedWalkingRoute == nil ? .free : .route },
+                get: {
+                    if showingCompetition { return .competition }
+                    return selectedWalkingRoute == nil ? .free : .route
+                },
                 set: { _ in }
             )
         ) { chosen in
@@ -3898,6 +3918,8 @@ struct WalkQuickStartSheet: View {
                 walkingRouteChoiceTouched = true
             case .route:
                 showingWalkingRoutes = true
+            case .competition:
+                showingCompetition = true
             case .workout, .exercises:
                 break
             }
