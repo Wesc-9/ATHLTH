@@ -130,6 +130,34 @@ final class ATHLTHCompoundExerciseCatalogTests: XCTestCase {
         XCTAssertNotEqual(first.first?.editorDragID, second.first?.editorDragID)
     }
 
+    func testDistinctPersonalPaceTargetsNeverCollapseIntoOneWorkout() throws {
+        let source = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first)
+        let base = ATHLTHCompoundExerciseCatalog.mainBlocks(
+            ATHLTHUnifiedWorkout.editorBlocks(from: source.plannedSession())
+        )
+        var faster = base
+        for index in faster.indices where faster[index].kind == .run {
+            faster[index].targetPaceSecondsPerKilometer = 275
+        }
+        let first = ATHLTHWorkoutMainSection(
+            id: UUID(), sourceWorkoutID: UUID(),
+            title: "Min første", kind: .running,
+            blocks: base, savedAt: Date()
+        )
+        let second = ATHLTHWorkoutMainSection(
+            id: UUID(), sourceWorkoutID: UUID(),
+            title: "Min raskere", kind: .running,
+            blocks: faster, savedAt: Date()
+        )
+        let entries = ATHLTHCompoundExerciseCatalog.build(
+            running: [], workoutCatalog: [], saved: [first, second]
+        ).filter(\.isPersonal)
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertEqual(Set(entries.map(\.id)).count, 2)
+        XCTAssertTrue(entries.contains { $0.blocks == base })
+        XCTAssertTrue(entries.contains { $0.blocks == faster })
+    }
+
     func testDuplicatePublishedMainsShareOneIdentityAndKeepBothSources() throws {
         let source = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first)
         let originalMain = ATHLTHCompoundExerciseCatalog.mainBlocks(
