@@ -11,6 +11,37 @@ struct ATHLTHRootNotificationSheetHost<Content: View>: View {
 
     var body: some View {
         content
+        // Competition updates and invitations open the SAME group chat that
+        // the athlete already has under Inbox, even on a cold app launch.
+        .sheet(
+            item: Binding<ATHLTHTournamentPushRoute?>(
+                get: {
+                    guard session.signedIn,
+                          let route = pushManager.pendingTournamentNotification,
+                          route.isForAccount(session.profile.userID)
+                    else { return nil }
+                    return route
+                },
+                set: { route, _ in
+                    if route == nil {
+                        pushManager.clearPendingTournamentNotification()
+                    }
+                }
+            )
+        ) { route in
+            NavigationStack {
+                ATHLTHTournamentNotificationDestination(
+                    tournamentID: route.tournamentID
+                )
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Lukk") {
+                            pushManager.clearPendingTournamentNotification()
+                        }
+                    }
+                }
+            }
+        }
         // Render the actual challenge detail above the root tabs. The
         // singleton retains the route if iOS delivers the tap before this
         // view is created (cold launch).
