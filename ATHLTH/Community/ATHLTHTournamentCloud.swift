@@ -284,6 +284,7 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
     let meetingPlace: String?
     let meetingLat: Double?
     let meetingLon: Double?
+    let coachExerciseIDs: [UUID]?
     let unlock: String
     let every: Int
     let unit: String
@@ -305,6 +306,8 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
         meetingPlace = settings.meetingPlace.isEmpty ? nil : settings.meetingPlace
         meetingLat = settings.meetingLat
         meetingLon = settings.meetingLon
+        coachExerciseIDs = settings.coachExerciseIDs.isEmpty
+            ? nil : settings.coachExerciseIDs
         unlock = settings.unlock.rawValue
         every = settings.every
         unit = settings.unit.rawValue
