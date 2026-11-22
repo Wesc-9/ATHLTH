@@ -80,7 +80,7 @@ enum ATHLTHQuickRunTimelineAdapter {
     }
 
     static func validationError(for workout: PlannedSession) -> String? {
-        let blocks = workout.resolvedWorkoutBlocks
+        let blocks = ATHLTHUniversalWorkoutExecutionRecipe(workout: workout).blocks
         let runs = blocks.filter { $0.kind == .run }
         guard !runs.isEmpty else {
             return ATHLTHLocalization.choose(
@@ -134,7 +134,7 @@ enum ATHLTHQuickRunTimelineAdapter {
     static func environment(for workout: PlannedSession) -> RunEnvironment {
         if workout.workoutCategory == "treadmill" { return .treadmill }
         if workout.workoutCategory == "indoor" { return .indoor }
-        let runs = workout.resolvedWorkoutBlocks.filter { $0.kind == .run }
+        let runs = ATHLTHUniversalWorkoutExecutionRecipe(workout: workout).blocks.filter { $0.kind == .run }
         guard runs.contains(where: { $0.isIndoor == true }) else { return .outdoor }
         return runs.contains(where: { $0.treadmillInclinePercent != nil })
             ? .treadmill : .indoor
@@ -148,7 +148,7 @@ enum ATHLTHQuickRunTimelineAdapter {
         environment: RunEnvironment
     ) -> PlannedSession {
         var copy = workout
-        var recipe = workout.resolvedWorkoutBlocks
+        var recipe = ATHLTHUniversalWorkoutExecutionRecipe(workout: workout).blocks
         for index in recipe.indices where recipe[index].kind == .run {
             recipe[index].isIndoor = environment != .outdoor
             recipe[index].treadmillInclinePercent = environment == .treadmill
@@ -180,7 +180,7 @@ enum ATHLTHQuickRunTimelineAdapter {
     ) -> WatchRunningWorkoutTransfer? {
         guard validationError(for: workout) == nil else { return nil }
 
-        let steps = workout.resolvedWorkoutBlocks.expandedForExecution().map { block in
+        let steps = ATHLTHUniversalWorkoutExecutionRecipe(workout: workout).blocks.expandedForExecution().map { block in
             let measure: WatchRunningStepMeasure =
                 block.distanceMeters != nil ? .distance :
                 block.durationSeconds != nil ? .time : .open
