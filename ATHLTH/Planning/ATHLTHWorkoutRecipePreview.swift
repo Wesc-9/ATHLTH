@@ -900,6 +900,23 @@ struct ATHLTHWorkoutRecipePreview: View {
     private func recipeStepCard(_ block: WorkoutTemplateBlock, index: Int) -> some View {
         let expanded = expandedStepIndices.contains(index)
         let isRecovery = block.kind == .rest || block.resolvedPhase == .recovery
+        // Resolve once per row, not once for the thumbnail, twice for the
+        // title and again for the open-library action while scrolling.
+        let linkedExercise = block.kind == .exercise
+            ? ATHLTHExerciseReferenceResolver.resolve(
+                block, in: exerciseLibrary.allExercises
+            ) : nil
+        let stepTitle: String
+        if let linkedExercise {
+            stepTitle = exerciseLibrary.localizedExerciseName(linkedExercise)
+        } else if block.kind == .exercise {
+            stepTitle = ATHLTHLocalization.isNorwegian
+                ? ATHLTHExerciseNameLocalization.norwegianName(
+                    for: block.exerciseSnapshot?.name ?? block.title
+                ) : block.exerciseSnapshot?.name ?? block.title
+        } else {
+            stepTitle = localizedTitle(block, compact: true)
+        }
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
                 Button {
@@ -927,9 +944,11 @@ struct ATHLTHWorkoutRecipePreview: View {
                     }
                 } label: {
                     HStack(alignment: .center, spacing: 11) {
-                        thumbnail(for: block, compact: isRecovery)
+                        thumbnail(
+                            for: block, compact: isRecovery, match: linkedExercise
+                        )
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(localizedTitle(block, compact: true))
+                            Text(stepTitle)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .multilineTextAlignment(.leading)
@@ -976,7 +995,7 @@ struct ATHLTHWorkoutRecipePreview: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(localizedTitle(block, compact: true))
+                .accessibilityLabel(stepTitle)
                 .accessibilityHint(block.kind == .exercise
                     ? tr("Double tap to expand exercise details",
                          "Dobbelttrykk for å utvide øvelsesdetaljer")
@@ -1060,8 +1079,13 @@ struct ATHLTHWorkoutRecipePreview: View {
                         selectedExercise = block
                     } label: {
                         Label(
-                            tr("Open exercise details", "Åpne øvelsen i biblioteket"),
-                            systemImage: "arrow.up.right.square"
+                            linkedExercise != nil
+                                ? tr("Open linked library exercise",
+                                     "Åpne koblet øvelse i biblioteket")
+                                : tr("View exercise information (not linked)",
+                                     "Se øvelsesinformasjon (ikke koblet)"),
+                            systemImage: linkedExercise != nil
+                                ? "checkmark.seal" : "info.circle"
                         )
                         .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity, minHeight: 40)
@@ -1099,11 +1123,10 @@ struct ATHLTHWorkoutRecipePreview: View {
     @ViewBuilder
     private func thumbnail(
         for block: WorkoutTemplateBlock,
-        compact: Bool = false
+        compact: Bool = false,
+        match: ExerciseLibraryEntry?
     ) -> some View {
-        if let match = ATHLTHExerciseReferenceResolver.resolve(
-            block, in: exerciseLibrary.allExercises
-        ) {
+        if let match {
             ExerciseArtwork(entry: match, size: compact ? 32 : 39)
         } else {
             Image(systemName: blockIcon(block))
