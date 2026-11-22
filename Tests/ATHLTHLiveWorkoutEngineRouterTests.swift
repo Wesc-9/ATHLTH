@@ -335,4 +335,29 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
         XCTAssertEqual(ATHLTHWorkoutSportMode(category: "meditation"), .meditation)
     }
 
+
+    func testRouterAndWatchUseSameStageBoundaryForHybridRecipe() throws {
+        let id = UUID()
+        let planned = [
+            block("Warm-up", kind: .run, sequence: 1, phase: .warmup),
+            block("Rest", kind: .rest, sequence: 2, phase: .recovery),
+            block("Strength", kind: .exercise, sequence: 3),
+            block("Cool-down", kind: .run, sequence: 4, phase: .cooldown)
+        ]
+        for index in planned.indices {
+            let decision = try XCTUnwrap(ATHLTHWorkoutStagePolicy.afterStage(
+                at: index, totalStages: planned.count
+            ))
+            let route = ATHLTHLiveWorkoutEngineRouter.advance(
+                workoutID: id, blocks: planned, from: index
+            )
+            switch decision {
+            case .advance(let nextIndex):
+                XCTAssertEqual(route?.next.blockIndex, nextIndex)
+                XCTAssertEqual(route?.next.workoutID, id)
+            case .prescriptionComplete:
+                XCTAssertNil(route, "Finishing the plan must not create a new recording")
+            }
+        }
+    }
 }

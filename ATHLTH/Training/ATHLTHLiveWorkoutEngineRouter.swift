@@ -156,13 +156,15 @@ enum ATHLTHLiveWorkoutEngineRouter {
         blocks: [WorkoutTemplateBlock],
         from index: Int
     ) -> ATHLTHLiveWorkoutTransition? {
-        guard blocks.indices.contains(index),
-              blocks.indices.contains(index + 1),
+        guard let stageDecision = ATHLTHWorkoutStagePolicy.afterStage(
+                  at: index, totalStages: blocks.count
+              ),
+              case .advance(let nextIndex) = stageDecision,
               let previous = route(
                 workoutID: workoutID, blocks: blocks, index: index
               ),
               let next = route(
-                workoutID: workoutID, blocks: blocks, index: index + 1
+                workoutID: workoutID, blocks: blocks, index: nextIndex
               ),
               !previous.blockID.isEmpty, !next.blockID.isEmpty,
               previous.blockID != next.blockID,
