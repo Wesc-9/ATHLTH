@@ -5809,6 +5809,7 @@ struct ATHLTHTrainView: View {
     @State private var showingLibrary = false
     @State private var showingAllWorkoutCategories = false
     @State private var pendingWorkoutCategoryAction: ATHLTHTrainAllWorkoutCategoriesSheet.Action?
+    @State private var selectedTrainCompetitionActivity: ATHLTHQuickStartActivity?
     @State private var showingTrainIntervalComposer = false
     @State private var savedTrainIntervalTemplate: RunningWorkoutTemplate?
     @State private var personalLibrarySection: ATHLTHPersonalLibrarySection?
@@ -5934,6 +5935,25 @@ struct ATHLTHTrainView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
+            }
+            .sheet(item: $selectedTrainCompetitionActivity) { activity in
+                switch activity {
+                case .running:
+                    ATHLTHCompetitionCreationView(
+                        initialActivity: .running,
+                        advanced: settings.resolvedAdvancedSetup(for: .running)
+                    )
+                case .walking:
+                    ATHLTHCompetitionCreationView(
+                        initialActivity: .walking,
+                        advanced: settings.resolvedAdvancedSetup(for: .walking)
+                    )
+                case .strength:
+                    ATHLTHCompetitionCreationView(
+                        initialActivity: .strength,
+                        advanced: settings.resolvedAdvancedSetup(for: .strength)
+                    )
+                }
             }
             .sheet(isPresented: $showingTrainIntervalComposer, onDismiss: {
                 // The interval editor closes before the running quick-start
@@ -9882,8 +9902,12 @@ struct ATHLTHTrainView: View {
             handleQuickStart(.walking)
         case .freeStrength:
             handleQuickStart(.strength)
-        case .strengthLibrary:
+        case .strengthLibrary, .runningWorkouts:
             personalLibrarySection = .workouts
+        case .strengthExercises:
+            handleQuickStart(.strength)
+        case .competition(let activity):
+            selectedTrainCompetitionActivity = activity
         case .cycling:
             startCyclingQuick()
         case .freeTraining:

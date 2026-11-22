@@ -10,6 +10,9 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
         case freeWalk
         case freeStrength
         case strengthLibrary
+        case runningWorkouts
+        case strengthExercises
+        case competition(ATHLTHQuickStartActivity)
         case cycling
         case freeTraining
         case custom(CustomQuickWorkoutActivity)
@@ -296,6 +299,13 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
             actionRow(icon: "timer", title: tr("Intervals", "Intervall"),
                       detail: tr("Build intervals and recovery", "Lag drag og pauser"),
                       action: .runIntervals)
+            actionRow(icon: "list.bullet.clipboard",
+                      title: tr("Training workout", "Treningsøkt"),
+                      detail: tr("Choose a saved running workout", "Velg en lagret løpeøkt"),
+                      action: .runningWorkouts)
+            actionRow(icon: "trophy", title: tr("Competition", "Konkurranse"),
+                      detail: tr("Duel, league or cup", "Duell, liga eller cup"),
+                      action: .competition(.running))
         case .walking:
             actionRow(icon: "figure.walk", title: tr("Free walk", "Fri gåtur"),
                       detail: tr("Walk without a route", "Gå uten valgt rute"),
@@ -307,6 +317,9 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
                           detail: tr("Browse walking routes", "Velg en turrute"))
             }
             .buttonStyle(.plain)
+            actionRow(icon: "trophy", title: tr("Competition", "Konkurranse"),
+                      detail: tr("Duel, league or cup", "Duell, liga eller cup"),
+                      action: .competition(.walking))
         case .strength:
             actionRow(icon: "dumbbell.fill",
                       title: tr("Free strength", "Fri styrketrening"),
@@ -316,6 +329,12 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
             actionRow(icon: "square.grid.2x2", title: tr("Saved workouts", "Lagrede økter"),
                       detail: tr("Browse your workout library", "Se treningsbiblioteket"),
                       action: .strengthLibrary)
+            actionRow(icon: "plus.circle", title: tr("Add exercises", "Legg til øvelser"),
+                      detail: tr("Build an exercise workout", "Bygg en økt med øvelser"),
+                      action: .strengthExercises)
+            actionRow(icon: "trophy", title: tr("Competition", "Konkurranse"),
+                      detail: tr("Duel, league or cup", "Duell, liga eller cup"),
+                      action: .competition(.strength))
         case .freeTraining, .custom, .cycling, .swimming, .yoga, .meditation:
             EmptyView()
         }

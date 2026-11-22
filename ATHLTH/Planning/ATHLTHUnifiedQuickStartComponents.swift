@@ -3,8 +3,9 @@ import SwiftUI
 /// The start UI has one vocabulary for running, walking and strength.
 /// These choices only determine what gets selected in the existing launch
 /// coordinator; they never create a second workout or recording engine.
-enum ATHLTHQuickStartActivity: Hashable {
+enum ATHLTHQuickStartActivity: Hashable, Identifiable {
     case running, walking, strength
+    var id: Self { self }
 
     var title: String {
         switch self {
