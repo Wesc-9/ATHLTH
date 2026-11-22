@@ -80,7 +80,7 @@ jobs:
       # Historical release branches preserve their existing upload contract.
       # v2.2.5/v2.2.6 cannot enter signing/archive until ALL test gates pass.
       - name: Verify full 2.2.x release gate on the exact commit
-        if: github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.6' || github.ref == 'refs/heads/release/v2.2.7'
+        if: github.ref == 'refs/heads/release/v2.2.5' || (github.ref == 'refs/heads/release/v2.2.6' || github.ref == 'refs/heads/release/v2.2.7') || github.ref == 'refs/heads/release/v2.2.7'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -229,7 +229,7 @@ jobs:
       # The branch can advance while waiting for a macOS runner. Do not
       # sign or upload an obsolete commit after the release gate passed.
       - name: Recheck release branch before signing
-        if: github.ref == 'refs/heads/release/v2.2.6' || github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.7'
+        if: (github.ref == 'refs/heads/release/v2.2.6' || github.ref == 'refs/heads/release/v2.2.7') || github.ref == 'refs/heads/release/v2.2.5' || github.ref == 'refs/heads/release/v2.2.7'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
