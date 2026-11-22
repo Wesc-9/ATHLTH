@@ -920,11 +920,17 @@ final class LibraryFavoritesStore: ObservableObject {
                     .execute()
                     .value
 
+            // A slow response from account A must never replace account B's
+            // favorites after sign-out or a rapid account switch.
+            guard activeUserID == user.id,
+                  client.auth.currentUser?.id == user.id else { return }
             favorites = rows
             lastRefreshAt = Date()
             persistLocal()
             errorMessage = nil
         } catch {
+            guard activeUserID == user.id,
+                  client.auth.currentUser?.id == user.id else { return }
             // Favorites remain fully usable from the account-local cache.
             // The next refresh retries Supabase automatically.
             errorMessage = error.localizedDescription
